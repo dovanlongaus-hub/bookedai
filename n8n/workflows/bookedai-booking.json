@@ -1,0 +1,72 @@
+{
+  "name": "BookedAI Booking Intake",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bookedai-booking",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "1b3d2f7d-4b2f-4a90-a2fb-d3933f5f4b5d",
+      "name": "Booking Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        240,
+        300
+      ],
+      "webhookId": "bookedai-booking"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.bookedai.au/api/automation/booking-callback",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "={{ 'Bearer ' + $env.N8N_WEBHOOK_BEARER_TOKEN }}"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ status: 'processed_by_n8n', booking_reference: (((($json.body || {}).metadata || {}).booking_reference) || $json.body.conversation_id || null), conversation_id: ($json.body || {}).conversation_id || null, service_id: (((($json.body || {}).metadata || {}).service_id) || null), service: (((($json.body || {}).booking || {}).requested_service) || null), customer_email: (((($json.body || {}).contact || {}).email) || null), customer_name: (((($json.body || {}).contact || {}).name) || null), payment_status: (((($json.body || {}).metadata || {}).payment_status) || null), payment_url: (((($json.body || {}).metadata || {}).payment_url) || null), summary: (($json.body || {}).ai_summary || ($json.body || {}).customer_message || 'BookedAI booking received'), reply: (($json.body || {}).customer_reply || 'BookedAI booking received by automation workflow.') }) }}",
+        "options": {}
+      },
+      "id": "7e4d3704-0e20-46dc-a0a6-b69f86a3d493",
+      "name": "Notify Backend",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 3,
+      "position": [
+        560,
+        300
+      ]
+    }
+  ],
+  "connections": {
+    "Booking Webhook": {
+      "main": [
+        [
+          {
+            "node": "Notify Backend",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "active": false,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "",
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "tags": []
+}

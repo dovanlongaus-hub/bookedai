@@ -1,0 +1,224 @@
+{{on-document "keydown" this.maybeFocusInput}}
+
+<div ...attributes>
+  <form class="relative w-full" {{on "submit" this.viewAllResults}}>
+    <X::DropdownList
+      @items={{this.items}}
+      @offset={{hash mainAxis=0 crossAxis=2}}
+      @placement="bottom-end"
+      @matchAnchorWidth={{hash enabled=true additionalWidth=4}}
+      @inputIsShown={{false}}
+      @isLoading={{this.maybeSearch.isRunning}}
+      class="search-popover theme--neutral
+        {{unless (or this.docMatches this.projectMatches) 'no-matches'}}"
+    >
+      <:anchor as |dd|>
+        <Hds::Form::TextInput::Base
+          data-test-global-search-input
+          {{did-insert dd.registerAnchor}}
+          {{did-insert this.registerInput}}
+          {{on "input" (perform this.search dd)}}
+          {{on "mousedown" (fn this.maybeCloseDropdown dd)}}
+          {{on "keydown" (fn this.maybeSubmitForm dd)}}
+          {{on "focusin" (fn this.maybeOpenDropdown dd)}}
+          {{on "focusin" (perform this.maybeSearch)}}
+          @type="search"
+          @value={{this.query}}
+          name="query"
+          size="25"
+          placeholder="Search Hermes..."
+          aria-label="Search Hermes..."
+          aria-controls={{dd.ariaControls}}
+          aria-expanded={{dd.contentIsShown}}
+          aria-haspopup="listbox"
+        />
+        {{#unless this.query}}
+          <span class="global-search-shortcut-affordance">
+            ⌘K
+          </span>
+        {{/unless}}
+      </:anchor>
+
+      <:header>
+
+        {{#if this.productAreaMatch}}
+          <h5>Product/Area</h5>
+          <div
+            data-test-product-area-hits
+            id={{this.productAreaID}}
+            class="global-search-section"
+          >
+            {{! placed by in-element}}
+          </div>
+        {{/if}}
+
+        {{#if this.projectMatches.length}}
+          <h5>Projects</h5>
+          <ul
+            data-test-project-hits
+            id={{this.projectsID}}
+            class="global-search-section"
+          >
+            {{! placed by in-element}}
+          </ul>
+        {{/if}}
+
+        {{#if this.docMatches}}
+          <h5>Documents</h5>
+          <ul
+            data-test-document-hits
+            id={{this.documentsID}}
+            class="global-search-section"
+          >
+            {{! placed by in-element}}
+          </ul>
+
+        {{/if}}
+
+        {{#if this.docMatches}}
+          <div
+            data-test-view-all-hits-container
+            id={{this.viewAllID}}
+            class="global-search-sectionX"
+          >
+            {{! placed by in-element}}
+          </div>
+        {{/if}}
+      </:header>
+
+      <:item as |dd|>
+
+        {{!
+            We use this property to catch the "view all results" and "view all [productArea] documents" items and, for semantic purposes, render them outside of the DropdownList's primary `ul/ol` element while still retaining the keyboard navigability provided by the DropdownList component.
+           }}
+        {{#unless this.searchInputIsEmpty}}
+          {{#in-element
+            (html-element
+              (if
+                dd.attrs.hit
+                this.projectsSelector
+                (if
+                  dd.attrs.productAreaName
+                  this.productAreaSelector
+                  (if
+                    dd.attrs.viewAllResults
+                    this.viewAllSelector
+                    this.documentsSelector
+                  )
+                )
+              )
+            )
+            insertBefore=null
+          }}
+            {{#if dd.attrs.hit}}
+              {{! Project result }}
+              <li>
+                <dd.LinkTo
+                  data-test-project-hit
+                  class="flex items-center gap-2 px-3"
+                  @route="authenticated.projects.project"
+                  @model={{dd.attrs.hit.objectID}}
+                >
+                  <div class="mt-px flex shrink-0 px-0.5">
+                    <Project::StatusIcon @status={{dd.attrs.hit.status}} />
+                  </div>
+                  <div class="overflow-hidden">
+                    <h4
+                      class="truncate font-semibold text-color-foreground-strong"
+                    >
+                      {{highlight-text dd.attrs.hit.title this.query}}
+                    </h4>
+                  </div>
+                </dd.LinkTo>
+              </li>
+            {{else if dd.attrs.viewAllResults}}
+              {{! View all results link }}
+              <dd.LinkTo
+                data-test-view-all-results-link
+                {{did-insert this.registerViewAllResultsLink}}
+                @route="authenticated.results"
+                @query={{this.viewAllResultsQuery}}
+              >
+                <div
+                  class="flex items-center gap-1.5 px-1 pt-2 pb-2.5 text-body-100 text-color-foreground-faint"
+                >
+                  <span>View all results</span>
+                  <FlightIcon
+                    @name="arrow-right"
+                    class="text-color-foreground-disabled"
+                  />
+                </div>
+              </dd.LinkTo>
+            {{else if dd.attrs.productAreaName}}
+              {{! Product area  }}
+              <dd.LinkTo
+                data-test-product-area-hit
+                @route="authenticated.product-areas.product-area"
+                @model={{dasherize dd.attrs.productAreaName}}
+                class="flex items-center gap-2 px-3 font-semibold"
+              >
+                <Product::Avatar @product={{dd.attrs.productAreaName}} />
+                <h4 class="text-color-foreground-strong">
+                  {{highlight-text dd.attrs.productAreaName this.query}}
+                </h4>
+              </dd.LinkTo>
+            {{else}}
+              {{! Document }}
+              <li>
+                <dd.LinkTo
+                  data-test-document-hit
+                  @route="authenticated.document"
+                  @model={{dd.attrs.objectID}}
+                  class="flex h-[74px] w-full gap-2 py-2 px-3"
+                >
+                  <Product::Avatar @product={{dd.attrs.product}} />
+                  <div class="grid w-full gap-px overflow-hidden">
+                    <h4 class="global-search-result-title">
+                      {{highlight-text dd.attrs.title this.query}}
+                    </h4>
+                    <div
+                      class="truncate text-body-100 text-color-foreground-faint"
+                    >
+                      <span>
+                        {{dd.attrs.status}}
+                      </span>
+                      <span class="text-color-foreground-disabled">·</span>
+                      <span>
+                        {{dd.attrs.docType}}
+                      </span>
+                      <span class="text-color-foreground-disabled">·</span>
+                      <span>
+                        {{dd.attrs.product}}
+                      </span>
+                      {{#let (get dd.attrs.owners 0) as |owner|}}
+                        {{#if owner}}
+                          <span class="text-color-foreground-disabled">·</span>
+                          <span>
+                            {{or (get-model-attr "person.name" owner) owner}}
+                          </span>
+                        {{/if}}
+
+                      {{/let}}
+                    </div>
+                    {{#if dd.attrs._snippetResult.content.value}}
+                      <Doc::Snippet
+                        data-test-search-result-snippet
+                        @snippet={{dd.attrs._snippetResult.content.value}}
+                        class="truncate"
+                      />
+                    {{/if}}
+                  </div>
+                </dd.LinkTo>
+              </li>
+            {{/if}}
+          {{/in-element}}
+        {{/unless}}
+      </:item>
+      <:no-matches>
+        <div data-test-no-matches class="x-dropdown-list-default-empty-state">
+          No matches
+        </div>
+      </:no-matches>
+    </X::DropdownList>
+  </form>
+</div>

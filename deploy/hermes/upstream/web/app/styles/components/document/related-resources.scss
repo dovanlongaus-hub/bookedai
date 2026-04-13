@@ -1,0 +1,106 @@
+.related-resources-list {
+  @apply mt-0.5 w-full;
+
+  .related-resource-inner {
+    @apply relative w-full;
+
+    &:hover:not(.disabled):not(:focus),
+    &:focus-within {
+      .related-resource-link {
+        @apply border border-color-border-primary bg-color-page-primary;
+      }
+    }
+  }
+
+  .related-resource {
+    @apply relative flex w-full;
+
+    .highlight-affordance {
+      @apply rounded;
+    }
+  }
+
+  .related-resource-link {
+    @apply relative grid items-start justify-start gap-2 rounded py-[5px];
+    @apply -ml-[8px] -mr-[4px] w-[calc(100%+12px)] pl-[8px] pr-3;
+    @apply outline-offset-[3px];
+    grid-template-columns: 22px auto;
+
+    .hermes-document + .external-resource {
+      @apply mt-1.5;
+    }
+  }
+
+  .related-resource-link {
+    @apply relative grid items-start justify-start gap-2 rounded py-[5px];
+    @apply -ml-[8px] -mr-[4px] w-[calc(100%+12px)] pl-[8px] pr-3;
+    @apply outline-offset-[3px];
+    grid-template-columns: 22px auto;
+
+    .hermes-document + .external-resource {
+      @apply mt-1.5;
+    }
+  }
+}
+
+.related-resources-modal-container {
+  @apply relative w-full px-6;
+}
+
+.add-external-resource-container {
+  @apply relative flex w-full items-center;
+  @apply mt-6 px-10;
+  @apply h-[228px];
+  animation: fadeIn 400ms ease-out;
+
+  &::before,
+  &::after {
+    content: "";
+    @apply absolute top-0 left-0 z-[-1] h-full w-full rounded-lg border;
+  }
+
+  &::before {
+    @apply border-color-border-primary bg-color-page-faint opacity-0;
+    @apply hds-elevation-low;
+    animation: fadeIn 200ms ease-out 500ms forwards;
+  }
+
+  &::after {
+    @apply border-color-border-highlight bg-color-surface-highlight;
+    animation:
+      fadeIn 400ms ease-out,
+      scaleIn 500ms ease-out,
+      fadeOut 500ms ease-out 600ms forwards;
+  }
+}
+
+.external-resource-title-input {
+  @apply h-11 px-2.5 text-display-300 font-semibold;
+
+  &::placeholder {
+    @apply opacity-50;
+  }
+}
+
+.external-resource-url {
+  @apply relative w-full text-color-foreground-faint;
+  @apply mb-5 pl-6;
+
+  .external-resource-favicon {
+    @apply h-4 w-4;
+    @apply absolute left-0 top-1/2 -translate-y-1/2;
+  }
+}
+
+.related-resources-modal-body-header {
+  @apply w-full text-center text-display-300 font-semibold text-color-foreground-faint opacity-75;
+}
+
+.related-document-option {
+  @apply grid h-[74px] w-full place-items-center rounded py-1.5 px-3;
+}
+
+.highlight-affordance {
+  @apply absolute top-0 left-0 right-0 bottom-0 z-[-1];
+  @apply border border-color-border-highlight bg-color-surface-highlight;
+}

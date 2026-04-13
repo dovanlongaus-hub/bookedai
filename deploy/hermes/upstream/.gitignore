@@ -1,0 +1,20 @@
+/config.hcl
+/hermes
+
+# Google OAuth 2.0
+/credentials.json
+/token.json
+
+# macOS & local
+.DS_Store
+.env
+
+# Web application
+node_modules
+/web/.pnp.*
+/web/.yarn/*
+/web/.eslintcache
+/web/dist
+
+# Terraform related
+.terraform

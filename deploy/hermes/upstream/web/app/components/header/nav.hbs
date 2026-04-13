@@ -1,0 +1,107 @@
+<nav class="header-nav x-container">
+  <LinkTo @route="authenticated.dashboard" class="header-nav-logo">
+    <HermesLogo />
+  </LinkTo>
+
+  <div class="primary-links">
+    <LinkTo
+      data-test-nav-link="projects"
+      @route="authenticated.projects"
+      @current-when="authenticated.projects.index"
+      @query={{this.defaultProjectsScreenQueryParams}}
+    >
+      Projects
+    </LinkTo>
+    <LinkTo
+      data-test-nav-link="all"
+      @route="authenticated.documents"
+      @current-when="authenticated.documents"
+      @query={{this.defaultBrowseScreenQueryParams}}
+    >
+      All Docs
+    </LinkTo>
+    <LinkTo
+      data-test-nav-link="my"
+      @route="authenticated.my.documents"
+      @current-when="authenticated.my.documents"
+      @query={{this.defaultMyQueryParams}}
+    >
+      My Docs
+    </LinkTo>
+  </div>
+
+  <Header::Search @query={{@query}} class="global-search" />
+
+  <div class="user-buttons">
+    <Hds::Button
+      data-test-create-new-button
+      @route="authenticated.new"
+      @text="New"
+      @icon="plus"
+      class="pl-2.5 pr-4"
+    />
+    <div class="relative flex">
+      <X::DropdownList
+        @items={{this.dropdownListItems}}
+        @placement="bottom-end"
+        class="user-dropdown"
+      >
+        <:anchor as |dd|>
+          <dd.ToggleAction
+            @hasChevron={{true}}
+            aria-label="User menu"
+            class="user-menu-button -mr-1"
+          >
+            <Person::Avatar
+              @email={{this.profile.email}}
+              @size="large"
+              data-test-user-menu-toggle
+            />
+          </dd.ToggleAction>
+          {{#if this.userMenuHighlightIsShown}}
+            <Header::UserMenuHighlight />
+          {{/if}}
+        </:anchor>
+        <:header>
+          <div
+            {{did-insert this.onDropdownOpen}}
+            class="mb-1 border-b border-b-color-border-primary py-3.5 px-5"
+          >
+            <div class="font-semibold" data-test-user-menu-title>
+              {{this.profile.name}}
+            </div>
+            <div class="text-color-foreground-faint" data-test-user-menu-email>
+              {{this.profile.email}}
+            </div>
+          </div>
+        </:header>
+        <:item as |dd|>
+          <div
+            data-test-user-menu-item={{dasherize dd.attrs.label}}
+            class="w-full"
+          >
+            {{#if dd.attrs.route}}
+              <dd.LinkTo @route={{dd.attrs.route}}>
+                {{dd.attrs.label}}
+                {{#if dd.attrs.isNew}}
+                  <Hds::Badge
+                    @text="New"
+                    class="highlighted-new-badge ml-1.5"
+                  />
+                {{/if}}
+              </dd.LinkTo>
+            {{else if dd.attrs.href}}
+              <dd.ExternalLink href={{dd.attrs.href}} @iconIsShown={{true}}>
+                {{dd.attrs.label}}
+              </dd.ExternalLink>
+            {{else if dd.attrs.action}}
+              <dd.Action {{on "click" dd.attrs.action}}>
+                {{dd.attrs.label}}
+              </dd.Action>
+            {{/if}}
+          </div>
+        </:item>
+      </X::DropdownList>
+    </div>
+  </div>
+</nav>

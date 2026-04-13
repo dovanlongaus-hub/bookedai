@@ -1,0 +1,19 @@
+services:
+  kong:
+    ports: []
+
+  db:
+    environment:
+      APP_DB_NAME: ${APP_DB_NAME}
+      APP_DB_USER: ${APP_DB_USER}
+      APP_DB_PASSWORD: ${APP_DB_PASSWORD}
+      N8N_DB_NAME: ${N8N_DB_NAME}
+      N8N_DB_USER: ${N8N_DB_USER}
+      N8N_DB_PASSWORD: ${N8N_DB_PASSWORD}
+    volumes:
+      - ./volumes/db/init/99-bookedai-init.sh:/docker-entrypoint-initdb.d/init-scripts/100-bookedai-init.sh:ro,Z
+
+networks:
+  default:
+    external: true
+    name: bookedai_internal

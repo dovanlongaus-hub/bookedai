@@ -1,0 +1,196 @@
+@use "components/action";
+
+@use "@hashicorp/design-system-components";
+
+@use "./variables";
+
+@use "./body";
+@use "./animations";
+@use "./typography";
+
+@use "components/dashboard";
+@use "components/person";
+@use "components/new";
+@use "components/toolbar";
+@use "components/x-tooltip";
+@use "components/popover";
+@use "components/footer";
+@use "components/nav";
+@use "components/segmented-control";
+@use "components/x/dropdown/list";
+@use "components/x/dropdown/list-item";
+@use "components/x/dropdown/toggle-select";
+@use "components/editable-field";
+@use "components/modal-dialog";
+@use "components/multiselect";
+@use "components/overflow-menu";
+@use "components/page";
+@use "components/hds-table";
+@use "components/header/active-filter-list";
+@use "components/header/active-filter-list-item";
+@use "components/header/search";
+@use "components/doc/thumbnail";
+@use "components/doc/folder-affordance";
+@use "components/doc/tile" as doc-tile;
+@use "components/doc/status";
+@use "components/table/sortable-header";
+@use "components/preview-card";
+@use "components/project";
+@use "components/interactive-card";
+@use "components/notification";
+@use "components/sidebar";
+@use "components/document/related-resources";
+@use "components/hds-badge";
+@use "components/jira-widget";
+@use "components/product-link";
+@use "components/projects/tile" as project-tile;
+@use "components/header/facet-dropdown";
+@use "components/floating-u-i/content";
+@use "hashicorp/product-badge";
+@use "hashicorp/hermes-logo";
+@use "hermes/avatar";
+@use "routes/results";
+@use "routes/my";
+
+@use "./buttons";
+
+@use "./ember-power-select-theme";
+
+@use "./error-404";
+@use "./hds-overrides";
+
+@use "tailwindcss/base";
+@use "tailwindcss/components";
+@use "tailwindcss/utilities";
+
+@layer utilities {
+  .hermes-h4 {
+    @apply text-body-100 font-medium uppercase tracking-wide text-color-foreground-faint;
+  }
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  border-width: 0;
+  border-style: solid;
+  border-color: transparent;
+}
+
+dialog {
+  @apply m-auto; // center the dialog
+  @apply -translate-y-5; // move it up a bit
+}
+
+body,
+button {
+  font-family: var(--token-typography-font-stack-display);
+  font-size: var(--token-typography-body-200-font-size);
+}
+
+body {
+  line-height: var(--token-typography-body-200-line-height);
+  color: var(--token-color-foreground-primary);
+}
+
+a {
+  text-decoration: none;
+  color: inherit;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+.x-container {
+  @apply mx-auto w-full max-w-screen-lg px-8;
+}
+
+h1 {
+  @apply text-display-500 font-bold text-color-foreground-strong;
+
+  + p {
+    @apply text-body-300;
+  }
+}
+
+.divided-list {
+  > li {
+    @apply border-t border-t-transparent;
+  }
+
+  > li:not(:first-child) {
+    @apply border-t-color-border-faint;
+  }
+}
+
+.horizontally-divided-list {
+  li {
+    @apply border-l border-l-transparent;
+  }
+
+  > li:not(:first-child) {
+    @apply border-l-color-border-faint;
+  }
+}
+
+.visible-with-group {
+  @apply group-focus-within:visible group-focus-within:opacity-100 group-hover:visible group-hover:opacity-100;
+
+  &:hover,
+  &:focus-within {
+    @apply visible opacity-100;
+  }
+}
+
+// Prevent the Flight Icons shim from taking up space
+.flight-sprite-container {
+  position: fixed;
+  top: 0;
+  right: 0;
+}
+
+// HACK! This should be imported dynamically from @hashicorp/ember-flight-icons
+// but it's not and this is the fastest way to ship milestone 2 on time.
+.flight-icon {
+  display: block;
+}
+
+.flight-icon-display-inline {
+  display: inline-block;
+}
+
+@keyframes hds-flight-icon-animation-rotation {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.flight-icon--animation-loading {
+  animation: hds-flight-icon-animation-rotation 9s linear infinite;
+}
+
+.flight-icon--animation-running {
+  animation: hds-flight-icon-animation-rotation 9s linear infinite;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .flight-icon--animation-loading {
+    animation-duration: 0.7s;
+  }
+
+  .flight-icon--animation-running {
+    animation-duration: 1s;
+  }
+}
+
+.flight-sprite-container {
+  position: absolute;
+  width: 0;
+  height: 0;
+  visibility: hidden;
+}

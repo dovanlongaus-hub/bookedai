@@ -1,0 +1,50 @@
+<Hds::Modal
+  ...attributes
+  @onClose={{@close}}
+  @color={{@color}}
+  @isDismissDisabled={{this.taskIsRunning}}
+  as |M|
+>
+  <M.Header>
+    {{@headerText}}
+  </M.Header>
+  <M.Body>
+    {{#if @bodyText}}
+      {{@bodyText}}
+    {{/if}}
+
+    {{yield (hash taskIsRunning=this.taskIsRunning)}}
+
+    {{#if this.errorIsShown}}
+      <ModalAlertError
+        data-test-modal-error
+        @onDismiss={{this.resetErrors}}
+        @title={{this.errorTitle}}
+        @description={{this.errorDescription}}
+      />
+    {{/if}}
+  </M.Body>
+  {{#if this.footerIsShown}}
+    <M.Footer data-test-document-modal-footer as |F|>
+      <Hds::ButtonSet>
+        <Hds::Button
+          data-test-document-modal-primary-button
+          @text={{this.primaryButtonText}}
+          @color="primary"
+          @icon={{if this.taskIsRunning "loading" @taskButtonIcon}}
+          disabled={{or @taskButtonIsDisabled this.taskIsRunning}}
+          {{on "click" (perform this.task)}}
+        />
+        {{#unless @secondaryButtonIsHidden}}
+          <Hds::Button
+            data-test-document-modal-secondary-button
+            @text="Cancel"
+            @color="secondary"
+            disabled={{this.taskIsRunning}}
+            {{on "click" F.close}}
+          />
+        {{/unless}}
+      </Hds::ButtonSet>
+    </M.Footer>
+  {{/if}}
+</Hds::Modal>

@@ -1,0 +1,22 @@
+<Action
+  data-test-x-dropdown-list-toggle-action
+  {{did-insert @registerAnchor}}
+  {{on "keydown" @onTriggerKeydown}}
+  {{on "click" @toggleContent}}
+  disabled={{@disabled}}
+  aria-controls={{@ariaControls}}
+  aria-expanded={{@contentIsShown}}
+  aria-haspopup="listbox"
+  class="{{if @hasChevron 'flex items-center gap-1'}}
+    {{if @contentIsShown 'open'}}
+    "
+  ...attributes
+>
+  {{yield}}
+  {{#if @hasChevron}}
+    <FlightIcon
+      data-test-toggle-action-chevron
+      @name={{if @contentIsShown "chevron-up" "chevron-down"}}
+    />
+  {{/if}}
+</Action>

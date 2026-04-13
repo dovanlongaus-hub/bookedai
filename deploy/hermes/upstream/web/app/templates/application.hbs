@@ -1,0 +1,18 @@
+{{page-title "Hermes"}}
+<div id="dialog-container" class="dialog-container"></div>
+
+<Notification />
+
+<div class="flex min-h-screen flex-col">
+  {{outlet}}
+</div>
+
+<Modals />
+
+<div class="absolute top-0 left-0">
+  <AnimatedOrphans />
+</div>
+
+{{#if this.animatedToolsAreShown}}
+  <AnimatedTools />
+{{/if}}

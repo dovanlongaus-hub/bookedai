@@ -1,0 +1,22 @@
+{{set-body-class "results"}}
+{{page-title this.pageTitle}}
+
+<div class="mb-6 flex w-full items-start gap-8">
+  <h1 data-test-results-headline class="w-full text-display-500">
+    Results
+    {{#if this.q}}
+      for
+      <mark>{{this.q}}</mark>
+    {{/if}}
+  </h1>
+  <Results::Nav @scope={{this.scope}} @q={{this.q}} class="shrink-0" />
+</div>
+
+<Header::Toolbar @scope={{this.scope}} @facets={{this.facets}} />
+
+<Results
+  @docResults={{this.model.docResults}}
+  @projectResults={{this.model.projectResults}}
+  @productResults={{this.model.productResults}}
+  @query={{this.q}}
+/>

@@ -1,0 +1,74 @@
+// Design System Overrides (this should be limited to workarounds)
+.hds-typography-body-200.hds-form-select {
+  padding: var(--token-form-control-padding);
+  padding-right: calc(
+    var(--token-form-control-padding) + 24px
+  ); // extra space for the icon
+}
+
+.hds-dropdown-toggle-button .hds-button__icon,
+.hds-dropdown-toggle-chevron > svg {
+  transition: none !important;
+}
+
+.hds-link-standalone.small-external-link {
+  @apply font-regular;
+
+  .hds-link-standalone__text {
+    @apply text-body-100;
+  }
+}
+/* Maintain contrast across hover and focus states */
+.hds-badge-count--color-neutral.hds-badge-count--type-filled {
+  &:not(.checkable-item-count) {
+    @apply mix-blend-multiply;
+  }
+}
+
+.x-dropdown-list-item-link {
+  &.is-aria-selected {
+    .hds-badge-count--color-neutral.hds-badge-count--type-filled {
+      @apply bg-white bg-opacity-10 text-color-foreground-high-contrast;
+    }
+  }
+}
+
+.hds-badge-dropdown {
+  @apply pr-6;
+
+  + .dropdown-caret {
+    @apply absolute right-1.5 top-1/2 -translate-y-1/2;
+  }
+}
+
+a.hds-button {
+  &:hover,
+  &:focus,
+  &:active {
+    @apply no-underline;
+  }
+}
+
+.hds-button {
+  &.pill-button,
+  &.pill-button::before {
+    @apply rounded-l-full rounded-r-full;
+  }
+}
+
+.hds-alert--type-inline {
+  &.hds-alert--color-success {
+    // hds-green-500/a20
+    border-color: #05422133;
+  }
+
+  &.hds-alert--color-warning {
+    // hds-amber-500/a20
+    border-color: #52270033;
+  }
+
+  &.hds-alert--color-critical {
+    // hds-red-500/a20
+    border-color: #52140a33;
+  }
+}

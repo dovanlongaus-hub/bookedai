@@ -1,0 +1,37 @@
+<div
+  data-test-doc-thumbnail
+  class="doc-thumbnail
+    {{this.size}}
+    {{if this.isObsolete 'obsolete'}}
+    rounded bg-color-palette-neutral-100"
+  ...attributes
+>
+  <img src="/images/document.png" class="h-auto w-full" />
+
+  <div class="absolute h-full w-full">
+    {{#if this.isObsolete}}
+      <Doc::FolderAffordance @size={{@size}} />
+    {{/if}}
+
+    {{#if (or this.isApproved this.isObsolete)}}
+      <div class="absolute w-full">
+        <FlightIcon
+          data-test-doc-status-icon
+          @name={{if this.isApproved "check-circle" "archive"}}
+          @size="24"
+          class="status-icon {{this.status}}"
+        />
+      </div>
+    {{/if}}
+
+    {{#if this.badgeIsShown}}
+      <Product::Avatar
+        data-test-product={{@product}}
+        data-test-doc-thumbnail-product-badge
+        @product={{@product}}
+        @size={{this.size}}
+        class="absolute left-0 bottom-0"
+      />
+    {{/if}}
+  </div>
+</div>

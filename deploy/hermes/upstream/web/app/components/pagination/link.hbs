@@ -1,0 +1,27 @@
+{{#if @disabled}}
+  <span
+    class="relative grid h-12 w-9 place-items-center
+      {{if @icon 'opacity-50' 'text-color-foreground-action'}}"
+  >
+    {{#if @icon}}
+      <FlightIcon @name={{@icon}} />
+    {{else}}
+      {{@page}}
+      <div
+        class="absolute bottom-0 left-1/2 h-0.5 w-6 -translate-x-1/2 bg-color-palette-blue-200"
+      ></div>
+    {{/if}}
+  </span>
+{{else}}
+  <LinkTo
+    data-test-pagination-link-type={{if @icon "icon" "text"}}
+    @query={{hash page=@page}}
+    class="grid h-12 w-9 place-items-center hover:text-color-foreground-strong"
+  >
+    {{#if @icon}}
+      <FlightIcon @name={{@icon}} />
+    {{else}}
+      {{@page}}
+    {{/if}}
+  </LinkTo>
+{{/if}}

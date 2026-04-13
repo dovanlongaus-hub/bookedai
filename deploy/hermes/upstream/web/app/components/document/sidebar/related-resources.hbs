@@ -1,0 +1,61 @@
+<RelatedResources
+  @items={{this.relatedResources}}
+  @isLoading={{this.loadRelatedResources.isRunning}}
+  @loadingHasFailed={{this.loadingHasFailed}}
+  @modalHeaderTitle={{@modalHeaderTitle}}
+  @modalInputPlaceholder={{@modalInputPlaceholder}}
+  @addResource={{this.addResource}}
+  @documentObjectID={{@objectID}}
+>
+  <:header as |rr|>
+    <Document::Sidebar::SectionHeader
+      {{did-insert (perform this.loadRelatedResources)}}
+      @title={{@headerTitle}}
+      @titleTooltipText={{this.titleTooltipText}}
+      @buttonIsHidden={{this.sectionHeaderButtonIsHidden}}
+      @buttonIsDisabled={{@docWasCreatedOffApp}}
+      @disabledButtonTooltipText="Only docs created in Hermes can add related resources"
+      @buttonAction={{rr.showModal}}
+    />
+  </:header>
+  <:list-loading>
+    <div class="h-[26px] pt-1.5">
+      <FlightIcon
+        data-test-related-resources-list-loading-icon
+        @name="loading"
+      />
+    </div>
+  </:list-loading>
+  <:list as |rr|>
+    <Document::Sidebar::RelatedResources::List
+      @items={{rr.items}}
+      @itemLimit={{@itemLimit}}
+      @showModal={{rr.showModal}}
+      @editingIsDisabled={{@editingIsDisabled}}
+    >
+      <:resource as |r|>
+        <Document::Sidebar::RelatedResources::ListItem
+          @resource={{r}}
+          @removeResource={{this.removeResource}}
+          @editResource={{this.editResource}}
+          @editingIsDisabled={{@editingIsDisabled}}
+        />
+      </:resource>
+    </Document::Sidebar::RelatedResources::List>
+  </:list>
+  <:list-error>
+    <div class="h-16">
+      <div class="failed-to-load-text">
+        Failed to load
+      </div>
+      <Hds::Button
+        data-test-related-resources-error-button
+        @color="secondary"
+        @size="small"
+        @text="Retry"
+        @icon="reload"
+        {{on "click" (perform this.loadRelatedResources)}}
+      />
+    </div>
+  </:list-error>
+</RelatedResources>

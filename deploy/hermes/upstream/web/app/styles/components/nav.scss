@@ -1,0 +1,111 @@
+.header-nav {
+  @apply relative flex w-full flex-wrap items-center justify-between md:flex-nowrap;
+
+  .header-nav-logo {
+    @apply order-1 mr-6 mt-3.5 flex shrink-0 items-center hover:text-color-foreground-strong md:mt-0 md:mr-0 md:h-16;
+  }
+
+  .primary-links {
+    @apply order-3 -ml-2.5 flex h-16 shrink-0 md:order-2 md:mx-6;
+
+    a {
+      @apply flex h-full items-center px-2.5 text-color-foreground-faint md:px-3.5;
+
+      &:hover {
+        @apply text-color-foreground-strong;
+      }
+
+      &.active {
+        @apply relative text-color-palette-blue-200;
+
+        /* Active indicator */
+        &::before {
+          content: "";
+          @apply absolute left-0 -bottom-px h-1 w-full bg-color-palette-blue-200;
+        }
+      }
+    }
+  }
+
+  .global-search {
+    @apply order-2 flex w-[calc(100%-9rem)] pt-3.5 md:order-3 md:w-full md:py-0;
+  }
+
+  .user-buttons {
+    @apply order-4 flex items-center justify-end gap-2.5 sm:ml-6 md:ml-8;
+  }
+
+  .user-dropdown {
+    li {
+      a,
+      button {
+        @apply px-4;
+      }
+    }
+  }
+
+  .user-menu-button {
+    &:hover {
+      .avatar {
+        box-shadow: 0 0 0 3px var(--token-color-border-strong);
+      }
+    }
+
+    &:focus,
+    &.open {
+      .avatar {
+        @apply shadow-focus-ring-action;
+      }
+    }
+  }
+
+  .user-menu-button {
+    &:hover,
+    &:focus,
+    &.open {
+      @apply outline-none;
+
+      .avatar {
+        @apply outline outline-1 outline-color-page-faint;
+      }
+    }
+  }
+
+  .user-menu-external-link {
+    @apply flex-row-reverse justify-end;
+
+    &:not(:hover) {
+      .hds-dropdown-list-item__interactive-icon {
+        @apply text-color-foreground-faint opacity-75;
+      }
+    }
+
+    .hds-dropdown-list-item__interactive-icon {
+      @apply mr-0 ml-1.5;
+    }
+
+    .hds-dropdown-list-item__interactive-text {
+      @apply flex-initial;
+    }
+  }
+
+  .search-dropdown {
+    @apply w-full min-w-[320px] max-w-none;
+  }
+
+  a {
+    @apply no-underline;
+
+    &.hds-button:hover {
+      @apply no-underline;
+    }
+  }
+
+  .is-aria-selected .highlighted-new-badge {
+    @apply bg-color-palette-alpha-300 mix-blend-normal;
+
+    .hds-badge__text {
+      @apply text-color-page-primary;
+    }
+  }
+}

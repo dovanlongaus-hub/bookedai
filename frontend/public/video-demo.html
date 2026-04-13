@@ -1,0 +1,232 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>BookedAI Video Demo | Salon Booking Flow</title>
+    <meta
+      name="description"
+      content="BookedAI video demo page for a salon booking flow: enquiry, options, slot selection, and confirmation."
+    />
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #020617;
+        --panel: rgba(15, 23, 42, 0.88);
+        --panel-border: rgba(51, 65, 85, 0.85);
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #38bdf8;
+        --accent-strong: #0ea5e9;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100vh;
+        font-family: "Segoe UI", Arial, sans-serif;
+        background:
+          radial-gradient(circle at top left, rgba(14, 165, 233, 0.22), transparent 30%),
+          linear-gradient(180deg, #020617 0%, #020617 100%);
+        color: var(--text);
+      }
+
+      main {
+        width: min(1100px, calc(100% - 32px));
+        margin: 0 auto;
+        padding: 56px 0 72px;
+      }
+
+      .panel {
+        border: 1px solid var(--panel-border);
+        border-radius: 32px;
+        background: var(--panel);
+        padding: 32px;
+        backdrop-filter: blur(16px);
+      }
+
+      .eyebrow {
+        margin: 0 0 12px;
+        font-size: 12px;
+        font-weight: 700;
+        letter-spacing: 0.2em;
+        text-transform: uppercase;
+        color: var(--accent);
+      }
+
+      h1 {
+        margin: 0;
+        font-size: clamp(40px, 6vw, 64px);
+        line-height: 1.02;
+      }
+
+      .lead {
+        max-width: 760px;
+        margin: 20px 0 0;
+        font-size: 18px;
+        line-height: 1.8;
+        color: var(--muted);
+      }
+
+      .grid {
+        display: grid;
+        gap: 24px;
+        margin-top: 32px;
+      }
+
+      .player {
+        width: 100%;
+        display: block;
+        border: 1px solid var(--panel-border);
+        border-radius: 24px;
+        background: #000;
+        margin-top: 28px;
+      }
+
+      @media (min-width: 860px) {
+        .grid {
+          grid-template-columns: 1.15fr 0.85fr;
+        }
+      }
+
+      .card {
+        border: 1px solid var(--panel-border);
+        border-radius: 24px;
+        background: rgba(2, 6, 23, 0.68);
+        padding: 24px;
+      }
+
+      h2 {
+        margin: 0 0 16px;
+        font-size: 24px;
+      }
+
+      ul {
+        margin: 0;
+        padding-left: 20px;
+        color: var(--muted);
+        line-height: 1.8;
+      }
+
+      li + li {
+        margin-top: 10px;
+      }
+
+      pre {
+        margin: 0;
+        overflow-x: auto;
+        white-space: pre-wrap;
+        word-break: break-word;
+        font-size: 14px;
+        line-height: 1.7;
+        color: #dbeafe;
+      }
+
+      .actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        margin-top: 28px;
+      }
+
+      .button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 18px;
+        padding: 14px 22px;
+        text-decoration: none;
+        font-weight: 700;
+      }
+
+      .button-primary {
+        background: var(--accent);
+        color: #082f49;
+      }
+
+      .button-primary:hover {
+        background: var(--accent-strong);
+      }
+
+      .button-secondary {
+        border: 1px solid var(--panel-border);
+        color: var(--text);
+        background: rgba(15, 23, 42, 0.78);
+      }
+
+      .note {
+        margin-top: 18px;
+        font-size: 14px;
+        color: var(--muted);
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <section class="panel">
+        <p class="eyebrow">Video Demo</p>
+        <h1>Salon Booking Flow Demo</h1>
+        <p class="lead">
+          This video demo page is designed for BookedAI.au and follows a customer
+          who needs a wedding haircut tomorrow. The flow shows enquiry,
+          available options, slot selection, and a confirmed booking with
+          BookedAI.
+        </p>
+
+        <video class="player" controls preload="metadata" playsinline>
+          <source src="/bookedai-salon-demo.mp4" type="video/mp4" />
+          Your browser does not support the video tag.
+        </video>
+
+        <div class="grid">
+          <article class="card">
+            <h2>Storyboard</h2>
+            <ul>
+              <li>Customer asks for a haircut booking needed tomorrow for a wedding.</li>
+              <li>BookedAI replies instantly with clear available time options.</li>
+              <li>The customer selects a preferred slot in a guided flow.</li>
+              <li>BookedAI confirms the booking and closes the conversation clearly.</li>
+            </ul>
+          </article>
+
+          <article class="card">
+            <h2>OpenAI Demo Prompt</h2>
+            <pre>from openai import OpenAI
+
+client = OpenAI()
+
+video = client.videos.create(
+    model="sora-2",
+    prompt="Create a 30-second style BookedAI demo for a salon customer who needs a wedding haircut tomorrow. Show the assistant presenting booking options, the customer selecting a time, and the booking being confirmed with BookedAI.",
+    size="1280x720",
+    seconds=20,
+)</pre>
+          </article>
+        </div>
+
+        <div class="actions">
+          <a class="button button-primary" href="/bookedai-salon-demo.mp4">
+            Open MP4 Link
+          </a>
+          <a class="button button-secondary" href="https://bookedai.au/">
+            Back to BookedAI.au
+          </a>
+          <a
+            class="button button-secondary"
+            href="mailto:ceo@bookedai.au?subject=BookedAI%20Salon%20Video%20Demo"
+          >
+            Request Full Demo
+          </a>
+        </div>
+
+        <p class="note">
+          This public page now hosts the live demo video and a direct MP4 link
+          for sharing.
+        </p>
+      </section>
+    </main>
+  </body>
+</html>

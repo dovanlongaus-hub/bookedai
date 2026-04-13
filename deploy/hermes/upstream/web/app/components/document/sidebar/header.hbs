@@ -1,0 +1,53 @@
+<div class="sidebar-header {{if @userHasScrolled 'scrolled'}}" ...attributes>
+  <LinkTo
+    data-test-sidebar-dashboard-link
+    class="quarternary-button sidebar-dashboard-link relative"
+    @route="authenticated.dashboard"
+    {{(if @isCollapsed (modifier "tooltip" "Dashboard" placement="right"))}}
+  >
+    <FlightIcon @name="hashicorp" @size={{if @isCollapsed "24"}} />
+    {{#unless @isCollapsed}}
+      <span
+        class="ml-[3px] border-l border-l-color-border-strong pl-2 text-body-300 font-semibold tracking-[-0.15px]"
+      >
+        Hermes
+      </span>
+    {{/unless}}
+  </LinkTo>
+  <div class="sidebar-header-icon-controls">
+    {{#if this.shareButtonIsShown}}
+      <CopyURLButton
+        data-test-sidebar-copy-url-button
+        data-test-copy-url-value={{@shareURL}}
+        @url={{@shareURL}}
+        @tooltipPlacement={{if @isCollapsed "right" "bottom"}}
+        @tooltipIsForcedOpen={{this.tooltipIsForcedOpen}}
+        @icon={{@shareButtonIcon}}
+        @tooltipText={{@shareButtonTooltipText}}
+        @isIconOnly={{true}}
+        class="quarternary-button"
+        id="sidebar-header-copy-url-button"
+      />
+    {{/if}}
+    <ExternalLink
+      data-test-sidebar-google-docs-link
+      class="quarternary-button"
+      href="https://docs.google.com/document/d/{{@document.objectID}}"
+      {{tooltip "Open in Google" placement=(if @isCollapsed "right" "bottom")}}
+    >
+      <FlightIcon @name="external-link" />
+    </ExternalLink>
+    <Action
+      data-test-sidebar-toggle-button
+      data-test-is-collapsed={{@isCollapsed}}
+      class="quarternary-button"
+      {{on "click" @toggleCollapsed}}
+      {{tooltip
+        (concat (if @isCollapsed "Expand" "Collapse") " sidebar")
+        placement=(if @isCollapsed "right" "bottom")
+      }}
+    >
+      <FlightIcon @name={{if @isCollapsed "sidebar-show" "sidebar-hide"}} />
+    </Action>
+  </div>
+</div>

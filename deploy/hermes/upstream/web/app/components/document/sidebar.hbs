@@ -1,0 +1,875 @@
+<Document::Sidebar::Header
+  @document={{@document}}
+  @isCollapsed={{@isCollapsed}}
+  @toggleCollapsed={{@toggleCollapsed}}
+  @userHasScrolled={{this.userHasScrolled}}
+  @shareButtonIsShown={{this.shareButtonIsShown}}
+  @shareButtonTooltipText={{this.temporaryShareButtonTooltipText}}
+  @shareButtonIcon={{this.temporaryShareButtonIcon}}
+  @shareURL={{this.shareURL}}
+/>
+
+{{#unless @isCollapsed}}
+  <div
+    class="sidebar-body"
+    {{on "scroll" this.onScroll}}
+    {{did-insert this.didInsertBody}}
+  >
+    <div class="sidebar-body-container">
+      {{! div to break the parent's space-y styles }}
+      <div>
+        {{! Add bgColor to make badge `multiply` work }}
+        <div class="mb-4 flex items-center space-x-1.5 bg-color-page-faint">
+
+          {{! Status }}
+          <X::DropdownList
+            data-test-doc-status-dropdown
+            @items={{array "In-Review" "Approved" "Obsolete"}}
+            @renderOut={{true}}
+            @offset={{hash mainAxis=3 crossAxis=-5}}
+            class="theme--neutral"
+          >
+            <:anchor as |dd|>
+              {{#if (and this.isOwner (not this.isDraft))}}
+                {{! Status dropdown (doc owner) }}
+                <div class="flex w-full items-center gap-1.5">
+                  <div class="flex items-center gap-2">
+                    <dd.ToggleAction
+                      disabled={{or
+                        this.editingIsDisabled
+                        this.changeDocumentStatus.isRunning
+                      }}
+                      data-test-doc-status-toggle
+                      data-test-icon={{this.draftVisibilityIcon}}
+                      class="hds-button hds-button--color-secondary
+                        {{dasherize this.status}}"
+                    >
+                      <Doc::Status
+                        data-test-doc-status
+                        @hideProgress={{true}}
+                        @status={{this.status}}
+                        {{! Make room for the chevron/running icon}}
+                        class="pr-7"
+                      />
+                      <FlightIcon
+                        @name={{if
+                          this.changeDocumentStatus.isRunning
+                          "running"
+                          "chevron-down"
+                        }}
+                        class="absolute right-1.5"
+                      />
+                    </dd.ToggleAction>
+                  </div>
+                </div>
+              {{else}}
+                {{! Read-only status }}
+                <Doc::Status
+                  data-test-doc-status
+                  @hideProgress={{true}}
+                  @status={{this.status}}
+                  @type={{if this.isDraft "inverted"}}
+                />
+              {{/if}}
+            </:anchor>
+            <:item as |dd|>
+              <dd.Action
+                data-test-doc-status-option
+                data-test-is-checked={{eq dd.attrs this.status}}
+                data-test-status={{dd.attrs}}
+                class="flex items-start gap-3 py-[1px] pl-1 pr-6"
+                {{on "click" (perform this.changeDocumentStatus dd.attrs)}}
+              >
+                <X::DropdownList::CheckableItem
+                  @isSelected={{eq dd.attrs this.status}}
+                  @checkmarkPosition="trailing"
+                  class="w-full"
+                >
+                  <div class="relative">
+
+                    <Doc::Status
+                      @status={{dd.attrs}}
+                      @hideProgress={{true}}
+                      class="w-full py-[5px] pl-2"
+                    />
+                    <div
+                      class="doc-status-fade pointer-events-none absolute right-0 top-0 h-full w-20 bg-gradient-to-l from-color-page-primary to-transparent"
+                    ></div>
+                  </div>
+                </X::DropdownList::CheckableItem>
+              </dd.Action>
+            </:item>
+          </X::DropdownList>
+
+          {{! visibility toggle/icon }}
+          {{#if this.isDraft}}
+            <X::DropdownList
+              data-test-draft-visibility-dropdown
+              @items={{this.draftVisibilityOptions}}
+              @selected={{this.draftVisibility}}
+              @renderOut={{true}}
+              @offset={{hash mainAxis=0 crossAxis=-7}}
+              class="w-[350px]"
+            >
+              <:anchor as |dd|>
+                {{#if this.isOwner}}
+                  <dd.ToggleAction
+                    data-test-draft-visibility-toggle
+                    data-test-icon={{this.draftVisibilityIcon}}
+                    class="quarternary-button draft-visibility-button z-10"
+                    disabled={{this.editingIsDisabled}}
+                    {{tooltip
+                      this.toggleDraftVisibilityTooltipText
+                      placement="bottom"
+                    }}
+                    @hasChevron={{true}}
+                  >
+                    <FlightIcon @name={{this.draftVisibilityIcon}} />
+                  </dd.ToggleAction>
+                {{else}}
+                  <div
+                    data-test-draft-visibility-read-only
+                    {{tooltip "Shareable draft" placement="bottom"}}
+                    class="draft-visibility-button items-center text-color-foreground-faint"
+                  >
+                    <FlightIcon @name="enterprise" />
+                  </div>
+                {{/if}}
+              </:anchor>
+              <:item as |dd|>
+                <dd.Action
+                  data-test-draft-visibility-option
+                  data-test-is-checked={{dd.isSelected}}
+                  data-test-value={{dd.value}}
+                  class="flex items-start gap-3 py-2.5 pl-4 pr-6"
+                  {{on "click" (perform this.setDraftVisibility dd.value)}}
+                >
+                  <FlightIcon @name={{dd.attrs.icon}} class="mt-0.5 shrink-0" />
+                  <div class="w-full">
+                    <h4>{{dd.attrs.title}}</h4>
+                    <p>{{dd.attrs.description}}</p>
+                  </div>
+                  <FlightIcon
+                    @name="check"
+                    class="check mt-0.5 shrink-0
+                      {{if dd.isSelected 'visible' 'invisible'}}"
+                  />
+                </dd.Action>
+              </:item>
+            </X::DropdownList>
+          {{/if}}
+        </div>
+        <div class="editable-field-container document-title mb-8 -mt-[5px]">
+          <EditableField
+            data-test-document-title
+            data-test-editable={{this.isOwner}}
+            @value={{this.title}}
+            @onSave={{this.saveTitle}}
+            {{! provide for the docNumber }}
+            @document={{@document}}
+            @isSaving={{this.saveIsRunning}}
+            @isReadOnly={{this.editingIsDisabled}}
+            @isRequired={{true}}
+            @name="title"
+            @tag="h1"
+            class="mb-1.5"
+          />
+        </div>
+
+        {{! Doctype }}
+        <Hds::Badge @text={{@document.docType}} />
+      </div>
+
+      <hr class="hds-border-faint border-0 border-b" />
+
+      {{! Summary }}
+      <div class="mb-5">
+        <Document::Sidebar::SectionHeader @title="Summary" />
+        <div class="editable-field-container">
+          <EditableField
+            data-test-document-summary
+            data-test-editable={{this.isOwner}}
+            @value={{this.summary}}
+            @onSave={{this.saveSummary}}
+            @isSaving={{this.saveIsRunning}}
+            @isReadOnly={{this.editingIsDisabled}}
+            @name="summary"
+            @placeholder={{if
+              (and this.isOwner (not this.editingIsDisabled))
+              "Enter a summary"
+            }}
+          />
+        </div>
+      </div>
+
+      {{! Product/Area }}
+      <div class="grid gap-2">
+        <Document::Sidebar::SectionHeader @title="Product/Area" />
+        {{#if (and this.isDraft this.isOwner (not this.editingIsDisabled))}}
+          <div
+            class="editable-field-container select-input"
+            data-test-document-product-area-editable
+          >
+            <Inputs::ProductSelect
+              data-test-document-product-area-editable
+              @selected={{this.product}}
+              @onChange={{this.saveProduct.perform}}
+              @isSaving={{this.saveIsRunning}}
+              @selectedAbbreviationIsHidden={{true}}
+              @renderOut={{true}}
+              @color="quarternary"
+              class="max-h-[275px] w-[320px]"
+            />
+          </div>
+        {{else}}
+          <ProductLink
+            data-test-document-product-area-read-only
+            @product={{@document.product}}
+            class="inline-flex gap-2"
+          >
+            <Product::Avatar @product={{@document.product}} />
+            <span class="underline-on-hover">{{@document.product}}</span>
+          </ProductLink>
+        {{/if}}
+      </div>
+
+      {{! Created }}
+      <div class="space-y-2">
+        <Document::Sidebar::SectionHeader @title="Created" />
+        <p>{{or (parse-date @document.created "long") "Unknown"}}</p>
+      </div>
+
+      {{! Last modified }}
+      <div class="space-y-2">
+        <Document::Sidebar::SectionHeader @title="Last modified" />
+        {{#if @document.modifiedTime}}
+          <p>{{time-ago @document.modifiedTime}}</p>
+        {{/if}}
+      </div>
+
+      {{! Owner }}
+      <div class="flex flex-col items-start">
+        <Document::Sidebar::SectionHeader @title="Owner" class="mb-2" />
+        <LinkTo
+          data-test-owner-link
+          @route="authenticated.documents"
+          @query={{get-owner-query (get @document.owners 0)}}
+          class="underlined-link grid"
+        >
+          <Person @email={{get @document.owners 0}} />
+        </LinkTo>
+      </div>
+
+      {{! Contributors }}
+      <div>
+        <Document::Sidebar::SectionHeader @title="Contributors" />
+        <div class="editable-field-container">
+          <EditableField
+            data-test-document-contributors
+            data-test-editable={{this.isOwner}}
+            @value={{this.contributors}}
+            @onChange={{this.updateContributors}}
+            @onSave={{perform this.save "contributors"}}
+            @isSaving={{this.saveIsRunning}}
+            @isReadOnly={{this.editingIsDisabled}}
+          />
+        </div>
+      </div>
+
+      {{#if this.approversAreShown}}
+        {{! Approvers }}
+        <div>
+          <Document::Sidebar::SectionHeader @title="Approvers" />
+          <div class="editable-field-container mt-[3px]">
+            <EditableField
+              data-test-document-approvers
+              data-test-editable={{this.isOwner}}
+              @value={{this.allApprovers}}
+              @onChange={{this.updateApprovers}}
+              @onSave={{perform this.saveApprovers}}
+              @isSaving={{this.saveIsRunning}}
+              @isReadOnly={{this.editingIsDisabled}}
+              @includeGroupsInPeopleSelect={{this.configSvc.config.group_approvals}}
+              {{! Provide the document to the `has-approved-doc` helper }}
+              @document={{@document}}
+            />
+          </div>
+        </div>
+      {{/if}}
+
+      {{! Related resources }}
+      <div>
+        <Document::Sidebar::RelatedResources
+          @docWasCreatedOffApp={{not @document.appCreated}}
+          @editingIsDisabled={{this.editingIsDisabled}}
+          @documentIsDraft={{this.isDraft}}
+          @productArea={{@document.product}}
+          @objectID={{@document.objectID}}
+          @headerTitle="Related resources"
+          @modalHeaderTitle="Add related resource"
+          @modalInputPlaceholder="Search docs or paste a URL..."
+          @scrollContainer={{this.body}}
+          @optionalSearchFilters={{concat "product:" @document.product}}
+        />
+      </div>
+
+      {{! Projects }}
+      <div>
+        <Document::Sidebar::SectionHeader
+          data-test-projects-section-header
+          {{did-insert (perform this.loadRelatedProjects)}}
+          @title="Projects"
+          @buttonAction={{this.showProjectsModal}}
+          @buttonIsDisabled={{this.isDraft}}
+          @disabledButtonTooltipText="Only published docs can be added to projects."
+        />
+        {{#if this.projects.length}}
+          <ol class="related-resources-list mt-1 space-y-0.5">
+            {{#each this.projects as |project|}}
+              <li data-test-document-project class="related-resource">
+                <div class="related-resource-inner group relative">
+                  <LinkTo
+                    data-test-project-link
+                    @route="authenticated.projects.project"
+                    @model={{project.id}}
+                    class="related-resource-link quarternary-button peer flex h-[32px] items-center gap-2 px-[5px]"
+                  >
+                    <div class="flex w-[18px] shrink-0 justify-center">
+                      <Project::StatusIcon @status={{project.status}} />
+                    </div>
+                    <div class="overflow-hidden">
+                      <TruncatedText
+                        class="text-body-200
+                          {{if
+                            (eq project.status 'active')
+                            'font-medium text-color-foreground-strong'
+                            'line-through'
+                          }}"
+                      >
+                        {{project.title}}
+                      </TruncatedText>
+                    </div>
+                  </LinkTo>
+
+                  <OverflowMenu
+                    @renderOut={{true}}
+                    @items={{hash
+                      remove=(hash
+                        icon="trash"
+                        label="Remove from project"
+                        action=(perform this.removeDocFromProject project.id)
+                      )
+                    }}
+                  />
+                </div>
+              </li>
+            {{/each}}
+          </ol>
+        {{else}}
+          {{#if this.projectsErrorIsShown}}
+            <div class="h-16">
+              <div class="failed-to-load-text">
+                Failed to load
+              </div>
+              <Hds::Button
+                data-test-document-projects-error-button
+                @color="secondary"
+                @size="small"
+                @text="Retry"
+                @icon="reload"
+                {{on "click" (perform this.loadRelatedProjects)}}
+              />
+            </div>
+          {{else}}
+            <Document::Sidebar::EmptyStateAddButton
+              @isReadOnly={{this.isDraft}}
+              @action={{this.showProjectsModal}}
+            />
+          {{/if}}
+        {{/if}}
+      </div>
+
+      {{! Custom fields }}
+      {{#each-in this.customEditableFields as |field attributes|}}
+        {{#if (or attributes.value this.isOwner)}}
+          <div>
+            <Document::Sidebar::SectionHeader
+              @title={{attributes.displayName}}
+            />
+            <CustomEditableField
+              class="mt-[3px]"
+              @document={{@document}}
+              @field={{field}}
+              @attributes={{attributes}}
+              @onSave={{perform this.saveCustomField field attributes}}
+              @isSaving={{this.saveIsRunning}}
+              @disabled={{this.editingIsDisabled}}
+            />
+          </div>
+        {{/if}}
+      {{/each-in}}
+
+      {{! Transfer ownership }}
+      {{#if this.isOwner}}
+        <div class="pt-5">
+          <div class="border-t border-color-border-faint pt-7">
+            <Action
+              data-test-transfer-document-ownership-button
+              {{on "click" this.showTransferOwnershipModal}}
+              disabled={{this.editingIsDisabled}}
+              class="flex gap-2 text-body-100 text-color-foreground-disabled hover:text-color-foreground-faint focus:text-color-foreground-faint"
+            >
+              <FlightIcon @name="swap-horizontal" />
+              Transfer ownership...
+            </Action>
+          </div>
+        </div>
+      {{/if}}
+    </div>
+
+  </div>
+
+  {{#if this.footerIsShown}}
+    <div
+      data-test-sidebar-footer
+      class="sidebar-footer
+        {{if
+          this.footerControlsAreDisabled
+          'border-t border-t-color-border-primary'
+        }}"
+    >
+      {{#if this.footerControlsAreDisabled}}
+        {{! Disabled controls }}
+        <div class="-mb-1 -mt-0.5 px-3">
+          <div class="text-body-200 text-color-foreground-faint">
+            <h5
+              data-test-disabled-footer-h5
+              class="mb-1 flex items-center text-body-200 font-semibold text-color-foreground-primary"
+            >
+              {{if this.docIsLocked "Document is locked" "Read-only headers"}}
+              <FlightIcon
+                @name="lock"
+                class="-mt-px ml-1.5 shrink-0 text-color-foreground-faint"
+              />
+            </h5>
+            <p class="mb-1.5">
+              {{if
+                this.docIsLocked
+                "Due to a Google API bug, all suggestions must be removed from the document header to unlock."
+                "Weʼre unable to edit the metadata of files created offsite."
+              }}
+            </p>
+          </div>
+          {{#if this.docIsLocked}}
+            <Hds::Link::Standalone
+              @icon="arrow-right"
+              @iconPosition="trailing"
+              @text="See the issue on GitHub"
+              @size="small"
+              @href="https://github.com/hashicorp-forge/hermes/issues/181"
+            />
+          {{else}}
+            <div class="text-body-100 text-color-foreground-faint">
+              Create docs in-app for best results.
+            </div>
+          {{/if}}
+        </div>
+      {{else}}
+        {{#let (and this.isDraft this.isOwner) as |canPublish|}}
+          {{#if (or canPublish this.isApprover this.isGroupApproverOnly)}}
+            <div class="flex gap-2 px-3">
+              {{#if canPublish}}
+                {{! Publish for review... }}
+                <Hds::Button
+                  data-test-sidebar-publish-for-review-button
+                  @text="Publish for review..."
+                  class="w-full"
+                  {{on "click" (set this "requestReviewModalIsShown" true)}}
+                />
+                {{! Delete... }}
+                <Hds::Button
+                  data-test-delete-draft-button
+                  @text="Delete..."
+                  @icon="trash"
+                  @color="secondary"
+                  @isIconOnly={{true}}
+                  class="basis-0"
+                  {{tooltip "Delete..."}}
+                  {{on "click" (fn (set this "deleteModalIsShown" true))}}
+                />
+              {{else}}
+                {{! isApprover or isGroupApproverOnly}}
+
+                {{! Read-only / isRunning state }}
+                {{#if
+                  (or
+                    this.hasApproved
+                    this.hasRejectedFRD
+                    this.approve.isRunning
+                    this.rejectFRD.isRunning
+                    this.leaveApproverRole.isRunning
+                  )
+                }}
+                  <div
+                    data-test-sidebar-footer-primary-button-read-only
+                    class="hds-button mock-disabled hds-button--primary hds-button--size-medium w-full leading-none"
+                  >
+                    {{if
+                      this.rejectFRD.isRunning
+                      "Saving..."
+                      (if
+                        this.approve.isRunning
+                        "Approving..."
+                        (if
+                          this.leaveApproverRole.isRunning
+                          "Leaving..."
+                          (if
+                            this.hasApproved
+                            "Approved"
+                            (if this.rejectFRD "Rejected")
+                          )
+                        )
+                      )
+                    }}
+                  </div>
+                {{else}}
+                  {{! Approve }}
+                  <Hds::Button
+                    data-test-approve-button
+                    @text="Approve"
+                    class="w-full"
+                    {{on "click" (perform this.approve)}}
+                  />
+
+                  {{#if (eq @document.docType "FRD")}}
+                    {{! Reject FRD }}
+                    <Hds::Button
+                      data-test-reject-frd-button
+                      @text="Reject"
+                      @color="critical"
+                      @icon="thumbs-down"
+                      @isIconOnly={{true}}
+                      {{tooltip "Reject"}}
+                      {{on "click" (perform this.rejectFRD)}}
+                    />
+                  {{/if}}
+
+                  {{#unless this.isGroupApproverOnly}}
+                    {{! Overflow menu (Leave approver role) }}
+                    <X::DropdownList
+                      data-test-sidebar-footer-overflow-menu
+                      @placement="top-start"
+                      @items={{array
+                        (hash
+                          icon="user-minus"
+                          label="Leave approver role"
+                          action=(perform this.leaveApproverRole)
+                        )
+                      }}
+                    >
+                      <:anchor as |dd|>
+                        <dd.ToggleAction>
+                          <Hds::Button
+                            data-test-sidebar-footer-secondary-dropdown-button
+                            @text="More actions"
+                            @icon="more-horizontal"
+                            @color="secondary"
+                            @isIconOnly={{true}}
+                          />
+                        </dd.ToggleAction>
+                      </:anchor>
+                      <:item as |dd|>
+                        <dd.Action
+                          class="flex gap-2.5"
+                          {{on "click" dd.attrs.action}}
+                        >
+                          <FlightIcon
+                            @name={{dd.attrs.icon}}
+                            class="opacity-60"
+                          />
+                          {{dd.attrs.label}}
+                        </dd.Action>
+                      </:item>
+                    </X::DropdownList>
+                  {{/unless}}
+                {{/if}}
+              {{/if}}
+            </div>
+          {{/if}}
+        {{/let}}
+      {{/if}}
+    </div>
+  {{/if}}
+{{/unless}}
+
+{{! Place modals at the end of the DOM so they don't inherit styles }}
+
+{{#in-element (html-element ".ember-application") insertBefore=null}}
+  {{#if this.projectsModalIsShown}}
+    <Projects::AddToOrCreate
+      @document={{@document}}
+      @onClose={{this.hideProjectsModal}}
+      @onSave={{perform this.addDocToProject}}
+    />
+  {{/if}}
+
+  {{#if this.deleteModalIsShown}}
+    <Document::Modal
+      data-test-delete-draft-modal
+      @color="critical"
+      @headerText="Delete draft?"
+      @bodyText="Are you sure you want to delete this draft?"
+      @errorTitle="Error deleting draft"
+      @close={{this.closeDeleteModal}}
+      @task={{perform this.deleteDraft}}
+      @taskButtonText="Yes, delete"
+      @taskButtonLoadingText="Deleting..."
+      @taskButtonIcon="trash"
+    />
+  {{/if}}
+
+  {{! Transfer ownership }}
+  {{#if this.transferOwnershipModalIsShown}}
+    <TypeToConfirm
+      @value="transfer"
+      @onEnter={{this.clickTransferButton}}
+      as |T|
+    >
+      <Document::Modal
+        data-test-transfer-ownership-modal
+        @headerText="Transfer ownership"
+        @errorTitle="Couldn't transfer ownership"
+        @close={{this.hideTransferOwnershipModal}}
+        @secondaryButtonIsHidden={{true}}
+        @task={{perform this.transferOwnership}}
+        @taskButtonText="Transfer doc"
+        @hideFooterWhileSaving={{true}}
+        @taskButtonIsDisabled={{or
+          (not this.newOwners.length)
+          (not T.hasConfirmed)
+        }}
+      >
+        <:default as |M|>
+          {{#if M.taskIsRunning}}
+            <div
+              data-test-transferring-doc
+              class="grid place-items-center pt-1 pb-8 text-center"
+            >
+              <FlightIcon @name="running" @size="24" class="mb-5" />
+              <h2>Transferring doc...</h2>
+            </div>
+          {{else}}
+
+            <p class="mb-5 text-body-300">
+              Give this document to someone in your workspace.
+              <br />
+              We'll notify them when the transfer completes.
+            </p>
+
+            <div class="grid gap-4 pb-2.5">
+              <div>
+                <label
+                  data-test-select-new-owner-label
+                  {{on "click" this.focusPeopleSelect}}
+                  for={{this.transferOwnershipPeopleSelectID}}
+                  class="hermes-form-label"
+                >
+                  Select new owner
+                </label>
+                <Inputs::PeopleSelect
+                  {{autofocus waitUntilNextRunloop=true}}
+                  @triggerId={{this.transferOwnershipPeopleSelectID}}
+                  @selected={{this.newOwners}}
+                  @onChange={{this.setNewOwner}}
+                  @isSingleSelect={{true}}
+                  @renderInPlace={{true}}
+                  @excludeSelf={{true}}
+                />
+              </div>
+              <div>
+                <T.Input {{did-insert this.registerTypeToConfirmInput}} />
+              </div>
+            </div>
+          {{/if}}
+        </:default>
+      </Document::Modal>
+    </TypeToConfirm>
+  {{/if}}
+
+  {{#if this.requestReviewModalIsShown}}
+    <Document::Modal
+      data-test-publish-for-review-modal
+      @headerText="Publish for review"
+      @errorTitle="Error requesting review"
+      @close={{this.closeRequestReviewModal}}
+      @task={{perform this.requestReview}}
+      @taskButtonText="Publish doc"
+      @taskButtonLoadingText="Publishing..."
+      @hideFooterWhileSaving={{true}}
+      @taskButtonIsDisabled={{and
+        (not this.docTypeCheckboxValue)
+        (not (is-empty this.docType.checks))
+      }}
+    >
+      <:default as |M|>
+        {{#if M.taskIsRunning}}
+          <div
+            data-test-publishing-for-review-message
+            class="grid place-items-center pt-1 pb-12"
+          >
+            <div class="text-center">
+              <FlightIcon @name="running" @size="24" class="mb-5" />
+              <h2>Submitting for review...</h2>
+              <p class="mb-2 text-body-300">This usually takes about a minute.</p>
+              <span
+                class="mb-8 block text-[12px] text-color-foreground-faint"
+              >We appreciate your patience.</span>
+              <div class="flex items-center justify-center space-x-2">
+                <div class="h-px w-4 bg-color-border-primary"></div>
+                <FlightIcon
+                  @name="hashicorp"
+                  class="text-color-foreground-faint"
+                />
+                <div class="h-px w-4 bg-color-border-primary"></div>
+              </div>
+            </div>
+          </div>
+        {{else}}
+          <ul class="mb-6 space-y-1 text-body-300">
+            {{#each this.requestReviewBulletPoints as |b|}}
+              <li class="flex gap-2.5">
+                <FlightIcon
+                  @name={{b.icon}}
+                  class="mt-1 text-color-foreground-disabled"
+                />
+                <span>
+                  {{b.text}}
+                </span>
+              </li>
+            {{/each}}
+          </ul>
+
+          <Hds::Form::Field @layout="vertical" as |F|>
+            <F.Control>
+              <Inputs::PeopleSelect
+                @includeGroups={{this.configSvc.config.group_approvals}}
+                @renderInPlace={{true}}
+                @selected={{this.allApprovers}}
+                @onChange={{this.updateApprovers}}
+                @disabled={{M.taskIsRunning}}
+                class="mb-0"
+              />
+            </F.Control>
+            <F.Label>Approvers</F.Label>
+          </Hds::Form::Field>
+
+          {{#if this.docType.checks}}
+            {{! For now, we only support one check }}
+            {{#each (take 1 this.docType.checks) as |check|}}
+              <div class="mt-3.5">
+                <Hds::Form::Checkbox::Field
+                  {{on "change" this.onDocTypeCheckboxChange}}
+                  checked={{this.docTypeCheckboxValue}}
+                  disabled={{M.taskIsRunning}}
+                  required
+                  as |F|
+                >
+                  <F.Label>
+                    {{check.label}}
+                  </F.Label>
+                  {{#if check.helperText}}
+                    <F.HelperText>
+                      {{check.helperText}}
+                    </F.HelperText>
+                  {{/if}}
+                </Hds::Form::Checkbox::Field>
+              </div>
+              {{#if check.links.length}}
+                <ul class="mt-1.5 list-none pl-6">
+                  {{#each check.links as |link|}}
+                    <li>
+                      <Hds::Link::Inline
+                        @icon="external-link"
+                        @iconPosition="trailing"
+                        @isHrefExternal={{true}}
+                        @href={{link.url}}
+                        class="text-body-100 no-underline"
+                      >
+                        {{link.text}}
+                      </Hds::Link::Inline>
+                    </li>
+                  {{/each}}
+                </ul>
+              {{/if}}
+            {{/each}}
+          {{/if}}
+        {{/if}}
+      </:default>
+    </Document::Modal>
+  {{/if}}
+
+  {{#if this.docPublishedModalIsShown}}
+    <Hds::Modal
+      @onClose={{this.closeRequestReviewSuccessModal}}
+      data-test-doc-published-modal
+      as |M|
+    >
+      <M.Header>
+        <div class="flex items-center">
+          <FlightIcon
+            @name="check-circle-fill"
+            class="mr-2 text-color-palette-green-200"
+          />
+          Document published!
+        </div>
+      </M.Header>
+      <M.Body>
+        <p class="text-body-300">
+          Your doc is now available to everyone in your workspace.
+          <br />
+          Weʼve notified your approvers and subscribers to this product/area.
+        </p>
+        {{#unless this.docNumberLookupHasFailed}}
+          <label
+            class="hermes-form-label mb-1 mt-5"
+            for="recently-published-share-url"
+          >
+            Share it with others
+          </label>
+          <Hds::Form::TextInput::Base
+            data-test-share-document-url-input
+            id="recently-published-share-url"
+            class="mb-1.5 pl-2.5 text-body-300"
+            @value={{this.shareURL}}
+            {{select-on-focus}}
+            readonly
+          />
+        {{/unless}}
+      </M.Body>
+      <M.Footer>
+        <Hds::ButtonSet>
+          {{#unless this.docNumberLookupHasFailed}}
+            <CopyURLButton
+              data-test-doc-published-copy-url-button
+              @url={{this.shareURL}}
+              class="hds-button hds-button--size-medium hds-button--color-primary"
+            />
+          {{/unless}}
+          <Hds::Button
+            data-test-continue-to-document-button
+            {{on "click" (set this "docPublishedModalIsShown" false)}}
+            @text="Continue to document"
+            @icon={{unless this.docNumberLookupHasFailed "arrow-right"}}
+            @iconPosition={{unless this.docNumberLookupHasFailed "trailing"}}
+            @color={{if this.docNumberLookupHasFailed "primary" "tertiary"}}
+            data-test-color={{if
+              this.docNumberLookupHasFailed
+              "primary"
+              "tertiary"
+            }}
+          />
+        </Hds::ButtonSet>
+      </M.Footer>
+    </Hds::Modal>
+  {{/if}}
+{{/in-element}}

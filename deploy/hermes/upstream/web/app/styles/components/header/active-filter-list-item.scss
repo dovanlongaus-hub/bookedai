@@ -1,0 +1,11 @@
+.active-filter-list-item {
+  @apply flex h-[30px] items-center rounded-full border border-color-border-strong bg-color-surface-interactive px-3.5 no-underline;
+
+  &:hover {
+    @apply bg-color-surface-interactive-hover;
+  }
+
+  .flight-icon {
+    @apply -ml-1.5 mr-1 scale-75;
+  }
+}

@@ -1,0 +1,39 @@
+<div
+  data-test-product-select-item
+  class="relative flex w-full gap-2"
+  ...attributes
+>
+  {{#if @product}}
+    <Product::Avatar @product={{@product}} />
+  {{else}}
+    <FlightIcon @name="folder" class="text-color-foreground-faint" />
+  {{/if}}
+
+  <div class="flex items-center gap-1.5">
+
+    {{#if @product}}
+      <span data-test-product-value class="w-full pr-5 text-body-200">
+        {{@product}}
+        {{#if this.abbreviationIsShown}}
+          <span
+            class="ml-0.5 opacity-60"
+            data-test-product-select-item-abbreviation
+          >
+            {{@abbreviation}}
+          </span>
+        {{/if}}
+      </span>
+    {{else}}
+      <EmptyStateText data-test-empty-state @value="Select a product/area" />
+    {{/if}}
+
+  </div>
+
+  {{#if @isSelected}}
+    <FlightIcon
+      data-test-check
+      @name="check"
+      class="check absolute right-0 top-1/2 -translate-y-1/2"
+    />
+  {{/if}}
+</div>
