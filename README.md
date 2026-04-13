@@ -1,21 +1,36 @@
 # BookedAI
 
-BookedAI is configured as a Docker-based full-stack application for the `bookedai.au` domain, with self-hosted Supabase and n8n on the same Docker host.
+BookedAI is a Docker-based full-stack application for the `bookedai.au` domain, with self-hosted Supabase, n8n, and Hermes running on the same Docker host.
 
-## Architecture
+## Repository structure
 
 - `frontend/`: React + TypeScript + Vite
 - `backend/`: FastAPI
-- `supabase/`: official self-hosted Supabase Docker stack
-- `n8n`: automation service on a separate subdomain
-- `proxy`: Nginx reverse proxy with TLS for app, Supabase, and n8n
+- `supabase/`: self-hosted Supabase Docker stack and overrides
+- `n8n/`: automation workflows and provisioning assets
+- `deploy/`: production-only infrastructure for Nginx, Certbot, systemd, and Hermes
+- `scripts/`: VPS bootstrap, deployment, health checks, and DNS automation
+- `storage/`: persisted uploaded assets
+
+## Production architecture
 
 Production traffic is expected to follow this path:
 
 - `https://bookedai.au/` -> frontend
 - `https://api.bookedai.au/*` -> FastAPI backend
+- `https://admin.bookedai.au/` -> admin-facing frontend routes behind the same proxy
 - `https://supabase.bookedai.au/` -> Supabase Studio, Auth, REST, Storage via Kong
 - `https://n8n.bookedai.au/` -> n8n editor and webhooks
+- `https://hermes.bookedai.au/` -> Hermes knowledge/documentation service
+- `https://upload.bookedai.au/` -> public file uploads served from `storage/uploads`
+
+Core production services defined in [`docker-compose.prod.yml`](/home/dovanlong/BookedAI/docker-compose.prod.yml:1):
+
+- `web`: built frontend container
+- `backend`: FastAPI API and booking logic
+- `hermes`: knowledge/documentation service
+- `n8n`: workflow automation
+- `proxy`: Nginx edge proxy and TLS termination
 
 ## Booking flow
 
@@ -59,6 +74,8 @@ AI provider:
 - `A` record for `api.bookedai.au` -> same public IP
 - `A` record for `supabase.bookedai.au` -> same public IP
 - `A` record for `n8n.bookedai.au` -> same public IP
+- `A` record for `hermes.bookedai.au` -> same public IP
+- `A` record for `upload.bookedai.au` -> same public IP
 
 2. Prepare environment:
 
@@ -106,9 +123,12 @@ AI provider:
 5. Access:
 
 - App: `https://bookedai.au`
+- Admin: `https://admin.bookedai.au`
 - API docs: `https://api.bookedai.au/api/docs`
 - Supabase: `https://supabase.bookedai.au`
 - n8n: `https://n8n.bookedai.au`
+- Hermes: `https://hermes.bookedai.au`
+- Uploads: `https://upload.bookedai.au`
 
 6. Optional hardening (health monitoring):
 
@@ -233,10 +253,12 @@ curl -s \
 ## Important files
 
 - `docker-compose.yml`: local development
-- `docker-compose.prod.yml`: production stack for app proxy, frontend, backend, and n8n
+- `docker-compose.prod.yml`: production stack for frontend, backend, Hermes, n8n, and edge proxy
 - `supabase/docker-compose.yml`: official Supabase self-hosted stack
 - `supabase/docker-compose.bookedai.yml`: BookedAI override for shared network and extra databases
 - `deploy/nginx/bookedai.au.conf`: TLS and reverse proxy config
+- `deploy/hermes/`: Hermes image build and runtime configuration
+- `deploy/systemd/`: boot-time DNS and reconciliation units
 - `.env.example`: required environment variables
 - `scripts/bootstrap_vps.sh`: installs Docker and host prerequisites on Ubuntu
 - `scripts/prepare_supabase_env.sh`: generates and patches `supabase/.env`
