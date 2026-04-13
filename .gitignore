@@ -11,6 +11,7 @@ backend/storage/
 backend/__pycache__/
 bookedai-video/.git
 bookedai-video/.git.backup/
+bookedai-video/
 bookedai-video/node_modules/
 bookedai-video/out/
 frontend/node_modules/
