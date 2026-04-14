@@ -1,5 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 
+import { getApiBaseUrl } from '../shared/config/api';
+
 type AdminMetricCard = {
   label: string;
   value: string;
@@ -116,6 +118,7 @@ type AdminServiceMerchantItem = {
   id: number;
   service_id: string;
   business_name: string;
+  business_email: string | null;
   name: string;
   category: string | null;
   summary: string | null;
@@ -161,26 +164,9 @@ type PartnerFormState = {
 type ServiceImportFormState = {
   website_url: string;
   business_name: string;
+  business_email: string;
   category: string;
 };
-
-function getApiBaseUrl() {
-  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-  if (configuredBaseUrl) {
-    return configuredBaseUrl.replace(/\/$/, '');
-  }
-
-  if (typeof window === 'undefined') {
-    return 'https://api.bookedai.au/api';
-  }
-
-  const { hostname } = window.location;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'http://localhost:8000/api';
-  }
-
-  return 'https://api.bookedai.au/api';
-}
 
 function formatDateTime(value: string) {
   try {
@@ -253,13 +239,14 @@ function emptyServiceImportForm(): ServiceImportFormState {
   return {
     website_url: '',
     business_name: '',
+    business_email: '',
     category: '',
   };
 }
 
 export function AdminPage() {
   const apiBaseUrl = getApiBaseUrl();
-  const [username, setUsername] = useState('info@bookedAI.au');
+  const [username, setUsername] = useState('info@bookedai.au');
   const [password, setPassword] = useState('');
   const [sessionToken, setSessionToken] = useState('');
   const [sessionExpiry, setSessionExpiry] = useState('');
@@ -757,7 +744,7 @@ export function AdminPage() {
                     value={username}
                     onChange={(event) => setUsername(event.target.value)}
                     className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-sky-400"
-                    placeholder="info@bookedAI.au"
+                    placeholder="info@bookedai.au"
                     autoComplete="username"
                   />
                 </label>
@@ -1051,7 +1038,7 @@ export function AdminPage() {
                 </div>
               </div>
 
-              <form className="mt-5 grid gap-4 md:grid-cols-[1.4fr_1fr_1fr_auto]" onSubmit={importServicesFromWebsite}>
+              <form className="mt-5 grid gap-4 md:grid-cols-[1.2fr_1fr_1fr_1fr_auto]" onSubmit={importServicesFromWebsite}>
                 <input
                   type="url"
                   value={serviceImportForm.website_url}
@@ -1076,6 +1063,18 @@ export function AdminPage() {
                   }
                   className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400"
                   placeholder="Business name"
+                />
+                <input
+                  type="email"
+                  value={serviceImportForm.business_email}
+                  onChange={(event) =>
+                    setServiceImportForm((current) => ({
+                      ...current,
+                      business_email: event.target.value,
+                    }))
+                  }
+                  className="rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400"
+                  placeholder="Business email"
                 />
                 <input
                   type="text"
@@ -1128,6 +1127,9 @@ export function AdminPage() {
                             .filter(Boolean)
                             .join(' • ')}
                         </div>
+                        {service.business_email ? (
+                          <div className="mt-2 text-sm text-slate-500">{service.business_email}</div>
+                        ) : null}
                         <p className="mt-3 text-sm leading-7 text-slate-600">
                           {service.summary || 'No summary extracted yet.'}
                         </p>
@@ -1681,8 +1683,19 @@ export function AdminPage() {
                             className="grid grid-cols-[1fr_1.3fr_80px] gap-3 px-4 py-3 text-sm text-slate-700"
                           >
                             <div className="font-semibold text-slate-950">{item.key}</div>
-                            <div className="break-all">{item.value || 'Not set'}</div>
-                            <div>{item.masked ? 'Masked' : 'Open'}</div>
+                            <div
+                              className={`break-all ${item.masked ? 'select-none' : ''}`}
+                              onCopy={
+                                item.masked
+                                  ? (event) => {
+                                      event.preventDefault();
+                                    }
+                                  : undefined
+                              }
+                            >
+                              {item.value || 'Not set'}
+                            </div>
+                            <div>{item.masked ? 'Protected' : 'Public'}</div>
                           </div>
                         ))}
                     </div>

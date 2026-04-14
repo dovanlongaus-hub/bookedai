@@ -131,6 +131,7 @@ class AdminBookingRecord(BaseModel):
     industry: str | None = None
     customer_name: str | None = None
     customer_email: str | None = None
+    business_email: str | None = None
     customer_phone: str | None = None
     service_name: str | None = None
     service_id: str | None = None
@@ -227,6 +228,7 @@ class AdminServiceMerchantItem(BaseModel):
     id: int
     service_id: str
     business_name: str
+    business_email: str | None = None
     name: str
     category: str | None = None
     summary: str | None = None
@@ -252,6 +254,7 @@ class AdminServiceMerchantListResponse(BaseModel):
 class AdminServiceImportRequest(BaseModel):
     website_url: str = Field(min_length=3, max_length=500)
     business_name: str | None = Field(default=None, max_length=255)
+    business_email: str | None = Field(default=None, max_length=255)
     category: str | None = Field(default=None, max_length=100)
 
 
@@ -259,6 +262,7 @@ class ServiceCatalogItem(BaseModel):
     id: str
     name: str
     category: str
+    business_email: str | None = Field(default=None, max_length=255)
     summary: str
     duration_minutes: int = Field(gt=0)
     amount_aud: float = Field(gt=0)
@@ -320,6 +324,7 @@ class BookingAssistantChatResponse(BaseModel):
     matched_services: list[ServiceCatalogItem]
     matched_events: list[AIEventItem] = Field(default_factory=list)
     suggested_service_id: str | None = None
+    should_request_location: bool = False
 
 
 class BookingAssistantSessionRequest(BaseModel):
@@ -346,6 +351,76 @@ class BookingAssistantSessionResponse(BaseModel):
     payment_url: str
     qr_code_url: str
     email_status: Literal["sent", "pending_manual_followup"]
+    meeting_status: Literal["scheduled", "configuration_required"]
+    meeting_join_url: str | None = None
+    meeting_event_url: str | None = None
+    calendar_add_url: str | None = None
     confirmation_message: str
     contact_email: str
     workflow_status: str | None = None
+
+
+class PricingConsultationRequest(BaseModel):
+    plan_id: Literal["basic", "standard", "pro"]
+    customer_name: str = Field(min_length=2, max_length=255)
+    customer_email: str = Field(min_length=3, max_length=255)
+    customer_phone: str | None = Field(default=None, max_length=50)
+    business_name: str = Field(min_length=2, max_length=255)
+    business_type: str = Field(min_length=2, max_length=120)
+    onboarding_mode: Literal["online", "onsite"] = "online"
+    startup_referral_eligible: bool = False
+    referral_partner: str | None = Field(default=None, max_length=255)
+    referral_location: str | None = Field(default=None, max_length=255)
+    preferred_date: date
+    preferred_time: time
+    timezone: str = "Australia/Sydney"
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class PricingConsultationResponse(BaseModel):
+    status: str
+    consultation_reference: str
+    plan_id: Literal["basic", "standard", "pro"]
+    plan_name: str
+    amount_aud: float = Field(gt=0)
+    amount_label: str
+    preferred_date: str
+    preferred_time: str
+    timezone: str
+    onboarding_mode: Literal["online", "onsite"]
+    trial_days: int
+    trial_summary: str
+    startup_offer_applied: bool
+    startup_offer_summary: str | None = None
+    onsite_travel_fee_note: str | None = None
+    meeting_status: Literal["scheduled", "configuration_required"]
+    meeting_join_url: str | None = None
+    meeting_event_url: str | None = None
+    payment_status: Literal["stripe_checkout_ready", "payment_follow_up_required"]
+    payment_url: str | None = None
+    email_status: Literal["sent", "pending_manual_followup"]
+
+
+class DemoBookingRequest(BaseModel):
+    customer_name: str = Field(min_length=2, max_length=255)
+    customer_email: str = Field(min_length=3, max_length=255)
+    customer_phone: str | None = Field(default=None, max_length=50)
+    business_name: str = Field(min_length=2, max_length=255)
+    business_type: str = Field(min_length=2, max_length=120)
+    preferred_date: date
+    preferred_time: time
+    timezone: str = "Australia/Sydney"
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class DemoBookingResponse(BaseModel):
+    status: str
+    demo_reference: str
+    preferred_date: str
+    preferred_time: str
+    timezone: str
+    meeting_status: Literal["scheduled", "configuration_required"]
+    meeting_join_url: str | None = None
+    meeting_event_url: str | None = None
+    email_status: Literal["sent", "pending_manual_followup"]
+    confirmation_message: str

@@ -148,10 +148,10 @@ export type ImageUploadContent = SectionContent & {
 };
 
 export const primaryCtaHref =
-  'mailto:ceo@bookedai.au?subject=Start%20Free%20Trial%20with%20BookedAI';
+  'mailto:info@bookedai.au?subject=Start%20Free%20Trial%20with%20BookedAI';
 
 export const demoCtaHref =
-  'mailto:ceo@bookedai.au?subject=BookedAI%20Demo%20Request';
+  'mailto:info@bookedai.au?subject=BookedAI%20Demo%20Request';
 
 export const videoDemoHref = '/video-demo.html';
 
@@ -170,12 +170,12 @@ export const navItems: NavItem[] = [
 ];
 
 export const heroContent: HeroContent = {
-  eyebrow: 'AI receptionist for Sydney service businesses',
+  eyebrow: 'AI receptionist for Australian SMEs',
   title: 'Turn Conversations Into Customers',
   bodyLead: 'From enquiry to booked job, automatically.',
   bodyRest:
-    'BookedAI replies instantly, qualifies leads, and fills your calendar for salons, clinics, trades, and local service businesses across Sydney.',
-  note: 'Built for Australian operators who need more bookings, not more admin.',
+    'BookedAI replies instantly, qualifies leads, and fills your calendar for salons, clinics, food venues, events, wellness, trades, healthcare, kids services, and other service businesses across Australia.',
+  note: 'Built for Australian operators who need more bookings, fewer missed leads, and less front-desk admin from Perth to Brisbane, Melbourne, Adelaide, Hobart, and everywhere in between.',
   primaryCta: 'Start Free Trial',
   secondaryCta: 'View Product',
   primaryHref: primaryCtaHref,
@@ -187,9 +187,9 @@ export const demoContent: DemoContent = {
   subtitle: 'BookedAI converts chat into confirmed bookings',
   status: 'Online',
   messages: [
-    'Do you have any appointments tomorrow in Surry Hills?',
-    'Yes. We have two available spots tomorrow and I can lock one in now.',
-    'Which time works better for you?',
+    'Can you help me book a table for 8 and also compare a salon consultation for tomorrow?',
+    'Yes. I can shortlist restaurant, salon, clinic, and event options across Australia and take the booking-ready details in one flow.',
+    'Would you like me to narrow it by location, availability, price, or the best overall fit first?',
   ],
   slots: ['10:00 AM', '11:30 AM'],
 };
@@ -198,7 +198,7 @@ export const problemContent: SectionContent = {
   kicker: 'Problem',
   kickerClassName: 'text-indigo-400',
   title: 'You’re Losing Customers Every Day',
-  body: 'Local businesses in Sydney do not lose sales because demand is low. They lose sales because response time is slow. Customers expect an answer now, not after the lunch rush or at the end of the day.',
+  body: 'Australian customers move quickly when they are booking a treatment, table, consultation, event slot, haircut, or service call. If your team replies late, that booking often goes to another provider.',
 };
 
 export const proofContent: ProofContent = {
@@ -212,8 +212,8 @@ export const proofContent: ProofContent = {
   section: {
     kicker: 'Why teams trust it',
     kickerClassName: 'text-sky-400',
-    title: 'Built to handle real front-desk pressure, not just answer a chat bubble',
-    body: 'BookedAI is built for busy operators who need fast replies, clean booking logic, and a workflow their team can trust.',
+    title: 'Built for busy booking teams, not just a generic chat bubble',
+    body: 'BookedAI is built for operators who need fast replies, clean booking logic, and a workflow customers can trust across hospitality, beauty, health, events, trades, family services, and more.',
   },
 };
 
@@ -221,22 +221,22 @@ export const proofItems: ProofItem[] = [
   {
     eyebrow: 'Coverage',
     title: 'Always on when your team is fully booked',
-    body: 'Late-night enquiries, lunch-hour rushes, and after-hours messages still get an immediate reply that keeps the customer engaged.',
+    body: 'After-hours enquiries, peak-weekend demand, and busy reception periods still get an immediate reply that keeps leads engaged.',
   },
   {
     eyebrow: 'Qualification',
     title: 'Lead screening happens before the booking hits your calendar',
-    body: 'BookedAI collects the right details up front so your staff spend less time chasing context and more time serving real customers.',
+    body: 'BookedAI collects service type, timing, contact details, and booking context up front so your team spends less time chasing basics and more time closing real work.',
   },
   {
     eyebrow: 'Routing',
     title: 'Escalate the right conversations to a human',
-    body: 'Urgent, high-value, or unusual enquiries can be handed off quickly instead of getting trapped in a generic automation flow.',
+    body: 'Urgent service questions, fit concerns, VIP leads, or higher-value enquiries can be handed off quickly instead of getting trapped in a generic automation flow.',
   },
   {
     eyebrow: 'Follow-up',
     title: 'Reminders and admin steps stay connected to the booking',
-    body: 'Calendar updates, reminders, and workflow automations can continue after the conversation so fewer leads fall through the cracks.',
+    body: 'Calendar updates, reminders, and workflow automations can continue after the conversation so fewer restaurant, salon, clinic, event, trade, or kids-service leads fall through the cracks.',
   },
 ];
 
@@ -271,15 +271,15 @@ export const showcaseImages: ShowcaseImage[] = [
 export const problemCards: InfoCard[] = [
   {
     title: 'Slow Replies',
-    body: 'Sydney customers move on fast when a business replies too late.',
+    body: 'Australian customers move on fast when a booking enquiry sits unanswered.',
   },
   {
     title: 'Missed Leads',
-    body: 'Busy front desks and small teams cannot answer every inquiry in time.',
+    body: 'Busy teams cannot answer every call, chat, DM, and web form in time.',
   },
   {
     title: 'Lost Revenue',
-    body: 'Every unanswered message is a missed booking and lost weekly revenue.',
+    body: 'Every unanswered enquiry can mean one less table, appointment, consultation, class, event, or callout.',
   },
 ];
 
@@ -287,21 +287,21 @@ export const solutionContent: SectionContent = {
   kicker: 'Solution',
   kickerClassName: 'text-emerald-400',
   title: 'Meet BookedAI',
-  body: 'BookedAI acts like an always-on front desk that answers questions, qualifies demand, and books appointments automatically.',
+  body: 'BookedAI acts like an always-on front desk that answers questions, qualifies demand, and books services automatically.',
 };
 
 export const solutionCards: InfoCard[] = [
   {
     title: 'Instant Replies',
-    body: 'Reply to web chat, WhatsApp, and inbound enquiries in seconds, 24/7.',
+    body: 'Reply to web chat, calls, and inbound enquiries in seconds, 24/7.',
   },
   {
     title: 'Smart Qualification',
-    body: 'Understand customer intent and move serious leads to the right next step.',
+    body: 'Understand whether the customer needs a table, treatment, consult, quote, event slot, or family service and move them to the right next step.',
   },
   {
     title: 'Auto Booking',
-    body: 'Turn conversations into confirmed appointments without manual follow-up.',
+    body: 'Turn customer conversations into confirmed bookings and qualified sales conversations without manual follow-up.',
   },
 ];
 
@@ -340,13 +340,13 @@ export const pricingContent: PricingContent = {
 export const ctaContent: CallToActionContent = {
   kicker: 'Call to action',
   title: 'Start your free trial today',
-  body: 'Launch BookedAI on bookedai.au and start converting more Sydney conversations into revenue this week.',
+  body: 'Launch BookedAI on bookedai.au and start converting more Australian enquiries into booked revenue this week across food, events, salons, healthcare, kids services, wellness, and local service businesses.',
   primaryCta: 'Start Free Trial',
   secondaryCta: 'Book a Demo',
   primaryHref: primaryCtaHref,
   secondaryHref: demoCtaHref,
   supportingText:
-    'Prefer email? Reach us directly at ceo@bookedai.au and we will help map your booking flow.',
+    'Prefer email? Reach us directly at info@bookedai.au and we will help map your booking flow for hospitality, beauty, health, events, trades, education, or other service-led SMEs.',
 };
 
 export const trustItems: TrustItem[] = [
@@ -420,7 +420,7 @@ export const teamMembers: TeamMember[] = [
   {
     name: 'Do Van Long',
     role: 'CEO',
-    imageSrc: 'https://upload.bookedai.au/images/eb09/0mp56c4pt42V3X1ni5Elhw.png',
+    imageSrc: 'https://upload.bookedai.au/images/e40f/k262gljWOBBiDXdMf6hfCA.png',
     imageAlt: 'Portrait of Do Van Long',
     bio: 'Do Van Long is a builder at heart: founder, technologist, and innovator in AI, blockchain, and digital business. He is passionate about turning emerging technology into real-world products that scale across markets.',
   },
@@ -445,9 +445,9 @@ export const bookingAssistantContent: BookingAssistantContent = {
   kicker: '',
   kickerClassName: 'text-rose-400',
   title: 'One product demo, one clear next step',
-  body: 'One live assistant for bookings, service discovery, and WSTI-priority AI event search.',
+  body: 'One live assistant for bookings across salons, food, events, healthcare, kids services, memberships, and broader Australian SME service discovery.',
   searchPlaceholder:
-    'Ask for a booking, service match, membership help, or AI events at WSTI...',
+    'Ask for a salon booking, table reservation, clinic consult, event enquiry, kids service, membership help, or AI event...',
   formIntro: '',
   submitLabel: 'Create Booking Request',
 };
@@ -529,7 +529,7 @@ export const imageUploadContent: ImageUploadContent = {
   kicker: 'Image Upload',
   kickerClassName: 'text-amber-500',
   title: 'Upload business images and get a hosted link instantly',
-  body: 'Drop in salon photos, service images, or customer assets and BookedAI will return a live URL on upload.bookedai.au that you can use right away in content, automations, and booking flows.',
+  body: 'Drop in venue photos, menu shots, treatment images, service assets, or customer creatives and BookedAI will return a live URL on upload.bookedai.au that you can use right away in content, automations, and booking flows.',
   acceptedFormats: ['JPEG', 'PNG', 'GIF', 'WebP'],
   helperText: 'Max 10MB per image. Files are published immediately after upload.',
   uploadLabel: 'Upload image',
@@ -539,8 +539,8 @@ export const imageUploadContent: ImageUploadContent = {
 export const customerShowcaseContent: CustomerShowcaseContent = {
   kicker: 'Customer Spotlight',
   kickerClassName: 'text-amber-300',
-  title: 'Novoprints.com.au is the kind of local business BookedAI can support',
-  body: 'BookedAI is made for service-led operators with urgent enquiries and customers who expect quick answers.',
+  title: 'BookedAI fits service-led SMEs across Australia',
+  body: 'BookedAI is made for operators with urgent enquiries and customers who expect quick answers, from hospitality and health to beauty, events, trades, tutoring, and print.',
   customerName: 'NOVO PRINT AND SIGNS',
   customerUrl: 'https://novoprints.com.au/',
   customerSummary:

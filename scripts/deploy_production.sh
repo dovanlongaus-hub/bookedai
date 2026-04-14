@@ -14,7 +14,7 @@ DOMAIN_N8N="${DOMAIN_N8N:-n8n.bookedai.au}"
 DOMAIN_SUPABASE="${DOMAIN_SUPABASE:-supabase.bookedai.au}"
 DOMAIN_HERMES="${DOMAIN_HERMES:-hermes.bookedai.au}"
 DOMAIN_UPLOAD="${DOMAIN_UPLOAD:-upload.bookedai.au}"
-EMAIL="${LETSENCRYPT_EMAIL:-admin@bookedai.au}"
+EMAIL="${LETSENCRYPT_EMAIL:-info@bookedai.au}"
 
 CERT_DOMAINS=(
   "${DOMAIN_ROOT}"

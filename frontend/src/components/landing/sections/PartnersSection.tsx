@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 
 import { fallbackPartners, type PartnersSectionContent } from '../data';
+import { getApiBaseUrl } from '../../../shared/config/api';
 import { SectionHeading } from '../ui/SectionHeading';
 
 type PartnerProfileItem = {
@@ -24,32 +25,6 @@ type PartnerProfileListResponse = {
 type PartnersSectionProps = {
   content: PartnersSectionContent;
 };
-
-function getApiBaseUrl() {
-  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/^['"]|['"]$/g, '');
-  if (configuredBaseUrl) {
-    try {
-      const normalizedBaseUrl = configuredBaseUrl.replace(/\/$/, '');
-      const candidate = normalizedBaseUrl.endsWith('/api')
-        ? normalizedBaseUrl
-        : `${normalizedBaseUrl}/api`;
-      return new URL(candidate).toString().replace(/\/$/, '');
-    } catch {
-      return '/api';
-    }
-  }
-
-  if (typeof window === 'undefined') {
-    return '/api';
-  }
-
-  const { hostname } = window.location;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'http://localhost:8000/api';
-  }
-
-  return '/api';
-}
 
 function hasDistinctShowcaseImage(item: PartnerProfileItem) {
   if (!item.image_url) {

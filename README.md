@@ -2,6 +2,8 @@
 
 BookedAI is a Docker-based full-stack application for the `bookedai.au` domain, with self-hosted Supabase, n8n, and Hermes running on the same Docker host.
 
+Current application release baseline: `1.0.1-stable`.
+
 ## Repository structure
 
 - `frontend/`: React + TypeScript + Vite
@@ -22,7 +24,7 @@ Production traffic is expected to follow this path:
 - `https://supabase.bookedai.au/` -> Supabase Studio, Auth, REST, Storage via Kong
 - `https://n8n.bookedai.au/` -> n8n editor and webhooks
 - `https://hermes.bookedai.au/` -> Hermes knowledge/documentation service
-- `https://upload.bookedai.au/` -> public file uploads served from `storage/uploads`
+- `https://upload.bookedai.au/` -> simple upload page plus public file hosting from `storage/uploads`
 
 Core production services defined in [`docker-compose.prod.yml`](/home/dovanlong/BookedAI/docker-compose.prod.yml:1):
 
@@ -183,21 +185,22 @@ These admin routes require an `X-Admin-Token` header that matches `ADMIN_API_TOK
 
 Recommended provider setup for this project:
 
-- Outbound SMTP: Zoho Mail (`smtppro.zoho.com`)
-- Inbound IMAP: Zoho Mail (`imappro.zoho.com`)
+- Outbound SMTP: Zoho Mail (`smtp.zoho.com.au`)
+- Inbound IMAP: Zoho Mail (`imap.zoho.com.au`)
 
 Example root `.env` values:
 
 ```env
 OPENAI_MODEL=gpt-5-mini
-EMAIL_SMTP_HOST=smtppro.zoho.com
+AI_MODEL=
+EMAIL_SMTP_HOST=smtp.zoho.com.au
 EMAIL_SMTP_PORT=587
 EMAIL_SMTP_USERNAME=info@bookedai.au
 EMAIL_SMTP_PASSWORD=your-zoho-app-password
 EMAIL_SMTP_FROM=info@bookedai.au
 EMAIL_SMTP_USE_TLS=false
 EMAIL_SMTP_USE_STARTTLS=true
-EMAIL_IMAP_HOST=imappro.zoho.com
+EMAIL_IMAP_HOST=imap.zoho.com.au
 EMAIL_IMAP_PORT=993
 EMAIL_IMAP_USERNAME=info@bookedai.au
 EMAIL_IMAP_PASSWORD=your-zoho-app-password
@@ -221,6 +224,7 @@ Required root `.env` values:
 ```env
 OPENAI_API_KEY=your-openai-key
 OPENAI_MODEL=gpt-5-mini
+AI_MODEL=
 ```
 
 Useful checks:

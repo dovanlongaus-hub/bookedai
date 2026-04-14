@@ -1,6 +1,7 @@
 import { ChangeEvent, DragEvent, useRef, useState } from 'react';
 
 import type { ImageUploadContent } from '../data';
+import { getApiBaseUrl } from '../../../shared/config/api';
 import { SectionHeading } from '../ui/SectionHeading';
 
 type UploadResponse = {
@@ -14,27 +15,6 @@ type UploadResponse = {
 type ImageUploadSectionProps = {
   content: ImageUploadContent;
 };
-
-function getApiBaseUrl() {
-  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
-  if (configuredBaseUrl) {
-    const normalizedBaseUrl = configuredBaseUrl.replace(/\/$/, '');
-    return normalizedBaseUrl.endsWith('/api')
-      ? normalizedBaseUrl
-      : `${normalizedBaseUrl}/api`;
-  }
-
-  if (typeof window === 'undefined') {
-    return '/api';
-  }
-
-  const { hostname } = window.location;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'http://localhost:8000/api';
-  }
-
-  return '/api';
-}
 
 function formatBytes(bytes: number) {
   if (bytes < 1024) {

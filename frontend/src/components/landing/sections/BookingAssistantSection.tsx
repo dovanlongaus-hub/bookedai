@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { BookingAssistantContent } from '../data';
+import { getApiBaseUrl } from '../../../shared/config/api';
 import { SectionHeading } from '../ui/SectionHeading';
 
 type ServiceCatalogItem = {
@@ -33,6 +34,7 @@ type BookingAssistantChatResponse = {
   matched_services: ServiceCatalogItem[];
   matched_events: AIEventItem[];
   suggested_service_id: string | null;
+  should_request_location: boolean;
 };
 
 type BookingAssistantSessionResponse = {
@@ -48,6 +50,10 @@ type BookingAssistantSessionResponse = {
   payment_url: string;
   qr_code_url: string;
   email_status: 'sent' | 'pending_manual_followup';
+  meeting_status: 'scheduled' | 'configuration_required';
+  meeting_join_url: string | null;
+  meeting_event_url: string | null;
+  calendar_add_url: string | null;
   confirmation_message: string;
   contact_email: string;
   workflow_status: string | null;
@@ -97,7 +103,10 @@ type BookingAssistantSectionProps = {
 const starterPrompts = [
   'Book a restaurant table for 6 tomorrow night',
   'I need physio for shoulder pain',
-  'Find me something under $50 near Parramatta',
+  'Find a dentist or skin clinic near me with weekend availability',
+  'Book a haircut and colour consultation for Friday afternoon',
+  'Find an event venue or private dining option for a team dinner',
+  'Find me something under $50 near me',
   'How do I renew my RSL membership?',
   'Which service is best if I need something quick after work?',
   'Compare a cafe group booking and a restaurant table for 8 people',
@@ -123,32 +132,6 @@ function formatEventDate(value: string) {
     timeZone: 'Australia/Sydney',
     timeZoneName: 'short',
   }).format(parsed);
-}
-
-function getApiBaseUrl() {
-  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/^['"]|['"]$/g, '');
-  if (configuredBaseUrl) {
-    try {
-      const normalizedBaseUrl = configuredBaseUrl.replace(/\/$/, '');
-      const candidate = normalizedBaseUrl.endsWith('/api')
-        ? normalizedBaseUrl
-        : `${normalizedBaseUrl}/api`;
-      return new URL(candidate).toString().replace(/\/$/, '');
-    } catch {
-      return '/api';
-    }
-  }
-
-  if (typeof window === 'undefined') {
-    return '/api';
-  }
-
-  const { hostname } = window.location;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'http://localhost:8000/api';
-  }
-
-  return '/api';
 }
 
 function extractEventImageUrl(event: AIEventItem) {
@@ -443,22 +426,78 @@ function buildDecisionSummary(services: ServiceCatalogItem[], userQuery: string)
   return `${first.name} is the strongest fit right now, while ${second.name} is the main alternative if you want a second option before booking.`;
 }
 
-function queryNeedsGeolocation(message: string) {
-  const lowered = message.toLowerCase();
+function buildServiceLocationLabel(service: ServiceCatalogItem) {
+  return [service.venue_name, service.location].filter(Boolean).join(' • ') || 'Location confirmed during booking';
+}
+
+function buildServiceNextStepLabel(service: ServiceCatalogItem) {
+  if (service.booking_url) {
+    return 'Book online now';
+  }
+  return 'Lock in a time in chat';
+}
+
+function buildServiceConfidenceNotes(service: ServiceCatalogItem) {
+  const notes = [service.booking_url ? 'Direct booking link' : 'Chat booking flow ready'];
+
+  if (service.map_url || service.location || service.venue_name) {
+    notes.push('Location details ready');
+  }
+
+  notes.push(service.featured ? 'Popular local choice' : 'Curated best-fit match');
+  return notes;
+}
+
+function buildBookabilityLabel(service: ServiceCatalogItem) {
+  if (service.booking_url) {
+    return 'Ready to book';
+  }
+  if (service.map_url && (service.location || service.venue_name)) {
+    return 'Easy to confirm';
+  }
+  return 'Best for comparing';
+}
+
+function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
   return [
-    'near me',
-    'nearby',
-    'closest',
-    'near ',
-    'around me',
-    'my location',
-    'location',
-    'suburb',
-    'local',
-    'gan toi',
-    'gan day',
-    'o gan',
-  ].some((pattern) => lowered.includes(pattern));
+    {
+      label: 'Confirmation email',
+      value:
+        result.email_status === 'sent'
+          ? 'Sent to customer'
+          : `Handled by ${result.contact_email}`,
+      tone:
+        result.email_status === 'sent'
+          ? 'bg-emerald-50 text-emerald-700'
+          : 'bg-amber-50 text-amber-800',
+    },
+    {
+      label: 'Payment',
+      value:
+        result.payment_status === 'stripe_checkout_ready'
+          ? 'Checkout ready now'
+          : 'Payment follow-up required',
+      tone:
+        result.payment_status === 'stripe_checkout_ready'
+          ? 'bg-sky-50 text-sky-700'
+          : 'bg-amber-50 text-amber-800',
+    },
+    {
+      label: 'Calendar and workflow',
+      value:
+        result.meeting_status === 'scheduled'
+          ? 'Calendar event sent'
+          : result.calendar_add_url
+            ? 'Calendar link ready'
+          : result.workflow_status
+            ? 'Sent into ops workflow'
+            : 'Queued for handoff',
+      tone:
+        result.meeting_status === 'scheduled' || result.workflow_status
+          ? 'bg-emerald-50 text-emerald-700'
+          : 'bg-slate-100 text-slate-600',
+    },
+  ];
 }
 
 export function BookingAssistantSection({
@@ -519,8 +558,8 @@ export function BookingAssistantSection({
     return () => controller.abort();
   }, []);
 
-  async function ensureGeoContextIfNeeded(message: string) {
-    if (!queryNeedsGeolocation(message) || userGeoContext || geoPromptState === 'denied') {
+  async function requestGeoContext() {
+    if (userGeoContext || geoPromptState === 'denied') {
       return userGeoContext;
     }
     if (typeof window === 'undefined' || !('geolocation' in navigator)) {
@@ -550,6 +589,37 @@ export function BookingAssistantSection({
         },
       );
     });
+  }
+
+  async function requestChatReply(
+    nextMessages: ChatMessage[],
+    geoContext?: UserGeoContext | null,
+  ) {
+    const response = await fetch(`${getApiBaseUrl()}/booking-assistant/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message: nextMessages[nextMessages.length - 1]?.content ?? '',
+        conversation: nextMessages.map<ChatApiMessage>((item) => ({
+          role: item.role,
+          content: item.content,
+        })),
+        user_latitude: geoContext?.latitude ?? userGeoContext?.latitude ?? null,
+        user_longitude: geoContext?.longitude ?? userGeoContext?.longitude ?? null,
+        user_locality: geoContext?.locality ?? userGeoContext?.locality ?? null,
+      }),
+    });
+
+    const payload = (await response.json()) as BookingAssistantChatResponse & {
+      detail?: string;
+    };
+    if (!response.ok) {
+      throw new Error(payload.detail || 'Unable to send message.');
+    }
+
+    return payload;
   }
 
   const highlightedServices = useMemo(() => {
@@ -649,29 +719,16 @@ export function BookingAssistantSection({
     setLoading(true);
 
     try {
-      const geoContext = await ensureGeoContextIfNeeded(message);
-      const response = await fetch(`${getApiBaseUrl()}/booking-assistant/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message,
-          conversation: nextMessages.map<ChatApiMessage>((item) => ({
-            role: item.role,
-            content: item.content,
-          })),
-          user_latitude: geoContext?.latitude ?? userGeoContext?.latitude ?? null,
-          user_longitude: geoContext?.longitude ?? userGeoContext?.longitude ?? null,
-          user_locality: geoContext?.locality ?? userGeoContext?.locality ?? null,
-        }),
-      });
-
-      const payload = (await response.json()) as BookingAssistantChatResponse & {
-        detail?: string;
-      };
-      if (!response.ok) {
-        throw new Error(payload.detail || 'Unable to send message.');
+      let payload = await requestChatReply(nextMessages);
+      if (
+        payload.should_request_location &&
+        !userGeoContext &&
+        geoPromptState !== 'denied'
+      ) {
+        const geoContext = await requestGeoContext();
+        if (geoContext) {
+          payload = await requestChatReply(nextMessages, geoContext);
+        }
       }
 
       setMessages((current) => [
@@ -996,26 +1053,29 @@ export function BookingAssistantSection({
                                           : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
                                       }`}
                                     >
-                                      {serviceImageUrl ? (
-                                        <div
-                                          className={`relative aspect-[16/7] w-full overflow-hidden ${
-                                            isSelected ? 'bg-slate-900/60' : 'bg-slate-100'
-                                          }`}
-                                        >
-                                          <div className="absolute left-3 top-3 z-10 rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-800">
-                                            {getServiceVisualLabel(service)}
-                                          </div>
-                                          <img
-                                            src={serviceImageUrl}
-                                            alt={service.name}
-                                            className="h-full w-full object-cover"
-                                            loading="lazy"
-                                          />
-                                        </div>
-                                      ) : null}
                                       <div className="p-3">
                                         <div className="flex items-start justify-between gap-3">
-                                          <div className="min-w-0">
+                                          <div className="flex min-w-0 gap-3">
+                                            {serviceImageUrl ? (
+                                              <div
+                                                className={`relative hidden h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] border sm:block ${
+                                                  isSelected
+                                                    ? 'border-white/10 bg-white/10'
+                                                    : 'border-slate-200 bg-slate-100'
+                                                }`}
+                                              >
+                                                <img
+                                                  src={serviceImageUrl}
+                                                  alt={service.name}
+                                                  className="h-full w-full object-cover"
+                                                  loading="lazy"
+                                                />
+                                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-white">
+                                                  {getServiceVisualLabel(service)}
+                                                </div>
+                                              </div>
+                                            ) : null}
+                                            <div className="min-w-0">
                                             <div className="flex flex-wrap items-center gap-2">
                                               <span
                                                 className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
@@ -1035,6 +1095,15 @@ export function BookingAssistantSection({
                                               >
                                                 {service.category}
                                               </span>
+                                              <span
+                                                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                                  isSelected
+                                                    ? 'bg-emerald-300 text-slate-950'
+                                                    : 'bg-emerald-50 text-emerald-700'
+                                                }`}
+                                              >
+                                                {buildBookabilityLabel(service)}
+                                              </span>
                                             </div>
                                             <div className="mt-2 text-sm font-semibold">{service.name}</div>
                                             <div
@@ -1042,8 +1111,9 @@ export function BookingAssistantSection({
                                                 isSelected ? 'text-white/70' : 'text-slate-500'
                                               }`}
                                             >
-                                              {service.duration_minutes} min
+                                              {buildServiceLocationLabel(service)}
                                             </div>
+                                          </div>
                                           </div>
                                           <div className="shrink-0 text-sm font-semibold">
                                             {formatPrice(service.amount_aud)}
@@ -1061,25 +1131,57 @@ export function BookingAssistantSection({
                                             isSelected ? 'bg-white/10 text-white/85' : 'bg-amber-50 text-amber-900'
                                           }`}
                                         >
-                                          <span className="font-semibold">Best for:</span> {bestForLabel}
+                                          <span className="font-semibold">Why it matches:</span> {bestForLabel}
                                         </div>
-                                        {(service.venue_name || service.location) && (
-                                          <div
-                                            className={`mt-3 text-xs ${
-                                              isSelected ? 'text-white/70' : 'text-slate-500'
-                                            }`}
-                                          >
-                                            {[service.venue_name, service.location]
-                                              .filter(Boolean)
-                                              .join(' • ')}
-                                          </div>
-                                        )}
                                         <div className="mt-3 flex flex-wrap gap-2">
                                           {fitNotes.map((note) => (
                                             <span
                                               key={`${service.id}-${note}`}
                                               className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
                                                 isSelected ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-700'
+                                              }`}
+                                            >
+                                              {note}
+                                            </span>
+                                          ))}
+                                        </div>
+                                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                          {[
+                                            { label: 'Price', value: formatPrice(service.amount_aud) },
+                                            {
+                                              label: 'Duration',
+                                              value: `${service.duration_minutes} min`,
+                                            },
+                                            {
+                                              label: 'Location',
+                                              value: buildServiceLocationLabel(service),
+                                            },
+                                            {
+                                              label: 'Next step',
+                                              value: buildServiceNextStepLabel(service),
+                                            },
+                                          ].map((fact) => (
+                                            <div
+                                              key={`${service.id}-${fact.label}`}
+                                              className={`rounded-[0.95rem] px-3 py-2 ${
+                                                isSelected ? 'bg-white/10 text-white' : 'bg-slate-50 text-slate-700'
+                                              }`}
+                                            >
+                                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                                                {fact.label}
+                                              </div>
+                                              <div className="mt-1 text-xs leading-5 font-medium">
+                                                {fact.value}
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                        <div className="mt-3 flex flex-wrap gap-2">
+                                          {buildServiceConfidenceNotes(service).map((note) => (
+                                            <span
+                                              key={`${service.id}-confidence-${note}`}
+                                              className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                                                isSelected ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-700'
                                               }`}
                                             >
                                               {note}
@@ -1133,7 +1235,7 @@ export function BookingAssistantSection({
                                                 : 'bg-amber-50 text-amber-800'
                                             }`}
                                           >
-                                            Ready to book
+                                            {buildBookabilityLabel(service)}
                                           </span>
                                         </div>
                                       </div>
@@ -1276,16 +1378,51 @@ export function BookingAssistantSection({
                               <div className="mt-2 text-xs text-slate-500">
                                 {selectedService.category} • {selectedService.duration_minutes} min
                               </div>
-                              {(selectedService.venue_name || selectedService.location) && (
-                                <div className="mt-2 text-xs leading-5 text-slate-600">
-                                  {[selectedService.venue_name, selectedService.location]
-                                    .filter(Boolean)
-                                    .join(' • ')}
-                                </div>
-                              )}
                               <p className="mt-3 text-xs leading-5 text-slate-600">
                                 {selectedService.summary}
                               </p>
+                              <div className="mt-3 rounded-[1rem] bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                                <span className="font-semibold">Why this is ready:</span> {buildBestForLabel(selectedService, latestCustomerRequirement)}
+                              </div>
+                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                {[
+                                  { label: 'Price', value: formatPrice(selectedService.amount_aud) },
+                                  {
+                                    label: 'Duration',
+                                    value: `${selectedService.duration_minutes} min`,
+                                  },
+                                  {
+                                    label: 'Location',
+                                    value: buildServiceLocationLabel(selectedService),
+                                  },
+                                  {
+                                    label: 'Next step',
+                                    value: buildServiceNextStepLabel(selectedService),
+                                  },
+                                ].map((fact) => (
+                                  <div
+                                    key={`selected-${fact.label}`}
+                                    className="rounded-[1rem] bg-slate-50 px-3 py-2 text-xs text-slate-700"
+                                  >
+                                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                      {fact.label}
+                                    </div>
+                                    <div className="mt-1 leading-5 font-medium text-slate-800">
+                                      {fact.value}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {buildServiceConfidenceNotes(selectedService).map((note) => (
+                                  <span
+                                    key={`selected-confidence-${note}`}
+                                    className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700"
+                                  >
+                                    {note}
+                                  </span>
+                                ))}
+                              </div>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {selectedService.map_url ? (
                                   <a
@@ -1574,7 +1711,37 @@ export function BookingAssistantSection({
                       <p className="mt-2 text-sm leading-6 text-slate-700">
                         {bookingResult.confirmation_message}
                       </p>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                        {buildBookingOutcomeSteps(bookingResult).map((step) => (
+                          <div key={step.label} className="rounded-[1rem] bg-white/80 px-3 py-3 text-xs text-slate-700">
+                            <div className="font-semibold text-slate-900">{step.label}</div>
+                            <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 font-semibold ${step.tone}`}>
+                              {step.value}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                       <div className="mt-4 flex flex-col gap-3 sm:flex-row">
+                        {bookingResult.meeting_event_url ? (
+                          <a
+                            href={bookingResult.meeting_event_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-full border border-slate-200 bg-white px-5 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                          >
+                            View calendar event
+                          </a>
+                        ) : null}
+                        {!bookingResult.meeting_event_url && bookingResult.calendar_add_url ? (
+                          <a
+                            href={bookingResult.calendar_add_url}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="rounded-full border border-slate-200 bg-white px-5 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                          >
+                            Add to Google Calendar
+                          </a>
+                        ) : null}
                         <a
                           href={bookingResult.payment_url}
                           target="_blank"
@@ -1591,7 +1758,24 @@ export function BookingAssistantSection({
                         >
                           Contact {bookingResult.contact_email}
                         </a>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            window.history.replaceState({}, '', '/');
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
+                          }}
+                          className="rounded-full border border-slate-200 bg-white px-5 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                        >
+                          Return to homepage
+                        </button>
                       </div>
+                      <p className="mt-3 text-xs leading-5 text-slate-600">
+                        {bookingResult.meeting_status === 'scheduled'
+                          ? 'A calendar event has been created and included in the booking flow. After payment, Stripe returns the customer to the homepage while the booking stays logged for follow-up.'
+                          : bookingResult.calendar_add_url
+                            ? 'A Google Calendar action is ready immediately and is also included in the confirmation email. After payment, Stripe returns the customer to the homepage while the booking stays logged for follow-up.'
+                          : 'After payment, Stripe returns the customer to the homepage. Email confirmation is handled here, and the booking is already passed into the workflow for calendar or team follow-up.'}
+                      </p>
                     </div>
                   ) : null}
                 </div>

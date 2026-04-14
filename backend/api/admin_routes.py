@@ -1,0 +1,102 @@
+from fastapi import APIRouter
+
+from api import route_handlers as handlers
+from schemas import (
+    AdminApiInventoryResponse,
+    AdminBookingDetailResponse,
+    AdminBookingsResponse,
+    AdminConfigResponse,
+    AdminOverviewResponse,
+    AdminServiceMerchantListResponse,
+    AdminSessionResponse,
+    EmailSendResponse,
+    PartnerProfileListResponse,
+)
+
+
+router = APIRouter(prefix="/api")
+
+router.add_api_route(
+    "/admin/login",
+    handlers.admin_login,
+    methods=["POST"],
+    response_model=AdminSessionResponse,
+)
+router.add_api_route(
+    "/admin/overview",
+    handlers.admin_overview,
+    methods=["GET"],
+    response_model=AdminOverviewResponse,
+)
+router.add_api_route(
+    "/admin/bookings",
+    handlers.admin_bookings,
+    methods=["GET"],
+    response_model=AdminBookingsResponse,
+)
+router.add_api_route(
+    "/admin/bookings/{booking_reference}",
+    handlers.admin_booking_detail,
+    methods=["GET"],
+    response_model=AdminBookingDetailResponse,
+)
+router.add_api_route(
+    "/admin/bookings/{booking_reference}/confirm-email",
+    handlers.admin_booking_confirm_email,
+    methods=["POST"],
+    response_model=EmailSendResponse,
+)
+router.add_api_route(
+    "/admin/apis",
+    handlers.admin_api_inventory,
+    methods=["GET"],
+    response_model=AdminApiInventoryResponse,
+)
+router.add_api_route(
+    "/admin/services",
+    handlers.admin_services,
+    methods=["GET"],
+    response_model=AdminServiceMerchantListResponse,
+)
+router.add_api_route(
+    "/admin/services/import-website",
+    handlers.admin_import_services_from_website,
+    methods=["POST"],
+    response_model=AdminServiceMerchantListResponse,
+)
+router.add_api_route(
+    "/admin/services/{service_row_id}",
+    handlers.admin_delete_service,
+    methods=["DELETE"],
+    response_model=AdminServiceMerchantListResponse,
+)
+router.add_api_route(
+    "/admin/partners",
+    handlers.admin_partners,
+    methods=["GET"],
+    response_model=PartnerProfileListResponse,
+)
+router.add_api_route(
+    "/admin/partners",
+    handlers.admin_partner_create,
+    methods=["POST"],
+    response_model=PartnerProfileListResponse,
+)
+router.add_api_route(
+    "/admin/partners/{partner_id}",
+    handlers.admin_partner_update,
+    methods=["PUT"],
+    response_model=PartnerProfileListResponse,
+)
+router.add_api_route(
+    "/admin/partners/{partner_id}",
+    handlers.admin_partner_delete,
+    methods=["DELETE"],
+    response_model=PartnerProfileListResponse,
+)
+router.add_api_route(
+    "/admin/config",
+    handlers.admin_config,
+    methods=["GET"],
+    response_model=AdminConfigResponse,
+)

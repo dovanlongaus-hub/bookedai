@@ -13,7 +13,16 @@ class Settings:
     supabase_anon_key: str
     supabase_service_role_key: str
     supabase_log_table: str
+    ai_provider: str
+    ai_api_key: str
+    ai_base_url: str
+    ai_model: str
+    ai_fallback_provider: str
+    ai_fallback_api_key: str
+    ai_fallback_base_url: str
+    ai_fallback_model: str
     openai_api_key: str
+    openai_base_url: str
     openai_model: str
     openai_timeout_seconds: float
     tawk_webhook_secret: str
@@ -24,6 +33,13 @@ class Settings:
     stripe_secret_key: str
     stripe_publishable_key: str
     stripe_currency: str
+    zoho_calendar_api_base_url: str
+    zoho_accounts_base_url: str
+    zoho_calendar_uid: str
+    zoho_calendar_access_token: str
+    zoho_calendar_refresh_token: str
+    zoho_calendar_client_id: str
+    zoho_calendar_client_secret: str
     google_maps_static_api_key: str
     booking_business_email: str
     email_smtp_host: str
@@ -86,7 +102,26 @@ def env_float(name: str, default: float) -> float:
         return default
 
 
+def env_str(name: str, default: str = "") -> str:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip()
+
+
 def get_settings() -> Settings:
+    openai_api_key = env_str("OPENAI_API_KEY", "")
+    openai_base_url = env_str("OPENAI_BASE_URL", "https://api.openai.com/v1")
+    openai_model = env_str("OPENAI_MODEL", "gpt-5-mini")
+    ai_provider = env_str("AI_PROVIDER", "")
+    ai_api_key = env_str("AI_API_KEY", openai_api_key)
+    ai_base_url = env_str("AI_BASE_URL", "") or openai_base_url
+    ai_model = env_str("AI_MODEL", "") or openai_model
+    ai_fallback_provider = env_str("AI_FALLBACK_PROVIDER", "")
+    ai_fallback_api_key = env_str("AI_FALLBACK_API_KEY", "")
+    ai_fallback_base_url = env_str("AI_FALLBACK_BASE_URL", "") or "https://api.openai.com/v1"
+    ai_fallback_model = env_str("AI_FALLBACK_MODEL", "") or openai_model
+
     return Settings(
         app_name=os.getenv("APP_NAME", "BookedAI"),
         database_url=os.getenv(
@@ -97,14 +132,23 @@ def get_settings() -> Settings:
         public_api_url=os.getenv("PUBLIC_API_URL", "https://api.bookedai.au"),
         cors_allow_origins=os.getenv(
             "CORS_ALLOW_ORIGINS",
-            "http://localhost:3000,http://localhost:5173,https://bookedai.au,https://www.bookedai.au,https://admin.bookedai.au",
+            "http://localhost:3000,http://localhost:5173,https://bookedai.au,https://www.bookedai.au,https://admin.bookedai.au,https://upload.bookedai.au",
         ),
         supabase_url=os.getenv("SUPABASE_URL", "https://supabase.bookedai.au"),
         supabase_anon_key=os.getenv("SUPABASE_ANON_KEY", ""),
         supabase_service_role_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
         supabase_log_table=os.getenv("SUPABASE_LOG_TABLE", "conversation_events"),
-        openai_api_key=os.getenv("OPENAI_API_KEY", ""),
-        openai_model=os.getenv("OPENAI_MODEL", "gpt-5-mini"),
+        ai_provider=ai_provider or ("openai" if "api.openai.com" in ai_base_url else "compatible"),
+        ai_api_key=ai_api_key,
+        ai_base_url=ai_base_url,
+        ai_model=ai_model,
+        ai_fallback_provider=ai_fallback_provider,
+        ai_fallback_api_key=ai_fallback_api_key,
+        ai_fallback_base_url=ai_fallback_base_url,
+        ai_fallback_model=ai_fallback_model,
+        openai_api_key=openai_api_key,
+        openai_base_url=openai_base_url,
+        openai_model=openai_model,
         openai_timeout_seconds=env_float("OPENAI_TIMEOUT_SECONDS", 30),
         tawk_webhook_secret=os.getenv("TAWK_WEBHOOK_SECRET", ""),
         tawk_verify_signature=env_bool("TAWK_VERIFY_SIGNATURE", False),
@@ -114,6 +158,17 @@ def get_settings() -> Settings:
         stripe_secret_key=os.getenv("STRIPE_SECRET_KEY", ""),
         stripe_publishable_key=os.getenv("STRIPE_PUBLISHABLE_KEY", ""),
         stripe_currency=os.getenv("STRIPE_CURRENCY", "aud"),
+        zoho_calendar_api_base_url=os.getenv(
+            "ZOHO_CALENDAR_API_BASE_URL", "https://calendar.zoho.com/api/v1"
+        ),
+        zoho_accounts_base_url=os.getenv(
+            "ZOHO_ACCOUNTS_BASE_URL", "https://accounts.zoho.com"
+        ),
+        zoho_calendar_uid=os.getenv("ZOHO_CALENDAR_UID", ""),
+        zoho_calendar_access_token=os.getenv("ZOHO_CALENDAR_ACCESS_TOKEN", ""),
+        zoho_calendar_refresh_token=os.getenv("ZOHO_CALENDAR_REFRESH_TOKEN", ""),
+        zoho_calendar_client_id=os.getenv("ZOHO_CALENDAR_CLIENT_ID", ""),
+        zoho_calendar_client_secret=os.getenv("ZOHO_CALENDAR_CLIENT_SECRET", ""),
         google_maps_static_api_key=os.getenv("GOOGLE_MAPS_STATIC_API_KEY", ""),
         booking_business_email=os.getenv("BOOKING_BUSINESS_EMAIL", "info@bookedai.au"),
         email_smtp_host=os.getenv("EMAIL_SMTP_HOST", ""),

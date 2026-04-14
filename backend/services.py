@@ -6,18 +6,13 @@ import hashlib
 import hmac
 from html import unescape
 from html.parser import HTMLParser
-import imaplib
 import json
+import logging
 import math
 import re
-import smtplib
 import unicodedata
 import os
 from datetime import datetime, timedelta
-from email import message_from_bytes
-from email.message import EmailMessage
-from email.policy import default
-from email.utils import parseaddr
 from typing import Any
 from urllib.parse import parse_qs, quote, unquote, urlencode
 from urllib.parse import urljoin, urlparse
@@ -25,10 +20,8 @@ from uuid import uuid4
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 import httpx
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from config import Settings
-from db import ConversationEvent
 from schemas import (
     AIBookingDecision,
     AIEventItem,
@@ -38,10 +31,72 @@ from schemas import (
     BookingAssistantSessionRequest,
     BookingAssistantSessionResponse,
     BookingWorkflowPayload,
-    InboxEmail,
+    DemoBookingRequest,
+    DemoBookingResponse,
+    PricingConsultationRequest,
+    PricingConsultationResponse,
     ServiceCatalogItem,
     TawkMessage,
 )
+from service_layer import EmailService, N8NService, store_event
+
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass(frozen=True)
+class AIProviderConfig:
+    label: str
+    api_key: str
+    base_url: str
+    model: str
+
+    @property
+    def responses_endpoint(self) -> str:
+        return f"{self.base_url.rstrip('/')}/responses"
+
+    @property
+    def is_openai(self) -> bool:
+        return "api.openai.com" in self.base_url
+
+
+@dataclass(frozen=True)
+class PricingPlanDefinition:
+    id: str
+    name: str
+    amount_aud: float
+    price_suffix: str
+    description: str
+    onboarding_label: str
+    consultation_minutes: int = 30
+
+
+PRICING_PLAN_DEFINITIONS: dict[str, PricingPlanDefinition] = {
+    "basic": PricingPlanDefinition(
+        id="basic",
+        name="Basic",
+        amount_aud=99,
+        price_suffix="/month",
+        description="BookedAI Basic plan for Australian SMEs that need always-on lead capture.",
+        onboarding_label="Lead capture setup",
+    ),
+    "standard": PricingPlanDefinition(
+        id="standard",
+        name="Standard",
+        amount_aud=249,
+        price_suffix="/month",
+        description="BookedAI Standard plan for businesses that want booking automation and follow-up.",
+        onboarding_label="Booking automation setup",
+    ),
+    "pro": PricingPlanDefinition(
+        id="pro",
+        name="Pro",
+        amount_aud=499,
+        price_suffix="/month",
+        description="BookedAI Pro plan for multi-location or higher-volume service teams.",
+        onboarding_label="Advanced rollout setup",
+    ),
+}
 
 
 def _build_google_maps_url(*parts: str | None) -> str | None:
@@ -60,20 +115,99 @@ def _build_map_snapshot_url(
     if latitude is None or longitude is None:
         return None
     api_key = os.getenv("GOOGLE_MAPS_STATIC_API_KEY", "").strip()
-    if not api_key:
-        return None
+    if api_key:
+        params = urlencode(
+            {
+                "center": f"{latitude},{longitude}",
+                "zoom": str(zoom),
+                "size": "1200x700",
+                "scale": "2",
+                "maptype": "roadmap",
+                "markers": f"color:red|label:B|{latitude},{longitude}",
+                "key": api_key,
+            }
+        )
+        return f"https://maps.googleapis.com/maps/api/staticmap?{params}"
     params = urlencode(
         {
             "center": f"{latitude},{longitude}",
             "zoom": str(zoom),
             "size": "1200x700",
-            "scale": "2",
-            "maptype": "roadmap",
-            "markers": f"color:red|label:B|{latitude},{longitude}",
-            "key": api_key,
+            "markers": f"{latitude},{longitude},red-pushpin",
         }
     )
-    return f"https://maps.googleapis.com/maps/api/staticmap?{params}"
+    return f"https://staticmap.openstreetmap.de/staticmap.php?{params}"
+
+
+CATEGORY_IMAGE_URLS: dict[str, str] = {
+    "Salon": "https://images.pexels.com/photos/3993449/pexels-photo-3993449.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "Kids Services": "https://images.pexels.com/photos/8613089/pexels-photo-8613089.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "Food and Beverage": "https://images.pexels.com/photos/67468/pexels-photo-67468.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "Healthcare Service": "https://images.pexels.com/photos/7089401/pexels-photo-7089401.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "Membership and Community": "https://images.pexels.com/photos/1181406/pexels-photo-1181406.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "Hospitality and Events": "https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg?auto=compress&cs=tinysrgb&w=1200",
+}
+
+SERVICE_IMAGE_URLS: dict[str, str] = {
+    "kids-swimming-lessons": "https://images.pexels.com/photos/863988/pexels-photo-863988.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "kids-chess-club": "https://images.pexels.com/photos/411207/pexels-photo-411207.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "junior-soccer-skills": "https://images.pexels.com/photos/114296/pexels-photo-114296.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "kids-multisport-clinic": "https://images.pexels.com/photos/3662630/pexels-photo-3662630.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "restaurant-table-booking": "https://images.pexels.com/photos/262978/pexels-photo-262978.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "cafe-group-booking": "https://images.pexels.com/photos/302899/pexels-photo-302899.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "catering-enquiry": "https://images.pexels.com/photos/587741/pexels-photo-587741.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "physio-initial-assessment": "https://images.pexels.com/photos/6111582/pexels-photo-6111582.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "dental-checkup-clean": "https://images.pexels.com/photos/3845810/pexels-photo-3845810.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "skin-clinic-consult": "https://images.pexels.com/photos/3762875/pexels-photo-3762875.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "gym-membership-tour": "https://images.pexels.com/photos/1552242/pexels-photo-1552242.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "coworking-membership-tour": "https://images.pexels.com/photos/1181406/pexels-photo-1181406.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "hotel-room-reservation": "https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg?auto=compress&cs=tinysrgb&w=1200",
+}
+
+
+def resolve_service_image_url(
+    *,
+    service_id: str,
+    category: str,
+    tags: list[str] | tuple[str, ...],
+    image_url: str | None = None,
+) -> str | None:
+    normalized_image_url = (image_url or "").strip()
+    if normalized_image_url:
+        return normalized_image_url
+
+    if service_id in SERVICE_IMAGE_URLS:
+        return SERVICE_IMAGE_URLS[service_id]
+
+    normalized_tags = {tag.strip().lower() for tag in tags if tag and tag.strip()}
+    if {"swimming", "swim", "water"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["kids-swimming-lessons"]
+    if {"chess", "strategy"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["kids-chess-club"]
+    if {"soccer", "football"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["junior-soccer-skills"]
+    if {"sport", "sports", "holiday"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["kids-multisport-clinic"]
+    if {"restaurant", "dining"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["restaurant-table-booking"]
+    if {"cafe", "coffee", "brunch"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["cafe-group-booking"]
+    if {"catering", "menu"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["catering-enquiry"]
+    if {"physio", "physiotherapy", "rehab"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["physio-initial-assessment"]
+    if {"dental", "dentist", "teeth"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["dental-checkup-clean"]
+    if {"skin", "aesthetic", "dermal"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["skin-clinic-consult"]
+    if {"gym", "fitness"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["gym-membership-tour"]
+    if {"coworking", "workspace", "office"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["coworking-membership-tour"]
+    if {"hotel", "room", "accommodation"} & normalized_tags:
+        return SERVICE_IMAGE_URLS["hotel-room-reservation"]
+
+    return CATEGORY_IMAGE_URLS.get(category)
 
 
 async def _geocode_place_query(
@@ -458,12 +592,36 @@ class ServiceQuerySignals:
     prefers_morning: bool = False
     customer_types: tuple[str, ...] = ()
     urgency: str | None = None
+    explicit_location_need: bool = False
+    follow_up_refinement: bool = False
 
 
 @dataclass(frozen=True)
 class ServiceMatchInsight:
     service: ServiceCatalogItem
     score: int
+
+
+LOCATION_REQUEST_KEYWORDS = {
+    "near",
+    "nearby",
+    "closest",
+    "around",
+    "local",
+    "location",
+    "suburb",
+    "where",
+    "nearest",
+    "gan",
+    "dia",
+    "diem",
+    "khu",
+    "vuc",
+    "o",
+    "tai",
+    "gan",
+    "toi",
+}
 
 
 class _LinkExtractor(HTMLParser):
@@ -568,6 +726,7 @@ def _service_catalog_item(
     id: str,
     name: str,
     category: str,
+    business_email: str | None = None,
     summary: str,
     duration_minutes: int,
     amount_aud: float,
@@ -580,15 +739,22 @@ def _service_catalog_item(
     longitude: float | None = None,
     booking_url: str | None = None,
 ) -> ServiceCatalogItem:
+    resolved_image_url = resolve_service_image_url(
+        service_id=id,
+        category=category,
+        tags=tags,
+        image_url=image_url,
+    )
     return ServiceCatalogItem(
         id=id,
         name=name,
         category=category,
+        business_email=business_email,
         summary=summary,
         duration_minutes=duration_minutes,
         amount_aud=amount_aud,
-        image_url=image_url,
-        map_snapshot_url=_build_map_snapshot_url(latitude, longitude) if not image_url else None,
+        image_url=resolved_image_url,
+        map_snapshot_url=_build_map_snapshot_url(latitude, longitude) if not resolved_image_url else None,
         venue_name=venue_name,
         location=location,
         map_url=_build_google_maps_url(venue_name, location),
@@ -608,6 +774,7 @@ def _extract_service_query_signals(query: str, tokens: set[str]) -> ServiceQuery
         r"(?:under|below|less than|max|budget)\s*\$?\s*(\d{1,4})",
         r"\$\s*(\d{1,4})",
         r"duoi\s*(\d{1,4})",
+        r"(?:gia|duoi|tam)\s*(\d{1,4})\s*(?:do|aud)?",
     ]
     for pattern in budget_patterns:
         match = re.search(pattern, lowered)
@@ -619,6 +786,7 @@ def _extract_service_query_signals(query: str, tokens: set[str]) -> ServiceQuery
     group_patterns = [
         r"(?:for|group of|party of|table for)\s+(\d{1,2})",
         r"(\d{1,2})\s*(?:people|guests|pax|nguoi)",
+        r"(?:nhom|ban|cho nhom|cho)\s*(\d{1,2})\s*(?:nguoi)?",
     ]
     for pattern in group_patterns:
         match = re.search(pattern, lowered)
@@ -626,46 +794,55 @@ def _extract_service_query_signals(query: str, tokens: set[str]) -> ServiceQuery
             group_size = int(match.group(1))
             break
 
-    preferred_locations: list[str] = []
-    for location in [
-        "parramatta",
-        "north parramatta",
-        "sydney olympic park",
-        "george street",
-        "church street",
-        "macquarie street",
-        "westfield parramatta",
-    ]:
-        if location in lowered:
-            preferred_locations.append(location)
+    preferred_locations = _extract_preferred_locations_from_query(query)
 
     prefers_fast_option = bool(
-        {"quick", "fast", "express"} & tokens or {"after", "work"} <= tokens
+        {"quick", "fast", "express", "quickest", "faster", "nhanh", "gap"} & tokens
+        or {"after", "work"} <= tokens
+        or "sau gio lam" in lowered
     )
     prefers_evening = bool(
         {"tonight", "evening"} & tokens
         or "after work" in lowered
         or "tomorrow night" in lowered
+        or "toi nay" in lowered
+        or "buoi toi" in lowered
+        or "chieu toi" in lowered
+        or "sau gio lam" in lowered
     )
     prefers_morning = bool(
-        {"morning"} & tokens or "tomorrow morning" in lowered or "mai sang" in lowered
+        {"morning", "sang"} & tokens
+        or "tomorrow morning" in lowered
+        or "mai sang" in lowered
+        or "buoi sang" in lowered
     )
 
     customer_types: list[str] = []
     customer_type_map = {
-        "family": {"family", "kids", "children"},
-        "corporate": {"corporate", "team", "office", "client", "workshop"},
-        "first_time": {"first", "new", "beginner"},
+        "family": {"family", "kids", "children", "gia", "dinh", "be", "tre"},
+        "corporate": {"corporate", "team", "office", "client", "workshop", "cong", "ty", "nhom"},
+        "first_time": {"first", "new", "beginner", "lan", "dau", "moi"},
     }
     for label, keywords in customer_type_map.items():
         if keywords & tokens:
             customer_types.append(label)
 
     urgency = None
-    if {"urgent", "asap", "today", "tonight"} & tokens:
+    if {"urgent", "asap", "today", "tonight", "hom", "nay", "gap"} & tokens or "hom nay" in lowered:
         urgency = "urgent"
-    elif {"tomorrow", "soon"} & tokens:
+    elif {"tomorrow", "soon", "mai"} & tokens or "ngay mai" in lowered:
         urgency = "soon"
+
+    explicit_location_need = bool(
+        LOCATION_REQUEST_KEYWORDS & tokens
+        or "near me" in lowered
+        or "closest to me" in lowered
+        or "gan toi" in lowered
+        or "gan day" in lowered
+        or "o gan" in lowered
+        or "gan nhat" in lowered
+    )
+    follow_up_refinement = bool(tokens & FOLLOW_UP_CONTEXT_TOKENS)
 
     return ServiceQuerySignals(
         budget_max=budget_max,
@@ -676,6 +853,8 @@ def _extract_service_query_signals(query: str, tokens: set[str]) -> ServiceQuery
         prefers_morning=prefers_morning,
         customer_types=tuple(customer_types),
         urgency=urgency,
+        explicit_location_need=explicit_location_need,
+        follow_up_refinement=follow_up_refinement,
     )
 
 
@@ -694,7 +873,89 @@ def _merge_service_query_signals(
         prefers_morning=primary.prefers_morning or secondary.prefers_morning,
         customer_types=tuple(dict.fromkeys([*primary.customer_types, *secondary.customer_types])),
         urgency=primary.urgency or secondary.urgency,
+        explicit_location_need=primary.explicit_location_need or secondary.explicit_location_need,
+        follow_up_refinement=primary.follow_up_refinement or secondary.follow_up_refinement,
     )
+
+
+def _extract_preferred_locations_from_query(query: str) -> list[str]:
+    lowered = query.lower()
+    candidates: list[str] = []
+    broad_location_tokens = {
+        "australia",
+        "australian",
+        "nationwide",
+        "anywhere",
+        "across australia",
+        "all australia",
+    }
+    known_locations = [
+        "sydney",
+        "melbourne",
+        "brisbane",
+        "perth",
+        "adelaide",
+        "canberra",
+        "gold coast",
+        "sunshine coast",
+        "newcastle",
+        "wollongong",
+        "geelong",
+        "hobart",
+        "darwin",
+        "parramatta",
+        "north parramatta",
+        "sydney olympic park",
+        "george street",
+        "church street",
+        "macquarie street",
+        "westfield parramatta",
+        "parramatta cbd",
+    ]
+    for location in known_locations:
+        if location in lowered and location not in candidates:
+            candidates.append(location)
+
+    patterns = [
+        r"(?:in|near|around|at|close to|within)\s+([a-z][a-z0-9\s-]{2,40})",
+        r"(?:o|gan|tai)\s+([a-z][a-z0-9\s-]{2,40})",
+    ]
+    trailing_stopwords = {
+        "today",
+        "tomorrow",
+        "tonight",
+        "please",
+        "now",
+        "for",
+        "with",
+        "under",
+        "after",
+        "before",
+        "this",
+        "next",
+        "week",
+        "weekend",
+    }
+    for pattern in patterns:
+        for match in re.finditer(pattern, lowered):
+            phrase = re.split(r"[,.!?;\n]", match.group(1), maxsplit=1)[0].strip(" -")
+            if not phrase or phrase in {"me", "my location", "day"}:
+                continue
+            words = [word for word in phrase.split() if word]
+            while words and words[-1] in trailing_stopwords:
+                words.pop()
+            if not words:
+                continue
+            candidate = " ".join(words[:4]).strip()
+            if (
+                len(candidate) < 3
+                or candidate in candidates
+                or candidate in broad_location_tokens
+            ):
+                continue
+            candidates.append(candidate)
+
+    return [candidate for candidate in candidates if candidate not in broad_location_tokens]
 
 
 SERVICE_CATALOG: list[ServiceCatalogItem] = [
@@ -707,9 +968,9 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         amount_aud=79,
         image_url=None,
         venue_name="Willow & Ash Studio",
-        location="Church Street, Parramatta NSW 2150",
-        latitude=-33.8150,
-        longitude=151.0010,
+        location="Collins Street, Melbourne VIC 3000",
+        latitude=-37.8153,
+        longitude=144.9631,
         tags=["haircut", "trim", "salon", "men", "women"],
         featured=True,
     ),
@@ -722,9 +983,9 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         amount_aud=149,
         image_url=None,
         venue_name="Luna Bridal Hair Lounge",
-        location="North Parramatta NSW 2151",
-        latitude=-33.8015,
-        longitude=151.0005,
+        location="James Street, Fortitude Valley QLD 4006",
+        latitude=-27.4574,
+        longitude=153.0402,
         tags=["wedding", "haircut", "styling", "event", "bridal"],
         featured=True,
     ),
@@ -737,9 +998,9 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         amount_aud=65,
         image_url=None,
         venue_name="Willow & Ash Studio",
-        location="Church Street, Parramatta NSW 2150",
-        latitude=-33.8150,
-        longitude=151.0010,
+        location="King Street, Newtown NSW 2042",
+        latitude=-33.8983,
+        longitude=151.1794,
         tags=["blow dry", "finish", "styling", "refresh"],
     ),
     _service_catalog_item(
@@ -751,10 +1012,71 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         amount_aud=35,
         image_url=None,
         venue_name="Hue Lab Salon",
-        location="Westfield Parramatta, Parramatta NSW 2150",
-        latitude=-33.8176,
-        longitude=151.0027,
+        location="Rundle Mall, Adelaide SA 5000",
+        latitude=-34.9227,
+        longitude=138.6040,
         tags=["colour", "consultation", "styling", "salon"],
+    ),
+    _service_catalog_item(
+        id="kids-swimming-lessons",
+        name="Kids Swimming Lessons",
+        category="Kids Services",
+        business_email="info@bookedai.au",
+        summary="Weekly learn-to-swim classes for children with beginner, intermediate, and confidence-building lanes.",
+        duration_minutes=45,
+        amount_aud=32,
+        image_url=None,
+        venue_name="Aqua Stars Swim School",
+        location="South Bank, Brisbane QLD 4101",
+        latitude=-27.4811,
+        longitude=153.0234,
+        tags=["kids", "children", "swimming", "swim", "lessons", "water", "beginner", "family"],
+        featured=True,
+    ),
+    _service_catalog_item(
+        id="kids-chess-club",
+        name="Kids Chess Club",
+        category="Kids Services",
+        business_email="info@bookedai.au",
+        summary="Beginner-friendly chess coaching for kids focused on tactics, confidence, and weekend tournament prep.",
+        duration_minutes=60,
+        amount_aud=24,
+        image_url=None,
+        venue_name="Checkmate Kids Academy",
+        location="Carlton VIC 3053",
+        latitude=-37.8009,
+        longitude=144.9661,
+        tags=["kids", "children", "chess", "club", "class", "lesson", "beginner", "strategy"],
+    ),
+    _service_catalog_item(
+        id="junior-soccer-skills",
+        name="Junior Soccer Skills Program",
+        category="Kids Services",
+        business_email="info@bookedai.au",
+        summary="After-school soccer sessions for children covering movement, ball control, and small-team play.",
+        duration_minutes=60,
+        amount_aud=28,
+        image_url=None,
+        venue_name="Junior Football Academy",
+        location="Perth WA 6000",
+        latitude=-31.9522,
+        longitude=115.8614,
+        tags=["kids", "children", "junior", "soccer", "football", "sport", "after school", "team"],
+    ),
+    _service_catalog_item(
+        id="kids-multisport-clinic",
+        name="Kids Multi-Sport Holiday Clinic",
+        category="Kids Services",
+        business_email="info@bookedai.au",
+        summary="School holiday sports sessions for kids combining basketball, running games, and coordination drills.",
+        duration_minutes=90,
+        amount_aud=35,
+        image_url=None,
+        venue_name="Active Kids Hub",
+        location="Canberra ACT 2601",
+        latitude=-35.2802,
+        longitude=149.1310,
+        tags=["kids", "children", "sport", "sports", "holiday", "clinic", "basketball", "active"],
     ),
     _service_catalog_item(
         id="restaurant-table-booking",
@@ -765,9 +1087,9 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         amount_aud=20,
         image_url=None,
         venue_name="Riverside Dining Room",
-        location="Parramatta Square, Parramatta NSW 2150",
-        latitude=-33.8155,
-        longitude=151.0036,
+        location="Southbank VIC 3006",
+        latitude=-37.8216,
+        longitude=144.9648,
         tags=["restaurant", "food", "dining", "table", "booking", "eat", "lunch", "dinner"],
         featured=True,
     ),
@@ -780,9 +1102,9 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         amount_aud=15,
         image_url=None,
         venue_name="Grounded Social Cafe",
-        location="George Street, Parramatta NSW 2150",
-        latitude=-33.8139,
-        longitude=151.0040,
+        location="West End QLD 4101",
+        latitude=-27.4820,
+        longitude=153.0080,
         tags=["cafe", "coffee", "brunch", "group booking", "food", "drink"],
     ),
     _service_catalog_item(
@@ -807,10 +1129,10 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         duration_minutes=20,
         amount_aud=89,
         image_url=None,
-        venue_name="Parramatta Health Hub",
-        location="Macquarie Street, Parramatta NSW 2150",
-        latitude=-33.8143,
-        longitude=151.0032,
+        venue_name="City Health Hub",
+        location="Adelaide SA 5000",
+        latitude=-34.9286,
+        longitude=138.6007,
         tags=["gp", "doctor", "clinic", "healthcare", "consultation", "medical"],
         featured=True,
     ),
@@ -823,9 +1145,9 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         amount_aud=120,
         image_url=None,
         venue_name="MoveWell Physio Clinic",
-        location="Hassall Street, Parramatta NSW 2150",
-        latitude=-33.8200,
-        longitude=151.0052,
+        location="Richmond VIC 3121",
+        latitude=-37.8231,
+        longitude=144.9989,
         tags=["physio", "physiotherapy", "rehab", "injury", "healthcare", "assessment"],
     ),
     _service_catalog_item(
@@ -837,9 +1159,9 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         amount_aud=149,
         image_url=None,
         venue_name="Smile Lane Dental",
-        location="Phillip Street, Parramatta NSW 2150",
-        latitude=-33.8148,
-        longitude=151.0094,
+        location="Subiaco WA 6008",
+        latitude=-31.9488,
+        longitude=115.8247,
         tags=["dental", "dentist", "teeth", "checkup", "clean", "healthcare"],
     ),
     _service_catalog_item(
@@ -851,9 +1173,9 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         amount_aud=95,
         image_url=None,
         venue_name="Lumina Skin Clinic",
-        location="Church Street, Parramatta NSW 2150",
-        latitude=-33.8136,
-        longitude=151.0016,
+        location="Newstead QLD 4006",
+        latitude=-27.4485,
+        longitude=153.0448,
         tags=["skin", "clinic", "aesthetic", "consultation", "healthcare", "treatment"],
     ),
     _service_catalog_item(
@@ -864,10 +1186,10 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         duration_minutes=20,
         amount_aud=10,
         image_url=None,
-        venue_name="Parramatta RSL Club",
-        location="Macquarie Street, Parramatta NSW 2150",
-        latitude=-33.8133,
-        longitude=151.0056,
+        venue_name="City RSL Club",
+        location="Newcastle NSW 2300",
+        latitude=-32.9283,
+        longitude=151.7817,
         tags=["rsl", "membership", "member", "signup", "community", "club"],
         featured=True,
     ),
@@ -879,10 +1201,10 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         duration_minutes=15,
         amount_aud=10,
         image_url=None,
-        venue_name="Parramatta RSL Club",
-        location="Macquarie Street, Parramatta NSW 2150",
-        latitude=-33.8133,
-        longitude=151.0056,
+        venue_name="City RSL Club",
+        location="Wollongong NSW 2500",
+        latitude=-34.4278,
+        longitude=150.8931,
         tags=["rsl", "membership", "renewal", "member", "club"],
     ),
     _service_catalog_item(
@@ -894,9 +1216,9 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         amount_aud=5,
         image_url=None,
         venue_name="Momentum Fitness Club",
-        location="Sydney Olympic Park NSW 2127",
-        latitude=-33.8481,
-        longitude=151.0665,
+        location="Surfers Paradise QLD 4217",
+        latitude=-28.0027,
+        longitude=153.4290,
         tags=["gym", "fitness", "membership", "tour", "signup"],
     ),
     _service_catalog_item(
@@ -907,10 +1229,10 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         duration_minutes=30,
         amount_aud=5,
         image_url=None,
-        venue_name="WOTSO Parramatta",
-        location="George Street, Parramatta NSW 2150",
-        latitude=-33.8140,
-        longitude=151.0047,
+        venue_name="WOTSO Melbourne",
+        location="Melbourne VIC 3000",
+        latitude=-37.8136,
+        longitude=144.9631,
         tags=["coworking", "membership", "office", "tour", "workspace"],
     ),
     _service_catalog_item(
@@ -922,9 +1244,9 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         amount_aud=35,
         image_url=None,
         venue_name="Riverside Brewhouse",
-        location="Church Street, Parramatta NSW 2150",
-        latitude=-33.8158,
-        longitude=151.0002,
+        location="The Rocks NSW 2000",
+        latitude=-33.8599,
+        longitude=151.2090,
         tags=["pub", "event", "function", "party", "hospitality", "booking"],
     ),
     _service_catalog_item(
@@ -935,10 +1257,10 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         duration_minutes=20,
         amount_aud=50,
         image_url=None,
-        venue_name="Harbour View Hotel Parramatta",
-        location="Parramatta CBD NSW 2150",
-        latitude=-33.8163,
-        longitude=151.0051,
+        venue_name="Harbour View Hotel Brisbane",
+        location="Brisbane City QLD 4000",
+        latitude=-27.4698,
+        longitude=153.0251,
         tags=["hotel", "room", "reservation", "stay", "hospitality", "booking"],
     ),
 ]
@@ -966,6 +1288,12 @@ GENERIC_MATCH_TOKENS = {
     "want",
     "wants",
     "looking",
+    "dich",
+    "vu",
+    "tim",
+    "kiem",
+    "toi",
+    "can",
 }
 CATEGORY_KEYWORDS: dict[str, set[str]] = {
     "Salon": {
@@ -980,6 +1308,11 @@ CATEGORY_KEYWORDS: dict[str, set[str]] = {
         "color",
         "bridal",
         "wedding",
+        "toc",
+        "cat",
+        "uon",
+        "nhuom",
+        "lam",
     },
     "Food and Beverage": {
         "restaurant",
@@ -994,6 +1327,19 @@ CATEGORY_KEYWORDS: dict[str, set[str]] = {
         "catering",
         "meal",
         "eat",
+        "an",
+        "uong",
+        "ban",
+        "dat",
+        "cho",
+        "nha",
+        "hang",
+        "quan",
+        "cafe",
+        "ca",
+        "phe",
+        "tiec",
+        "nhom",
     },
     "Healthcare Service": {
         "health",
@@ -1014,6 +1360,44 @@ CATEGORY_KEYWORDS: dict[str, set[str]] = {
         "skin",
         "patient",
         "treatment",
+        "kham",
+        "bac",
+        "si",
+        "dau",
+        "vai",
+        "vat",
+        "ly",
+        "tri",
+        "lieu",
+    },
+    "Kids Services": {
+        "kids",
+        "kid",
+        "children",
+        "child",
+        "family",
+        "swimming",
+        "swim",
+        "chess",
+        "junior",
+        "sport",
+        "sports",
+        "soccer",
+        "football",
+        "class",
+        "lesson",
+        "lessons",
+        "after",
+        "school",
+        "be",
+        "tre",
+        "lop",
+        "hoc",
+        "boi",
+        "co",
+        "vua",
+        "the",
+        "thao",
     },
     "Membership and Community": {
         "membership",
@@ -1029,6 +1413,13 @@ CATEGORY_KEYWORDS: dict[str, set[str]] = {
         "gym",
         "coworking",
         "workspace",
+        "hoi",
+        "vien",
+        "thanh",
+        "gia",
+        "han",
+        "dang",
+        "ky",
     },
     "Hospitality and Events": {
         "hotel",
@@ -1042,6 +1433,13 @@ CATEGORY_KEYWORDS: dict[str, set[str]] = {
         "party",
         "venue",
         "hospitality",
+        "khach",
+        "san",
+        "phong",
+        "su",
+        "kien",
+        "dia",
+        "diem",
     },
     "Print and signage": {
         "print",
@@ -1060,6 +1458,12 @@ CATEGORY_KEYWORDS: dict[str, set[str]] = {
         "flyer",
         "corflute",
         "branding",
+        "bien",
+        "bang",
+        "hieu",
+        "booth",
+        "backdrop",
+        "poster",
     },
 }
 SERVICE_KEYWORD_SYNONYMS: dict[str, set[str]] = {
@@ -1067,8 +1471,12 @@ SERVICE_KEYWORD_SYNONYMS: dict[str, set[str]] = {
     "gp-consultation": {"doctor", "medical", "symptoms", "general", "health"},
     "dental-checkup-clean": {"dentist", "tooth", "teeth", "checkup", "clean"},
     "skin-clinic-consult": {"skin", "acne", "aesthetic", "treatment", "dermal"},
-    "restaurant-table-booking": {"restaurant", "table", "dinner", "lunch", "party", "guests"},
-    "cafe-group-booking": {"cafe", "coffee", "brunch", "group", "meeting"},
+    "kids-swimming-lessons": {"kids", "children", "swimming", "swim", "lessons", "water", "learn"},
+    "kids-chess-club": {"kids", "children", "chess", "class", "club", "beginner", "strategy"},
+    "junior-soccer-skills": {"kids", "children", "junior", "soccer", "football", "sport", "after school"},
+    "kids-multisport-clinic": {"kids", "children", "sport", "sports", "holiday", "clinic", "active"},
+    "restaurant-table-booking": {"restaurant", "table", "dinner", "lunch", "party", "guests", "dat", "ban", "cho"},
+    "cafe-group-booking": {"cafe", "coffee", "brunch", "group", "meeting", "nhom", "ban"},
     "catering-enquiry": {"catering", "quote", "event", "corporate", "menu"},
     "rsl-membership-renewal": {"rsl", "membership", "renew", "renewal", "member"},
     "rsl-membership-signup": {"rsl", "membership", "join", "signup", "member"},
@@ -1081,6 +1489,7 @@ FOLLOW_UP_CONTEXT_TOKENS = {
     "best",
     "better",
     "cheapest",
+    "cheap",
     "closest",
     "compare",
     "comparison",
@@ -1093,6 +1502,11 @@ FOLLOW_UP_CONTEXT_TOKENS = {
     "one",
     "ones",
     "which",
+    "re",
+    "nhat",
+    "gan",
+    "nhanh",
+    "tot",
 }
 AI_EVENT_KEYWORDS = {
     "ai",
@@ -1198,10 +1612,17 @@ SERVICE_DISCOVERY_KEYWORDS = {
     "tu",
     "van",
     "gia",
+    "re",
+    "nhat",
+    "ban",
+    "cho",
+    "nhom",
 }
 SERVICE_DISCOVERY_QUESTION_KEYWORDS = {
     "best",
     "better",
+    "cheap",
+    "cheapest",
     "compare",
     "comparison",
     "recommend",
@@ -1230,6 +1651,18 @@ SERVICE_DISCOVERY_QUESTION_KEYWORDS = {
     "sanh",
     "goi",
     "y",
+    "nhanh",
+    "re",
+    "gan",
+    "toi",
+    "nhat",
+    "dat",
+    "ban",
+    "cho",
+    "nhom",
+    "sau",
+    "gio",
+    "lam",
 }
 
 
@@ -1724,6 +2157,9 @@ class OpenAIService:
         prompt = (
             "You are BookedAI, a premium booking and discovery assistant for bookedai.au. "
             "Answer like an experienced front-desk consultant. Recommend only services that exist in the catalog. "
+            "Use the user's exact wording, the recent conversation context, and the catalog together as a semantic search brief. "
+            "Treat the provided catalog as a ranked shortlist for the current request, not the full database. "
+            "Stay anchored to the user's latest message first, and use older conversation context only to refine follow-up intent. "
             "Keep the tone concise, polished, and decision-oriented. Lead with the strongest recommendation, "
             "then briefly explain why it fits. Mention price, duration, venue, or timing when they help the user "
             "decide. End with one concrete next step. If the user is vague, ask one clarifying question while still "
@@ -1731,7 +2167,8 @@ class OpenAIService:
             "and occasion-readiness; healthcare should focus on suitability, assessment, and care context without sounding medical-legal; "
             "food and hospitality should focus on group fit, table or venue suitability, and booking convenience; memberships should focus "
             "on eligibility, renewal, onboarding, and value; AI/community events should focus on relevance, timing, networking value, and venue. "
-            "The user may write in English or Vietnamese. Avoid filler, hype, or long paragraphs."
+            "The user may write in English or Vietnamese. Reply in the user's language when clear. "
+            "Do not invent services, locations, or prices. Avoid filler, hype, or long paragraphs."
         )
         schema = {
             "type": "object",
@@ -1995,7 +2432,7 @@ class OpenAIService:
         return None
 
     def is_configured(self) -> bool:
-        return bool(self.settings.openai_api_key)
+        return any(config.api_key for config in self._provider_configs())
 
     async def _generate_structured_json(
         self,
@@ -2005,24 +2442,76 @@ class OpenAIService:
         schema_name: str,
         schema: dict[str, Any],
     ) -> str:
-        return await self._generate_openai_structured_json(
-            prompt=prompt,
-            payload=payload,
-            schema_name=schema_name,
-            schema=schema,
+        last_error: Exception | None = None
+        for provider in self._provider_configs():
+            try:
+                return await self._generate_provider_structured_json(
+                    provider=provider,
+                    prompt=prompt,
+                    payload=payload,
+                    schema_name=schema_name,
+                    schema=schema,
+                )
+            except Exception as exc:
+                last_error = exc
+                logger.warning(
+                    "AI provider %s failed; trying next configured provider: %s",
+                    provider.label,
+                    exc,
+                )
+
+        if last_error is not None:
+            raise last_error
+        raise RuntimeError("No AI provider is configured")
+
+    def _provider_configs(self) -> list[AIProviderConfig]:
+        providers: list[AIProviderConfig] = []
+        primary = self._build_provider_config(
+            label=self.settings.ai_provider or "primary",
+            api_key=self.settings.ai_api_key,
+            base_url=self.settings.ai_base_url,
+            model=self.settings.ai_model,
+        )
+        fallback = self._build_provider_config(
+            label=self.settings.ai_fallback_provider or "fallback",
+            api_key=self.settings.ai_fallback_api_key,
+            base_url=self.settings.ai_fallback_base_url,
+            model=self.settings.ai_fallback_model,
+        )
+        for provider in (primary, fallback):
+            if provider and provider.api_key:
+                providers.append(provider)
+        return providers
+
+    @staticmethod
+    def _build_provider_config(
+        *,
+        label: str,
+        api_key: str,
+        base_url: str,
+        model: str,
+    ) -> AIProviderConfig | None:
+        normalized_key = api_key.strip()
+        if not normalized_key:
+            return None
+        return AIProviderConfig(
+            label=label.strip() or "provider",
+            api_key=normalized_key,
+            base_url=base_url.strip() or "https://api.openai.com/v1",
+            model=model.strip() or "gpt-5-mini",
         )
 
-    async def _generate_openai_structured_json(
+    async def _generate_provider_structured_json(
         self,
         *,
+        provider: AIProviderConfig,
         prompt: str,
         payload: dict[str, Any],
         schema_name: str,
         schema: dict[str, Any],
     ) -> str:
         request_payload = {
-            "model": self.settings.openai_model,
-            "reasoning": {"effort": "none"},
+            "model": provider.model,
             "input": [
                 {
                     "role": "system",
@@ -2047,14 +2536,16 @@ class OpenAIService:
                 }
             },
         }
+        if provider.is_openai:
+            request_payload["reasoning"] = {"effort": "minimal"}
         headers = {
-            "Authorization": f"Bearer {self.settings.openai_api_key}",
+            "Authorization": f"Bearer {provider.api_key}",
             "Content-Type": "application/json",
         }
 
         async with httpx.AsyncClient(timeout=self.settings.openai_timeout_seconds) as client:
             response = await client.post(
-                "https://api.openai.com/v1/responses",
+                provider.responses_endpoint,
                 headers=headers,
                 json=request_payload,
             )
@@ -2100,43 +2591,6 @@ class OpenAIService:
             },
             booking={},
         )
-
-
-@dataclass
-class N8NService:
-    settings: Settings
-
-    async def trigger_booking(self, payload: BookingWorkflowPayload) -> str:
-        if not self.settings.n8n_booking_webhook_url:
-            return "skipped"
-
-        headers = {"Content-Type": "application/json"}
-        if self.settings.n8n_api_key:
-            headers["X-N8N-API-KEY"] = self.settings.n8n_api_key
-        if self.settings.n8n_webhook_bearer_token:
-            headers["Authorization"] = f"Bearer {self.settings.n8n_webhook_bearer_token}"
-
-        async with httpx.AsyncClient(timeout=20) as client:
-            try:
-                response = await client.post(
-                    self.settings.n8n_booking_webhook_url,
-                    headers=headers,
-                    json=payload.model_dump(),
-                )
-                response.raise_for_status()
-            except httpx.HTTPStatusError as exc:
-                status_code = exc.response.status_code
-                if status_code == 401:
-                    return "unauthorized"
-                if status_code == 404:
-                    return "webhook_not_registered"
-                return f"http_{status_code}"
-            except httpx.HTTPError:
-                return "delivery_failed"
-
-        return "triggered"
-
-
 @dataclass
 class BookingAssistantService:
     settings: Settings
@@ -2183,8 +2637,9 @@ class BookingAssistantService:
             user_locality=user_locality,
             precomputed_signals=memory_signals,
         )
-        matched_services = [item.service for item in ranked_matches[:MAX_SERVICE_MATCHES]]
-        matched_services = self._curate_service_matches(matched_services)
+        shortlist = [item.service for item in ranked_matches[: max(MAX_SERVICE_MATCHES * 2, 6)]]
+        matched_services = self._curate_service_matches(shortlist)
+        ai_shortlist = self._curate_service_matches(shortlist, limit=max(MAX_SERVICE_MATCHES * 2, 6))
         wants_services = self._should_match_services(message, matched_services)
 
         if wants_events and not wants_services:
@@ -2194,19 +2649,20 @@ class BookingAssistantService:
                 matched_services=[],
                 matched_events=self._curate_event_matches(matched_events),
                 suggested_service_id=None,
+                should_request_location=False,
             )
 
         try:
             ai_reply, ai_service_ids = await openai_service.booking_assistant_reply(
-                message=message,
+                message=effective_query,
                 conversation=conversation,
-                services=catalog,
+                services=ai_shortlist,
             )
         except Exception:
             ai_reply, ai_service_ids = "", None
 
         if ai_service_ids:
-            services_by_id = {service.id: service for service in catalog}
+            services_by_id = {service.id: service for service in ai_shortlist}
             matched_services = [
                 services_by_id[service_id]
                 for service_id in ai_service_ids
@@ -2217,6 +2673,14 @@ class BookingAssistantService:
         matched_events = self._curate_event_matches(matched_events)
 
         suggested_service_id = matched_services[0].id if matched_services else None
+        should_request_location = self._should_request_location(
+            message=message,
+            query_signals=memory_signals,
+            ranked_matches=ranked_matches,
+            user_latitude=user_latitude,
+            user_longitude=user_longitude,
+            user_locality=user_locality,
+        )
         reply = ai_reply.strip() or self._build_fallback_chat_reply(
             message,
             matched_services,
@@ -2246,6 +2710,7 @@ class BookingAssistantService:
             matched_services=matched_services,
             matched_events=matched_events if wants_events else [],
             suggested_service_id=suggested_service_id,
+            should_request_location=should_request_location,
         )
 
     def _should_search_ai_events(self, message: str) -> bool:
@@ -2287,10 +2752,20 @@ class BookingAssistantService:
         if not recent_user_context:
             return message, primary_signals
 
-        needs_context = (
-            len(message_tokens) <= 8
-            or bool(message_tokens & FOLLOW_UP_CONTEXT_TOKENS)
-            or not any(message_tokens & keywords for keywords in CATEGORY_KEYWORDS.values())
+        explicit_follow_up = bool(message_tokens & FOLLOW_UP_CONTEXT_TOKENS)
+        has_current_category = any(message_tokens & keywords for keywords in CATEGORY_KEYWORDS.values())
+        has_current_filters = bool(
+            primary_signals.budget_max is not None
+            or primary_signals.group_size is not None
+            or primary_signals.preferred_locations
+            or primary_signals.prefers_fast_option
+            or primary_signals.prefers_evening
+            or primary_signals.prefers_morning
+            or primary_signals.explicit_location_need
+            or primary_signals.urgency
+        )
+        needs_context = explicit_follow_up or (
+            len(message_tokens) <= 5 and not has_current_category and not has_current_filters
         )
         if not needs_context:
             return message, primary_signals
@@ -2501,6 +2976,30 @@ class BookingAssistantService:
         booking_reference = f"BAI-{uuid4().hex[:8].upper()}"
         payment_status = "payment_follow_up_required"
         payment_url = self._build_manual_followup_url(booking_reference, service, payload)
+        meeting_status = "configuration_required"
+        meeting_join_url: str | None = None
+        meeting_event_url: str | None = None
+        calendar_add_url = self._build_google_calendar_url(
+            booking_reference=booking_reference,
+            service=service,
+            payload=payload,
+        )
+        business_recipient = (
+            (service.business_email or "").strip().lower() or self.settings.booking_business_email
+        )
+        info_recipient = self.settings.booking_business_email.strip().lower()
+
+        if normalized_email and self.zoho_calendar_configured():
+            try:
+                meeting_join_url, meeting_event_url = await self._create_zoho_calendar_event(
+                    booking_reference=booking_reference,
+                    service=service,
+                    payload=payload,
+                    customer_email=normalized_email,
+                )
+                meeting_status = "scheduled"
+            except Exception:
+                meeting_status = "configuration_required"
 
         if self.settings.stripe_secret_key:
             try:
@@ -2519,22 +3018,31 @@ class BookingAssistantService:
                 if normalized_email:
                     await email_service.send_email(
                         to=[normalized_email],
+                        cc=[business_recipient, info_recipient],
                         subject=f"BookedAI booking request {booking_reference}",
                         text=self._build_customer_confirmation_text(
                             booking_reference=booking_reference,
                             service=service,
                             payload=payload,
                             payment_url=payment_url,
+                            business_email=business_recipient,
+                            meeting_join_url=meeting_join_url,
+                            meeting_event_url=meeting_event_url,
+                            calendar_add_url=calendar_add_url,
                         ),
                     )
                 await email_service.send_email(
-                    to=[self.settings.booking_business_email],
+                    to=[business_recipient],
+                    cc=[info_recipient],
                     subject=f"New BookedAI booking lead {booking_reference}",
                     text=self._build_internal_notification_text(
                         booking_reference=booking_reference,
                         service=service,
                         payload=payload,
                         payment_url=payment_url,
+                        meeting_join_url=meeting_join_url,
+                        meeting_event_url=meeting_event_url,
+                        calendar_add_url=calendar_add_url,
                     ),
                 )
                 email_status = "sent" if normalized_email else "pending_manual_followup"
@@ -2570,6 +3078,11 @@ class BookingAssistantService:
                 metadata={
                     "booking_reference": booking_reference,
                     "service_id": service.id,
+                    "business_email": business_recipient,
+                    "meeting_status": meeting_status,
+                    "meeting_join_url": meeting_join_url,
+                    "meeting_event_url": meeting_event_url,
+                    "calendar_add_url": calendar_add_url,
                     "payment_status": payment_status,
                     "payment_url": payment_url,
                 },
@@ -2581,9 +3094,11 @@ class BookingAssistantService:
             if payment_status == "stripe_checkout_ready"
             else (
                 "Your booking request has been captured. Payment checkout will be completed with "
-                f"a follow-up from {self.settings.booking_business_email}."
+                f"a follow-up from {business_recipient}."
             )
         )
+        if meeting_status == "scheduled":
+            confirmation_message += " Your calendar event has also been prepared."
 
         return BookingAssistantSessionResponse(
             status="ok",
@@ -2598,10 +3113,129 @@ class BookingAssistantService:
             payment_url=payment_url,
             qr_code_url=self._build_qr_code_url(payment_url),
             email_status=email_status,
+            meeting_status=meeting_status,  # type: ignore[arg-type]
+            meeting_join_url=meeting_join_url,
+            meeting_event_url=meeting_event_url,
+            calendar_add_url=calendar_add_url,
             confirmation_message=confirmation_message,
-            contact_email=self.settings.booking_business_email,
+            contact_email=business_recipient,
             workflow_status=workflow_status,
         )
+
+    def zoho_calendar_configured(self) -> bool:
+        return bool(
+            self.settings.zoho_calendar_uid
+            and (
+                self.settings.zoho_calendar_access_token
+                or (
+                    self.settings.zoho_calendar_refresh_token
+                    and self.settings.zoho_calendar_client_id
+                    and self.settings.zoho_calendar_client_secret
+                )
+            )
+        )
+
+    async def _get_zoho_access_token(self) -> str:
+        direct_token = self.settings.zoho_calendar_access_token.strip()
+        if direct_token:
+            return direct_token
+
+        if not (
+            self.settings.zoho_calendar_refresh_token
+            and self.settings.zoho_calendar_client_id
+            and self.settings.zoho_calendar_client_secret
+        ):
+            raise ValueError("Zoho Calendar OAuth credentials are incomplete")
+
+        token_url = f"{self.settings.zoho_accounts_base_url.rstrip('/')}/oauth/v2/token"
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                token_url,
+                data={
+                    "refresh_token": self.settings.zoho_calendar_refresh_token,
+                    "client_id": self.settings.zoho_calendar_client_id,
+                    "client_secret": self.settings.zoho_calendar_client_secret,
+                    "grant_type": "refresh_token",
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+
+        access_token = str(payload.get("access_token") or "").strip()
+        if not access_token:
+            raise ValueError("Zoho OAuth response did not include an access token")
+        return access_token
+
+    async def _create_zoho_calendar_event(
+        self,
+        *,
+        booking_reference: str,
+        service: ServiceCatalogItem,
+        payload: BookingAssistantSessionRequest,
+        customer_email: str,
+    ) -> tuple[str | None, str | None]:
+        access_token = await self._get_zoho_access_token()
+        zone = ZoneInfo(payload.timezone)
+        start_at = datetime.combine(payload.requested_date, payload.requested_time, tzinfo=zone)
+        end_at = start_at + timedelta(minutes=service.duration_minutes)
+        description_lines = [
+            f"BookedAI booking request for {service.name}.",
+            f"Booking reference: {booking_reference}",
+            f"Customer: {payload.customer_name}",
+            f"Email: {customer_email}",
+            f"Phone: {(payload.customer_phone or '').strip() or 'Not provided'}",
+            f"Location: {' • '.join(item for item in [service.venue_name, service.location] if item) or 'To be confirmed'}",
+            f"Price: {self._format_amount(service.amount_aud)}",
+        ]
+        if payload.notes:
+            description_lines.append(f"Notes: {payload.notes.strip()}")
+
+        event_data = {
+            "title": f"{service.name} - {payload.customer_name}",
+            "location": " • ".join(item for item in [service.venue_name, service.location] if item)
+            or "Service booking via BookedAI",
+            "description": "\n".join(description_lines),
+            "dateandtime": {
+                "timezone": payload.timezone,
+                "start": start_at.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ"),
+                "end": end_at.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ"),
+            },
+            "attendees": [
+                {
+                    "email": customer_email,
+                    "permission": 1,
+                    "attendance": 1,
+                }
+            ],
+            "reminders": [
+                {"action": "email", "minutes": 60},
+                {"action": "popup", "minutes": 15},
+            ],
+            "notify_attendee": 2,
+            "conference": "zmeeting",
+            "allowForwarding": True,
+            "notifyType": 1,
+        }
+        encoded_event_data = quote(json.dumps(event_data, separators=(",", ":")), safe="")
+        calendar_url = (
+            f"{self.settings.zoho_calendar_api_base_url.rstrip('/')}/calendars/"
+            f"{self.settings.zoho_calendar_uid}/events?eventdata={encoded_event_data}"
+        )
+
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                calendar_url,
+                headers={"Authorization": f"Zoho-oauthtoken {access_token}"},
+            )
+            response.raise_for_status()
+            payload_data = response.json()
+
+        event = ((payload_data.get("events") or [None])[0] or {}) if isinstance(payload_data, dict) else {}
+        app_data = event.get("app_data") if isinstance(event.get("app_data"), dict) else {}
+        meeting_data = app_data.get("meetingdata") if isinstance(app_data.get("meetingdata"), dict) else {}
+        meeting_link = str(meeting_data.get("meetinglink") or "").strip() or None
+        event_url = str(event.get("viewEventURL") or "").strip() or None
+        return meeting_link, event_url
 
     async def _create_stripe_checkout_url(
         self,
@@ -2678,9 +3312,10 @@ class BookingAssistantService:
                 ]
             )
         )
-        return (
-            f"mailto:{self.settings.booking_business_email}?subject={subject}&body={body}"
+        business_recipient = (
+            (service.business_email or "").strip().lower() or self.settings.booking_business_email
         )
+        return f"mailto:{business_recipient}?subject={subject}&body={body}"
 
     @staticmethod
     def _build_qr_code_url(target_url: str) -> str:
@@ -2693,6 +3328,41 @@ class BookingAssistantService:
     def _format_amount(amount_aud: float) -> str:
         return f"A${amount_aud:,.2f}"
 
+    def _build_google_calendar_url(
+        self,
+        *,
+        booking_reference: str,
+        service: ServiceCatalogItem,
+        payload: BookingAssistantSessionRequest,
+    ) -> str:
+        zone = ZoneInfo(payload.timezone)
+        start_at = datetime.combine(payload.requested_date, payload.requested_time, tzinfo=zone)
+        end_at = start_at + timedelta(minutes=service.duration_minutes)
+        details = [
+            f"BookedAI booking reference: {booking_reference}",
+            f"Service: {service.name}",
+            f"Customer: {payload.customer_name}",
+        ]
+        if payload.notes:
+            details.append(f"Notes: {payload.notes.strip()}")
+        params = urlencode(
+            {
+                "action": "TEMPLATE",
+                "text": f"{service.name} - {payload.customer_name}",
+                "dates": (
+                    f"{start_at.astimezone(ZoneInfo('UTC')).strftime('%Y%m%dT%H%M%SZ')}/"
+                    f"{end_at.astimezone(ZoneInfo('UTC')).strftime('%Y%m%dT%H%M%SZ')}"
+                ),
+                "details": "\n".join(details),
+                "location": " • ".join(
+                    item for item in [service.venue_name, service.location] if item
+                )
+                or "Service booking via BookedAI",
+                "ctz": payload.timezone,
+            }
+        )
+        return f"https://calendar.google.com/calendar/render?{params}"
+
     def _build_customer_confirmation_text(
         self,
         *,
@@ -2700,23 +3370,36 @@ class BookingAssistantService:
         service: ServiceCatalogItem,
         payload: BookingAssistantSessionRequest,
         payment_url: str,
+        business_email: str,
+        meeting_join_url: str | None,
+        meeting_event_url: str | None,
+        calendar_add_url: str | None,
     ) -> str:
-        return "\n".join(
+        lines = [
+            "Thanks for booking with BookedAI.",
+            "",
+            f"Booking reference: {booking_reference}",
+            f"Service: {service.name}",
+            f"Requested date: {payload.requested_date.isoformat()}",
+            f"Requested time: {payload.requested_time.strftime('%H:%M')}",
+            f"Timezone: {payload.timezone}",
+            f"Price: {self._format_amount(service.amount_aud)}",
+        ]
+        if meeting_event_url:
+            lines.append(f"Calendar event: {meeting_event_url}")
+        if meeting_join_url:
+            lines.append(f"Calendar join link: {meeting_join_url}")
+        if calendar_add_url:
+            lines.append(f"Add to Google Calendar: {calendar_add_url}")
+        lines.extend(
             [
-                "Thanks for booking with BookedAI.",
-                "",
-                f"Booking reference: {booking_reference}",
-                f"Service: {service.name}",
-                f"Requested date: {payload.requested_date.isoformat()}",
-                f"Requested time: {payload.requested_time.strftime('%H:%M')}",
-                f"Timezone: {payload.timezone}",
-                f"Price: {self._format_amount(service.amount_aud)}",
                 "",
                 f"Payment and confirmation link: {payment_url}",
                 "",
-                f"If you need help, reply to {self.settings.booking_business_email}.",
+                f"If you need help, reply to {business_email}.",
             ]
         )
+        return "\n".join(lines)
 
     @staticmethod
     def _build_internal_notification_text(
@@ -2725,23 +3408,31 @@ class BookingAssistantService:
         service: ServiceCatalogItem,
         payload: BookingAssistantSessionRequest,
         payment_url: str,
+        meeting_join_url: str | None,
+        meeting_event_url: str | None,
+        calendar_add_url: str | None,
     ) -> str:
-        return "\n".join(
-            [
-                "New booking assistant lead received.",
-                "",
-                f"Reference: {booking_reference}",
-                f"Service: {service.name}",
-                f"Customer: {payload.customer_name}",
-                f"Email: {(payload.customer_email or '').strip().lower() or 'Not provided'}",
-                f"Phone: {payload.customer_phone or 'Not provided'}",
-                f"Requested date: {payload.requested_date.isoformat()}",
-                f"Requested time: {payload.requested_time.strftime('%H:%M')}",
-                f"Timezone: {payload.timezone}",
-                f"Notes: {payload.notes or 'None'}",
-                f"Payment URL: {payment_url}",
-            ]
-        )
+        lines = [
+            "New booking assistant lead received.",
+            "",
+            f"Reference: {booking_reference}",
+            f"Service: {service.name}",
+            f"Customer: {payload.customer_name}",
+            f"Email: {(payload.customer_email or '').strip().lower() or 'Not provided'}",
+            f"Phone: {payload.customer_phone or 'Not provided'}",
+            f"Requested date: {payload.requested_date.isoformat()}",
+            f"Requested time: {payload.requested_time.strftime('%H:%M')}",
+            f"Timezone: {payload.timezone}",
+            f"Notes: {payload.notes or 'None'}",
+            f"Payment URL: {payment_url}",
+        ]
+        if meeting_event_url:
+            lines.append(f"Calendar event: {meeting_event_url}")
+        if meeting_join_url:
+            lines.append(f"Calendar join link: {meeting_join_url}")
+        if calendar_add_url:
+            lines.append(f"Add to Google Calendar: {calendar_add_url}")
+        return "\n".join(lines)
 
     @staticmethod
     def _build_fallback_chat_reply(
@@ -2826,9 +3517,50 @@ class BookingAssistantService:
                 service.name,
                 service.category,
                 service.summary,
+                service.venue_name or "",
+                service.location or "",
                 *service.tags,
             ]
         ).lower()
+
+    @staticmethod
+    def _should_request_location(
+        *,
+        message: str,
+        query_signals: ServiceQuerySignals,
+        ranked_matches: list[ServiceMatchInsight],
+        user_latitude: float | None,
+        user_longitude: float | None,
+        user_locality: str | None,
+    ) -> bool:
+        if user_latitude is not None and user_longitude is not None:
+            return False
+        if user_locality and user_locality.strip():
+            return False
+        if query_signals.preferred_locations:
+            return False
+
+        tokens = tokenize_text(message)
+        explicit_location_need = bool(tokens & LOCATION_REQUEST_KEYWORDS)
+        if not ranked_matches:
+            return explicit_location_need
+
+        top_score = ranked_matches[0].score
+        second_score = ranked_matches[1].score if len(ranked_matches) > 1 else None
+        distinct_locations = {
+            " | ".join(
+                item
+                for item in [match.service.venue_name or "", match.service.location or ""]
+                if item
+            ).strip()
+            for match in ranked_matches[:3]
+        }
+        distinct_locations.discard("")
+
+        return explicit_location_need and (
+            len(distinct_locations) >= 2
+            or (second_score is not None and abs(top_score - second_score) <= 5)
+        )
 
     def _rank_services(
         self,
@@ -2872,10 +3604,24 @@ class BookingAssistantService:
                 prefers_morning=query_signals.prefers_morning,
                 customer_types=query_signals.customer_types,
                 urgency=query_signals.urgency,
+                explicit_location_need=query_signals.explicit_location_need,
+                follow_up_refinement=query_signals.follow_up_refinement,
             )
         prefers_fast_option = query_signals.prefers_fast_option
         group_visit = bool(
             {"group", "team", "people", "guests"} & intent_tokens or query_signals.group_size
+        )
+        social_booking_intent = bool(
+            (query_signals.group_size is not None and query_signals.group_size >= 4)
+            or {"group", "guests", "party", "meeting", "table", "people", "nhom", "nguoi"}
+            & intent_tokens
+        )
+        explicit_location_need = query_signals.explicit_location_need
+        follow_up_refinement = query_signals.follow_up_refinement
+        prefers_low_cost = bool(
+            {"cheap", "cheapest", "budget", "re", "nhat"} & intent_tokens
+            or "gia re" in query_lower
+            or "re nhat" in query_lower
         )
 
         specific_category_intent = bool(detected_categories)
@@ -2899,6 +3645,7 @@ class BookingAssistantService:
             category_score = 0
             specificity_penalty = 0
             fit_bonus = 0
+            bookability_bonus = 0
 
             if detected_categories:
                 if service.category in detected_categories:
@@ -2917,6 +3664,29 @@ class BookingAssistantService:
             if service.featured:
                 phrase_bonus += 1
 
+            if service.booking_url:
+                bookability_bonus += 10
+            if service.map_url:
+                bookability_bonus += 4
+            if service.location or service.venue_name:
+                bookability_bonus += 5
+            if service.summary and len(service.summary.strip()) >= 40:
+                bookability_bonus += 3
+            if service.image_url:
+                bookability_bonus += 1
+            if service.featured:
+                bookability_bonus += 2
+            if service.amount_aud > 0:
+                bookability_bonus += 2
+            if service.duration_minutes <= 45:
+                bookability_bonus += 2
+            if service.duration_minutes <= 30:
+                bookability_bonus += 1
+            if not service.booking_url and not service.map_url:
+                specificity_penalty -= 2
+            if not service.location and not service.venue_name:
+                specificity_penalty -= 3
+
             if detected_categories and service.category not in detected_categories and overlap == 0:
                 specificity_penalty -= 8
 
@@ -2926,13 +3696,54 @@ class BookingAssistantService:
                 elif service.category not in detected_categories:
                     specificity_penalty -= 6
 
+            if social_booking_intent:
+                supports_groups = bool(
+                    {"group", "guests", "party", "meeting", "table", "event"} & service_tokens
+                ) or service.category in {"Food and Beverage", "Hospitality and Events"}
+                if supports_groups:
+                    fit_bonus += 6
+                else:
+                    specificity_penalty -= 20
+
+            if explicit_location_need and not detected_categories:
+                location_relevant = bool(service.venue_name or service.location)
+                if location_relevant:
+                    fit_bonus += 2
+                else:
+                    specificity_penalty -= 6
+
             if prefers_fast_option:
                 if service.duration_minutes <= 20:
                     fit_bonus += 8
+                elif service.duration_minutes <= 30:
+                    fit_bonus += 6
                 elif service.duration_minutes <= 35:
                     fit_bonus += 4
+                elif service.duration_minutes >= 45:
+                    fit_bonus -= 8
                 else:
-                    fit_bonus -= 2
+                    fit_bonus -= 4
+
+            if follow_up_refinement:
+                if service.duration_minutes <= 20:
+                    fit_bonus += 10
+                elif service.duration_minutes <= 30:
+                    fit_bonus += 6
+                elif service.duration_minutes <= 35:
+                    fit_bonus += 2
+                elif service.duration_minutes >= 45:
+                    specificity_penalty -= 10
+
+                if {"after", "work"} <= intent_tokens:
+                    if service.category == "Healthcare Service" and service.duration_minutes <= 30:
+                        fit_bonus += 4
+                    elif service.category == "Healthcare Service" and service.duration_minutes >= 45:
+                        specificity_penalty -= 4
+                    elif service.category in {"Food and Beverage", "Hospitality and Events"}:
+                        fit_bonus += 2
+
+                if prefers_fast_option and {"initial", "assessment"} & service_tokens and service.duration_minutes >= 40:
+                    specificity_penalty -= 6
 
             if group_visit:
                 if {"group", "guests", "party", "meeting"} & service_tokens:
@@ -2946,6 +3757,8 @@ class BookingAssistantService:
                         fit_bonus += 8
                     elif service.category == "Food and Beverage":
                         fit_bonus += 4
+                    elif service.category in {"Healthcare Service", "Membership and Community", "Salon"}:
+                        specificity_penalty -= 14
                 elif query_signals.group_size <= 2 and service.category == "Food and Beverage":
                     fit_bonus += 2
 
@@ -2955,6 +3768,15 @@ class BookingAssistantService:
                 else:
                     over_budget = service.amount_aud - query_signals.budget_max
                     fit_bonus -= min(10, int(over_budget // 10) + 2)
+            elif prefers_low_cost:
+                if service.amount_aud <= 20:
+                    fit_bonus += 8
+                elif service.amount_aud <= 35:
+                    fit_bonus += 5
+                elif service.amount_aud <= 50:
+                    fit_bonus += 2
+                elif service.amount_aud >= 100:
+                    specificity_penalty -= 6
 
             if query_signals.preferred_locations:
                 service_location_text = " ".join(
@@ -2987,7 +3809,7 @@ class BookingAssistantService:
                     else:
                         fit_bonus -= min(6, int(distance_km // 5))
                 elif "near me" in query_lower or "nearby" in query_lower:
-                    fit_bonus -= 2
+                    specificity_penalty -= 6
 
             if query_signals.prefers_evening:
                 if service.category in {"Food and Beverage", "Hospitality and Events"}:
@@ -3033,6 +3855,7 @@ class BookingAssistantService:
                 + phrase_bonus
                 + category_score
                 + fit_bonus
+                + bookability_bonus
                 + specificity_penalty
             )
             if score > 0:
@@ -3041,8 +3864,13 @@ class BookingAssistantService:
         scored_services.sort(
             key=lambda item: (
                 item.score,
+                bool(item.service.booking_url),
+                bool(item.service.location or item.service.venue_name),
+                bool(item.service.map_url),
+                bool(item.service.featured),
                 item.service.featured,
                 len(SERVICE_KEYWORD_SYNONYMS.get(item.service.id, set())),
+                -(item.service.duration_minutes if item.service.duration_minutes else 999),
                 -item.service.amount_aud,
             ),
             reverse=True,
@@ -3165,190 +3993,620 @@ class BookingAssistantService:
 
 
 @dataclass
-class EmailService:
-    settings: Settings
-
-    def smtp_configured(self) -> bool:
-        return all(
-            [
-                self.settings.email_smtp_host,
-                self.settings.email_smtp_port > 0,
-                self.settings.email_smtp_username,
-                self.settings.email_smtp_password,
-                self.settings.email_smtp_from,
-            ]
-        )
-
-    def imap_configured(self) -> bool:
-        return all(
-            [
-                self.settings.email_imap_host,
-                self.settings.email_imap_port > 0,
-                self.settings.email_imap_username,
-                self.settings.email_imap_password,
-            ]
-        )
-
-    async def send_email(
-        self,
-        *,
-        to: list[str],
-        subject: str,
-        text: str,
-        html: str | None = None,
-    ) -> None:
-        if not self.smtp_configured():
-            raise ValueError("SMTP is not fully configured")
-
-        await asyncio.to_thread(
-            self._send_email_sync,
-            to=to,
-            subject=subject,
-            text=text,
-            html=html,
-        )
-
-    def _send_email_sync(
-        self,
-        *,
-        to: list[str],
-        subject: str,
-        text: str,
-        html: str | None = None,
-    ) -> None:
-        message = EmailMessage()
-        message["From"] = self.settings.email_smtp_from
-        message["To"] = ", ".join(to)
-        message["Subject"] = subject
-        message.set_content(text)
-        if html:
-            message.add_alternative(html, subtype="html")
-
-        if self.settings.email_smtp_use_tls:
-            server: smtplib.SMTP = smtplib.SMTP_SSL(
-                self.settings.email_smtp_host,
-                self.settings.email_smtp_port,
-                timeout=20,
-            )
-        else:
-            server = smtplib.SMTP(
-                self.settings.email_smtp_host,
-                self.settings.email_smtp_port,
-                timeout=20,
-            )
-
-        try:
-            server.ehlo()
-            if self.settings.email_smtp_use_starttls and not self.settings.email_smtp_use_tls:
-                server.starttls()
-                server.ehlo()
-            server.login(
-                self.settings.email_smtp_username,
-                self.settings.email_smtp_password,
-            )
-            server.send_message(message)
-        finally:
-            server.quit()
-
-    async def fetch_inbox(self, limit: int = 20) -> list[InboxEmail]:
-        if not self.imap_configured():
-            raise ValueError("IMAP is not fully configured")
-        if limit < 1:
-            return []
-        return await asyncio.to_thread(self._fetch_inbox_sync, limit)
-
-    def _fetch_inbox_sync(self, limit: int) -> list[InboxEmail]:
-        if self.settings.email_imap_use_ssl:
-            mailbox: imaplib.IMAP4 = imaplib.IMAP4_SSL(
-                self.settings.email_imap_host,
-                self.settings.email_imap_port,
-            )
-        else:
-            mailbox = imaplib.IMAP4(
-                self.settings.email_imap_host,
-                self.settings.email_imap_port,
-            )
-
-        try:
-            mailbox.login(
-                self.settings.email_imap_username,
-                self.settings.email_imap_password,
-            )
-            mailbox.select(self.settings.email_imap_mailbox)
-            status, data = mailbox.search(None, "ALL")
-            if status != "OK" or not data:
-                return []
-
-            uids = [value for value in data[0].split() if value]
-            selected = uids[-limit:]
-            selected.reverse()
-
-            result: list[InboxEmail] = []
-            for uid in selected:
-                fetch_status, msg_data = mailbox.fetch(uid, "(RFC822)")
-                if fetch_status != "OK" or not msg_data:
-                    continue
-                raw = next((item[1] for item in msg_data if isinstance(item, tuple)), None)
-                if not raw:
-                    continue
-                parsed = message_from_bytes(raw, policy=default)
-                from_header = parseaddr(parsed.get("From", ""))[1] or parsed.get("From", "")
-                subject = parsed.get("Subject", "")
-                date = parsed.get("Date", "")
-                snippet = self._extract_snippet(parsed)
-                result.append(
-                    InboxEmail(
-                        uid=uid.decode(),
-                        from_address=from_header,
-                        subject=subject,
-                        date=date,
-                        snippet=snippet,
-                    )
-                )
-            return result
-        finally:
-            try:
-                mailbox.close()
-            except Exception:
-                pass
-            mailbox.logout()
+class PricingService:
+    def __init__(self, settings: Settings):
+        self.settings = settings
 
     @staticmethod
-    def _extract_snippet(message: EmailMessage) -> str:
-        if message.is_multipart():
-            for part in message.walk():
-                if part.get_content_type() == "text/plain":
-                    text = part.get_content()
-                    return str(text).strip()[:240]
-        else:
-            text = message.get_content()
-            return str(text).strip()[:240]
-        return ""
+    def _format_amount(amount_aud: float, suffix: str = "") -> str:
+        formatted = f"A${amount_aud:,.2f}"
+        return f"{formatted}{suffix}" if suffix else formatted
 
+    def _get_plan(self, plan_id: str) -> PricingPlanDefinition:
+        plan = PRICING_PLAN_DEFINITIONS.get(plan_id)
+        if not plan:
+            raise ValueError("Selected pricing plan was not found")
+        return plan
 
-async def store_event(
-    session: AsyncSession,
-    *,
-    source: str,
-    event_type: str,
-    message: TawkMessage,
-    ai_intent: str | None,
-    ai_reply: str | None,
-    workflow_status: str | None,
-    metadata: dict[str, Any],
-) -> None:
-    session.add(
-        ConversationEvent(
-            source=source,
-            event_type=event_type,
-            conversation_id=message.conversation_id,
-            sender_name=message.sender_name,
-            sender_email=message.sender_email,
-            message_text=message.text,
-            ai_intent=ai_intent,
-            ai_reply=ai_reply,
-            workflow_status=workflow_status,
-            metadata_json=metadata,
+    def _validate_payload(self, payload: PricingConsultationRequest) -> None:
+        normalized_email = payload.customer_email.strip().lower()
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", normalized_email):
+            raise ValueError("Enter a valid email address")
+
+        phone = (payload.customer_phone or "").strip()
+        if phone:
+            digits = re.sub(r"\D", "", phone)
+            if len(digits) < 8:
+                raise ValueError("Enter a valid phone number with at least 8 digits")
+
+        try:
+            zone = ZoneInfo(payload.timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError("Unsupported timezone for consultation scheduling") from exc
+
+        preferred_start = datetime.combine(payload.preferred_date, payload.preferred_time, tzinfo=zone)
+        if preferred_start <= datetime.now(zone) + timedelta(minutes=30):
+            raise ValueError("Choose a consultation time at least 30 minutes from now")
+
+        if payload.startup_referral_eligible and not (payload.referral_partner or "").strip():
+            raise ValueError("Enter the accelerator or incubator that referred you")
+
+    def _validate_demo_payload(self, payload: DemoBookingRequest) -> None:
+        normalized_email = payload.customer_email.strip().lower()
+        if not re.match(r"^[^@\s]+@[^@\s]+\.[^@\s]+$", normalized_email):
+            raise ValueError("Enter a valid email address")
+
+        phone = (payload.customer_phone or "").strip()
+        if phone:
+            digits = re.sub(r"\D", "", phone)
+            if len(digits) < 8:
+                raise ValueError("Enter a valid phone number with at least 8 digits")
+
+        try:
+            zone = ZoneInfo(payload.timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError("Unsupported timezone for demo scheduling") from exc
+
+        preferred_start = datetime.combine(payload.preferred_date, payload.preferred_time, tzinfo=zone)
+        if preferred_start <= datetime.now(zone) + timedelta(minutes=30):
+            raise ValueError("Choose a demo time at least 30 minutes from now")
+
+    @staticmethod
+    def _build_trial_summary(trial_days: int, startup_offer_applied: bool) -> str:
+        if startup_offer_applied:
+            return (
+                "3 months free when referred by an Australian accelerator or incubator, "
+                "then the selected monthly plan starts."
+            )
+        return "First 30 days free, then the selected monthly plan starts."
+
+    @staticmethod
+    def _build_onsite_travel_fee_note(onboarding_mode: str) -> str | None:
+        if onboarding_mode != "onsite":
+            return None
+        return "Onsite setup is available. Travel is quoted separately once the address is confirmed."
+
+    def zoho_calendar_configured(self) -> bool:
+        return bool(
+            self.settings.zoho_calendar_uid
+            and (
+                self.settings.zoho_calendar_access_token
+                or (
+                    self.settings.zoho_calendar_refresh_token
+                    and self.settings.zoho_calendar_client_id
+                    and self.settings.zoho_calendar_client_secret
+                )
+            )
         )
-    )
-    await session.commit()
+
+    async def create_consultation(
+        self,
+        payload: PricingConsultationRequest,
+        *,
+        email_service: "EmailService",
+    ) -> PricingConsultationResponse:
+        self._validate_payload(payload)
+        plan = self._get_plan(payload.plan_id)
+        consultation_reference = f"CONS-{uuid4().hex[:8].upper()}"
+        startup_offer_applied = bool(payload.startup_referral_eligible and (payload.referral_partner or "").strip())
+        trial_days = 90 if startup_offer_applied else 30
+        trial_summary = self._build_trial_summary(trial_days, startup_offer_applied)
+        onsite_travel_fee_note = self._build_onsite_travel_fee_note(payload.onboarding_mode)
+        meeting_status = "configuration_required"
+        meeting_join_url: str | None = None
+        meeting_event_url: str | None = None
+
+        if self.zoho_calendar_configured():
+            meeting_join_url, meeting_event_url = await self._create_zoho_calendar_event(
+                consultation_reference=consultation_reference,
+                plan=plan,
+                payload=payload,
+            )
+            meeting_status = "scheduled"
+
+        payment_status = "payment_follow_up_required"
+        payment_url: str | None = None
+        if self.settings.stripe_secret_key:
+            payment_url = await self._create_stripe_checkout_url(
+                consultation_reference=consultation_reference,
+                plan=plan,
+                payload=payload,
+            )
+            payment_status = "stripe_checkout_ready"
+
+        email_status = "pending_manual_followup"
+        if email_service.smtp_configured():
+            await email_service.send_email(
+                to=[payload.customer_email],
+                cc=[self.settings.booking_business_email],
+                subject=f"BookedAI consultation booked for {plan.name} ({consultation_reference})",
+                text=self._build_customer_confirmation_text(
+                    consultation_reference=consultation_reference,
+                    plan=plan,
+                    payload=payload,
+                    meeting_join_url=meeting_join_url,
+                    meeting_event_url=meeting_event_url,
+                    payment_url=payment_url,
+                ),
+            )
+            await email_service.send_email(
+                to=[self.settings.booking_business_email],
+                subject=f"New pricing consultation for {plan.name} ({consultation_reference})",
+                text=self._build_internal_notification_text(
+                    consultation_reference=consultation_reference,
+                    plan=plan,
+                    payload=payload,
+                    meeting_join_url=meeting_join_url,
+                    meeting_event_url=meeting_event_url,
+                    payment_url=payment_url,
+                ),
+            )
+            email_status = "sent"
+
+        return PricingConsultationResponse(
+            status="ok",
+            consultation_reference=consultation_reference,
+            plan_id=plan.id,  # type: ignore[arg-type]
+            plan_name=plan.name,
+            amount_aud=plan.amount_aud,
+            amount_label=self._format_amount(plan.amount_aud, plan.price_suffix),
+            preferred_date=payload.preferred_date.isoformat(),
+            preferred_time=payload.preferred_time.strftime("%H:%M"),
+            timezone=payload.timezone,
+            onboarding_mode=payload.onboarding_mode,  # type: ignore[arg-type]
+            trial_days=trial_days,
+            trial_summary=trial_summary,
+            startup_offer_applied=startup_offer_applied,
+            startup_offer_summary=trial_summary if startup_offer_applied else None,
+            onsite_travel_fee_note=onsite_travel_fee_note,
+            meeting_status=meeting_status,  # type: ignore[arg-type]
+            meeting_join_url=meeting_join_url,
+            meeting_event_url=meeting_event_url,
+            payment_status=payment_status,  # type: ignore[arg-type]
+            payment_url=payment_url,
+            email_status=email_status,  # type: ignore[arg-type]
+        )
+
+    async def create_demo_request(
+        self,
+        payload: DemoBookingRequest,
+        *,
+        email_service: "EmailService",
+    ) -> DemoBookingResponse:
+        self._validate_demo_payload(payload)
+        demo_reference = f"DEMO-{uuid4().hex[:8].upper()}"
+        meeting_status = "configuration_required"
+        meeting_join_url: str | None = None
+        meeting_event_url: str | None = None
+
+        if self.zoho_calendar_configured():
+            meeting_join_url, meeting_event_url = await self._create_zoho_demo_event(
+                demo_reference=demo_reference,
+                payload=payload,
+            )
+            meeting_status = "scheduled"
+
+        email_status = "pending_manual_followup"
+        if email_service.smtp_configured():
+            await email_service.send_email(
+                to=[payload.customer_email],
+                cc=[self.settings.booking_business_email],
+                subject=f"BookedAI demo booked ({demo_reference})",
+                text=self._build_demo_customer_confirmation_text(
+                    demo_reference=demo_reference,
+                    payload=payload,
+                    meeting_join_url=meeting_join_url,
+                    meeting_event_url=meeting_event_url,
+                ),
+            )
+            await email_service.send_email(
+                to=[self.settings.booking_business_email],
+                subject=f"New BookedAI demo request ({demo_reference})",
+                text=self._build_demo_internal_notification_text(
+                    demo_reference=demo_reference,
+                    payload=payload,
+                    meeting_join_url=meeting_join_url,
+                    meeting_event_url=meeting_event_url,
+                ),
+            )
+            email_status = "sent"
+
+        confirmation_message = (
+            "Your demo request is confirmed. We have sent the invite details and added the session to our calendar."
+            if meeting_status == "scheduled"
+            else "Your demo request is captured. Our team will follow up shortly to confirm the meeting."
+        )
+
+        return DemoBookingResponse(
+            status="ok",
+            demo_reference=demo_reference,
+            preferred_date=payload.preferred_date.isoformat(),
+            preferred_time=payload.preferred_time.strftime("%H:%M"),
+            timezone=payload.timezone,
+            meeting_status=meeting_status,  # type: ignore[arg-type]
+            meeting_join_url=meeting_join_url,
+            meeting_event_url=meeting_event_url,
+            email_status=email_status,  # type: ignore[arg-type]
+            confirmation_message=confirmation_message,
+        )
+
+    async def _get_zoho_access_token(self) -> str:
+        direct_token = self.settings.zoho_calendar_access_token.strip()
+        if direct_token:
+            return direct_token
+
+        if not (
+            self.settings.zoho_calendar_refresh_token
+            and self.settings.zoho_calendar_client_id
+            and self.settings.zoho_calendar_client_secret
+        ):
+            raise ValueError("Zoho Calendar OAuth credentials are incomplete")
+
+        token_url = (
+            f"{self.settings.zoho_accounts_base_url.rstrip('/')}/oauth/v2/token"
+        )
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                token_url,
+                data={
+                    "refresh_token": self.settings.zoho_calendar_refresh_token,
+                    "client_id": self.settings.zoho_calendar_client_id,
+                    "client_secret": self.settings.zoho_calendar_client_secret,
+                    "grant_type": "refresh_token",
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+
+        access_token = str(payload.get("access_token") or "").strip()
+        if not access_token:
+            raise ValueError("Zoho OAuth response did not include an access token")
+        return access_token
+
+    async def _create_zoho_calendar_event(
+        self,
+        *,
+        consultation_reference: str,
+        plan: PricingPlanDefinition,
+        payload: PricingConsultationRequest,
+    ) -> tuple[str | None, str | None]:
+        access_token = await self._get_zoho_access_token()
+        zone = ZoneInfo(payload.timezone)
+        start_at = datetime.combine(payload.preferred_date, payload.preferred_time, tzinfo=zone)
+        end_at = start_at + timedelta(minutes=plan.consultation_minutes)
+        description_lines = [
+            f"BookedAI onboarding booking for the {plan.name} plan.",
+            f"Consultation reference: {consultation_reference}",
+            f"Business: {payload.business_name}",
+            f"Business type: {payload.business_type}",
+            f"Setup mode: {payload.onboarding_mode}",
+            f"Customer: {payload.customer_name}",
+            f"Email: {payload.customer_email.strip().lower()}",
+            f"Phone: {(payload.customer_phone or '').strip() or 'Not provided'}",
+        ]
+        if payload.startup_referral_eligible:
+            description_lines.append(
+                f"Startup referral: {(payload.referral_partner or '').strip() or 'Referral requested'}"
+            )
+        if payload.referral_location:
+            description_lines.append(f"Referral location: {payload.referral_location.strip()}")
+        travel_fee_note = self._build_onsite_travel_fee_note(payload.onboarding_mode)
+        if travel_fee_note:
+            description_lines.append(travel_fee_note)
+        if payload.notes:
+            description_lines.append(f"Notes: {payload.notes.strip()}")
+
+        event_data = {
+            "title": f"BookedAI {plan.onboarding_label} - {payload.business_name}",
+            "location": payload.onboarding_mode == "onsite" and "Onsite setup" or "Zoho Meeting",
+            "description": "\n".join(description_lines),
+            "dateandtime": {
+                "timezone": payload.timezone,
+                "start": start_at.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ"),
+                "end": end_at.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ"),
+            },
+            "attendees": [
+                {
+                    "email": payload.customer_email.strip().lower(),
+                    "permission": 1,
+                    "attendance": 1,
+                }
+            ],
+            "reminders": [
+                {"action": "email", "minutes": 60},
+                {"action": "popup", "minutes": 15},
+            ],
+            "notify_attendee": 2,
+            "conference": "zmeeting",
+            "allowForwarding": True,
+            "notifyType": 1,
+        }
+        encoded_event_data = quote(json.dumps(event_data, separators=(",", ":")), safe="")
+        calendar_url = (
+            f"{self.settings.zoho_calendar_api_base_url.rstrip('/')}/calendars/"
+            f"{self.settings.zoho_calendar_uid}/events?eventdata={encoded_event_data}"
+        )
+
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                calendar_url,
+                headers={"Authorization": f"Zoho-oauthtoken {access_token}"},
+            )
+            response.raise_for_status()
+            payload_data = response.json()
+
+        event = ((payload_data.get("events") or [None])[0] or {}) if isinstance(payload_data, dict) else {}
+        app_data = event.get("app_data") if isinstance(event.get("app_data"), dict) else {}
+        meeting_data = app_data.get("meetingdata") if isinstance(app_data.get("meetingdata"), dict) else {}
+        meeting_link = str(meeting_data.get("meetinglink") or "").strip() or None
+        event_url = str(event.get("viewEventURL") or "").strip() or None
+        return meeting_link, event_url
+
+    async def _create_zoho_demo_event(
+        self,
+        *,
+        demo_reference: str,
+        payload: DemoBookingRequest,
+    ) -> tuple[str | None, str | None]:
+        access_token = await self._get_zoho_access_token()
+        zone = ZoneInfo(payload.timezone)
+        start_at = datetime.combine(payload.preferred_date, payload.preferred_time, tzinfo=zone)
+        end_at = start_at + timedelta(minutes=30)
+        description_lines = [
+            "BookedAI live product demo.",
+            f"Demo reference: {demo_reference}",
+            f"Business: {payload.business_name}",
+            f"Business type: {payload.business_type}",
+            f"Customer: {payload.customer_name}",
+            f"Email: {payload.customer_email.strip().lower()}",
+            f"Phone: {(payload.customer_phone or '').strip() or 'Not provided'}",
+        ]
+        if payload.notes:
+            description_lines.append(f"Notes: {payload.notes.strip()}")
+
+        event_data = {
+            "title": f"BookedAI demo - {payload.business_name}",
+            "location": "Zoho Meeting",
+            "description": "\n".join(description_lines),
+            "dateandtime": {
+                "timezone": payload.timezone,
+                "start": start_at.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ"),
+                "end": end_at.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ"),
+            },
+            "attendees": [
+                {
+                    "email": payload.customer_email.strip().lower(),
+                    "permission": 1,
+                    "attendance": 1,
+                }
+            ],
+            "reminders": [
+                {"action": "email", "minutes": 60},
+                {"action": "popup", "minutes": 15},
+            ],
+            "notify_attendee": 2,
+            "conference": "zmeeting",
+            "allowForwarding": True,
+            "notifyType": 1,
+        }
+        encoded_event_data = quote(json.dumps(event_data, separators=(",", ":")), safe="")
+        calendar_url = (
+            f"{self.settings.zoho_calendar_api_base_url.rstrip('/')}/calendars/"
+            f"{self.settings.zoho_calendar_uid}/events?eventdata={encoded_event_data}"
+        )
+
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                calendar_url,
+                headers={"Authorization": f"Zoho-oauthtoken {access_token}"},
+            )
+            response.raise_for_status()
+            payload_data = response.json()
+
+        event = ((payload_data.get("events") or [None])[0] or {}) if isinstance(payload_data, dict) else {}
+        app_data = event.get("app_data") if isinstance(event.get("app_data"), dict) else {}
+        meeting_data = app_data.get("meetingdata") if isinstance(app_data.get("meetingdata"), dict) else {}
+        meeting_link = str(meeting_data.get("meetinglink") or "").strip() or None
+        event_url = str(event.get("viewEventURL") or "").strip() or None
+        return meeting_link, event_url
+
+    async def _create_stripe_checkout_url(
+        self,
+        *,
+        consultation_reference: str,
+        plan: PricingPlanDefinition,
+        payload: PricingConsultationRequest,
+    ) -> str:
+        amount_cents = int(round(plan.amount_aud * 100))
+        form_data: list[tuple[str, str]] = [
+            ("mode", "subscription"),
+            (
+                "success_url",
+                f"{self.settings.public_app_url}/?pricing=success&plan={plan.id}&ref={consultation_reference}",
+            ),
+            (
+                "cancel_url",
+                f"{self.settings.public_app_url}/?pricing=cancelled&plan={plan.id}&ref={consultation_reference}",
+            ),
+            ("payment_method_types[]", "card"),
+            ("line_items[0][quantity]", "1"),
+            ("line_items[0][price_data][currency]", self.settings.stripe_currency),
+            ("line_items[0][price_data][unit_amount]", str(amount_cents)),
+            ("line_items[0][price_data][recurring][interval]", "month"),
+            ("line_items[0][price_data][product_data][name]", f"BookedAI {plan.name}"),
+            ("line_items[0][price_data][product_data][description]", plan.description),
+            ("client_reference_id", consultation_reference),
+            ("metadata[consultation_reference]", consultation_reference),
+            ("metadata[plan_id]", plan.id),
+            ("metadata[plan_name]", plan.name),
+            ("metadata[business_name]", payload.business_name),
+            ("metadata[business_type]", payload.business_type),
+            ("metadata[onboarding_mode]", payload.onboarding_mode),
+            ("metadata[trial_days]", str(90 if bool(payload.startup_referral_eligible and (payload.referral_partner or "").strip()) else 30)),
+            ("metadata[preferred_date]", payload.preferred_date.isoformat()),
+            ("metadata[preferred_time]", payload.preferred_time.strftime("%H:%M")),
+            ("metadata[timezone]", payload.timezone),
+            ("subscription_data[metadata][consultation_reference]", consultation_reference),
+            ("subscription_data[metadata][plan_id]", plan.id),
+            ("subscription_data[trial_period_days]", str(90 if bool(payload.startup_referral_eligible and (payload.referral_partner or "").strip()) else 30)),
+        ]
+        if payload.referral_partner:
+            form_data.append(("metadata[referral_partner]", payload.referral_partner.strip()))
+        if payload.referral_location:
+            form_data.append(("metadata[referral_location]", payload.referral_location.strip()))
+        normalized_email = payload.customer_email.strip().lower()
+        if normalized_email:
+            form_data.append(("customer_email", normalized_email))
+
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                "https://api.stripe.com/v1/checkout/sessions",
+                headers={
+                    "Authorization": f"Bearer {self.settings.stripe_secret_key}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                content=urlencode(form_data).encode(),
+            )
+            response.raise_for_status()
+            response_data = response.json()
+
+        checkout_url = str(response_data.get("url") or "").strip()
+        if not checkout_url:
+            raise ValueError("Stripe response did not include a checkout URL")
+        return checkout_url
+
+    def _build_customer_confirmation_text(
+        self,
+        *,
+        consultation_reference: str,
+        plan: PricingPlanDefinition,
+        payload: PricingConsultationRequest,
+        meeting_join_url: str | None,
+        meeting_event_url: str | None,
+        payment_url: str | None,
+    ) -> str:
+        lines = [
+            f"Thanks for booking BookedAI {plan.name}.",
+            "",
+            f"Consultation reference: {consultation_reference}",
+            f"Plan: {plan.name} ({self._format_amount(plan.amount_aud, plan.price_suffix)})",
+            f"Offer: {self._build_trial_summary(90 if bool(payload.startup_referral_eligible and (payload.referral_partner or '').strip()) else 30, bool(payload.startup_referral_eligible and (payload.referral_partner or '').strip()))}",
+            f"Business: {payload.business_name}",
+            f"Business type: {payload.business_type}",
+            f"Setup mode: {payload.onboarding_mode}",
+            f"Preferred time: {payload.preferred_date.isoformat()} {payload.preferred_time.strftime('%H:%M')} {payload.timezone}",
+        ]
+        if payload.referral_partner:
+            lines.append(f"Referral partner: {payload.referral_partner.strip()}")
+        if payload.referral_location:
+            lines.append(f"Referral location: {payload.referral_location.strip()}")
+        travel_fee_note = self._build_onsite_travel_fee_note(payload.onboarding_mode)
+        if travel_fee_note:
+            lines.append(travel_fee_note)
+        if meeting_join_url:
+            lines.extend(["", f"Zoho meeting link: {meeting_join_url}"])
+        if meeting_event_url:
+            lines.append(f"Zoho calendar event: {meeting_event_url}")
+        if payment_url:
+            lines.extend(["", f"Stripe checkout: {payment_url}"])
+        if payload.notes:
+            lines.extend(["", f"Notes: {payload.notes.strip()}"])
+        lines.extend(
+            [
+                "",
+                "A confirmation copy has also been sent to info@bookedai.au.",
+            ]
+        )
+        return "\n".join(lines)
+
+    def _build_internal_notification_text(
+        self,
+        *,
+        consultation_reference: str,
+        plan: PricingPlanDefinition,
+        payload: PricingConsultationRequest,
+        meeting_join_url: str | None,
+        meeting_event_url: str | None,
+        payment_url: str | None,
+    ) -> str:
+        lines = [
+            "New BookedAI plan onboarding booking received.",
+            "",
+            f"Reference: {consultation_reference}",
+            f"Plan: {plan.name}",
+            f"Customer: {payload.customer_name}",
+            f"Email: {payload.customer_email.strip().lower()}",
+            f"Phone: {(payload.customer_phone or '').strip() or 'Not provided'}",
+            f"Business: {payload.business_name}",
+            f"Business type: {payload.business_type}",
+            f"Setup mode: {payload.onboarding_mode}",
+            f"Preferred time: {payload.preferred_date.isoformat()} {payload.preferred_time.strftime('%H:%M')} {payload.timezone}",
+        ]
+        if payload.referral_partner:
+            lines.append(f"Referral partner: {payload.referral_partner.strip()}")
+        if payload.referral_location:
+            lines.append(f"Referral location: {payload.referral_location.strip()}")
+        travel_fee_note = self._build_onsite_travel_fee_note(payload.onboarding_mode)
+        if travel_fee_note:
+            lines.append(travel_fee_note)
+        if meeting_join_url:
+            lines.append(f"Zoho meeting link: {meeting_join_url}")
+        if meeting_event_url:
+            lines.append(f"Zoho calendar event: {meeting_event_url}")
+        if payment_url:
+            lines.append(f"Stripe checkout: {payment_url}")
+        if payload.notes:
+            lines.append(f"Notes: {payload.notes.strip()}")
+        return "\n".join(lines)
+
+    def _build_demo_customer_confirmation_text(
+        self,
+        *,
+        demo_reference: str,
+        payload: DemoBookingRequest,
+        meeting_join_url: str | None,
+        meeting_event_url: str | None,
+    ) -> str:
+        lines = [
+            "Thanks for booking a BookedAI live demo.",
+            "",
+            f"Demo reference: {demo_reference}",
+            f"Business: {payload.business_name}",
+            f"Business type: {payload.business_type}",
+            f"Preferred time: {payload.preferred_date.isoformat()} {payload.preferred_time.strftime('%H:%M')} {payload.timezone}",
+        ]
+        if meeting_join_url:
+            lines.extend(["", f"Zoho meeting link: {meeting_join_url}"])
+        if meeting_event_url:
+            lines.append(f"Zoho calendar event: {meeting_event_url}")
+        if payload.notes:
+            lines.extend(["", f"Notes: {payload.notes.strip()}"])
+        lines.extend(["", "A confirmation copy has also been sent to info@bookedai.au."])
+        return "\n".join(lines)
+
+    def _build_demo_internal_notification_text(
+        self,
+        *,
+        demo_reference: str,
+        payload: DemoBookingRequest,
+        meeting_join_url: str | None,
+        meeting_event_url: str | None,
+    ) -> str:
+        lines = [
+            "New BookedAI demo request received.",
+            "",
+            f"Reference: {demo_reference}",
+            f"Customer: {payload.customer_name}",
+            f"Email: {payload.customer_email.strip().lower()}",
+            f"Phone: {(payload.customer_phone or '').strip() or 'Not provided'}",
+            f"Business: {payload.business_name}",
+            f"Business type: {payload.business_type}",
+            f"Preferred time: {payload.preferred_date.isoformat()} {payload.preferred_time.strftime('%H:%M')} {payload.timezone}",
+        ]
+        if meeting_join_url:
+            lines.append(f"Zoho meeting link: {meeting_join_url}")
+        if meeting_event_url:
+            lines.append(f"Zoho calendar event: {meeting_event_url}")
+        if payload.notes:
+            lines.append(f"Notes: {payload.notes.strip()}")
+        return "\n".join(lines)

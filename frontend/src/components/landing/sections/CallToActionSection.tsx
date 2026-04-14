@@ -3,11 +3,13 @@ import type { CallToActionContent } from '../data';
 type CallToActionSectionProps = {
   content: CallToActionContent;
   onStartTrial: () => void;
+  onBookDemo: () => void;
 };
 
 export function CallToActionSection({
   content,
   onStartTrial,
+  onBookDemo,
 }: CallToActionSectionProps) {
   return (
     <section id="demo" className="mx-auto w-full max-w-7xl px-6 py-24 lg:px-8">
@@ -29,12 +31,13 @@ export function CallToActionSection({
           >
             {content.primaryCta}
           </button>
-          <a
-            href={content.secondaryHref}
+          <button
+            type="button"
+            onClick={onBookDemo}
             className="rounded-full border border-black/10 bg-white px-7 py-3.5 text-base font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
           >
             {content.secondaryCta}
-          </a>
+          </button>
         </div>
         <p className="mx-auto mt-5 max-w-2xl text-sm leading-7 text-slate-500">
           {content.supportingText}

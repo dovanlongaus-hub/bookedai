@@ -1,14 +1,13 @@
 import { useState } from 'react';
-
-import { demoCtaHref } from './data';
 import { LogoMark } from './ui/LogoMark';
 
 type HeaderProps = {
   navItems: string[];
   onStartTrial: () => void;
+  onBookDemo: () => void;
 };
 
-export function Header({ navItems, onStartTrial }: HeaderProps) {
+export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   function closeMobileMenu() {
@@ -28,12 +27,13 @@ export function Header({ navItems, onStartTrial }: HeaderProps) {
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
-          <a
-            href={demoCtaHref}
+          <button
+            type="button"
+            onClick={onBookDemo}
             className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
           >
             Book a Demo
-          </a>
+          </button>
           <button
             type="button"
             onClick={onStartTrial}
@@ -88,13 +88,16 @@ export function Header({ navItems, onStartTrial }: HeaderProps) {
           </nav>
 
           <div className="mt-4 grid gap-3">
-            <a
-              href={demoCtaHref}
-              onClick={closeMobileMenu}
+            <button
+              type="button"
+              onClick={() => {
+                closeMobileMenu();
+                onBookDemo();
+              }}
               className="rounded-full border border-black/10 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
             >
               Book a Demo
-            </a>
+            </button>
             <button
               type="button"
               onClick={() => {
