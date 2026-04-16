@@ -22,6 +22,8 @@ Current focus areas:
 - roadmap sprint document register now maps each sprint to the real implementation docs in repo
 - release rehearsal wrapper now writes promote-or-hold artifacts after the root gate
 - release gate now uses a smaller `admin-smoke` Playwright lane instead of the full admin regression suite
+- Playwright release lanes now clear preview-server ports before each run so repeated rehearsal passes are less likely to fail on stale local servers
+- Playwright admin and live-read lanes now also rebuild behind mode-safe preview bootstrapping, so stale legacy/live-read env bleed and expired-session fixtures are less likely to flip search-quality smoke outcomes
 - Prompt 5 dependency mapping into Prompt 9, Prompt 10, and Prompt 11
 - Prompt 5 backend contract test enablement in project-local virtualenv
 - Prompt 5 public booking assistant shadow adoption
@@ -211,6 +213,7 @@ Latest verification status:
 - `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes` now passes
 - `npm run build` still passes after the public booking assistant Prompt 5 shadow adapter and the Prompt 9 search or trust behavior update
 - `npm run build` still passes after adding the admin Prompt 5 preview surface
+- targeted Playwright admin regression fixes now cover session-expiry fixture drift, Prompt 5 preview CRM backlog stubs, and preview-server mode isolation for legacy versus live-read lanes
 - backend Prompt 10 lifecycle changes still preserve the current Prompt 5 contract suite, with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes` remaining green after CRM sync seeding and lifecycle email persistence moved behind service or repository seams
 - backend Prompt 11 integration status and reconciliation summary additions still preserve the current Prompt 5 contract suite, with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes` remaining green
 - `npm run build` still passes after expanding the admin Prompt 5 preview surface to include booking-path resolution, lifecycle preview writes, and Prompt 11 integration or reconciliation visibility

@@ -18,6 +18,8 @@ This command already runs:
 
 The broader `@admin` regression suite remains separate from the release gate and should still be used for deeper admin passes.
 
+The frontend Playwright commands now clear the standard preview ports before each run, so the release gate is less likely to fail because a previous smoke pass left a local preview server behind.
+
 ## Rehearsal
 
 Use the rehearsal wrapper when you want a timestamped promote-or-hold artifact rather than only raw command output.

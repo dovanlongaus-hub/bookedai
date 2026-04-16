@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const storedSession = {
   token: 'session-test',
   username: 'info@bookedai.au',
-  expiresAt: '2026-04-16T12:00:00Z',
+  expiresAt: '2030-04-16T12:00:00Z',
 };
 
 type AdminBookingRecord = {
@@ -215,10 +215,10 @@ test.describe('admin bookings filters', () => {
 
     await page.goto('/admin');
 
-    const bookingsSection = page
-      .locator('section')
-      .filter({ has: page.getByText('Bookings and transactions') })
-      .first();
+    await expect(
+      page.getByRole('heading', { name: 'Bookings and transactions' }),
+    ).toBeVisible();
+    const bookingsSection = page.locator('#bookings');
 
     await expect(bookingsSection.getByText('Bookings and transactions')).toBeVisible();
     await expect(bookingsSection.getByRole('button', { name: /BR-ADMIN-1/i })).toBeVisible();
@@ -237,10 +237,7 @@ test.describe('admin bookings filters', () => {
     await expect(bookingsSection.getByRole('button', { name: /BR-ADMIN-1/i })).toHaveCount(0);
     await expect(bookingsSection.getByRole('button', { name: /BR-ADMIN-2/i })).toBeVisible();
     await bookingsSection.getByRole('button', { name: /BR-ADMIN-2/i }).click();
-    const selectedBookingPanel = page
-      .locator('section')
-      .filter({ has: page.getByText('Selected booking') })
-      .first();
+    const selectedBookingPanel = page.locator('#selected-booking');
     await expect(selectedBookingPanel.getByText('BR-ADMIN-2', { exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Open Stripe checkout' })).toHaveAttribute(
       'href',

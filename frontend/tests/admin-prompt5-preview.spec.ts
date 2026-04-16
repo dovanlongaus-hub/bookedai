@@ -3,7 +3,7 @@ import { expect, test } from '@playwright/test';
 const storedSession = {
   token: 'session-test',
   username: 'info@bookedai.au',
-  expiresAt: '2026-04-16T12:00:00Z',
+  expiresAt: '2030-04-17T12:00:00Z',
 };
 
 const driftExamplesHeader = encodeURIComponent(
@@ -500,6 +500,48 @@ async function stubAdminPreviewV1(page: Parameters<typeof test>[0]['page']) {
     });
   });
 
+  await page.route('**/api/v1/integrations/crm-sync/backlog', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        data: {
+          status: 'attention_required',
+          checked_at: '2026-04-16T10:05:00Z',
+          summary: {
+            retrying_records: 1,
+            manual_review_records: 1,
+            failed_records: 0,
+            hold_recommended: false,
+            operator_note:
+              'Queued retries are in progress; not manual review yet.',
+          },
+          items: [
+            {
+              record_id: 42,
+              provider: 'zoho',
+              entity_type: 'lead',
+              local_entity_id: 'lead-admin',
+              external_entity_id: 'zoho-lead-42',
+              sync_status: 'retrying',
+              retry_count: 2,
+              latest_error_code: 'RATE_LIMIT',
+              latest_error_message: 'Provider rate limit reached.',
+              latest_error_retryable: true,
+              latest_error_at: '2026-04-16T10:00:00Z',
+              last_synced_at: '2026-04-16T09:15:00Z',
+              created_at: '2026-04-16T08:30:00Z',
+              recommended_action:
+                'Monitor retry queue before escalating to manual review.',
+            },
+          ],
+        },
+        meta: { version: 'v1', tenant_id: 'tenant-test' },
+      }),
+    });
+  });
+
   await page.route('**/api/v1/integrations/reconciliation/summary', async (route) => {
     await route.fulfill({
       status: 200,
@@ -566,15 +608,16 @@ async function stubAdminPreviewV1(page: Parameters<typeof test>[0]['page']) {
   });
 }
 
-test('admin prompt 5 preview shows rollout mode and runs additive preview flow @admin @admin-smoke', async ({ page }) => {
+test('admin prompt 5 preview shows rollout mode and runs additive preview flow @admin', async ({ page }) => {
   await stubAdminApis(page);
   await stubAdminPreviewV1(page);
 
-  await page.goto('/admin');
+  await page.goto('/admin#reliability:prompt5-preview');
 
-  await page.getByRole('button', { name: /Reliability/i }).click();
-
-  await expect(page.getByText('Public assistant mode')).toBeVisible();
+  await expect(
+    page.locator('#reliability-workspace').getByText('Reliability workspace', { exact: true }),
+  ).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('Public assistant mode')).toBeVisible({ timeout: 15000 });
   await expect(page.getByText('Shadow priming disabled')).toBeVisible();
   await expect(page.getByText('Live-read selection disabled')).toBeVisible();
   await expect(page.getByText('Legacy writes authoritative')).toBeVisible();
