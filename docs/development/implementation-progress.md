@@ -15,6 +15,13 @@ Current focus areas:
 - Prompt 5 UI adoption planning for public and admin surfaces
 - Prompt 5 pricing shared contract/client alignment on the legacy consultation path
 - Prompt 5 admin support adapter extraction for preview and triage flows
+- roadmap page compact timeline and cluster-based drill-down refresh
+- roadmap sprint sequence with per-sprint evidence, gaps, prompt order, and agent roster
+- roadmap deep-link hash sync for phase/sprint selection plus mini-Gantt milestone strip
+- roadmap phase and sprint detail subpages for shareable deep-dive delivery views
+- roadmap sprint document register now maps each sprint to the real implementation docs in repo
+- release rehearsal wrapper now writes promote-or-hold artifacts after the root gate
+- release gate now uses a smaller `admin-smoke` Playwright lane instead of the full admin regression suite
 - Prompt 5 dependency mapping into Prompt 9, Prompt 10, and Prompt 11
 - Prompt 5 backend contract test enablement in project-local virtualenv
 - Prompt 5 public booking assistant shadow adoption
@@ -25,6 +32,7 @@ Current focus areas:
 - Prompt 10 CRM sync and lifecycle email service foundations
 - Prompt 10 lifecycle orchestration baseline with CRM manual-review ledger semantics
 - Prompt 11 integration provider status, attention queue, and reconciliation read models
+- Prompt 11 CRM retry backlog read model and admin drill-in for Sprint 10 hardening
 - admin Prompt 5 preview expanded to lifecycle email, CRM seeding, integration health, attention queue, and reconciliation signals
 - next-wave execution planning for Prompt 10 lifecycle orchestration, Prompt 11 attention read models, and selective live assistant adoption
 - Sprint 4 release-readiness and rollout contract updates for Prompt 10, Prompt 11, and selective live assistant adoption
@@ -50,6 +58,8 @@ Current focus areas:
 - admin catalog-quality diagnostics now include dedicated quality summary and CSV export endpoints, so the team can prioritize and remediate search-data issues as an operator workflow rather than ad-hoc inspection
 - Sprint S4 search evaluation is now in progress with a fixed-query evaluation pack and runnable harness, so common user intents like Sydney skincare, Melbourne facial no-match, housing, membership renewal, kids services, and signage suppression now have explicit pass/fail regression checks
 - public assistant search presentation now defaults to the top 3 ranked matches with progressive `See more` reveal, while booking cards prioritize compact decision-ready facts such as price, duration, location, and why the service matches
+- admin catalog now also surfaces search-readiness counts, warning-state pills, local quality filters, and CSV export for non-search-ready records, so catalog cleanup can follow the same quality gate that live search already enforces
+- public assistant search presentation now has explicit browser regression coverage for the top-3 shortlist and progressive reveal behavior, so future search-quality work is less likely to regress into thin or noisy result layouts
 - admin shadow diagnostics now supports real recent drift examples payloads and operator drill-in affordances for booking detail triage
 - frontend admin diagnostics now surface lifecycle drift breakdowns for booking, payment, workflow, email, and meeting comparisons in the bookings surface
 - frontend admin diagnostics now surface recent drift examples and top drift references, so operators can move from category counts to concrete cases when reviewing rollout gaps
@@ -159,6 +169,7 @@ Current shape:
 - Prompt 9 booking-path decisions now run through a dedicated escalation-ready policy helper on the same v1 path instead of branching into a separate API style
 - Prompt 11 visibility now flows through the same v1 envelope style, so integration provider health and reconciliation attention signals can be surfaced without inventing a separate admin-only contract family
 - Prompt 11 now also exposes additive attention buckets and section-level reconciliation detail, so admin can review retryable or manual-review states without turning those reads into operational mutations
+- Prompt 11 now also exposes an additive CRM retry backlog read model, so admin can inspect record-level retry truth, latest error context, and rollout-hold posture beyond summary pills alone
 - Prompt 10 lifecycle orchestration now has its own backend unit-test seam in `backend/tests/test_lifecycle_ops_service.py`, so CRM sync and lifecycle email status behavior can evolve without hiding logic in route tests alone
 - backend route coverage now also includes provider status, reconciliation summary, matching search, booking trust, and booking-path resolution, which makes the current admin-preview and public live-read read surface more release-ready without changing source-of-truth ownership
 - repository access is moving toward tenant-aware and query-specific ownership
@@ -212,6 +223,9 @@ Latest verification status:
 - Prompt 8 panel-level deep-link implementation now preserves the frontend build and admin smoke suite, with `npx playwright test tests/admin-prompt5-preview.spec.ts --project=legacy` green after adding `#workspace:panel` navigation, panel quick links, and additive panel anchors inside the split admin runtime
 - Prompt 11 triage snapshot now preserves both the backend contract suite and admin smoke coverage, with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes` and `npx playwright test tests/admin-prompt5-preview.spec.ts --project=legacy` covering the new read-only reliability board
 - reliability workspace extraction and admin route-level lazy loading now preserve the frontend build and admin smoke suite, while build output is chunked across runtime and workspace boundaries instead of keeping the admin entry path monolithic
+- the catalog workspace now consumes the search-quality diagnostics lane directly, so operator cleanup and customer-facing search quality are connected inside the same admin runtime instead of living only in backend endpoints
+- roadmap overview and detail-route split now preserve the frontend build, with `/roadmap/phase/<slug>` and `/roadmap/sprint/<slug>` giving shareable deep-dive pages alongside the compact overview
+- frontend build remains green after adding roadmap-linked sprint document references and the admin Prompt 11 CRM retry backlog drill-in
 
 ## Release Readiness
 
@@ -265,6 +279,9 @@ Current release-readiness snapshot:
 - pricing consultation now routes through `frontend/src/shared/api/pricing.ts` and `frontend/src/shared/contracts/pricing.ts`, so the legacy commercial flow shares one typed client path instead of keeping request and response shapes inside `PricingSection.tsx`
 - admin Prompt 5 preview now routes through `frontend/src/features/admin/prompt5-support-adapter.ts`, so support and triage actions are isolated from the component shell while legacy admin reads remain on `frontend/src/features/admin/api.ts`
 - targeted frontend verification is green for `tests/pricing-demo-flows.spec.ts` and the admin Prompt 5 preview and drill-down slices touched in this wave, while the broader admin Playwright suite still shows a later-stage preview-server refusal that needs a separate stability pass before claiming full-suite green
+- the standalone roadmap page now groups agent lanes as outer execution clusters and phase work as selectable time-sequenced cards with expandable registers, so `/roadmap` reads like an operating timeline instead of one long board dump
+- the standalone roadmap page now also carries a dedicated sprint sequence rail with per-sprint outcome, repo evidence, main gap, next prompt, and named agents, so execution can be read at `phase -> sprint -> agent` depth without expanding the entire roadmap at once
+- the roadmap page now also supports roadmap-specific hash state for selected phase and sprint, and includes a mini-Gantt strip across milestones `M0` to `M4`, so shared links can land closer to the active execution lane instead of only jumping to a broad section anchor
 - Prompt 9 matching now also has an additive semantic model-assist seam with config-backed provider routing, optional Gemini Maps grounding support, and a DB flag gate `semantic_matching_model_assist_v1`, so semantic rerank can be deployed behind immediate fail-open fallback to the heuristic path
 - `/api/v1/matching/search` now surfaces additive semantic assist metadata including `semantic_score` per candidate plus response-level `semantic_assist` provider or evidence summary, so live-read rollout and admin diagnostics can distinguish heuristic-only ranking from model-assisted ranking
 - backend verification now also covers semantic rerank merge behavior and route-level semantic assist metadata, so Prompt 9 search quality work can expand without coupling semantic failures to the authoritative booking-trust path
@@ -282,6 +299,8 @@ Current release-readiness snapshot:
 - the roadmap page now groups active specialist agents by delivery role cluster and renders them in denser cards, so the execution roster remains visible without stretching too far below the first viewport
 - release verification now also has a root-level `./scripts/run_release_gate.sh` command, which runs the frontend release gate plus backend v1 and lifecycle tests in one promote-or-hold sequence
 - release verification now also has an explicit promote, hold, and rollback checklist in `docs/development/release-gate-checklist.md`, so the gate is no longer only a command contract
+- release verification now also has `./scripts/run_release_rehearsal.sh`, which turns the root gate into a timestamped rehearsal report with explicit `promote_ready` or `hold` output
+- release verification now separates `admin-smoke` from the broader `@admin` suite, so promote-or-hold checks stay representative without pulling the whole admin regression surface into every gate run
 - the release-gate baseline is now complete enough to treat `Member I` as closed, because the root script plus checklist have already passed together as the current promote-or-hold contract
 - the earlier Prompt 8 next-wave items for reliability module extraction and admin bundle-size reduction have now moved into execution, with a dedicated reliability workspace module and route-level lazy loading in place before the next optimization pass
 - residual risk has narrowed to broader browser regression coverage beyond this targeted rollout slice, not the absence of a frontend harness

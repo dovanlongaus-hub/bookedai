@@ -202,11 +202,78 @@ async function stubAdminApis(page: Parameters<typeof test>[0]['page']) {
     });
   });
 
+  await page.route('**/api/admin/services/quality', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        counts: {
+          total_records: 2,
+          search_ready_records: 1,
+          warning_records: 1,
+          inactive_records: 1,
+        },
+        items: [],
+      }),
+    });
+  });
+
   await page.route('**/api/admin/services', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ status: 'ok', items: [] }),
+      body: JSON.stringify({
+        status: 'ok',
+        items: [
+          {
+            id: 1,
+            service_id: 'signature-facial-sydney',
+            business_name: 'Harbour Glow Spa',
+            business_email: 'bookings@harbourglow.example.com',
+            name: 'Signature Facial',
+            category: 'Spa',
+            summary: 'Hydrating skin treatment in central Sydney.',
+            amount_aud: 139,
+            duration_minutes: 60,
+            venue_name: 'Harbour Glow Spa',
+            location: 'Sydney NSW 2000',
+            map_url: null,
+            booking_url: 'https://book.example.com/facial',
+            image_url: null,
+            source_url: 'https://example.com/facial',
+            tags: ['facial', 'skin'],
+            featured: true,
+            is_active: true,
+            is_search_ready: true,
+            quality_warnings: [],
+            updated_at: '2026-04-16T00:00:00Z',
+          },
+          {
+            id: 2,
+            service_id: 'novo-print-banner',
+            business_name: 'NOVO PRINT',
+            business_email: null,
+            name: 'Outdoor Banner Print',
+            category: 'Print and Signage',
+            summary: 'Event banner print service for expos and activations.',
+            amount_aud: 80,
+            duration_minutes: 30,
+            venue_name: 'NOVO PRINT',
+            location: null,
+            map_url: null,
+            booking_url: 'https://example.com/banner',
+            image_url: null,
+            source_url: 'https://example.com/banner',
+            tags: ['signage'],
+            featured: false,
+            is_active: false,
+            is_search_ready: false,
+            quality_warnings: ['missing_location'],
+            updated_at: '2026-04-16T00:00:00Z',
+          },
+        ],
+      }),
     });
   });
 }
@@ -499,7 +566,7 @@ async function stubAdminPreviewV1(page: Parameters<typeof test>[0]['page']) {
   });
 }
 
-test('admin prompt 5 preview shows rollout mode and runs additive preview flow @admin', async ({ page }) => {
+test('admin prompt 5 preview shows rollout mode and runs additive preview flow @admin @admin-smoke', async ({ page }) => {
   await stubAdminApis(page);
   await stubAdminPreviewV1(page);
 
@@ -601,7 +668,30 @@ test('admin workspace navigation splits operations, catalog, and reliability vie
   await expect(page.getByRole('button', { name: 'Open API inventory' })).toBeVisible();
 });
 
-test('admin workspace deep-link opens reliability triage workspace directly @admin', async ({
+test('catalog workspace surfaces search-readiness summary and review warnings @admin', async ({
+  page,
+}) => {
+  await stubAdminApis(page);
+  await stubAdminPreviewV1(page);
+
+  await page.goto('/admin#catalog:service-catalog');
+
+  const catalogSection = page
+    .locator('section')
+    .filter({ has: page.getByText('Live service catalog import') })
+    .first();
+
+  await expect(catalogSection.getByText('Search ready', { exact: true })).toBeVisible();
+  await expect(catalogSection.getByRole('button', { name: /Needs review \(1\)/i })).toBeVisible();
+  await expect(catalogSection.getByText('Signature Facial')).toBeVisible();
+
+  await catalogSection.getByRole('button', { name: /Needs review \(1\)/i }).click();
+  await expect(catalogSection.getByText('Outdoor Banner Print')).toBeVisible();
+  await expect(catalogSection.getByText('missing location')).toBeVisible();
+  await expect(catalogSection.getByRole('button', { name: 'Export warnings CSV' })).toBeVisible();
+});
+
+test('admin workspace deep-link opens reliability triage workspace directly @admin @admin-smoke', async ({
   page,
 }) => {
   await stubAdminApis(page);
@@ -688,7 +778,7 @@ test('reliability drill-down view tracks the active lane and primary action @adm
   await expect(
     drilldownSection.getByText('Review API contract exposure before blaming operator workflow'),
   ).toBeVisible();
-  await expect(drilldownSection.getByText('Contract review')).toBeVisible();
+  await expect(drilldownSection.getByText('Contract review', { exact: true }).first()).toBeVisible();
   await expect(drilldownSection.getByRole('button', { name: 'Open API inventory' })).toBeVisible();
 
   await drilldownSection.getByRole('button', { name: 'Open API inventory' }).click();

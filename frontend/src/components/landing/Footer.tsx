@@ -1,4 +1,8 @@
 import {
+  brandDescriptor,
+  brandDomainLabel,
+  brandLogoPath,
+  brandPositioning,
   privacyHref,
   roadmapHref,
   termsHref,
@@ -15,12 +19,24 @@ export function Footer({ onStartTrial, onBookDemo }: FooterProps) {
     <footer className="mx-auto w-full max-w-7xl px-6 pb-12 pt-4 lg:px-8">
       <div className="apple-card px-6 py-8 lg:px-8">
         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <div className="text-lg font-semibold tracking-[-0.03em] text-[#1d1d1f]">BookedAI.au</div>
+          <div className="flex items-start gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-[1rem] bg-[#f5f5f7] p-1.5">
+              <img
+                src={brandLogoPath}
+                alt={`${brandDomainLabel} logo`}
+                className="h-full w-full object-contain"
+                loading="eager"
+              />
+            </div>
+            <div>
+            <div className="text-lg font-semibold tracking-[-0.03em] text-[#1d1d1f]">{brandDomainLabel}</div>
+            <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#0071e3]">
+              {brandDescriptor}
+            </div>
             <p className="apple-body mt-2 max-w-2xl text-sm leading-7">
-              AI receptionist support for Australian service businesses that want
-              faster replies, better qualification, and more booked work.
+              {brandPositioning}
             </p>
+          </div>
           </div>
 
           <div className="flex flex-wrap gap-3 text-sm">

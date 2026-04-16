@@ -8,9 +8,10 @@
     "preview": "vite preview --port 3000",
     "test:playwright": "playwright test",
     "test:playwright:admin": "PLAYWRIGHT_PUBLIC_ASSISTANT_MODE=legacy playwright test --grep @admin",
+    "test:playwright:admin-smoke": "PLAYWRIGHT_PUBLIC_ASSISTANT_MODE=legacy playwright test --grep @admin-smoke",
     "test:playwright:legacy": "PLAYWRIGHT_PUBLIC_ASSISTANT_MODE=legacy playwright test --grep @legacy",
     "test:playwright:live-read": "PLAYWRIGHT_PUBLIC_ASSISTANT_MODE=live-read playwright test --grep @live-read",
-    "test:playwright:smoke": "npm run test:playwright:legacy && npm run test:playwright:live-read && npm run test:playwright:admin",
+    "test:playwright:smoke": "npm run test:playwright:legacy && npm run test:playwright:live-read && npm run test:playwright:admin-smoke",
     "test:release-gate": "npm run build && npm run test:playwright:smoke"
   },
   "dependencies": {

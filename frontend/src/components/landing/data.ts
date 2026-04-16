@@ -217,12 +217,16 @@ export type RoadmapArchitecture = {
 export type RoadmapTask = {
   title: string;
   status: RoadmapStatus;
+  note?: string;
 };
 
 export type RoadmapPhase = {
   name: string;
   timing: string;
   summary: string;
+  windowLabel?: string;
+  focusLabel?: string;
+  milestoneLabel?: string;
   tasks: RoadmapTask[];
 };
 
@@ -231,12 +235,47 @@ export type RoadmapRole = {
   track: string;
   body: string;
   status: RoadmapStatus;
+  windowLabel?: string;
+  focusLabel?: string;
 };
 
 export type RoadmapRoleGroup = {
   name: string;
   summary: string;
+  clusterLabel?: string;
+  windowLabel?: string;
   roles: RoadmapRole[];
+};
+
+export type RoadmapSprintLink = {
+  label: string;
+  href: string;
+};
+
+export type RoadmapSprintReference = {
+  title: string;
+  path: string;
+  summary: string;
+};
+
+export type RoadmapSprint = {
+  name: string;
+  phaseName: string;
+  timing: string;
+  status: RoadmapStatus;
+  windowLabel?: string;
+  focusLabel?: string;
+  milestoneLabel?: string;
+  summary: string;
+  evidence: string;
+  mainGap: string;
+  nextPrompt: string;
+  ownerGroup: string;
+  agents: string[];
+  tasks: RoadmapTask[];
+  riskNotes?: string[];
+  links?: RoadmapSprintLink[];
+  references?: RoadmapSprintReference[];
 };
 
 export type RoadmapContent = SectionContent & {
@@ -244,6 +283,7 @@ export type RoadmapContent = SectionContent & {
   architectures: RoadmapArchitecture[];
   roleGroups: RoadmapRoleGroup[];
   phases: RoadmapPhase[];
+  sprints: RoadmapSprint[];
 };
 
 export type ImageUploadContent = SectionContent & {
@@ -268,23 +308,30 @@ export const privacyHref = '/privacy-policy.html';
 
 export const termsHref = '/terms.html';
 
+export const brandName = 'BookedAI';
+export const brandDomainLabel = 'BookedAI.au';
+export const brandDescriptor = 'AI Receptionist & Booking for SMEs';
+export const brandPositioning =
+  'AI receptionist for service SMEs that turns conversations into bookings.';
+export const brandHomeUrl = 'https://bookedai.au/';
+export const brandLogoPath = '/branding/bookedai-logo.png';
+
 export const navItems: NavItem[] = [
-  'Product',
   'Problem',
+  'Solution',
   'How it Works',
-  'Booking Assistant',
-  'Partners',
-  'Team Members',
+  'Demo',
+  'Implementation',
   'Pricing',
 ];
 
 export const heroContent: HeroContent = {
-  eyebrow: 'AI receptionist for Australian SMEs',
-  title: 'From Conversation to Revenue',
-  bodyLead: 'Turn every enquiry into a booking-ready recommendation.',
+  eyebrow: 'AI Receptionist & Booking for SMEs',
+  title: 'Turn enquiries into booked jobs',
+  bodyLead: 'BookedAI responds fast, qualifies intent, and keeps the next step clear.',
   bodyRest:
-    'BookedAI turns messy enquiries into polished search results, confident recommendations, and booking-ready next steps for swim schools, restaurants, clinics, salons, family services, and other Australian SMEs.',
-  note: 'Designed to feel premium in front of customers and operationally reliable for founders, operators, and investors reviewing the product story.',
+    'Built for service SMEs that want a premium front-desk experience, less admin, and more bookings across chat, calls, calendar, and workflows.',
+  note: 'For SME operators: fewer missed leads and less admin. For investors: a repeatable conversion wedge with clear expansion potential.',
   primaryCta: 'Start Free Trial',
   secondaryCta: 'View Product',
   primaryHref: primaryCtaHref,
@@ -345,46 +392,46 @@ export const demoContent: DemoContent = {
 export const problemContent: SectionContent = {
   kicker: 'Problem',
   kickerClassName: 'text-indigo-400',
-  title: 'You’re Losing Customers Every Day',
-  body: 'Australian customers move quickly when they are booking a treatment, table, consultation, event slot, haircut, or service call. If your team replies late, that booking often goes to another provider.',
+  title: 'SMEs lose revenue in the first 60 seconds.',
+  body: 'Slow replies, weak qualification, and no clear next step let warm leads disappear before they book.',
 };
 
 export const proofContent: ProofContent = {
   channels: [
-    'Website Chat',
-    'Phone Calls',
+    'Web chat',
+    'Phone calls',
     'WhatsApp',
     'Calendar',
-    'n8n Workflows',
+    'Automations',
   ],
   section: {
-    kicker: 'Why teams trust it',
+    kicker: 'Solution',
     kickerClassName: 'text-sky-400',
-    title: 'Built for busy booking teams, not just a generic chat bubble',
-    body: 'BookedAI is built for operators who need fast replies, clean booking logic, and a workflow customers can trust across hospitality, beauty, health, events, trades, family services, and more.',
+    title: 'A simple conversion layer for service SMEs',
+    body: 'BookedAI gives SMEs one clear system to respond faster, qualify better, and move real demand into booked revenue.',
   },
 };
 
 export const proofItems: ProofItem[] = [
   {
-    eyebrow: 'Coverage',
-    title: 'Always on when your team is fully booked',
-    body: 'After-hours enquiries, peak-weekend demand, and busy reception periods still get an immediate reply that keeps leads engaged.',
+    eyebrow: 'Response speed',
+    title: 'Reply before the lead cools',
+    body: 'Every inbound message gets a fast first response before the lead chooses someone else.',
   },
   {
-    eyebrow: 'Qualification',
-    title: 'Lead screening happens before the booking hits your calendar',
-    body: 'BookedAI collects service type, timing, contact details, and booking context up front so your team spends less time chasing basics and more time closing real work.',
+    eyebrow: 'Operational value',
+    title: 'Cut repetitive admin',
+    body: 'Qualification happens up front, so the team spends less time repeating questions.',
   },
   {
-    eyebrow: 'Routing',
-    title: 'Escalate the right conversations to a human',
-    body: 'Urgent service questions, fit concerns, VIP leads, or higher-value enquiries can be handed off quickly instead of getting trapped in a generic automation flow.',
+    eyebrow: 'Expansion logic',
+    title: 'Repeat across service verticals',
+    body: 'The same engine can work across clinics, salons, trades, events, and other service-led workflows.',
   },
   {
-    eyebrow: 'Follow-up',
-    title: 'Reminders and admin steps stay connected to the booking',
-    body: 'Calendar updates, reminders, and workflow automations can continue after the conversation so fewer restaurant, salon, clinic, event, trade, or kids-service leads fall through the cracks.',
+    eyebrow: 'Workflow continuity',
+    title: 'Keep the workflow connected',
+    body: 'Booking, payment, reminders, escalation, and follow-up stay connected after the chat ends.',
   },
 ];
 
@@ -418,46 +465,53 @@ export const showcaseImages: ShowcaseImage[] = [
 
 export const problemCards: InfoCard[] = [
   {
-    title: 'Slow Replies',
-    body: 'Australian customers move on fast when a booking enquiry sits unanswered.',
+    title: 'Slow response',
+    body: 'The lead cools before anyone responds.',
   },
   {
-    title: 'Missed Leads',
-    body: 'Busy teams cannot answer every call, chat, DM, and web form in time.',
+    title: 'Weak qualification',
+    body: 'Teams spend too long on back-and-forth before they know the fit.',
   },
   {
-    title: 'Lost Revenue',
-    body: 'Every unanswered enquiry can mean one less table, appointment, consultation, class, event, or callout.',
+    title: 'No next step',
+    body: 'Interest stalls when there is no obvious booking action.',
   },
 ];
 
 export const solutionContent: SectionContent = {
   kicker: 'Solution',
   kickerClassName: 'text-emerald-400',
-  title: 'Meet BookedAI',
-  body: 'BookedAI acts like an always-on front desk that answers questions, qualifies demand, and books services automatically.',
+  title: 'One AI receptionist layer from first message to booked outcome',
+  body: 'Answer, qualify, recommend, book, and hand off in one visible flow.',
+};
+
+export const implementationContent: SectionContent = {
+  kicker: 'Implementation',
+  kickerClassName: 'text-cyan-500',
+  title: 'Start standalone now, extend into widget, plugin, or mobile later',
+  body: 'Launch BookedAI as a hosted booking surface first, then expand into an embedded receptionist, plugin-integrated workflow, or future mobile experience without changing the core conversion engine.',
 };
 
 export const solutionCards: InfoCard[] = [
   {
-    title: 'Instant Replies',
-    body: 'Reply to web chat, calls, and inbound enquiries in seconds, 24/7.',
+    title: 'Instant response',
+    body: 'Every channel gets a fast first reply with the same tone and service flow.',
   },
   {
-    title: 'Smart Qualification',
-    body: 'Understand whether the customer needs a table, treatment, consult, quote, event slot, or family service and move them to the right next step.',
+    title: 'Smart qualification',
+    body: 'The AI captures need, timing, and fit before staff need to step in.',
   },
   {
-    title: 'Auto Booking',
-    body: 'Turn customer conversations into confirmed bookings and qualified sales conversations without manual follow-up.',
+    title: 'Booking-ready handoff',
+    body: 'The strongest option appears with the next step already clear.',
   },
 ];
 
 export const flowSteps = [
-  'Customer sends a message',
-  'BookedAI replies instantly',
-  'BookedAI qualifies the lead',
-  'BookedAI confirms the booking',
+  'Capture intent',
+  'Qualify fit',
+  'Rank the best option',
+  'Book and follow up',
 ];
 
 export const metrics: Metric[] = [
@@ -469,8 +523,8 @@ export const metrics: Metric[] = [
 export const pricingContent: PricingContent = {
   kicker: 'Pricing',
   kickerClassName: 'text-indigo-400',
-  title: 'Simple monthly pricing built for Australian SMEs',
-  body: 'Start with 30 days free, then move onto a clear monthly plan with a lower entry price and a simpler setup path that is easier to approve quickly.',
+  title: 'Simple monthly pricing for SMEs',
+  body: 'Start free for 30 days, then move to a clear monthly plan with an easy setup path.',
   planLabel: 'Starter plan',
   planPrice: 'A$79/mo',
   planCaption: 'after your 30-day free subscription period',
@@ -487,14 +541,14 @@ export const pricingContent: PricingContent = {
 
 export const ctaContent: CallToActionContent = {
   kicker: 'Call to action',
-  title: 'Start your 30-day free subscription today',
-  body: 'Launch BookedAI on bookedai.au and start converting more Australian enquiries into booked revenue this week across food, events, salons, healthcare, kids services, wellness, and local service businesses.',
+  title: 'Ready to trial BookedAI or map your rollout?',
+  body: 'If the problem, solution, demo, implementation path, and pricing all make sense, this is the right moment to take the next step.',
   primaryCta: 'Start Free Trial',
   secondaryCta: 'Book a Demo',
   primaryHref: primaryCtaHref,
   secondaryHref: demoCtaHref,
   supportingText:
-    'Prefer email? Reach us directly at info@bookedai.au and we will help map your booking flow for hospitality, beauty, health, events, trades, education, or other service-led SMEs.',
+    'Prefer email? Reach us at info@bookedai.au and we will help map your booking flow.',
 };
 
 export const trustItems: TrustItem[] = [
@@ -575,13 +629,13 @@ export const teamMembers: TeamMember[] = [
 ];
 
 export const videoDemoContent: VideoDemoContent = {
-  kicker: 'Video Demo',
-  title: 'Watch the revenue story before you book a live walkthrough',
-  body: 'This short demo follows a salon enquiry from customer request to match, booking trust, and confirmed outcome. It is built to help buyers understand how BookedAI converts demand into revenue, not just chat replies.',
+  kicker: 'Demo',
+  title: 'See the booking flow in one short pass',
+  body: 'A compact demo of enquiry, recommendation, and booking-ready handoff before you decide how to deploy it.',
   highlights: [
-    'Customer request, AI understanding, and matched next step in one clean flow',
-    'Booking trust shown clearly: real options, not vague chatbot answers',
-    'Ends on confirmed outcome and the next commercial step',
+    'Natural request in, clear match out',
+    'Real options instead of vague replies',
+    'A confirmed next step at the end',
   ],
   primaryCta: 'Watch Demo Hub',
   primaryHref: videoDemoHref,
@@ -812,7 +866,7 @@ export const roadmapContent: RoadmapContent = {
   title: 'A delivery plan that connects product polish, architecture depth, and operational readiness',
   body: 'The roadmap is organized around the architectures already defined, then expanded into phased execution so each release moves both the customer experience and the backend platform forward together.',
   lead:
-    'Every task is visible with a status marker so the plan reads like an execution board, not just a pitch deck timeline, and the active specialist agent roster is shown directly inside the roadmap.',
+    'The roadmap now reads as an operating view: compact phase timing first, agent clusters second, then expandable delivery detail only when you want to drill deeper.',
   architectures: [
     {
       title: 'Customer experience architecture',
@@ -834,6 +888,8 @@ export const roadmapContent: RoadmapContent = {
   roleGroups: [
     {
       name: 'Leadership and Planning',
+      clusterLabel: 'Strategic layer',
+      windowLabel: 'Foundation -> Scale',
       summary:
         'The delivery model starts with strategic roles that set architecture direction, product priorities, and business framing before execution fans out into specialist agents.',
       roles: [
@@ -859,6 +915,8 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Experience and Product Delivery',
+      clusterLabel: 'Customer surfaces',
+      windowLabel: 'Phase 1 -> Phase 3',
       summary:
         'These roles convert product intent into a usable buying journey, a confident mobile booking flow, and operator-friendly interfaces.',
       roles: [
@@ -884,6 +942,8 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Platform and Intelligence',
+      clusterLabel: 'Core platform',
+      windowLabel: 'Phase 1 -> Phase 4',
       summary:
         'Core engineering roles power the booking engine, AI reasoning, integrations, and infrastructure that move a conversation into an operationally valid booking.',
       roles: [
@@ -921,6 +981,8 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Quality and Validation',
+      clusterLabel: 'Release safety',
+      windowLabel: 'Phase 2 -> Phase 4',
       summary:
         'Quality roles make sure automation is trustworthy, regressions are visible, and production behavior remains safe as the system expands.',
       roles: [
@@ -946,6 +1008,8 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Active Agent Coordination',
+      clusterLabel: 'Sprint control',
+      windowLabel: 'Current execution wave',
       summary:
         'This coordination cluster keeps the sprint plan coherent, sequences specialist work, and ties roadmap language back to implementation reality without letting the execution board sprawl.',
       roles: [
@@ -989,6 +1053,8 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Active Backend and Integration Agents',
+      clusterLabel: 'Backend execution',
+      windowLabel: 'Prompt 5 -> Prompt 11 wave',
       summary:
         'These agent lanes carry the typed v1 backend, lifecycle orchestration, and integration reconciliation work that sits behind the public and admin surfaces.',
       roles: [
@@ -1098,6 +1164,8 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Active Frontend and Rollout Agents',
+      clusterLabel: 'Frontend rollout',
+      windowLabel: 'Prompt 5 adoption wave',
       summary:
         'These lanes focus on operator visibility, public rollout sequencing, and the UX surfaces that make the additive v1 path understandable during staged adoption.',
       roles: [
@@ -1153,6 +1221,8 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Active QA and Recon Agents',
+      clusterLabel: 'Verification',
+      windowLabel: 'Release-gate wave',
       summary:
         'These reconnaissance and QA agents compress the selector audit, smoke-gap discovery, and route-stub planning work so each sprint can ship with targeted verification instead of broad, slow exploration.',
       roles: [
@@ -1199,6 +1269,9 @@ export const roadmapContent: RoadmapContent = {
     {
       name: 'Phase 1',
       timing: 'Foundation',
+      windowLabel: 'Sprint S1-S3',
+      focusLabel: 'Landing story, roadmap shell, admin baseline, typed contracts',
+      milestoneLabel: 'Dedicated roadmap page and operator baseline are already live',
       summary: 'Establish the baseline product story, core booking flow, and operator visibility.',
       tasks: [
         { title: 'Redesign the homepage with premium whitespace, stronger typography, and investor-facing narrative', status: 'In Progress' },
@@ -1212,6 +1285,9 @@ export const roadmapContent: RoadmapContent = {
     {
       name: 'Phase 2',
       timing: 'Booking Intelligence',
+      windowLabel: 'Sprint S3-S6',
+      focusLabel: 'Matching, trust, escalation, and normalized booking payloads',
+      milestoneLabel: 'Prompt 9 search quality and trust-first booking-path logic are underway',
       summary: 'Deepen qualification, routing, and trust so conversations become cleaner booking outcomes.',
       tasks: [
         { title: 'Expand structured lead qualification fields per service type', status: 'In Progress' },
@@ -1225,6 +1301,9 @@ export const roadmapContent: RoadmapContent = {
     {
       name: 'Phase 3',
       timing: 'Commercial Expansion',
+      windowLabel: 'Sprint S5-S8',
+      focusLabel: 'Pricing conversion, payment resilience, packages, and CRM-linked milestones',
+      milestoneLabel: 'Shared pricing contracts are in place while revenue-path hardening continues',
       summary: 'Connect more revenue-critical systems so BookedAI can support a broader go-to-market motion.',
       tasks: [
         { title: 'Broaden pricing and plan conversion flows', status: 'In Progress' },
@@ -1240,6 +1319,9 @@ export const roadmapContent: RoadmapContent = {
     {
       name: 'Phase 4',
       timing: 'Scale and Reliability',
+      windowLabel: 'Sprint S7-S10',
+      focusLabel: 'Prompt 10/11 reliability, protected re-auth, release gate, and operational guardrails',
+      milestoneLabel: 'Admin reliability workspace and release-gate foundations are already active',
       summary: 'Strengthen observability, operational safety, and production readiness for larger rollout volumes.',
       tasks: [
         { title: 'Add deployment health and release-readiness checklists', status: 'In Progress' },
@@ -1270,6 +1352,361 @@ export const roadmapContent: RoadmapContent = {
         { title: 'Continue admin chunk reduction or drill-down isolation if reliability outgrows the current three-lane split', status: 'Completed' },
         { title: 'Consider richer handoff packaging only if the current local note and export summary pattern proves too thin', status: 'Completed' },
         { title: 'Revisit handoff tooling only if operators need shared or server-backed note state', status: 'Planned' },
+      ],
+    },
+  ],
+  sprints: [
+    {
+      name: 'Sprint 1',
+      phaseName: 'Phase 1',
+      timing: 'Production baseline',
+      status: 'Completed',
+      windowLabel: 'M0 • Sprint 1-2',
+      focusLabel: 'Lock production contracts, inventory flows, and release discipline',
+      milestoneLabel: 'Baseline architecture and release framing are already in repo',
+      summary: 'Production baseline and architectural inventory were locked first so later refactors could move faster with less ambiguity.',
+      evidence:
+        'Architecture docs, roadmap page, deploy scripts, route inventory work, and release notes are already reflected in repo structure and documentation.',
+      mainGap:
+        'Keep contract inventory current and convert checklist-heavy release work into more automated gates.',
+      nextPrompt: 'Prompt 13',
+      ownerGroup: 'Coordination and release',
+      agents: ['PM Integrator', 'Worker A', 'Worker C'],
+      tasks: [
+        { title: 'Complete route, webhook, env, and integration inventory', status: 'Completed' },
+        { title: 'Document smoke and rollback checklist', status: 'Completed' },
+        { title: 'Maintain production contract inventory as code evolves', status: 'In Progress' },
+      ],
+      links: [
+        { label: 'MVP Sprint Execution Plan', href: '/roadmap#sprint-sequence' },
+        { label: 'Implementation Progress', href: '/roadmap#sprint-sequence' },
+      ],
+      references: [
+        {
+          title: 'MVP Sprint Execution Plan',
+          path: 'docs/architecture/mvp-sprint-execution-plan.md',
+          summary: 'Canonical sprint-by-sprint baseline and gap list for the original MVP delivery rail.',
+        },
+        {
+          title: 'Implementation Phase Roadmap',
+          path: 'docs/architecture/implementation-phase-roadmap.md',
+          summary: 'Phase-level operating picture that keeps sprint work aligned with the broader roadmap.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 2',
+      phaseName: 'Phase 1',
+      timing: 'Internal modular foundation',
+      status: 'In Progress',
+      windowLabel: 'M0 • Sprint 2',
+      focusLabel: 'Bound service seams, shared contracts, and adapter boundaries',
+      milestoneLabel: 'Public/admin and backend modules are already split into safer seams',
+      summary: 'This sprint establishes modular foundations so new work lands in bounded modules instead of giant handlers or page shells.',
+      evidence:
+        '`frontend/src/features/admin/*`, `frontend/src/shared/contracts/*`, `backend/service_layer/*`, `backend/repositories/*`, and `backend/core/*` are already active.',
+      mainGap:
+        'Finish moving the remaining hotspot logic into stable seams and reduce duplicate contract ownership.',
+      nextPrompt: 'Prompt 2, Prompt 5, Prompt 8',
+      ownerGroup: 'Backend execution',
+      agents: ['Worker A', 'Worker B', 'Worker C', 'PM Integrator'],
+      tasks: [
+        { title: 'Expand domain and repository seams across backend modules', status: 'In Progress' },
+        { title: 'Reduce duplicated DTO handling in public and admin flows', status: 'In Progress' },
+        { title: 'Keep new features landing in bounded modules instead of giant files', status: 'Completed' },
+      ],
+      riskNotes: ['Residual hotspot logic still exists in legacy handlers and a few shell-level integrations.'],
+      references: [
+        {
+          title: 'Repo Module Strategy',
+          path: 'docs/architecture/repo-module-strategy.md',
+          summary: 'Module-boundary strategy behind the repository, service-layer, and route-shell split.',
+        },
+        {
+          title: 'Prompt 5 API V1 Execution Package',
+          path: 'docs/development/prompt-5-api-v1-execution-package.md',
+          summary: 'Execution package that ties shared contracts and additive v1 seams into concrete rollout work.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 3',
+      phaseName: 'Phase 2',
+      timing: 'Platform safety tables',
+      status: 'In Progress',
+      windowLabel: 'M1 • Sprint 3',
+      focusLabel: 'Tenant anchor, feature flags, audit, webhook, and outbox foundation',
+      milestoneLabel: 'Migration 001 and tenant-safe platform foundations are already present',
+      summary: 'This sprint lays down platform-safety tables and tenant foundations that later dual-write and integration work depend on.',
+      evidence:
+        'Migration `001_platform_safety_and_tenant_anchor.sql`, tenant repository, feature-flag repository, and `backend/core/feature_flags.py` are already live in repo.',
+      mainGap:
+        'Wire audit, idempotency, webhook, and outbox foundations into more runtime paths instead of stopping at schema readiness.',
+      nextPrompt: 'Prompt 4, Prompt 12, Prompt 13',
+      ownerGroup: 'Backend execution',
+      agents: ['PM Integrator', 'Worker A'],
+      tasks: [
+        { title: 'Apply and validate migration 001 safely', status: 'Completed' },
+        { title: 'Expose default tenant anchor and feature-flag repository access', status: 'Completed' },
+        { title: 'Integrate audit, idempotency, webhook, and outbox hooks into more runtime paths', status: 'In Progress' },
+      ],
+      references: [
+        {
+          title: 'Data Architecture Migration Strategy',
+          path: 'docs/architecture/data-architecture-migration-strategy.md',
+          summary: 'Tenant anchor, safety tables, and lifecycle-safe schema direction for audit and idempotency work.',
+        },
+        {
+          title: 'Auth RBAC Multi-Tenant Security Strategy',
+          path: 'docs/architecture/auth-rbac-multi-tenant-security-strategy.md',
+          summary: 'Security and role framing for tenant-safe runtime evolution.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 4',
+      phaseName: 'Phase 2',
+      timing: 'Dual-write mirrors',
+      status: 'In Progress',
+      windowLabel: 'M1 • Sprint 4',
+      focusLabel: 'Normalized lead, booking, payment, and lifecycle mirrors beside legacy flows',
+      milestoneLabel: 'Booking assistant, pricing, and demo already dual-write into mirror truth',
+      summary: 'Normalized mirrors are being written in parallel so future read-side cutovers can happen safely against comparable truth.',
+      evidence:
+        '`backend/service_layer/booking_mirror_service.py`, dual-write coverage for booking/pricing/demo, and admin shadow compare support are already present.',
+      mainGap:
+        'Finish callback-driven mirror updates and reconciliation coverage for payment, email, workflow, and meeting lifecycle state.',
+      nextPrompt: 'Prompt 3, Prompt 4, Prompt 10, Prompt 11',
+      ownerGroup: 'Backend execution',
+      agents: ['Member A', 'Member B', 'PM Integrator'],
+      tasks: [
+        { title: 'Dual-write booking assistant, pricing, and demo flows', status: 'Completed' },
+        { title: 'Support reconciliation and shadow compare for normalized mirrors', status: 'Completed' },
+        { title: 'Complete callback-driven lifecycle mirror normalization', status: 'In Progress' },
+      ],
+      references: [
+        {
+          title: 'Phase 2-6 Detailed Implementation Package',
+          path: 'docs/architecture/phase-2-6-detailed-implementation-package.md',
+          summary: 'Detailed package for mirror writes, reconciliation, and lifecycle-safe additive rollout.',
+        },
+        {
+          title: 'Prompt 5 To Prompt 11 Dependency Gap Map',
+          path: 'docs/architecture/prompt-5-to-11-gap-map.md',
+          summary: 'Crosswalk that explains why mirror truth and lifecycle normalization must land before richer sync behavior.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 5',
+      phaseName: 'Phase 3',
+      timing: 'Domain API v1 foundation',
+      status: 'Completed',
+      windowLabel: 'M2 • Sprint 5',
+      focusLabel: 'Additive `/api/v1/*`, shared contracts, and initial UI adoption',
+      milestoneLabel: 'Prompt 5 v1 routes and typed clients are already live in repo',
+      summary: 'Although the original plan treated this sprint as future work, the repo now already has additive v1 routes, shared contracts, and selective public/admin adoption.',
+      evidence:
+        '`backend/api/v1_routes.py`, shared contracts, typed client, admin preview wiring, and selective live-read assistant behavior are already implemented.',
+      mainGap:
+        'Round out remaining domain shells, tighten contract coverage, and keep v1 as the center of future logic rather than a side path.',
+      nextPrompt: 'Prompt 9, Prompt 10',
+      ownerGroup: 'Backend execution',
+      agents: ['Worker A', 'Worker B', 'Worker C', 'Member A'],
+      tasks: [
+        { title: 'Ship additive `/api/v1/*` endpoint families', status: 'Completed' },
+        { title: 'Provide shared envelopes and typed public/admin client support', status: 'Completed' },
+        { title: 'Expand contract coverage and remaining domain shells', status: 'In Progress' },
+      ],
+      references: [
+        {
+          title: 'Prompt 5 API V1 Execution Package',
+          path: 'docs/development/prompt-5-api-v1-execution-package.md',
+          summary: 'Primary implementation package for additive v1 routes, typed contracts, and safe rollout rules.',
+        },
+        {
+          title: 'Prompt 5 UI Adoption Plan',
+          path: 'docs/development/prompt-5-ui-adoption-plan.md',
+          summary: 'Public/admin adoption order for moving surfaces onto the shared v1 seam.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 6',
+      phaseName: 'Phase 2',
+      timing: 'Matching and trust',
+      status: 'In Progress',
+      windowLabel: 'M2 • Sprint 6',
+      focusLabel: 'Trust-first matching, booking-path policy, and escalation-ready routing',
+      milestoneLabel: 'Search rerank, trust signals, and booking-path logic are already in motion',
+      summary: 'This sprint moves the assistant away from generic chat and toward booking-safe trust and routing behavior.',
+      evidence:
+        'Admin shadow diagnostics, drift taxonomy, semantic rerank, strict relevance gating, booking-trust helpers, and booking-path policy now exist.',
+      mainGap:
+        'Complete deeper AI routing, stronger industry-aware escalation policy, and more explicit human handoff logic.',
+      nextPrompt: 'Prompt 9, Prompt 14',
+      ownerGroup: 'Platform and intelligence',
+      agents: ['Member B', 'Member C', 'PM Integrator'],
+      tasks: [
+        { title: 'Improve search ranking, semantic assist, and trust diagnostics', status: 'In Progress' },
+        { title: 'Expose booking-path policy and safer next-action logic', status: 'Completed' },
+        { title: 'Deepen human escalation and industry-aware routing', status: 'Planned' },
+      ],
+      references: [
+        {
+          title: 'AI Router Matching Search Strategy',
+          path: 'docs/architecture/ai-router-matching-search-strategy.md',
+          summary: 'Search relevance, rerank, and routing strategy behind Prompt 9 behavior.',
+        },
+        {
+          title: 'Prompt 5 To Prompt 11 Dependency Gap Map',
+          path: 'docs/architecture/prompt-5-to-11-gap-map.md',
+          summary: 'Dependency map showing how Prompt 9 trust logic fits into later lifecycle and sync work.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 7',
+      phaseName: 'Phase 3',
+      timing: 'Public growth uplift',
+      status: 'In Progress',
+      windowLabel: 'M3 • Sprint 7',
+      focusLabel: 'Pricing conversion, attribution, public trust education, and GTM surfaces',
+      milestoneLabel: 'Public roadmap/demo/pricing surface is already much stronger than the original baseline',
+      summary: 'This sprint strengthens the acquisition and conversion layer without sacrificing the trust-first product story.',
+      evidence:
+        'Public landing/demo work, partner-wall upgrades, standalone roadmap page, and pricing/demo smoke coverage are all present in repo.',
+      mainGap:
+        'Connect attribution, conversion instrumentation, package positioning, and cancelled-state loops into more measurable growth outcomes.',
+      nextPrompt: 'Prompt 6, Prompt 16, Prompt 17',
+      ownerGroup: 'Frontend rollout',
+      agents: ['Locke', 'Raman', 'Meitner', 'PM Integrator'],
+      tasks: [
+        { title: 'Strengthen pricing/demo conversion and banner states', status: 'Completed' },
+        { title: 'Improve partner proof and public storytelling surfaces', status: 'In Progress' },
+        { title: 'Connect attribution and GTM loops into measurable growth metrics', status: 'Planned' },
+      ],
+      references: [
+        {
+          title: 'Pricing Packaging Monetization Strategy',
+          path: 'docs/architecture/pricing-packaging-monetization-strategy.md',
+          summary: 'Commercial conversion direction for pricing, packaging, and growth surfaces.',
+        },
+        {
+          title: 'Demo Script Storytelling Video Strategy',
+          path: 'docs/architecture/demo-script-storytelling-video-strategy.md',
+          summary: 'Narrative and GTM framing for public proof, demo, and storytelling surfaces.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 8',
+      phaseName: 'Phase 4',
+      timing: 'Admin ops modularization',
+      status: 'In Progress',
+      windowLabel: 'M3 • Sprint 8',
+      focusLabel: 'Issue-first admin IA, reliability workspace, and deep-linkable operator lanes',
+      milestoneLabel: 'Admin is already a workspace shell instead of one giant ops page',
+      summary: 'Admin is being reshaped into issue-first operator lanes so reliability, ops, and catalog workflows scale without one mega dashboard.',
+      evidence:
+        '`AdminPage` is now a composition shell, with feature-local modules, reliability workspace split, panel deep-links, and lazy drill-down modules.',
+      mainGap:
+        'Finish pushing deeper ops, catalog, tenant, and integration experiences into clearer workspaces instead of one shared screen.',
+      nextPrompt: 'Prompt 8',
+      ownerGroup: 'Backend and integration lanes',
+      agents: ['Member J', 'Member J2', 'Member K', 'Member L', 'Member O', 'Member P'],
+      tasks: [
+        { title: 'Split admin into operations, catalog, and reliability workspaces', status: 'Completed' },
+        { title: 'Add issue-first insights, panel deep-links, and lazy drill-down modules', status: 'Completed' },
+        { title: 'Continue deeper admin IA split for tenant and integration surfaces', status: 'In Progress' },
+      ],
+      references: [
+        {
+          title: 'Internal Admin App Strategy',
+          path: 'docs/architecture/internal-admin-app-strategy.md',
+          summary: 'Issue-first admin IA strategy behind workspace split, drill-down panels, and operator lanes.',
+        },
+        {
+          title: 'Next Sprint Protected Reauth Retry Gate Plan',
+          path: 'docs/development/next-sprint-protected-reauth-retry-gate-plan.md',
+          summary: 'Operational hardening plan that led into deeper reliability and protected-action work.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 9',
+      phaseName: 'Phase 4',
+      timing: 'Tenant foundation',
+      status: 'In Progress',
+      windowLabel: 'M4 • Sprint 9',
+      focusLabel: 'Tenant-safe APIs, role model, permission abstraction, and lifecycle-safe shell',
+      milestoneLabel: 'Tenant-aware data seams exist, but the first tenant product shell is still pending',
+      summary: 'The platform is structurally approaching tenant-safe rollout, but the tenant-facing product shell and scoped views are not finished yet.',
+      evidence:
+        'Tenant-aware repository context, `tenant_mode_enabled`, default tenant seed, and tenant-aware mirror writes are already present.',
+      mainGap:
+        'Build tenant shell, role model, scoped APIs, and the first read-heavy tenant overview before broad tenant-facing expansion.',
+      nextPrompt: 'Prompt 7, Prompt 12',
+      ownerGroup: 'Strategic layer',
+      agents: ['PM Integrator'],
+      tasks: [
+        { title: 'Prepare tenant-aware repositories and runtime flags', status: 'Completed' },
+        { title: 'Define role model, permission abstraction, and tenant-scoped APIs', status: 'In Progress' },
+        { title: 'Ship the first tenant read-heavy shell and overview surfaces', status: 'Planned' },
+      ],
+      references: [
+        {
+          title: 'Tenant App Strategy',
+          path: 'docs/architecture/tenant-app-strategy.md',
+          summary: 'Tenant-facing shell and scoped operational overview strategy for the first tenant product surface.',
+        },
+        {
+          title: 'Auth RBAC Multi-Tenant Security Strategy',
+          path: 'docs/architecture/auth-rbac-multi-tenant-security-strategy.md',
+          summary: 'Role model, permission abstraction, and tenant-safe access boundaries for this sprint.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 10',
+      phaseName: 'Phase 4',
+      timing: 'Hardening release',
+      status: 'In Progress',
+      windowLabel: 'M4 • Sprint 10',
+      focusLabel: 'Protected re-auth, CRM retry truth, release gate, and broader reliability hardening',
+      milestoneLabel: 'Release gate, admin reliability workspace, and CRM retry preview are already active',
+      summary: 'This sprint consolidates the MVP into a stronger release baseline, with more reliable admin recovery, retry truth, and release discipline.',
+      evidence:
+        'Rollout flags, observability/logging foundations, smoke coverage, protected re-auth slices, CRM retry lane, admin retry preview, and release-gate command all exist.',
+      mainGap:
+        'Complete CI/CD rehearsal, rollback drills, broader retry/reconciliation truth, and richer operator drill-in beyond the current additive baseline.',
+      nextPrompt: 'Prompt 10, Prompt 11, Prompt 13, Prompt 14',
+      ownerGroup: 'Coordination and release',
+      agents: ['Member H', 'Member H2', 'Member H3', 'Member H4', 'Member I2', 'Member I3', 'Mencius', 'PM Integrator'],
+      tasks: [
+        { title: 'Standardize release gate, rollback framing, and protected re-auth slices', status: 'Completed' },
+        { title: 'Surface CRM retry preview and retry posture inside admin reliability', status: 'Completed' },
+        { title: 'Deepen provider-side retry/reconciliation truth and CI rehearsal', status: 'In Progress' },
+      ],
+      riskNotes: [
+        'Broader admin Playwright stability still needs its own pass before claiming a fully green reliability suite.',
+      ],
+      references: [
+        {
+          title: 'Next Sprint Protected Reauth Retry Gate Plan',
+          path: 'docs/development/next-sprint-protected-reauth-retry-gate-plan.md',
+          summary: 'Current hardening sprint plan for protected re-auth, CRM retry truth, and release gate discipline.',
+        },
+        {
+          title: 'Release Gate Checklist',
+          path: 'docs/development/release-gate-checklist.md',
+          summary: 'Promote, hold, and rollback checklist used to operationalize the current release gate.',
+        },
+        {
+          title: 'QA Testing Reliability AI Evaluation Strategy',
+          path: 'docs/architecture/qa-testing-reliability-ai-evaluation-strategy.md',
+          summary: 'Reliability test strategy that frames retry, reconciliation, and rollout verification work.',
+        },
       ],
     },
   ],

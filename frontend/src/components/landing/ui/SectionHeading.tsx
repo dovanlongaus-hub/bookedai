@@ -18,10 +18,12 @@ export function SectionHeading({
           {kicker}
         </p>
       ) : null}
-      <h2 className="apple-title mt-3 text-4xl font-semibold text-[#1d1d1f] sm:text-5xl">
+      <h2 className="apple-title mt-3 max-w-2xl text-4xl font-semibold text-[#1d1d1f] sm:text-5xl">
         {title}
       </h2>
-      <p className="apple-body mt-4 text-lg leading-8">{body}</p>
+      <p className="apple-body mt-4 max-w-2xl text-base leading-7 sm:text-lg">
+        {body}
+      </p>
     </div>
   );
 }

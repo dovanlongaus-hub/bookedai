@@ -7,6 +7,7 @@ import {
   AdminBookingsResponse,
   AdminConfigResponse,
   AdminOverviewResponse,
+  AdminServiceCatalogQualityResponse,
   AdminServiceMerchantListResponse,
   EmailSendResponse,
   LoginResponse,
@@ -173,6 +174,7 @@ export async function fetchAdminDashboardData(
     fetch(`${apiBaseUrl}/admin/apis`, { headers }),
     fetch(`${apiBaseUrl}/admin/partners`, { headers }),
     fetch(`${apiBaseUrl}/admin/services`, { headers }),
+    fetch(`${apiBaseUrl}/admin/services/quality`, { headers }),
   ]);
 
   const payloads = await Promise.all(responses.map((response) => parseJsonOrNull(response)));
@@ -193,6 +195,7 @@ export async function fetchAdminDashboardData(
     apiInventory: payloads[3] as AdminApiInventoryResponse,
     partners: payloads[4] as PartnerProfileListResponse,
     services: payloads[5] as AdminServiceMerchantListResponse,
+    serviceQuality: payloads[6] as AdminServiceCatalogQualityResponse,
     bookingsViewEnabled:
       responses[1].headers.get('X-BookedAI-Admin-Bookings-View') === 'enhanced',
     bookingsShadowStatus: responses[1].headers.get('X-BookedAI-Admin-Bookings-Shadow') ?? 'disabled',
@@ -229,6 +232,46 @@ export async function fetchAdminDashboardData(
     bookingsShadowRecentDriftExamples: parseRecentDriftExamplesHeader(
       responses[1].headers.get('X-BookedAI-Admin-Bookings-Shadow-Recent-Drift-Examples'),
     ),
+  };
+}
+
+export async function downloadAdminServiceQualityExport(
+  apiBaseUrl: string,
+  sessionToken: string,
+  filters: {
+    searchReady?: boolean;
+    qualityWarning?: string;
+  } = {},
+) {
+  const search = new URLSearchParams();
+  if (filters.searchReady !== undefined) {
+    search.set('search_ready', String(filters.searchReady));
+  }
+  if (filters.qualityWarning?.trim()) {
+    search.set('quality_warning', filters.qualityWarning.trim());
+  }
+
+  const url = `${apiBaseUrl}/admin/services/quality/export.csv${
+    search.toString() ? `?${search.toString()}` : ''
+  }`;
+  const response = await fetch(url, {
+    headers: createAdminAuthHeaders(sessionToken),
+  });
+
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    const payload = await parseJsonOrNull(response);
+    throw new Error(parseErrorMessage(payload, 'Could not export service quality report.'));
+  }
+
+  const blob = await response.blob();
+  const disposition = response.headers.get('content-disposition') ?? '';
+  const filenameMatch = disposition.match(/filename="?([^"]+)"?/i);
+  return {
+    blob,
+    filename: filenameMatch?.[1] ?? 'service-catalog-quality.csv',
   };
 }
 

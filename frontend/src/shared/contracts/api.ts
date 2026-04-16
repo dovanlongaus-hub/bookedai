@@ -359,6 +359,36 @@ export interface IntegrationAttentionTriageResponse {
   };
 }
 
+export interface CrmRetryBacklogItem {
+  record_id: number;
+  provider: string;
+  entity_type: string;
+  local_entity_id: string;
+  external_entity_id?: string | null;
+  sync_status: string;
+  retry_count: number;
+  latest_error_code?: string | null;
+  latest_error_message?: string | null;
+  latest_error_retryable: boolean;
+  latest_error_at?: string | null;
+  last_synced_at?: string | null;
+  created_at?: string | null;
+  recommended_action: string;
+}
+
+export interface CrmRetryBacklogResponse {
+  status: string;
+  checked_at?: string | null;
+  summary: {
+    retrying_records: number;
+    manual_review_records: number;
+    failed_records: number;
+    hold_recommended: boolean;
+    operator_note: string;
+  };
+  items: CrmRetryBacklogItem[];
+}
+
 export interface IntegrationReconciliationSummaryResponse {
   status: string;
   checked_at?: string | null;

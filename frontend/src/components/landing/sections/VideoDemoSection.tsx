@@ -6,7 +6,7 @@ type VideoDemoSectionProps = {
 
 export function VideoDemoSection({ content }: VideoDemoSectionProps) {
   return (
-    <section id="video-demo" className="mx-auto w-full max-w-7xl px-6 py-24 lg:px-8">
+    <section id="demo" className="mx-auto w-full max-w-7xl px-6 py-24 lg:px-8">
       <div className="grid gap-8 rounded-[2.5rem] border border-black/5 bg-white p-8 shadow-[0_28px_80px_rgba(15,23,42,0.06)] lg:grid-cols-[1.05fr_0.95fr] lg:p-12">
         <div>
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-sky-600">

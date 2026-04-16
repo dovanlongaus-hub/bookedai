@@ -64,6 +64,34 @@ export type Prompt5TriageSnapshot = {
   };
 };
 
+export type Prompt5CrmRetryBacklog = {
+  status: string;
+  checkedAt?: string | null;
+  summary: {
+    retryingRecords: number;
+    manualReviewRecords: number;
+    failedRecords: number;
+    holdRecommended: boolean;
+    operatorNote: string;
+  };
+  items: Array<{
+    recordId: number;
+    provider: string;
+    entityType: string;
+    localEntityId: string;
+    externalEntityId?: string | null;
+    syncStatus: string;
+    retryCount: number;
+    latestErrorCode?: string | null;
+    latestErrorMessage?: string | null;
+    latestErrorRetryable: boolean;
+    latestErrorAt?: string | null;
+    lastSyncedAt?: string | null;
+    createdAt?: string | null;
+    recommendedAction: string;
+  }>;
+};
+
 export type Prompt5ReconciliationSummary = {
   status: string;
   conflicts: string[];
@@ -97,6 +125,7 @@ export type RunPrompt5SupportPreviewResult = {
   integrationStatuses: Prompt5IntegrationStatus[];
   integrationAttention: Prompt5IntegrationAttentionItem[];
   triageSnapshot: Prompt5TriageSnapshot | null;
+  crmRetryBacklog: Prompt5CrmRetryBacklog | null;
   reconciliationSummary: Prompt5ReconciliationSummary | null;
   reconciliationDetails: Prompt5ReconciliationDetails | null;
 };
@@ -186,6 +215,7 @@ export async function runPrompt5SupportPreview({
       integrationStatuses: [],
       integrationAttention: [],
       triageSnapshot: null,
+      crmRetryBacklog: null,
       reconciliationSummary: null,
       reconciliationDetails: null,
     };
@@ -209,6 +239,7 @@ export async function runPrompt5SupportPreview({
       integrationStatuses: [],
       integrationAttention: [],
       triageSnapshot: null,
+      crmRetryBacklog: null,
       reconciliationSummary: null,
       reconciliationDetails: null,
     };
@@ -232,6 +263,7 @@ export async function runPrompt5SupportPreview({
       integrationStatuses: [],
       integrationAttention: [],
       triageSnapshot: null,
+      crmRetryBacklog: null,
       reconciliationSummary: null,
       reconciliationDetails: null,
     };
@@ -255,6 +287,7 @@ export async function runPrompt5SupportPreview({
     integrationResponse,
     attentionResponse,
     triageResponse,
+    crmRetryBacklogResponse,
     reconciliationResponse,
     reconciliationDetailsResponse,
   ] = await Promise.all([
@@ -287,6 +320,7 @@ export async function runPrompt5SupportPreview({
     apiV1.getIntegrationProviderStatuses(),
     apiV1.getIntegrationAttention(),
     apiV1.getIntegrationAttentionTriage(),
+    apiV1.getCrmRetryBacklog(),
     apiV1.getIntegrationReconciliationSummary(),
     apiV1.getIntegrationReconciliationDetails(),
   ]);
@@ -353,6 +387,36 @@ export async function runPrompt5SupportPreview({
               holdRecommended: triageResponse.data.retry_posture.hold_recommended,
               operatorNote: triageResponse.data.retry_posture.operator_note,
             },
+          }
+        : null,
+    crmRetryBacklog:
+      'data' in crmRetryBacklogResponse
+        ? {
+            status: crmRetryBacklogResponse.data.status,
+            checkedAt: crmRetryBacklogResponse.data.checked_at,
+            summary: {
+              retryingRecords: crmRetryBacklogResponse.data.summary.retrying_records,
+              manualReviewRecords: crmRetryBacklogResponse.data.summary.manual_review_records,
+              failedRecords: crmRetryBacklogResponse.data.summary.failed_records,
+              holdRecommended: crmRetryBacklogResponse.data.summary.hold_recommended,
+              operatorNote: crmRetryBacklogResponse.data.summary.operator_note,
+            },
+            items: crmRetryBacklogResponse.data.items.map((item) => ({
+              recordId: item.record_id,
+              provider: item.provider,
+              entityType: item.entity_type,
+              localEntityId: item.local_entity_id,
+              externalEntityId: item.external_entity_id,
+              syncStatus: item.sync_status,
+              retryCount: item.retry_count,
+              latestErrorCode: item.latest_error_code,
+              latestErrorMessage: item.latest_error_message,
+              latestErrorRetryable: item.latest_error_retryable,
+              latestErrorAt: item.latest_error_at,
+              lastSyncedAt: item.last_synced_at,
+              createdAt: item.created_at,
+              recommendedAction: item.recommended_action,
+            })),
           }
         : null,
     reconciliationSummary:

@@ -7,13 +7,35 @@ This checklist turns the current local release gate into a clear promote, hold, 
 Primary gate command:
 
 - `./scripts/run_release_gate.sh`
-- `./scripts/run_search_eval_pack.py`
+- optional rehearsal wrapper: `./scripts/run_release_rehearsal.sh --skip-stack-healthcheck`
 
 This command already runs:
 
 1. frontend build
-2. Playwright smoke suites for `legacy`, `live-read`, and `admin`
+2. Playwright smoke suites for `legacy`, `live-read`, and `admin-smoke`
 3. backend v1 route and lifecycle unit tests
+4. fixed-query search eval pack
+
+The broader `@admin` regression suite remains separate from the release gate and should still be used for deeper admin passes.
+
+## Rehearsal
+
+Use the rehearsal wrapper when you want a timestamped promote-or-hold artifact rather than only raw command output.
+
+Recommended local command:
+
+- `./scripts/run_release_rehearsal.sh --skip-stack-healthcheck`
+
+Optional commands:
+
+- `./scripts/run_release_rehearsal.sh`
+- `./scripts/run_release_rehearsal.sh --beta-healthcheck`
+
+Rehearsal output:
+
+- writes a report under `artifacts/release-rehearsal/`
+- records whether the run is `promote_ready` or `hold`
+- keeps rollback reminders close to the release result instead of relying on memory
 
 ## Promote
 

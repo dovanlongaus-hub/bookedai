@@ -146,11 +146,26 @@ export type AdminServiceMerchantItem = {
   tags: string[];
   featured: boolean;
   is_active: boolean;
+  is_search_ready: boolean;
+  quality_warnings: string[];
   updated_at: string;
 };
 
 export type AdminServiceMerchantListResponse = {
   status: string;
+  items: AdminServiceMerchantItem[];
+};
+
+export type AdminServiceCatalogQualityCounts = {
+  total_records: number;
+  search_ready_records: number;
+  warning_records: number;
+  inactive_records: number;
+};
+
+export type AdminServiceCatalogQualityResponse = {
+  status: string;
+  counts: AdminServiceCatalogQualityCounts;
   items: AdminServiceMerchantItem[];
 };
 

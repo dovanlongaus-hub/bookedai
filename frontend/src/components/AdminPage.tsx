@@ -88,6 +88,7 @@ export function AdminPage() {
     apiRoutes,
     partners,
     importedServices,
+    serviceQualityCounts,
     editingPartnerId,
     partnerForm,
     serviceImportForm,
@@ -95,6 +96,7 @@ export function AdminPage() {
     serviceMessage,
     savingPartner,
     importingServices,
+    exportingServiceQuality,
     uploadingLogo,
     uploadingImage,
     searchQuery,
@@ -145,6 +147,7 @@ export function AdminPage() {
     deletePartner,
     importServicesFromWebsite,
     deleteImportedService,
+    exportServiceQualityReport,
   } = useAdminPageState(apiBaseUrl);
 
   async function openBookingDetailFromReview(
@@ -373,12 +376,17 @@ export function AdminPage() {
                 <ServiceCatalogSection
                   serviceImportForm={serviceImportForm}
                   importedServices={importedServices}
+                  serviceQualityCounts={serviceQualityCounts}
                   importingServices={importingServices}
+                  exportingQualityReport={exportingServiceQuality}
                   serviceMessage={serviceMessage}
                   onServiceImportFormChange={updateServiceImportForm}
                   onSubmitImport={importServicesFromWebsite}
                   onDeleteImportedService={(serviceRowId) => {
                     void deleteImportedService(serviceRowId);
+                  }}
+                  onExportQualityReport={() => {
+                    void exportServiceQualityReport();
                   }}
                 />
               </div>

@@ -112,6 +112,89 @@ async def build_integration_attention_items(
     return attention_items
 
 
+async def build_crm_retry_backlog(
+    session,
+    *,
+    tenant_id: str,
+) -> dict[str, object | None]:
+    repository = IntegrationRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    items = await repository.list_crm_retry_backlog(tenant_id=tenant_id)
+
+    backlog_items: list[dict[str, object | None]] = []
+    retrying_count = 0
+    failed_count = 0
+    manual_review_count = 0
+    latest_at = None
+
+    for item in items:
+        sync_status = str(item.get("sync_status") or "unknown")
+        retry_count = int(item.get("retry_count") or 0)
+        latest_error_at = item.get("latest_error_at")
+
+        if sync_status == "retrying":
+            retrying_count += 1
+        elif sync_status in {"failed", "conflict"}:
+            failed_count += 1
+        elif sync_status == "manual_review_required":
+            manual_review_count += 1
+
+        if latest_error_at and (latest_at is None or str(latest_error_at) > str(latest_at)):
+            latest_at = latest_error_at
+
+        recommended_action = "Monitor retry queue burn-down before widening rollout."
+        if sync_status in {"failed", "conflict"}:
+            recommended_action = "Operator review needed before another retry is queued."
+        elif sync_status == "manual_review_required":
+            recommended_action = "Fix local lead payload before queueing another CRM sync attempt."
+        elif retry_count >= 2:
+            recommended_action = "Escalate if retries keep repeating without a successful sync."
+
+        backlog_items.append(
+            {
+                "record_id": item.get("id"),
+                "provider": item.get("provider"),
+                "entity_type": item.get("entity_type"),
+                "local_entity_id": item.get("local_entity_id"),
+                "external_entity_id": item.get("external_entity_id"),
+                "sync_status": sync_status,
+                "retry_count": retry_count,
+                "latest_error_code": item.get("latest_error_code"),
+                "latest_error_message": item.get("latest_error_message"),
+                "latest_error_retryable": bool(item.get("latest_error_retryable")),
+                "latest_error_at": latest_error_at,
+                "last_synced_at": item.get("last_synced_at"),
+                "created_at": item.get("created_at"),
+                "recommended_action": recommended_action,
+            }
+        )
+
+    status = "healthy"
+    if failed_count or manual_review_count:
+        status = "attention_required"
+    elif retrying_count:
+        status = "monitoring"
+
+    hold_recommended = failed_count > 0 or (retrying_count > 0 and manual_review_count > 0)
+    operator_note = (
+        "Hold broader rollout while failed CRM records or manual-review backlog stay mixed with queued retries."
+        if hold_recommended
+        else "Retry backlog is additive-only and can stay in monitor mode while queued work is burning down."
+    )
+
+    return {
+        "status": status,
+        "checked_at": latest_at,
+        "summary": {
+            "retrying_records": retrying_count,
+            "manual_review_records": manual_review_count,
+            "failed_records": failed_count,
+            "hold_recommended": hold_recommended,
+            "operator_note": operator_note,
+        },
+        "items": backlog_items,
+    }
+
+
 async def build_reconciliation_details(
     session,
     *,

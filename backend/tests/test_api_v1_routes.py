@@ -273,6 +273,55 @@ class ApiV1RoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["retry_posture"]["queued_retries"], 1)
         self.assertEqual(payload["meta"]["tenant_id"], "tenant-test")
 
+    def test_integration_crm_retry_backlog_returns_success_envelope(self):
+        async def _build_crm_retry_backlog(*_args, **_kwargs):
+            return {
+                "status": "attention_required",
+                "checked_at": None,
+                "summary": {
+                    "retrying_records": 1,
+                    "manual_review_records": 1,
+                    "failed_records": 1,
+                    "hold_recommended": True,
+                    "operator_note": "Hold broader rollout while failed CRM records or manual-review backlog stay mixed with queued retries.",
+                },
+                "items": [
+                    {
+                        "record_id": 42,
+                        "provider": "zoho_crm",
+                        "entity_type": "lead",
+                        "local_entity_id": "lead-123",
+                        "external_entity_id": None,
+                        "sync_status": "retrying",
+                        "retry_count": 2,
+                        "latest_error_code": "retry_queued",
+                        "latest_error_message": "CRM sync was queued for retry and reconciliation review.",
+                        "latest_error_retryable": True,
+                        "latest_error_at": None,
+                        "last_synced_at": None,
+                        "created_at": None,
+                        "recommended_action": "Escalate if retries keep repeating without a successful sync.",
+                    }
+                ],
+            }
+
+        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_routes.get_session",
+            _fake_get_session,
+        ), patch(
+            "api.v1_routes.build_crm_retry_backlog",
+            _build_crm_retry_backlog,
+        ):
+            client = TestClient(create_test_app())
+            response = client.get("/api/v1/integrations/crm-sync/backlog")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["summary"]["retrying_records"], 1)
+        self.assertEqual(payload["data"]["items"][0]["record_id"], 42)
+        self.assertEqual(payload["meta"]["tenant_id"], "tenant-test")
+
     def test_integration_reconciliation_details_returns_success_envelope(self):
         async def _build_reconciliation_details(*_args, **_kwargs):
             return {

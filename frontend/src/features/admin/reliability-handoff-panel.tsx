@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { brandName } from '../../components/landing/data';
 
 type HandoffFormat = 'slack' | 'ticket' | 'incident';
 
@@ -13,7 +14,7 @@ const handoffFormats: {
     value: 'slack',
     label: 'Slack',
     audience: 'Ops channel handoff',
-    suggestedTitle: 'BookedAI reliability triage update',
+    suggestedTitle: `${brandName} reliability triage update`,
     intro: 'Use this short format for rapid operator or release-channel updates.',
   },
   {
@@ -101,6 +102,7 @@ export function ReliabilityHandoffPanel({
     }
 
     return [
+      `Lane: ${laneLabel}`,
       `Lane tag: ${laneToken}`,
       `Lane focus: ${laneToken}`,
       `Summary: ${laneSummary}`,

@@ -166,6 +166,8 @@ Based on the current repo, implementation is progressing in a staggered way rath
 - Sprint S3 import hardening is now in progress with category normalization and category-topic mismatch gating, so invalid `service_merchant_profiles` records can be downgraded before they appear in live search
 - Sprint S3 now also has an audit/backfill path for pre-existing catalog rows, so historical `service_merchant_profiles` can be normalized to the same readiness standard instead of relying on new imports only
 - Sprint S3 now includes operator-facing catalog-quality diagnostics and CSV export, so remediation can be driven from warning classes such as `missing_location` and `category_topic_mismatch` instead of only relying on implicit search outcomes
+- Sprint S3 operator tooling is now also wired into the admin catalog workspace, with search-ready counts, warning-state pills, cleanup filters, and export actions sitting beside imported services so search quality can be improved from the same operational surface that manages catalog content
+- Sprint S4 public search UX now constrains the shortlist to the top 3 ranked results with progressive reveal in batches of 3, so customer chat stays decision-ready without flooding the primary layout with lower-confidence alternatives
 - Phase 4 — In Progress
   - tenant-aware data seams and lifecycle foundations exist, but tenant-facing product surfaces are not yet built
 - Phase 5 — In Progress

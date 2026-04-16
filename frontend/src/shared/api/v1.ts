@@ -12,6 +12,7 @@ import type {
   RetryCrmSyncResponse,
   CheckAvailabilityRequest,
   CheckAvailabilityResponse,
+  CrmRetryBacklogResponse,
   IntegrationAttentionResponse,
   IntegrationAttentionTriageResponse,
   IntegrationProviderStatusesResponse,
@@ -140,6 +141,10 @@ export async function getIntegrationAttentionTriage() {
   return requestV1Envelope<IntegrationAttentionTriageResponse>('/v1/integrations/attention/triage');
 }
 
+export async function getCrmRetryBacklog() {
+  return requestV1Envelope<CrmRetryBacklogResponse>('/v1/integrations/crm-sync/backlog');
+}
+
 export async function getIntegrationReconciliationSummary() {
   return requestV1Envelope<IntegrationReconciliationSummaryResponse>(
     '/v1/integrations/reconciliation/summary',
@@ -170,6 +175,7 @@ export const apiV1 = {
   sendLifecycleEmail,
   getIntegrationAttention,
   getIntegrationAttentionTriage,
+  getCrmRetryBacklog,
   getIntegrationProviderStatuses,
   getIntegrationReconciliationDetails,
   getIntegrationReconciliationSummary,

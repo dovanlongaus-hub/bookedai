@@ -101,7 +101,32 @@ async function stubAdminDashboard(page: Parameters<typeof test>[0]['page']) {
     });
   });
 
-  for (const path of ['config', 'apis', 'partners', 'services']) {
+  await page.route('**/api/admin/services/quality', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        counts: {
+          total_records: 0,
+          search_ready_records: 0,
+          warning_records: 0,
+          inactive_records: 0,
+        },
+        items: [],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/services', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', items: [] }),
+    });
+  });
+
+  for (const path of ['config', 'apis', 'partners']) {
     await page.route(`**/api/admin/${path}`, async (route) => {
       await route.fulfill({
         status: 200,
@@ -238,7 +263,32 @@ async function stubAdminReauthAfterExpiry(page: Parameters<typeof test>[0]['page
     });
   });
 
-  for (const path of ['config', 'apis', 'partners', 'services']) {
+  await page.route('**/api/admin/services/quality', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        counts: {
+          total_records: 0,
+          search_ready_records: 0,
+          warning_records: 0,
+          inactive_records: 0,
+        },
+        items: [],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/services', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', items: [] }),
+    });
+  });
+
+  for (const path of ['config', 'apis', 'partners']) {
     await page.route(`**/api/admin/${path}`, async (route) => {
       await route.fulfill({
         status: 200,
@@ -373,7 +423,32 @@ async function stubAdminProtectedActionReauth(page: Parameters<typeof test>[0]['
     });
   });
 
-  for (const path of ['config', 'apis', 'partners', 'services']) {
+  await page.route('**/api/admin/services/quality', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        counts: {
+          total_records: 0,
+          search_ready_records: 0,
+          warning_records: 0,
+          inactive_records: 0,
+        },
+        items: [],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/services', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', items: [] }),
+    });
+  });
+
+  for (const path of ['config', 'apis', 'partners']) {
     await page.route(`**/api/admin/${path}`, async (route) => {
       await route.fulfill({
         status: 200,
@@ -478,6 +553,23 @@ async function stubAdminPartnerProtectedActionReauth(
     });
   });
 
+  await page.route('**/api/admin/services/quality', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        counts: {
+          total_records: 0,
+          search_ready_records: 0,
+          warning_records: 0,
+          inactive_records: 0,
+        },
+        items: [],
+      }),
+    });
+  });
+
   for (const path of ['config', 'apis', 'services']) {
     await page.route(`**/api/admin/${path}`, async (route) => {
       await route.fulfill({
@@ -490,7 +582,7 @@ async function stubAdminPartnerProtectedActionReauth(
 }
 
 test.describe('admin session and refresh regressions', () => {
-  test('admin refresh keeps stored session visible and logout returns to sign-in @admin', async ({
+  test('admin refresh keeps stored session visible and logout returns to sign-in @admin @admin-smoke', async ({
     page,
   }) => {
     await stubAdminDashboard(page);
@@ -559,7 +651,7 @@ test.describe('admin session and refresh regressions', () => {
     });
   });
 
-  test('protected admin mutation expiry returns to sign-in and supports re-auth @admin', async ({
+  test('protected admin mutation expiry returns to sign-in and supports re-auth @admin @admin-smoke', async ({
     page,
   }) => {
     await stubAdminProtectedActionReauth(page);
@@ -593,13 +685,16 @@ test.describe('admin session and refresh regressions', () => {
     await expect(page.getByRole('button', { name: 'Send confirmation email' })).toBeVisible();
   });
 
-  test('partner create expiry returns to sign-in and allows protected mutation retry after re-auth @admin', async ({
+  test('partner create expiry returns to sign-in and allows protected mutation retry after re-auth @admin @admin-smoke', async ({
     page,
   }) => {
     await stubAdminPartnerProtectedActionReauth(page);
 
     await page.goto('/admin');
 
+    const catalogButton = page.getByRole('button', { name: /Catalog/i });
+    await expect(catalogButton).toBeVisible();
+    await catalogButton.click();
     await expect(page.getByText('Partners and customers')).toBeVisible();
     await page.getByLabel('Business name').fill('Retry Ready Studio');
     await page.getByRole('button', { name: 'Create profile' }).click();

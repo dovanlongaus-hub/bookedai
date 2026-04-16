@@ -43,7 +43,7 @@ export function AdminWorkspaceInsights({
           <InsightCard label="Bookings workspace" value={`${bookingsTotal} visible`} detail="Current query and filter result set." />
           <InsightCard label="Shadow compare" value={shadowStatus} detail="Live-vs-shadow read posture for booking operations." />
           <InsightCard
-            label="Selected booking"
+            label="Booking focus"
             value={selectedBookingReference ?? 'No booking selected'}
             detail="Detail panel follows the current triage target."
           />

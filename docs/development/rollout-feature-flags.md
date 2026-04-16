@@ -105,6 +105,8 @@ These are not active platform commitments yet, but they are the cleanest rollout
 - hard boundary: this flag gates process discipline only, not product behavior
 - current full local gate command:
   - `./scripts/run_release_gate.sh`
+- rehearsal wrapper with promote-or-hold artifact:
+  - `./scripts/run_release_rehearsal.sh --skip-stack-healthcheck`
 - frontend-only subcommand:
   - `cd frontend && npm run test:release-gate`
 - paired backend verification command inside the root gate:

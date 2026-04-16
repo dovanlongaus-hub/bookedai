@@ -181,6 +181,23 @@ async function stubAdminDashboard(page: Parameters<typeof test>[0]['page']) {
     });
   });
 
+  await page.route('**/api/admin/services/quality', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        counts: {
+          total_records: 0,
+          search_ready_records: 0,
+          warning_records: 0,
+          inactive_records: 0,
+        },
+        items: [],
+      }),
+    });
+  });
+
   await page.route('**/api/admin/services', async (route) => {
     await route.fulfill({
       status: 200,
@@ -219,14 +236,15 @@ test.describe('admin bookings filters', () => {
 
     await expect(bookingsSection.getByRole('button', { name: /BR-ADMIN-1/i })).toHaveCount(0);
     await expect(bookingsSection.getByRole('button', { name: /BR-ADMIN-2/i })).toBeVisible();
+    await bookingsSection.getByRole('button', { name: /BR-ADMIN-2/i }).click();
     const selectedBookingPanel = page
       .locator('section')
       .filter({ has: page.getByText('Selected booking') })
       .first();
+    await expect(selectedBookingPanel.getByText('BR-ADMIN-2', { exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Open Stripe checkout' })).toHaveAttribute(
       'href',
       'https://checkout.stripe.com/pay/cs_test_filtered',
     );
-    await expect(selectedBookingPanel.getByRole('textbox', { name: 'Manual confirmation note' })).toBeVisible();
   });
 });

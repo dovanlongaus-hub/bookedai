@@ -1,6 +1,10 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
-import type { BookingAssistantContent } from '../data';
+import {
+  brandDescriptor,
+  brandName,
+  type BookingAssistantContent,
+} from '../data';
 import { getApiBaseUrl } from '../../../shared/config/api';
 import {
   isPublicBookingAssistantV1Enabled,
@@ -485,7 +489,7 @@ function buildProcessSteps(params: {
       id: 'intent',
       title: 'Understand the request',
       detail: hasCustomerMessage
-        ? 'BookedAI captured the customer need and context.'
+        ? `${brandName} captured the customer need and context.`
         : 'Waiting for a customer message or voice note.',
       status: hasCustomerMessage ? 'completed' : 'in_progress',
     },
@@ -520,7 +524,7 @@ function buildProcessSteps(params: {
         ? `Booking ${result.booking_reference} is ready with payment and follow-up.`
         : loading
           ? 'Generating booking reference, payment link, and workflow handoff.'
-          : 'BookedAI will generate the booking package after submission.',
+          : `${brandName} will generate the booking package after submission.`,
       status: result ? 'completed' : loading ? 'in_progress' : 'pending',
     },
   ];
@@ -790,11 +794,11 @@ export function BookingAssistantDialog({
   layoutMode = 'default',
 }: BookingAssistantDialogProps) {
   const isProductAppLayout = standalone && layoutMode === 'product_app';
-  const standaloneEyebrow = standalone ? 'BookedAI' : 'Start Free Trial';
-  const standaloneTitle = standalone ? 'BookedAI booking assistant' : 'AI booking agent popup';
+  const standaloneEyebrow = standalone ? brandDescriptor : 'Start Free Trial';
+  const standaloneTitle = standalone ? `${brandName} booking assistant` : 'AI booking agent popup';
   const standaloneDescription = standalone
     ? 'Search, compare, and continue straight into booking.'
-    : 'Search services, chat by text or voice, then watch BookedAI build the booking outcome live.';
+    : `Search services, chat by text or voice, then watch ${brandName} build the booking outcome live.`;
   const [catalog, setCatalog] = useState<BookingAssistantCatalogResponse | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -1553,7 +1557,7 @@ export function BookingAssistantDialog({
                   <div className="flex items-center gap-2">
                     <div className="h-2 w-2 rounded-full bg-emerald-500" />
                     <div className="line-clamp-1 text-[11px] font-semibold tracking-tight text-slate-950">
-                      BookedAI
+                      {brandName}
                     </div>
                   </div>
                 ) : (
@@ -1756,7 +1760,7 @@ export function BookingAssistantDialog({
                           : 'text-sm'
                       }`}
                     >
-                      {standalone ? 'Chat with BookedAI' : 'Live service search'}
+                      {standalone ? `Chat with ${brandName}` : 'Live service search'}
                     </div>
                     {!hasConversationStarted ? (
                       <div className="mt-1 text-xs text-slate-500">
@@ -1764,7 +1768,7 @@ export function BookingAssistantDialog({
                           ? 'Assistant offline'
                           : standalone
                             ? isProductAppLayout
-                              ? 'Ask naturally and let BookedAI rank the strongest result for immediate booking.'
+                              ? `Ask naturally and let ${brandName} rank the strongest result for immediate booking.`
                               : 'Choose a vertical below or ask naturally like a real customer.'
                             : 'Assistant online and ready for any booking request'}
                       </div>
@@ -1833,7 +1837,7 @@ export function BookingAssistantDialog({
                         Search naturally. See the best result. Continue straight into booking.
                       </div>
                       <p className="mt-2 max-w-xs text-[12px] leading-5 text-slate-200">
-                        BookedAI turns one customer-style message into a clear shortlist with booking-ready details.
+                        {brandName} turns one customer-style message into a clear shortlist with booking-ready details.
                       </p>
 
                       <div className="mt-4 grid gap-2">
@@ -2216,7 +2220,7 @@ export function BookingAssistantDialog({
                 {chatLoading ? (
                   <div className="flex justify-start">
                     <div className="rounded-[1.5rem] rounded-bl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-                      BookedAI is thinking...
+                      {brandName} is thinking...
                     </div>
                   </div>
                 ) : null}
@@ -2319,7 +2323,7 @@ export function BookingAssistantDialog({
                     </div>
                   </div>
                   <div className="mt-3 text-xs leading-5 text-slate-500">
-                    BookedAI moves from selected result to contact details, scheduling, and payment in one flow.
+                    {brandName} moves from selected result to contact details, scheduling, and payment in one flow.
                   </div>
                   <div className="mt-4 grid grid-cols-3 gap-2">
                     {bookingJourneySteps.map((step, index) => (
@@ -2351,7 +2355,7 @@ export function BookingAssistantDialog({
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-slate-950">
-                      BookedAI workflow
+                      {brandName} workflow
                     </div>
                     <div className="mt-1 text-sm text-slate-500">
                       A visible process view of what the agent has already handled.
@@ -2463,7 +2467,7 @@ export function BookingAssistantDialog({
                     <div className="mt-2 text-sm text-slate-500">
                       {selectedService
                         ? `${selectedService.name} is currently selected. Review the shortlist below, then continue to booking when you are ready.`
-                        : 'Review the top matched options below. BookedAI keeps the strongest shortlist visible so users can compare before they book.'}
+                        : `Review the top matched options below. ${brandName} keeps the strongest shortlist visible so users can compare before they book.`}
                     </div>
                   </div>
                   {latestSuggestedServices.length > CHAT_RESULT_BATCH_SIZE ? (
@@ -3061,7 +3065,7 @@ export function BookingAssistantDialog({
                         : 'Confirm Payment by Email'}
                     </a>
                     <a
-                      href={`mailto:${result.contact_email}?subject=BookedAI%20booking%20${result.booking_reference}`}
+                      href={`mailto:${result.contact_email}?subject=${encodeURIComponent(`${brandName} booking ${result.booking_reference}`)}`}
                       className="rounded-[1rem] border border-black/10 bg-white px-3 py-3 text-center text-[11px] font-semibold leading-4 text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
                     >
                       Contact {result.contact_email}

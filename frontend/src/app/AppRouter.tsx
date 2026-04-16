@@ -31,7 +31,7 @@ function isRoadmapRuntime() {
     return false;
   }
 
-  return window.location.pathname === '/roadmap';
+  return window.location.pathname === '/roadmap' || window.location.pathname.startsWith('/roadmap/');
 }
 
 function isProductRuntime() {

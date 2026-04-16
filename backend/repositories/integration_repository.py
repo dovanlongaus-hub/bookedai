@@ -8,6 +8,74 @@ from repositories.base import BaseRepository
 class IntegrationRepository(BaseRepository):
     """Read-oriented seam for integration connection health and reconciliation status."""
 
+    async def list_crm_retry_backlog(
+        self,
+        *,
+        tenant_id: str,
+        limit: int = 8,
+    ) -> list[dict[str, object | None]]:
+        result = await self.session.execute(
+            text(
+                """
+                with latest_errors as (
+                  select distinct on (crm_sync_record_id)
+                    crm_sync_record_id,
+                    error_code,
+                    error_message,
+                    retryable,
+                    created_at
+                  from crm_sync_errors
+                  where tenant_id = cast(:tenant_id as uuid)
+                  order by crm_sync_record_id, created_at desc
+                ),
+                retry_counts as (
+                  select
+                    crm_sync_record_id,
+                    count(*) filter (where error_code = 'retry_queued')::int as retry_count
+                  from crm_sync_errors
+                  where tenant_id = cast(:tenant_id as uuid)
+                  group by crm_sync_record_id
+                )
+                select
+                  record.id,
+                  record.provider,
+                  record.entity_type,
+                  record.local_entity_id,
+                  record.external_entity_id,
+                  record.sync_status,
+                  record.last_synced_at,
+                  record.created_at,
+                  latest.error_code as latest_error_code,
+                  latest.error_message as latest_error_message,
+                  latest.retryable as latest_error_retryable,
+                  latest.created_at as latest_error_at,
+                  coalesce(retry_counts.retry_count, 0)::int as retry_count
+                from crm_sync_records as record
+                left join latest_errors as latest
+                  on latest.crm_sync_record_id = record.id
+                left join retry_counts
+                  on retry_counts.crm_sync_record_id = record.id
+                where record.tenant_id = cast(:tenant_id as uuid)
+                  and record.sync_status in ('retrying', 'failed', 'manual_review_required', 'conflict')
+                order by
+                  case record.sync_status
+                    when 'failed' then 0
+                    when 'conflict' then 1
+                    when 'manual_review_required' then 2
+                    when 'retrying' then 3
+                    else 4
+                  end,
+                  coalesce(latest.created_at, record.created_at) desc
+                limit :limit
+                """
+            ),
+            {
+                "tenant_id": tenant_id,
+                "limit": limit,
+            },
+        )
+        return [dict(row._mapping) for row in result]
+
     async def list_connections(
         self,
         *,

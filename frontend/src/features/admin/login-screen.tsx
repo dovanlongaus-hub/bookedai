@@ -1,4 +1,5 @@
 import { FormEvent } from 'react';
+import { brandDescriptor, brandLogoPath, brandName } from '../../components/landing/data';
 
 type AdminLoginScreenProps = {
   username: string;
@@ -27,13 +28,24 @@ export function AdminLoginScreen({
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">
               Admin Portal
             </div>
+            <div className="mt-5 flex h-18 w-18 items-center justify-center overflow-hidden rounded-[1.25rem] bg-white/10 p-2">
+              <img
+                src={brandLogoPath}
+                alt={`${brandName} logo`}
+                className="h-full w-full object-contain"
+                loading="eager"
+              />
+            </div>
             <h1 className="mt-4 text-4xl font-bold tracking-tight">
-              BookedAI operations dashboard for bookings, payment flow, and messaging
+              {brandName} operations dashboard for bookings, payment flow, and messaging
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-200">
               Sign in to review live booking references, payment readiness, workflow callbacks,
               inbox state, and integration configuration from one place.
             </p>
+            <div className="mt-4 text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/80">
+              {brandDescriptor}
+            </div>
             <div className="mt-8 grid gap-4 md:grid-cols-3">
               {[
                 'Live booking feed with customer and service details',

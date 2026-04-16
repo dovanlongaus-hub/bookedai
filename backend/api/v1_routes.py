@@ -35,6 +35,7 @@ from service_layer.prompt9_matching_service import (
 )
 from service_layer.prompt11_integration_service import (
     build_attention_triage_snapshot,
+    build_crm_retry_backlog,
     build_integration_attention_items,
     build_integration_provider_statuses,
     build_reconciliation_details,
@@ -855,6 +856,19 @@ async def integration_attention_triage(request: Request):
         snapshot = await build_attention_triage_snapshot(session, tenant_id=tenant_id or "")
     return _success_response(
         snapshot,
+        tenant_id=tenant_id,
+        actor_context=actor_context,
+    )
+
+
+@router.get("/integrations/crm-sync/backlog")
+async def integration_crm_sync_backlog(request: Request):
+    actor_context = ActorContextPayload(channel="admin", role="integration_preview", deployment_mode="headless_api")
+    tenant_id = await _resolve_tenant_id(request, actor_context)
+    async with get_session(request.app.state.session_factory) as session:
+        backlog = await build_crm_retry_backlog(session, tenant_id=tenant_id or "")
+    return _success_response(
+        backlog,
         tenant_id=tenant_id,
         actor_context=actor_context,
     )

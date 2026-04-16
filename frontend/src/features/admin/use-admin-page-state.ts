@@ -3,6 +3,7 @@ import { FormEvent, useEffect, useState } from 'react';
 import {
   deleteAdminPartner,
   deleteAdminService,
+  downloadAdminServiceQualityExport,
   fetchAdminBookingDetail,
   fetchAdminDashboardData,
   importAdminServicesFromWebsite,
@@ -17,6 +18,7 @@ import {
   AdminBookingRecord,
   AdminConfigEntry,
   AdminOverviewResponse,
+  AdminServiceCatalogQualityCounts,
   AdminServiceMerchantItem,
   PartnerFormState,
   PartnerProfileItem,
@@ -47,6 +49,8 @@ export function useAdminPageState(apiBaseUrl: string) {
   const [apiRoutes, setApiRoutes] = useState<AdminApiRoute[]>([]);
   const [partners, setPartners] = useState<PartnerProfileItem[]>([]);
   const [importedServices, setImportedServices] = useState<AdminServiceMerchantItem[]>([]);
+  const [serviceQualityCounts, setServiceQualityCounts] =
+    useState<AdminServiceCatalogQualityCounts | null>(null);
   const [editingPartnerId, setEditingPartnerId] = useState<number | null>(null);
   const [partnerForm, setPartnerForm] = useState<PartnerFormState>(emptyPartnerForm);
   const [serviceImportForm, setServiceImportForm] = useState<ServiceImportFormState>(
@@ -56,6 +60,7 @@ export function useAdminPageState(apiBaseUrl: string) {
   const [serviceMessage, setServiceMessage] = useState('');
   const [savingPartner, setSavingPartner] = useState(false);
   const [importingServices, setImportingServices] = useState(false);
+  const [exportingServiceQuality, setExportingServiceQuality] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -100,6 +105,7 @@ export function useAdminPageState(apiBaseUrl: string) {
     setApiRoutes([]);
     setPartners([]);
     setImportedServices([]);
+    setServiceQualityCounts(null);
     setEditingPartnerId(null);
     setPartnerForm(emptyPartnerForm());
     setServiceImportForm(emptyServiceImportForm());
@@ -226,6 +232,7 @@ export function useAdminPageState(apiBaseUrl: string) {
         apiInventory: apiInventoryPayload,
         partners: partnersPayload,
         services: servicesPayload,
+        serviceQuality: serviceQualityPayload,
         bookingsViewEnabled: nextBookingsViewEnabled,
         bookingsShadowStatus: nextBookingsShadowStatus,
         bookingsShadowMatched: nextBookingsShadowMatched,
@@ -248,6 +255,7 @@ export function useAdminPageState(apiBaseUrl: string) {
       setApiRoutes(apiInventoryPayload.items);
       setPartners(partnersPayload.items);
       setImportedServices(servicesPayload.items);
+      setServiceQualityCounts(serviceQualityPayload.counts);
       setBookingsViewEnabled(nextBookingsViewEnabled);
       setBookingsShadowStatus(nextBookingsShadowStatus);
       setBookingsShadowMatched(nextBookingsShadowMatched);
@@ -469,6 +477,45 @@ export function useAdminPageState(apiBaseUrl: string) {
     }
   }
 
+  async function exportServiceQualityReport() {
+    if (!sessionToken || typeof window === 'undefined') {
+      return;
+    }
+
+    setExportingServiceQuality(true);
+    setError('');
+    setServiceMessage('');
+
+    try {
+      const { blob, filename } = await downloadAdminServiceQualityExport(
+        apiBaseUrl,
+        sessionToken,
+        { searchReady: false },
+      );
+      const objectUrl = window.URL.createObjectURL(blob);
+      const link = window.document.createElement('a');
+      link.href = objectUrl;
+      link.download = filename;
+      window.document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.setTimeout(() => window.URL.revokeObjectURL(objectUrl), 0);
+      setServiceMessage('Downloaded catalog quality report for non-search-ready records.');
+    } catch (requestError) {
+      const message = resolveErrorMessage(
+        requestError,
+        'Could not export the catalog quality report.',
+      );
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setError(message);
+    } finally {
+      setExportingServiceQuality(false);
+    }
+  }
+
   return {
     username,
     setUsername,
@@ -484,6 +531,7 @@ export function useAdminPageState(apiBaseUrl: string) {
     apiRoutes,
     partners,
     importedServices,
+    serviceQualityCounts,
     editingPartnerId,
     partnerForm,
     serviceImportForm,
@@ -491,6 +539,7 @@ export function useAdminPageState(apiBaseUrl: string) {
     serviceMessage,
     savingPartner,
     importingServices,
+    exportingServiceQuality,
     uploadingLogo,
     uploadingImage,
     searchQuery,
@@ -541,5 +590,6 @@ export function useAdminPageState(apiBaseUrl: string) {
     deletePartner,
     importServicesFromWebsite,
     deleteImportedService,
+    exportServiceQualityReport,
   };
 }

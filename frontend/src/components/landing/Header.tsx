@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { LogoMark } from './ui/LogoMark';
-import { roadmapHref, videoDemoHref } from './data';
+import { brandName, roadmapHref, videoDemoHref } from './data';
 
 type HeaderProps = {
   navItems: string[];
@@ -19,11 +19,13 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
     <header className="sticky top-0 z-30">
       <div className="apple-glass-nav mx-auto flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
-            <LogoMark />
+          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[0.9rem] bg-white/10 p-1">
+            <LogoMark className="h-full w-full object-contain" />
           </div>
-          <div className="text-xl font-semibold tracking-[-0.03em] text-white">
-            Booked<span className="text-white/70">AI</span>
+          <div>
+            <div className="text-xl font-semibold tracking-[-0.03em] text-white">
+              {brandName}<span className="text-white/70">.au</span>
+            </div>
           </div>
         </div>
 

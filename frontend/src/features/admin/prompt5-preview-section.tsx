@@ -8,6 +8,7 @@ import {
   type Prompt5CandidatePreview,
   type Prompt5IntegrationAttentionItem,
   type Prompt5IntegrationStatus,
+  type Prompt5CrmRetryBacklog,
   type Prompt5ReconciliationDetails,
   type Prompt5ReconciliationSummary,
   type Prompt5ResolutionSummary,
@@ -44,6 +45,7 @@ export function Prompt5PreviewSection({
   const [reconciliationSummary, setReconciliationSummary] =
     useState<Prompt5ReconciliationSummary | null>(null);
   const [triageSnapshot, setTriageSnapshot] = useState<Prompt5TriageSnapshot | null>(null);
+  const [crmRetryBacklog, setCrmRetryBacklog] = useState<Prompt5CrmRetryBacklog | null>(null);
   const [reconciliationDetails, setReconciliationDetails] =
     useState<Prompt5ReconciliationDetails | null>(null);
   const [crmRetryRecordId, setCrmRetryRecordId] = useState('');
@@ -111,6 +113,7 @@ export function Prompt5PreviewSection({
       setIntegrationStatuses(preview.integrationStatuses);
       setIntegrationAttention(preview.integrationAttention);
       setTriageSnapshot(preview.triageSnapshot);
+      setCrmRetryBacklog(preview.crmRetryBacklog);
       setReconciliationSummary(preview.reconciliationSummary);
       setReconciliationDetails(preview.reconciliationDetails);
     } catch (requestError) {
@@ -123,6 +126,7 @@ export function Prompt5PreviewSection({
       setIntegrationStatuses([]);
       setIntegrationAttention([]);
       setTriageSnapshot(null);
+      setCrmRetryBacklog(null);
       setReconciliationSummary(null);
       setReconciliationDetails(null);
     } finally {
@@ -389,6 +393,68 @@ export function Prompt5PreviewSection({
                       Hold broader rollout if queued retries keep growing while manual-review or failed
                       counts stay flat.
                     </p>
+                  </div>
+                ) : null}
+                {crmRetryBacklog ? (
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-slate-950">CRM retry backlog</div>
+                        <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Write-side retry truth
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+                        {crmRetryBacklog.status}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <p>Retrying records: {crmRetryBacklog.summary.retryingRecords}</p>
+                      <p>Manual review records: {crmRetryBacklog.summary.manualReviewRecords}</p>
+                      <p>Failed records: {crmRetryBacklog.summary.failedRecords}</p>
+                      <p>Latest backlog signal: {crmRetryBacklog.checkedAt ?? 'Not reported in this preview'}</p>
+                    </div>
+                    <p className="mt-3 leading-6">{crmRetryBacklog.summary.operatorNote}</p>
+                    <div className="mt-3 space-y-3">
+                      {crmRetryBacklog.items.length > 0 ? (
+                        crmRetryBacklog.items.slice(0, 3).map((item) => (
+                          <div
+                            key={item.recordId}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="font-semibold text-slate-950">
+                                  Record {item.recordId} • {item.entityType}
+                                </div>
+                                <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                  {item.provider} • {item.syncStatus}
+                                </div>
+                              </div>
+                              <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 ring-1 ring-slate-200">
+                                Retry count {item.retryCount}
+                              </span>
+                            </div>
+                            <div className="mt-2 grid gap-1">
+                              <p>Local entity: {item.localEntityId}</p>
+                              <p>Latest error: {item.latestErrorCode ?? 'Not reported'}</p>
+                              <p>
+                                Retryable latest error:{' '}
+                                {item.latestErrorRetryable ? 'Yes' : 'No'}
+                              </p>
+                            </div>
+                            <p className="mt-2 leading-6">
+                              {item.latestErrorMessage ?? item.recommendedAction}
+                            </p>
+                            <p className="mt-2 leading-6 text-slate-500">{item.recommendedAction}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                          No CRM retry backlog items returned yet.
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : null}
               </div>

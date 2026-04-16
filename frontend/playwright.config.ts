@@ -18,9 +18,9 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: `${liveReadEnv}npm run build && ${liveReadEnv}npx vite preview --host 127.0.0.1 --port ${port} --strictPort`,
+    command: `${liveReadEnv}node scripts/start-playwright-preview.mjs ${port}`,
     url: `http://127.0.0.1:${port}`,
-    reuseExistingServer: false,
+    reuseExistingServer: true,
     cwd: '.',
     timeout: 240000,
   },

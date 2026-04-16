@@ -231,7 +231,10 @@ As of `2026-04-16`, this follow-on sprint is now underway:
 - `Member I2` is now complete with a root-level release gate script that runs frontend smoke plus backend lifecycle verification in one command
 - `Member H3` is now complete with an operator retry drill-in block inside the admin preview
 - `Member I3` is now complete with a release gate checklist for promote, hold, and rollback decisions
+- `Member I4` is now complete with a release rehearsal wrapper that writes timestamped promote-or-hold reports after the root gate
+- `Member I5` is now complete with an `admin-smoke` split so the release gate can use a smaller representative admin slice while the full `@admin` suite remains available for broader regression passes
 - `Member H4` is now complete with retry-state summary pills and quick operator decision cues inside the admin preview
+- `Member H5` is now complete with an additive CRM retry backlog read model and admin drill-in so record-level retry truth can be inspected beyond summary pills
 - `Member I` can now be treated as complete for this sprint because the root gate and the release checklist have passed together as the current baseline
 - `Member J` is now complete with the deeper Prompt 8 workspace split for operations, catalog, and reliability
 - `Member J2` is now complete with explicit frontend runtime linkage for `admin.bookedai.au`

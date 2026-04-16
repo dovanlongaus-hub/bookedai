@@ -6,6 +6,7 @@ import {
   demoContent,
   flowSteps,
   heroContent,
+  implementationContent,
   navItems,
   partnersSectionContent,
   problemCards,
@@ -25,6 +26,7 @@ import { DemoBookingDialog } from '../../components/landing/DemoBookingDialog';
 import { BookingAssistantSection } from '../../components/landing/sections/BookingAssistantSection';
 import { CallToActionSection } from '../../components/landing/sections/CallToActionSection';
 import { HeroSection } from '../../components/landing/sections/HeroSection';
+import { ImplementationSection } from '../../components/landing/sections/ImplementationSection';
 import { PartnersSection } from '../../components/landing/sections/PartnersSection';
 import { PricingSection } from '../../components/landing/sections/PricingSection';
 import { ProblemSection } from '../../components/landing/sections/ProblemSection';
@@ -149,58 +151,32 @@ export function PublicApp() {
           onStartTrial={() => setIsAssistantOpen(true)}
         />
         <ProblemSection content={problemContent} cards={problemCards} />
+        <ProductProofSection content={proofContent} items={proofItems} />
         <SolutionSection
           content={solutionContent}
           cards={solutionCards}
           flowSteps={flowSteps}
         />
         <ProductFlowShowcaseSection demo={demoContent} />
-        <ProductProofSection content={proofContent} items={proofItems} />
         <VideoDemoSection content={videoDemoContent} />
-        <BookingAssistantSection
-          content={bookingAssistantContent}
-          onOpenAssistant={() => setIsAssistantOpen(true)}
-        />
+        <ImplementationSection content={implementationContent} />
       </section>
-      <PartnersSection content={partnersSectionContent} />
-      <TeamSection content={teamSectionContent} members={teamMembers} />
       <PricingSection />
       <CallToActionSection
         content={ctaContent}
         onStartTrial={() => setIsAssistantOpen(true)}
         onBookDemo={() => setIsDemoOpen(true)}
       />
+      <BookingAssistantSection
+        content={bookingAssistantContent}
+        onOpenAssistant={() => setIsAssistantOpen(true)}
+      />
+      <PartnersSection content={partnersSectionContent} />
+      <TeamSection content={teamSectionContent} members={teamMembers} />
       <Footer
         onStartTrial={() => setIsAssistantOpen(true)}
         onBookDemo={() => setIsDemoOpen(true)}
       />
-
-      {!isAssistantOpen ? (
-        <button
-          type="button"
-          onClick={() => setIsAssistantOpen(true)}
-          className="apple-floating-widget booking-widget fixed bottom-3 right-3 z-40 w-[calc(100%-1.5rem)] max-w-[18rem] overflow-hidden rounded-[1.75rem] border border-white/10 p-3 text-left transition hover:scale-[1.01] sm:bottom-5 sm:right-5 sm:max-w-[22rem] sm:p-4"
-        >
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <div className="flex items-center gap-2 text-xs font-semibold text-[#2997ff]">
-                <span className="booking-widget-dot h-2.5 w-2.5 rounded-full bg-[#2997ff]" />
-                AI Booking Agent
-              </div>
-              <div className="mt-2 text-base font-semibold tracking-[-0.03em] sm:text-lg">
-                Start a free trial chat
-              </div>
-              <p className="mt-1 text-xs leading-5 text-white/72 sm:text-sm sm:leading-6">
-                Text or voice. Search services, capture the booking, and watch the
-                workflow run live.
-              </p>
-            </div>
-            <div className="rounded-full border border-white/12 px-3 py-1 text-[11px] font-semibold text-white/80 sm:text-xs">
-              Open
-            </div>
-          </div>
-        </button>
-      ) : null}
 
       <BookingAssistantDialog
         content={bookingAssistantContent}

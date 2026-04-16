@@ -65,6 +65,57 @@
     font-family: var(--apple-font);
   }
 
+  .apple-product-shell {
+    background:
+      radial-gradient(circle at top left, rgba(0, 113, 227, 0.12), transparent 28%),
+      radial-gradient(circle at 88% 12%, rgba(41, 151, 255, 0.1), transparent 22%),
+      linear-gradient(180deg, #ffffff 0%, #f5f5f7 38%, #edf1f7 100%);
+  }
+
+  .apple-product-band {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: saturate(180%) blur(22px);
+    border-bottom: 1px solid rgba(29, 29, 31, 0.08);
+  }
+
+  .apple-product-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    border-radius: 999px;
+    border: 1px solid rgba(29, 29, 31, 0.08);
+    background: rgba(255, 255, 255, 0.78);
+    padding: 0.5rem 0.8rem;
+    font-size: 0.78rem;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: rgba(29, 29, 31, 0.72);
+    backdrop-filter: blur(18px);
+  }
+
+  .apple-product-card {
+    border-radius: 28px;
+    border: 1px solid rgba(29, 29, 31, 0.08);
+    background: rgba(255, 255, 255, 0.82);
+    box-shadow: rgba(0, 0, 0, 0.08) 0 18px 48px;
+    backdrop-filter: blur(18px);
+  }
+
+  .apple-product-frame {
+    border-radius: 32px;
+    border: 1px solid rgba(29, 29, 31, 0.08);
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: rgba(0, 0, 0, 0.1) 0 24px 60px;
+  }
+
+  .apple-product-flow-step {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(249, 249, 251, 0.95) 100%);
+  }
+
+  .apple-product-quiet {
+    color: rgba(29, 29, 31, 0.64);
+  }
+
   .apple-admin-shell {
     min-height: 100vh;
     background: linear-gradient(180deg, #fbfbfd 0%, var(--apple-gray) 100%);

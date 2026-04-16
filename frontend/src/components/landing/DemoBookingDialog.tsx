@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useId, useState } from 'react';
 
+import { brandDescriptor, brandName } from './data';
 import { ApiClientError, apiFetch } from '../../shared/api/client';
 
 type DemoBookingDialogProps = {
@@ -208,7 +209,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
         setSyncError(
           resolveApiErrorMessage(
             error,
-            'Unable to sync your Zoho booking with BookedAI right now.',
+            `Unable to sync your Zoho booking with ${brandName} right now.`,
           ),
         );
       } finally {
@@ -310,7 +311,10 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
 
         <div className="max-w-3xl pr-10">
           <div className="inline-flex rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
-            BookedAI demo
+            {brandName} demo
+          </div>
+          <div className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/80">
+            {brandDescriptor}
           </div>
           <h3 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
             Share your context, then choose the best time
@@ -381,7 +385,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                     <p className="mt-2">
                       Your demo brief is safely saved. If the Zoho calendar sync is taking longer
                       than expected, keep the reference handy and continue from the hosted booking
-                      page while BookedAI keeps matching the consultation in the background.
+                      page while {brandName} keeps matching the consultation in the background.
                     </p>
                   </div>
                 ) : null}
@@ -506,7 +510,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
               </div>
               <p className="text-sm leading-6 text-slate-300">
                 Choose the time that best suits your team. Once the booking is created in Zoho,
-                BookedAI will sync it back into the system using the email and demo brief you
+                {brandName} will sync it back into the system using the email and demo brief you
                 submitted here.
               </p>
               {briefResult ? (

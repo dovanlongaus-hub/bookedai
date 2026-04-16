@@ -12,7 +12,7 @@ export function CallToActionSection({
   onBookDemo,
 }: CallToActionSectionProps) {
   return (
-    <section id="demo" className="mx-auto w-full max-w-7xl px-6 py-24 lg:px-8">
+    <section id="call-to-action" className="mx-auto w-full max-w-7xl px-6 py-24 lg:px-8">
       <div className="rounded-[2.8rem] border border-black/5 bg-white px-8 py-16 text-center shadow-[0_32px_90px_rgba(15,23,42,0.08)] lg:px-16">
         <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-600">
           {content.kicker}

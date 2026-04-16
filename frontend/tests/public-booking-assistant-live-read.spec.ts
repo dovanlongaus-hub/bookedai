@@ -117,7 +117,34 @@ const stripeReadyBookingSessionResult: BookingAssistantSessionResponse = {
   workflow_status: 'scheduled',
 };
 
+function buildService(index: number): ServiceCatalogItem {
+  return {
+    id: `service-v${index}`,
+    name: `Result Service ${index}`,
+    category: 'Hair',
+    summary: `Suggested service ${index}.`,
+    duration_minutes: 30 + index * 5,
+    amount_aud: 50 + index * 10,
+    image_url: null,
+    map_snapshot_url: null,
+    venue_name: `Studio ${index}`,
+    location: 'Sydney',
+    map_url: null,
+    booking_url: null,
+    tags: [`style-${index}`],
+    featured: index === 1,
+  };
+}
+
 async function stubAssistantApis(page: Parameters<typeof test>[0]['page']) {
+  await page.route('**/api/partners', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', items: [] }),
+    });
+  });
+
   await page.route('**/api/booking-assistant/catalog', async (route) => {
     await route.fulfill({
       status: 200,
@@ -147,6 +174,12 @@ async function stubAssistantApis(page: Parameters<typeof test>[0]['page']) {
   });
 }
 
+async function openAssistant(page: Parameters<typeof test>[0]['page']) {
+  await page.goto('/?assistant=open');
+  await expect(page.locator('#assistant-chat-input')).toBeVisible();
+  await page.waitForTimeout(250);
+}
+
 test.describe('public assistant rollout smoke', () => {
   test('flag-off keeps legacy selection and does not surface live-read guidance @legacy', async ({ page }) => {
     let v1Requests = 0;
@@ -161,7 +194,7 @@ test.describe('public assistant rollout smoke', () => {
       });
     });
 
-    await page.goto('/?assistant=open');
+    await openAssistant(page);
     await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
     await page.locator('#assistant-chat-input').press('Enter');
 
@@ -273,7 +306,7 @@ test.describe('public assistant rollout smoke', () => {
       });
     });
 
-    await page.goto('/?assistant=open');
+    await openAssistant(page);
     await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
     await page.locator('#assistant-chat-input').press('Enter');
 
@@ -286,6 +319,145 @@ test.describe('public assistant rollout smoke', () => {
     expect(searchRequests).toBeGreaterThanOrEqual(1);
     expect(trustRequests).toBe(1);
     expect(pathRequests).toBe(1);
+  });
+
+  test('chat shows only the top 3 ranked matches first and reveals the next 3 on demand @live-read', async ({
+    page,
+  }) => {
+    const rankedServices = Array.from({ length: 6 }, (_, index) => buildService(index + 1));
+
+    await page.route('**/api/booking-assistant/catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          business_email: 'hello@example.com',
+          stripe_enabled: false,
+          services: rankedServices,
+        }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'I found several strong matches for your request.',
+          matched_services: [...rankedServices].reverse(),
+          matched_events: [],
+          suggested_service_id: rankedServices[5].id,
+          should_request_location: false,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-ranked',
+            channel_session_id: 'chan-ranked',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-ranked',
+            candidates: rankedServices.map((service) => ({
+              candidateId: service.id,
+              providerName: service.venue_name,
+              serviceName: service.name,
+              sourceType: 'service_catalog',
+              distanceKm: null,
+              explanation: `${service.name} stays in the ranked shortlist.`,
+            })),
+            recommendations: [
+              {
+                candidate_id: rankedServices[0].id,
+                reason: 'Best exact fit',
+                path_type: 'request_callback',
+              },
+            ],
+            confidence: {
+              score: 0.94,
+              reason: 'Strong topic and location fit',
+              gating_state: 'high',
+            },
+            warnings: [],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/booking-trust/checks', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            availability_state: 'available',
+            verified: true,
+            booking_confidence: 'high',
+            booking_path_options: ['request_callback'],
+            warnings: [],
+            payment_allowed_now: false,
+            recommended_booking_path: 'request_callback',
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/bookings/path/resolve', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            path_type: 'request_callback',
+            trust_confidence: 'high',
+            warnings: [],
+            next_step: 'Share the best three first, then reveal more if the customer asks.',
+            payment_allowed_before_confirmation: false,
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await openAssistant(page);
+    await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
+    await page.locator('#assistant-chat-input').press('Enter');
+
+    await expect(page.getByText('Result Service 1', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Result Service 2', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Result Service 3', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Result Service 4', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Result Service 6', { exact: true })).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'See more results' }).first().click();
+
+    await expect(page.getByText('Result Service 4', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Result Service 5', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Result Service 6', { exact: true }).first()).toBeVisible();
   });
 
   test('booking submit still uses legacy session as the authoritative write when live-read is enabled @live-read', async ({ page }) => {
@@ -440,7 +612,7 @@ test.describe('public assistant rollout smoke', () => {
       });
     });
 
-    await page.goto('/?assistant=open');
+    await openAssistant(page);
     await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
     await page.locator('#assistant-chat-input').press('Enter');
 
@@ -605,7 +777,7 @@ test.describe('public assistant rollout smoke', () => {
       });
     });
 
-    await page.goto('/?assistant=open');
+    await openAssistant(page);
     await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
     await page.locator('#assistant-chat-input').press('Enter');
 
