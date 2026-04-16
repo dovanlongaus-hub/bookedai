@@ -4,7 +4,7 @@
 
 BookedAI is a full-stack booking automation platform for `bookedai.au`. It combines a public-facing discovery and booking experience, a business-facing admin interface, AI-assisted service matching, workflow automation, and a self-hosted data and infrastructure stack.
 
-The production platform is currently designed around a single Docker host with multiple routed subdomains.
+The platform is currently designed around a single Docker host with multiple routed subdomains, plus a beta runtime tier used for pre-production release rehearsal.
 
 ## Business Domains
 
@@ -33,17 +33,36 @@ The production platform is currently designed around a single Docker host with m
 - DNS synchronization
 - health checks and boot reconciliation
 
-## Production Subdomains
+## Routed Subdomains
 
 | Subdomain | Purpose | Runtime Target |
 |---|---|---|
 | `bookedai.au` | Public website and in-site API proxy | frontend + backend |
+| `beta.bookedai.au` | Beta staging surface for pre-production validation | beta-web + beta-backend |
 | `admin.bookedai.au` | Admin-facing UI | frontend |
 | `api.bookedai.au` | Direct API access | backend |
 | `supabase.bookedai.au` | Self-hosted Supabase gateway | Supabase Kong |
 | `n8n.bookedai.au` | Workflow editor and webhook host | n8n |
 | `hermes.bookedai.au` | Knowledge/documentation service | Hermes |
 | `upload.bookedai.au` | Public uploads host | static storage volume |
+
+## Environment Topology
+
+### Production tier
+
+- `bookedai.au`
+- `admin.bookedai.au`
+- `api.bookedai.au`
+
+### Beta staging tier
+
+- `beta.bookedai.au`
+
+Current beta properties:
+
+- separate frontend and backend runtime containers from production
+- shared database and most shared provider credentials unless beta-specific secrets are introduced later
+- safe for runtime-level release rehearsal, but not yet a fully isolated data sandbox
 
 ## System Layers
 
@@ -155,6 +174,7 @@ Responsibilities:
 - DNS updates
 - host bootstrap
 - health monitoring
+- beta runtime separation
 
 ## Primary Runtime Flows
 
@@ -207,6 +227,7 @@ Responsibilities:
 ## Current Architectural Strengths
 
 - clear subdomain separation
+- dedicated beta runtime path for pre-production validation
 - single deployment shape for the full platform
 - reusable assistant catalog model
 - admin and public experience both connected to the same business logic core
@@ -219,6 +240,7 @@ Responsibilities:
 ## Current Architectural Constraints
 
 - frontend public and admin experiences are still delivered from one build artifact even though their app entry structure is now separated
+- beta runtime is separated from production containers, but not yet fully isolated at the database and provider-sandbox layer
 - backend handler logic is still concentrated in `backend/api/route_handlers.py`
 - core AI and booking logic remains concentrated in `backend/services.py`
 - pricing logic remains in the large service module and is a remaining refactor candidate

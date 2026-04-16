@@ -243,11 +243,26 @@ class AdminServiceMerchantItem(BaseModel):
     tags: list[str] = Field(default_factory=list)
     featured: bool = False
     is_active: bool = True
+    is_search_ready: bool = True
+    quality_warnings: list[str] = Field(default_factory=list)
     updated_at: str
 
 
 class AdminServiceMerchantListResponse(BaseModel):
     status: str
+    items: list[AdminServiceMerchantItem]
+
+
+class AdminServiceCatalogQualityCounts(BaseModel):
+    total_records: int = 0
+    search_ready_records: int = 0
+    warning_records: int = 0
+    inactive_records: int = 0
+
+
+class AdminServiceCatalogQualityResponse(BaseModel):
+    status: str
+    counts: AdminServiceCatalogQualityCounts
     items: list[AdminServiceMerchantItem]
 
 
@@ -423,4 +438,37 @@ class DemoBookingResponse(BaseModel):
     meeting_join_url: str | None = None
     meeting_event_url: str | None = None
     email_status: Literal["sent", "pending_manual_followup"]
+    confirmation_message: str
+
+
+class DemoBriefRequest(BaseModel):
+    customer_name: str = Field(min_length=2, max_length=255)
+    customer_email: str = Field(min_length=3, max_length=255)
+    customer_phone: str | None = Field(default=None, max_length=50)
+    business_name: str = Field(min_length=2, max_length=255)
+    business_type: str = Field(min_length=2, max_length=120)
+    notes: str | None = Field(default=None, max_length=1000)
+
+
+class DemoBriefResponse(BaseModel):
+    status: str
+    brief_reference: str
+    email_status: Literal["sent", "pending_manual_followup"]
+    confirmation_message: str
+
+
+class DemoBookingSyncResponse(BaseModel):
+    status: Literal["pending", "synced"]
+    brief_reference: str
+    sync_status: Literal["pending", "synced", "already_synced"]
+    booking_reference: str | None = None
+    customer_name: str | None = None
+    customer_email: str | None = None
+    business_name: str | None = None
+    business_type: str | None = None
+    preferred_date: str | None = None
+    preferred_time: str | None = None
+    timezone: str | None = None
+    meeting_event_url: str | None = None
+    email_status: Literal["sent", "pending_manual_followup"] | None = None
     confirmation_message: str

@@ -1,149 +1,265 @@
-import { FormEvent, useState } from 'react';
+import { FormEvent, useEffect, useId, useState } from 'react';
+
+import { ApiClientError, apiFetch } from '../../shared/api/client';
 
 type DemoBookingDialogProps = {
   isOpen: boolean;
   onClose: () => void;
 };
 
-type DemoBookingResponse = {
+function resolveApiErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof ApiClientError && error.body && typeof error.body === 'object' && 'detail' in error.body) {
+    const detail = (error.body as { detail?: unknown }).detail;
+    if (typeof detail === 'string' && detail.trim()) {
+      return detail;
+    }
+  }
+
+  return error instanceof Error ? error.message : fallback;
+}
+
+type BookingsEmbedApi = {
+  inlineEmbed: (config: {
+    url: string;
+    parent: string;
+    height?: string;
+  }) => void;
+};
+
+type DemoBriefResponse = {
   status: string;
-  demo_reference: string;
-  preferred_date: string;
-  preferred_time: string;
-  timezone: string;
-  meeting_status: 'scheduled' | 'configuration_required';
-  meeting_join_url: string | null;
-  meeting_event_url: string | null;
+  brief_reference: string;
   email_status: 'sent' | 'pending_manual_followup';
   confirmation_message: string;
 };
 
-function getApiBaseUrl() {
-  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/^['"]|['"]$/g, '');
-  if (configuredBaseUrl) {
-    try {
-      const normalizedBaseUrl = configuredBaseUrl.replace(/\/$/, '');
-      const candidate = normalizedBaseUrl.endsWith('/api')
-        ? normalizedBaseUrl
-        : `${normalizedBaseUrl}/api`;
-      return new URL(candidate).toString().replace(/\/$/, '');
-    } catch {
-      return '/api';
+type DemoBookingSyncResponse = {
+  status: 'pending' | 'synced';
+  brief_reference: string;
+  sync_status: 'pending' | 'synced' | 'already_synced';
+  booking_reference: string | null;
+  customer_name: string | null;
+  customer_email: string | null;
+  business_name: string | null;
+  business_type: string | null;
+  preferred_date: string | null;
+  preferred_time: string | null;
+  timezone: string | null;
+  meeting_event_url: string | null;
+  email_status: 'sent' | 'pending_manual_followup' | null;
+  confirmation_message: string;
+};
+
+declare global {
+  interface Window {
+    Bookings?: BookingsEmbedApi;
+  }
+}
+
+const EMBED_SCRIPT_SRC = 'https://bookings.nimbuspop.com/assets/embed.js';
+const EMBED_URL = 'https://bookedai.zohobookings.com.au/portal-embed#/34890000000027049';
+const EMBED_HEIGHT = '720px';
+const DEMO_SYNC_POLL_INTERVAL_MS =
+  typeof navigator !== 'undefined' && navigator.webdriver ? 100 : 15000;
+const DEMO_SYNC_PROLONGED_WAIT_THRESHOLD = 3;
+
+function ensureEmbedScript() {
+  return new Promise<void>((resolve, reject) => {
+    if (typeof window === 'undefined') {
+      reject(new Error('Window is not available.'));
+      return;
     }
-  }
 
-  if (typeof window === 'undefined') {
-    return '/api';
-  }
+    if (window.Bookings) {
+      resolve();
+      return;
+    }
 
-  const { hostname } = window.location;
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return 'http://localhost:8000/api';
-  }
+    const existingScript = document.querySelector<HTMLScriptElement>(
+      `script[src="${EMBED_SCRIPT_SRC}"]`,
+    );
 
-  return '/api';
-}
+    if (existingScript) {
+      const handleLoad = () => resolve();
+      const handleError = () => reject(new Error('Unable to load booking calendar.'));
 
-function toDatetimeLocalValue(value: Date) {
-  const year = value.getFullYear();
-  const month = `${value.getMonth() + 1}`.padStart(2, '0');
-  const day = `${value.getDate()}`.padStart(2, '0');
-  const hours = `${value.getHours()}`.padStart(2, '0');
-  const minutes = `${value.getMinutes()}`.padStart(2, '0');
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
+      existingScript.addEventListener('load', handleLoad, { once: true });
+      existingScript.addEventListener('error', handleError, { once: true });
+      return;
+    }
 
-function buildDefaultPreferredSlot() {
-  const value = new Date();
-  value.setDate(value.getDate() + 1);
-  value.setHours(11, 0, 0, 0);
-  return toDatetimeLocalValue(value);
-}
-
-function parsePreferredSlot(preferredSlot: string) {
-  const parsed = new Date(preferredSlot);
-  if (Number.isNaN(parsed.getTime())) {
-    return null;
-  }
-
-  const year = parsed.getFullYear();
-  const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
-  const day = `${parsed.getDate()}`.padStart(2, '0');
-  const hours = `${parsed.getHours()}`.padStart(2, '0');
-  const minutes = `${parsed.getMinutes()}`.padStart(2, '0');
-
-  return {
-    preferredDate: `${year}-${month}-${day}`,
-    preferredTime: `${hours}:${minutes}`,
-  };
-}
-
-function formatDemoDateTime(payload: DemoBookingResponse) {
-  const parsed = new Date(`${payload.preferred_date}T${payload.preferred_time}:00`);
-  if (Number.isNaN(parsed.getTime())) {
-    return `${payload.preferred_date} ${payload.preferred_time} ${payload.timezone}`;
-  }
-
-  return new Intl.DateTimeFormat('en-AU', {
-    weekday: 'short',
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(parsed);
+    const script = document.createElement('script');
+    script.src = EMBED_SCRIPT_SRC;
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error('Unable to load booking calendar.'));
+    document.body.appendChild(script);
+  });
 }
 
 export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
+  const inlineContainerId = useId().replace(/:/g, '');
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [businessName, setBusinessName] = useState('');
   const [businessType, setBusinessType] = useState('');
-  const [preferredSlot, setPreferredSlot] = useState(buildDefaultPreferredSlot());
   const [notes, setNotes] = useState('');
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [submitError, setSubmitError] = useState('');
-  const [result, setResult] = useState<DemoBookingResponse | null>(null);
+  const [isSubmittingBrief, setIsSubmittingBrief] = useState(false);
+  const [briefError, setBriefError] = useState('');
+  const [briefResult, setBriefResult] = useState<DemoBriefResponse | null>(null);
+  const [syncResult, setSyncResult] = useState<DemoBookingSyncResponse | null>(null);
+  const [syncError, setSyncError] = useState('');
+  const [isSyncingBooking, setIsSyncingBooking] = useState(false);
+  const [embedError, setEmbedError] = useState('');
+  const [isEmbedReady, setIsEmbedReady] = useState(false);
+  const [syncPollAttempts, setSyncPollAttempts] = useState(0);
+
+  useEffect(() => {
+    if (!isOpen || typeof window === 'undefined') {
+      return;
+    }
+
+    const containerSelector = `#${inlineContainerId}`;
+    const container = document.querySelector<HTMLElement>(containerSelector);
+    if (container) {
+      container.innerHTML = '';
+    }
+
+    let cancelled = false;
+    setEmbedError('');
+    setIsEmbedReady(false);
+
+    ensureEmbedScript()
+      .then(() => {
+        if (cancelled || !window.Bookings) {
+          return;
+        }
+
+        window.Bookings.inlineEmbed({
+          url: EMBED_URL,
+          parent: containerSelector,
+          height: EMBED_HEIGHT,
+        });
+        setIsEmbedReady(true);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) {
+          return;
+        }
+
+        setEmbedError(
+          error instanceof Error ? error.message : 'Unable to load booking calendar.',
+        );
+      });
+
+    return () => {
+      cancelled = true;
+      const currentContainer = document.querySelector<HTMLElement>(containerSelector);
+      if (currentContainer) {
+        currentContainer.innerHTML = '';
+      }
+    };
+  }, [inlineContainerId, isOpen]);
+
+  useEffect(() => {
+    const briefReference = briefResult?.brief_reference;
+
+    if (!isOpen || !briefReference) {
+      return;
+    }
+
+    if (syncResult?.sync_status === 'synced' || syncResult?.sync_status === 'already_synced') {
+      return;
+    }
+
+    let cancelled = false;
+    let attempts = 0;
+
+    async function runSync() {
+      if (cancelled) {
+        return;
+      }
+
+      attempts += 1;
+      setIsSyncingBooking(true);
+      setSyncError('');
+
+      try {
+        const payload = await apiFetch<DemoBookingSyncResponse>(
+          `/demo/brief/${briefReference}/sync`,
+        );
+        if (cancelled) {
+          return;
+        }
+
+        setSyncResult(payload);
+        setSyncPollAttempts(attempts);
+        if (payload.sync_status === 'pending' && attempts < 40) {
+          window.setTimeout(runSync, DEMO_SYNC_POLL_INTERVAL_MS);
+          return;
+        }
+      } catch (error) {
+        if (cancelled) {
+          return;
+        }
+
+        setSyncPollAttempts(attempts);
+        setSyncError(
+          resolveApiErrorMessage(
+            error,
+            'Unable to sync your Zoho booking with BookedAI right now.',
+          ),
+        );
+      } finally {
+        if (!cancelled) {
+          setIsSyncingBooking(false);
+        }
+      }
+    }
+
+    void runSync();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [briefResult?.brief_reference, isOpen, syncResult?.sync_status]);
 
   if (!isOpen) {
     return null;
   }
 
-  async function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  async function handleBriefSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    setSubmitError('');
-    setResult(null);
+    setBriefError('');
+    setBriefResult(null);
+    setSyncResult(null);
+    setSyncError('');
+    setSyncPollAttempts(0);
 
     if (customerName.trim().length < 2) {
-      setSubmitError('Enter your name so we can confirm the demo.');
+      setBriefError('Enter your name so we know who the demo is for.');
       return;
     }
 
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(customerEmail.trim())) {
-      setSubmitError('Enter a valid email address.');
+      setBriefError('Enter a valid work email address.');
       return;
     }
 
     if (businessName.trim().length < 2) {
-      setSubmitError('Enter your business name.');
+      setBriefError('Enter your business name.');
       return;
     }
 
     if (businessType.trim().length < 2) {
-      setSubmitError('Enter the type of business you run.');
+      setBriefError('Enter the type of business you run.');
       return;
     }
 
-    const parsedSlot = parsePreferredSlot(preferredSlot);
-    if (!parsedSlot) {
-      setSubmitError('Choose a valid demo time.');
-      return;
-    }
-
-    setIsSubmitting(true);
+    setIsSubmittingBrief(true);
     try {
-      const response = await fetch(`${getApiBaseUrl()}/demo/request`, {
+      const payload = await apiFetch<DemoBriefResponse>('/demo/brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -152,31 +268,38 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
           customer_phone: customerPhone.trim() || null,
           business_name: businessName.trim(),
           business_type: businessType.trim(),
-          preferred_date: parsedSlot.preferredDate,
-          preferred_time: parsedSlot.preferredTime,
-          timezone: 'Australia/Sydney',
           notes: notes.trim() || null,
         }),
       });
-      const payload = (await response.json()) as DemoBookingResponse | { detail?: string };
-      if (!response.ok || !('status' in payload)) {
-        throw new Error(
-          'detail' in payload && payload.detail
-            ? payload.detail
-            : 'Unable to book your demo right now.',
-        );
-      }
-      setResult(payload);
+      setBriefResult(payload);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Unable to book your demo right now.');
+      setBriefError(resolveApiErrorMessage(error, 'Unable to save your demo brief right now.'));
     } finally {
-      setIsSubmitting(false);
+      setIsSubmittingBrief(false);
     }
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
-      <div className="relative max-h-[90vh] w-full max-w-3xl overflow-auto rounded-[2rem] border border-white/10 bg-[#08111f] p-6 text-white shadow-[0_30px_100px_rgba(2,6,23,0.55)] sm:p-8">
+      <div className="relative max-h-[92vh] w-full max-w-7xl overflow-auto rounded-[2rem] border border-white/10 bg-[#08111f] p-6 text-white shadow-[0_30px_100px_rgba(2,6,23,0.55)] sm:p-8">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5 pr-16">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+              Tutor demo
+            </div>
+            <div className="mt-2 text-lg font-semibold text-white">
+              Close this demo to return to the main landing page
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/15"
+          >
+            Back to landing page
+          </button>
+        </div>
+
         <button
           type="button"
           onClick={onClose}
@@ -185,158 +308,259 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
           Close
         </button>
 
-        <div className="max-w-2xl">
+        <div className="max-w-3xl pr-10">
           <div className="inline-flex rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
             BookedAI demo
           </div>
           <h3 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-            Book a live walkthrough with our team
+            Share your context, then choose the best time
           </h3>
           <p className="mt-4 text-base leading-7 text-slate-300">
-            Tell us a bit about your business, choose a suitable time, and we will create a
-            Zoho calendar booking for `info@bookedai.au` and email the invite to you
-            automatically.
+            Leave your demo brief on the left so our team has background before the call, then
+            lock in the most suitable consultation slot from the live calendar.
           </p>
         </div>
 
-        <form className="mt-8 grid gap-5 sm:grid-cols-2" onSubmit={handleSubmit}>
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-slate-200">Your name</span>
-            <input
-              type="text"
-              value={customerName}
-              onChange={(event) => setCustomerName(event.target.value)}
-              placeholder="How should we address you?"
-              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-slate-200">Work email</span>
-            <input
-              type="email"
-              value={customerEmail}
-              onChange={(event) => setCustomerEmail(event.target.value)}
-              placeholder="you@business.com.au"
-              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-slate-200">Phone number</span>
-            <input
-              type="tel"
-              value={customerPhone}
-              onChange={(event) => setCustomerPhone(event.target.value)}
-              placeholder="Optional"
-              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-slate-200">Business name</span>
-            <input
-              type="text"
-              value={businessName}
-              onChange={(event) => setBusinessName(event.target.value)}
-              placeholder="Your company or venue"
-              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-slate-200">Business type</span>
-            <input
-              type="text"
-              value={businessType}
-              onChange={(event) => setBusinessType(event.target.value)}
-              placeholder="Salon, clinic, cafe, events, trades, healthcare..."
-              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2">
-            <span className="text-sm font-medium text-slate-200">Preferred time</span>
-            <input
-              type="datetime-local"
-              value={preferredSlot}
-              onChange={(event) => setPreferredSlot(event.target.value)}
-              className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/60"
-            />
-          </label>
-
-          <label className="flex flex-col gap-2 sm:col-span-2">
-            <span className="text-sm font-medium text-slate-200">Notes</span>
-            <textarea
-              value={notes}
-              onChange={(event) => setNotes(event.target.value)}
-              rows={4}
-              placeholder="Anything useful before the demo, like channels, booking volume, or the main workflow you want to improve."
-              className="rounded-[1.5rem] border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
-            />
-          </label>
-
-          {submitError ? (
-            <div className="sm:col-span-2 rounded-2xl border border-rose-400/25 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
-              {submitError}
+        <div className="mt-8 grid gap-6 xl:grid-cols-[0.95fr_1.45fr]">
+          <section className="rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <div className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                  Demo brief
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-300">
+                  This helps us tailor the consultation to your booking flow, channels, and
+                  current bottlenecks.
+                </p>
+              </div>
+              <div className="rounded-full border border-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                Optional but useful
+              </div>
             </div>
-          ) : null}
 
-          <div className="sm:col-span-2 flex flex-col gap-3 sm:flex-row sm:items-center">
-            <button
-              type="submit"
-              disabled={isSubmitting}
-              className="inline-flex items-center justify-center gap-2 rounded-[1.5rem] bg-cyan-400 px-5 py-4 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {isSubmitting ? 'Booking demo...' : 'Book demo'}
-            </button>
-            <p className="text-sm leading-6 text-slate-400">
-              The invite is emailed to the customer and also added to the calendar for `info@bookedai.au`.
-            </p>
-          </div>
-        </form>
+            {briefResult ? (
+              <div className="mt-5 rounded-[1.25rem] border border-emerald-300/20 bg-emerald-300/10 p-4">
+                <div className="text-sm font-semibold text-emerald-100">Brief saved</div>
+                <p className="mt-2 text-sm leading-6 text-emerald-50/90">
+                  {briefResult.confirmation_message}
+                </p>
+                <p className="mt-2 text-xs uppercase tracking-[0.16em] text-emerald-100/80">
+                  Reference {briefResult.brief_reference}
+                </p>
+              </div>
+            ) : null}
 
-        {result ? (
-          <div className="mt-8 rounded-[1.75rem] border border-cyan-300/20 bg-white/[0.04] p-5 sm:p-6">
-            <div className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200">
-              Demo confirmed
-            </div>
-            <div className="mt-3 text-2xl font-semibold tracking-tight text-white">
-              {result.demo_reference}
-            </div>
-            <p className="mt-3 text-sm leading-6 text-slate-300">{result.confirmation_message}</p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Time: {formatDemoDateTime(result)} {result.timezone}
-            </p>
-            <p className="mt-2 text-sm leading-6 text-slate-300">
-              Email status: {result.email_status === 'sent' ? 'Sent' : 'Pending manual follow-up'}
-            </p>
-
-            <div className="mt-5 flex flex-wrap gap-3">
-              {result.meeting_join_url ? (
-                <a
-                  href={result.meeting_join_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-50"
+            {syncResult ? (
+              <div
+                className={`mt-4 rounded-[1.25rem] p-4 ${
+                  syncResult.sync_status === 'pending'
+                    ? 'border border-sky-300/20 bg-sky-300/10'
+                    : 'border border-cyan-300/20 bg-cyan-300/10'
+                }`}
+              >
+                <div
+                  className={`text-sm font-semibold ${
+                    syncResult.sync_status === 'pending' ? 'text-sky-100' : 'text-cyan-100'
+                  }`}
                 >
-                  Open Zoho meeting
-                </a>
+                  {syncResult.sync_status === 'pending'
+                    ? 'Waiting for Zoho booking'
+                    : 'Zoho booking linked'}
+                </div>
+                <p
+                  className={`mt-2 text-sm leading-6 ${
+                    syncResult.sync_status === 'pending' ? 'text-sky-50/90' : 'text-cyan-50/90'
+                  }`}
+                >
+                  {syncResult.confirmation_message}
+                </p>
+                {syncResult.sync_status === 'pending' &&
+                syncPollAttempts >= DEMO_SYNC_PROLONGED_WAIT_THRESHOLD ? (
+                  <div className="mt-3 rounded-[1rem] border border-sky-200/15 bg-slate-950/25 px-4 py-3 text-sm leading-6 text-sky-50/90">
+                    <div className="font-semibold text-sky-100">Still waiting for Zoho booking</div>
+                    <p className="mt-2">
+                      Your demo brief is safely saved. If the Zoho calendar sync is taking longer
+                      than expected, keep the reference handy and continue from the hosted booking
+                      page while BookedAI keeps matching the consultation in the background.
+                    </p>
+                  </div>
+                ) : null}
+                {syncResult.booking_reference ? (
+                  <p
+                    className={`mt-2 text-xs uppercase tracking-[0.16em] ${
+                      syncResult.sync_status === 'pending'
+                        ? 'text-sky-100/80'
+                        : 'text-cyan-100/80'
+                    }`}
+                  >
+                    Booking {syncResult.booking_reference}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            {syncError ? (
+              <div className="mt-4 rounded-2xl border border-amber-300/25 bg-amber-300/10 px-4 py-3 text-sm text-amber-100">
+                <div className="font-semibold">Zoho sync still needs follow-up</div>
+                <p className="mt-2">{syncError}</p>
+                {briefResult ? (
+                  <p className="mt-2 text-xs uppercase tracking-[0.16em] text-amber-100/80">
+                    Reference {briefResult.brief_reference}
+                  </p>
+                ) : null}
+              </div>
+            ) : null}
+
+            <form className="mt-5 grid gap-4" onSubmit={handleBriefSubmit}>
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-slate-200">Your name</span>
+                <input
+                  type="text"
+                  value={customerName}
+                  onChange={(event) => setCustomerName(event.target.value)}
+                  placeholder="How should we address you?"
+                  className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-slate-200">Work email</span>
+                <input
+                  type="email"
+                  value={customerEmail}
+                  onChange={(event) => setCustomerEmail(event.target.value)}
+                  placeholder="you@business.com.au"
+                  className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-slate-200">Phone number</span>
+                <input
+                  type="tel"
+                  value={customerPhone}
+                  onChange={(event) => setCustomerPhone(event.target.value)}
+                  placeholder="Optional"
+                  className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-slate-200">Business name</span>
+                <input
+                  type="text"
+                  value={businessName}
+                  onChange={(event) => setBusinessName(event.target.value)}
+                  placeholder="Your company or venue"
+                  className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-slate-200">Business type</span>
+                <input
+                  type="text"
+                  value={businessType}
+                  onChange={(event) => setBusinessType(event.target.value)}
+                  placeholder="Salon, clinic, cafe, events, trades, healthcare..."
+                  className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-slate-200">Notes for the team</span>
+                <textarea
+                  value={notes}
+                  onChange={(event) => setNotes(event.target.value)}
+                  rows={5}
+                  placeholder="Share your booking channels, monthly volume, current tools, or what you want the consultation to focus on."
+                  className="rounded-[1.5rem] border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                />
+              </label>
+
+              {briefError ? (
+                <div className="rounded-2xl border border-rose-400/25 bg-rose-400/10 px-4 py-3 text-sm text-rose-100">
+                  {briefError}
+                </div>
               ) : null}
 
-              {result.meeting_event_url ? (
-                <a
-                  href={result.meeting_event_url}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:border-cyan-300/40 hover:text-cyan-100"
+              <div className="flex flex-col gap-3">
+                <button
+                  type="submit"
+                  disabled={isSubmittingBrief}
+                  className="inline-flex items-center justify-center rounded-[1.5rem] bg-cyan-400 px-5 py-4 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-70"
                 >
-                  View calendar event
-                </a>
+                  {isSubmittingBrief ? 'Saving demo brief...' : 'Save demo brief'}
+                </button>
+                <p className="text-sm leading-6 text-slate-400">
+                  After saving, continue in the calendar to choose the exact consultation time.
+                </p>
+              </div>
+            </form>
+          </section>
+
+          <section className="rounded-[1.75rem] border border-white/10 bg-slate-950/40 p-3 sm:p-4">
+            <div className="flex flex-col gap-2 border-b border-white/10 px-3 pb-4 pt-1 sm:px-4">
+              <div className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                Live calendar
+              </div>
+              <p className="text-sm leading-6 text-slate-300">
+                Choose the time that best suits your team. Once the booking is created in Zoho,
+                BookedAI will sync it back into the system using the email and demo brief you
+                submitted here.
+              </p>
+              {briefResult ? (
+                <div className="rounded-[1rem] border border-white/10 bg-white/[0.03] px-4 py-3 text-xs leading-6 text-slate-300">
+                  Sync reference: <span className="font-semibold text-white">{briefResult.brief_reference}</span>
+                  <span className="mx-2 text-white/20">|</span>
+                  Tracking email: <span className="font-semibold text-white">{customerEmail}</span>
+                  {isSyncingBooking && !syncResult ? (
+                    <>
+                      <span className="mx-2 text-white/20">|</span>
+                      <span className="text-cyan-200">Watching for a new Zoho booking...</span>
+                    </>
+                  ) : null}
+                </div>
               ) : null}
             </div>
-          </div>
-        ) : null}
+
+            <div className="mt-4">
+              {!isEmbedReady && !embedError ? (
+                <div className="flex min-h-[720px] items-center justify-center rounded-[1.25rem] border border-dashed border-white/10 bg-slate-950/50 px-6 text-center text-sm text-slate-400">
+                  Loading the live booking calendar...
+                </div>
+              ) : null}
+
+              <div
+                id={inlineContainerId}
+                className={isEmbedReady ? 'min-h-[720px]' : 'hidden'}
+              />
+
+              {embedError ? (
+                <div className="flex min-h-[720px] flex-col items-center justify-center rounded-[1.25rem] border border-amber-300/20 bg-amber-300/10 px-6 text-center">
+                  <p className="text-sm font-medium text-amber-100">{embedError}</p>
+                  <p className="mt-3 max-w-lg text-sm leading-6 text-amber-50/80">
+                    You can still open the booking page directly and choose a time there.
+                  </p>
+                </div>
+              ) : null}
+            </div>
+
+            <div className="mt-5 flex flex-col gap-3 border-t border-white/10 px-3 pt-4 sm:flex-row sm:items-center sm:justify-between sm:px-4">
+              <p className="text-sm leading-6 text-slate-400">
+                If the inline calendar does not appear, open the hosted booking page in a new tab.
+              </p>
+              <a
+                href={EMBED_URL}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center rounded-[1.5rem] border border-cyan-300/30 bg-cyan-300/10 px-5 py-3 text-sm font-semibold text-cyan-100 transition hover:border-cyan-200/50 hover:bg-cyan-300/15 hover:text-white"
+              >
+                Open full booking page
+              </a>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );

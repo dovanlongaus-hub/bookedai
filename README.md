@@ -14,6 +14,20 @@ Current application release baseline: `1.0.1-stable`.
 - `scripts/`: VPS bootstrap, deployment, health checks, and DNS automation
 - `storage/`: persisted uploaded assets
 
+## Additive foundation scaffolding
+
+This production repo now also includes a non-destructive foundation scaffold to support later phases without rewriting the system:
+
+- `backend/core/`: config grouping, logging, observability, feature flags, shared contracts, and error models
+- `backend/domain/`: starter service seams for growth, matching, booking trust, booking paths, payments, CRM, email, billing, deployment modes, AI routing, conversations, and integration hub
+- `backend/repositories/`: starter repository boundaries for future tenant-aware persistence
+- `backend/integrations/`: provider adapter seams for Stripe, Zoho CRM, email, WhatsApp, AI/search, n8n, and external systems
+- `backend/workers/`: outbox, job, and scheduler skeletons
+- `frontend/src/shared/contracts/`: shared domain DTOs for API and surface reuse
+- `frontend/src/shared/api/client.ts`: common API fetch helper
+
+These files are intentionally foundations only. They do not replace the current production flows yet.
+
 ## Production architecture
 
 Production traffic is expected to follow this path:
@@ -25,6 +39,7 @@ Production traffic is expected to follow this path:
 - `https://n8n.bookedai.au/` -> n8n editor and webhooks
 - `https://hermes.bookedai.au/` -> Hermes knowledge/documentation service
 - `https://upload.bookedai.au/` -> simple upload page plus public file hosting from `storage/uploads`
+- `https://calendar.bookedai.au/` -> redirect to Zoho Bookings calendar page
 
 Core production services defined in [`docker-compose.prod.yml`](/home/dovanlong/BookedAI/docker-compose.prod.yml:1):
 
@@ -67,6 +82,14 @@ AI provider:
 - Backend health: `http://localhost:8000/api/health`
 - API docs: `http://localhost:8000/api/docs`
 
+Additional developer references:
+
+- [Foundation Scaffold Notes](./docs/development/foundation-scaffold.md)
+- [Target Platform Architecture](./docs/architecture/target-platform-architecture.md)
+- [Repo And Module Strategy](./docs/architecture/repo-module-strategy.md)
+- [Go-To-Market Sales And Event Strategy](./docs/architecture/go-to-market-sales-event-strategy.md)
+- [Demo Script Storytelling And Video Strategy](./docs/architecture/demo-script-storytelling-video-strategy.md)
+
 ## Production deployment for bookedai.au
 
 1. Point DNS records:
@@ -78,6 +101,7 @@ AI provider:
 - `A` record for `n8n.bookedai.au` -> same public IP
 - `A` record for `hermes.bookedai.au` -> same public IP
 - `A` record for `upload.bookedai.au` -> same public IP
+- `A` record for `calendar.bookedai.au` -> same public IP
 
 2. Prepare environment:
 
@@ -116,23 +140,33 @@ AI provider:
    DEPLOY_USER=ubuntu sudo bash scripts/bootstrap_vps.sh
    ```
 
-4. Deploy as the application user:
+4. Deploy beta preview first:
+
+   ```sh
+   bash scripts/deploy_beta.sh
+   ```
+
+   This rebuilds and redeploys the dedicated `beta-web` and `beta-backend` services behind `https://beta.bookedai.au` without touching the production web or production backend containers.
+
+5. Promote the full stack when ready:
 
    ```sh
    bash scripts/deploy_production.sh
    ```
 
-5. Access:
+6. Access:
 
 - App: `https://bookedai.au`
+- Beta: `https://beta.bookedai.au`
 - Admin: `https://admin.bookedai.au`
 - API docs: `https://api.bookedai.au/api/docs`
 - Supabase: `https://supabase.bookedai.au`
 - n8n: `https://n8n.bookedai.au`
 - Hermes: `https://hermes.bookedai.au`
 - Uploads: `https://upload.bookedai.au`
+- Calendar redirect: `https://calendar.bookedai.au`
 
-6. Optional hardening (health monitoring):
+7. Optional hardening (health monitoring):
 
    ```sh
    sudo bash scripts/install_healthcheck_cron.sh
@@ -142,7 +176,7 @@ AI provider:
 
 - `/var/log/bookedai-healthcheck.log`
 
-7. Optional dynamic IP sync to Cloudflare on each reboot:
+8. Optional dynamic IP sync to Cloudflare on each reboot:
 
    ```sh
    sudo bash scripts/install_cloudflare_dns_autoupdate.sh
@@ -157,12 +191,13 @@ AI provider:
 - `n8n.bookedai.au`
 - `supabase.bookedai.au`
 - `upload.bookedai.au`
+- `calendar.bookedai.au`
 
    You can customize the record list in root `.env`:
 
    ```env
-   CLOUDFLARE_AUTO_DNS_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au
-   CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au
+   CLOUDFLARE_AUTO_DNS_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,calendar.bookedai.au
+   CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,calendar.bookedai.au
    ```
 
    To run the sync manually at any time:
@@ -182,6 +217,26 @@ Backend now supports SMTP send and IMAP inbox fetch APIs:
 - `GET /api/email/inbox?limit=20`
 
 These admin routes require an `X-Admin-Token` header that matches `ADMIN_API_TOKEN`.
+
+## Feature flag operations
+
+To print the exact SQL needed for a rollout-safe flag change:
+
+```sh
+./scripts/set_feature_flag.py semantic_matching_model_assist_v1 --enabled true --dry-run
+```
+
+To write the flag directly when `DATABASE_URL` is reachable from the current environment:
+
+```sh
+./scripts/set_feature_flag.py semantic_matching_model_assist_v1 --enabled true
+```
+
+To target a specific tenant UUID instead of the default production tenant:
+
+```sh
+./scripts/set_feature_flag.py semantic_matching_model_assist_v1 --enabled true --tenant-id <tenant-uuid>
+```
 
 Recommended provider setup for this project:
 
@@ -267,6 +322,7 @@ curl -s \
 - `scripts/bootstrap_vps.sh`: installs Docker and host prerequisites on Ubuntu
 - `scripts/prepare_supabase_env.sh`: generates and patches `supabase/.env`
 - `scripts/sync_app_env_from_supabase.sh`: syncs app DB and API keys from `supabase/.env`
-- `scripts/deploy_production.sh`: obtains Let's Encrypt certs and deploys both stacks
+- `scripts/deploy_beta.sh`: rebuilds and redeploys the beta staging runtime at `beta.bookedai.au`
+- `scripts/deploy_production.sh`: obtains Let's Encrypt certs and deploys both production and beta stacks
 - `scripts/healthcheck_stack.sh`: validates core containers and HTTPS endpoints
 - `scripts/install_healthcheck_cron.sh`: installs recurring health check cron job

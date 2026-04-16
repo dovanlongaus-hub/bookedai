@@ -1,0 +1,635 @@
+import { expect, test } from '@playwright/test';
+
+const storedSession = {
+  token: 'session-test',
+  username: 'info@bookedai.au',
+  expiresAt: '2026-04-16T12:00:00Z',
+};
+
+const reauthenticatedSession = {
+  token: 'session-reauth',
+  username: 'info@bookedai.au',
+  expiresAt: '2026-04-16T18:00:00Z',
+};
+
+async function stubAdminDashboard(page: Parameters<typeof test>[0]['page']) {
+  let overviewRequests = 0;
+
+  await page.addInitScript((session) => {
+    window.localStorage.setItem('bookedai_admin_session', session.token);
+    window.localStorage.setItem('bookedai_admin_username', session.username);
+    window.localStorage.setItem('bookedai_admin_expires_at', session.expiresAt);
+  }, storedSession);
+
+  await page.route('**/api/admin/overview', async (route) => {
+    overviewRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        metrics: [{ label: 'Bookings', value: String(overviewRequests), tone: 'info' }],
+        recent_bookings: [],
+        recent_events: [],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/bookings?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'X-BookedAI-Admin-Bookings-View': 'enhanced',
+        'X-BookedAI-Admin-Bookings-Shadow': 'disabled',
+      },
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        total: 1,
+        items: [
+          {
+            booking_reference: 'BR-SESSION-1',
+            created_at: '2026-04-16T00:00:00Z',
+            industry: 'hair',
+            customer_name: 'Session Customer',
+            customer_email: 'session@example.com',
+            customer_phone: null,
+            service_name: 'Session Cut',
+            service_id: 'service-session',
+            requested_date: '2026-04-16',
+            requested_time: '14:00',
+            timezone: 'Australia/Sydney',
+            amount_aud: 75,
+            payment_status: 'pending',
+            payment_url: null,
+            email_status: 'sent',
+            workflow_status: 'queued',
+            notes: null,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/bookings/BR-SESSION-1', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        booking: {
+          booking_reference: 'BR-SESSION-1',
+          created_at: '2026-04-16T00:00:00Z',
+          industry: 'hair',
+          customer_name: 'Session Customer',
+          customer_email: 'session@example.com',
+          customer_phone: null,
+          service_name: 'Session Cut',
+          service_id: 'service-session',
+          requested_date: '2026-04-16',
+          requested_time: '14:00',
+          timezone: 'Australia/Sydney',
+          amount_aud: 75,
+          payment_status: 'pending',
+          payment_url: null,
+          email_status: 'sent',
+          workflow_status: 'queued',
+          notes: null,
+        },
+        events: [],
+      }),
+    });
+  });
+
+  for (const path of ['config', 'apis', 'partners', 'services']) {
+    await page.route(`**/api/admin/${path}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', items: [] }),
+      });
+    });
+  }
+}
+
+async function stubAdminReauthAfterExpiry(page: Parameters<typeof test>[0]['page']) {
+  let overviewRequests = 0;
+  let authorized = false;
+
+  await page.addInitScript((session) => {
+    window.localStorage.setItem('bookedai_admin_session', session.token);
+    window.localStorage.setItem('bookedai_admin_username', session.username);
+    window.localStorage.setItem('bookedai_admin_expires_at', session.expiresAt);
+  }, storedSession);
+
+  await page.route('**/api/admin/login', async (route) => {
+    authorized = true;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        session_token: reauthenticatedSession.token,
+        username: reauthenticatedSession.username,
+        expires_at: reauthenticatedSession.expiresAt,
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/overview', async (route) => {
+    if (!authorized) {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Admin session expired' }),
+      });
+      return;
+    }
+
+    overviewRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        metrics: [{ label: 'Bookings', value: String(overviewRequests), tone: 'info' }],
+        recent_bookings: [],
+        recent_events: [],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/bookings?**', async (route) => {
+    if (!authorized) {
+      await route.fulfill({
+        status: 200,
+        headers: {
+          'X-BookedAI-Admin-Bookings-View': 'enhanced',
+          'X-BookedAI-Admin-Bookings-Shadow': 'disabled',
+        },
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', total: 0, items: [] }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'X-BookedAI-Admin-Bookings-View': 'enhanced',
+        'X-BookedAI-Admin-Bookings-Shadow': 'disabled',
+      },
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        total: 1,
+        items: [
+          {
+            booking_reference: 'BR-SESSION-REAUTH',
+            created_at: '2026-04-16T00:00:00Z',
+            industry: 'hair',
+            customer_name: 'Session Customer',
+            customer_email: 'session@example.com',
+            customer_phone: null,
+            service_name: 'Session Cut',
+            service_id: 'service-session',
+            requested_date: '2026-04-16',
+            requested_time: '14:00',
+            timezone: 'Australia/Sydney',
+            amount_aud: 75,
+            payment_status: 'pending',
+            payment_url: null,
+            email_status: 'sent',
+            workflow_status: 'queued',
+            notes: null,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/bookings/BR-SESSION-REAUTH', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        booking: {
+          booking_reference: 'BR-SESSION-REAUTH',
+          created_at: '2026-04-16T00:00:00Z',
+          industry: 'hair',
+          customer_name: 'Session Customer',
+          customer_email: 'session@example.com',
+          customer_phone: null,
+          service_name: 'Session Cut',
+          service_id: 'service-session',
+          requested_date: '2026-04-16',
+          requested_time: '14:00',
+          timezone: 'Australia/Sydney',
+          amount_aud: 75,
+          payment_status: 'pending',
+          payment_url: null,
+          email_status: 'sent',
+          workflow_status: 'queued',
+          notes: null,
+        },
+        events: [],
+      }),
+    });
+  });
+
+  for (const path of ['config', 'apis', 'partners', 'services']) {
+    await page.route(`**/api/admin/${path}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', items: [] }),
+      });
+    });
+  }
+}
+
+async function stubAdminProtectedActionReauth(page: Parameters<typeof test>[0]['page']) {
+  let overviewRequests = 0;
+  let confirmationAuthorized = false;
+
+  await page.addInitScript((session) => {
+    window.localStorage.setItem('bookedai_admin_session', session.token);
+    window.localStorage.setItem('bookedai_admin_username', session.username);
+    window.localStorage.setItem('bookedai_admin_expires_at', session.expiresAt);
+  }, storedSession);
+
+  await page.route('**/api/admin/login', async (route) => {
+    confirmationAuthorized = true;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        session_token: reauthenticatedSession.token,
+        username: reauthenticatedSession.username,
+        expires_at: reauthenticatedSession.expiresAt,
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/overview', async (route) => {
+    overviewRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        metrics: [{ label: 'Bookings', value: String(overviewRequests), tone: 'info' }],
+        recent_bookings: [],
+        recent_events: [],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/bookings?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'X-BookedAI-Admin-Bookings-View': 'enhanced',
+        'X-BookedAI-Admin-Bookings-Shadow': 'disabled',
+      },
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        total: 1,
+        items: [
+          {
+            booking_reference: 'BR-SESSION-CONFIRM',
+            created_at: '2026-04-16T00:00:00Z',
+            industry: 'hair',
+            customer_name: 'Session Customer',
+            customer_email: 'session@example.com',
+            customer_phone: null,
+            service_name: 'Session Cut',
+            service_id: 'service-session',
+            requested_date: '2026-04-16',
+            requested_time: '14:00',
+            timezone: 'Australia/Sydney',
+            amount_aud: 75,
+            payment_status: 'pending',
+            payment_url: 'https://checkout.stripe.com/pay/cs_test_confirm',
+            email_status: 'sent',
+            workflow_status: 'queued',
+            notes: null,
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/bookings/BR-SESSION-CONFIRM', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        booking: {
+          booking_reference: 'BR-SESSION-CONFIRM',
+          created_at: '2026-04-16T00:00:00Z',
+          industry: 'hair',
+          customer_name: 'Session Customer',
+          customer_email: 'session@example.com',
+          customer_phone: null,
+          service_name: 'Session Cut',
+          service_id: 'service-session',
+          requested_date: '2026-04-16',
+          requested_time: '14:00',
+          timezone: 'Australia/Sydney',
+          amount_aud: 75,
+          payment_status: 'pending',
+          payment_url: 'https://checkout.stripe.com/pay/cs_test_confirm',
+          email_status: 'sent',
+          workflow_status: 'queued',
+          notes: null,
+        },
+        events: [],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/bookings/BR-SESSION-CONFIRM/confirm-email', async (route) => {
+    if (!confirmationAuthorized) {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Admin session expired' }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        message: 'Confirmation email queued for BR-SESSION-CONFIRM.',
+      }),
+    });
+  });
+
+  for (const path of ['config', 'apis', 'partners', 'services']) {
+    await page.route(`**/api/admin/${path}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', items: [] }),
+      });
+    });
+  }
+}
+
+async function stubAdminPartnerProtectedActionReauth(
+  page: Parameters<typeof test>[0]['page'],
+) {
+  let overviewRequests = 0;
+  let partnerAuthorized = false;
+
+  await page.addInitScript((session) => {
+    window.localStorage.setItem('bookedai_admin_session', session.token);
+    window.localStorage.setItem('bookedai_admin_username', session.username);
+    window.localStorage.setItem('bookedai_admin_expires_at', session.expiresAt);
+  }, storedSession);
+
+  await page.route('**/api/admin/login', async (route) => {
+    partnerAuthorized = true;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        session_token: reauthenticatedSession.token,
+        username: reauthenticatedSession.username,
+        expires_at: reauthenticatedSession.expiresAt,
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/overview', async (route) => {
+    overviewRequests += 1;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        metrics: [{ label: 'Bookings', value: String(overviewRequests), tone: 'info' }],
+        recent_bookings: [],
+        recent_events: [],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/bookings?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      headers: {
+        'X-BookedAI-Admin-Bookings-View': 'enhanced',
+        'X-BookedAI-Admin-Bookings-Shadow': 'disabled',
+      },
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', total: 0, items: [] }),
+    });
+  });
+
+  await page.route('**/api/admin/partners', async (route) => {
+    if (route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', items: [] }),
+      });
+      return;
+    }
+
+    if (!partnerAuthorized) {
+      await route.fulfill({
+        status: 401,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Admin session expired' }),
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        items: [
+          {
+            id: 1,
+            name: 'Retry Ready Studio',
+            category: 'Customer',
+            website_url: null,
+            description: 'Partner created after admin re-auth.',
+            logo_url: null,
+            image_url: null,
+            featured: false,
+            sort_order: 0,
+            is_active: true,
+          },
+        ],
+      }),
+    });
+  });
+
+  for (const path of ['config', 'apis', 'services']) {
+    await page.route(`**/api/admin/${path}`, async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', items: [] }),
+      });
+    });
+  }
+}
+
+test.describe('admin session and refresh regressions', () => {
+  test('admin refresh keeps stored session visible and logout returns to sign-in @admin', async ({
+    page,
+  }) => {
+    await stubAdminDashboard(page);
+
+    await page.goto('/admin');
+
+    const bookingsMetric = page
+      .locator('article')
+      .filter({ has: page.getByText('Bookings') })
+      .first();
+    await expect(
+      page.getByText('Signed in as info@bookedai.au until 16 Apr 2026, 12:00 pm'),
+    ).toBeVisible();
+    await expect(bookingsMetric.getByText('1', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Refresh' }).click();
+    await expect(bookingsMetric.getByText('2', { exact: true })).toBeVisible();
+
+    await page.getByRole('button', { name: 'Log out' }).click();
+    await expect(page.getByText('Admin Portal')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
+
+    const sessionState = await page.evaluate(() => ({
+      token: window.localStorage.getItem('bookedai_admin_session'),
+      username: window.localStorage.getItem('bookedai_admin_username'),
+      expiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
+    }));
+
+    expect(sessionState).toEqual({
+      token: null,
+      username: null,
+      expiresAt: null,
+    });
+  });
+
+  test('expired admin session returns to sign-in and supports immediate re-auth @admin', async ({
+    page,
+  }) => {
+    await stubAdminReauthAfterExpiry(page);
+
+    await page.goto('/admin');
+
+    await expect(page.getByText('Your admin session expired. Sign in again to continue.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
+
+    await page.getByLabel('Password').fill('bookedai-demo-password');
+    await page.getByRole('button', { name: 'Sign in to admin' }).click();
+
+    await expect(
+      page.getByText('Signed in as info@bookedai.au until 16 Apr 2026, 6:00 pm'),
+    ).toBeVisible();
+    await expect(
+      page.locator('article').filter({ has: page.getByText('Bookings') }).first().getByText('1', { exact: true }),
+    ).toBeVisible();
+
+    const sessionState = await page.evaluate(() => ({
+      token: window.localStorage.getItem('bookedai_admin_session'),
+      username: window.localStorage.getItem('bookedai_admin_username'),
+      expiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
+    }));
+
+    expect(sessionState).toEqual({
+      token: reauthenticatedSession.token,
+      username: reauthenticatedSession.username,
+      expiresAt: reauthenticatedSession.expiresAt,
+    });
+  });
+
+  test('protected admin mutation expiry returns to sign-in and supports re-auth @admin', async ({
+    page,
+  }) => {
+    await stubAdminProtectedActionReauth(page);
+
+    await page.goto('/admin');
+
+    await expect(page.getByRole('button', { name: 'Send confirmation email' })).toBeVisible();
+    await page.getByRole('button', { name: 'Send confirmation email' }).click();
+
+    await expect(page.getByText('Your admin session expired. Sign in again to continue.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
+
+    const expiredSessionState = await page.evaluate(() => ({
+      token: window.localStorage.getItem('bookedai_admin_session'),
+      username: window.localStorage.getItem('bookedai_admin_username'),
+      expiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
+    }));
+
+    expect(expiredSessionState).toEqual({
+      token: null,
+      username: null,
+      expiresAt: null,
+    });
+
+    await page.getByLabel('Password').fill('bookedai-demo-password');
+    await page.getByRole('button', { name: 'Sign in to admin' }).click();
+
+    await expect(
+      page.getByText('Signed in as info@bookedai.au until 16 Apr 2026, 6:00 pm'),
+    ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send confirmation email' })).toBeVisible();
+  });
+
+  test('partner create expiry returns to sign-in and allows protected mutation retry after re-auth @admin', async ({
+    page,
+  }) => {
+    await stubAdminPartnerProtectedActionReauth(page);
+
+    await page.goto('/admin');
+
+    await expect(page.getByText('Partners and customers')).toBeVisible();
+    await page.getByLabel('Business name').fill('Retry Ready Studio');
+    await page.getByRole('button', { name: 'Create profile' }).click();
+
+    await expect(page.getByText('Your admin session expired. Sign in again to continue.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
+
+    const expiredSessionState = await page.evaluate(() => ({
+      token: window.localStorage.getItem('bookedai_admin_session'),
+      username: window.localStorage.getItem('bookedai_admin_username'),
+      expiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
+    }));
+
+    expect(expiredSessionState).toEqual({
+      token: null,
+      username: null,
+      expiresAt: null,
+    });
+
+    await page.getByLabel('Password').fill('bookedai-demo-password');
+    await page.getByRole('button', { name: 'Sign in to admin' }).click();
+
+    await expect(
+      page.getByText('Signed in as info@bookedai.au until 16 Apr 2026, 6:00 pm'),
+    ).toBeVisible();
+
+    await page.getByLabel('Business name').fill('Retry Ready Studio');
+    await page.getByRole('button', { name: 'Create profile' }).click();
+
+    await expect(page.getByText('Partner profile created.')).toBeVisible();
+    await expect(page.getByText('Retry Ready Studio')).toBeVisible();
+  });
+});

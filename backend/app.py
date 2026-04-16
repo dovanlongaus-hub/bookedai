@@ -2,10 +2,14 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from api.route_handlers import api, lifespan, settings
+from api.v1_routes import router as v1_router
+from core.logging import configure_logging
+from core.observability import CorrelationIdMiddleware, register_exception_handlers
 from services import parse_cors_origins
 
 
 def create_app() -> FastAPI:
+    configure_logging()
     app = FastAPI(
         title="BookedAI API",
         version="1.0.1-stable",
@@ -22,7 +26,10 @@ def create_app() -> FastAPI:
         allow_methods=["*"],
         allow_headers=["*"],
     )
+    app.add_middleware(CorrelationIdMiddleware)
+    register_exception_handlers(app)
     app.include_router(api)
+    app.include_router(v1_router)
     return app
 
 

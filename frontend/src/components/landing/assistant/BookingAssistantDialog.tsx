@@ -2,6 +2,17 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { BookingAssistantContent } from '../data';
 import { getApiBaseUrl } from '../../../shared/config/api';
+import {
+  isPublicBookingAssistantV1Enabled,
+  isPublicBookingAssistantV1LiveReadEnabled,
+} from '../../../shared/config/publicBookingAssistant';
+import {
+  createPublicBookingAssistantSessionId,
+  getPublicBookingAssistantLiveReadRecommendation,
+  primePublicBookingAssistantSession,
+  shadowPublicBookingAssistantLeadAndBookingIntent,
+  shadowPublicBookingAssistantSearch,
+} from './publicBookingAssistantV1';
 
 type ServiceCatalogItem = {
   id: string;
@@ -98,6 +109,9 @@ type BookingAssistantDialogProps = {
   content: BookingAssistantContent;
   isOpen: boolean;
   onClose: () => void;
+  standalone?: boolean;
+  closeLabel?: string;
+  layoutMode?: 'default' | 'product_app';
 };
 
 type BrowserSpeechRecognitionResult = {
@@ -138,25 +152,25 @@ type ProcessStep = {
 
 const popupShortcutTopics = [
   {
-    label: 'AI Events',
-    prompt: 'Show me the best AI events happening soon, especially WSTI events.',
+    label: 'Swim',
+    prompt: 'Find the best swim lesson for a 7-year-old near Caringbah this weekend.',
   },
   {
-    label: 'SME Services',
+    label: 'Housing',
     prompt:
-      'Help me compare salons, clinics, food bookings, event spaces, trades, and kids services anywhere in Australia.',
+      'I want a housing consultation about apartment or townhouse projects in Sydney and would like to book a call.',
   },
   {
-    label: 'Food',
-    prompt: 'Help me find the best food or restaurant booking option for tonight.',
+    label: 'Salon',
+    prompt: 'Book a haircut and colour consultation for Friday afternoon near me.',
   },
   {
-    label: 'Healthcare',
-    prompt: 'I need a healthcare service and want the best match for my needs.',
+    label: 'Clinic',
+    prompt: 'I need a physio or skin clinic with weekend availability near me.',
   },
   {
-    label: 'Services',
-    prompt: 'Show me the best services available and help me choose quickly.',
+    label: 'Restaurant',
+    prompt: 'Find the best restaurant booking option for 6 people tonight.',
   },
 ];
 
@@ -233,8 +247,32 @@ function getEventVisualLabel(event: AIEventItem) {
   return extractImageUrl(event.image_url) ? 'Event image' : 'Google map location';
 }
 
-function curateServiceMatches(services: ServiceCatalogItem[]) {
-  return Array.from(new Map(services.map((service) => [service.id, service])).values());
+const CHAT_RESULT_BATCH_SIZE = 3;
+
+function curateServiceMatches(
+  services: ServiceCatalogItem[],
+  preferredOrder: string[] = [],
+) {
+  const deduped = Array.from(new Map(services.map((service) => [service.id, service])).values());
+  if (!preferredOrder.length) {
+    return deduped;
+  }
+
+  const order = new Map(preferredOrder.map((serviceId, index) => [serviceId, index]));
+  return [...deduped].sort((left, right) => {
+    const leftIndex = order.get(left.id);
+    const rightIndex = order.get(right.id);
+    if (leftIndex !== undefined && rightIndex !== undefined) {
+      return leftIndex - rightIndex;
+    }
+    if (leftIndex !== undefined) {
+      return -1;
+    }
+    if (rightIndex !== undefined) {
+      return 1;
+    }
+    return 0;
+  });
 }
 
 function curateEventMatches(events: AIEventItem[]) {
@@ -382,6 +420,12 @@ function getBookingRequirementConfig(
         label: 'Membership context',
         placeholder: 'Optional: new signup, renewal, or the plan you want help with.',
       };
+    case 'Housing and Property':
+      return {
+        label: 'Project of interest',
+        placeholder:
+          'Optional: suburb, budget, property type, buyer status, or the projects you want to discuss in the consultation.',
+      };
     default:
       return {
         label: 'Extra detail',
@@ -517,6 +561,9 @@ function buildBestForLabel(service: ServiceCatalogItem, userQuery: string) {
   if (tokens.some((tag) => ['membership', 'renewal', 'signup', 'member'].includes(tag))) {
     return 'Best for joining or renewing';
   }
+  if (category.includes('housing') || category.includes('property')) {
+    return 'Best for project discovery and property consultation';
+  }
   if (category.includes('print')) {
     return 'Best for signage, booths, and event branding';
   }
@@ -546,6 +593,13 @@ function buildDecisionBadge(
   if (service.duration_minutes === minDuration && services.length > 1) {
     return 'Fastest option';
   }
+  if (
+    (service.category.toLowerCase().includes('housing') ||
+      service.category.toLowerCase().includes('property')) &&
+    /(housing|property|project|apartment|home|investment)/i.test(userQuery)
+  ) {
+    return 'Project consult';
+  }
   if (service.category.toLowerCase().includes('print') && userQuery.toLowerCase().includes('event')) {
     return 'Event-ready';
   }
@@ -572,6 +626,9 @@ function buildServiceLocationLabel(service: ServiceCatalogItem) {
 }
 
 function buildServiceNextStepLabel(service: ServiceCatalogItem) {
+  if (service.category.toLowerCase().includes('housing') || service.category.toLowerCase().includes('property')) {
+    return 'Book a consultation';
+  }
   if (service.booking_url) {
     return 'Book online now';
   }
@@ -579,7 +636,16 @@ function buildServiceNextStepLabel(service: ServiceCatalogItem) {
 }
 
 function buildServiceConfidenceNotes(service: ServiceCatalogItem) {
-  const notes = [service.booking_url ? 'Direct booking link' : 'Chat booking flow ready'];
+  const isHousing = service.category.toLowerCase().includes('housing') || service.category.toLowerCase().includes('property');
+  const notes = [
+    service.booking_url
+      ? isHousing
+        ? 'Partner consultation link'
+        : 'Direct booking link'
+      : isHousing
+        ? 'Project consult flow ready'
+        : 'Chat booking flow ready',
+  ];
 
   if (service.map_url || service.location || service.venue_name) {
     notes.push('Location details ready');
@@ -590,6 +656,9 @@ function buildServiceConfidenceNotes(service: ServiceCatalogItem) {
 }
 
 function buildBookabilityLabel(service: ServiceCatalogItem) {
+  if (service.category.toLowerCase().includes('housing') || service.category.toLowerCase().includes('property')) {
+    return service.booking_url ? 'Consultation ready' : 'Project consult';
+  }
   if (service.booking_url) {
     return 'Ready to book';
   }
@@ -597,6 +666,29 @@ function buildBookabilityLabel(service: ServiceCatalogItem) {
     return 'Easy to confirm';
   }
   return 'Best for comparing';
+}
+
+function buildReadyToBookSummary(service: ServiceCatalogItem, userQuery: string) {
+  const reasons = [
+    buildBestForLabel(service, userQuery),
+    buildServiceNextStepLabel(service),
+  ];
+
+  if (service.venue_name || service.location) {
+    reasons.push(buildServiceLocationLabel(service));
+  }
+
+  return reasons.filter(Boolean).slice(0, 2).join(' • ');
+}
+
+function buildReadyToBookConfidence(service: ServiceCatalogItem, userQuery: string) {
+  return [
+    formatPrice(service.amount_aud),
+    `${service.duration_minutes} min`,
+    buildBestForLabel(service, userQuery),
+  ]
+    .filter(Boolean)
+    .join(' • ');
 }
 
 function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
@@ -641,11 +733,68 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
   ];
 }
 
+function buildBookingJourneySteps(params: {
+  selectedService: ServiceCatalogItem | null;
+  preferredSlot: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  result: BookingAssistantSessionResponse | null;
+}) {
+  const hasContact =
+    params.customerName.trim().length > 1 &&
+    (params.customerEmail.trim().length > 3 ||
+      params.customerPhone.trim().replace(/\D/g, '').length >= 8);
+  const hasSchedule = Boolean(params.preferredSlot);
+
+  return [
+    {
+      id: 'details',
+      label: 'Details',
+      status: params.selectedService ? 'active' : 'pending',
+    },
+    {
+      id: 'schedule',
+      label: 'Schedule',
+      status: hasContact && hasSchedule ? 'active' : params.selectedService ? 'pending' : 'pending',
+    },
+    {
+      id: 'payment',
+      label: 'Payment',
+      status: params.result ? 'active' : hasContact && hasSchedule ? 'pending' : 'pending',
+    },
+  ] as const;
+}
+
+const productWelcomeSignals = [
+  {
+    label: 'Best-fit search',
+    value: 'Finds the strongest local match from a natural message.',
+  },
+  {
+    label: 'Booking cues',
+    value: 'Shows price, duration, and location before the booking step.',
+  },
+  {
+    label: 'Ready to book',
+    value: 'Moves the chosen result straight into booking and checkout.',
+  },
+];
+
 export function BookingAssistantDialog({
   content,
   isOpen,
   onClose,
+  standalone = false,
+  closeLabel,
+  layoutMode = 'default',
 }: BookingAssistantDialogProps) {
+  const isProductAppLayout = standalone && layoutMode === 'product_app';
+  const standaloneEyebrow = standalone ? 'BookedAI' : 'Start Free Trial';
+  const standaloneTitle = standalone ? 'BookedAI booking assistant' : 'AI booking agent popup';
+  const standaloneDescription = standalone
+    ? 'Search, compare, and continue straight into booking.'
+    : 'Search services, chat by text or voice, then watch BookedAI build the booking outcome live.';
   const [catalog, setCatalog] = useState<BookingAssistantCatalogResponse | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -666,16 +815,36 @@ export function BookingAssistantDialog({
   const [result, setResult] = useState<BookingAssistantSessionResponse | null>(null);
   const [isListening, setIsListening] = useState(false);
   const [voiceError, setVoiceError] = useState('');
-  const [voiceRepliesEnabled, setVoiceRepliesEnabled] = useState(true);
+  const [voiceRepliesEnabled, setVoiceRepliesEnabled] = useState(false);
   const [activeMobilePanel, setActiveMobilePanel] = useState<'chat' | 'booking'>('chat');
   const [selectionAnimationKey, setSelectionAnimationKey] = useState(0);
   const [workflowHandoffKey, setWorkflowHandoffKey] = useState(0);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [messageVisibleCounts, setMessageVisibleCounts] = useState<Record<number, number>>({});
+  const [shortlistVisibleCount, setShortlistVisibleCount] = useState(CHAT_RESULT_BATCH_SIZE);
+  const [liveReadSummary, setLiveReadSummary] = useState<{
+    serviceId: string;
+    availabilityState: string;
+    bookingConfidence: string;
+    recommendedBookingPath: string | null;
+    pathType: string;
+    nextStep: string;
+    paymentAllowedBeforeConfirmation: boolean;
+    warnings: string[];
+  } | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const dialogBodyRef = useRef<HTMLDivElement | null>(null);
   const bookingPanelRef = useRef<HTMLDivElement | null>(null);
+  const bookingScrollRef = useRef<HTMLDivElement | null>(null);
   const customerNameInputRef = useRef<HTMLInputElement | null>(null);
   const minDate = getSydneyToday();
+  const bookingAssistantV1Enabled = isPublicBookingAssistantV1Enabled();
+  const bookingAssistantV1LiveReadEnabled = isPublicBookingAssistantV1LiveReadEnabled();
+  const bookingAssistantV1SessionStartedRef = useRef(false);
+  const bookingAssistantV1SessionIdRef = useRef<string | null>(null);
+  const bookingAssistantV1SessionId =
+    bookingAssistantV1SessionIdRef.current ?? createPublicBookingAssistantSessionId();
+  bookingAssistantV1SessionIdRef.current = bookingAssistantV1SessionId;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -692,6 +861,8 @@ export function BookingAssistantDialog({
         const data = (await response.json()) as BookingAssistantCatalogResponse;
         setCatalog(data);
         setMessages([]);
+        setMessageVisibleCounts({});
+        setShortlistVisibleCount(CHAT_RESULT_BATCH_SIZE);
       } catch (error) {
         if (!controller.signal.aborted) {
           setCatalogError('The live booking assistant is temporarily unavailable.');
@@ -769,6 +940,9 @@ export function BookingAssistantDialog({
 
   useEffect(() => {
     if (!isOpen) {
+      bookingAssistantV1SessionStartedRef.current = false;
+      setMessageVisibleCounts({});
+      setShortlistVisibleCount(CHAT_RESULT_BATCH_SIZE);
       return;
     }
 
@@ -776,7 +950,9 @@ export function BookingAssistantDialog({
     setPreferredSlot((current) => current || buildDefaultPreferredSlot());
 
     const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
+    if (!standalone) {
+      document.body.style.overflow = 'hidden';
+    }
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -786,10 +962,31 @@ export function BookingAssistantDialog({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => {
-      document.body.style.overflow = previousOverflow;
+      if (!standalone) {
+        document.body.style.overflow = previousOverflow;
+      }
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose]);
+  }, [isOpen, onClose, standalone]);
+
+  useEffect(() => {
+    if (
+      !isOpen ||
+      (!bookingAssistantV1Enabled && !bookingAssistantV1LiveReadEnabled) ||
+      bookingAssistantV1SessionStartedRef.current
+    ) {
+      return;
+    }
+
+    bookingAssistantV1SessionStartedRef.current = true;
+    void primePublicBookingAssistantSession({
+      anonymousSessionId: bookingAssistantV1SessionId,
+      sourcePage:
+        typeof window !== 'undefined'
+          ? `${window.location.pathname}${window.location.search}`
+          : '/',
+    });
+  }, [isOpen, bookingAssistantV1Enabled, bookingAssistantV1LiveReadEnabled]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -854,14 +1051,18 @@ export function BookingAssistantDialog({
     }
 
     const timeoutId = window.setTimeout(() => {
-      bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      if (isProductAppLayout) {
+        bookingScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
       if (activeMobilePanel === 'booking') {
         customerNameInputRef.current?.focus();
       }
     }, 120);
 
     return () => window.clearTimeout(timeoutId);
-  }, [selectedServiceId, activeMobilePanel]);
+  }, [selectedServiceId, activeMobilePanel, isProductAppLayout]);
 
   const selectedService = useMemo(
     () =>
@@ -897,6 +1098,10 @@ export function BookingAssistantDialog({
     () => latestSuggestedServices.slice(0, 2),
     [latestSuggestedServices],
   );
+  const visibleLatestSuggestedServices = useMemo(
+    () => latestSuggestedServices.slice(0, shortlistVisibleCount),
+    [latestSuggestedServices, shortlistVisibleCount],
+  );
   const hasConversationStarted = messages.length > 0 || chatLoading;
   const hasFirstSearchResult = useMemo(
     () =>
@@ -909,6 +1114,8 @@ export function BookingAssistantDialog({
     [messages],
   );
   const shouldShowShortcutTopics = !hasConversationStarted && !hasFirstSearchResult;
+  const showProductWelcomeState =
+    isProductAppLayout && !hasConversationStarted && !hasFirstSearchResult;
   const isCompactMobileViewport =
     viewportSize.width > 0 &&
     viewportSize.width < 640 &&
@@ -943,6 +1150,31 @@ export function BookingAssistantDialog({
     [processSteps],
   );
   const progressPercent = Math.round((completedStepCount / processSteps.length) * 100);
+  const hasSelectionReadyForBooking = Boolean(selectedServiceId || selectedEvent);
+  const bookingJourneySteps = useMemo(
+    () =>
+      buildBookingJourneySteps({
+        selectedService,
+        preferredSlot,
+        customerName,
+        customerEmail,
+        customerPhone,
+        result,
+      }),
+    [customerEmail, customerName, customerPhone, preferredSlot, result, selectedService],
+  );
+
+  function focusBookingDetails() {
+    setActiveMobilePanel('booking');
+    window.setTimeout(() => {
+      if (isProductAppLayout) {
+        bookingScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      customerNameInputRef.current?.focus();
+    }, 120);
+  }
 
   async function sendChatMessage(message: string) {
     const trimmedMessage = message.trim();
@@ -962,8 +1194,40 @@ export function BookingAssistantDialog({
     setChatInput('');
     setChatError('');
     setChatLoading(true);
+    setShortlistVisibleCount(CHAT_RESULT_BATCH_SIZE);
 
     try {
+      const liveReadPromise = bookingAssistantV1LiveReadEnabled
+        ? getPublicBookingAssistantLiveReadRecommendation({
+            query: trimmedMessage,
+            sourcePage:
+              typeof window !== 'undefined'
+                ? `${window.location.pathname}${window.location.search}`
+                : '/',
+            locationHint: userGeoContext?.locality ?? null,
+            serviceCategory: selectedService?.category ?? null,
+            selectedServiceId: selectedServiceId || null,
+          })
+        : Promise.resolve({
+            candidateIds: [] as string[],
+            suggestedServiceId: null,
+            trustSummary: null,
+            bookingPathSummary: null,
+            usedLiveRead: false,
+          });
+      const shadowCandidateIdsPromise = bookingAssistantV1Enabled
+        ? shadowPublicBookingAssistantSearch({
+            query: trimmedMessage,
+            sourcePage:
+              typeof window !== 'undefined'
+                ? `${window.location.pathname}${window.location.search}`
+                : '/',
+            locationHint: userGeoContext?.locality ?? null,
+            serviceCategory: selectedService?.category ?? null,
+            selectedServiceId: selectedServiceId || null,
+          })
+        : Promise.resolve([] as string[]);
+
       let payload = await requestChatReply(nextMessages);
       if (
         payload.should_request_location &&
@@ -976,24 +1240,66 @@ export function BookingAssistantDialog({
         }
       }
 
+      const liveRead = await liveReadPromise;
+      const shadowCandidateIds = await shadowCandidateIdsPromise;
+      const v1CandidateIds = liveRead.usedLiveRead ? liveRead.candidateIds : shadowCandidateIds;
+      const shadowMatchedServices = v1CandidateIds
+        .map((candidateId) =>
+          catalog?.services.find((service) => service.id === candidateId) ?? null,
+        )
+        .filter((service): service is ServiceCatalogItem => Boolean(service));
+      const candidatePriorityIds = liveRead.usedLiveRead ? liveRead.candidateIds : shadowCandidateIds;
+      const mergedMatchedServices = curateServiceMatches(
+        [...payload.matched_services, ...shadowMatchedServices],
+        candidatePriorityIds,
+      );
+      const suggestedServiceId = liveRead.usedLiveRead
+        ? liveRead.suggestedServiceId ?? payload.suggested_service_id ?? shadowMatchedServices[0]?.id ?? null
+        : payload.suggested_service_id ?? shadowMatchedServices[0]?.id ?? null;
+
+      const nextAssistantIndex = nextMessages.length;
       setMessages((current) => [
         ...current,
         {
           role: 'assistant',
           content: payload.reply,
-          matchedServices: curateServiceMatches(payload.matched_services),
+          matchedServices: mergedMatchedServices,
           matchedEvents: curateEventMatches(payload.matched_events),
         },
       ]);
+      setMessageVisibleCounts((current) => ({
+        ...current,
+        [nextAssistantIndex]: CHAT_RESULT_BATCH_SIZE,
+      }));
 
       if (!payload.matched_events.length) {
         setSelectedEvent(null);
       }
 
-      if (payload.suggested_service_id) {
-        setSelectedServiceId(payload.suggested_service_id);
+      if (suggestedServiceId) {
+        setSelectedServiceId(suggestedServiceId);
+        if (liveRead.usedLiveRead && liveRead.trustSummary && liveRead.bookingPathSummary) {
+          setLiveReadSummary({
+            serviceId: suggestedServiceId,
+            availabilityState: liveRead.trustSummary.availabilityState,
+            bookingConfidence: liveRead.trustSummary.bookingConfidence,
+            recommendedBookingPath: liveRead.trustSummary.recommendedBookingPath,
+            pathType: liveRead.bookingPathSummary.pathType,
+            nextStep: liveRead.bookingPathSummary.nextStep,
+            paymentAllowedBeforeConfirmation:
+              liveRead.bookingPathSummary.paymentAllowedBeforeConfirmation,
+            warnings: [
+              ...liveRead.trustSummary.warnings,
+              ...liveRead.bookingPathSummary.warnings,
+            ],
+          });
+        } else {
+          setLiveReadSummary(null);
+        }
         setSelectionAnimationKey((current) => current + 1);
         setWorkflowHandoffKey((current) => current + 1);
+      } else {
+        setLiveReadSummary(null);
       }
     } catch (error) {
       const messageText =
@@ -1004,9 +1310,23 @@ export function BookingAssistantDialog({
     }
   }
 
+  function handleShowMoreResults(messageIndex: number) {
+    setMessageVisibleCounts((current) => ({
+      ...current,
+      [messageIndex]: (current[messageIndex] ?? CHAT_RESULT_BATCH_SIZE) + CHAT_RESULT_BATCH_SIZE,
+    }));
+  }
+
+  function handleShowMoreShortlist() {
+    setShortlistVisibleCount((current) => current + CHAT_RESULT_BATCH_SIZE);
+  }
+
   function handleSelectService(serviceId: string) {
     setSelectedServiceId(serviceId);
     setSelectedEvent(null);
+    if (liveReadSummary?.serviceId !== serviceId) {
+      setLiveReadSummary(null);
+    }
     setSubmitError('');
     setResult(null);
     setActiveMobilePanel('booking');
@@ -1057,6 +1377,25 @@ export function BookingAssistantDialog({
     setLoading(true);
     setSubmitError('');
     setResult(null);
+
+    if (bookingAssistantV1Enabled) {
+      void shadowPublicBookingAssistantLeadAndBookingIntent({
+        sourcePage:
+          typeof window !== 'undefined'
+            ? `${window.location.pathname}${window.location.search}`
+            : '/',
+        serviceId: selectedService.id,
+        serviceName: selectedService.name,
+        serviceCategory: selectedService.category,
+        customerName,
+        customerEmail: customerEmail.trim() ? customerEmail.trim().toLowerCase() : null,
+        customerPhone: customerPhone.trim() || null,
+        notes: notes.trim() || null,
+        requestedDate: slot.requestedDate,
+        requestedTime: slot.requestedTime,
+        timezone: 'Australia/Sydney',
+      });
+    }
 
     try {
       const response = await fetch(`${getApiBaseUrl()}/booking-assistant/session`, {
@@ -1141,19 +1480,58 @@ export function BookingAssistantDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50">
-      <button
-        type="button"
-        aria-label="Close booking assistant"
-        onClick={onClose}
-        className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
-      />
+    <div
+      className={
+        standalone
+          ? isProductAppLayout
+            ? 'h-[100dvh] overflow-hidden bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_30%),linear-gradient(180deg,#dbeafe_0%,#eef4ff_18%,#ffffff_100%)]'
+            : 'min-h-screen bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.12),transparent_38%),linear-gradient(180deg,#eef4fb_0%,#f8fafc_28%,#ffffff_100%)]'
+          : 'fixed inset-0 z-50'
+      }
+    >
+      {!standalone ? (
+        <button
+          type="button"
+          aria-label="Close booking assistant"
+          onClick={onClose}
+          className="absolute inset-0 bg-slate-950/45 backdrop-blur-sm"
+        />
+      ) : null}
 
-      <div className="absolute inset-0 mx-auto flex w-full items-end justify-center p-0 sm:items-center sm:p-4 lg:p-6">
-        <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#f8fafc] shadow-[0_35px_120px_rgba(15,23,42,0.35)] sm:h-auto sm:max-h-[96dvh] sm:w-[min(90vw,88rem)] sm:rounded-[2rem] sm:border sm:border-white/20">
+      <div
+        className={
+          standalone
+            ? isProductAppLayout
+              ? 'mx-auto flex h-[100dvh] w-full items-center justify-center overflow-hidden px-0 py-0 sm:px-6 sm:py-6'
+              : 'mx-auto flex min-h-screen w-full items-stretch justify-center p-0 sm:p-4'
+            : 'absolute inset-0 mx-auto flex w-full items-end justify-center p-0 sm:items-center sm:p-4 lg:p-6'
+        }
+      >
+        <div
+          className={`relative flex w-full flex-col overflow-hidden ${
+            standalone
+              ? isProductAppLayout
+                ? 'h-[100dvh] bg-transparent shadow-none sm:h-[min(92dvh,53rem)] sm:w-[min(100%,25.5rem)]'
+                : 'min-h-screen bg-[#f8fafc] shadow-[0_35px_120px_rgba(15,23,42,0.35)] sm:min-h-0 sm:h-[min(96dvh,58rem)] sm:w-[min(94vw,30rem)] sm:rounded-[2rem] sm:border sm:border-white/20'
+              : 'h-[100dvh] bg-[#f8fafc] shadow-[0_35px_120px_rgba(15,23,42,0.35)] sm:h-auto sm:max-h-[96dvh] sm:w-[min(90vw,88rem)] sm:rounded-[2rem] sm:border sm:border-white/20'
+          }`}
+        >
+          <div
+            className={
+              isProductAppLayout
+                ? 'relative mx-auto flex h-full w-full max-w-[25.5rem] flex-col overflow-hidden border border-slate-900/10 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] shadow-[0_35px_120px_rgba(15,23,42,0.24)] sm:rounded-[2.6rem] sm:border-white/40 sm:ring-1 sm:ring-black/5'
+                : 'relative flex min-h-0 flex-1 flex-col'
+            }
+          >
+            {isProductAppLayout ? (
+              <>
+                <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-24 bg-[linear-gradient(180deg,rgba(255,255,255,0.9)_0%,rgba(255,255,255,0)_100%)]" />
+                <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),transparent_58%)]" />
+              </>
+            ) : null}
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),transparent_58%)]"
+            className={isProductAppLayout ? 'hidden' : 'pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),transparent_58%)]'}
           />
           <div
             className={`border-b border-slate-200 bg-white/90 backdrop-blur-xl transition-all ${
@@ -1162,41 +1540,56 @@ export function BookingAssistantDialog({
                   ? 'px-3 py-1.5 sm:px-6 sm:py-3'
                   : 'px-4 py-2 sm:px-6 sm:py-3'
                 : 'px-4 py-3 sm:px-6 sm:py-4'
-            }`}
+            } ${isProductAppLayout ? 'px-3 py-2 sm:px-3 sm:py-2' : ''}`}
           >
-            <div className="flex items-start justify-between gap-3">
+            {isProductAppLayout ? (
+              <div className="mb-1 flex items-center justify-center">
+                <div className="h-1 w-14 rounded-full bg-slate-900/10" />
+              </div>
+            ) : null}
+            <div className={`flex items-center justify-between gap-2 ${isProductAppLayout ? '' : 'items-start'}`}>
               <div className="min-w-0">
-                <div
-                  className={`font-semibold uppercase tracking-[0.18em] text-sky-600 transition-all ${
-                    hasConversationStarted
-                      ? isCompactMobileViewport
-                        ? 'text-[9px] sm:text-sm'
-                        : 'text-[10px] sm:text-sm'
-                      : 'text-[11px] sm:text-sm'
-                  }`}
-                >
-                  Start Free Trial
-                </div>
-                <h2
-                  className={`mt-1 font-bold tracking-tight text-slate-950 transition-all ${
-                    hasConversationStarted
-                      ? 'hidden sm:block sm:text-xl'
-                      : 'text-base sm:text-2xl'
-                  }`}
-                >
-                  AI booking agent popup
-                </h2>
-                <p
-                  className={`mt-1 max-w-2xl text-xs text-slate-500 transition-all sm:text-sm ${
-                    hasConversationStarted ? 'hidden sm:hidden' : 'hidden sm:block'
-                  }`}
-                >
-                  Search services, chat by text or voice, then watch BookedAI build the
-                  booking outcome live.
-                </p>
+                {isProductAppLayout ? (
+                  <div className="flex items-center gap-2">
+                    <div className="h-2 w-2 rounded-full bg-emerald-500" />
+                    <div className="line-clamp-1 text-[11px] font-semibold tracking-tight text-slate-950">
+                      BookedAI
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className={`font-semibold uppercase tracking-[0.18em] text-sky-600 transition-all ${
+                        hasConversationStarted
+                          ? isCompactMobileViewport
+                            ? 'text-[9px] sm:text-sm'
+                            : 'text-[10px] sm:text-sm'
+                          : 'text-[11px] sm:text-sm'
+                      }`}
+                    >
+                      {standaloneEyebrow}
+                    </div>
+                    <h2
+                      className={`mt-1 font-bold tracking-tight text-slate-950 transition-all ${
+                        hasConversationStarted && !isProductAppLayout
+                          ? 'hidden sm:block sm:text-xl'
+                          : 'text-base sm:text-2xl'
+                      }`}
+                    >
+                      {standaloneTitle}
+                    </h2>
+                    <p
+                      className={`mt-1 max-w-2xl text-xs text-slate-500 transition-all sm:text-sm ${
+                        hasConversationStarted && !isProductAppLayout ? 'hidden sm:hidden' : 'hidden sm:block'
+                      }`}
+                    >
+                      {standaloneDescription}
+                    </p>
+                  </>
+                )}
               </div>
 
-              <div className="flex shrink-0 items-center gap-2">
+              <div className="flex shrink-0 items-center gap-1.5">
                 <button
                   type="button"
                   onClick={() => setVoiceRepliesEnabled((current) => !current)}
@@ -1204,45 +1597,65 @@ export function BookingAssistantDialog({
                     voiceRepliesEnabled
                       ? 'bg-emerald-100 text-emerald-800'
                       : 'bg-slate-200 text-slate-600'
-                  }`}
+                  } ${isProductAppLayout ? 'sm:hidden' : ''}`}
                 >
                   Voice replies {voiceRepliesEnabled ? 'On' : 'Off'}
                 </button>
+                {isProductAppLayout ? (
+                  <button
+                    type="button"
+                    aria-label={voiceRepliesEnabled ? 'Voice on' : 'Voice off'}
+                    onClick={() => setVoiceRepliesEnabled((current) => !current)}
+                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                      voiceRepliesEnabled
+                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                        : 'border-slate-200 bg-white text-slate-500'
+                    }`}
+                  >
+                    <span className="text-xs font-semibold">{voiceRepliesEnabled ? 'V' : 'M'}</span>
+                  </button>
+                ) : null}
                 <button
                   type="button"
                   onClick={onClose}
                   className={`rounded-full border border-slate-200 bg-white font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 ${
-                    hasConversationStarted
+                    standalone
+                      ? isProductAppLayout
+                        ? 'h-8 w-8 px-0 py-0 text-[11px]'
+                        : 'px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm'
+                      : hasConversationStarted
                       ? isCompactMobileViewport
                         ? 'px-2 py-1 text-[11px] sm:px-4 sm:py-2 sm:text-sm'
                         : 'px-2.5 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm'
                       : 'px-3 py-2 text-sm sm:px-4'
                   }`}
                 >
-                  {hasConversationStarted ? 'X' : 'Close'}
+                  {isProductAppLayout ? 'x' : closeLabel ?? (standalone ? 'Back' : hasConversationStarted ? 'X' : 'Close')}
                 </button>
               </div>
             </div>
 
             <div
-              className={`flex items-center justify-between gap-3 sm:hidden ${
-                hasConversationStarted
-                  ? isCompactMobileViewport
-                    ? 'mt-1'
-                    : 'mt-1.5'
-                  : 'mt-3'
-              }`}
+              className={`mt-1 flex items-center gap-2 ${
+                isProductAppLayout
+                  ? ''
+                  : `justify-between sm:hidden ${
+                      hasConversationStarted
+                        ? isCompactMobileViewport
+                          ? 'mt-1'
+                          : 'mt-1.5'
+                        : 'mt-3'
+                    }`
+              } ${isProductAppLayout ? '' : ''}`}
             >
               <button
                 type="button"
                 onClick={() => setVoiceRepliesEnabled((current) => !current)}
-                className={`rounded-full font-semibold transition ${
-                  hasConversationStarted
-                    ? isCompactMobileViewport
-                      ? 'px-2 py-1 text-[10px]'
-                      : 'px-2.5 py-1.5 text-[11px]'
-                    : 'px-3 py-2 text-xs'
-                } ${
+                className={`rounded-full font-semibold transition ${isProductAppLayout ? 'hidden' : hasConversationStarted
+                  ? isCompactMobileViewport
+                    ? 'px-2 py-1 text-[10px]'
+                    : 'px-2.5 py-1.5 text-[11px]'
+                  : 'px-3 py-2 text-xs'} ${
                   voiceRepliesEnabled
                     ? 'bg-emerald-100 text-emerald-800'
                     : 'bg-slate-200 text-slate-600'
@@ -1254,24 +1667,20 @@ export function BookingAssistantDialog({
               </button>
 
               <div
-                className={`grid flex-1 grid-cols-2 rounded-full bg-slate-100 ${
-                  hasConversationStarted
-                    ? isCompactMobileViewport
-                      ? 'p-[2px]'
-                      : 'p-0.5'
-                    : 'p-1'
-                }`}
+                className={`grid flex-1 grid-cols-2 rounded-full bg-slate-100 ${isProductAppLayout ? 'p-[2px]' : hasConversationStarted
+                  ? isCompactMobileViewport
+                    ? 'p-[2px]'
+                    : 'p-0.5'
+                  : 'p-1'}`}
               >
                 <button
                   type="button"
                   onClick={() => setActiveMobilePanel('chat')}
-                  className={`rounded-full font-semibold transition ${
-                    hasConversationStarted
-                      ? isCompactMobileViewport
-                        ? 'px-2.5 py-1 text-[10px]'
-                        : 'px-3 py-1.5 text-[11px]'
-                      : 'px-3 py-2 text-xs'
-                  } ${
+                  className={`rounded-full font-semibold transition ${isProductAppLayout ? 'px-2.5 py-1 text-[10px]' : hasConversationStarted
+                    ? isCompactMobileViewport
+                      ? 'px-2.5 py-1 text-[10px]'
+                      : 'px-3 py-1.5 text-[11px]'
+                    : 'px-3 py-2 text-xs'} ${
                     activeMobilePanel === 'chat'
                       ? 'bg-slate-950 text-white'
                       : 'text-slate-600'
@@ -1282,28 +1691,49 @@ export function BookingAssistantDialog({
                 <button
                   type="button"
                   onClick={() => setActiveMobilePanel('booking')}
-                  className={`rounded-full font-semibold transition ${
-                    hasConversationStarted
-                      ? isCompactMobileViewport
-                        ? 'px-2.5 py-1 text-[10px]'
-                        : 'px-3 py-1.5 text-[11px]'
-                      : 'px-3 py-2 text-xs'
-                  } ${
+                  className={`relative rounded-full font-semibold transition ${isProductAppLayout ? 'px-2.5 py-1 text-[10px]' : hasConversationStarted
+                    ? isCompactMobileViewport
+                      ? 'px-2.5 py-1 text-[10px]'
+                      : 'px-3 py-1.5 text-[11px]'
+                    : 'px-3 py-2 text-xs'} ${
                     activeMobilePanel === 'booking'
                       ? 'bg-slate-950 text-white'
                       : 'text-slate-600'
                   }`}
                 >
                   Booking
+                  {isProductAppLayout && hasSelectionReadyForBooking ? (
+                    <span
+                      className={`ml-1 inline-flex min-w-4 items-center justify-center rounded-full px-1 py-0.5 text-[9px] font-semibold ${
+                        activeMobilePanel === 'booking'
+                          ? 'bg-white/15 text-white'
+                          : 'bg-emerald-100 text-emerald-700'
+                      }`}
+                    >
+                      1
+                    </span>
+                  ) : null}
                 </button>
               </div>
             </div>
           </div>
 
-          <div className="grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.45fr)_minmax(22rem,0.7fr)]">
+          <div
+            className={
+              isProductAppLayout
+                ? 'flex min-h-0 flex-1 flex-col'
+                : 'grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.45fr)_minmax(22rem,0.7fr)]'
+            }
+          >
             <div
-              className={`min-h-0 flex-col border-b border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] lg:flex lg:border-b-0 lg:border-r ${
-                activeMobilePanel === 'chat' ? 'flex' : 'hidden'
+              className={`min-h-0 flex-col bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] ${
+                isProductAppLayout
+                  ? activeMobilePanel === 'chat'
+                    ? 'flex flex-1'
+                    : 'hidden'
+                  : `border-b border-slate-200 lg:flex lg:border-b-0 lg:border-r ${
+                      activeMobilePanel === 'chat' ? 'flex' : 'hidden'
+                    }`
               }`}
             >
               <div
@@ -1313,7 +1743,7 @@ export function BookingAssistantDialog({
                       ? 'py-1.5 sm:py-2.5'
                       : 'py-2 sm:py-2.5'
                     : 'py-3 sm:py-4'
-                }`}
+                } ${isProductAppLayout ? 'hidden' : ''}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="min-w-0">
@@ -1326,13 +1756,17 @@ export function BookingAssistantDialog({
                           : 'text-sm'
                       }`}
                     >
-                      Live service search
+                      {standalone ? 'Chat with BookedAI' : 'Live service search'}
                     </div>
                     {!hasConversationStarted ? (
                       <div className="mt-1 text-xs text-slate-500">
                         {catalogError
                           ? 'Assistant offline'
-                          : 'Assistant online and ready for any booking request'}
+                          : standalone
+                            ? isProductAppLayout
+                              ? 'Ask naturally and let BookedAI rank the strongest result for immediate booking.'
+                              : 'Choose a vertical below or ask naturally like a real customer.'
+                            : 'Assistant online and ready for any booking request'}
                       </div>
                     ) : (
                       <div
@@ -1360,13 +1794,15 @@ export function BookingAssistantDialog({
                 </div>
 
                 {shouldShowShortcutTopics ? (
-                  <div className="mt-3 flex gap-2 overflow-x-auto pb-1">
+                  <div className={`flex gap-2 overflow-x-auto pb-1 ${isProductAppLayout ? 'mt-2' : 'mt-3'}`}>
                     {popupShortcutTopics.map((topic) => (
                       <button
                         key={topic.label}
                         type="button"
                         onClick={() => void sendChatMessage(topic.prompt)}
-                        className="shrink-0 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100"
+                        className={`shrink-0 rounded-full border border-slate-200 bg-white font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-100 ${
+                          isProductAppLayout ? 'px-2.5 py-1.5 text-[11px]' : 'px-3 py-2 text-xs'
+                        }`}
                       >
                         {topic.label}
                       </button>
@@ -1383,8 +1819,88 @@ export function BookingAssistantDialog({
                       ? 'py-2 sm:py-5'
                       : 'py-2.5 sm:py-5'
                     : 'py-3 sm:py-5'
+                } ${isProductAppLayout ? 'px-4 py-4 sm:px-5' : ''} ${
+                  showProductWelcomeState ? 'flex flex-col justify-center space-y-5' : ''
                 }`}
               >
+                {showProductWelcomeState ? (
+                  <div className="space-y-4">
+                    <div className="overflow-hidden rounded-[2rem] border border-slate-200 bg-[linear-gradient(155deg,#0f172a_0%,#111827_38%,#1d4ed8_100%)] p-5 text-white shadow-[0_24px_70px_rgba(15,23,42,0.24)]">
+                      <div className="inline-flex items-center rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-100">
+                        Mobile booking search
+                      </div>
+                      <div className="mt-3 text-[1.35rem] font-semibold leading-8 tracking-tight">
+                        Search naturally. See the best result. Continue straight into booking.
+                      </div>
+                      <p className="mt-2 max-w-xs text-[12px] leading-5 text-slate-200">
+                        BookedAI turns one customer-style message into a clear shortlist with booking-ready details.
+                      </p>
+
+                      <div className="mt-4 grid gap-2">
+                        <div className="ml-auto max-w-[82%] rounded-[1.35rem] rounded-br-md bg-white px-3 py-2 text-[12px] font-medium leading-5 text-slate-900 shadow-sm">
+                          Find the best swim lesson near Caringbah for my 7-year-old this weekend.
+                        </div>
+                        <div className="max-w-[88%] rounded-[1.35rem] rounded-bl-md bg-white/10 px-3 py-3 text-[12px] leading-5 text-slate-100 ring-1 ring-white/10 backdrop-blur">
+                          Ranked a best-fit option with price, duration, location, and a ready-to-book next step.
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid grid-cols-3 gap-2">
+                        {productWelcomeSignals.map((signal) => (
+                          <div
+                            key={signal.label}
+                            className="rounded-[1.1rem] bg-white/10 px-3 py-3 ring-1 ring-white/10 backdrop-blur"
+                          >
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-100">
+                              {signal.label}
+                            </div>
+                            <div className="mt-1 text-[11px] leading-4 text-slate-100">
+                              {signal.value}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            Try a real search
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-slate-950">
+                            Start with one tap or type your own request below.
+                          </div>
+                        </div>
+                        <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                          Search first
+                        </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2">
+                        {popupShortcutTopics.map((topic) => (
+                          <button
+                            key={`welcome-${topic.label}`}
+                            type="button"
+                            onClick={() => void sendChatMessage(topic.prompt)}
+                            className="rounded-[1.2rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 py-3 text-left transition hover:border-slate-300 hover:shadow-[0_10px_26px_rgba(15,23,42,0.08)]"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-sm font-semibold text-slate-950">{topic.label}</div>
+                              <div className="rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
+                                Search
+                              </div>
+                            </div>
+                            <div className="mt-2 line-clamp-3 text-[11px] leading-4 text-slate-500">
+                              {topic.prompt}
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
                 {messages.map((message, index) => (
                   <div key={`${message.role}-${index}`} className="space-y-3">
                     <div
@@ -1397,22 +1913,23 @@ export function BookingAssistantDialog({
                           message.role === 'user'
                             ? 'rounded-br-md bg-slate-950 text-white'
                             : 'rounded-bl-md border border-slate-200 bg-white text-slate-700'
-                        }`}
+                        } ${isProductAppLayout ? 'px-3 py-2.5 text-[13px] leading-5' : ''}`}
                       >
                         {message.content}
                       </div>
                     </div>
 
                     {message.role === 'assistant' && message.matchedServices?.length ? (
-                      <div className="grid gap-3">
-                        {message.matchedServices.map((service, index) => {
+                      <div className="grid gap-2.5">
+                        {message.matchedServices
+                          .slice(0, messageVisibleCounts[index] ?? CHAT_RESULT_BATCH_SIZE)
+                          .map((service, resultIndex) => {
                           const isSelected = service.id === selectedServiceId;
                           const serviceImageUrl = extractServiceImageUrl(service);
-                          const fitNotes = buildServiceFitNotes(service);
                           const decisionBadge = buildDecisionBadge(
                             service,
                             message.matchedServices ?? [],
-                            index,
+                            resultIndex,
                             latestCustomerRequirement,
                           );
                           const bestForLabel = buildBestForLabel(service, latestCustomerRequirement);
@@ -1423,19 +1940,33 @@ export function BookingAssistantDialog({
                               onClick={() => {
                                 handleSelectService(service.id);
                               }}
-                          className={`overflow-hidden rounded-[1.5rem] border text-left transition ${
+                          className={`overflow-hidden rounded-[1.35rem] border text-left transition ${
                                 isSelected
                                   ? 'booking-card-picked border-slate-950 bg-slate-950 text-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]'
                                   : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)]'
                               }`}
                             >
-                              <div className="p-4">
-                                <div className="flex min-w-0 items-start justify-between gap-4">
+                              <div className={`${isProductAppLayout ? 'p-3.5' : 'p-4'}`}>
+                                <div className={`-mx-4 -mt-4 mb-3 flex items-center justify-between px-4 py-2.5 ${
+                                  isSelected
+                                    ? 'bg-white/8'
+                                    : 'bg-[linear-gradient(90deg,#eff6ff_0%,#f8fafc_100%)]'
+                                }`}>
+                                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Ranked result
+                                  </div>
+                                  <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                                    isSelected ? 'bg-white text-slate-950' : 'bg-emerald-100 text-emerald-700'
+                                  }`}>
+                                    {resultIndex === 0 ? 'Top match' : 'Trusted fit'}
+                                  </div>
+                                </div>
+                                <div className="flex min-w-0 items-start justify-between gap-3">
                                   <div className="flex min-w-0 gap-3">
                                     {serviceImageUrl ? (
                                       <div
-                                        className={`relative hidden h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] border sm:block ${
-                                          isSelected ? 'border-white/10 bg-white/10' : 'border-slate-200 bg-slate-100'
+                                        className={`relative h-14 w-14 shrink-0 overflow-hidden rounded-[1rem] border shadow-sm ${
+                                          isSelected ? 'border-white/10 bg-white/10 ring-1 ring-white/10' : 'border-slate-200 bg-slate-100'
                                         }`}
                                       >
                                         <img
@@ -1444,39 +1975,38 @@ export function BookingAssistantDialog({
                                           className="h-full w-full object-cover"
                                           loading="lazy"
                                         />
-                                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-white">
-                                          {getServiceVisualLabel(service)}
-                                        </div>
                                       </div>
                                     ) : null}
                                     <div className="min-w-0">
-                                    <div className="flex flex-wrap items-center gap-2">
-                                      <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                                        isSelected ? 'bg-white text-slate-950' : 'bg-emerald-50 text-emerald-700'
-                                      }`}>
-                                        {decisionBadge}
+                                      <div className="flex flex-wrap items-center gap-1.5">
+                                        <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                          isSelected ? 'bg-white text-slate-950' : 'bg-emerald-50 text-emerald-700'
+                                        }`}>
+                                          {decisionBadge}
+                                        </div>
+                                        <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                          isSelected ? 'bg-white/10 text-white' : 'bg-sky-50 text-sky-700'
+                                        }`}>
+                                          {service.category}
+                                        </div>
+                                        <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                          isSelected ? 'bg-emerald-300 text-slate-950' : 'bg-emerald-50 text-emerald-700'
+                                        }`}>
+                                          {buildBookabilityLabel(service)}
+                                        </div>
                                       </div>
-                                  <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                                        isSelected ? 'bg-white/10 text-white' : 'bg-sky-50 text-sky-700'
-                                      }`}>
-                                        {service.category}
+                                      <div className="mt-1.5 line-clamp-1 text-[15px] font-semibold leading-5">
+                                        {service.name}
                                       </div>
-                                      <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                                        isSelected ? 'bg-emerald-300 text-slate-950' : 'bg-emerald-50 text-emerald-700'
-                                      }`}>
-                                        {buildBookabilityLabel(service)}
+                                      <div className={`mt-1 line-clamp-1 text-[11px] leading-4 ${isSelected ? 'text-white/60' : 'text-slate-500'}`}>
+                                        {buildServiceLocationLabel(service)}
                                       </div>
-                                    </div>
-                                    <div className="mt-2 text-base font-semibold">
-                                      {service.name}
-                                    </div>
-                                    <div className={`mt-1 text-[11px] leading-5 ${isSelected ? 'text-white/60' : 'text-slate-500'}`}>
-                                      {buildServiceLocationLabel(service)}
                                     </div>
                                   </div>
-                                  </div>
-                                  <div className="text-right">
-                                    <div className="text-base font-semibold">
+                                  <div className="shrink-0 text-right">
+                                    <div className={`inline-flex rounded-full px-3 py-1.5 text-[13px] font-semibold ${
+                                      isSelected ? 'bg-white text-slate-950' : 'bg-slate-950 text-white'
+                                    }`}>
                                       {formatPrice(service.amount_aud)}
                                     </div>
                                     <div className={`mt-1 text-[11px] ${isSelected ? 'text-white/60' : 'text-slate-500'}`}>
@@ -1484,36 +2014,16 @@ export function BookingAssistantDialog({
                                     </div>
                                   </div>
                                 </div>
-                                <p
-                                  className={`mt-3 text-sm leading-6 ${
-                                    isSelected ? 'text-white/80' : 'text-slate-600'
-                                  }`}
-                                >
-                                  {service.summary}
-                                </p>
-                                <div className={`mt-3 rounded-2xl px-3 py-2 text-xs ${
+                                <div className={`mt-2.5 rounded-2xl px-3 py-2 text-[11px] ${
                                   isSelected ? 'bg-white/10 text-white/85' : 'bg-amber-50 text-amber-900'
                                 }`}>
                                   <span className="font-semibold">Why it matches:</span> {bestForLabel}
                                 </div>
-                                <div className="mt-3 flex flex-wrap gap-2">
-                                  {fitNotes.map((note) => (
-                                    <div
-                                      key={`${service.id}-${note}`}
-                                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                                        isSelected ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-700'
-                                      }`}
-                                    >
-                                      {note}
-                                    </div>
-                                  ))}
-                                </div>
-                                <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-3">
                                   {[
                                     { label: 'Price', value: formatPrice(service.amount_aud) },
                                     { label: 'Duration', value: `${service.duration_minutes} min` },
                                     { label: 'Location', value: buildServiceLocationLabel(service) },
-                                    { label: 'Next step', value: buildServiceNextStepLabel(service) },
                                   ].map((fact) => (
                                     <div
                                       key={`${service.id}-${fact.label}`}
@@ -1524,32 +2034,13 @@ export function BookingAssistantDialog({
                                       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
                                         {fact.label}
                                       </div>
-                                      <div className="mt-1 text-xs leading-5 font-medium">
+                                      <div className="mt-1 line-clamp-2 text-[11px] leading-4 font-medium">
                                         {fact.value}
                                       </div>
                                     </div>
                                   ))}
                                 </div>
                                 <div className="mt-3 flex flex-wrap gap-2">
-                                  {buildServiceConfidenceNotes(service).map((note) => (
-                                    <div
-                                      key={`${service.id}-confidence-${note}`}
-                                      className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                                        isSelected ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-700'
-                                      }`}
-                                    >
-                                      {note}
-                                    </div>
-                                  ))}
-                                </div>
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                  <div
-                                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${
-                                      isSelected ? 'bg-white text-slate-950' : 'bg-slate-950 text-white'
-                                    }`}
-                                  >
-                                    {isSelected ? 'Chosen for booking' : 'Choose this option'}
-                                  </div>
                                   {service.map_url ? (
                                     <a
                                       href={service.map_url}
@@ -1576,18 +2067,50 @@ export function BookingAssistantDialog({
                                       Book now
                                     </a>
                                   ) : null}
-                                  <div
-                                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${
-                                      isSelected ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-700'
-                                    }`}
-                                  >
-                                    {buildBookabilityLabel(service)}
+                                </div>
+                                <div className={`mt-3 rounded-[1.1rem] px-3 py-2.5 ${
+                                  isSelected ? 'bg-white/10' : 'bg-slate-50'
+                                }`}>
+                                  <div className="flex items-center justify-between gap-3">
+                                    <div className="min-w-0">
+                                      <div className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                        isSelected ? 'text-white/60' : 'text-slate-500'
+                                      }`}>
+                                        Next action
+                                      </div>
+                                      <div className={`mt-1 text-[11px] font-medium ${
+                                        isSelected ? 'text-white' : 'text-slate-700'
+                                      }`}>
+                                        {isSelected
+                                          ? 'Booking is ready below.'
+                                          : 'Select this match and continue into booking.'}
+                                      </div>
+                                    </div>
+                                    <div
+                                      className={`shrink-0 rounded-full px-3 py-2 text-[11px] font-semibold ${
+                                        isSelected ? 'bg-white text-slate-950' : 'bg-slate-950 text-white shadow-sm'
+                                      }`}
+                                    >
+                                      {isSelected ? 'Booking open' : 'Choose and book'}
+                                    </div>
                                   </div>
                                 </div>
                               </div>
                             </button>
                           );
                         })}
+                        {message.matchedServices.length >
+                        (messageVisibleCounts[index] ?? CHAT_RESULT_BATCH_SIZE) ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              handleShowMoreResults(index);
+                            }}
+                            className="rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                          >
+                            See more results
+                          </button>
+                        ) : null}
                       </div>
                     ) : null}
 
@@ -1699,37 +2222,49 @@ export function BookingAssistantDialog({
                 ) : null}
               </div>
 
-              <div className="border-t border-slate-200 bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-6 sm:py-4">
+              <div
+                className={`border-t border-slate-200 bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-6 sm:py-4 ${
+                  isProductAppLayout ? 'sticky bottom-0 z-10 px-4 sm:px-5' : ''
+                }`}
+              >
                 <form onSubmit={handleChatSubmit}>
                   <label className="sr-only" htmlFor="assistant-chat-input">
                     Ask the booking assistant
                   </label>
-                  <div className="flex flex-col gap-3 sm:flex-row">
+                  <div className={`flex gap-2 ${isProductAppLayout ? 'items-center' : 'flex-col sm:flex-row sm:gap-3'}`}>
                     <input
                       id="assistant-chat-input"
                       type="text"
                       value={chatInput}
                       onChange={(event) => setChatInput(event.target.value)}
-                      placeholder={content.searchPlaceholder}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+                      placeholder={
+                        showProductWelcomeState
+                          ? 'Try: best swim lesson near Caringbah this weekend'
+                          : content.searchPlaceholder
+                      }
+                      className={`w-full rounded-2xl border border-slate-200 bg-white text-slate-700 outline-none transition focus:border-slate-400 ${
+                        isProductAppLayout ? 'px-3 py-2.5 text-[13px]' : 'px-4 py-3 text-sm'
+                      }`}
                     />
                     <button
                       type="button"
                       onClick={toggleVoiceCapture}
-                      className={`w-full rounded-full px-5 py-3 text-sm font-semibold transition sm:w-auto ${
+                      className={`rounded-full font-semibold transition ${
                         isListening
                           ? 'booking-listening bg-rose-600 text-white hover:bg-rose-500'
                           : 'border border-black/10 bg-white text-slate-700 hover:border-black/15 hover:bg-slate-50'
-                      }`}
+                      } ${isProductAppLayout ? 'h-10 w-10 shrink-0 px-0 py-0 text-[11px]' : 'w-full px-5 py-3 text-sm sm:w-auto'}`}
                     >
-                      {isListening ? 'Listening...' : 'Talk'}
+                      {isProductAppLayout ? (isListening ? 'On' : 'Mic') : isListening ? 'Listening...' : 'Talk'}
                     </button>
                     <button
                       type="submit"
                       disabled={chatLoading || !chatInput.trim()}
-                      className="w-full rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+                      className={`rounded-full bg-slate-950 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isProductAppLayout ? 'h-10 shrink-0 px-4 py-0 text-[11px]' : 'w-full px-5 py-3 text-sm sm:w-auto'
+                      }`}
                     >
-                      Send
+                      {isProductAppLayout ? 'Go' : 'Send'}
                     </button>
                   </div>
                 </form>
@@ -1753,10 +2288,62 @@ export function BookingAssistantDialog({
             </div>
 
             <div
-              className={`min-h-0 overflow-y-auto overscroll-contain bg-[#f8fafc] px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-6 sm:py-5 lg:block ${
-                activeMobilePanel === 'booking' ? 'block' : 'hidden'
+              ref={bookingScrollRef}
+              className={`min-h-0 overflow-y-auto overscroll-contain bg-[#f8fafc] px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-6 sm:py-5 ${
+                isProductAppLayout
+                  ? activeMobilePanel === 'booking'
+                    ? 'block flex-1'
+                    : 'hidden'
+                  : `lg:block ${activeMobilePanel === 'booking' ? 'block' : 'hidden'}`
               }`}
             >
+              {isProductAppLayout ? (
+                <div className="mb-4 rounded-[1.5rem] border border-slate-200 bg-white/90 p-4 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        Booking flow
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-slate-950">
+                        {hasSelectionReadyForBooking
+                          ? 'Your selection is ready to continue.'
+                          : 'Choose a result from chat to unlock booking.'}
+                      </div>
+                    </div>
+                    <div className={`rounded-full px-3 py-1 text-[11px] font-semibold ${
+                      hasSelectionReadyForBooking
+                        ? 'bg-emerald-50 text-emerald-700'
+                        : 'bg-slate-100 text-slate-500'
+                    }`}>
+                      {hasSelectionReadyForBooking ? 'Ready' : 'Waiting'}
+                    </div>
+                  </div>
+                  <div className="mt-3 text-xs leading-5 text-slate-500">
+                    BookedAI moves from selected result to contact details, scheduling, and payment in one flow.
+                  </div>
+                  <div className="mt-4 grid grid-cols-3 gap-2">
+                    {bookingJourneySteps.map((step, index) => (
+                      <div
+                        key={step.id}
+                        className={`rounded-2xl border px-3 py-3 text-center ${
+                          step.status === 'active'
+                            ? 'border-slate-950 bg-slate-950 text-white'
+                            : 'border-slate-200 bg-white text-slate-600'
+                        }`}
+                      >
+                        <div className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold ${
+                          step.status === 'active'
+                            ? 'bg-white text-slate-950'
+                            : 'bg-slate-100 text-slate-600'
+                        }`}>
+                          {index + 1}
+                        </div>
+                        <div className="mt-2 text-[11px] font-semibold">{step.label}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               <div
                 key={`workflow-panel-${selectedServiceId || selectedEvent?.url || 'idle'}-${workflowHandoffKey}`}
                 className="booking-handoff rounded-[1.75rem] border border-slate-200 bg-white p-5"
@@ -1868,20 +2455,52 @@ export function BookingAssistantDialog({
                 ref={bookingPanelRef}
                 className="booking-focus-in mt-5 rounded-[1.75rem] border border-slate-200 bg-white p-5"
               >
-                <div className="text-sm font-semibold text-slate-950">
-                  Best-fit shortlist
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="text-sm font-semibold text-slate-950">
+                      Best-fit shortlist
+                    </div>
+                    <div className="mt-2 text-sm text-slate-500">
+                      {selectedService
+                        ? `${selectedService.name} is currently selected. Review the shortlist below, then continue to booking when you are ready.`
+                        : 'Review the top matched options below. BookedAI keeps the strongest shortlist visible so users can compare before they book.'}
+                    </div>
+                  </div>
+                  {latestSuggestedServices.length > CHAT_RESULT_BATCH_SIZE ? (
+                    <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                      Showing {Math.min(shortlistVisibleCount, latestSuggestedServices.length)} of {latestSuggestedServices.length}
+                    </div>
+                  ) : null}
                 </div>
-                <div className="mt-2 text-sm text-slate-500">
-                  {selectedService
-                    ? `${selectedService.name} is currently selected. Review the shortlist below, then continue to booking when you are ready.`
-                    : 'Review the top matched options below. BookedAI keeps the strongest shortlist visible so users can compare before they book.'}
-                </div>
+                {selectedService && isProductAppLayout ? (
+                  <div className="mt-4 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 p-4">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                          Selected for booking
+                        </div>
+                        <div className="mt-1 text-sm font-semibold text-emerald-950">
+                          {selectedService.name}
+                        </div>
+                        <div className="mt-1 text-[11px] text-emerald-800">
+                          {buildReadyToBookConfidence(selectedService, latestCustomerRequirement)}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={focusBookingDetails}
+                        className="rounded-full bg-slate-950 px-3 py-2 text-[11px] font-semibold text-white"
+                      >
+                        Continue
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
 
                 {latestSuggestedServices.length ? (
                   <div className="mt-4 grid gap-3">
-                    {latestSuggestedServices.map((service, index) => {
+                    {visibleLatestSuggestedServices.map((service, index) => {
                       const isSelected = service.id === selectedServiceId;
-                      const fitNotes = buildServiceFitNotes(service);
                       const decisionBadge = buildDecisionBadge(
                         service,
                         latestSuggestedServices,
@@ -1937,24 +2556,11 @@ export function BookingAssistantDialog({
                               }`}>
                                 <span className="font-semibold">Why it matches:</span> {bestForLabel}
                               </div>
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {fitNotes.map((note) => (
-                                  <div
-                                    key={`${service.id}-${note}`}
-                                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                                      isSelected ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-700'
-                                    }`}
-                                  >
-                                    {note}
-                                  </div>
-                                ))}
-                              </div>
-                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                              <div className="mt-3 grid gap-2 sm:grid-cols-3">
                                 {[
                                   { label: 'Price', value: formatPrice(service.amount_aud) },
                                   { label: 'Duration', value: `${service.duration_minutes} min` },
                                   { label: 'Location', value: buildServiceLocationLabel(service) },
-                                  { label: 'Next step', value: buildServiceNextStepLabel(service) },
                                 ].map((fact) => (
                                   <div
                                     key={`${service.id}-shortlist-${fact.label}`}
@@ -1972,7 +2578,7 @@ export function BookingAssistantDialog({
                                 ))}
                               </div>
                               <div className="mt-3 flex flex-wrap gap-2">
-                                {buildServiceConfidenceNotes(service).map((note) => (
+                                {buildServiceConfidenceNotes(service).slice(0, 2).map((note) => (
                                   <div
                                     key={`${service.id}-shortlist-confidence-${note}`}
                                     className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
@@ -1996,6 +2602,15 @@ export function BookingAssistantDialog({
                         </button>
                       );
                     })}
+                    {latestSuggestedServices.length > shortlistVisibleCount ? (
+                      <button
+                        type="button"
+                        onClick={handleShowMoreShortlist}
+                        className="rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                      >
+                        See more results
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
 
@@ -2066,6 +2681,88 @@ export function BookingAssistantDialog({
                       </div>
                     </div>
                   ) : null}
+                  {selectedService && isProductAppLayout ? (
+                    <div className="mt-3 rounded-[1.35rem] border border-slate-200 bg-[#fbfbfd] p-4">
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                            Ready to book
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-slate-950">
+                            {selectedService.name}
+                          </div>
+                          <div className="mt-1 text-[11px] leading-5 text-slate-500">
+                            {buildReadyToBookSummary(selectedService, latestCustomerRequirement)}
+                          </div>
+                        </div>
+                          <div className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold text-emerald-700">
+                            {buildBookabilityLabel(selectedService)}
+                          </div>
+                      </div>
+
+                      <div className="mt-3 grid grid-cols-2 gap-2 xl:grid-cols-4">
+                        <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Price
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-slate-950">
+                            {formatPrice(selectedService.amount_aud)}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Duration
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-slate-950">
+                            {selectedService.duration_minutes} min
+                          </div>
+                        </div>
+                        <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Location
+                          </div>
+                          <div className="mt-1 text-[11px] font-medium leading-4 text-slate-700">
+                            {buildServiceLocationLabel(selectedService)}
+                          </div>
+                        </div>
+                        <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Best for
+                          </div>
+                          <div className="mt-1 text-[11px] font-medium leading-4 text-slate-700">
+                            {buildBestForLabel(selectedService, latestCustomerRequirement)}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : null}
+                  {selectedService && liveReadSummary?.serviceId === selectedService.id ? (
+                    <div className="mt-3 rounded-[1.25rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
+                      <div className="font-semibold">Prompt 5 live-read guidance</div>
+                      <div className="mt-1 text-xs text-sky-800">
+                        Availability: {liveReadSummary.availabilityState} • Confidence:{' '}
+                        {liveReadSummary.bookingConfidence}
+                      </div>
+                      <div className="mt-2 text-xs text-sky-800">
+                        Recommended path: {liveReadSummary.recommendedBookingPath ?? 'Not set'} •
+                        CTA path: {liveReadSummary.pathType}
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-sky-900">
+                        {liveReadSummary.nextStep}
+                      </p>
+                      <p className="mt-2 text-xs text-sky-800">
+                        Payment before confirmation:{' '}
+                        {liveReadSummary.paymentAllowedBeforeConfirmation ? 'Allowed' : 'Blocked'}
+                      </p>
+                      {liveReadSummary.warnings.length > 0 ? (
+                        <div className="mt-2 space-y-1 text-xs text-sky-800">
+                          {Array.from(new Set(liveReadSummary.warnings)).map((warning) => (
+                            <p key={warning}>{warning}</p>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {selectedEvent ? (
                     <div className="mt-3 rounded-[1.25rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -2093,6 +2790,35 @@ export function BookingAssistantDialog({
                     </div>
                   ) : null}
                 </div>
+
+                {isProductAppLayout ? (
+                  <div className="rounded-[1.25rem] border border-slate-200 bg-[#fbfbfd] p-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Booking journey
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2">
+                      {bookingJourneySteps.map((step, index) => (
+                        <div
+                          key={`journey-${step.id}`}
+                          className={`rounded-2xl px-3 py-3 text-center ${
+                            step.status === 'active'
+                              ? 'bg-slate-950 text-white'
+                              : 'bg-white text-slate-600 ring-1 ring-slate-200'
+                          }`}
+                        >
+                          <div className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold ${
+                            step.status === 'active'
+                              ? 'bg-white text-slate-950'
+                              : 'bg-slate-100 text-slate-600'
+                          }`}>
+                            {index + 1}
+                          </div>
+                          <div className="mt-2 text-[11px] font-semibold">{step.label}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block text-sm text-slate-600">
@@ -2174,72 +2900,142 @@ export function BookingAssistantDialog({
                 >
                   {loading ? 'Preparing your booking...' : content.submitLabel}
                 </button>
+
+                {isProductAppLayout && selectedService && !result ? (
+                  <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-1 border-t border-slate-200 bg-white/92 px-5 py-2.5 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] backdrop-blur">
+                    <div className="rounded-[1.15rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 py-2.5 shadow-[0_10px_22px_rgba(15,23,42,0.06)]">
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                            Ready to book
+                          </div>
+                          <div className="mt-0.5 line-clamp-1 text-[13px] font-semibold text-slate-950">
+                            {selectedService.name}
+                          </div>
+                          <div className="mt-0.5 line-clamp-1 text-[10px] leading-4 text-slate-500">
+                            {formatPrice(selectedService.amount_aud)} • {selectedService.duration_minutes} min • {buildBestForLabel(selectedService, latestCustomerRequirement)}
+                          </div>
+                        </div>
+                        <button
+                          type="submit"
+                          disabled={loading || !selectedService}
+                          className="shrink-0 rounded-full bg-slate-950 px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {loading ? 'Preparing...' : 'Book now'}
+                        </button>
+                      </div>
+
+                      <div className="mt-1.5 flex items-center justify-between gap-2">
+                        <div className="min-w-0 line-clamp-1 text-[10px] leading-4 text-slate-500">
+                          {buildServiceLocationLabel(selectedService)}
+                        </div>
+                        <div className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-semibold text-emerald-700">
+                          {buildBookabilityLabel(selectedService)}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
               </form>
 
               {result ? (
-                <div className="mt-5 rounded-[1.75rem] border border-slate-200 bg-white p-5">
-                  <div className="flex flex-wrap items-start justify-between gap-4">
-                    <div>
-                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                        Booking reference
+                <div className="mt-5 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)]">
+                  <div className="overflow-hidden rounded-[1.5rem] bg-[linear-gradient(135deg,#0f172a_0%,#111827_38%,#0f766e_100%)] p-4 text-white">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="inline-flex rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-100">
+                          Booking confirmed
+                        </div>
+                        <div className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-white/70">
+                          Booking reference
+                        </div>
+                        <div className="mt-1 text-2xl font-bold tracking-tight text-white">
+                          {result.booking_reference}
+                        </div>
+                        <p className="mt-3 max-w-xl text-sm leading-6 text-slate-100">
+                          {result.confirmation_message}
+                        </p>
                       </div>
-                      <div className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
-                        {result.booking_reference}
+                      <div className="rounded-[1.25rem] bg-white p-2 shadow-sm">
+                        <img
+                          src={result.qr_code_url}
+                          alt={`QR code for ${result.booking_reference}`}
+                          className="h-24 w-24 rounded-xl bg-white object-cover"
+                        />
                       </div>
-                      <p className="mt-3 max-w-xl text-sm leading-6 text-slate-600">
-                        {result.confirmation_message}
-                      </p>
                     </div>
-                    <img
-                      src={result.qr_code_url}
-                      alt={`QR code for ${result.booking_reference}`}
-                      className="h-28 w-28 rounded-2xl border border-slate-200 bg-white object-cover"
-                    />
+
+                    <div className="mt-4 grid grid-cols-3 gap-2">
+                      <div className="rounded-[1rem] bg-white/10 px-3 py-3 ring-1 ring-white/10">
+                        <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                          Service
+                        </div>
+                        <div className="mt-1 line-clamp-2 text-[12px] font-semibold text-white">
+                          {result.service.name}
+                        </div>
+                      </div>
+                      <div className="rounded-[1rem] bg-white/10 px-3 py-3 ring-1 ring-white/10">
+                        <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                          Price
+                        </div>
+                        <div className="mt-1 text-[12px] font-semibold text-white">
+                          {result.amount_label}
+                        </div>
+                      </div>
+                      <div className="rounded-[1rem] bg-white/10 px-3 py-3 ring-1 ring-white/10">
+                        <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                          Slot
+                        </div>
+                        <div className="mt-1 text-[12px] font-semibold text-white">
+                          {result.requested_time}
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  <div className="mt-5 grid gap-3 text-sm text-slate-600 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-[#f5f5f7] px-4 py-3">
-                      <div className="font-semibold text-slate-950">Service</div>
-                      <div className="mt-1">{result.service.name}</div>
-                    </div>
-                    <div className="rounded-2xl bg-[#f5f5f7] px-4 py-3">
-                      <div className="font-semibold text-slate-950">Price</div>
-                      <div className="mt-1">{result.amount_label}</div>
-                    </div>
-                    <div className="rounded-2xl bg-[#f5f5f7] px-4 py-3">
-                      <div className="font-semibold text-slate-950">Requested slot</div>
-                      <div className="mt-1">
-                        {result.requested_date} at {result.requested_time}
+                  <div className="mt-5 grid grid-cols-2 gap-2 text-slate-600">
+                    <div className="rounded-[1rem] bg-[#f5f5f7] px-3 py-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Requested slot
+                      </div>
+                      <div className="mt-1 text-[12px] font-semibold text-slate-950">
+                        {result.requested_date}
+                      </div>
+                      <div className="mt-0.5 text-[11px] text-slate-600">
+                        {result.requested_time}
                       </div>
                     </div>
-                    <div className="rounded-2xl bg-[#f5f5f7] px-4 py-3">
-                      <div className="font-semibold text-slate-950">Email follow-up</div>
-                      <div className="mt-1">
-                        {result.email_status === 'sent'
-                          ? 'Confirmation email sent'
-                          : `Manual follow-up via ${result.contact_email}`}
+                    <div className="rounded-[1rem] bg-[#f5f5f7] px-3 py-3">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Follow-up
+                      </div>
+                      <div className="mt-1 text-[12px] font-semibold text-slate-950">
+                        {result.email_status === 'sent' ? 'Email sent' : 'Manual follow-up'}
+                      </div>
+                      <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-600">
+                        {result.contact_email}
                       </div>
                     </div>
                   </div>
 
-                  <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
                     {buildBookingOutcomeSteps(result).map((step) => (
-                      <div key={step.label} className="rounded-2xl bg-[#f5f5f7] px-4 py-3">
-                        <div className="font-semibold text-slate-950">{step.label}</div>
-                        <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${step.tone}`}>
+                      <div key={step.label} className="rounded-[1rem] bg-[#f5f5f7] px-3 py-3">
+                        <div className="text-[11px] font-semibold text-slate-950">{step.label}</div>
+                        <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${step.tone}`}>
                           {step.value}
                         </div>
                       </div>
                     ))}
                   </div>
 
-                  <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+                  <div className="mt-5 grid grid-cols-2 gap-2">
                     {result.meeting_event_url ? (
                       <a
                         href={result.meeting_event_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded-full border border-black/10 bg-white px-5 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
+                        className="rounded-[1rem] border border-black/10 bg-white px-3 py-3 text-center text-[11px] font-semibold leading-4 text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
                       >
                         View calendar event
                       </a>
@@ -2249,7 +3045,7 @@ export function BookingAssistantDialog({
                         href={result.calendar_add_url}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded-full border border-black/10 bg-white px-5 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
+                        className="rounded-[1rem] border border-black/10 bg-white px-3 py-3 text-center text-[11px] font-semibold leading-4 text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
                       >
                         Add to Google Calendar
                       </a>
@@ -2258,7 +3054,7 @@ export function BookingAssistantDialog({
                       href={result.payment_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-full bg-slate-950 px-5 py-3 text-center text-sm font-semibold text-white transition hover:bg-slate-800"
+                      className="rounded-[1rem] bg-slate-950 px-3 py-3 text-center text-[11px] font-semibold leading-4 text-white transition hover:bg-slate-800 shadow-sm"
                     >
                       {result.payment_status === 'stripe_checkout_ready'
                         ? 'Continue to Stripe'
@@ -2266,7 +3062,7 @@ export function BookingAssistantDialog({
                     </a>
                     <a
                       href={`mailto:${result.contact_email}?subject=BookedAI%20booking%20${result.booking_reference}`}
-                      className="rounded-full border border-black/10 bg-white px-5 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
+                      className="rounded-[1rem] border border-black/10 bg-white px-3 py-3 text-center text-[11px] font-semibold leading-4 text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
                     >
                       Contact {result.contact_email}
                     </a>
@@ -2277,12 +3073,14 @@ export function BookingAssistantDialog({
                         window.history.replaceState({}, '', '/');
                         window.scrollTo({ top: 0, behavior: 'smooth' });
                       }}
-                      className="rounded-full border border-black/10 bg-white px-5 py-3 text-center text-sm font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
+                      className={`rounded-[1rem] border border-black/10 bg-white px-3 py-3 text-center text-[11px] font-semibold leading-4 text-slate-700 transition hover:border-black/15 hover:bg-slate-50 ${
+                        result.meeting_event_url || result.calendar_add_url ? 'col-span-2' : ''
+                      }`}
                     >
                       Return to homepage
                     </button>
                   </div>
-                  <p className="mt-3 text-xs leading-5 text-slate-500">
+                  <p className="mt-3 text-[11px] leading-5 text-slate-500">
                     {result.meeting_status === 'scheduled'
                       ? 'A calendar event has been created and included in the booking flow. After payment, Stripe returns the customer to the homepage while the booking stays logged for follow-up.'
                       : result.calendar_add_url
@@ -2292,6 +3090,7 @@ export function BookingAssistantDialog({
                 </div>
               ) : null}
             </div>
+          </div>
           </div>
         </div>
       </div>

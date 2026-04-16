@@ -25,6 +25,14 @@ class Settings:
     openai_base_url: str
     openai_model: str
     openai_timeout_seconds: float
+    semantic_search_enabled: bool
+    semantic_search_provider: str
+    semantic_search_api_key: str
+    semantic_search_base_url: str
+    semantic_search_model: str
+    semantic_search_timeout_seconds: float
+    semantic_search_max_candidates: int
+    semantic_search_gemini_maps_grounding_enabled: bool
     tawk_webhook_secret: str
     tawk_verify_signature: bool
     n8n_booking_webhook_url: str
@@ -34,12 +42,17 @@ class Settings:
     stripe_publishable_key: str
     stripe_currency: str
     zoho_calendar_api_base_url: str
+    zoho_bookings_api_base_url: str
     zoho_accounts_base_url: str
     zoho_calendar_uid: str
     zoho_calendar_access_token: str
     zoho_calendar_refresh_token: str
     zoho_calendar_client_id: str
     zoho_calendar_client_secret: str
+    zoho_bookings_access_token: str
+    zoho_bookings_refresh_token: str
+    zoho_bookings_client_id: str
+    zoho_bookings_client_secret: str
     google_maps_static_api_key: str
     booking_business_email: str
     email_smtp_host: str
@@ -121,6 +134,11 @@ def get_settings() -> Settings:
     ai_fallback_api_key = env_str("AI_FALLBACK_API_KEY", "")
     ai_fallback_base_url = env_str("AI_FALLBACK_BASE_URL", "") or "https://api.openai.com/v1"
     ai_fallback_model = env_str("AI_FALLBACK_MODEL", "") or openai_model
+    semantic_search_enabled = env_bool("SEMANTIC_SEARCH_ENABLED", False)
+    semantic_search_provider = env_str("SEMANTIC_SEARCH_PROVIDER", "") or ai_provider or "openai"
+    semantic_search_api_key = env_str("SEMANTIC_SEARCH_API_KEY", "") or ai_api_key
+    semantic_search_base_url = env_str("SEMANTIC_SEARCH_BASE_URL", "") or ai_base_url
+    semantic_search_model = env_str("SEMANTIC_SEARCH_MODEL", "") or ai_model
 
     return Settings(
         app_name=os.getenv("APP_NAME", "BookedAI"),
@@ -132,7 +150,7 @@ def get_settings() -> Settings:
         public_api_url=os.getenv("PUBLIC_API_URL", "https://api.bookedai.au"),
         cors_allow_origins=os.getenv(
             "CORS_ALLOW_ORIGINS",
-            "http://localhost:3000,http://localhost:5173,https://bookedai.au,https://www.bookedai.au,https://admin.bookedai.au,https://upload.bookedai.au",
+            "http://localhost:3000,http://localhost:5173,https://bookedai.au,https://www.bookedai.au,https://admin.bookedai.au,https://product.bookedai.au,https://upload.bookedai.au",
         ),
         supabase_url=os.getenv("SUPABASE_URL", "https://supabase.bookedai.au"),
         supabase_anon_key=os.getenv("SUPABASE_ANON_KEY", ""),
@@ -150,6 +168,20 @@ def get_settings() -> Settings:
         openai_base_url=openai_base_url,
         openai_model=openai_model,
         openai_timeout_seconds=env_float("OPENAI_TIMEOUT_SECONDS", 30),
+        semantic_search_enabled=semantic_search_enabled,
+        semantic_search_provider=semantic_search_provider,
+        semantic_search_api_key=semantic_search_api_key,
+        semantic_search_base_url=semantic_search_base_url,
+        semantic_search_model=semantic_search_model,
+        semantic_search_timeout_seconds=env_float(
+            "SEMANTIC_SEARCH_TIMEOUT_SECONDS",
+            min(env_float("OPENAI_TIMEOUT_SECONDS", 30), 12),
+        ),
+        semantic_search_max_candidates=env_int("SEMANTIC_SEARCH_MAX_CANDIDATES", 8),
+        semantic_search_gemini_maps_grounding_enabled=env_bool(
+            "SEMANTIC_SEARCH_GEMINI_MAPS_GROUNDING_ENABLED",
+            False,
+        ),
         tawk_webhook_secret=os.getenv("TAWK_WEBHOOK_SECRET", ""),
         tawk_verify_signature=env_bool("TAWK_VERIFY_SIGNATURE", False),
         n8n_booking_webhook_url=os.getenv("N8N_BOOKING_WEBHOOK_URL", ""),
@@ -161,6 +193,9 @@ def get_settings() -> Settings:
         zoho_calendar_api_base_url=os.getenv(
             "ZOHO_CALENDAR_API_BASE_URL", "https://calendar.zoho.com/api/v1"
         ),
+        zoho_bookings_api_base_url=os.getenv(
+            "ZOHO_BOOKINGS_API_BASE_URL", "https://www.zohoapis.com.au/bookings/v1/json"
+        ),
         zoho_accounts_base_url=os.getenv(
             "ZOHO_ACCOUNTS_BASE_URL", "https://accounts.zoho.com"
         ),
@@ -169,6 +204,22 @@ def get_settings() -> Settings:
         zoho_calendar_refresh_token=os.getenv("ZOHO_CALENDAR_REFRESH_TOKEN", ""),
         zoho_calendar_client_id=os.getenv("ZOHO_CALENDAR_CLIENT_ID", ""),
         zoho_calendar_client_secret=os.getenv("ZOHO_CALENDAR_CLIENT_SECRET", ""),
+        zoho_bookings_access_token=os.getenv(
+            "ZOHO_BOOKINGS_ACCESS_TOKEN",
+            os.getenv("ZOHO_CALENDAR_ACCESS_TOKEN", ""),
+        ),
+        zoho_bookings_refresh_token=os.getenv(
+            "ZOHO_BOOKINGS_REFRESH_TOKEN",
+            os.getenv("ZOHO_CALENDAR_REFRESH_TOKEN", ""),
+        ),
+        zoho_bookings_client_id=os.getenv(
+            "ZOHO_BOOKINGS_CLIENT_ID",
+            os.getenv("ZOHO_CALENDAR_CLIENT_ID", ""),
+        ),
+        zoho_bookings_client_secret=os.getenv(
+            "ZOHO_BOOKINGS_CLIENT_SECRET",
+            os.getenv("ZOHO_CALENDAR_CLIENT_SECRET", ""),
+        ),
         google_maps_static_api_key=os.getenv("GOOGLE_MAPS_STATIC_API_KEY", ""),
         booking_business_email=os.getenv("BOOKING_BUSINESS_EMAIL", "info@bookedai.au"),
         email_smtp_host=os.getenv("EMAIL_SMTP_HOST", ""),

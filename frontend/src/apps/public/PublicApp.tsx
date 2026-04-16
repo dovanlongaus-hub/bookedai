@@ -16,6 +16,7 @@ import {
   solutionContent,
   teamMembers,
   teamSectionContent,
+  videoDemoContent,
 } from '../../components/landing/data';
 import { Footer } from '../../components/landing/Footer';
 import { Header } from '../../components/landing/Header';
@@ -27,9 +28,11 @@ import { HeroSection } from '../../components/landing/sections/HeroSection';
 import { PartnersSection } from '../../components/landing/sections/PartnersSection';
 import { PricingSection } from '../../components/landing/sections/PricingSection';
 import { ProblemSection } from '../../components/landing/sections/ProblemSection';
+import { ProductFlowShowcaseSection } from '../../components/landing/sections/ProductFlowShowcaseSection';
 import { ProductProofSection } from '../../components/landing/sections/ProductProofSection';
 import { SolutionSection } from '../../components/landing/sections/SolutionSection';
 import { TeamSection } from '../../components/landing/sections/TeamSection';
+import { VideoDemoSection } from '../../components/landing/sections/VideoDemoSection';
 
 export function PublicApp() {
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
@@ -50,6 +53,18 @@ export function PublicApp() {
     const pricingStatus = url.searchParams.get('pricing');
     const reference = url.searchParams.get('ref');
     const pricingPlan = url.searchParams.get('plan');
+    const assistantMode = url.searchParams.get('assistant');
+    const demoMode = url.searchParams.get('demo');
+
+    if (assistantMode === 'open') {
+      setIsAssistantOpen(true);
+      url.searchParams.delete('assistant');
+    }
+
+    if (demoMode === 'open') {
+      setIsDemoOpen(true);
+      url.searchParams.delete('demo');
+    }
 
     if (bookingStatus === 'success') {
       setBookingBanner({
@@ -84,6 +99,7 @@ export function PublicApp() {
           : 'Your plan booking is still saved. You can reopen pricing and continue payment when ready.',
       });
     } else {
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
       return;
     }
 
@@ -96,19 +112,14 @@ export function PublicApp() {
   }, []);
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#f5f5f7] text-slate-950 [font-family:'Plus_Jakarta_Sans',system-ui,sans-serif]">
-      <div
-        aria-hidden="true"
-        className="pointer-events-none absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_24%),radial-gradient(circle_at_80%_0%,rgba(15,23,42,0.08),transparent_22%),linear-gradient(180deg,#ffffff_0%,#f5f5f7_38%,#eef2ff_100%)]"
-      />
-
+    <main className="apple-public-shell relative overflow-hidden">
       {bookingBanner ? (
-        <div className="sticky top-0 z-50 border-b border-black/5 px-4 py-3 sm:px-6 lg:px-8">
+        <div className="sticky top-0 z-50 border-b border-black/10 bg-[#f5f5f7]/95 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
           <div
-            className={`mx-auto flex max-w-7xl items-start justify-between gap-3 rounded-[1.25rem] border px-4 py-3 shadow-sm ${
+            className={`mx-auto flex max-w-7xl items-start justify-between gap-3 rounded-[1.5rem] px-4 py-3 ${
               bookingBanner.tone === 'success'
-                ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
-                : 'border-slate-200 bg-white text-slate-900'
+                ? 'bg-white text-[#1d1d1f] shadow-[rgba(0,0,0,0.12)_0_12px_36px]'
+                : 'bg-white text-[#1d1d1f] shadow-[rgba(0,0,0,0.12)_0_12px_36px]'
             }`}
           >
             <div>
@@ -118,7 +129,7 @@ export function PublicApp() {
             <button
               type="button"
               onClick={() => setBookingBanner(null)}
-              className="rounded-full border border-black/10 bg-white px-3 py-1 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+              className="apple-button-secondary px-3 py-1 text-xs font-semibold"
             >
               Dismiss
             </button>
@@ -131,11 +142,7 @@ export function PublicApp() {
         onStartTrial={() => setIsAssistantOpen(true)}
         onBookDemo={() => setIsDemoOpen(true)}
       />
-      <section className="relative overflow-hidden border-y border-black/5 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(248,250,252,0.98)_36%,rgba(255,255,255,0.96)_100%)]">
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-64 bg-[radial-gradient(circle_at_top,rgba(14,165,233,0.10),transparent_55%)]"
-        />
+      <section className="apple-section-light relative overflow-hidden border-y border-black/5">
         <HeroSection
           content={heroContent}
           demo={demoContent}
@@ -147,7 +154,9 @@ export function PublicApp() {
           cards={solutionCards}
           flowSteps={flowSteps}
         />
+        <ProductFlowShowcaseSection demo={demoContent} />
         <ProductProofSection content={proofContent} items={proofItems} />
+        <VideoDemoSection content={videoDemoContent} />
         <BookingAssistantSection
           content={bookingAssistantContent}
           onOpenAssistant={() => setIsAssistantOpen(true)}
@@ -170,15 +179,15 @@ export function PublicApp() {
         <button
           type="button"
           onClick={() => setIsAssistantOpen(true)}
-          className="booking-widget fixed bottom-3 right-3 z-40 w-[calc(100%-1.5rem)] max-w-[18rem] overflow-hidden rounded-[1.5rem] border border-white/20 bg-[linear-gradient(135deg,#0f172a_0%,#111827_55%,#0ea5e9_160%)] p-3 text-left text-white shadow-[0_20px_55px_rgba(15,23,42,0.28)] transition hover:scale-[1.01] sm:bottom-5 sm:right-5 sm:max-w-[22rem] sm:p-4"
+          className="apple-floating-widget booking-widget fixed bottom-3 right-3 z-40 w-[calc(100%-1.5rem)] max-w-[18rem] overflow-hidden rounded-[1.75rem] border border-white/10 p-3 text-left transition hover:scale-[1.01] sm:bottom-5 sm:right-5 sm:max-w-[22rem] sm:p-4"
         >
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-sky-200">
-                <span className="booking-widget-dot h-2.5 w-2.5 rounded-full bg-emerald-300" />
+              <div className="flex items-center gap-2 text-xs font-semibold text-[#2997ff]">
+                <span className="booking-widget-dot h-2.5 w-2.5 rounded-full bg-[#2997ff]" />
                 AI Booking Agent
               </div>
-              <div className="mt-2 text-base font-bold tracking-tight sm:text-lg">
+              <div className="mt-2 text-base font-semibold tracking-[-0.03em] sm:text-lg">
                 Start a free trial chat
               </div>
               <p className="mt-1 text-xs leading-5 text-white/72 sm:text-sm sm:leading-6">
@@ -186,7 +195,7 @@ export function PublicApp() {
                 workflow run live.
               </p>
             </div>
-            <div className="rounded-full bg-white/10 px-3 py-1 text-[11px] font-semibold text-white/80 sm:text-xs">
+            <div className="rounded-full border border-white/12 px-3 py-1 text-[11px] font-semibold text-white/80 sm:text-xs">
               Open
             </div>
           </div>

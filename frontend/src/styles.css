@@ -3,6 +3,18 @@
 @layer base {
   :root {
     color-scheme: light;
+    --apple-black: #000000;
+    --apple-ink: #1d1d1f;
+    --apple-gray: #f5f5f7;
+    --apple-blue: #0071e3;
+    --apple-link-blue: #0066cc;
+    --apple-bright-blue: #2997ff;
+    --apple-surface-dark: #272729;
+    --apple-border: rgba(29, 29, 31, 0.08);
+    --apple-shadow: rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
+    --apple-font:
+      "SF Pro Text", "SF Pro Display", "SF Pro Icons", "Helvetica Neue",
+      Helvetica, Arial, sans-serif;
   }
 
   * {
@@ -16,10 +28,12 @@
   body {
     margin: 0;
     min-width: 320px;
-    background: #f5f5f7;
-    color: #020617;
-    font-family: "Plus Jakarta Sans", system-ui, -apple-system, BlinkMacSystemFont,
-      "Segoe UI", sans-serif;
+    background: var(--apple-gray);
+    color: var(--apple-ink);
+    font-family: var(--apple-font);
+    letter-spacing: -0.022em;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
   }
 
   a {
@@ -33,6 +47,140 @@
 
   #root {
     min-height: 100vh;
+  }
+
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+  }
+}
+
+@layer components {
+  .apple-public-shell {
+    min-height: 100vh;
+    background: var(--apple-gray);
+    color: var(--apple-ink);
+    font-family: var(--apple-font);
+  }
+
+  .apple-admin-shell {
+    min-height: 100vh;
+    background: linear-gradient(180deg, #fbfbfd 0%, var(--apple-gray) 100%);
+    color: var(--apple-ink);
+    font-family: var(--apple-font);
+  }
+
+  .apple-glass-nav {
+    background: rgba(0, 0, 0, 0.8);
+    color: #fff;
+    backdrop-filter: saturate(180%) blur(20px);
+  }
+
+  .apple-section-light {
+    background: var(--apple-gray);
+    color: var(--apple-ink);
+  }
+
+  .apple-section-dark {
+    background: #000;
+    color: #fff;
+  }
+
+  .apple-card {
+    border-radius: 28px;
+    background: #fff;
+    box-shadow: var(--apple-shadow);
+  }
+
+  .apple-card-soft {
+    border-radius: 24px;
+    background: #fff;
+    box-shadow: rgba(0, 0, 0, 0.1) 0 12px 40px;
+  }
+
+  .apple-card-dark {
+    border-radius: 28px;
+    background: var(--apple-surface-dark);
+    color: #fff;
+  }
+
+  .apple-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: var(--apple-blue);
+    color: #fff;
+    transition:
+      background-color 180ms ease,
+      color 180ms ease,
+      border-color 180ms ease;
+  }
+
+  .apple-button:hover {
+    background: #0077ed;
+  }
+
+  .apple-button-secondary {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    border: 1px solid var(--apple-link-blue);
+    background: transparent;
+    color: var(--apple-link-blue);
+    transition:
+      background-color 180ms ease,
+      color 180ms ease,
+      border-color 180ms ease;
+  }
+
+  .apple-button-secondary:hover {
+    background: rgba(0, 102, 204, 0.06);
+  }
+
+  .apple-chip {
+    border-radius: 999px;
+    background: rgba(29, 29, 31, 0.06);
+    color: rgba(29, 29, 31, 0.8);
+  }
+
+  .apple-kicker {
+    color: var(--apple-blue);
+    letter-spacing: 0;
+  }
+
+  .apple-title {
+    letter-spacing: -0.045em;
+    line-height: 1.07;
+  }
+
+  .apple-body {
+    color: rgba(29, 29, 31, 0.8);
+    letter-spacing: -0.022em;
+  }
+
+  .apple-dark-link {
+    color: var(--apple-bright-blue);
+  }
+
+  .apple-light-link {
+    color: var(--apple-link-blue);
+  }
+
+  .apple-floating-widget {
+    background: rgba(0, 0, 0, 0.88);
+    color: #fff;
+    box-shadow: rgba(0, 0, 0, 0.28) 0 24px 80px;
+    backdrop-filter: saturate(160%) blur(18px);
+  }
+
+  .apple-admin-shell section[class*="bg-white"],
+  .apple-admin-shell article[class*="bg-white"] {
+    box-shadow: rgba(0, 0, 0, 0.12) 0 12px 40px;
   }
 }
 
@@ -148,9 +296,19 @@
     }
   }
 
+  @keyframes partnersMarquee {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+
   .booking-step-live {
-    box-shadow: 0 0 0 1px rgba(186, 230, 253, 0.7),
-      0 12px 30px rgba(56, 189, 248, 0.08);
+    box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.22),
+      0 12px 30px rgba(0, 0, 0, 0.12);
   }
 
   .booking-step-dot {
@@ -197,5 +355,26 @@
       bookingWave 2.4s linear infinite,
       bookingProgressNudge 380ms cubic-bezier(0.22, 1, 0.36, 1);
     transform-origin: left center;
+  }
+
+  .text-apple-blue {
+    color: var(--apple-blue);
+  }
+
+  .bg-apple-blue {
+    background: var(--apple-blue);
+  }
+
+  .border-apple-blue {
+    border-color: var(--apple-blue);
+  }
+
+  .partners-marquee {
+    animation: partnersMarquee 30s linear infinite;
+    will-change: transform;
+  }
+
+  .partners-marquee:hover {
+    animation-play-state: paused;
   }
 }

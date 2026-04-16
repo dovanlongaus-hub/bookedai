@@ -7,6 +7,7 @@ from schemas import (
     AdminBookingsResponse,
     AdminConfigResponse,
     AdminOverviewResponse,
+    AdminServiceCatalogQualityResponse,
     AdminServiceMerchantListResponse,
     AdminSessionResponse,
     EmailSendResponse,
@@ -57,6 +58,17 @@ router.add_api_route(
     handlers.admin_services,
     methods=["GET"],
     response_model=AdminServiceMerchantListResponse,
+)
+router.add_api_route(
+    "/admin/services/quality",
+    handlers.admin_service_catalog_quality,
+    methods=["GET"],
+    response_model=AdminServiceCatalogQualityResponse,
+)
+router.add_api_route(
+    "/admin/services/quality/export.csv",
+    handlers.admin_service_catalog_quality_export,
+    methods=["GET"],
 )
 router.add_api_route(
     "/admin/services/import-website",

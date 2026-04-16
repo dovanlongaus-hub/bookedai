@@ -1,0 +1,13 @@
+<svg width="512" height="192" viewBox="0 0 512 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="192" rx="28" fill="#FFFFFF"/>
+  <rect x="28" y="34" width="74" height="74" rx="14" fill="#E42527"/>
+  <rect x="86" y="34" width="74" height="74" rx="14" fill="#F8B91C"/>
+  <rect x="144" y="34" width="74" height="74" rx="14" fill="#0AA84F"/>
+  <rect x="202" y="34" width="74" height="74" rx="14" fill="#0067B8"/>
+  <text x="65" y="82" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="white">Z</text>
+  <text x="123" y="82" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="white">O</text>
+  <text x="181" y="82" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="white">H</text>
+  <text x="239" y="82" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="white">O</text>
+  <text x="28" y="146" font-family="Arial, Helvetica, sans-serif" font-size="32" font-weight="700" fill="#111827">Zoho for Startups</text>
+  <text x="28" y="171" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600" fill="#6B7280">CRM and email delivery support</text>
+</svg>

@@ -2,7 +2,6 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { BookingAssistantContent } from '../data';
 import { getApiBaseUrl } from '../../../shared/config/api';
-import { SectionHeading } from '../ui/SectionHeading';
 
 type ServiceCatalogItem = {
   id: string;
@@ -101,17 +100,18 @@ type BookingAssistantSectionProps = {
 };
 
 const starterPrompts = [
-  'Book a restaurant table for 6 tomorrow night',
-  'I need physio for shoulder pain',
-  'Find a dentist or skin clinic near me with weekend availability',
+  'Find a facial in Sydney under $150',
   'Book a haircut and colour consultation for Friday afternoon',
-  'Find an event venue or private dining option for a team dinner',
-  'Find me something under $50 near me',
+  'I need physio for shoulder pain near Parramatta',
+  'Book a restaurant table for 6 tomorrow night',
+  'Find a private dining or team dinner venue in Sydney',
+  'I want a housing consultation about apartment or townhouse projects',
   'How do I renew my RSL membership?',
-  'Which service is best if I need something quick after work?',
-  'Compare a cafe group booking and a restaurant table for 8 people',
+  'Find a quick after-work facial or haircut near Sydney CBD',
+  'Compare two facial options in Sydney under $150',
   'What AI events are coming up at WSTI and Western Sydney Startup Hub?',
   'Tìm sự kiện AI tại WSTI tuần này và gợi ý bước tiếp theo',
+  'Find signage or expo booth printing for an event in Sydney',
 ];
 
 const MAX_DISPLAYED_MATCHES = 4;
@@ -341,6 +341,12 @@ function getBookingRequirementConfig(
         label: 'Membership context',
         placeholder: 'Optional: new signup, renewal, or the plan you want help with.',
       };
+    case 'Housing and Property':
+      return {
+        label: 'Project of interest',
+        placeholder:
+          'Optional: suburb, budget, property type, buyer status, or the projects you want to discuss in the consultation.',
+      };
     default:
       return {
         label: 'Extra detail',
@@ -373,6 +379,9 @@ function buildBestForLabel(service: ServiceCatalogItem, userQuery: string) {
   if (tags.some((tag) => ['membership', 'renewal', 'signup', 'member'].includes(tag))) {
     return 'Joining, renewing, or onboarding';
   }
+  if (category.includes('housing') || category.includes('property')) {
+    return 'Project discovery and property consultation';
+  }
   if (category.includes('print')) {
     return 'Expo booths, signage, and branded materials';
   }
@@ -404,6 +413,13 @@ function buildDecisionBadge(
   if (service.duration_minutes === minDuration && services.length > 1) {
     return 'Fastest option';
   }
+  if (
+    (service.category.toLowerCase().includes('housing') ||
+      service.category.toLowerCase().includes('property')) &&
+    /(housing|property|project|apartment|home|investment)/i.test(lowered)
+  ) {
+    return 'Project consult';
+  }
   if (service.category.toLowerCase().includes('print') && lowered.includes('event')) {
     return 'Event-ready';
   }
@@ -431,6 +447,9 @@ function buildServiceLocationLabel(service: ServiceCatalogItem) {
 }
 
 function buildServiceNextStepLabel(service: ServiceCatalogItem) {
+  if (service.category.toLowerCase().includes('housing') || service.category.toLowerCase().includes('property')) {
+    return 'Book a consultation';
+  }
   if (service.booking_url) {
     return 'Book online now';
   }
@@ -438,7 +457,16 @@ function buildServiceNextStepLabel(service: ServiceCatalogItem) {
 }
 
 function buildServiceConfidenceNotes(service: ServiceCatalogItem) {
-  const notes = [service.booking_url ? 'Direct booking link' : 'Chat booking flow ready'];
+  const isHousing = service.category.toLowerCase().includes('housing') || service.category.toLowerCase().includes('property');
+  const notes = [
+    service.booking_url
+      ? isHousing
+        ? 'Partner consultation link'
+        : 'Direct booking link'
+      : isHousing
+        ? 'Project consult flow ready'
+        : 'Chat booking flow ready',
+  ];
 
   if (service.map_url || service.location || service.venue_name) {
     notes.push('Location details ready');
@@ -449,6 +477,9 @@ function buildServiceConfidenceNotes(service: ServiceCatalogItem) {
 }
 
 function buildBookabilityLabel(service: ServiceCatalogItem) {
+  if (service.category.toLowerCase().includes('housing') || service.category.toLowerCase().includes('property')) {
+    return service.booking_url ? 'Consultation ready' : 'Project consult';
+  }
   if (service.booking_url) {
     return 'Ready to book';
   }
@@ -504,6 +535,8 @@ export function BookingAssistantSection({
   content,
   onOpenAssistant,
 }: BookingAssistantSectionProps) {
+  void content;
+  void onOpenAssistant;
   const [catalog, setCatalog] = useState<BookingAssistantCatalogResponse | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -517,6 +550,7 @@ export function BookingAssistantSection({
   const [userGeoContext, setUserGeoContext] = useState<UserGeoContext | null>(null);
   const [geoPromptState, setGeoPromptState] = useState<'idle' | 'granted' | 'denied'>('idle');
   const [showInlineBooking, setShowInlineBooking] = useState(false);
+  const [activePreviewTab, setActivePreviewTab] = useState<'chat' | 'booking'>('chat');
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -687,6 +721,15 @@ export function BookingAssistantSection({
   }, [showInlineBooking, latestCustomerRequirement, bookingNotes]);
 
   useEffect(() => {
+    if (showInlineBooking || selectedServiceId || selectedEvent || bookingResult) {
+      setActivePreviewTab('booking');
+      return;
+    }
+
+    setActivePreviewTab('chat');
+  }, [showInlineBooking, selectedServiceId, selectedEvent, bookingResult]);
+
+  useEffect(() => {
     if (!showInlineBooking) {
       return;
     }
@@ -716,6 +759,7 @@ export function BookingAssistantSection({
     setMessages(nextMessages);
     setChatInput('');
     setChatError('');
+    setActivePreviewTab('chat');
     setLoading(true);
 
     try {
@@ -768,6 +812,7 @@ export function BookingAssistantSection({
 
   function handleOpenInlineBooking() {
     setShowInlineBooking(true);
+    setActivePreviewTab('booking');
     setBookingError('');
     setBookingResult(null);
     setSelectionAnimationKey((current) => current + 1);
@@ -788,6 +833,7 @@ export function BookingAssistantSection({
     setSelectedServiceId(serviceId);
     setSelectedEvent(null);
     setShowInlineBooking(true);
+    setActivePreviewTab('booking');
     setBookingError('');
     setBookingResult(null);
     setSelectionAnimationKey((current) => current + 1);
@@ -805,6 +851,7 @@ export function BookingAssistantSection({
   function handleSelectEvent(event: AIEventItem) {
     setSelectedEvent(event);
     setShowInlineBooking(true);
+    setActivePreviewTab('booking');
     setBookingError('');
     setBookingResult(null);
     setSelectionAnimationKey((current) => current + 1);
@@ -867,6 +914,7 @@ export function BookingAssistantSection({
       }
 
       setBookingResult(payload);
+      setActivePreviewTab('booking');
     } catch (error) {
       setBookingError(
         error instanceof Error ? error.message : 'Unable to create booking request.',
@@ -877,91 +925,10 @@ export function BookingAssistantSection({
   }
 
   return (
-    <section id="booking-assistant" className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="grid min-w-0 gap-10 lg:grid-cols-[0.82fr_1.18fr] lg:items-start">
-        <div className="min-w-0 rounded-[2rem] border border-slate-200 bg-[radial-gradient(circle_at_top_left,#fff7ed_0%,#ffffff_42%,#f8fafc_100%)] p-6 shadow-[0_24px_70px_rgba(15,23,42,0.06)] sm:p-8 lg:p-10">
-          <SectionHeading {...content} />
-          {content.formIntro ? (
-            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-600">{content.formIntro}</p>
-          ) : null}
-
-          <div className="mt-6 flex flex-wrap gap-3">
-            {[
-              'Standalone phone demo',
-              'Real service and event matching',
-              'WSTI results ranked first',
-            ].map((item) => (
-              <div
-                key={item}
-                className="rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-8 grid gap-3">
-            {[
-              'The product demo sits in its own frame and does not share a content card.',
-              'The chat stays simple while still surfacing real matches and next actions.',
-              'It can answer booking, membership, hospitality, and WSTI event queries.',
-            ].map((item) => (
-              <div
-                key={item}
-                className="rounded-[1.25rem] border border-slate-200 bg-white/80 px-4 py-3 text-sm font-medium text-slate-700 backdrop-blur"
-              >
-                {item}
-              </div>
-            ))}
-          </div>
-
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-            <button
-              type="button"
-              onClick={onOpenAssistant}
-              className="rounded-full bg-slate-950 px-6 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              Open full booking flow
-            </button>
-            <div className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm font-medium text-emerald-700">
-              {catalogError ? 'Agent offline' : 'Live agent connected'}
-            </div>
-          </div>
-          <div className="mt-8 rounded-[1.75rem] border border-slate-200 bg-[#fffaf5] p-4 shadow-[0_18px_50px_rgba(15,23,42,0.04)]">
-            <div className="text-sm font-semibold text-slate-950">What users get in the chat</div>
-            <div className="mt-3 grid gap-3">
-              {[
-                'A clear best-fit recommendation tied directly to the phone demo selection flow.',
-                'Useful buying details like price, duration, venue, and map link instead of generic summaries.',
-                'Professional answers across service discovery, comparison, booking, membership, hospitality, and WSTI event questions.',
-              ].map((item) => (
-                <div
-                  key={item}
-                  className="rounded-[1.1rem] border border-slate-200 bg-white px-4 py-3 text-sm leading-6 text-slate-600"
-                >
-                  {item}
-                </div>
-              ))}
-            </div>
-
-          </div>
-        </div>
-
-        <div className="min-w-0">
-          <div className="mx-auto max-w-[520px] lg:mr-0 lg:ml-auto">
-            <div className="mb-5 rounded-[1.5rem] border border-slate-200 bg-white px-5 py-4 shadow-[0_16px_40px_rgba(15,23,42,0.05)]">
-              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Product demo frame
-              </div>
-              <div className="mt-2 text-lg font-semibold text-slate-950">
-                A standalone mobile experience that sits outside the main content card
-              </div>
-              <p className="mt-2 text-sm leading-6 text-slate-600">
-                The demo is isolated in its own stage so the product reads like a real interface, not a block inside the page copy.
-              </p>
-            </div>
-
-            <div className="rounded-[2.5rem] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_34%),linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-6 shadow-[0_28px_80px_rgba(15,23,42,0.10)]">
+    <>
+      <section id="booking-assistant" className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      <div className="mx-auto min-w-0 max-w-[520px]">
+        <div className="hidden rounded-[2.5rem] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_34%),linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-6 shadow-[0_28px_80px_rgba(15,23,42,0.10)]">
               <div className="mx-auto w-full max-w-[400px]">
                 <div className="animate-[floatPhone_6s_ease-in-out_infinite] rounded-[2.75rem] bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] p-3 shadow-[0_38px_100px_rgba(15,23,42,0.34)]">
                   <div className="rounded-[2.15rem] bg-[linear-gradient(180deg,#fff8f1_0%,#ffffff_20%,#f8fafc_100%)] p-3">
@@ -982,272 +949,307 @@ export function BookingAssistantSection({
                       </div>
 
                       <div className="border-b border-slate-200 bg-[#fffaf5] px-3 py-3">
-                        <div className="flex gap-2 overflow-x-auto pb-1">
-                          {starterPrompts.map((prompt) => (
-                            <button
-                              key={prompt}
-                              type="button"
-                              onClick={() => void sendMessage(prompt)}
-                              className="shrink-0 rounded-full border border-amber-200 bg-white px-3 py-2 text-left text-xs font-medium text-slate-700 transition hover:border-amber-300 hover:bg-amber-50"
-                            >
-                              {prompt}
-                            </button>
-                          ))}
+                        <div className="grid grid-cols-2 gap-2 rounded-full bg-white p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                          <button
+                            type="button"
+                            onClick={() => setActivePreviewTab('chat')}
+                            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                              activePreviewTab === 'chat'
+                                ? 'bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]'
+                                : 'text-slate-500'
+                            }`}
+                          >
+                            Chat
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setActivePreviewTab('booking')}
+                            className={`rounded-full px-3 py-2 text-xs font-semibold transition ${
+                              activePreviewTab === 'booking'
+                                ? 'bg-slate-950 text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]'
+                                : 'text-slate-500'
+                            }`}
+                          >
+                            Booking
+                          </button>
+                        </div>
+
+                        <div className="mt-3 rounded-[1rem] border border-amber-200 bg-amber-50/80 px-3 py-2 text-[11px] font-medium text-amber-900">
+                          {activePreviewTab === 'chat'
+                            ? 'Discovery mode: ask, compare, and pick the strongest match.'
+                            : 'Booking mode: review the selected service, then continue into the form below.'}
                         </div>
                       </div>
 
-                      <div className="max-h-[28rem] min-h-[24rem] space-y-3 overflow-y-auto bg-[linear-gradient(180deg,#fcfcfe_0%,#f8fafc_100%)] px-3 py-4">
-                        {messages.map((message, index) => (
-                          <div key={`${message.role}-${index}`} className="space-y-3">
-                            <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-                              <div
-                                className={`flex max-w-[88%] items-end gap-2 ${
-                                  message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
-                                }`}
-                              >
-                                <div
-                                  className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
-                                    message.role === 'user'
-                                      ? 'bg-slate-200 text-slate-700'
-                                      : 'bg-amber-100 text-amber-800'
-                                  }`}
+                      {activePreviewTab === 'chat' ? (
+                        <>
+                          <div className="border-b border-slate-200 bg-[#fffaf5] px-3 py-3">
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                              {starterPrompts.map((prompt) => (
+                                <button
+                                  key={prompt}
+                                  type="button"
+                                  onClick={() => void sendMessage(prompt)}
+                                  className="shrink-0 rounded-full border border-amber-200 bg-white px-3 py-2 text-left text-xs font-medium text-slate-700 transition hover:border-amber-300 hover:bg-amber-50"
                                 >
-                                  {message.role === 'user' ? 'You' : 'AI'}
-                                </div>
-                                <div
-                                  className={`break-words rounded-[1.25rem] px-4 py-3 text-sm leading-6 ${
-                                    message.role === 'user'
-                                      ? 'rounded-br-md bg-[linear-gradient(135deg,#111827_0%,#1f2937_100%)] text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]'
-                                      : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 whitespace-pre-line shadow-sm'
-                                  }`}
-                                >
-                                  {message.content}
-                                </div>
-                              </div>
+                                  {prompt}
+                                </button>
+                              ))}
                             </div>
+                          </div>
 
-                            {message.role === 'assistant' && message.matchedServices?.length ? (
-                              <div className="grid gap-2">
-                                {message.matchedServices.map((service) => {
-                                  const isSelected = selectedServiceId === service.id;
-                                  const serviceImageUrl = extractServiceImageUrl(service);
-                                  const latestUserQuery =
-                                    [...messages.slice(0, index)]
-                                      .reverse()
-                                      .find((entry) => entry.role === 'user')
-                                      ?.content ?? latestCustomerRequirement;
-                                  const decisionBadge = buildDecisionBadge(
-                                    service,
-                                    message.matchedServices ?? [],
-                                    (message.matchedServices ?? []).findIndex((item) => item.id === service.id),
-                                    latestUserQuery,
-                                  );
-                                  const bestForLabel = buildBestForLabel(service, latestUserQuery);
-                                  const fitNotes = buildServiceFitNotes(service);
-                                  return (
+                          <div className="max-h-[28rem] min-h-[24rem] space-y-3 overflow-y-auto bg-[linear-gradient(180deg,#fcfcfe_0%,#f8fafc_100%)] px-3 py-4">
+                            {messages.map((message, index) => (
+                              <div key={`${message.role}-${index}`} className="space-y-3">
+                                <div className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                  <div
+                                    className={`flex max-w-[88%] items-end gap-2 ${
+                                      message.role === 'user' ? 'flex-row-reverse' : 'flex-row'
+                                    }`}
+                                  >
                                     <div
-                                      key={service.id}
-                                      className={`overflow-hidden rounded-[1.2rem] border text-left transition ${
-                                        isSelected
-                                          ? 'booking-card-picked border-slate-950 bg-slate-950 text-white shadow-[0_14px_32px_rgba(15,23,42,0.18)]'
-                                          : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+                                      className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+                                        message.role === 'user'
+                                          ? 'bg-slate-200 text-slate-700'
+                                          : 'bg-amber-100 text-amber-800'
                                       }`}
                                     >
-                                      <div className="p-3">
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div className="flex min-w-0 gap-3">
-                                            {serviceImageUrl ? (
-                                              <div
-                                                className={`relative hidden h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] border sm:block ${
-                                                  isSelected
-                                                    ? 'border-white/10 bg-white/10'
-                                                    : 'border-slate-200 bg-slate-100'
-                                                }`}
-                                              >
-                                                <img
-                                                  src={serviceImageUrl}
-                                                  alt={service.name}
-                                                  className="h-full w-full object-cover"
-                                                  loading="lazy"
-                                                />
-                                                <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-white">
-                                                  {getServiceVisualLabel(service)}
+                                      {message.role === 'user' ? 'You' : 'AI'}
+                                    </div>
+                                    <div
+                                      className={`break-words rounded-[1.25rem] px-4 py-3 text-sm leading-6 ${
+                                        message.role === 'user'
+                                          ? 'rounded-br-md bg-[linear-gradient(135deg,#111827_0%,#1f2937_100%)] text-white shadow-[0_10px_24px_rgba(15,23,42,0.18)]'
+                                          : 'rounded-bl-md border border-slate-200 bg-white text-slate-700 whitespace-pre-line shadow-sm'
+                                      }`}
+                                    >
+                                      {message.content}
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {message.role === 'assistant' && message.matchedServices?.length ? (
+                                  <div className="grid gap-2">
+                                    {message.matchedServices.map((service) => {
+                                      const isSelected = selectedServiceId === service.id;
+                                      const serviceImageUrl = extractServiceImageUrl(service);
+                                      const latestUserQuery =
+                                        [...messages.slice(0, index)]
+                                          .reverse()
+                                          .find((entry) => entry.role === 'user')
+                                          ?.content ?? latestCustomerRequirement;
+                                      const decisionBadge = buildDecisionBadge(
+                                        service,
+                                        message.matchedServices ?? [],
+                                        (message.matchedServices ?? []).findIndex((item) => item.id === service.id),
+                                        latestUserQuery,
+                                      );
+                                      const bestForLabel = buildBestForLabel(service, latestUserQuery);
+                                      const fitNotes = buildServiceFitNotes(service);
+                                      return (
+                                        <div
+                                          key={service.id}
+                                          className={`overflow-hidden rounded-[1.2rem] border text-left transition ${
+                                            isSelected
+                                              ? 'booking-card-picked border-slate-950 bg-slate-950 text-white shadow-[0_14px_32px_rgba(15,23,42,0.18)]'
+                                              : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300'
+                                          }`}
+                                        >
+                                          <div className="p-3">
+                                            <div className="flex items-start justify-between gap-3">
+                                              <div className="flex min-w-0 gap-3">
+                                                {serviceImageUrl ? (
+                                                  <div
+                                                    className={`relative hidden h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] border sm:block ${
+                                                      isSelected
+                                                        ? 'border-white/10 bg-white/10'
+                                                        : 'border-slate-200 bg-slate-100'
+                                                    }`}
+                                                  >
+                                                    <img
+                                                      src={serviceImageUrl}
+                                                      alt={service.name}
+                                                      className="h-full w-full object-cover"
+                                                      loading="lazy"
+                                                    />
+                                                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-white">
+                                                      {getServiceVisualLabel(service)}
+                                                    </div>
+                                                  </div>
+                                                ) : null}
+                                                <div className="min-w-0">
+                                                <div className="flex flex-wrap items-center gap-2">
+                                                  <span
+                                                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                                      isSelected
+                                                        ? 'bg-white text-slate-950'
+                                                        : 'bg-emerald-50 text-emerald-700'
+                                                    }`}
+                                                  >
+                                                    {decisionBadge}
+                                                  </span>
+                                                  <span
+                                                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                                      isSelected
+                                                        ? 'bg-white/10 text-white'
+                                                        : 'bg-sky-50 text-sky-700'
+                                                    }`}
+                                                  >
+                                                    {service.category}
+                                                  </span>
+                                                  <span
+                                                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                                      isSelected
+                                                        ? 'bg-emerald-300 text-slate-950'
+                                                        : 'bg-emerald-50 text-emerald-700'
+                                                    }`}
+                                                  >
+                                                    {buildBookabilityLabel(service)}
+                                                  </span>
+                                                </div>
+                                                <div className="mt-2 text-sm font-semibold">{service.name}</div>
+                                                <div
+                                                  className={`mt-1 text-xs ${
+                                                    isSelected ? 'text-white/70' : 'text-slate-500'
+                                                  }`}
+                                                >
+                                                  {buildServiceLocationLabel(service)}
                                                 </div>
                                               </div>
-                                            ) : null}
-                                            <div className="min-w-0">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                              <span
-                                                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                              </div>
+                                              <div className="shrink-0 text-sm font-semibold">
+                                                {formatPrice(service.amount_aud)}
+                                              </div>
+                                            </div>
+                                            <p
+                                              className={`mt-2 text-xs leading-5 ${
+                                                isSelected ? 'text-white/80' : 'text-slate-600'
+                                              }`}
+                                            >
+                                              {service.summary}
+                                            </p>
+                                            <div
+                                              className={`mt-3 rounded-[0.95rem] px-3 py-2 text-xs ${
+                                                isSelected ? 'bg-white/10 text-white/85' : 'bg-amber-50 text-amber-900'
+                                              }`}
+                                            >
+                                              <span className="font-semibold">Why it matches:</span> {bestForLabel}
+                                            </div>
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                              {fitNotes.map((note) => (
+                                                <span
+                                                  key={`${service.id}-${note}`}
+                                                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                                                    isSelected ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-700'
+                                                  }`}
+                                                >
+                                                  {note}
+                                                </span>
+                                              ))}
+                                            </div>
+                                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                              {[
+                                                { label: 'Price', value: formatPrice(service.amount_aud) },
+                                                {
+                                                  label: 'Duration',
+                                                  value: `${service.duration_minutes} min`,
+                                                },
+                                                {
+                                                  label: 'Location',
+                                                  value: buildServiceLocationLabel(service),
+                                                },
+                                                {
+                                                  label: 'Next step',
+                                                  value: buildServiceNextStepLabel(service),
+                                                },
+                                              ].map((fact) => (
+                                                <div
+                                                  key={`${service.id}-${fact.label}`}
+                                                  className={`rounded-[0.95rem] px-3 py-2 ${
+                                                    isSelected ? 'bg-white/10 text-white' : 'bg-slate-50 text-slate-700'
+                                                  }`}
+                                                >
+                                                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                                                    {fact.label}
+                                                  </div>
+                                                  <div className="mt-1 text-xs leading-5 font-medium">
+                                                    {fact.value}
+                                                  </div>
+                                                </div>
+                                              ))}
+                                            </div>
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                              {buildServiceConfidenceNotes(service).map((note) => (
+                                                <span
+                                                  key={`${service.id}-confidence-${note}`}
+                                                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
+                                                    isSelected ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-700'
+                                                  }`}
+                                                >
+                                                  {note}
+                                                </span>
+                                              ))}
+                                            </div>
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                              <button
+                                                type="button"
+                                                onClick={() => handleSelectService(service.id)}
+                                                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
                                                   isSelected
-                                                    ? 'bg-white text-slate-950'
-                                                    : 'bg-emerald-50 text-emerald-700'
+                                                    ? 'bg-white text-slate-950 hover:bg-slate-100'
+                                                    : 'bg-slate-950 text-white hover:bg-slate-800'
                                                 }`}
                                               >
-                                                {decisionBadge}
-                                              </span>
+                                                {isSelected ? 'Selected' : 'Select this'}
+                                              </button>
+                                              {service.map_url ? (
+                                                <a
+                                                  href={service.map_url}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                                                    isSelected
+                                                      ? 'border border-white/20 bg-white/10 text-white hover:bg-white/15'
+                                                      : 'border border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'
+                                                  }`}
+                                                >
+                                                  Open Google map
+                                                </a>
+                                              ) : null}
+                                              {service.booking_url ? (
+                                                <a
+                                                  href={service.booking_url}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                                                    isSelected
+                                                      ? 'border border-white/20 bg-white/10 text-white hover:bg-white/15'
+                                                      : 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300'
+                                                  }`}
+                                                >
+                                                  Book now
+                                                </a>
+                                              ) : null}
                                               <span
-                                                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                                className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${
                                                   isSelected
                                                     ? 'bg-white/10 text-white'
-                                                    : 'bg-sky-50 text-sky-700'
-                                                }`}
-                                              >
-                                                {service.category}
-                                              </span>
-                                              <span
-                                                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                                                  isSelected
-                                                    ? 'bg-emerald-300 text-slate-950'
-                                                    : 'bg-emerald-50 text-emerald-700'
+                                                    : 'bg-amber-50 text-amber-800'
                                                 }`}
                                               >
                                                 {buildBookabilityLabel(service)}
                                               </span>
                                             </div>
-                                            <div className="mt-2 text-sm font-semibold">{service.name}</div>
-                                            <div
-                                              className={`mt-1 text-xs ${
-                                                isSelected ? 'text-white/70' : 'text-slate-500'
-                                              }`}
-                                            >
-                                              {buildServiceLocationLabel(service)}
-                                            </div>
-                                          </div>
-                                          </div>
-                                          <div className="shrink-0 text-sm font-semibold">
-                                            {formatPrice(service.amount_aud)}
                                           </div>
                                         </div>
-                                        <p
-                                          className={`mt-2 text-xs leading-5 ${
-                                            isSelected ? 'text-white/80' : 'text-slate-600'
-                                          }`}
-                                        >
-                                          {service.summary}
-                                        </p>
-                                        <div
-                                          className={`mt-3 rounded-[0.95rem] px-3 py-2 text-xs ${
-                                            isSelected ? 'bg-white/10 text-white/85' : 'bg-amber-50 text-amber-900'
-                                          }`}
-                                        >
-                                          <span className="font-semibold">Why it matches:</span> {bestForLabel}
-                                        </div>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                          {fitNotes.map((note) => (
-                                            <span
-                                              key={`${service.id}-${note}`}
-                                              className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                                                isSelected ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-700'
-                                              }`}
-                                            >
-                                              {note}
-                                            </span>
-                                          ))}
-                                        </div>
-                                        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                                          {[
-                                            { label: 'Price', value: formatPrice(service.amount_aud) },
-                                            {
-                                              label: 'Duration',
-                                              value: `${service.duration_minutes} min`,
-                                            },
-                                            {
-                                              label: 'Location',
-                                              value: buildServiceLocationLabel(service),
-                                            },
-                                            {
-                                              label: 'Next step',
-                                              value: buildServiceNextStepLabel(service),
-                                            },
-                                          ].map((fact) => (
-                                            <div
-                                              key={`${service.id}-${fact.label}`}
-                                              className={`rounded-[0.95rem] px-3 py-2 ${
-                                                isSelected ? 'bg-white/10 text-white' : 'bg-slate-50 text-slate-700'
-                                              }`}
-                                            >
-                                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
-                                                {fact.label}
-                                              </div>
-                                              <div className="mt-1 text-xs leading-5 font-medium">
-                                                {fact.value}
-                                              </div>
-                                            </div>
-                                          ))}
-                                        </div>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                          {buildServiceConfidenceNotes(service).map((note) => (
-                                            <span
-                                              key={`${service.id}-confidence-${note}`}
-                                              className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                                                isSelected ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-700'
-                                              }`}
-                                            >
-                                              {note}
-                                            </span>
-                                          ))}
-                                        </div>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                          <button
-                                            type="button"
-                                            onClick={() => handleSelectService(service.id)}
-                                            className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-                                              isSelected
-                                                ? 'bg-white text-slate-950 hover:bg-slate-100'
-                                                : 'bg-slate-950 text-white hover:bg-slate-800'
-                                            }`}
-                                          >
-                                            {isSelected ? 'Selected' : 'Select this'}
-                                          </button>
-                                          {service.map_url ? (
-                                            <a
-                                              href={service.map_url}
-                                              target="_blank"
-                                              rel="noreferrer"
-                                              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-                                                isSelected
-                                                  ? 'border border-white/20 bg-white/10 text-white hover:bg-white/15'
-                                                  : 'border border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'
-                                              }`}
-                                            >
-                                              Open Google map
-                                            </a>
-                                          ) : null}
-                                          {service.booking_url ? (
-                                            <a
-                                              href={service.booking_url}
-                                              target="_blank"
-                                              rel="noreferrer"
-                                              className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-                                                isSelected
-                                                  ? 'border border-white/20 bg-white/10 text-white hover:bg-white/15'
-                                                  : 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300'
-                                              }`}
-                                            >
-                                              Book now
-                                            </a>
-                                          ) : null}
-                                          <span
-                                            className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${
-                                              isSelected
-                                                ? 'bg-white/10 text-white'
-                                                : 'bg-amber-50 text-amber-800'
-                                            }`}
-                                          >
-                                            {buildBookabilityLabel(service)}
-                                          </span>
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            ) : null}
+                                      );
+                                    })}
+                                  </div>
+                                ) : null}
 
-                            {message.role === 'assistant' && message.matchedEvents?.length ? (
-                              <div className="grid gap-2">
-                                {message.matchedEvents.map((event) => {
+                                {message.role === 'assistant' && message.matchedEvents?.length ? (
+                                  <div className="grid gap-2">
+                                  {message.matchedEvents.map((event) => {
                                   const imageUrl = extractEventImageUrl(event);
                                   return (
                                     <div
@@ -1335,209 +1337,185 @@ export function BookingAssistantSection({
                                     </div>
                                   );
                                 })}
+                                  </div>
+                                ) : null}
                               </div>
-                            ) : null}
-                          </div>
-                        ))}
+                            ))}
 
-                        {loading ? (
-                          <div className="flex justify-start">
-                            <div className="rounded-[1.2rem] rounded-bl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
-                              BookedAI is finding the best match...
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-
-                      <div className="border-t border-slate-200 bg-[#fffaf5] p-3">
-                        <div
-                          key={`selected-match-${selectedServiceId || selectedEvent?.url || 'empty'}-${selectionAnimationKey}`}
-                          ref={selectedMatchRef}
-                          className={`rounded-[1.25rem] border border-slate-200 bg-white p-3 shadow-sm ${
-                            selectedService || selectedEvent ? 'booking-focus-in' : ''
-                          }`}
-                        >
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                Selected match
-                              </div>
-                              <div className="mt-1 text-sm font-semibold text-slate-950">
-                                {selectedService?.name ?? 'No selection yet'}
-                              </div>
-                            </div>
-                            {selectedService ? (
-                              <div className="shrink-0 text-sm font-bold text-slate-950">
-                                {formatPrice(selectedService.amount_aud)}
+                            {loading ? (
+                              <div className="flex justify-start">
+                                <div className="rounded-[1.2rem] rounded-bl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
+                                  BookedAI is finding the best match...
+                                </div>
                               </div>
                             ) : null}
                           </div>
 
-                          {selectedService ? (
-                            <>
-                              <div className="mt-2 text-xs text-slate-500">
-                                {selectedService.category} • {selectedService.duration_minutes} min
-                              </div>
-                              <p className="mt-3 text-xs leading-5 text-slate-600">
-                                {selectedService.summary}
-                              </p>
-                              <div className="mt-3 rounded-[1rem] bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
-                                <span className="font-semibold">Why this is ready:</span> {buildBestForLabel(selectedService, latestCustomerRequirement)}
-                              </div>
-                              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                                {[
-                                  { label: 'Price', value: formatPrice(selectedService.amount_aud) },
-                                  {
-                                    label: 'Duration',
-                                    value: `${selectedService.duration_minutes} min`,
-                                  },
-                                  {
-                                    label: 'Location',
-                                    value: buildServiceLocationLabel(selectedService),
-                                  },
-                                  {
-                                    label: 'Next step',
-                                    value: buildServiceNextStepLabel(selectedService),
-                                  },
-                                ].map((fact) => (
-                                  <div
-                                    key={`selected-${fact.label}`}
-                                    className="rounded-[1rem] bg-slate-50 px-3 py-2 text-xs text-slate-700"
-                                  >
-                                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                                      {fact.label}
-                                    </div>
-                                    <div className="mt-1 leading-5 font-medium text-slate-800">
-                                      {fact.value}
-                                    </div>
+                          <div className="border-t border-slate-200 bg-[#fffaf5] p-3">
+                            <div
+                              key={`selected-match-${selectedServiceId || selectedEvent?.url || 'empty'}-${selectionAnimationKey}`}
+                              ref={selectedMatchRef}
+                              className={`rounded-[1.25rem] border border-slate-200 bg-white p-3 shadow-sm ${
+                                selectedService || selectedEvent ? 'booking-focus-in' : ''
+                              }`}
+                            >
+                              <div className="flex items-center justify-between gap-3">
+                                <div>
+                                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                                    Selected match
                                   </div>
-                                ))}
-                              </div>
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {buildServiceConfidenceNotes(selectedService).map((note) => (
-                                  <span
-                                    key={`selected-confidence-${note}`}
-                                    className="rounded-full bg-emerald-50 px-2.5 py-1 text-[11px] font-medium text-emerald-700"
-                                  >
-                                    {note}
-                                  </span>
-                                ))}
-                              </div>
-                              <div className="mt-3 flex flex-wrap gap-2">
-                                {selectedService.map_url ? (
-                                  <a
-                                    href={selectedService.map_url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                                  >
-                                    Open Google map
-                                  </a>
-                                ) : null}
-                                {selectedService.booking_url ? (
-                                  <a
-                                    href={selectedService.booking_url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[11px] font-semibold text-emerald-700 transition hover:border-emerald-300 hover:bg-emerald-100"
-                                  >
-                                    Book now
-                                  </a>
-                                ) : null}
-                                <button
-                                  type="button"
-                                  onClick={handleOpenInlineBooking}
-                                  className="rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-slate-800"
-                                >
-                                  Continue to booking
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={onOpenAssistant}
-                                  className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                                >
-                                  Open full flow
-                                </button>
-                              </div>
-
-                              {compareServices.length >= 2 ? (
-                                <div className="mt-4 rounded-[1rem] border border-slate-200 bg-[#fbfbfd] p-3">
-                                  <div className="flex items-center justify-between gap-3">
-                                    <div>
-                                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                                        Compare top options
-                                      </div>
-                                      <div className="mt-1 text-xs leading-5 text-slate-600">
-                                        {buildDecisionSummary(compareServices, latestCustomerRequirement)}
-                                      </div>
-                                    </div>
-                                  </div>
-                                  <div className="mt-3 grid gap-2">
-                                    {compareServices.map((service, compareIndex) => (
-                                      <div
-                                        key={`compare-${service.id}`}
-                                        className={`rounded-[1rem] border px-3 py-3 ${
-                                          service.id === selectedServiceId
-                                            ? 'border-slate-950 bg-slate-950 text-white'
-                                            : 'border-slate-200 bg-white text-slate-800'
-                                        }`}
-                                      >
-                                        <div className="flex items-start justify-between gap-3">
-                                          <div>
-                                            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
-                                              {buildDecisionBadge(service, compareServices, compareIndex, latestCustomerRequirement)}
-                                            </div>
-                                            <div className="mt-1 text-sm font-semibold">{service.name}</div>
-                                          </div>
-                                          <div className="text-sm font-semibold">{formatPrice(service.amount_aud)}</div>
-                                        </div>
-                                        <div className="mt-2 text-xs opacity-80">
-                                          {service.duration_minutes} min
-                                          {(service.venue_name || service.location)
-                                            ? ` • ${[service.venue_name, service.location].filter(Boolean).join(' • ')}`
-                                            : ''}
-                                        </div>
-                                      </div>
-                                    ))}
+                                  <div className="mt-1 text-sm font-semibold text-slate-950">
+                                    {selectedService?.name ?? 'No selection yet'}
                                   </div>
                                 </div>
-                              ) : null}
-                            </>
-                          ) : (
-                            <div className="mt-2 text-xs leading-5 text-slate-500">
-                              Start with any booking request above. Once BookedAI finds the right option, the strongest match will stay pinned here for quick review.
-                            </div>
-                          )}
+                                {selectedService ? (
+                                  <div className="shrink-0 text-sm font-bold text-slate-950">
+                                    {formatPrice(selectedService.amount_aud)}
+                                  </div>
+                                ) : null}
+                              </div>
 
-                          {latestAssistantSelection?.matchedEvents?.length &&
-                          !latestAssistantSelection.matchedServices?.length ? (
-                            <div className="mt-3 rounded-[1rem] bg-emerald-50 px-3 py-2 text-xs leading-5 text-emerald-800">
-                              Live event results stay in the thread above with venue, time, and map actions so users can compare WSTI options without losing the chat flow.
+                              {selectedService ? (
+                                <>
+                                  <div className="mt-2 text-xs text-slate-500">
+                                    {selectedService.category} • {selectedService.duration_minutes} min
+                                  </div>
+                                  <p className="mt-3 text-xs leading-5 text-slate-600">
+                                    {selectedService.summary}
+                                  </p>
+                                  <div className="mt-3 rounded-[1rem] bg-amber-50 px-3 py-2 text-xs leading-5 text-amber-900">
+                                    <span className="font-semibold">Why this is ready:</span> {buildBestForLabel(selectedService, latestCustomerRequirement)}
+                                  </div>
+                                  <div className="mt-3 flex flex-wrap gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => setActivePreviewTab('booking')}
+                                      className="rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-slate-800"
+                                    >
+                                      Switch to booking
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={handleOpenInlineBooking}
+                                      className="rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                                    >
+                                      Continue below
+                                    </button>
+                                  </div>
+                                </>
+                              ) : (
+                                <div className="mt-2 text-xs leading-5 text-slate-500">
+                                  Start with any booking request above. Once BookedAI finds the right option, the strongest match will stay pinned here for quick review.
+                                </div>
+                              )}
                             </div>
-                          ) : null}
-                        </div>
-                      </div>
-
-                      <div className="border-t border-slate-200 bg-white p-3">
-                        <form onSubmit={handleSubmit}>
-                          <div className="flex items-center gap-2 rounded-[1.35rem] border border-slate-200 bg-slate-50 p-2">
-                            <input
-                              type="text"
-                              value={chatInput}
-                              onChange={(event) => setChatInput(event.target.value)}
-                              placeholder={content.searchPlaceholder}
-                              className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-slate-700 outline-none"
-                            />
-                            <button
-                              type="submit"
-                              disabled={loading || !chatInput.trim()}
-                              className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
-                            >
-                              {loading ? '...' : 'Send'}
-                            </button>
                           </div>
-                        </form>
-                      </div>
+
+                          <div className="border-t border-slate-200 bg-white p-3">
+                            <form onSubmit={handleSubmit}>
+                              <div className="flex items-center gap-2 rounded-[1.35rem] border border-slate-200 bg-slate-50 p-2">
+                                <input
+                                  type="text"
+                                  value={chatInput}
+                                  onChange={(event) => setChatInput(event.target.value)}
+                                  placeholder={content.searchPlaceholder}
+                                  className="min-w-0 flex-1 bg-transparent px-2 py-2 text-sm text-slate-700 outline-none"
+                                />
+                                <button
+                                  type="submit"
+                                  disabled={loading || !chatInput.trim()}
+                                  className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {loading ? '...' : 'Send'}
+                                </button>
+                              </div>
+                            </form>
+                          </div>
+                        </>
+                      ) : (
+                        <div className="min-h-[32rem] bg-[linear-gradient(180deg,#fcfcfe_0%,#f8fafc_100%)] px-3 py-4">
+                          <div className="rounded-[1.35rem] border border-slate-200 bg-white p-4 shadow-sm">
+                            <div className="flex items-center justify-between gap-3">
+                              <div>
+                                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-600">
+                                  Booking tab
+                                </div>
+                                <div className="mt-1 text-sm font-semibold text-slate-950">
+                                  {selectedService ? selectedService.name : 'Waiting for a selected service'}
+                                </div>
+                              </div>
+                              <div className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                                {selectedService ? 'Ready' : 'Idle'}
+                              </div>
+                            </div>
+
+                            {selectedService ? (
+                              <>
+                                <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                                  {[
+                                    { label: 'Category', value: selectedService.category },
+                                    { label: 'Duration', value: `${selectedService.duration_minutes} min` },
+                                    { label: 'Price', value: formatPrice(selectedService.amount_aud) },
+                                    { label: 'Location', value: buildServiceLocationLabel(selectedService) },
+                                  ].map((fact) => (
+                                    <div
+                                      key={`booking-tab-${fact.label}`}
+                                      className="rounded-[1rem] bg-slate-50 px-3 py-3 text-xs text-slate-700"
+                                    >
+                                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                        {fact.label}
+                                      </div>
+                                      <div className="mt-1 leading-5 font-medium text-slate-800">
+                                        {fact.value}
+                                      </div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div className="mt-4 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-3 text-xs leading-5 text-amber-900">
+                                  <span className="font-semibold">Next action:</span> confirm details in the booking form below, then continue to payment and confirmation.
+                                </div>
+
+                                <div className="mt-4 grid gap-2">
+                                  {[
+                                    'Customer details',
+                                    'Preferred time',
+                                    bookingResult ? 'Booking reference and payment ready' : 'Payment and confirmation handoff',
+                                  ].map((item, index) => (
+                                    <div key={item} className="flex items-center gap-3 rounded-[1rem] bg-[#f8fafc] px-3 py-3">
+                                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-950 text-[11px] font-semibold text-white">
+                                        {index + 1}
+                                      </div>
+                                      <div className="text-xs font-medium text-slate-700">{item}</div>
+                                    </div>
+                                  ))}
+                                </div>
+
+                                <div className="mt-4 flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={handleOpenInlineBooking}
+                                    className="rounded-full bg-slate-950 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-slate-800"
+                                  >
+                                    Continue to booking
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setActivePreviewTab('chat')}
+                                    className="rounded-full border border-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                                  >
+                                    Back to chat
+                                  </button>
+                                </div>
+                              </>
+                            ) : (
+                              <div className="mt-4 rounded-[1rem] bg-[#f8fafc] px-4 py-4 text-sm leading-6 text-slate-600">
+                                Pick a service in the chat tab first. Once selected, this booking tab becomes the clear next step and stays synced with the form below.
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1782,14 +1760,13 @@ export function BookingAssistantSection({
               ) : null}
             </div>
           </div>
-        </div>
-      </div>
-      <style>{`
+        </section>
+        <style>{`
         @keyframes floatPhone {
           0%, 100% { transform: translateY(0px); }
           50% { transform: translateY(-6px); }
         }
-      `}</style>
-    </section>
+        `}</style>
+    </>
   );
 }

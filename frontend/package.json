@@ -4,14 +4,21 @@
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
-    "preview": "vite preview --port 3000"
+    "build": "tsc && vite build && node scripts/generate-hosted-html.mjs",
+    "preview": "vite preview --port 3000",
+    "test:playwright": "playwright test",
+    "test:playwright:admin": "PLAYWRIGHT_PUBLIC_ASSISTANT_MODE=legacy playwright test --grep @admin",
+    "test:playwright:legacy": "PLAYWRIGHT_PUBLIC_ASSISTANT_MODE=legacy playwright test --grep @legacy",
+    "test:playwright:live-read": "PLAYWRIGHT_PUBLIC_ASSISTANT_MODE=live-read playwright test --grep @live-read",
+    "test:playwright:smoke": "npm run test:playwright:legacy && npm run test:playwright:live-read && npm run test:playwright:admin",
+    "test:release-gate": "npm run build && npm run test:playwright:smoke"
   },
   "dependencies": {
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/vite": "^4.2.2",
     "@types/react": "^18.3.12",
     "@types/react-dom": "^18.3.1",

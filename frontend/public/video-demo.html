@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>BookedAI Video Demo | Salon Booking Flow</title>
+    <title>BookedAI Demo Hub | Match, Trust, Book, Convert</title>
     <meta
       name="description"
-      content="BookedAI video demo page for a salon booking flow: enquiry, options, slot selection, and confirmation."
+      content="BookedAI demo hub showing how BookedAI turns a real customer enquiry into a match, booking trust decision, payment path, and revenue outcome."
     />
     <style>
       :root {
@@ -115,16 +115,6 @@
         margin-top: 10px;
       }
 
-      pre {
-        margin: 0;
-        overflow-x: auto;
-        white-space: pre-wrap;
-        word-break: break-word;
-        font-size: 14px;
-        line-height: 1.7;
-        color: #dbeafe;
-      }
-
       .actions {
         display: flex;
         flex-wrap: wrap;
@@ -162,71 +152,440 @@
         font-size: 14px;
         color: var(--muted);
       }
+
+      .scenario-grid {
+        display: grid;
+        gap: 20px;
+        margin-top: 32px;
+      }
+
+      @media (min-width: 860px) {
+        .scenario-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      .scenario-card {
+        border: 1px solid var(--panel-border);
+        border-radius: 24px;
+        background: rgba(2, 6, 23, 0.68);
+        padding: 24px;
+      }
+
+      .scenario-card.is-active {
+        border-color: rgba(56, 189, 248, 0.7);
+        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.24);
+      }
+
+      .scenario-tag {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 8px 12px;
+        font-size: 11px;
+        font-weight: 700;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: #bae6fd;
+        background: rgba(14, 165, 233, 0.14);
+      }
+
+      .scenario-card h3 {
+        margin: 14px 0 10px;
+        font-size: 24px;
+      }
+
+      .scenario-copy {
+        margin: 0;
+        color: var(--muted);
+        line-height: 1.7;
+      }
+
+      .scenario-list {
+        margin-top: 16px;
+      }
+
+      .scenario-actions {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .mini-button {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border-radius: 14px;
+        padding: 10px 14px;
+        text-decoration: none;
+        font-size: 14px;
+        font-weight: 700;
+      }
+
+      .mini-button-primary {
+        background: rgba(56, 189, 248, 0.18);
+        color: #bae6fd;
+      }
+
+      .mini-button-secondary {
+        border: 1px solid var(--panel-border);
+        background: rgba(15, 23, 42, 0.6);
+        color: var(--text);
+      }
     </style>
   </head>
   <body>
     <main>
       <section class="panel">
-        <p class="eyebrow">Video Demo</p>
-        <h1>Salon Booking Flow Demo</h1>
-        <p class="lead">
-          This video demo page is designed for BookedAI.au and follows a customer
-          who needs a wedding haircut tomorrow. The flow shows enquiry,
-          available options, slot selection, and a confirmed booking with
-          BookedAI.
+        <p class="eyebrow" id="scenario-eyebrow">Demo Hub</p>
+        <h1 id="scenario-title">See how BookedAI turns enquiries into revenue</h1>
+        <p class="lead" id="scenario-lead">
+          This short walkthrough follows a salon customer from the first message
+          through AI understanding, matched options, booking trust, and a
+          confirmed outcome. It is designed to show how BookedAI helps service
+          businesses convert demand into bookings, not just generate chat replies.
         </p>
 
-        <video class="player" controls preload="metadata" playsinline>
-          <source src="/bookedai-salon-demo.mp4" type="video/mp4" />
+        <video class="player" id="scenario-video" controls preload="metadata" playsinline>
+          <source id="scenario-video-source" src="/bookedai-salon-demo-generated.mp4" type="video/mp4" />
           Your browser does not support the video tag.
         </video>
 
         <div class="grid">
           <article class="card">
-            <h2>Storyboard</h2>
-            <ul>
+            <h2 id="story-title">Demo Story</h2>
+            <ul id="story-list">
               <li>Customer asks for a haircut booking needed tomorrow for a wedding.</li>
-              <li>BookedAI replies instantly with clear available time options.</li>
-              <li>The customer selects a preferred slot in a guided flow.</li>
-              <li>BookedAI confirms the booking and closes the conversation clearly.</li>
+              <li>BookedAI understands the request and matches the right booking path.</li>
+              <li>BookedAI shows clear booking options and trust instead of a vague reply.</li>
+              <li>The customer selects a preferred slot and moves toward a confirmed outcome.</li>
             </ul>
           </article>
 
           <article class="card">
-            <h2>OpenAI Demo Prompt</h2>
-            <pre>from openai import OpenAI
-
-client = OpenAI()
-
-video = client.videos.create(
-    model="sora-2",
-    prompt="Create a 30-second style BookedAI demo for a salon customer who needs a wedding haircut tomorrow. Show the assistant presenting booking options, the customer selecting a time, and the booking being confirmed with BookedAI.",
-    size="1280x720",
-    seconds=20,
-)</pre>
+            <h2 id="proof-title">What This Shows</h2>
+            <ul id="proof-list">
+              <li>AI matching instead of generic chatbot responses.</li>
+              <li>Booking trust through clear available options and next steps.</li>
+              <li>A payment or confirmation path that leads toward revenue.</li>
+              <li>A founder-friendly demo asset you can share after events and calls.</li>
+            </ul>
           </article>
         </div>
 
         <div class="actions">
-          <a class="button button-primary" href="/bookedai-salon-demo.mp4">
+          <a class="button button-primary" id="primary-cta" href="/?demo=open">
+            Book Live Demo
+          </a>
+          <a class="button button-secondary" href="/?assistant=open">
+            Start Free Trial
+          </a>
+          <a class="button button-secondary" href="/#pricing">
+            See Pricing
+          </a>
+          <a class="button button-secondary" id="mp4-link" href="/bookedai-salon-demo-generated.mp4">
             Open MP4 Link
-          </a>
-          <a class="button button-secondary" href="https://bookedai.au/">
-            Back to BookedAI.au
-          </a>
-          <a
-            class="button button-secondary"
-            href="mailto:info@bookedai.au?subject=BookedAI%20Salon%20Video%20Demo"
-          >
-            Request Full Demo
           </a>
         </div>
 
-        <p class="note">
-          This public page now hosts the live demo video and a direct MP4 link
-          for sharing.
+        <p class="note" id="scenario-note">
+          Use this page as a shareable demo link, then move buyers directly into
+          the live demo, free-trial flow, or pricing section on the current site.
         </p>
+
+        <div class="scenario-grid">
+          <article class="scenario-card" data-scenario="swim-school">
+            <div class="scenario-tag">Swim School</div>
+            <h3>Parent enquiry to class booking path</h3>
+            <p class="scenario-copy">
+              Show a parent asking for beginner swimming lessons for a 6-year-old,
+              then walk through matching, class availability, waitlist logic, and
+              trial-class payment.
+            </p>
+            <ul class="scenario-list">
+              <li>Customer request: child age, level, and preferred suburb.</li>
+              <li>BookedAI matches the right class or next-best alternative.</li>
+              <li>Trust state: available, waitlist, or callback path.</li>
+              <li>Outcome: payment or trial-class booking starts immediately.</li>
+            </ul>
+            <div class="scenario-actions">
+              <a class="mini-button mini-button-primary" href="/video-demo-swim-school.html">Open Swim Page</a>
+              <a class="mini-button mini-button-secondary" href="/video-demo.html?scenario=swim-school">View In Hub</a>
+            </div>
+          </article>
+
+          <article class="scenario-card" data-scenario="clinic">
+            <div class="scenario-tag">Clinic</div>
+            <h3>Symptom question to trusted appointment path</h3>
+            <p class="scenario-copy">
+              Show a patient asking which consultation they need, then guide them
+              into the right booking path with availability clarity and payment or
+              invoice options.
+            </p>
+            <ul class="scenario-list">
+              <li>Customer request: symptom or appointment need.</li>
+              <li>BookedAI matches the correct consultation type.</li>
+              <li>Trust state: direct booking, callback, or provider handoff.</li>
+              <li>Outcome: appointment request captured without confusion.</li>
+            </ul>
+            <div class="scenario-actions">
+              <a class="mini-button mini-button-primary" href="/video-demo-clinic.html">Open Clinic Page</a>
+              <a class="mini-button mini-button-secondary" href="/video-demo.html?scenario=clinic">View In Hub</a>
+            </div>
+          </article>
+
+          <article class="scenario-card" data-scenario="salon">
+            <div class="scenario-tag">Salon</div>
+            <h3>Style request to confirmed booking</h3>
+            <p class="scenario-copy">
+              Use the current salon video to show how BookedAI takes a high-intent
+              beauty enquiry and turns it into a guided booking flow with clearer
+              trust and less front-desk back-and-forth.
+            </p>
+            <ul class="scenario-list">
+              <li>Customer request: cut, colour, or event-ready booking.</li>
+              <li>BookedAI clarifies the service and suggests the next step.</li>
+              <li>Trust state: slot available and ready to confirm.</li>
+              <li>Outcome: booking confirmed and revenue captured faster.</li>
+            </ul>
+            <div class="scenario-actions">
+              <a class="mini-button mini-button-primary" href="/video-demo-salon.html">Open Salon Page</a>
+              <a class="mini-button mini-button-secondary" href="/video-demo.html?scenario=salon">View In Hub</a>
+            </div>
+          </article>
+
+          <article class="scenario-card" data-scenario="tutor">
+            <div class="scenario-tag">Tutor</div>
+            <h3>Learning need to matched session flow</h3>
+            <p class="scenario-copy">
+              Show a parent or student asking for help with Year 10 maths, then
+              guide them into the right tutor, time preference, and invoice or
+              card-payment next step.
+            </p>
+            <ul class="scenario-list">
+              <li>Customer request: subject, year level, and urgency.</li>
+              <li>BookedAI matches the most relevant tutor path.</li>
+              <li>Trust state: session available or callback follow-up.</li>
+              <li>Outcome: qualified lead moves toward booked session.</li>
+            </ul>
+            <div class="scenario-actions">
+              <a class="mini-button mini-button-primary" href="/video-demo-tutor.html">Open Tutor Page</a>
+              <a class="mini-button mini-button-secondary" href="/video-demo.html?scenario=tutor">View In Hub</a>
+            </div>
+          </article>
+
+          <article class="scenario-card" data-scenario="trades">
+            <div class="scenario-tag">Trades</div>
+            <h3>Urgent job request to quote or booking path</h3>
+            <p class="scenario-copy">
+              Show a plumbing or electrical enquiry where timing matters, then
+              guide the customer into qualification, callback, booking, or invoice
+              flow without losing the lead.
+            </p>
+            <ul class="scenario-list">
+              <li>Customer request: job type, urgency, and location.</li>
+              <li>BookedAI qualifies the work and routes the next step.</li>
+              <li>Trust state: available, partner, or callback path.</li>
+              <li>Outcome: quote-ready lead captured instead of missed.</li>
+            </ul>
+            <div class="scenario-actions">
+              <a class="mini-button mini-button-primary" href="/video-demo-trades.html">Open Trades Page</a>
+              <a class="mini-button mini-button-secondary" href="/video-demo.html?scenario=trades">View In Hub</a>
+            </div>
+          </article>
+        </div>
       </section>
     </main>
+
+    <script>
+      const scenarioContent = {
+        salon: {
+          eyebrow: "Salon Demo",
+          title: "See how BookedAI converts a salon enquiry into a confirmed booking",
+          lead:
+            "This version of the demo focuses on a salon customer who needs a wedding-ready appointment quickly. It shows AI understanding, matched service flow, booking trust, and a confirmed commercial outcome.",
+          storyTitle: "Salon Story",
+          story: [
+            "Customer asks for a haircut booking needed tomorrow for a wedding.",
+            "BookedAI understands the request and matches the right booking path.",
+            "BookedAI shows clear booking options and trust instead of a vague reply.",
+            "The customer selects a preferred slot and moves toward a confirmed outcome."
+          ],
+          proofTitle: "Why Salon Teams Care",
+          proof: [
+            "AI matching instead of generic chatbot responses.",
+            "Booking trust through clear available options and next steps.",
+            "A fast route from web enquiry to real appointment confirmation.",
+            "A founder-friendly demo asset you can share after events and calls."
+          ],
+          note:
+            "Best for salon and beauty conversations where speed, slot clarity, and a stronger booking path help convert more demand.",
+          cta: "Book Salon Demo",
+          video: "/bookedai-salon-demo-generated.mp4",
+          pageTitle: "BookedAI Salon Demo | Match, Trust, Book, Convert",
+          description:
+            "BookedAI salon demo showing how a beauty-service enquiry becomes a matched booking path with trust, confirmation, and revenue outcome."
+        },
+        "swim-school": {
+          eyebrow: "Swim School Demo",
+          title: "See how BookedAI helps convert parent enquiries into class bookings",
+          lead:
+            "This version focuses on a swim school use case: a parent enquires about beginner lessons for a child, and BookedAI guides the request through matching, availability logic, trust, and the next commercial step.",
+          storyTitle: "Swim School Story",
+          story: [
+            "A parent asks for beginner lessons for a 6-year-old in a preferred suburb.",
+            "BookedAI understands age, level, timing, and the likely class path.",
+            "BookedAI shows available class options, waitlist logic, or callback next step.",
+            "The enquiry moves toward trial-class payment or a confirmed booking path."
+          ],
+          proofTitle: "Why Swim Schools Care",
+          proof: [
+            "Parent enquiries are matched to the most relevant class path faster.",
+            "Trust is clearer when a class is available, waitlisted, or needs follow-up.",
+            "After-hours demand is still captured instead of going cold.",
+            "The business sees a cleaner route to trial-class or full booking revenue."
+          ],
+          note:
+            "Best for swim schools and child activity operators where parents need confidence, clarity, and a fast next step.",
+          cta: "Book Swim Demo",
+          video: "/bookedai-swim-school-demo-generated.mp4",
+          pageTitle: "BookedAI Swim School Demo | Parent Enquiry To Class Booking",
+          description:
+            "BookedAI swim school demo showing how a parent enquiry becomes a matched class path, trust state, and payment or booking outcome."
+        },
+        clinic: {
+          eyebrow: "Clinic Demo",
+          title: "See how BookedAI guides a patient enquiry into the right appointment path",
+          lead:
+            "This version is built for clinics and allied health teams. It shows how BookedAI can take a symptom or appointment question, match the right consultation type, show trust clearly, and move the patient toward booking or callback.",
+          storyTitle: "Clinic Story",
+          story: [
+            "A patient asks what kind of appointment they need for symptoms or review.",
+            "BookedAI understands urgency, likely service type, and timing preference.",
+            "BookedAI matches the request to the most appropriate consultation path.",
+            "The patient moves toward direct booking, callback, or invoice path with more confidence."
+          ],
+          proofTitle: "Why Clinics Care",
+          proof: [
+            "Patients get a clearer path instead of a confusing front-desk back-and-forth.",
+            "Booking trust helps the clinic avoid overpromising uncertain availability.",
+            "The enquiry is captured even if the final path needs human follow-up.",
+            "The business protects appointment demand that might otherwise be missed."
+          ],
+          note:
+            "Best for clinics that want stronger patient triage, cleaner booking trust, and fewer lost appointment requests.",
+          cta: "Book Clinic Demo",
+          video: "/bookedai-clinic-demo-generated.mp4",
+          pageTitle: "BookedAI Clinic Demo | Patient Enquiry To Trusted Booking Path",
+          description:
+            "BookedAI clinic demo showing how a patient enquiry becomes a matched appointment path with booking trust and a commercial next step."
+        },
+        tutor: {
+          eyebrow: "Tutor Demo",
+          title: "See how BookedAI turns a tutoring enquiry into a matched session path",
+          lead:
+            "This version focuses on tutoring and education operators. It shows how BookedAI can understand subject need, match the right session path, show timing trust, and move the lead toward booking or invoice.",
+          storyTitle: "Tutor Story",
+          story: [
+            "A parent or student asks for Year 10 maths help this week.",
+            "BookedAI understands the subject, year level, urgency, and likely session fit.",
+            "BookedAI shows the most relevant tutor path and next-step options.",
+            "The enquiry moves toward a booked session or an invoice-ready follow-up."
+          ],
+          proofTitle: "Why Tutors Care",
+          proof: [
+            "Tutoring enquiries are qualified faster and with less manual messaging.",
+            "Parents get a clearer view of the next step instead of waiting for a callback.",
+            "Trust stays visible when the right session path is not immediately available.",
+            "Revenue moves faster through a cleaner booking or invoice path."
+          ],
+          note:
+            "Best for tutors, coaching operators, and education businesses where matching and timing clarity drive conversion.",
+          cta: "Book Tutor Demo",
+          video: "/bookedai-tutor-demo-generated.mp4",
+          pageTitle: "BookedAI Tutor Demo | Learning Need To Matched Session Flow",
+          description:
+            "BookedAI tutor demo showing how a tutoring enquiry becomes a matched session path, trust state, and booking or invoice outcome."
+        },
+        trades: {
+          eyebrow: "Trades Demo",
+          title: "See how BookedAI captures urgent trade enquiries before they go cold",
+          lead:
+            "This version is for trades and home-service teams. It shows how BookedAI takes an urgent job request, qualifies it quickly, shows the right trust state, and moves the lead toward booking, callback, or invoice.",
+          storyTitle: "Trades Story",
+          story: [
+            "A customer asks for help with a leaking tap or urgent electrical issue.",
+            "BookedAI understands the job type, urgency, and likely service path.",
+            "BookedAI guides the enquiry toward availability, callback, or partner route.",
+            "The lead becomes quote-ready instead of being lost while the team is busy."
+          ],
+          proofTitle: "Why Trades Teams Care",
+          proof: [
+            "Urgent jobs are qualified faster while crews are already on the road.",
+            "Trust is clearer when the right next step is callback, not instant booking.",
+            "The business captures commercial intent instead of losing the lead to a competitor.",
+            "A stronger revenue path replaces missed calls and slow admin follow-up."
+          ],
+          note:
+            "Best for trades teams where speed, qualification, and callback trust make the difference between winning and losing jobs.",
+          cta: "Book Trades Demo",
+          video: "/bookedai-trades-demo-generated.mp4",
+          pageTitle: "BookedAI Trades Demo | Urgent Job Request To Revenue Path",
+          description:
+            "BookedAI trades demo showing how a home-service enquiry becomes a qualified path toward booking, callback, or invoice."
+        }
+      };
+
+      const params = new URLSearchParams(window.location.search);
+      const scenario = params.get("scenario");
+      const content = scenario && scenarioContent[scenario] ? scenarioContent[scenario] : null;
+
+      if (content) {
+        document.title = content.pageTitle;
+        const description = document.querySelector('meta[name="description"]');
+        if (description) description.setAttribute("content", content.description);
+        document.getElementById("scenario-eyebrow").textContent = content.eyebrow;
+        document.getElementById("scenario-title").textContent = content.title;
+        document.getElementById("scenario-lead").textContent = content.lead;
+        document.getElementById("story-title").textContent = content.storyTitle;
+        document.getElementById("proof-title").textContent = content.proofTitle;
+        document.getElementById("scenario-note").textContent = content.note;
+        document.getElementById("primary-cta").textContent = content.cta;
+        const source = document.getElementById("scenario-video-source");
+        const video = document.getElementById("scenario-video");
+        const mp4Link = document.getElementById("mp4-link");
+        if (source && video && content.video) {
+          source.setAttribute("src", content.video);
+          video.load();
+        }
+        if (mp4Link && content.video) {
+          mp4Link.setAttribute("href", content.video);
+        }
+
+        const storyList = document.getElementById("story-list");
+        storyList.innerHTML = "";
+        content.story.forEach((item) => {
+          const li = document.createElement("li");
+          li.textContent = item;
+          storyList.appendChild(li);
+        });
+
+        const proofList = document.getElementById("proof-list");
+        proofList.innerHTML = "";
+        content.proof.forEach((item) => {
+          const li = document.createElement("li");
+          li.textContent = item;
+          proofList.appendChild(li);
+        });
+
+        const cards = document.querySelectorAll("[data-scenario]");
+        cards.forEach((card) => {
+          if (card.getAttribute("data-scenario") === scenario) {
+            card.classList.add("is-active");
+          }
+        });
+      }
+    </script>
   </body>
 </html>

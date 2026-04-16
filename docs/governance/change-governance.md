@@ -45,6 +45,8 @@ Do not patch one layer only if the behavior change clearly spans more than one l
 
 A change is not considered complete until the corresponding architecture and audience documents are updated where needed.
 
+If a prompt introduces substantial new architecture, module, migration, workflow, governance, or product-structure description, that description should also be written back into the corresponding `.md` files and reflected in `project.md` as part of the closure standard.
+
 ## Synchronization Rules
 
 ### If frontend changes
@@ -120,3 +122,4 @@ A request should only be considered fully handled when:
 2. the related documentation is aligned
 3. previous behavior descriptions were reviewed before upgrading them
 4. the final state is internally consistent for all affected audiences
+5. substantial prompt-level descriptions have been recorded into the relevant documentation files and `project.md` unless the user explicitly chooses otherwise

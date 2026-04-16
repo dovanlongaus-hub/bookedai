@@ -1,0 +1,7 @@
+<svg width="512" height="192" viewBox="0 0 512 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="192" rx="28" fill="#FFFFFF"/>
+  <path d="M62 26C66 20 75 20 79 26L116 78C120 83 117 90 110 90H90L112 163C114 169 107 174 102 170L41 121C36 117 35 109 40 104L63 82H46C39 82 36 75 40 70L62 26Z" fill="#3ECF8E"/>
+  <text x="148" y="80" font-family="Arial, Helvetica, sans-serif" font-size="38" font-weight="700" fill="#111827">supabase</text>
+  <text x="28" y="142" font-family="Arial, Helvetica, sans-serif" font-size="28" font-weight="700" fill="#111827">Backend platform partner</text>
+  <text x="28" y="169" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600" fill="#6B7280">Data, auth, storage, and API foundation for BookedAI</text>
+</svg>

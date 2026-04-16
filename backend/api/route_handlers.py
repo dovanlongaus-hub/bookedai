@@ -1,23 +1,26 @@
 from __future__ import annotations
 
 import base64
+import csv
 import hashlib
 import hmac
 import json
-import mimetypes
 import re
 import secrets
 import unicodedata
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from io import StringIO
 from json import JSONDecodeError
 from pathlib import Path
+from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, FastAPI, File, Header, HTTPException, Request, UploadFile, status
+from fastapi import APIRouter, FastAPI, File, Header, HTTPException, Request, Response, UploadFile, status
 from sqlalchemy import desc, func, select
 
 from config import Settings, get_settings
+from core.feature_flags import is_flag_enabled
 from db import (
     ConversationEvent,
     PartnerProfile,
@@ -27,7 +30,10 @@ from db import (
     get_session,
     init_database,
 )
+from integrations.ai_models import SemanticSearchAdapter
 from rate_limit import InMemoryRateLimiter, TooManyRequestsError
+from repositories.base import RepositoryContext
+from repositories.tenant_repository import TenantRepository
 from schemas import BookingWorkflowPayload, TawkMessage, TawkWebhookResponse
 from schemas import (
     AdminConfigResponse,
@@ -37,6 +43,7 @@ from schemas import (
     AdminApiInventoryResponse,
     AdminLoginRequest,
     AdminOverviewResponse,
+    AdminServiceCatalogQualityResponse,
     AdminServiceImportRequest,
     AdminServiceMerchantListResponse,
     AdminSessionResponse,
@@ -45,6 +52,9 @@ from schemas import (
     BookingAssistantChatResponse,
     BookingAssistantSessionRequest,
     BookingAssistantSessionResponse,
+    DemoBriefRequest,
+    DemoBriefResponse,
+    DemoBookingSyncResponse,
     EmailInboxResponse,
     EmailSendRequest,
     EmailSendResponse,
@@ -57,6 +67,35 @@ from schemas import (
     PricingConsultationResponse,
     ServiceCatalogItem,
 )
+from service_layer.admin_presenters import (
+    build_booking_record,
+    build_partner_item,
+    build_service_catalog_item,
+    build_service_catalog_quality_counts,
+    build_service_merchant_item,
+    build_timeline_event,
+    filter_booking_records,
+    merge_booking_records,
+)
+from service_layer.catalog_quality_service import apply_catalog_quality_gate
+from service_layer.admin_dashboard_service import (
+    build_admin_booking_detail_payload,
+    build_admin_bookings_payload,
+    build_admin_bookings_shadow_summary,
+    build_admin_overview_payload,
+    send_admin_booking_confirmation_email,
+)
+from service_layer.booking_mirror_service import dual_write_booking_assistant_session
+from service_layer.booking_mirror_service import (
+    dual_write_demo_request,
+    dual_write_pricing_consultation,
+    sync_callback_status_to_mirrors,
+)
+from service_layer.demo_workflow_service import (
+    submit_demo_brief,
+    sync_demo_booking_from_brief as sync_demo_booking_from_brief_service,
+)
+from service_layer.prompt9_semantic_search_service import Prompt9SemanticSearchService
 from services import (
     BookingAssistantService,
     EmailService,
@@ -70,134 +109,152 @@ from services import (
     verify_bearer_token,
     verify_tawk_signature,
 )
+from service_layer.upload_service import save_uploaded_file
 
 settings = get_settings()
 
-ALLOWED_DOCUMENT_EXTENSIONS = {
-    ".pdf": "application/pdf",
-    ".doc": "application/msword",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".xls": "application/vnd.ms-excel",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".ppt": "application/vnd.ms-powerpoint",
-    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-    ".txt": "text/plain",
-    ".csv": "text/csv",
-}
-
-ALLOWED_IMAGE_CONTENT_TYPES = {
-    ".jpg": "image/jpeg",
-    ".png": "image/png",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-}
-
-
-def detect_image_extension(content: bytes) -> str | None:
-    if content.startswith(b"\xff\xd8\xff"):
-        return ".jpg"
-    if content.startswith(b"\x89PNG\r\n\x1a\n"):
-        return ".png"
-    if content.startswith((b"GIF87a", b"GIF89a")):
-        return ".gif"
-    if len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP":
-        return ".webp"
-    return None
-
-
-def guess_document_extension(file: UploadFile) -> str | None:
-    original_name = (file.filename or "").strip()
-    suffix = Path(original_name).suffix.lower()
-    if suffix in ALLOWED_DOCUMENT_EXTENSIONS:
-        return suffix
-
-    guessed_from_type = mimetypes.guess_extension(file.content_type or "")
-    if guessed_from_type:
-        normalized = guessed_from_type.lower()
-        if normalized == ".jpeg":
-            normalized = ".jpg"
-        if normalized in ALLOWED_DOCUMENT_EXTENSIONS:
-            return normalized
-
-    return None
-
-
-def prepare_upload_target(
-    cfg: Settings,
-    *,
-    category: str,
-    filename: str,
-) -> tuple[Path, str]:
-    relative_dir = Path(category) / secrets.token_hex(2)
-    target_dir = Path(cfg.upload_base_dir) / relative_dir
-    target_dir.mkdir(parents=True, exist_ok=True)
-    relative_url = f"/{relative_dir.as_posix()}/{filename}"
-    return target_dir / filename, relative_url
-
-
-async def save_uploaded_file(
-    request: Request,
-    *,
-    file: UploadFile,
-    allowed_kind: str,
-) -> dict[str, str | int]:
-    await enforce_rate_limit(
-        request,
-        scope=f"{allowed_kind}-upload",
-        limit=20,
-        window_seconds=60,
-    )
-
-    cfg: Settings = request.app.state.settings
-    content = await file.read()
-    if not content:
-        raise HTTPException(status_code=400, detail="Uploaded file is empty")
-    if len(content) > cfg.upload_max_file_size_bytes:
-        raise HTTPException(
-            status_code=413,
-            detail=f"File exceeds the {cfg.upload_max_file_size_bytes} byte limit",
-        )
-
-    image_extension = detect_image_extension(content)
-    if allowed_kind == "images":
-        if image_extension is None:
-            raise HTTPException(
-                status_code=400,
-                detail="Only JPEG, PNG, GIF, and WebP images are allowed",
-            )
-        extension = image_extension
-        category = "images"
-        content_type = ALLOWED_IMAGE_CONTENT_TYPES[extension]
-    else:
-        extension = image_extension or guess_document_extension(file)
-        if extension is None:
-            raise HTTPException(
-                status_code=400,
-                detail=(
-                    "Allowed files: JPEG, PNG, GIF, WebP, PDF, DOC, DOCX, XLS, XLSX, "
-                    "PPT, PPTX, TXT, CSV"
-                ),
-            )
-        category = "images" if extension in ALLOWED_IMAGE_CONTENT_TYPES else "documents"
-        content_type = (
-            ALLOWED_IMAGE_CONTENT_TYPES.get(extension)
-            or ALLOWED_DOCUMENT_EXTENSIONS.get(extension)
-            or file.content_type
-            or "application/octet-stream"
-        )
-
-    filename = f"{secrets.token_urlsafe(16).rstrip('=')}{extension}"
-    target_path, relative_url = prepare_upload_target(cfg, category=category, filename=filename)
-    target_path.write_bytes(content)
-
-    return {
-        "filename": filename,
-        "content_type": content_type,
-        "size": len(content),
-        "url": f"{cfg.upload_public_base_url.rstrip('/')}{relative_url}",
-        "path": relative_url,
-    }
-
+DEFAULT_PARTNER_PROFILES = [
+    {
+        "name": "Western Sydney Tech Innovators",
+        "category": "AI Ecosystem Partner",
+        "website_url": "https://www.meetup.com/western-sydney-tech-innovators/",
+        "description": "WSTI is a Western Sydney grassroots AI community running practical meetups, project hubs, and startup-friendly events at Western Sydney Startup Hub.",
+        "logo_url": "/wsti-logo.webp",
+        "image_url": "/wsti-logo.webp",
+        "featured": 1,
+        "sort_order": 0,
+    },
+    {
+        "name": "Carelogix",
+        "category": "Health AI Partner",
+        "website_url": None,
+        "description": "Carelogix is presented as a healthcare-oriented AI partner on the BookedAI ecosystem wall.",
+        "logo_url": "https://upload.bookedai.au/images/e26b/bxVyyqW-QH4J9AplLIpe0Q.png",
+        "image_url": "https://upload.bookedai.au/images/e26b/bxVyyqW-QH4J9AplLIpe0Q.png",
+        "featured": 1,
+        "sort_order": 1,
+    },
+    {
+        "name": "ClearPath",
+        "category": "AI Partner",
+        "website_url": None,
+        "description": "ClearPath appears on the BookedAI partner wall as part of the current AI and startup partner lineup.",
+        "logo_url": "https://upload.bookedai.au/images/8429/c31vEhemWqkAEE5_LWukOg.png",
+        "image_url": "https://upload.bookedai.au/images/8429/c31vEhemWqkAEE5_LWukOg.png",
+        "featured": 1,
+        "sort_order": 2,
+    },
+    {
+        "name": "METALMIND AI",
+        "category": "AI Partner",
+        "website_url": None,
+        "description": "MetalMind AI is featured on the BookedAI partner wall as an AI-focused collaborator with cross-border trade positioning.",
+        "logo_url": "https://upload.bookedai.au/images/2766/0cbr3ibd6HU7ziF5_J-tEQ.jpg",
+        "image_url": "https://upload.bookedai.au/images/2766/0cbr3ibd6HU7ziF5_J-tEQ.jpg",
+        "featured": 1,
+        "sort_order": 3,
+    },
+    {
+        "name": "NOVO PRINT",
+        "category": "Customer Partner",
+        "website_url": "https://novoprints.com.au/",
+        "description": "NOVO PRINT is a print and signage business serving Australian operators with custom print, branding, and promotional production.",
+        "logo_url": "https://upload.bookedai.au/images/a7ec/V0HPc7AinO_gYx7TtFj-qw.jpg",
+        "image_url": "https://upload.bookedai.au/images/a7ec/V0HPc7AinO_gYx7TtFj-qw.jpg",
+        "featured": 1,
+        "sort_order": 4,
+    },
+    {
+        "name": "Future Swim Caringbah",
+        "category": "Client Example",
+        "website_url": "https://bookedai.au",
+        "description": "Swim school example used on the landing page to demonstrate a real enquiry-to-booking flow for parents searching nearby lessons.",
+        "logo_url": "https://images.pexels.com/photos/1263348/pexels-photo-1263348.jpeg?auto=compress&cs=tinysrgb&w=1200",
+        "image_url": "https://images.pexels.com/photos/1263348/pexels-photo-1263348.jpeg?auto=compress&cs=tinysrgb&w=1200",
+        "featured": 1,
+        "sort_order": 5,
+    },
+    {
+        "name": "Zoho for Startups",
+        "category": "CRM and Email Partner",
+        "website_url": "https://www.zoho.com/startups/",
+        "description": "Zoho supports CRM and email operations that help BookedAI manage follow-up, customer records, and lifecycle communication.",
+        "logo_url": "/partners/zoho-startups.svg",
+        "image_url": "/partners/zoho-startups.svg",
+        "featured": 1,
+        "sort_order": 6,
+    },
+    {
+        "name": "Google for Startups",
+        "category": "Cloud and AI Partner",
+        "website_url": "https://startup.google.com/",
+        "description": "Google for Startups supports the project with cloud infrastructure pathways and Gemini AI experimentation across product and delivery workflows.",
+        "logo_url": "/partners/google-startups.svg",
+        "image_url": "/partners/google-startups.svg",
+        "featured": 1,
+        "sort_order": 7,
+    },
+    {
+        "name": "OpenAI for Startups",
+        "category": "AI Model Partner",
+        "website_url": "https://openai.com/",
+        "description": "OpenAI supports BookedAI with ChatGPT and API model capabilities that power conversational booking intelligence and assistant orchestration.",
+        "logo_url": "/partners/openai-startups.svg",
+        "image_url": "/partners/openai-startups.svg",
+        "featured": 1,
+        "sort_order": 8,
+    },
+    {
+        "name": "Stripe",
+        "category": "Payments Partner",
+        "website_url": "https://stripe.com/au",
+        "description": "Stripe powers checkout, payment state, and commercial handoff so customer conversations can move into paid booking outcomes.",
+        "logo_url": "/partners/stripe.svg",
+        "image_url": "/partners/stripe.svg",
+        "featured": 1,
+        "sort_order": 9,
+    },
+    {
+        "name": "n8n",
+        "category": "Workflow Partner",
+        "website_url": "https://n8n.io/",
+        "description": "n8n runs automation across reminders, CRM updates, booking follow-up, and downstream operational workflows.",
+        "logo_url": "/partners/n8n.svg",
+        "image_url": "/partners/n8n.svg",
+        "featured": 1,
+        "sort_order": 10,
+    },
+    {
+        "name": "Supabase",
+        "category": "Backend Platform Partner",
+        "website_url": "https://supabase.com/",
+        "description": "Supabase supports authentication, data, storage, and backend service foundations used across the BookedAI platform.",
+        "logo_url": "/partners/supabase.svg",
+        "image_url": "/partners/supabase.svg",
+        "featured": 1,
+        "sort_order": 11,
+    },
+    {
+        "name": "Codex Property",
+        "category": "Housing Partner",
+        "website_url": "https://codexproperty.com.au",
+        "description": "Codex Property helps BookedAI extend the partner network into housing discovery and project consultation journeys.",
+        "logo_url": "/partners/codex-property.svg",
+        "image_url": "/partners/codex-property.svg",
+        "featured": 1,
+        "sort_order": 12,
+    },
+    {
+        "name": "Auzland",
+        "category": "Housing Partner",
+        "website_url": "https://auzland.au/",
+        "description": "Auzland supports housing consultations where customers want to discuss suitable projects, locations, and purchase timing.",
+        "logo_url": "/partners/auzland.svg",
+        "image_url": "/partners/auzland.svg",
+        "featured": 1,
+        "sort_order": 13,
+    },
+]
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -209,7 +266,9 @@ async def lifespan(app: FastAPI):
     await init_database(engine)
     booking_assistant_service = BookingAssistantService(settings)
     pricing_service = PricingService(settings)
+    semantic_search_service = Prompt9SemanticSearchService(SemanticSearchAdapter(settings))
     await seed_default_service_catalog(session_factory, booking_assistant_service)
+    await seed_default_partner_profiles(session_factory)
 
     app.state.settings = settings
     app.state.db_engine = engine
@@ -219,6 +278,7 @@ async def lifespan(app: FastAPI):
     app.state.email_service = EmailService(settings)
     app.state.booking_assistant_service = booking_assistant_service
     app.state.pricing_service = pricing_service
+    app.state.semantic_search_service = semantic_search_service
     app.state.rate_limiter = InMemoryRateLimiter()
     try:
         yield
@@ -328,206 +388,6 @@ def require_admin_access(
     raise HTTPException(status_code=401, detail="Admin authentication required")
 
 
-def build_booking_record(event: ConversationEvent) -> dict[str, object | None]:
-    metadata = event.metadata_json or {}
-    service = metadata.get("service") if isinstance(metadata.get("service"), dict) else {}
-    contact = metadata.get("contact") if isinstance(metadata.get("contact"), dict) else {}
-    booking = metadata.get("booking") if isinstance(metadata.get("booking"), dict) else {}
-    service_name = service.get("name") or (
-        metadata.get("service") if isinstance(metadata.get("service"), str) else None
-    )
-
-    return {
-        "booking_reference": metadata.get("booking_reference")
-        or event.conversation_id
-        or f"event-{event.id}",
-        "created_at": event.created_at.astimezone(UTC).isoformat(),
-        "industry": metadata.get("industry") or service.get("category"),
-        "customer_name": contact.get("name") or event.sender_name,
-        "customer_email": contact.get("email") or event.sender_email,
-        "business_email": metadata.get("business_email"),
-        "customer_phone": contact.get("phone"),
-        "service_name": service_name or booking.get("requested_service"),
-        "service_id": service.get("id"),
-        "requested_date": booking.get("requested_date"),
-        "requested_time": booking.get("requested_time"),
-        "timezone": booking.get("timezone"),
-        "amount_aud": metadata.get("amount_aud"),
-        "payment_status": metadata.get("payment_status") or event.workflow_status,
-        "payment_url": metadata.get("payment_url"),
-        "email_status": metadata.get("email_status"),
-        "workflow_status": metadata.get("workflow_status") or event.workflow_status,
-        "notes": booking.get("notes") or event.message_text,
-    }
-
-
-def merge_booking_records(events: list[ConversationEvent]) -> list[dict[str, object | None]]:
-    by_reference: dict[str, dict[str, object | None]] = {}
-    for event in sorted(events, key=lambda item: item.created_at):
-        record = build_booking_record(event)
-        reference = str(record["booking_reference"])
-        current = by_reference.get(reference)
-        if current is None:
-            by_reference[reference] = record
-            continue
-
-        merged = dict(current)
-        for key, value in record.items():
-            if value not in (None, "", []):
-                if (
-                    event.source == "n8n"
-                    and key in {"customer_name", "customer_email", "customer_phone", "notes"}
-                    and current.get(key) not in (None, "", [])
-                ):
-                    continue
-                merged[key] = value
-        merged["created_at"] = current["created_at"]
-        by_reference[reference] = merged
-
-    return sorted(
-        by_reference.values(),
-        key=lambda item: str(item["created_at"]),
-        reverse=True,
-    )
-
-
-def filter_booking_records(
-    records: list[dict[str, object | None]],
-    *,
-    query: str | None = None,
-    industry: str | None = None,
-    payment_status: str | None = None,
-    email_status: str | None = None,
-    workflow_status: str | None = None,
-    date_from: str | None = None,
-    date_to: str | None = None,
-) -> list[dict[str, object | None]]:
-    filtered = records
-
-    if query and query.strip():
-        needle = query.strip().lower()
-        filtered = [
-            item
-            for item in filtered
-            if needle in " ".join(
-                [
-                    str(item.get("booking_reference") or ""),
-                    str(item.get("customer_name") or ""),
-                    str(item.get("customer_email") or ""),
-                    str(item.get("service_name") or ""),
-                    str(item.get("industry") or ""),
-                    str(item.get("notes") or ""),
-                ]
-            ).lower()
-        ]
-
-    def matches_status(value: object | None, expected: str | None) -> bool:
-        return not expected or str(value or "") == expected
-
-    filtered = [
-        item
-        for item in filtered
-        if matches_status(item.get("industry"), industry)
-        and matches_status(item.get("payment_status"), payment_status)
-        and matches_status(item.get("email_status"), email_status)
-        and matches_status(item.get("workflow_status"), workflow_status)
-    ]
-
-    if date_from:
-        filtered = [
-            item for item in filtered if str(item.get("requested_date") or "") >= date_from
-        ]
-    if date_to:
-        filtered = [
-            item for item in filtered if str(item.get("requested_date") or "") <= date_to
-        ]
-
-    return filtered
-
-
-def build_timeline_event(event: ConversationEvent) -> dict[str, object | None]:
-    return {
-        "id": event.id,
-        "source": event.source,
-        "event_type": event.event_type,
-        "created_at": event.created_at.astimezone(UTC).isoformat(),
-        "ai_intent": event.ai_intent,
-        "workflow_status": event.workflow_status,
-        "message_text": event.message_text,
-        "ai_reply": event.ai_reply,
-        "sender_name": event.sender_name,
-        "sender_email": event.sender_email,
-        "metadata": event.metadata_json or {},
-    }
-
-
-def build_partner_item(partner: PartnerProfile) -> dict[str, object]:
-    return {
-        "id": partner.id,
-        "name": partner.name,
-        "category": partner.category,
-        "website_url": partner.website_url,
-        "description": partner.description,
-        "logo_url": partner.logo_url,
-        "image_url": partner.image_url,
-        "featured": bool(partner.featured),
-        "sort_order": partner.sort_order,
-        "is_active": bool(partner.is_active),
-    }
-
-
-def build_service_merchant_item(service: ServiceMerchantProfile) -> dict[str, object | None]:
-    return {
-        "id": service.id,
-        "service_id": service.service_id,
-        "business_name": service.business_name,
-        "business_email": service.business_email,
-        "name": service.name,
-        "category": service.category,
-        "summary": service.summary,
-        "amount_aud": service.amount_aud,
-        "duration_minutes": service.duration_minutes,
-        "venue_name": service.venue_name,
-        "location": service.location,
-        "map_url": service.map_url,
-        "booking_url": service.booking_url,
-        "image_url": service.image_url,
-        "source_url": service.source_url,
-        "tags": service.tags_json or [],
-        "featured": bool(service.featured),
-        "is_active": bool(service.is_active),
-        "updated_at": service.updated_at.astimezone(UTC).isoformat(),
-    }
-
-
-def build_service_catalog_item(service: ServiceMerchantProfile) -> ServiceCatalogItem:
-    resolved_image_url = resolve_service_image_url(
-        service_id=service.service_id,
-        category=service.category or "General Service",
-        tags=list(service.tags_json or []),
-        image_url=service.image_url,
-    )
-    return ServiceCatalogItem(
-        id=service.service_id,
-        name=service.name,
-        category=service.category or "General Service",
-        business_email=service.business_email,
-        summary=service.summary or "Service imported from merchant website.",
-        duration_minutes=service.duration_minutes or 30,
-        amount_aud=service.amount_aud or 0.01,
-        image_url=resolved_image_url,
-        map_snapshot_url=None,
-        venue_name=service.venue_name,
-        location=service.location,
-        map_url=service.map_url,
-        booking_url=service.booking_url,
-        latitude=None,
-        longitude=None,
-        tags=list(service.tags_json or []),
-        featured=bool(service.featured),
-    )
-
-
 async def seed_default_service_catalog(
     session_factory,
     booking_service: BookingAssistantService,
@@ -563,6 +423,7 @@ async def seed_default_service_catalog(
                 "featured": 1 if item.featured else 0,
                 "is_active": 1,
             }
+            mapped_values, _quality_warnings = apply_catalog_quality_gate(mapped_values)
 
             if existing:
                 for key, value in mapped_values.items():
@@ -592,6 +453,44 @@ async def load_active_service_catalog(request: Request) -> list[ServiceCatalogIt
     seen_ids = {item.id for item in imported_catalog}
     merged = imported_catalog + [item for item in demo_catalog if item.id not in seen_ids]
     return merged
+
+
+async def seed_default_partner_profiles(session_factory) -> None:
+    async with get_session(session_factory) as session:
+        for item in DEFAULT_PARTNER_PROFILES:
+            existing_matches = (
+                await session.execute(
+                    select(PartnerProfile)
+                    .where(func.lower(PartnerProfile.name) == item["name"].strip().lower())
+                    .order_by(PartnerProfile.id)
+                )
+            ).scalars().all()
+            existing = existing_matches[0] if existing_matches else None
+
+            # Keep the oldest matching row authoritative and drop accidental duplicates
+            # so startup seeding does not fail if prior deploys inserted the same partner twice.
+            for duplicate in existing_matches[1:]:
+                await session.delete(duplicate)
+
+            mapped_values = {
+                "name": item["name"],
+                "category": item["category"],
+                "website_url": item["website_url"],
+                "description": item["description"],
+                "logo_url": item["logo_url"],
+                "image_url": item["image_url"],
+                "featured": item["featured"],
+                "sort_order": item["sort_order"],
+                "is_active": 1,
+            }
+
+            if existing:
+                for key, value in mapped_values.items():
+                    setattr(existing, key, value)
+            else:
+                session.add(PartnerProfile(**mapped_values))
+
+        await session.commit()
 
 
 async def enforce_rate_limit(
@@ -661,7 +560,12 @@ async def upload_image(
     request: Request,
     file: UploadFile = File(...),
 ) -> dict[str, str | int]:
-    return await save_uploaded_file(request, file=file, allowed_kind="images")
+    return await save_uploaded_file(
+        request,
+        file=file,
+        allowed_kind="images",
+        enforce_rate_limit_fn=enforce_rate_limit,
+    )
 
 
 @api.post("/uploads/files", status_code=status.HTTP_201_CREATED)
@@ -669,7 +573,12 @@ async def upload_file(
     request: Request,
     file: UploadFile = File(...),
 ) -> dict[str, str | int]:
-    return await save_uploaded_file(request, file=file, allowed_kind="files")
+    return await save_uploaded_file(
+        request,
+        file=file,
+        allowed_kind="files",
+        enforce_rate_limit_fn=enforce_rate_limit,
+    )
 
 
 @api.get("/booking-assistant/catalog", response_model=BookingAssistantCatalogResponse)
@@ -777,6 +686,16 @@ async def booking_assistant_session(
                     "workflow_status": result.workflow_status,
                 },
             )
+            if await is_flag_enabled("new_booking_domain_dual_write", session=session):
+                try:
+                    await dual_write_booking_assistant_session(
+                        session,
+                        payload=payload,
+                        result=result,
+                    )
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -846,6 +765,16 @@ async def pricing_consultation(
                     "email_status": result.email_status,
                 },
             )
+            if await is_flag_enabled("new_booking_domain_dual_write", session=session):
+                try:
+                    await dual_write_pricing_consultation(
+                        session,
+                        payload=payload,
+                        result=result,
+                    )
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -906,6 +835,16 @@ async def demo_request(
                     "email_status": result.email_status,
                 },
             )
+            if await is_flag_enabled("new_booking_domain_dual_write", session=session):
+                try:
+                    await dual_write_demo_request(
+                        session,
+                        payload=payload,
+                        result=result,
+                    )
+                    await session.commit()
+                except Exception:
+                    await session.rollback()
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -914,6 +853,46 @@ async def demo_request(
             status_code=502,
             detail="Unable to reach Zoho Calendar right now",
         ) from exc
+
+
+@api.post(
+    "/demo/brief",
+    response_model=DemoBriefResponse,
+)
+async def demo_brief(
+    request: Request,
+    payload: DemoBriefRequest,
+) -> DemoBriefResponse:
+    await enforce_rate_limit(
+        request,
+        scope="demo-brief",
+        limit=10,
+        window_seconds=300,
+    )
+
+    return await submit_demo_brief(
+        session_factory=request.app.state.session_factory,
+        email_service=request.app.state.email_service,
+        settings=request.app.state.settings,
+        payload=payload,
+    )
+
+
+@api.get(
+    "/demo/brief/{brief_reference}/sync",
+    response_model=DemoBookingSyncResponse,
+)
+async def sync_demo_booking_from_brief(
+    brief_reference: str,
+    request: Request,
+) -> DemoBookingSyncResponse:
+    return await sync_demo_booking_from_brief_service(
+        session_factory=request.app.state.session_factory,
+        pricing_service=request.app.state.pricing_service,
+        email_service=request.app.state.email_service,
+        settings=request.app.state.settings,
+        brief_reference=brief_reference,
+    )
 
 
 @api.post("/webhooks/tawk", response_model=TawkWebhookResponse)
@@ -1027,6 +1006,15 @@ async def booking_callback(
             workflow_status=payload.get("status"),
             metadata=payload,
         )
+        if await is_flag_enabled("new_booking_domain_dual_write", session=session):
+            try:
+                await sync_callback_status_to_mirrors(
+                    session,
+                    payload=payload,
+                )
+                await session.commit()
+            except Exception:
+                await session.rollback()
 
     return {"status": "logged"}
 
@@ -1049,67 +1037,25 @@ async def admin_login(payload: AdminLoginRequest, request: Request) -> AdminSess
 @api.get("/admin/overview", response_model=AdminOverviewResponse)
 async def admin_overview(
     request: Request,
+    response: Response,
     authorization: str | None = Header(default=None),
     x_admin_token: str | None = Header(default=None),
 ) -> AdminOverviewResponse:
     require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
 
     async with get_session(request.app.state.session_factory) as session:
-        booking_events = (
-            await session.execute(
-                select(ConversationEvent)
-                .where(
-                    ConversationEvent.event_type.in_(
-                        ["booking_session_created", "booking_callback"]
-                    )
-                )
-                .order_by(desc(ConversationEvent.created_at))
-            )
-        ).scalars().all()
-        recent_events = (
-            await session.execute(
-                select(ConversationEvent)
-                .order_by(desc(ConversationEvent.created_at))
-                .limit(8)
-            )
-        ).scalars().all()
-        total_callbacks = await session.scalar(
-            select(func.count())
-            .select_from(ConversationEvent)
-            .where(ConversationEvent.event_type == "booking_callback")
-        )
+        payload, bookings_view_enabled = await build_admin_overview_payload(session)
 
-    all_bookings = merge_booking_records(booking_events)
-    total_bookings = len(all_bookings)
-    pending_email = sum(
-        1
-        for item in all_bookings
-        if item.get("email_status") == "pending_manual_followup"
+    response.headers["X-BookedAI-Admin-Bookings-View"] = (
+        "enhanced" if bookings_view_enabled else "legacy"
     )
-    ready_for_checkout = sum(
-        1
-        for item in all_bookings
-        if item.get("payment_status") == "stripe_checkout_ready"
-    )
-
-    metrics = [
-        {"label": "Bookings captured", "value": str(total_bookings or 0), "tone": "info"},
-        {"label": "Stripe-ready checkouts", "value": str(ready_for_checkout or 0), "tone": "success"},
-        {"label": "Pending email follow-up", "value": str(pending_email or 0), "tone": "warning"},
-        {"label": "n8n callbacks logged", "value": str(total_callbacks or 0), "tone": "neutral"},
-    ]
-
-    return AdminOverviewResponse(
-        status="ok",
-        metrics=metrics,
-        recent_bookings=all_bookings[:8],
-        recent_events=[build_timeline_event(item) for item in recent_events],
-    )
+    return AdminOverviewResponse(**payload)
 
 
 @api.get("/admin/bookings", response_model=AdminBookingsResponse)
 async def admin_bookings(
     request: Request,
+    response: Response,
     authorization: str | None = Header(default=None),
     x_admin_token: str | None = Header(default=None),
     limit: int = 50,
@@ -1128,36 +1074,56 @@ async def admin_bookings(
     offset = max(offset, 0)
 
     async with get_session(request.app.state.session_factory) as session:
-        events = (
-            await session.execute(
-                select(ConversationEvent)
-                .where(
-                    ConversationEvent.event_type.in_(
-                        ["booking_session_created", "booking_callback"]
-                    )
-                )
-                .order_by(desc(ConversationEvent.created_at))
-            )
-        ).scalars().all()
+        payload, bookings_view_enabled = await build_admin_bookings_payload(
+            session,
+            limit=limit,
+            offset=offset,
+            query=q,
+            industry=industry,
+            payment_status=payment_status,
+            email_status=email_status,
+            workflow_status=workflow_status,
+            date_from=date_from,
+            date_to=date_to,
+        )
+        shadow_summary = await build_admin_bookings_shadow_summary(
+            session,
+            legacy_records=payload["items"],  # type: ignore[arg-type]
+            limit=limit,
+        )
 
-    records = filter_booking_records(
-        merge_booking_records(events),
-        query=q,
-        industry=industry,
-        payment_status=payment_status,
-        email_status=email_status,
-        workflow_status=workflow_status,
-        date_from=date_from,
-        date_to=date_to,
+    response.headers["X-BookedAI-Admin-Bookings-View"] = (
+        "enhanced" if bookings_view_enabled else "legacy"
     )
-    total = len(records)
-    items = records[offset : offset + limit]
-
-    return AdminBookingsResponse(
-        status="ok",
-        total=total or 0,
-        items=items,
+    response.headers["X-BookedAI-Admin-Bookings-Shadow"] = str(shadow_summary["status"])
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Matched"] = str(shadow_summary["matched_count"])
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Mismatch"] = str(shadow_summary["mismatch_count"])
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Missing"] = str(shadow_summary["missing_count"])
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Payment-Status-Mismatch"] = str(
+        shadow_summary["payment_status_mismatch_count"]
     )
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Amount-Mismatch"] = str(
+        shadow_summary["amount_mismatch_count"]
+    )
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Meeting-Status-Mismatch"] = str(
+        shadow_summary["meeting_status_mismatch_count"]
+    )
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Workflow-Status-Mismatch"] = str(
+        shadow_summary["workflow_status_mismatch_count"]
+    )
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Email-Status-Mismatch"] = str(
+        shadow_summary["email_status_mismatch_count"]
+    )
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Field-Parity-Mismatch"] = str(
+        shadow_summary["field_parity_mismatch_count"]
+    )
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Top-Drift-References"] = str(
+        shadow_summary["top_drift_references"]
+    )
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Recent-Drift-Examples"] = str(
+        shadow_summary["recent_drift_examples"]
+    )
+    return AdminBookingsResponse(**payload)
 
 
 @api.get("/admin/bookings/{booking_reference}", response_model=AdminBookingDetailResponse)
@@ -1170,26 +1136,14 @@ async def admin_booking_detail(
     require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
 
     async with get_session(request.app.state.session_factory) as session:
-        events = (
-            await session.execute(
-                select(ConversationEvent)
-                .where(ConversationEvent.conversation_id == booking_reference)
-                .order_by(desc(ConversationEvent.created_at))
+        try:
+            payload = await build_admin_booking_detail_payload(
+                session,
+                booking_reference=booking_reference,
             )
-        ).scalars().all()
-
-    if not events:
-        raise HTTPException(status_code=404, detail="Booking was not found")
-
-    primary = next(
-        (item for item in events if item.event_type == "booking_session_created"),
-        events[0],
-    )
-    return AdminBookingDetailResponse(
-        status="ok",
-        booking=build_booking_record(primary),
-        events=[build_timeline_event(item) for item in events],
-    )
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+    return AdminBookingDetailResponse(**payload)
 
 
 @api.post("/admin/bookings/{booking_reference}/confirm-email", response_model=EmailSendResponse)
@@ -1203,61 +1157,20 @@ async def admin_booking_confirm_email(
     require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
 
     async with get_session(request.app.state.session_factory) as session:
-        events = (
-            await session.execute(
-                select(ConversationEvent)
-                .where(ConversationEvent.conversation_id == booking_reference)
-                .order_by(desc(ConversationEvent.created_at))
+        try:
+            payload_data = await send_admin_booking_confirmation_email(
+                session,
+                booking_reference=booking_reference,
+                note=payload.note,
+                email_service=request.app.state.email_service,
+                booking_business_email=request.app.state.settings.booking_business_email,
             )
-        ).scalars().all()
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    if not events:
-        raise HTTPException(status_code=404, detail="Booking was not found")
-
-    booking = merge_booking_records(events)[0]
-    recipient = str(booking.get("customer_email") or "").strip()
-    if not recipient:
-        raise HTTPException(status_code=400, detail="Booking does not include a customer email")
-
-    lines = [
-        f"Hello {booking.get('customer_name') or 'there'},",
-        "",
-        "This is your manual booking confirmation from BookedAI.",
-        f"Booking reference: {booking_reference}",
-        f"Service: {booking.get('service_name') or 'Not specified'}",
-        f"Requested date: {booking.get('requested_date') or 'Not specified'}",
-        f"Requested time: {booking.get('requested_time') or 'Not specified'}",
-        f"Timezone: {booking.get('timezone') or 'Australia/Sydney'}",
-    ]
-    if booking.get("payment_url"):
-        lines.extend(["", f"Checkout link: {booking.get('payment_url')}"])
-    if payload.note:
-        lines.extend(["", "Additional note:", payload.note.strip()])
-    business_recipient = (
-        str(booking.get("business_email") or "").strip().lower()
-        or request.app.state.settings.booking_business_email
-    )
-    cc_recipients = [
-        email
-        for email in [business_recipient, request.app.state.settings.booking_business_email]
-        if email and email.lower() != recipient.lower()
-    ]
-    lines.extend(["", f"Reply to {business_recipient} if you need help."])
-
-    email_service: EmailService = request.app.state.email_service
-    try:
-        await email_service.send_email(
-            to=[recipient],
-            cc=cc_recipients,
-            subject=f"BookedAI booking confirmation {booking_reference}",
-            text="\n".join(lines),
-        )
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"SMTP send failed: {exc}") from exc
-
-    return EmailSendResponse(status="sent", message="Confirmation email accepted by SMTP server")
+    return EmailSendResponse(**payload_data)
 
 
 @api.get("/admin/apis", response_model=AdminApiInventoryResponse)
@@ -1311,6 +1224,114 @@ async def admin_services(
         status="ok",
         items=[build_service_merchant_item(item) for item in items],
     )
+
+
+@api.get("/admin/services/quality", response_model=AdminServiceCatalogQualityResponse)
+async def admin_service_catalog_quality(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+    search_ready: bool | None = None,
+    quality_warning: str | None = None,
+) -> AdminServiceCatalogQualityResponse:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        services = (
+            await session.execute(
+                select(ServiceMerchantProfile).order_by(
+                    desc(ServiceMerchantProfile.featured),
+                    ServiceMerchantProfile.business_name,
+                    ServiceMerchantProfile.name,
+                )
+            )
+        ).scalars().all()
+
+    items = [build_service_merchant_item(item) for item in services]
+    if search_ready is not None:
+        items = [item for item in items if bool(item.get("is_search_ready")) is search_ready]
+    if quality_warning:
+        normalized_warning = quality_warning.strip()
+        items = [
+            item
+            for item in items
+            if normalized_warning in list(item.get("quality_warnings") or [])
+        ]
+
+    return AdminServiceCatalogQualityResponse(
+        status="ok",
+        counts=build_service_catalog_quality_counts(items),
+        items=items,
+    )
+
+
+@api.get("/admin/services/quality/export.csv")
+async def admin_service_catalog_quality_export(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+    search_ready: bool | None = None,
+    quality_warning: str | None = None,
+) -> Response:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        services = (
+            await session.execute(
+                select(ServiceMerchantProfile).order_by(
+                    desc(ServiceMerchantProfile.featured),
+                    ServiceMerchantProfile.business_name,
+                    ServiceMerchantProfile.name,
+                )
+            )
+        ).scalars().all()
+
+    items = [build_service_merchant_item(item) for item in services]
+    if search_ready is not None:
+        items = [item for item in items if bool(item.get("is_search_ready")) is search_ready]
+    if quality_warning:
+        normalized_warning = quality_warning.strip()
+        items = [
+            item
+            for item in items
+            if normalized_warning in list(item.get("quality_warnings") or [])
+        ]
+
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(
+        [
+            "service_id",
+            "business_name",
+            "name",
+            "category",
+            "location",
+            "is_active",
+            "is_search_ready",
+            "quality_warnings",
+            "tags",
+            "updated_at",
+        ]
+    )
+    for item in items:
+        writer.writerow(
+            [
+                item.get("service_id"),
+                item.get("business_name"),
+                item.get("name"),
+                item.get("category"),
+                item.get("location"),
+                item.get("is_active"),
+                item.get("is_search_ready"),
+                "|".join(str(value) for value in list(item.get("quality_warnings") or [])),
+                "|".join(str(value) for value in list(item.get("tags") or [])),
+                item.get("updated_at"),
+            ]
+        )
+
+    response = Response(content=buffer.getvalue(), media_type="text/csv")
+    response.headers["Content-Disposition"] = 'attachment; filename="service-catalog-quality.csv"'
+    return response
 
 
 @api.post("/admin/services/import-website", response_model=AdminServiceMerchantListResponse)
@@ -1378,6 +1399,7 @@ async def admin_import_services_from_website(
                 "featured": 1 if item.get("featured") else 0,
                 "is_active": 1,
             }
+            mapped_values, _quality_warnings = apply_catalog_quality_gate(mapped_values)
 
             if mapped_values["map_url"] is None and (mapped_values["venue_name"] or mapped_values["location"]):
                 from services import _build_google_maps_url

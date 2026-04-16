@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
-import { getApiBaseUrl } from '../../../shared/config/api';
+import { submitPricingConsultation } from '../../../shared/api';
+import type { PricingConsultationRequest, PricingConsultationResponse } from '../../../shared/contracts';
 
 type PlanId = 'basic' | 'standard' | 'pro';
 type ConsultationFlowMode = 'full' | 'guided';
@@ -21,39 +22,10 @@ type Plan = {
   featured?: boolean;
 };
 
-type PerformanceOption = {
-  label: string;
-  price: string;
-};
-
 type Recommendation = {
   label: string;
   detail: string;
   featured?: boolean;
-};
-
-type PricingConsultationResponse = {
-  status: string;
-  consultation_reference: string;
-  plan_id: PlanId;
-  plan_name: string;
-  amount_aud: number;
-  amount_label: string;
-  preferred_date: string;
-  preferred_time: string;
-  timezone: string;
-  onboarding_mode: OnboardingMode;
-  trial_days: number;
-  trial_summary: string;
-  startup_offer_applied: boolean;
-  startup_offer_summary: string | null;
-  onsite_travel_fee_note: string | null;
-  meeting_status: 'scheduled' | 'configuration_required';
-  meeting_join_url: string | null;
-  meeting_event_url: string | null;
-  payment_status: 'stripe_checkout_ready' | 'payment_follow_up_required';
-  payment_url: string | null;
-  email_status: 'sent' | 'pending_manual_followup';
 };
 
 type ConsultationFormState = {
@@ -72,81 +44,71 @@ type ConsultationFormState = {
 };
 
 const highlightPoints = [
-  '1st month free on every plan',
-  'startup referrals can unlock 3 months free',
-  'book now, then confirm by Stripe, email, and calendar',
+  '30 days of subscription free on every plan',
+  'online setup included for launch customers',
+  'simple monthly plans from A$79 with no long lock-in',
 ];
 
 const topOffers = [
   {
-    eyebrow: 'Most popular offer',
-    title: 'Start free for your first 30 days',
-    body: 'Go live fast, keep risk low, and only start paying after your first month.',
+    eyebrow: 'Start small',
+    title: 'Book now from A$79 per month',
+    body: 'Lower entry pricing makes it easier for SMEs to start without a heavy decision or a big upfront commitment.',
   },
   {
-    eyebrow: 'Startup pathway',
-    title: '3 months free for referred startup teams',
-    body: 'Available to startups introduced by accelerators or incubators across Sydney, Melbourne, Perth, Brisbane, Adelaide, Darwin, and other Australian startup hubs.',
+    eyebrow: 'Keep it simple',
+    title: 'One monthly fee, clear setup path',
+    body: 'Most customers can launch online first. If you need onsite rollout, we quote it separately after we confirm your location and scope.',
   },
 ];
 
 const setupOptions = [
   {
     label: 'Online setup',
-    detail: 'Included in the booking flow and fastest to launch.',
+    detail: 'Fastest option for most SMEs. Included for launch customers so you can get live quickly without extra setup friction.',
   },
   {
     label: 'Onsite setup',
-    detail: 'Available when needed. Travel is quoted separately after address confirmation.',
-  },
-];
-
-const upgradePath = [
-  {
-    step: 'Start with Basic',
-    detail: 'Get fast lead capture and stop missing new enquiries.',
-  },
-  {
-    step: 'Move to Standard',
-    detail: 'Add booking flow automation when volume starts growing.',
-  },
-  {
-    step: 'Scale with Pro',
-    detail: 'Run deeper automation, reporting, and multi-service rollout.',
+    detail: 'Available for more complex teams, multi-location rollouts, or in-person training. Quoted separately after address confirmation.',
   },
 ];
 
 const plans: Plan[] = [
   {
     id: 'basic',
-    name: 'Basic',
-    price: '$99',
-    subtitle: 'Start cheap. Stop missing ready-to-buy enquiries.',
-    badge: 'Entry',
-    ctaLabel: 'Book Now',
+    name: 'Starter',
+    price: 'A$79',
+    subtitle: 'For smaller service businesses that want a clean, affordable first step.',
+    badge: 'Easy Start',
+    ctaLabel: 'Start Free',
     introLabel: 'Lowest monthly price',
-    microcopy: 'Lowest monthly cost after your free first month',
+    microcopy:
+      '30 days free, then a simple low monthly fee. Online setup is included for launch customers.',
+    supportingText:
+      'Best when you need faster replies, lead capture, and one clear booking path without a complicated rollout.',
     features: [
       'AI website chat',
       'missed call SMS auto-reply',
       'basic lead capture',
       '1 business workflow',
       '1 calendar integration',
-      'simple setup for local Australian SMEs',
+      'best fit for salons, tutors, clinics, and smaller trades teams',
     ],
   },
   {
     id: 'standard',
-    name: 'Standard',
-    price: '$249',
-    subtitle: 'The best path for teams ready to convert more bookings',
-    badge: 'Most Popular',
-    ctaLabel: 'Book Now',
-    introLabel: 'Best conversion step',
-    microcopy: 'Most Australian SMEs choose this once leads are consistent',
-    supportingText: 'Strong fit for salons, clinics, trades, hospitality, and kids services',
+    name: 'Growth',
+    price: 'A$149',
+    subtitle: 'For growing local teams that want stronger automation without enterprise pricing.',
+    badge: 'Best Value',
+    ctaLabel: 'Book Most Popular',
+    introLabel: 'Most balanced plan',
+    microcopy:
+      '30 days free, then one predictable monthly price. Designed to be the easiest yes for busy SMEs.',
+    supportingText:
+      'Strong fit when bookings are regular and you need better qualification, follow-up, and conversion.',
     features: [
-      'everything in Basic',
+      'everything in Starter',
       'AI answers inbound calls',
       'guided booking flows',
       '2-3 service journeys',
@@ -158,14 +120,17 @@ const plans: Plan[] = [
   {
     id: 'pro',
     name: 'Pro',
-    price: '$499',
-    subtitle: 'For teams ready to automate more of the customer journey',
-    badge: 'Scale',
-    ctaLabel: 'Book Now',
-    introLabel: 'Scale-up rollout',
-    microcopy: 'Best once your business wants deeper automation and handoff control',
+    price: 'A$249',
+    subtitle: 'For multi-location or more complex teams that need broader automation.',
+    badge: 'Advanced',
+    ctaLabel: 'Book Pro',
+    introLabel: 'More automation',
+    microcopy:
+      '30 days free. Built for operators who need more service logic, more locations, and deeper workflow support.',
+    supportingText:
+      'Strong fit for larger clinics, hospitality groups, education operators, and more complex trades workflows.',
     features: [
-      'everything in Standard',
+      'everything in Growth',
       'advanced booking flows',
       'multi-service and multi-location support',
       'CRM integration',
@@ -175,26 +140,24 @@ const plans: Plan[] = [
   },
 ];
 
-const performanceOptions: PerformanceOption[] = [
-  { label: 'Per lead', price: '$10-$30' },
-  { label: 'Per booking', price: '$20-$40' },
-];
-
 const recommendations: Recommendation[] = [
   {
-    label: 'Basic',
-    detail: 'Launch quickly',
+    label: 'Starter',
+    detail: 'Lowest risk',
   },
   {
-    label: 'Standard',
-    detail: 'Most balanced',
+    label: 'Growth',
+    detail: 'Best value',
     featured: true,
   },
   {
     label: 'Pro',
-    detail: 'Scale operations',
+    detail: 'Scale further',
   },
 ];
+
+const visiblePlans = plans.slice(0, 2);
+const advancedPlan = plans[2];
 
 const businessTypeSuggestions = [
   'Salon or beauty studio',
@@ -605,37 +568,23 @@ export function PricingSection() {
 
     setIsSubmitting(true);
     try {
-      const response = await fetch(`${getApiBaseUrl()}/pricing/consultation`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          plan_id: formState.planId,
-          customer_name: formState.customerName.trim(),
-          customer_email: formState.customerEmail.trim(),
-          customer_phone: formState.customerPhone.trim() || null,
-          business_name: formState.businessName.trim(),
-          business_type: formState.businessType.trim(),
-          onboarding_mode: formState.onboardingMode,
-          startup_referral_eligible: formState.startupReferralEligible,
-          referral_partner: formState.referralPartner.trim() || null,
-          referral_location: formState.referralLocation.trim() || null,
-          preferred_date: preferredSlot.preferredDate,
-          preferred_time: preferredSlot.preferredTime,
-          timezone: 'Australia/Sydney',
-          notes: formState.notes.trim() || null,
-        }),
-      });
-      const payload = (await response.json()) as PricingConsultationResponse | { detail?: string };
-      if (!response.ok || !('status' in payload)) {
-        throw new Error(
-          'detail' in payload && payload.detail
-            ? payload.detail
-            : 'Unable to schedule your consultation right now.',
-        );
-      }
-
+      const request: PricingConsultationRequest = {
+        plan_id: formState.planId,
+        customer_name: formState.customerName.trim(),
+        customer_email: formState.customerEmail.trim(),
+        customer_phone: formState.customerPhone.trim() || null,
+        business_name: formState.businessName.trim(),
+        business_type: formState.businessType.trim(),
+        onboarding_mode: formState.onboardingMode,
+        startup_referral_eligible: formState.startupReferralEligible,
+        referral_partner: formState.referralPartner.trim() || null,
+        referral_location: formState.referralLocation.trim() || null,
+        preferred_date: preferredSlot.preferredDate,
+        preferred_time: preferredSlot.preferredTime,
+        timezone: 'Australia/Sydney',
+        notes: formState.notes.trim() || null,
+      };
+      const payload = await submitPricingConsultation(request);
       setResult(payload);
       setConsultationStep('confirmed');
     } catch (error) {
@@ -681,20 +630,19 @@ export function PricingSection() {
 
         <div className="mx-auto max-w-3xl text-center">
           <div className="inline-flex items-center justify-center rounded-full border border-cyan-300/20 bg-white/6 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-100 shadow-[0_12px_40px_rgba(6,182,212,0.12)] backdrop-blur-xl">
-            30-day free start • Australia-wide SME pricing
+            30-day free trial • simple SME pricing
           </div>
           <h2 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Professional pricing that feels safe to start
+            Simple pricing that feels easy to book now
           </h2>
           <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-slate-300">
-            Start with your first month free, book the package that fits now, and move
-            straight into Stripe, email confirmation, and installation scheduling.
+            Start free for 30 days, then move to a clear monthly plan that fits your stage.
+            We have lowered the entry price and simplified the offer so SMEs can decide faster.
           </p>
           <p className="mx-auto mt-4 max-w-3xl text-sm leading-6 text-slate-400 sm:text-base">
-            Built for salons, clinics, trades, kids services, hospitality, and other
-            local businesses across Australia. Startup teams referred by accelerators or
-            incubators can unlock 3 months free across Sydney, Melbourne, Perth, Brisbane,
-            Adelaide, Darwin, and other startup locations.
+            Built for salons, clinics, swim schools, tutors, trades, hospitality, and other
+            local businesses across Australia. Online rollout covers most teams, and we only
+            quote extra when you need onsite support or a more custom implementation.
           </p>
         </div>
 
@@ -706,21 +654,20 @@ export function PricingSection() {
                   Special offers first
                 </p>
                 <h3 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-                  Lead with the offer, then choose your path up
+                  Three clear plans, one easy buying decision
                 </h3>
               </div>
               <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/45 px-5 py-4 text-right">
                 <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
-                  Lowest plan
+                  Starts from
                 </div>
-                <div className="mt-1 text-3xl font-semibold text-white">$99 to $499</div>
+                <div className="mt-1 text-3xl font-semibold text-white">A$79/mo</div>
               </div>
             </div>
             <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
-              We show the easiest offer first, keep the entry price visible, then guide
-              businesses upward only when they need more automation. Every `Book now` action
-              opens the selected package flow and moves straight into setup scheduling,
-              confirmation email, and Stripe checkout.
+              Pick the plan that matches your current volume and workflow. Every `Book` action
+              takes you straight into the onboarding flow, timing selection, confirmation email,
+              and payment preparation.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {topOffers.map((offer) => (
@@ -740,15 +687,14 @@ export function PricingSection() {
 
           <div className="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(8,47,73,0.38)_0%,rgba(15,23,42,0.88)_100%)] p-7 shadow-[0_24px_80px_rgba(2,6,23,0.42)] backdrop-blur-xl sm:p-8">
             <div className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200">
-              Setup options
+              How setup works
             </div>
             <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white">
-              Online first, onsite available when needed
+              Keep launch simple, add complexity only if needed
             </h3>
             <p className="mt-4 text-base leading-7 text-slate-300">
-              Choose the onboarding style that suits your team. Online is fastest and
-              ideal for most businesses. Onsite installation can be booked too, with travel
-              quoted separately once location details are confirmed.
+              Most SMEs can launch online first. If your team needs onsite support, training,
+              or a more hands-on rollout, we quote that separately so the base pricing stays clean.
             </p>
             <div className="mt-6 grid gap-3">
               {setupOptions.map((item) => (
@@ -774,58 +720,65 @@ export function PricingSection() {
           </div>
         </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-3">
-          {plans.map((plan) => (
+        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1fr_0.9fr]">
+          {visiblePlans.map((plan) => (
             <PlanCard key={plan.id} plan={plan} onOpenConsultation={openConsultation} />
           ))}
-        </div>
-
-        <div className="mt-8 grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
-          <div className="rounded-[2rem] border border-white/10 bg-white/[0.05] p-7 shadow-[0_24px_80px_rgba(2,6,23,0.34)] backdrop-blur-xl sm:p-8">
-            <div className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200">
-              Prefer performance-based pricing?
-            </div>
-            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white">
-              We can shape a hybrid model after the base plan is clear
-            </h3>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {performanceOptions.map((option) => (
-                <div
-                  key={option.label}
-                  className="rounded-[1.5rem] border border-cyan-300/18 bg-slate-950/40 p-5"
-                >
-                  <div className="text-sm uppercase tracking-[0.16em] text-slate-400">
-                    {option.label}
+          <article className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.96)_0%,rgba(2,6,23,0.96)_100%)] p-7 shadow-[0_24px_60px_rgba(2,6,23,0.34)] backdrop-blur-xl sm:p-8">
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute inset-x-6 top-0 h-24 rounded-full bg-cyan-300/10 blur-3xl"
+            />
+            <div className="relative">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
+                    For complex teams
                   </div>
-                  <div className="mt-3 text-4xl font-semibold tracking-tight text-white">
-                    {option.price}
+                  <div className="text-xl font-semibold tracking-tight text-white">
+                    {advancedPlan.name}
                   </div>
+                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                    Multi-location, more custom automation, or broader operational rollout.
+                  </p>
                 </div>
-              ))}
-            </div>
-          </div>
+                <span className="rounded-full bg-white/8 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-200 ring-1 ring-white/10">
+                  Talk to us
+                </span>
+              </div>
 
-          <div className="rounded-[2rem] border border-cyan-300/30 bg-[linear-gradient(135deg,rgba(6,182,212,0.18)_0%,rgba(15,23,42,0.96)_45%,rgba(30,41,59,0.96)_100%)] p-7 shadow-[0_28px_90px_rgba(6,182,212,0.2)] backdrop-blur-xl sm:p-8">
-            <div className="inline-flex rounded-full border border-cyan-200/25 bg-white/8 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
-              Upgrade path
+              <div className="mt-8 text-4xl font-semibold tracking-tight text-white">
+                Custom scope
+              </div>
+              <p className="mt-2 text-sm font-medium text-cyan-100">
+                Usually starts from {advancedPlan.price}/mo after your 30-day free period
+              </p>
+              <p className="mt-3 text-sm leading-6 text-slate-300">
+                We keep advanced rollout off the main buying path so smaller SMEs can decide
+                quickly, while larger operators can still get the right package.
+              </p>
+
+              <ul className="mt-8 space-y-3">
+                {advancedPlan.features.slice(1).map((feature) => (
+                  <li key={feature} className="flex items-start gap-3 text-sm leading-6 text-slate-200">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-300/12">
+                      <CheckIcon />
+                    </span>
+                    <span>{feature}</span>
+                  </li>
+                ))}
+              </ul>
+
+              <button
+                type="button"
+                onClick={() => openConsultation(advancedPlan.id, 'guided')}
+                className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl border border-cyan-300/30 bg-transparent px-5 py-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:border-cyan-200/60 hover:text-cyan-100"
+              >
+                Talk To Us About Pro
+                <ArrowIcon />
+              </button>
             </div>
-            <h3 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
-              Start low, then move up only when the business needs more automation.
-            </h3>
-            <p className="mt-4 max-w-2xl text-lg leading-8 text-slate-200">
-              The pricing table is ordered to make the easiest yes visible first. Basic
-              gets you in quickly, Standard is the natural next step, and Pro is there when
-              operations become more complex.
-            </p>
-            <div className="mt-6 grid gap-3">
-              {upgradePath.map((item) => (
-                <div key={item.step} className="rounded-[1.5rem] border border-white/10 bg-slate-950/35 px-4 py-4">
-                  <div className="text-sm font-semibold text-white">{item.step}</div>
-                  <div className="mt-1 text-sm leading-6 text-slate-300">{item.detail}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+          </article>
         </div>
 
         <div className="mt-8 rounded-[2rem] border border-white/10 bg-white/[0.05] p-7 shadow-[0_24px_80px_rgba(2,6,23,0.36)] backdrop-blur-xl sm:p-8">
@@ -835,11 +788,11 @@ export function PricingSection() {
                 Need help choosing?
               </div>
               <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
-                Start with the plan that matches your current stage
+                Choose the plan that matches where your business is today
               </h3>
               <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
-                Basic is the easiest first yes, Standard is the most balanced growth plan,
-                and Pro is for deeper rollout across multiple services, locations, or team handoffs.
+                Starter is the lowest-risk entry and Growth is the best-value default for most SMEs.
+                If your rollout is more complex, we can scope Pro with you separately.
               </p>
             </div>
 
@@ -924,7 +877,7 @@ export function PricingSection() {
                   >
                     {plans.map((plan) => (
                       <option key={plan.id} value={plan.id}>
-                        {plan.name} ({plan.price}/mo after free trial)
+                        {plan.name} ({plan.price}/mo after free subscription period)
                       </option>
                     ))}
                   </select>
@@ -1111,7 +1064,7 @@ export function PricingSection() {
               <form className="mt-8 grid gap-5 sm:grid-cols-2" onSubmit={handleSubmit}>
                 <div className="sm:col-span-2 rounded-[1.5rem] border border-cyan-300/20 bg-white/[0.04] p-4 text-sm leading-6 text-slate-300">
                   Package reserved for <span className="font-semibold text-white">{formState.customerEmail}</span>.
-                  Choose the onboarding time below, then we will create the calendar step and prepare Stripe for the selected plan.
+                  Choose the onboarding time below, then we will create the calendar step and prepare payment for the selected plan. Subscription and setup are handled as separate commercial items.
                 </div>
 
                 <label className="flex flex-col gap-2">
@@ -1132,7 +1085,7 @@ export function PricingSection() {
                 <label className="flex flex-col gap-2">
                   <span className="text-sm font-medium text-slate-200">Selected plan</span>
                   <input
-                    value={`${selectedPlan.name} (${selectedPlan.price}/mo after ${formState.startupReferralEligible ? '3-month' : '30-day'} free period)`}
+                    value={`${selectedPlan.name} (${selectedPlan.price}/mo after ${formState.startupReferralEligible ? '3-month' : '30-day'} free subscription period)`}
                     readOnly
                     className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-200 outline-none"
                   />
@@ -1192,6 +1145,9 @@ export function PricingSection() {
                   {result.plan_name} plan for {result.amount_label}
                 </div>
                 <p className="mt-3 text-sm leading-6 text-cyan-100">{result.trial_summary}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-300">
+                  Setup fee is treated separately from subscription. Online launch setup may be waived for eligible early customers, while onsite rollout is quoted separately where needed.
+                </p>
                 <p className="mt-3 text-sm leading-6 text-slate-300">
                   Reference: {result.consultation_reference}
                 </p>

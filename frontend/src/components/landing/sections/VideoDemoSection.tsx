@@ -35,7 +35,7 @@ export function VideoDemoSection({ content }: VideoDemoSectionProps) {
           </div>
         </div>
 
-        <div className="rounded-[2rem] border border-slate-200 bg-[#fbfbfd] p-6">
+        <div className="rounded-[2rem] border border-slate-200 bg-[linear-gradient(180deg,#fbfdff_0%,#f8fafc_100%)] p-6">
           <div className="flex items-center justify-between border-b border-slate-200 pb-4">
             <div>
               <div className="text-sm font-semibold text-slate-950">Salon Demo Storyboard</div>
@@ -48,17 +48,41 @@ export function VideoDemoSection({ content }: VideoDemoSectionProps) {
             </div>
           </div>
 
-          <div className="mt-5 space-y-3">
+          <div className="mt-5 grid gap-3">
             {content.highlights.map((highlight, index) => (
               <div
                 key={highlight}
-                className="flex items-start gap-3 rounded-[1.4rem] border border-slate-200 bg-white p-4"
+                className="flex items-start gap-3 rounded-[1.4rem] border border-slate-200 bg-white p-4 shadow-[0_10px_22px_rgba(15,23,42,0.03)]"
               >
                 <div className="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-sky-50 text-sm font-semibold text-sky-700">
                   {index + 1}
                 </div>
                 <p className="text-sm leading-7 text-slate-600">{highlight}</p>
               </div>
+            ))}
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {[
+              {
+                title: 'Enquiry',
+                body: 'A user asks for help in a way that feels natural and urgent.',
+              },
+              {
+                title: 'Recommendation',
+                body: 'The product surfaces the strongest match and why it fits.',
+              },
+              {
+                title: 'Booking',
+                body: 'The story ends with a clear commercial next step, not just chat.',
+              },
+            ].map((item) => (
+              <article key={item.title} className="rounded-[1.3rem] bg-slate-950 px-4 py-4 text-white">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-200">
+                  {item.title}
+                </div>
+                <div className="mt-2 text-sm leading-6 text-white/85">{item.body}</div>
+              </article>
             ))}
           </div>
         </div>

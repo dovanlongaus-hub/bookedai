@@ -69,6 +69,14 @@ DEPLOY_USER=ubuntu sudo bash scripts/bootstrap_vps.sh
 bash scripts/deploy_production.sh
 ```
 
+### Beta staging deployment
+
+```sh
+bash scripts/deploy_beta.sh
+```
+
+Use this as the default preview rollout path before promoting changes to `bookedai.au`.
+
 ### Supabase environment preparation
 
 ```sh

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { fallbackPartners, type PartnersSectionContent } from '../data';
 import { getApiBaseUrl } from '../../../shared/config/api';
@@ -26,14 +26,49 @@ type PartnersSectionProps = {
   content: PartnersSectionContent;
 };
 
-function hasDistinctShowcaseImage(item: PartnerProfileItem) {
-  if (!item.image_url) {
-    return false;
-  }
-  if (!item.logo_url) {
-    return true;
-  }
-  return item.image_url.trim() !== item.logo_url.trim();
+function isInfrastructurePartner(item: PartnerProfileItem) {
+  const category = (item.category ?? '').toLowerCase();
+  const name = item.name.toLowerCase();
+
+  return (
+    category.includes('crm') ||
+    category.includes('email') ||
+    category.includes('cloud') ||
+    category.includes('ai model') ||
+    category.includes('payments') ||
+    category.includes('workflow') ||
+    category.includes('backend platform') ||
+    name.includes('zoho') ||
+    name.includes('google for startups') ||
+    name.includes('openai') ||
+    name.includes('stripe') ||
+    name.includes('n8n') ||
+    name.includes('supabase')
+  );
+}
+
+function isWideWordmarkPartner(item: PartnerProfileItem) {
+  const name = item.name.toLowerCase();
+
+  return (
+    name.includes('google for startups') ||
+    name.includes('zoho for startups') ||
+    name.includes('openai for startups') ||
+    name.includes('codex property') ||
+    name.includes('auzland')
+  );
+}
+
+function getPartnerLogoFrameClass(item: PartnerProfileItem) {
+  return isWideWordmarkPartner(item)
+    ? 'h-28 px-5 py-4'
+    : 'h-24 px-4 py-3';
+}
+
+function getPartnerLogoImageClass(item: PartnerProfileItem) {
+  return isWideWordmarkPartner(item)
+    ? 'max-h-full w-full max-w-[86%] object-contain'
+    : 'max-h-full w-full max-w-full object-contain';
 }
 
 export function PartnersSection({ content }: PartnersSectionProps) {
@@ -85,35 +120,47 @@ export function PartnersSection({ content }: PartnersSectionProps) {
     };
   }, []);
 
-  const mergedItems = [
-    ...fallbackPartners.map<PartnerProfileItem>((partner, index) => ({
-      id: -1000 - index,
-      name: partner.name,
-      category: partner.category,
-      website_url: partner.websiteUrl,
-      description: partner.description,
-      logo_url: partner.logoUrl,
-      image_url: partner.imageUrl,
-      featured: partner.featured,
-      sort_order: -1000 + index,
-      is_active: true,
-    })),
-    ...items,
-  ].filter(
-    (item, index, array) =>
-      array.findIndex(
-        (candidate) =>
-          candidate.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
-      ) === index,
-  ).sort((left, right) => left.sort_order - right.sort_order);
+  const approvedPartnerNames = useMemo(
+    () => new Set(fallbackPartners.map((partner) => partner.name.trim().toLowerCase())),
+    [],
+  );
 
-  const featuredItems = mergedItems.filter((item) => item.featured);
-  const logoItems = mergedItems.filter((item) => item.logo_url);
-  const spotlightItems = (featuredItems.length > 0 ? featuredItems : mergedItems).slice(0, 6);
+  const mergedItems = useMemo(
+    () =>
+      [
+        ...fallbackPartners.map<PartnerProfileItem>((partner, index) => ({
+          id: -1000 - index,
+          name: partner.name,
+          category: partner.category,
+          website_url: partner.websiteUrl,
+          description: partner.description,
+          logo_url: partner.logoUrl,
+          image_url: partner.imageUrl,
+          featured: partner.featured,
+          sort_order: index,
+          is_active: true,
+        })),
+        ...items,
+      ]
+        .filter((item) => approvedPartnerNames.has(item.name.trim().toLowerCase()))
+        .filter(
+          (item, index, array) =>
+            array.findIndex(
+              (candidate) =>
+                candidate.name.trim().toLowerCase() === item.name.trim().toLowerCase(),
+            ) === index,
+        )
+        .sort((left, right) => left.sort_order - right.sort_order),
+    [approvedPartnerNames, items],
+  );
+
+  const visibleItems = mergedItems.filter((item) => item.logo_url || item.image_url);
+  const infrastructurePartners = visibleItems.filter(isInfrastructurePartner);
+  const ecosystemPartners = visibleItems.filter((item) => !isInfrastructurePartner(item));
 
   return (
     <section id="partners" className="mx-auto w-full max-w-7xl px-6 py-24 lg:px-8">
-      <div className="grid gap-10 lg:grid-cols-[0.92fr_1.08fr] lg:items-start">
+      <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
         <div>
           <SectionHeading
             kicker={content.kicker}
@@ -122,11 +169,11 @@ export function PartnersSection({ content }: PartnersSectionProps) {
             body={content.body}
           />
 
-          <div className="mt-8 grid gap-3">
+          <div className="mt-7 grid gap-3">
             {content.stats.map((item) => (
               <div
                 key={item}
-                className="rounded-[1.35rem] border border-slate-200 bg-white/80 px-5 py-4 text-sm font-medium text-slate-700 shadow-[0_16px_40px_rgba(15,23,42,0.05)]"
+                className="rounded-[1.2rem] border border-slate-200 bg-white/80 px-4 py-3 text-sm font-medium text-slate-700 shadow-[0_14px_35px_rgba(15,23,42,0.04)]"
               >
                 {item}
               </div>
@@ -134,126 +181,135 @@ export function PartnersSection({ content }: PartnersSectionProps) {
           </div>
         </div>
 
-        <div className="space-y-6">
-          <div className="rounded-[2rem] border border-black/5 bg-white p-6 shadow-[0_28px_80px_rgba(15,23,42,0.08)]">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Trusted by
-                </div>
-                <div className="mt-2 text-2xl font-bold text-slate-950">
-                  Partners and customers on the BookedAI wall
-                </div>
+        <div className="rounded-[1.9rem] border border-black/5 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5 shadow-[0_22px_60px_rgba(15,23,42,0.07)]">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Partner trust
               </div>
-              <div className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                {mergedItems.length} profiles live
+              <div className="mt-2 text-2xl font-bold text-slate-950">
+                Startup-backed infrastructure plus visible ecosystem momentum
               </div>
             </div>
-
-            {loading ? (
-              <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-5 py-10 text-sm text-slate-500">
-                Loading partner profiles...
-              </div>
-            ) : error ? (
-              <div className="mt-6 rounded-[1.5rem] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-700">
-                {error}
-              </div>
-            ) : logoItems.length > 0 ? (
-              <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
-                {logoItems.map((item) => {
-                  const logoImage = (
-                    <div className="flex min-h-[112px] items-center justify-center rounded-[1.2rem] bg-white px-5 py-5">
-                      <img
-                        src={item.logo_url ?? item.image_url ?? ''}
-                        alt={`${item.name} logo`}
-                        className="max-h-16 w-full object-contain"
-                        loading="lazy"
-                      />
-                    </div>
-                  );
-
-                  return item.website_url ? (
-                    <a
-                      key={item.id}
-                      href={item.website_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3 transition hover:border-slate-300 hover:bg-white"
-                    >
-                      {logoImage}
-                    </a>
-                  ) : (
-                    <div
-                      key={item.id}
-                      className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-3"
-                    >
-                      {logoImage}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : (
-              <div className="mt-6 rounded-[1.5rem] border border-dashed border-slate-300 bg-slate-50 px-6 py-10">
-                <div className="text-lg font-semibold text-slate-950">{content.emptyTitle}</div>
-                <p className="mt-3 text-sm leading-7 text-slate-600">{content.emptyBody}</p>
-              </div>
-            )}
+            <div className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+              {visibleItems.length} partners
+            </div>
           </div>
 
-          {spotlightItems.length > 0 ? (
-            <div className="grid gap-4 md:grid-cols-2">
-              {spotlightItems.map((item) => {
-                const useShowcaseImage = hasDistinctShowcaseImage(item);
-                return (
-                  <article
-                    key={item.id}
-                    className="flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_24px_60px_rgba(15,23,42,0.06)]"
-                  >
-                    <div className="aspect-[4/2.6] bg-slate-100">
-                      {useShowcaseImage ? (
-                        <img
-                          src={item.image_url || ''}
-                          alt={item.name}
-                          className="h-full w-full object-cover"
-                          loading="lazy"
-                        />
-                      ) : item.logo_url || item.image_url ? (
-                        <div className="flex h-full items-center justify-center bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] px-8 py-8">
+          {loading ? (
+            <div className="mt-6 rounded-[1.4rem] border border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
+              Loading partner profiles...
+            </div>
+          ) : null}
+
+          {error ? (
+            <div className="mt-6 rounded-[1.4rem] border border-amber-200 bg-amber-50 px-5 py-4 text-sm text-amber-700">
+              {error}
+            </div>
+          ) : null}
+
+          {!loading && visibleItems.length > 0 ? (
+            <div className="mt-6 space-y-5">
+              <section className="rounded-[1.5rem] border border-sky-100 bg-sky-50/70 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+                      Infrastructure support
+                    </div>
+                    <div className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+                      Startup programs and platforms helping BookedAI ship faster
+                    </div>
+                  </div>
+                  <div className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700 ring-1 ring-sky-100">
+                    {infrastructurePartners.length} logos
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
+                  {infrastructurePartners.map((item) => (
+                    <a
+                      key={item.id}
+                      href={item.website_url ?? '#partners'}
+                      target={item.website_url ? '_blank' : undefined}
+                      rel={item.website_url ? 'noreferrer' : undefined}
+                      className="min-h-[13rem] overflow-hidden rounded-[1.2rem] border border-sky-100 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(15,23,42,0.05)]"
+                    >
+                      <div className="flex h-full min-w-0 flex-col">
+                        <div
+                          className={`flex items-center justify-center rounded-[1rem] border border-slate-100 bg-[linear-gradient(180deg,#f8fbff_0%,#f8fafc_100%)] ${getPartnerLogoFrameClass(item)}`}
+                        >
                           <img
-                            src={item.logo_url || item.image_url || ''}
-                            alt={item.name}
-                            className="max-h-24 w-full object-contain"
+                            src={item.logo_url ?? item.image_url ?? ''}
+                            alt={`${item.name} logo`}
+                            className={getPartnerLogoImageClass(item)}
                             loading="lazy"
                           />
                         </div>
-                      ) : (
-                        <div className="flex h-full items-center justify-center px-6 text-center text-sm text-slate-400">
-                          No image uploaded yet
+                        <div className="mt-4 flex min-h-[4.25rem] flex-1 flex-col">
+                          <div className="line-clamp-2 break-words text-[15px] font-semibold leading-5 text-slate-950">
+                            {item.name}
+                          </div>
+                          <div className="mt-1 line-clamp-2 break-words text-[12px] font-medium leading-4 text-sky-700">
+                            {item.category ?? 'Infrastructure partner'}
+                          </div>
+                          <div className="mt-auto pt-3 text-[11px] leading-4 text-slate-500">
+                            Startup support
+                          </div>
                         </div>
-                      )}
-                    </div>
-                    <div className="flex h-full flex-col p-5">
-                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-600">
-                        {item.category || 'Partner profile'}
                       </div>
-                      <h3 className="mt-3 text-xl font-semibold text-slate-950">{item.name}</h3>
-                      <p className="mt-3 text-sm leading-7 text-slate-600">
-                        {item.description || 'Profile description coming soon.'}
-                      </p>
-                      {item.website_url ? (
-                        <a
-                          href={item.website_url}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="mt-auto pt-5 inline-flex text-sm font-semibold text-sky-700 transition hover:text-sky-800"
-                        >
-                          Visit website
-                        </a>
-                      ) : null}
+                    </a>
+                  ))}
+                </div>
+              </section>
+
+              <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                      Ecosystem and client visibility
                     </div>
-                  </article>
-                );
-              })}
+                    <div className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+                      Customer and ecosystem logos sized to stay inside the landing layout
+                    </div>
+                  </div>
+                  <div className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                    Responsive grid
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {ecosystemPartners.map((item) => (
+                    <a
+                      key={item.id}
+                      href={item.website_url ?? '#partners'}
+                      target={item.website_url ? '_blank' : undefined}
+                      rel={item.website_url ? 'noreferrer' : undefined}
+                      className="min-h-[13rem] overflow-hidden rounded-[1.25rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(15,23,42,0.05)]"
+                    >
+                      <div className="flex h-full min-w-0 flex-col">
+                        <div
+                          className={`flex items-center justify-center overflow-hidden rounded-[1rem] border border-slate-200 bg-slate-50 ${getPartnerLogoFrameClass(item)}`}
+                        >
+                          <img
+                            src={item.image_url ?? item.logo_url ?? ''}
+                            alt={item.name}
+                            className={getPartnerLogoImageClass(item)}
+                            loading="lazy"
+                          />
+                        </div>
+                        <div className="mt-4 flex min-h-[4.25rem] flex-1 flex-col">
+                          <div className="line-clamp-2 break-words text-[15px] font-semibold leading-5 text-slate-950">
+                            {item.name}
+                          </div>
+                          <div className="mt-1 line-clamp-2 break-words text-[12px] font-medium leading-4 text-emerald-700">
+                            {item.category ?? 'Partner'}
+                          </div>
+                        </div>
+                      </div>
+                    </a>
+                  ))}
+                </div>
+              </section>
             </div>
           ) : null}
         </div>

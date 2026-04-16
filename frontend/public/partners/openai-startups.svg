@@ -1,0 +1,10 @@
+<svg width="512" height="192" viewBox="0 0 512 192" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="192" rx="28" fill="#FFFFFF"/>
+  <g transform="translate(36 34)">
+    <path d="M40 0C56 0 69 13 69 29C69 33 68 37 66 41C76 46 82 56 82 67C82 82 70 94 54 94C51 94 48 94 45 93C41 104 31 112 19 112C3 112 -10 99 -10 83C-10 79 -9 75 -8 71C-18 66 -24 56 -24 45C-24 29 -11 16 5 16C8 16 11 16 14 17C18 7 28 0 40 0Z" fill="#111111"/>
+    <path d="M24 18L54 35V69L24 86L-6 69V35L24 18Z" fill="white" opacity="0.16"/>
+  </g>
+  <text x="132" y="78" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700" fill="#111827">OpenAI for Startups</text>
+  <text x="28" y="138" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700" fill="#111827">ChatGPT and API model support for booking intelligence</text>
+  <text x="28" y="167" font-family="Arial, Helvetica, sans-serif" font-size="16" font-weight="600" fill="#6B7280">Conversational reasoning and assistant orchestration</text>
+</svg>

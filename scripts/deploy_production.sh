@@ -10,10 +10,13 @@ DOMAIN_ROOT="${DOMAIN_ROOT:-bookedai.au}"
 DOMAIN_WWW="${DOMAIN_WWW:-www.bookedai.au}"
 DOMAIN_API="${DOMAIN_API:-api.bookedai.au}"
 DOMAIN_ADMIN="${DOMAIN_ADMIN:-admin.bookedai.au}"
+DOMAIN_BETA="${DOMAIN_BETA:-beta.bookedai.au}"
+DOMAIN_PRODUCT="${DOMAIN_PRODUCT:-product.bookedai.au}"
 DOMAIN_N8N="${DOMAIN_N8N:-n8n.bookedai.au}"
 DOMAIN_SUPABASE="${DOMAIN_SUPABASE:-supabase.bookedai.au}"
 DOMAIN_HERMES="${DOMAIN_HERMES:-hermes.bookedai.au}"
 DOMAIN_UPLOAD="${DOMAIN_UPLOAD:-upload.bookedai.au}"
+DOMAIN_CALENDAR="${DOMAIN_CALENDAR:-calendar.bookedai.au}"
 EMAIL="${LETSENCRYPT_EMAIL:-info@bookedai.au}"
 
 CERT_DOMAINS=(
@@ -21,9 +24,12 @@ CERT_DOMAINS=(
   "${DOMAIN_WWW}"
   "${DOMAIN_API}"
   "${DOMAIN_ADMIN}"
+  "${DOMAIN_BETA}"
+  "${DOMAIN_PRODUCT}"
   "${DOMAIN_N8N}"
   "${DOMAIN_SUPABASE}"
   "${DOMAIN_HERMES}"
+  "${DOMAIN_CALENDAR}"
 )
 
 if [[ -n "${DOMAIN_UPLOAD}" ]] && getent ahosts "${DOMAIN_UPLOAD}" >/dev/null 2>&1; then
@@ -52,7 +58,7 @@ bash scripts/sync_app_env_from_supabase.sh
 mkdir -p deploy/certbot/www
 docker network create bookedai_internal >/dev/null 2>&1 || true
 
-docker compose -f docker-compose.prod.yml --env-file .env build web backend
+docker compose -f docker-compose.prod.yml --env-file .env build web backend beta-web beta-backend
 
 CERT_PATH="/etc/letsencrypt/live/${DOMAIN_ROOT}/fullchain.pem"
 NEEDS_CERT_UPDATE="false"
@@ -62,7 +68,13 @@ elif [[ "${CHECK_UPLOAD_CERT}" == "true" ]] && ! openssl x509 -in "${CERT_PATH}"
   NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_ADMIN}([, ]|$)"; then
   NEEDS_CERT_UPDATE="true"
+elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_BETA}([, ]|$)"; then
+  NEEDS_CERT_UPDATE="true"
+elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_PRODUCT}([, ]|$)"; then
+  NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_HERMES}([, ]|$)"; then
+  NEEDS_CERT_UPDATE="true"
+elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_CALENDAR}([, ]|$)"; then
   NEEDS_CERT_UPDATE="true"
 fi
 
@@ -95,9 +107,12 @@ bash scripts/provision_n8n_workflows.sh
 
 echo "Deployment completed."
 echo "App: https://${DOMAIN_ROOT}"
+echo "Beta: https://${DOMAIN_BETA}"
+echo "Product: https://${DOMAIN_PRODUCT}"
 echo "Admin: https://${DOMAIN_ADMIN}"
 echo "API: https://${DOMAIN_API}"
 echo "n8n: https://${DOMAIN_N8N}"
 echo "Supabase: https://${DOMAIN_SUPABASE}"
 echo "Hermes: https://${DOMAIN_HERMES}"
 echo "Uploads: https://${DOMAIN_UPLOAD}"
+echo "Calendar redirect: https://${DOMAIN_CALENDAR}"

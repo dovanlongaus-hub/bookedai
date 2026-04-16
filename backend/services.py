@@ -38,7 +38,9 @@ from schemas import (
     ServiceCatalogItem,
     TawkMessage,
 )
-from service_layer import EmailService, N8NService, store_event
+from service_layer.email_service import EmailService
+from service_layer.event_store import store_event
+from service_layer.n8n_service import N8NService
 
 
 logger = logging.getLogger(__name__)
@@ -74,24 +76,24 @@ class PricingPlanDefinition:
 PRICING_PLAN_DEFINITIONS: dict[str, PricingPlanDefinition] = {
     "basic": PricingPlanDefinition(
         id="basic",
-        name="Basic",
-        amount_aud=99,
+        name="Starter",
+        amount_aud=119,
         price_suffix="/month",
-        description="BookedAI Basic plan for Australian SMEs that need always-on lead capture.",
+        description="BookedAI Starter plan for Australian SMEs that need always-on lead capture and a simpler booking path.",
         onboarding_label="Lead capture setup",
     ),
     "standard": PricingPlanDefinition(
         id="standard",
-        name="Standard",
-        amount_aud=249,
+        name="Growth",
+        amount_aud=299,
         price_suffix="/month",
-        description="BookedAI Standard plan for businesses that want booking automation and follow-up.",
+        description="BookedAI Growth plan for Australian SMEs that want stronger booking automation and follow-up.",
         onboarding_label="Booking automation setup",
     ),
     "pro": PricingPlanDefinition(
         id="pro",
         name="Pro",
-        amount_aud=499,
+        amount_aud=649,
         price_suffix="/month",
         description="BookedAI Pro plan for multi-location or higher-volume service teams.",
         onboarding_label="Advanced rollout setup",
@@ -146,6 +148,7 @@ CATEGORY_IMAGE_URLS: dict[str, str] = {
     "Healthcare Service": "https://images.pexels.com/photos/7089401/pexels-photo-7089401.jpeg?auto=compress&cs=tinysrgb&w=1200",
     "Membership and Community": "https://images.pexels.com/photos/1181406/pexels-photo-1181406.jpeg?auto=compress&cs=tinysrgb&w=1200",
     "Hospitality and Events": "https://images.pexels.com/photos/261102/pexels-photo-261102.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "Housing and Property": "https://images.pexels.com/photos/323780/pexels-photo-323780.jpeg?auto=compress&cs=tinysrgb&w=1200",
 }
 
 SERVICE_IMAGE_URLS: dict[str, str] = {
@@ -162,6 +165,8 @@ SERVICE_IMAGE_URLS: dict[str, str] = {
     "gym-membership-tour": "https://images.pexels.com/photos/1552242/pexels-photo-1552242.jpeg?auto=compress&cs=tinysrgb&w=1200",
     "coworking-membership-tour": "https://images.pexels.com/photos/1181406/pexels-photo-1181406.jpeg?auto=compress&cs=tinysrgb&w=1200",
     "hotel-room-reservation": "https://images.pexels.com/photos/271624/pexels-photo-271624.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "codex-property-project-consult": "https://images.pexels.com/photos/1396122/pexels-photo-1396122.jpeg?auto=compress&cs=tinysrgb&w=1200",
+    "auzland-project-consult": "https://images.pexels.com/photos/106399/pexels-photo-106399.jpeg?auto=compress&cs=tinysrgb&w=1200",
 }
 
 
@@ -1018,6 +1023,49 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         tags=["colour", "consultation", "styling", "salon"],
     ),
     _service_catalog_item(
+        id="signature-facial-sydney",
+        name="Signature Facial",
+        category="Spa",
+        summary="A premium facial with skin analysis, deep cleanse, hydration, and finishing massage for a polished glow.",
+        duration_minutes=60,
+        amount_aud=139,
+        image_url=None,
+        venue_name="Harbour Glow Spa",
+        location="Surry Hills, Sydney NSW 2010",
+        latitude=-33.8840,
+        longitude=151.2094,
+        tags=["facial", "spa", "skin", "hydration", "glow", "beauty", "treatment"],
+        featured=True,
+    ),
+    _service_catalog_item(
+        id="express-facial-sydney",
+        name="Express Facial Reset",
+        category="Spa",
+        summary="A fast lunchtime facial focused on cleanse, exfoliation, and hydration for busy city schedules.",
+        duration_minutes=35,
+        amount_aud=95,
+        image_url=None,
+        venue_name="Harbour Glow Spa",
+        location="Sydney CBD NSW 2000",
+        latitude=-33.8680,
+        longitude=151.2070,
+        tags=["facial", "spa", "express", "skin", "hydration", "city", "quick"],
+    ),
+    _service_catalog_item(
+        id="led-skin-therapy-sydney",
+        name="LED Skin Therapy Facial",
+        category="Spa",
+        summary="Targeted facial treatment combining LED therapy, calming mask, and tailored post-treatment skincare advice.",
+        duration_minutes=50,
+        amount_aud=149,
+        image_url=None,
+        venue_name="Lumina Skin Studio Sydney",
+        location="Paddington, Sydney NSW 2021",
+        latitude=-33.8848,
+        longitude=151.2294,
+        tags=["facial", "spa", "led", "skin", "therapy", "beauty", "treatment"],
+    ),
+    _service_catalog_item(
         id="kids-swimming-lessons",
         name="Kids Swimming Lessons",
         category="Kids Services",
@@ -1263,6 +1311,58 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         longitude=153.0251,
         tags=["hotel", "room", "reservation", "stay", "hospitality", "booking"],
     ),
+    _service_catalog_item(
+        id="codex-property-project-consult",
+        name="Codex Property Project Consultation",
+        category="Housing and Property",
+        summary="Book a consultation to discuss off-the-plan housing projects, target suburbs, budget range, and investment or owner-occupier goals.",
+        duration_minutes=45,
+        amount_aud=49,
+        image_url=None,
+        venue_name="Codex Property",
+        location="Sydney NSW 2000",
+        latitude=-33.8688,
+        longitude=151.2093,
+        booking_url="https://codexproperty.com.au",
+        tags=[
+            "housing",
+            "property",
+            "project",
+            "apartment",
+            "home",
+            "investment",
+            "off the plan",
+            "consultation",
+            "real estate",
+        ],
+        featured=True,
+    ),
+    _service_catalog_item(
+        id="auzland-project-consult",
+        name="Auzland Housing Project Consultation",
+        category="Housing and Property",
+        summary="Schedule a housing consultation to review available projects, preferred locations, budget, and settlement timeline with the Auzland team.",
+        duration_minutes=45,
+        amount_aud=49,
+        image_url=None,
+        venue_name="Auzland",
+        location="Melbourne VIC 3000",
+        latitude=-37.8136,
+        longitude=144.9631,
+        booking_url="https://auzland.au/",
+        tags=[
+            "housing",
+            "property",
+            "project",
+            "townhouse",
+            "house",
+            "apartment",
+            "first home",
+            "consultation",
+            "real estate",
+        ],
+        featured=True,
+    ),
 ]
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -1441,6 +1541,41 @@ CATEGORY_KEYWORDS: dict[str, set[str]] = {
         "dia",
         "diem",
     },
+    "Housing and Property": {
+        "housing",
+        "property",
+        "properties",
+        "real",
+        "estate",
+        "project",
+        "projects",
+        "apartment",
+        "apartments",
+        "unit",
+        "units",
+        "house",
+        "home",
+        "homes",
+        "townhouse",
+        "investment",
+        "investor",
+        "buyer",
+        "buyers",
+        "off",
+        "plan",
+        "mortgage",
+        "suburb",
+        "du",
+        "an",
+        "nha",
+        "dat",
+        "bat",
+        "dong",
+        "san",
+        "can",
+        "ho",
+        "mua",
+    },
     "Print and signage": {
         "print",
         "printing",
@@ -1484,6 +1619,28 @@ SERVICE_KEYWORD_SYNONYMS: dict[str, set[str]] = {
     "coworking-membership-tour": {"coworking", "workspace", "office", "desk", "tour"},
     "pub-function-enquiry": {"pub", "function", "party", "event", "venue"},
     "hotel-room-reservation": {"hotel", "room", "reservation", "stay", "accommodation"},
+    "codex-property-project-consult": {
+        "housing",
+        "property",
+        "project",
+        "projects",
+        "apartment",
+        "home",
+        "investment",
+        "off the plan",
+        "real estate",
+    },
+    "auzland-project-consult": {
+        "housing",
+        "property",
+        "project",
+        "projects",
+        "townhouse",
+        "house",
+        "apartment",
+        "first home",
+        "real estate",
+    },
 }
 FOLLOW_UP_CONTEXT_TOKENS = {
     "best",
@@ -2841,6 +2998,8 @@ class BookingAssistantService:
             return "group fit, venue suitability, and booking convenience"
         if "membership" in category or "community" in category:
             return "eligibility, onboarding, and renewal simplicity"
+        if "housing" in category or "property" in category:
+            return "project fit, budget alignment, and consultation clarity"
         return "fit, convenience, and next-step clarity"
 
     @classmethod
@@ -2854,6 +3013,8 @@ class BookingAssistantService:
             return f"My strongest recommendation is {service.name} if you want the smoothest booking option for this plan."
         if "membership" in category or "community" in category:
             return f"My strongest recommendation is {service.name} because it is the clearest path to get your membership request moving."
+        if "housing" in category or "property" in category:
+            return f"My strongest recommendation is {service.name} because it is the clearest path to discuss the right project options with a consultant."
         return f"My strongest recommendation is {service.name}."
 
     @classmethod
@@ -2880,6 +3041,8 @@ class BookingAssistantService:
             return "group size, venue fit, and convenience"
         if "membership" in category:
             return "joining, renewing, and onboarding simplicity"
+        if "housing" in category or "property" in category:
+            return "project suitability, budget range, and next-step consultation"
         if {"wedding", "bridal", "event"} & tags:
             return "important occasions and presentation"
         if service.duration_minutes <= 20:
@@ -3507,7 +3670,7 @@ class BookingAssistantService:
 
         return (
             "Tell me the outcome you need and I will surface the strongest matching services or events. "
-            "For example: physio for shoulder pain, restaurant table for 6, renew my membership, or AI events at WSTI."
+            "For example: facial in Sydney under 150 dollars, physio for shoulder pain near Parramatta, restaurant table for 6, renew my membership, or AI events at WSTI."
         )
 
     @staticmethod
@@ -4055,10 +4218,10 @@ class PricingService:
     def _build_trial_summary(trial_days: int, startup_offer_applied: bool) -> str:
         if startup_offer_applied:
             return (
-                "3 months free when referred by an Australian accelerator or incubator, "
+                "Subscription is free for the first 3 months when referred by an Australian accelerator or incubator, "
                 "then the selected monthly plan starts."
             )
-        return "First 30 days free, then the selected monthly plan starts."
+        return "Subscription is free for the first 30 days, then the selected monthly plan starts."
 
     @staticmethod
     def _build_onsite_travel_fee_note(onboarding_mode: str) -> str | None:
@@ -4230,6 +4393,88 @@ class PricingService:
             confirmation_message=confirmation_message,
         )
 
+    def zoho_bookings_configured(self) -> bool:
+        return bool(
+            self.settings.zoho_bookings_api_base_url
+            and (
+                self.settings.zoho_bookings_access_token
+                or (
+                    self.settings.zoho_bookings_refresh_token
+                    and self.settings.zoho_bookings_client_id
+                    and self.settings.zoho_bookings_client_secret
+                )
+            )
+        )
+
+    async def fetch_recent_demo_booking(
+        self,
+        *,
+        customer_email: str,
+        customer_name: str | None,
+        appointment_created_from: datetime,
+        appointment_created_till: datetime | None = None,
+    ) -> dict[str, Any] | None:
+        if not self.zoho_bookings_configured():
+            return None
+
+        access_token = await self._get_zoho_bookings_access_token()
+        bookings_url = (
+            f"{self.settings.zoho_bookings_api_base_url.rstrip('/')}/fetchappointment"
+        )
+        created_till = appointment_created_till or datetime.utcnow() + timedelta(minutes=5)
+        payload = {
+            "customer_email": customer_email.strip().lower(),
+            "appointment_created_from": appointment_created_from.strftime("%d-%b-%Y %H:%M:%S"),
+            "appointment_created_till": created_till.strftime("%d-%b-%Y %H:%M:%S"),
+            "need_customer_more_info": "true",
+            "per_page": "20",
+        }
+        if customer_name and customer_name.strip():
+            payload["customer_name"] = customer_name.strip()
+
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                bookings_url,
+                headers={"Authorization": f"Zoho-oauthtoken {access_token}"},
+                data=payload,
+            )
+            response.raise_for_status()
+            data = response.json()
+
+        appointments = (
+            ((data.get("response") or {}).get("returnvalue") or {}).get("response") or []
+        )
+        if not isinstance(appointments, list):
+            return None
+
+        normalized_email = customer_email.strip().lower()
+        normalized_name = (customer_name or "").strip().lower()
+
+        def parse_booked_on(value: str) -> datetime:
+            try:
+                return datetime.strptime(value, "%Y-%m-%d %H:%M:%S")
+            except ValueError:
+                return datetime.min
+
+        matched: list[dict[str, Any]] = []
+        for item in appointments:
+            if not isinstance(item, dict):
+                continue
+            email = str(item.get("customer_email") or "").strip().lower()
+            if email != normalized_email:
+                continue
+            if normalized_name:
+                name = str(item.get("customer_name") or "").strip().lower()
+                if normalized_name not in name and name not in normalized_name:
+                    continue
+            matched.append(item)
+
+        if not matched:
+            return None
+
+        matched.sort(key=lambda item: parse_booked_on(str(item.get("booked_on") or "")), reverse=True)
+        return matched[0]
+
     async def _get_zoho_access_token(self) -> str:
         direct_token = self.settings.zoho_calendar_access_token.strip()
         if direct_token:
@@ -4261,6 +4506,39 @@ class PricingService:
         access_token = str(payload.get("access_token") or "").strip()
         if not access_token:
             raise ValueError("Zoho OAuth response did not include an access token")
+        return access_token
+
+    async def _get_zoho_bookings_access_token(self) -> str:
+        direct_token = self.settings.zoho_bookings_access_token.strip()
+        if direct_token:
+            return direct_token
+
+        if not (
+            self.settings.zoho_bookings_refresh_token
+            and self.settings.zoho_bookings_client_id
+            and self.settings.zoho_bookings_client_secret
+        ):
+            raise ValueError("Zoho Bookings OAuth credentials are incomplete")
+
+        token_url = (
+            f"{self.settings.zoho_accounts_base_url.rstrip('/')}/oauth/v2/token"
+        )
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                token_url,
+                data={
+                    "refresh_token": self.settings.zoho_bookings_refresh_token,
+                    "client_id": self.settings.zoho_bookings_client_id,
+                    "client_secret": self.settings.zoho_bookings_client_secret,
+                    "grant_type": "refresh_token",
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+
+        access_token = str(payload.get("access_token") or "").strip()
+        if not access_token:
+            raise ValueError("Zoho OAuth response did not include a Bookings access token")
         return access_token
 
     async def _create_zoho_calendar_event(

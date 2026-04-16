@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { LogoMark } from './ui/LogoMark';
+import { roadmapHref, videoDemoHref } from './data';
 
 type HeaderProps = {
   navItems: string[];
@@ -15,29 +16,41 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-30 mx-auto w-full max-w-7xl px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
-      <div className="flex items-center justify-between gap-4">
+    <header className="sticky top-0 z-30">
+      <div className="apple-glass-nav mx-auto flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
         <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-slate-950 shadow-[0_18px_36px_rgba(15,23,42,0.16)]">
+          <div className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10">
             <LogoMark />
           </div>
-          <div className="text-2xl font-bold tracking-tight text-slate-950">
-            Booked<span className="text-slate-500">AI</span>
+          <div className="text-xl font-semibold tracking-[-0.03em] text-white">
+            Booked<span className="text-white/70">AI</span>
           </div>
         </div>
 
         <div className="hidden items-center gap-3 md:flex">
+          <a
+            href={roadmapHref}
+            className="text-xs text-white/82 transition hover:text-white"
+          >
+            Roadmap
+          </a>
+          <a
+            href={videoDemoHref}
+            className="text-xs text-white/82 transition hover:text-white"
+          >
+            Watch Demo
+          </a>
           <button
             type="button"
             onClick={onBookDemo}
-            className="rounded-full border border-black/10 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
+            className="apple-button-secondary border-white/24 px-4 py-2 text-sm text-white hover:bg-white/10"
           >
             Book a Demo
           </button>
           <button
             type="button"
             onClick={onStartTrial}
-            className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(15,23,42,0.14)] transition hover:bg-slate-800"
+            className="apple-button px-4 py-2 text-sm font-semibold"
           >
             Start Free Trial
           </button>
@@ -48,21 +61,21 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
           aria-expanded={isMobileMenuOpen}
           aria-controls="mobile-nav"
           onClick={() => setIsMobileMenuOpen((current) => !current)}
-          className="inline-flex h-11 items-center justify-center rounded-full border border-black/10 bg-white px-4 text-sm font-semibold text-slate-700 shadow-[0_12px_26px_rgba(15,23,42,0.08)] transition hover:border-black/15 hover:bg-slate-50 md:hidden"
+          className="inline-flex h-10 items-center justify-center rounded-full border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 md:hidden"
         >
           {isMobileMenuOpen ? 'Close' : 'Menu'}
         </button>
       </div>
 
       <nav
-        className="mt-4 hidden items-center gap-8 text-sm text-slate-600 md:flex"
+        className="apple-glass-nav hidden items-center justify-center gap-8 px-4 py-3 text-xs text-white/72 md:flex"
         aria-label="Primary"
       >
         {navItems.map((item) => (
           <a
             key={item}
             href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
-            className="transition hover:text-slate-950"
+            className="transition hover:text-white"
           >
             {item}
           </a>
@@ -72,7 +85,7 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
       {isMobileMenuOpen ? (
         <div
           id="mobile-nav"
-          className="mt-4 rounded-[1.75rem] border border-black/5 bg-white/95 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] md:hidden"
+          className="apple-glass-nav m-4 rounded-[1.5rem] p-4 md:hidden"
         >
           <nav className="flex flex-col gap-2" aria-label="Mobile primary">
             {navItems.map((item) => (
@@ -80,7 +93,7 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
                 key={item}
                 href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
                 onClick={closeMobileMenu}
-                className="rounded-2xl border border-black/5 bg-slate-50 px-4 py-3 text-sm font-medium text-slate-700 transition hover:bg-slate-100"
+                className="rounded-2xl bg-white/8 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/12"
               >
                 {item}
               </a>
@@ -88,13 +101,27 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
           </nav>
 
           <div className="mt-4 grid gap-3">
+            <a
+              href={roadmapHref}
+              onClick={closeMobileMenu}
+              className="apple-button-secondary border-white/24 px-4 py-3 text-center text-sm text-white hover:bg-white/10"
+            >
+              Roadmap
+            </a>
+            <a
+              href={videoDemoHref}
+              onClick={closeMobileMenu}
+              className="apple-button-secondary border-white/24 px-4 py-3 text-center text-sm text-white hover:bg-white/10"
+            >
+              Watch Demo
+            </a>
             <button
               type="button"
               onClick={() => {
                 closeMobileMenu();
                 onBookDemo();
               }}
-              className="rounded-full border border-black/10 bg-white px-4 py-3 text-center text-sm font-medium text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
+              className="apple-button-secondary border-white/24 px-4 py-3 text-center text-sm text-white hover:bg-white/10"
             >
               Book a Demo
             </button>
@@ -104,7 +131,7 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
                 closeMobileMenu();
                 onStartTrial();
               }}
-              className="rounded-full bg-slate-950 px-4 py-3 text-sm font-semibold text-white shadow-[0_16px_30px_rgba(15,23,42,0.14)] transition hover:bg-slate-800"
+              className="apple-button px-4 py-3 text-sm font-semibold"
             >
               Start Free Trial
             </button>
