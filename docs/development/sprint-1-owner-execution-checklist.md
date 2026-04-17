@@ -163,6 +163,7 @@ Finish the Phase 0 reset and lock the project onto one shared execution model fo
 - create explicit Phase 1 implementation kickoff owner list
 - create Sprint 2 start criteria
 - confirm no conflicting narrative remains in core planning docs
+- complete `docs/architecture/phase-0-exit-review.md`
 
 ## 7. Sprint 2 start criteria
 

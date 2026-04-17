@@ -31,6 +31,7 @@ For any meaningful product or architecture change:
 - `docs/architecture/mvp-sprint-execution-plan.md`
 - `docs/architecture/pricing-packaging-monetization-strategy.md`
 - `docs/architecture/landing-page-system-requirements.md`
+- `docs/architecture/phase-0-exit-review.md`
 - `docs/development/sprint-1-owner-execution-checklist.md`
 
 Focus:
@@ -44,6 +45,10 @@ Focus:
 
 - `docs/architecture/bookedai-master-prd.md`
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
+- `docs/architecture/sprint-2-implementation-package.md`
+- `docs/architecture/frontend-theme-design-token-map.md`
+- `docs/architecture/landing-component-tree-and-file-ownership.md`
+- `docs/architecture/landing-page-execution-task-map.md`
 - `docs/architecture/phase-1-2-epic-story-task-breakdown.md`
 - `docs/architecture/public-growth-app-strategy.md`
 - `docs/architecture/implementation-phase-roadmap.md`

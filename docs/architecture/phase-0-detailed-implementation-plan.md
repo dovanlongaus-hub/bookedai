@@ -464,6 +464,10 @@ Approval should be explicit from:
 - Backend lead
 - QA or release owner
 
+Current review artifact:
+
+- `docs/architecture/phase-0-exit-review.md`
+
 ## 16. Immediate handoff into Phase 1
 
 Once Phase 0 is approved, Phase 1 starts with:

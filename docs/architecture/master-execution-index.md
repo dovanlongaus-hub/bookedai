@@ -46,6 +46,8 @@ Core docs:
 
 - `docs/architecture/phase-0-detailed-implementation-plan.md`
 - `docs/architecture/phase-0-epic-story-task-breakdown.md`
+- `docs/architecture/landing-page-system-requirements.md`
+- `docs/architecture/phase-0-exit-review.md`
 - `docs/development/sprint-1-owner-execution-checklist.md`
 
 ### Phase 1-2
@@ -59,6 +61,10 @@ Primary output:
 Core docs:
 
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
+- `docs/architecture/sprint-2-implementation-package.md`
+- `docs/architecture/frontend-theme-design-token-map.md`
+- `docs/architecture/landing-component-tree-and-file-ownership.md`
+- `docs/architecture/landing-page-execution-task-map.md`
 - `docs/architecture/phase-1-2-epic-story-task-breakdown.md`
 - `docs/development/sprint-2-owner-execution-checklist.md`
 - `docs/development/sprint-3-owner-execution-checklist.md`
@@ -152,4 +158,3 @@ Leadership should review the program at these points:
 - `docs/architecture/solution-architecture-master-execution-plan.md`
 - `docs/architecture/implementation-phase-roadmap.md`
 - `docs/development/roadmap-sprint-document-register.md`
-
