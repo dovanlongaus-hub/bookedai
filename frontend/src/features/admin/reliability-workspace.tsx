@@ -23,6 +23,8 @@ type ReliabilityWorkspaceProps = {
   selectedServiceId?: string | null;
   configItems: AdminConfigEntry[];
   apiRoutes: AdminApiRoute[];
+  apiBaseUrl: string;
+  sessionToken: string;
   onPanelNavigate: (panel: Extract<AdminWorkspacePanelId, 'prompt5-preview' | 'live-configuration' | 'api-inventory'>) => void;
 };
 
@@ -31,9 +33,14 @@ export function ReliabilityWorkspace({
   selectedServiceId,
   configItems,
   apiRoutes,
+  apiBaseUrl,
+  sessionToken,
   onPanelNavigate,
 }: ReliabilityWorkspaceProps) {
   const effectivePanel = activePanel ?? 'prompt5-preview';
+  const discordConfigured = configItems.some(
+    (item) => item.key === 'DISCORD_WEBHOOK_URL' && item.value.trim().length > 0,
+  );
 
   return (
     <div className="mt-6 space-y-6">
@@ -42,6 +49,9 @@ export function ReliabilityWorkspace({
         configItemsCount={configItems.length}
         apiRoutesCount={apiRoutes.length}
         selectedServiceId={selectedServiceId}
+        apiBaseUrl={apiBaseUrl}
+        sessionToken={sessionToken}
+        discordConfigured={discordConfigured}
         onPanelNavigate={onPanelNavigate}
       />
 

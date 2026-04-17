@@ -73,16 +73,26 @@ async def run(*, apply: bool, limit: int) -> None:
     session = session_factory()
 
     try:
-        services = (
-            await session.execute(
-                select(ServiceMerchantProfile).order_by(ServiceMerchantProfile.id)
-            )
-        ).scalars().all()
+        try:
+            services = (
+                await session.execute(
+                    select(ServiceMerchantProfile).order_by(ServiceMerchantProfile.id)
+                )
+            ).scalars().all()
+        except Exception as exc:
+            summary = {
+                "mode": "apply" if apply else "dry_run",
+                "status": "error",
+                "error": f"Unable to reach the configured database: {exc}",
+            }
+            print(json.dumps(summary, indent=2, default=str))
+            return
 
         changed_count = 0
         downgraded_count = 0
         warning_count = 0
         category_normalized_count = 0
+        metro_tagged_count = 0
         sampled_findings: list[dict[str, Any]] = []
 
         for service in services:
@@ -99,6 +109,8 @@ async def run(*, apply: bool, limit: int) -> None:
                 downgraded_count += 1
             if service.category != normalized.get("category"):
                 category_normalized_count += 1
+            if any(tag in {"sydney", "melbourne", "brisbane", "wollongong", "newcastle", "adelaide", "perth", "canberra"} for tag in normalized.get("tags_json") or []):
+                metro_tagged_count += 1
 
             if len(sampled_findings) < limit:
                 sampled_findings.append(finding)
@@ -118,6 +130,7 @@ async def run(*, apply: bool, limit: int) -> None:
             "records_with_quality_warnings": warning_count,
             "records_downgraded_to_inactive": downgraded_count,
             "records_with_category_normalization": category_normalized_count,
+            "records_with_metro_location_tags": metro_tagged_count,
             "sample_findings": sampled_findings,
         }
         print(json.dumps(summary, indent=2, default=str))

@@ -2369,6 +2369,54 @@ class OpenAIService:
         normalized_ids = [str(item) for item in matched_service_ids if str(item).strip()]
         return reply, normalized_ids
 
+    async def team_assistant_reply(
+        self,
+        *,
+        question: str,
+        context_blocks: list[dict[str, str]],
+    ) -> str:
+        if not self.is_configured():
+            return ""
+
+        prompt = (
+            "You are BookedAI's internal team assistant. "
+            "Answer using only the supplied repo planning and progress context. "
+            "Be concise, operational, and truthful. "
+            "If the context is insufficient, say that clearly instead of guessing. "
+            "Prefer short bullet-ready language and reference the most relevant source file path when helpful."
+        )
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "reply": {"type": "string"},
+            },
+            "required": ["reply"],
+        }
+
+        try:
+            output_text = await self._generate_structured_json(
+                prompt=prompt,
+                payload={
+                    "question": question,
+                    "context_blocks": context_blocks,
+                },
+                schema_name="team_assistant_reply",
+                schema=schema,
+            )
+        except Exception:
+            return ""
+
+        if not output_text:
+            return ""
+
+        try:
+            parsed = json.loads(output_text)
+        except json.JSONDecodeError:
+            return ""
+
+        return str(parsed.get("reply") or "").strip()
+
     async def extract_services_from_website(
         self,
         *,

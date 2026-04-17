@@ -3,9 +3,17 @@ import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 import {
   brandDescriptor,
   brandName,
+  demoContent,
   type BookingAssistantContent,
 } from '../data';
-import { getApiBaseUrl } from '../../../shared/config/api';
+import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../../shared/config/api';
+import {
+  buildPartnerMatchActionFooterModelFromServiceItem,
+  buildPartnerMatchCardModelFromServiceItem,
+} from '../../../shared/presenters/partnerMatch';
+import { PartnerMatchCard } from '../../../shared/components/PartnerMatchCard';
+import { PartnerMatchActionFooter } from '../../../shared/components/PartnerMatchActionFooter';
+import { PartnerMatchShortlist } from '../../../shared/components/PartnerMatchShortlist';
 
 type ServiceCatalogItem = {
   id: string;
@@ -30,6 +38,30 @@ type BookingAssistantCatalogResponse = {
   stripe_enabled: boolean;
   services: ServiceCatalogItem[];
 };
+
+function buildFallbackCatalog(): BookingAssistantCatalogResponse {
+  return {
+    status: 'fallback',
+    business_email: 'info@bookedai.au',
+    stripe_enabled: true,
+    services: demoContent.results.map((item, index) => ({
+      id: `fallback-service-${index + 1}`,
+      name: item.name,
+      category: item.category,
+      summary: item.summary,
+      duration_minutes: 45,
+      amount_aud: Number.parseInt(item.priceLabel.replace(/[^\d]/g, ''), 10) || 30,
+      image_url: item.imageUrl,
+      map_snapshot_url: null,
+      venue_name: item.name,
+      location: item.locationLabel,
+      map_url: null,
+      booking_url: '#assistant',
+      tags: demoContent.quickFilters,
+      featured: true,
+    })),
+  };
+}
 
 type BookingAssistantChatResponse = {
   status: string;
@@ -118,7 +150,7 @@ const starterPrompts = [
   'Find signage or expo booth printing for an event in Sydney',
 ];
 
-const MAX_DISPLAYED_MATCHES = 4;
+const CHAT_RESULT_BATCH_SIZE = 3;
 
 function formatEventDate(value: string) {
   const parsed = new Date(value);
@@ -180,16 +212,13 @@ function extractImageUrl(value: string | null | undefined) {
 }
 
 function curateServiceMatches(services: ServiceCatalogItem[]) {
-  return Array.from(new Map(services.map((service) => [service.id, service])).values()).slice(
-    0,
-    MAX_DISPLAYED_MATCHES,
-  );
+  return Array.from(new Map(services.map((service) => [service.id, service])).values());
 }
 
 function curateEventMatches(events: AIEventItem[]) {
   return Array.from(
     new Map(events.map((event) => [`${event.url}-${event.start_at}`, event])).values(),
-  ).slice(0, MAX_DISPLAYED_MATCHES);
+  );
 }
 
 function formatPrice(amount: number) {
@@ -572,6 +601,15 @@ export function BookingAssistantSection({
     const controller = new AbortController();
 
     async function loadCatalog() {
+      if (shouldUseLocalStaticPublicData()) {
+        setCatalog(buildFallbackCatalog());
+        setCatalogError('');
+        setMessages([]);
+        setSelectedServiceId('');
+        setCompareServiceIds([]);
+        return;
+      }
+
       try {
         const response = await fetch(`${getApiBaseUrl()}/booking-assistant/catalog`, {
           signal: controller.signal,
@@ -587,7 +625,9 @@ export function BookingAssistantSection({
         setCompareServiceIds([]);
       } catch (error) {
         if (!controller.signal.aborted) {
-          setCatalogError('The live booking assistant is temporarily unavailable.');
+          setCatalog(buildFallbackCatalog());
+          setCatalogError('');
+          setMessages([]);
         }
       }
     }
@@ -1033,10 +1073,26 @@ export function BookingAssistantSection({
                                 </div>
 
                                 {message.role === 'assistant' && message.matchedServices?.length ? (
-                                  <div className="grid gap-2">
-                                    {message.matchedServices.map((service) => {
+                                  <PartnerMatchShortlist
+                                    items={message.matchedServices}
+                                    batchSize={CHAT_RESULT_BATCH_SIZE}
+                                    resetKey={`${index}-${message.matchedServices.length}`}
+                                    className="space-y-2"
+                                    listClassName="grid gap-2"
+                                    buttonLabel="More results"
+                                    buttonClassName="rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                                    emptyState={null}
+                                    renderMeta={({ visibleCount, totalCount }) =>
+                                      totalCount > CHAT_RESULT_BATCH_SIZE ? (
+                                        <div className="flex justify-end">
+                                          <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                                            Showing {visibleCount} of {totalCount}
+                                          </div>
+                                        </div>
+                                      ) : null
+                                    }
+                                    renderItem={(service, resultIndex) => {
                                       const isSelected = selectedServiceId === service.id;
-                                      const serviceImageUrl = extractServiceImageUrl(service);
                                       const latestUserQuery =
                                         [...messages.slice(0, index)]
                                           .reverse()
@@ -1045,14 +1101,23 @@ export function BookingAssistantSection({
                                       const decisionBadge = buildDecisionBadge(
                                         service,
                                         message.matchedServices ?? [],
-                                        (message.matchedServices ?? []).findIndex((item) => item.id === service.id),
+                                        resultIndex,
                                         latestUserQuery,
                                       );
                                       const bestForLabel = buildBestForLabel(service, latestUserQuery);
-                                      const fitNotes = buildServiceFitNotes(service);
+                                      const shortlistCard = buildPartnerMatchCardModelFromServiceItem(service, {
+                                        providerNameOverride: service.venue_name,
+                                        explanation: `Why it matches: ${bestForLabel}`,
+                                      });
+                                      const actionFooter = buildPartnerMatchActionFooterModelFromServiceItem(service, {
+                                        selected: isSelected,
+                                        providerNameOverride: service.venue_name,
+                                      });
                                       return (
-                                        <div
+                                        <button
                                           key={service.id}
+                                          type="button"
+                                          onClick={() => handleSelectService(service.id)}
                                           className={`overflow-hidden rounded-[1.2rem] border text-left transition ${
                                             isSelected
                                               ? 'booking-card-picked border-slate-950 bg-slate-950 text-white shadow-[0_14px_32px_rgba(15,23,42,0.18)]'
@@ -1060,112 +1125,17 @@ export function BookingAssistantSection({
                                           }`}
                                         >
                                           <div className="p-3">
-                                            <div className="flex items-start justify-between gap-3">
-                                              <div className="flex min-w-0 gap-3">
-                                                {serviceImageUrl ? (
-                                                  <div
-                                                    className={`relative hidden h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] border sm:block ${
-                                                      isSelected
-                                                        ? 'border-white/10 bg-white/10'
-                                                        : 'border-slate-200 bg-slate-100'
-                                                    }`}
-                                                  >
-                                                    <img
-                                                      src={serviceImageUrl}
-                                                      alt={service.name}
-                                                      className="h-full w-full object-cover"
-                                                      loading="lazy"
-                                                    />
-                                                    <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/55 to-transparent px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-white">
-                                                      {getServiceVisualLabel(service)}
-                                                    </div>
-                                                  </div>
-                                                ) : null}
-                                                <div className="min-w-0">
-                                                <div className="flex flex-wrap items-center gap-2">
-                                                  <span
-                                                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                                                      isSelected
-                                                        ? 'bg-white text-slate-950'
-                                                        : 'bg-emerald-50 text-emerald-700'
-                                                    }`}
-                                                  >
-                                                    {decisionBadge}
-                                                  </span>
-                                                  <span
-                                                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                                                      isSelected
-                                                        ? 'bg-white/10 text-white'
-                                                        : 'bg-sky-50 text-sky-700'
-                                                    }`}
-                                                  >
-                                                    {service.category}
-                                                  </span>
-                                                  <span
-                                                    className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                                                      isSelected
-                                                        ? 'bg-emerald-300 text-slate-950'
-                                                        : 'bg-emerald-50 text-emerald-700'
-                                                    }`}
-                                                  >
-                                                    {buildBookabilityLabel(service)}
-                                                  </span>
-                                                </div>
-                                                <div className="mt-2 text-sm font-semibold">{service.name}</div>
-                                                <div
-                                                  className={`mt-1 text-xs ${
-                                                    isSelected ? 'text-white/70' : 'text-slate-500'
-                                                  }`}
-                                                >
-                                                  {buildServiceLocationLabel(service)}
-                                                </div>
-                                              </div>
-                                              </div>
-                                              <div className="shrink-0 text-sm font-semibold">
-                                                {formatPrice(service.amount_aud)}
-                                              </div>
-                                            </div>
-                                            <p
-                                              className={`mt-2 text-xs leading-5 ${
-                                                isSelected ? 'text-white/80' : 'text-slate-600'
-                                              }`}
-                                            >
-                                              {service.summary}
-                                            </p>
-                                            <div
-                                              className={`mt-3 rounded-[0.95rem] px-3 py-2 text-xs ${
-                                                isSelected ? 'bg-white/10 text-white/85' : 'bg-amber-50 text-amber-900'
-                                              }`}
-                                            >
-                                              <span className="font-semibold">Why it matches:</span> {bestForLabel}
-                                            </div>
-                                            <div className="mt-3 flex flex-wrap gap-2">
-                                              {fitNotes.map((note) => (
-                                                <span
-                                                  key={`${service.id}-${note}`}
-                                                  className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                                                    isSelected ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-700'
-                                                  }`}
-                                                >
-                                                  {note}
-                                                </span>
-                                              ))}
-                                            </div>
-                                            <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                                            <PartnerMatchCard
+                                              card={shortlistCard}
+                                              tone={isSelected ? 'selected' : 'default'}
+                                              badge={decisionBadge}
+                                              trailingLabel={service.category}
+                                            />
+                                            <div className="mt-3 grid gap-2 sm:grid-cols-3">
                                               {[
                                                 { label: 'Price', value: formatPrice(service.amount_aud) },
-                                                {
-                                                  label: 'Duration',
-                                                  value: `${service.duration_minutes} min`,
-                                                },
-                                                {
-                                                  label: 'Location',
-                                                  value: buildServiceLocationLabel(service),
-                                                },
-                                                {
-                                                  label: 'Next step',
-                                                  value: buildServiceNextStepLabel(service),
-                                                },
+                                                { label: 'Duration', value: `${service.duration_minutes} min` },
+                                                { label: 'Location', value: buildServiceLocationLabel(service) },
                                               ].map((fact) => (
                                                 <div
                                                   key={`${service.id}-${fact.label}`}
@@ -1183,11 +1153,11 @@ export function BookingAssistantSection({
                                               ))}
                                             </div>
                                             <div className="mt-3 flex flex-wrap gap-2">
-                                              {buildServiceConfidenceNotes(service).map((note) => (
+                                              {buildServiceFitNotes(service).map((note) => (
                                                 <span
-                                                  key={`${service.id}-confidence-${note}`}
+                                                  key={`${service.id}-${note}`}
                                                   className={`rounded-full px-2.5 py-1 text-[11px] font-medium ${
-                                                    isSelected ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-700'
+                                                    isSelected ? 'bg-white/10 text-white' : 'bg-amber-50 text-amber-800'
                                                   }`}
                                                 >
                                                   {note}
@@ -1197,7 +1167,10 @@ export function BookingAssistantSection({
                                             <div className="mt-3 flex flex-wrap gap-2">
                                               <button
                                                 type="button"
-                                                onClick={() => handleSelectService(service.id)}
+                                                onClick={(event) => {
+                                                  event.stopPropagation();
+                                                  handleSelectService(service.id);
+                                                }}
                                                 className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
                                                   isSelected
                                                     ? 'bg-white text-slate-950 hover:bg-slate-100'
@@ -1206,142 +1179,135 @@ export function BookingAssistantSection({
                                               >
                                                 {isSelected ? 'Selected' : 'Select this'}
                                               </button>
-                                              {service.map_url ? (
-                                                <a
-                                                  href={service.map_url}
-                                                  target="_blank"
-                                                  rel="noreferrer"
-                                                  className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-                                                    isSelected
-                                                      ? 'border border-white/20 bg-white/10 text-white hover:bg-white/15'
-                                                      : 'border border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300'
-                                                  }`}
-                                                >
-                                                  Open Google map
-                                                </a>
-                                              ) : null}
-                                              {service.booking_url ? (
-                                                <a
-                                                  href={service.booking_url}
-                                                  target="_blank"
-                                                  rel="noreferrer"
-                                                  className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
-                                                    isSelected
-                                                      ? 'border border-white/20 bg-white/10 text-white hover:bg-white/15'
-                                                      : 'border border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300'
-                                                  }`}
-                                                >
-                                                  Book now
-                                                </a>
-                                              ) : null}
                                               <span
                                                 className={`rounded-full px-3 py-1.5 text-[11px] font-semibold ${
-                                                  isSelected
-                                                    ? 'bg-white/10 text-white'
-                                                    : 'bg-amber-50 text-amber-800'
+                                                  isSelected ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-700'
                                                 }`}
                                               >
                                                 {buildBookabilityLabel(service)}
                                               </span>
                                             </div>
+                                            <PartnerMatchActionFooter
+                                              model={actionFooter}
+                                              tone={isSelected ? 'selected' : 'default'}
+                                              onActionClick={(event) => event.stopPropagation()}
+                                            />
                                           </div>
-                                        </div>
+                                        </button>
                                       );
-                                    })}
-                                  </div>
+                                    }}
+                                  />
                                 ) : null}
 
                                 {message.role === 'assistant' && message.matchedEvents?.length ? (
-                                  <div className="grid gap-2">
-                                  {message.matchedEvents.map((event) => {
-                                  const imageUrl = extractEventImageUrl(event);
-                                  return (
-                                    <div
-                                      key={`${event.url}-${event.start_at}`}
-                                      className="overflow-hidden rounded-[1.2rem] border border-slate-200 bg-white text-left transition hover:-translate-y-0.5 hover:border-slate-300"
-                                    >
-                                      {imageUrl ? (
-                                        <div className="relative aspect-[16/8] w-full overflow-hidden bg-slate-100">
-                                          <img
-                                            src={imageUrl}
-                                            alt={event.title}
-                                            className="h-full w-full object-cover"
-                                            loading="lazy"
-                                          />
-                                          <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-800">
-                                            {getEventVisualLabel(event)}
+                                  <PartnerMatchShortlist
+                                    items={message.matchedEvents}
+                                    batchSize={CHAT_RESULT_BATCH_SIZE}
+                                    resetKey={`${index}-${message.matchedEvents.length}`}
+                                    className="space-y-2"
+                                    listClassName="grid gap-2"
+                                    buttonLabel="More events"
+                                    buttonClassName="rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                                    emptyState={null}
+                                    renderMeta={({ visibleCount, totalCount }) =>
+                                      totalCount > CHAT_RESULT_BATCH_SIZE ? (
+                                        <div className="flex justify-end">
+                                          <div className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold text-slate-600">
+                                            Showing {visibleCount} of {totalCount}
                                           </div>
                                         </div>
-                                      ) : (
-                                        <div className="flex aspect-[16/8] w-full items-end bg-[linear-gradient(135deg,#dbeafe_0%,#ecfeff_48%,#dcfce7_100%)] p-3">
-                                          <div className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-700">
-                                            {event.is_wsti_priority ? 'WSTI featured event' : 'Sydney AI event'}
+                                      ) : null
+                                    }
+                                    renderItem={(event) => {
+                                      const imageUrl = extractEventImageUrl(event);
+                                      return (
+                                        <div
+                                          key={`${event.url}-${event.start_at}`}
+                                          className="overflow-hidden rounded-[1.2rem] border border-slate-200 bg-white text-left transition hover:-translate-y-0.5 hover:border-slate-300"
+                                        >
+                                          {imageUrl ? (
+                                            <div className="relative aspect-[16/8] w-full overflow-hidden bg-slate-100">
+                                              <img
+                                                src={imageUrl}
+                                                alt={event.title}
+                                                className="h-full w-full object-cover"
+                                                loading="lazy"
+                                              />
+                                              <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-800">
+                                                {getEventVisualLabel(event)}
+                                              </div>
+                                            </div>
+                                          ) : (
+                                            <div className="flex aspect-[16/8] w-full items-end bg-[linear-gradient(135deg,#dbeafe_0%,#ecfeff_48%,#dcfce7_100%)] p-3">
+                                              <div className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-700">
+                                                {event.is_wsti_priority ? 'WSTI featured event' : 'Sydney AI event'}
+                                              </div>
+                                            </div>
+                                          )}
+                                          <div className="p-3">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                              <div
+                                                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                                                  event.is_wsti_priority
+                                                    ? 'bg-emerald-100 text-emerald-700'
+                                                    : 'bg-sky-100 text-sky-700'
+                                                }`}
+                                              >
+                                                {event.is_wsti_priority ? 'WSTI' : 'AI event'}
+                                              </div>
+                                              <div className="text-[11px] text-slate-500">
+                                                {formatEventDate(event.start_at)}
+                                              </div>
+                                            </div>
+                                            <div className="mt-2 text-sm font-semibold text-slate-950">
+                                              {event.title}
+                                            </div>
+                                            {event.organizer ? (
+                                              <div className="mt-1 text-xs font-medium text-slate-600">
+                                                Hosted by {event.organizer}
+                                              </div>
+                                            ) : null}
+                                            {(event.venue_name || event.location) && (
+                                              <div className="mt-2 rounded-[0.95rem] bg-slate-50 px-3 py-2 text-xs text-slate-600">
+                                                <span className="font-semibold">Venue:</span>{' '}
+                                                {[event.venue_name, event.location].filter(Boolean).join(' • ')}
+                                              </div>
+                                            )}
+                                            <p className="mt-3 text-xs leading-5 text-slate-600">
+                                              {event.summary}
+                                            </p>
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                              <a
+                                                href={event.url}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                className="inline-flex items-center rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-semibold text-white"
+                                              >
+                                                View event details
+                                              </a>
+                                              <button
+                                                type="button"
+                                                onClick={() => handleSelectEvent(event)}
+                                                className="inline-flex items-center rounded-full bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-500"
+                                              >
+                                                Use this event
+                                              </button>
+                                              {event.map_url ? (
+                                                <a
+                                                  href={event.map_url}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                  className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                                                >
+                                                  Open Google map
+                                                </a>
+                                              ) : null}
+                                            </div>
                                           </div>
                                         </div>
-                                      )}
-                                      <div className="p-3">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                          <div
-                                            className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
-                                              event.is_wsti_priority
-                                                ? 'bg-emerald-100 text-emerald-700'
-                                                : 'bg-sky-100 text-sky-700'
-                                            }`}
-                                          >
-                                            {event.is_wsti_priority ? 'WSTI' : 'AI event'}
-                                          </div>
-                                          <div className="text-[11px] text-slate-500">
-                                            {formatEventDate(event.start_at)}
-                                          </div>
-                                        </div>
-                                        <div className="mt-2 text-sm font-semibold text-slate-950">
-                                          {event.title}
-                                        </div>
-                                        {event.organizer ? (
-                                          <div className="mt-1 text-xs font-medium text-slate-600">
-                                            Hosted by {event.organizer}
-                                          </div>
-                                        ) : null}
-                                        {(event.venue_name || event.location) && (
-                                          <div className="mt-1 text-xs text-slate-500">
-                                            {[event.venue_name, event.location].filter(Boolean).join(' • ')}
-                                          </div>
-                                        )}
-                                        <p className="mt-3 text-xs leading-5 text-slate-600">
-                                          {event.summary}
-                                        </p>
-                                        <div className="mt-3 flex flex-wrap gap-2">
-                                          <a
-                                            href={event.url}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-semibold text-white"
-                                          >
-                                            View event details
-                                          </a>
-                                          <button
-                                            type="button"
-                                            onClick={() => handleSelectEvent(event)}
-                                            className="inline-flex items-center rounded-full bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-500"
-                                          >
-                                            Use this event
-                                          </button>
-                                          {event.map_url ? (
-                                            <a
-                                              href={event.map_url}
-                                              target="_blank"
-                                              rel="noreferrer"
-                                              className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                                            >
-                                              Open Google map
-                                            </a>
-                                          ) : null}
-                                        </div>
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                                  </div>
+                                      );
+                                    }}
+                                  />
                                 ) : null}
                               </div>
                             ))}
@@ -1455,6 +1421,38 @@ export function BookingAssistantSection({
 
                             {selectedService ? (
                               <>
+                                <div className="mt-4 overflow-hidden rounded-[1.2rem] border border-slate-200 bg-slate-50">
+                                  {extractServiceImageUrl(selectedService) ? (
+                                    <div className="relative aspect-[16/8] w-full overflow-hidden bg-slate-100">
+                                      <img
+                                        src={extractServiceImageUrl(selectedService) ?? ''}
+                                        alt={selectedService.name}
+                                        className="h-full w-full object-cover"
+                                        loading="lazy"
+                                      />
+                                      <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-800">
+                                        {getServiceVisualLabel(selectedService)}
+                                      </div>
+                                    </div>
+                                  ) : null}
+                                  <div className="grid gap-2 p-3">
+                                    <div className="rounded-[1rem] bg-white px-3 py-3 text-xs leading-5 text-slate-700">
+                                      <span className="font-semibold text-slate-900">Why users book this:</span>{' '}
+                                      {buildBestForLabel(selectedService, latestCustomerRequirement)}
+                                    </div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {buildServiceConfidenceNotes(selectedService).map((note) => (
+                                        <span
+                                          key={`booking-tab-confidence-${note}`}
+                                          className="rounded-full bg-white px-2.5 py-1 text-[11px] font-medium text-slate-700"
+                                        >
+                                          {note}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                </div>
+
                                 <div className="mt-4 grid gap-2 sm:grid-cols-2">
                                   {[
                                     { label: 'Category', value: selectedService.category },
@@ -1559,10 +1557,27 @@ export function BookingAssistantSection({
                       </p>
                     </div>
                     {selectedService ? (
-                      <div className="rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                        <div className="font-semibold">{selectedService.name}</div>
-                        <div className="mt-1 text-xs text-amber-800">
-                          {selectedService.category} • {selectedService.duration_minutes} min • {formatPrice(selectedService.amount_aud)}
+                      <div className="max-w-md rounded-[1.25rem] border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+                        <div className="flex items-start gap-3">
+                          {extractServiceImageUrl(selectedService) ? (
+                            <div className="h-20 w-20 shrink-0 overflow-hidden rounded-[1rem] border border-amber-200 bg-white">
+                              <img
+                                src={extractServiceImageUrl(selectedService) ?? ''}
+                                alt={selectedService.name}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
+                            </div>
+                          ) : null}
+                          <div className="min-w-0">
+                            <div className="font-semibold">{selectedService.name}</div>
+                            <div className="mt-1 text-xs text-amber-800">
+                              {selectedService.category} • {selectedService.duration_minutes} min • {formatPrice(selectedService.amount_aud)}
+                            </div>
+                            <div className="mt-2 text-xs leading-5 text-amber-900">
+                              {buildBestForLabel(selectedService, latestCustomerRequirement)}
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ) : null}
@@ -1596,6 +1611,28 @@ export function BookingAssistantSection({
                   ) : null}
 
                   <form className="mt-5 space-y-4" onSubmit={handleBookingSubmit}>
+                    {selectedService ? (
+                      <div className="rounded-[1.25rem] border border-slate-200 bg-[#f8fafc] p-4">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Booking summary
+                        </div>
+                        <div className="mt-2 grid gap-2 sm:grid-cols-3">
+                          {[
+                            { label: 'Chosen service', value: selectedService.name },
+                            { label: 'Decision points', value: `${formatPrice(selectedService.amount_aud)} • ${selectedService.duration_minutes} min` },
+                            { label: 'Fulfilment', value: bookingResult ? 'Email + payment + workflow ready' : 'Email and payment prepared next' },
+                          ].map((fact) => (
+                            <div key={fact.label} className="rounded-[1rem] bg-white px-3 py-3 text-xs text-slate-700">
+                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                {fact.label}
+                              </div>
+                              <div className="mt-1 leading-5 font-medium text-slate-800">{fact.value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="block text-sm text-slate-600">
                         <span className="mb-2 block font-medium text-slate-700">Name</span>
@@ -1693,6 +1730,12 @@ export function BookingAssistantSection({
                       <p className="mt-2 text-sm leading-6 text-slate-700">
                         {bookingResult.confirmation_message}
                       </p>
+                      <div className="mt-4 rounded-[1rem] border border-emerald-200 bg-white/80 px-4 py-3 text-sm text-slate-700">
+                        <span className="font-semibold text-slate-900">Customer handoff:</span>{' '}
+                        {bookingResult.email_status === 'sent'
+                          ? `Confirmation email has been sent and the next payment step is ready for the customer now.`
+                          : `Booking is queued for manual email follow-up via ${bookingResult.contact_email}.`}
+                      </div>
                       <div className="mt-4 grid gap-2 sm:grid-cols-3">
                         {buildBookingOutcomeSteps(bookingResult).map((step) => (
                           <div key={step.label} className="rounded-[1rem] bg-white/80 px-3 py-3 text-xs text-slate-700">

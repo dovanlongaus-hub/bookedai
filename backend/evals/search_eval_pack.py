@@ -104,6 +104,16 @@ SEARCH_EVAL_SERVICES: list[SimpleNamespace] = [
         featured=True,
     ),
     _service(
+        service_id="haircut-wedding-brisbane",
+        name="Wedding Hair Styling",
+        summary="Bridal and wedding hair styling near James Street and Fortitude Valley.",
+        category="Salon",
+        location="James Street, Fortitude Valley QLD 4006",
+        amount_aud=160,
+        tags=["hair", "bridal", "wedding", "styling", "brisbane"],
+        featured=True,
+    ),
+    _service(
         service_id="restaurant-table-booking",
         name="Restaurant Table Booking",
         summary="Reserve a table for dinner, group dining, or casual team catch-up.",
@@ -162,6 +172,19 @@ SEARCH_EVAL_CASES: tuple[SearchEvalCase, ...] = (
         require_location_match=True,
     ),
     SearchEvalCase(
+        name="paddington-facial-infers-sydney-metro",
+        query="facial Paddington under 150",
+        requested_category="Spa",
+        budget={"max_aud": 150},
+        expected_ids=(
+            "led-skin-therapy-sydney",
+            "signature-facial-sydney",
+            "express-facial-sydney",
+        ),
+        expected_top_id="led-skin-therapy-sydney",
+        require_location_match=True,
+    ),
+    SearchEvalCase(
         name="facial-melbourne-no-false-positive",
         query="facial Melbourne",
         location_hint="Melbourne",
@@ -193,6 +216,14 @@ SEARCH_EVAL_CASES: tuple[SearchEvalCase, ...] = (
         requested_category="Kids Services",
         budget={"max_aud": 40},
         expected_ids=("kids-swimming-lessons",),
+        require_location_match=True,
+    ),
+    SearchEvalCase(
+        name="wedding-hair-fortitude-valley",
+        query="wedding hair Fortitude Valley",
+        requested_category="Salon",
+        expected_ids=("haircut-wedding-brisbane",),
+        expected_top_id="haircut-wedding-brisbane",
         require_location_match=True,
     ),
     SearchEvalCase(

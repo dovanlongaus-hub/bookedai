@@ -8,11 +8,11 @@ from service_layer.prompt9_matching_service import expand_topic_terms
 
 CANONICAL_TOPIC_TAGS: tuple[tuple[str, set[str]], ...] = (
     ("facial", {"facial", "facials", "spa", "beauty", "skincare", "skin", "glow", "led"}),
-    ("hair", {"hair", "haircut", "colour", "color", "salon", "styling"}),
+    ("hair", {"hair", "haircut", "colour", "color", "salon", "styling", "bridal", "wedding"}),
     ("kids", {"kids", "kid", "children", "child", "family", "junior", "swim", "swimming", "soccer", "sport"}),
     ("healthcare", {"healthcare", "medical", "doctor", "gp", "dental", "dentist", "teeth"}),
-    ("physio", {"physio", "physiotherapy", "physical", "therapy", "rehab", "rehabilitation"}),
-    ("restaurant", {"restaurant", "dining", "dinner", "table", "cafe", "private", "group", "catering", "menu"}),
+    ("physio", {"physio", "physiotherapy", "physical", "rehab", "rehabilitation"}),
+    ("restaurant", {"restaurant", "dining", "dinner", "table", "cafe", "catering", "menu"}),
     ("venue", {"venue", "function", "party", "event", "hotel", "accommodation", "room", "reservation", "stay"}),
     ("membership", {"membership", "member", "renew", "renewal", "signup", "join"}),
     ("housing", {"housing", "property", "project", "apartment", "townhouse", "home", "estate", "investment"}),
@@ -21,14 +21,25 @@ CANONICAL_TOPIC_TAGS: tuple[tuple[str, set[str]], ...] = (
 
 CANONICAL_CATEGORY_SYNONYMS: tuple[tuple[str, set[str]], ...] = (
     ("Spa", {"spa", "beauty", "facial", "skincare", "skin treatment"}),
-    ("Salon", {"salon", "hair", "haircut", "barber", "styling", "colour", "color"}),
+    ("Salon", {"salon", "hair", "haircut", "barber", "styling", "colour", "color", "bridal hair", "wedding hair"}),
     ("Kids Services", {"kids", "children", "family", "junior", "swim school", "sports for kids"}),
     ("Food and Beverage", {"restaurant", "dining", "cafe", "catering", "food", "beverage", "private dining"}),
-    ("Healthcare Service", {"healthcare", "medical", "doctor", "clinic", "physio", "physiotherapy", "dental"}),
+    ("Healthcare Service", {"healthcare", "medical", "doctor", "clinic", "physio", "physiotherapy", "dental", "gp clinic", "medical clinic"}),
     ("Membership and Community", {"membership", "community", "club", "gym", "coworking"}),
     ("Hospitality and Events", {"hospitality", "events", "event", "venue", "function", "hotel"}),
     ("Housing and Property", {"housing", "property", "real estate", "project", "apartment", "townhouse"}),
     ("Print and Signage", {"signage", "printing", "print", "expo", "banner", "booth"}),
+)
+
+CANONICAL_LOCATION_TAGS: tuple[tuple[str, set[str]], ...] = (
+    ("sydney", {"sydney", "sydney cbd", "paddington", "surry hills", "parramatta", "newtown", "the rocks", "sydney olympic park", "olympic park", "western sydney", "castle hill"}),
+    ("melbourne", {"melbourne", "melbourne cbd", "southbank", "carlton", "richmond", "collins street"}),
+    ("brisbane", {"brisbane", "brisbane city", "south bank", "south bank brisbane", "newstead", "west end", "fortitude valley", "james street", "surfers paradise"}),
+    ("wollongong", {"wollongong"}),
+    ("newcastle", {"newcastle"}),
+    ("adelaide", {"adelaide", "rundle mall"}),
+    ("perth", {"perth", "subiaco"}),
+    ("canberra", {"canberra"}),
 )
 
 CATEGORY_TOPIC_EXPECTATIONS: dict[str, set[str]] = {
@@ -55,11 +66,10 @@ def _normalized_terms(*values: str | None) -> set[str]:
 
 
 def _derived_topic_tags_from_terms(source_terms: set[str], tags: list[str] | None) -> list[str]:
-    expanded_terms = expand_topic_terms(source_terms)
     derived_tags: list[str] = []
 
     for canonical_tag, group in CANONICAL_TOPIC_TAGS:
-        if expanded_terms & group and canonical_tag not in derived_tags:
+        if source_terms & group and canonical_tag not in derived_tags:
             derived_tags.append(canonical_tag)
 
     for tag in tags or []:
@@ -79,6 +89,30 @@ def derive_catalog_topic_tags(
 ) -> list[str]:
     source_terms = _normalized_terms(name, category, summary, " ".join(tags or []))
     return _derived_topic_tags_from_terms(source_terms, tags)
+
+
+def derive_catalog_location_tags(
+    *,
+    location: str | None,
+    venue_name: str | None = None,
+    tags: list[str] | None = None,
+) -> list[str]:
+    source_text = " ".join(
+        value.strip() for value in (location or "", venue_name or "", " ".join(tags or [])) if value and value.strip()
+    )
+    normalized_source = re.sub(r"[^a-z0-9]+", " ", source_text.lower()).strip()
+    if not normalized_source:
+        return []
+
+    derived_tags: list[str] = []
+    for canonical_tag, aliases in CANONICAL_LOCATION_TAGS:
+        for alias in aliases:
+            pattern = rf"(^| ){re.escape(alias)}( |$)"
+            if re.search(pattern, normalized_source) and canonical_tag not in derived_tags:
+                derived_tags.append(canonical_tag)
+                break
+
+    return derived_tags
 
 
 def normalize_catalog_category(
@@ -159,12 +193,18 @@ def apply_catalog_quality_gate(payload: dict[str, Any]) -> tuple[dict[str, Any],
         summary=str(normalized_payload.get("summary") or "").strip() or None,
         tags=raw_tags,
     )
-    normalized_payload["tags_json"] = derive_catalog_topic_tags(
+    topic_tags = derive_catalog_topic_tags(
         name=str(normalized_payload.get("name") or "").strip() or None,
         category=normalized_payload["category"],
         summary=str(normalized_payload.get("summary") or "").strip() or None,
         tags=raw_tags,
     )
+    location_tags = derive_catalog_location_tags(
+        location=str(normalized_payload.get("location") or "").strip() or None,
+        venue_name=str(normalized_payload.get("venue_name") or "").strip() or None,
+        tags=raw_tags,
+    )
+    normalized_payload["tags_json"] = list(dict.fromkeys([*topic_tags, *location_tags]))
     warnings = catalog_quality_warnings(normalized_payload)
     normalized_payload["is_active"] = 0 if warnings else int(normalized_payload.get("is_active", 1) or 0)
     normalized_payload.pop("_source_tags_json", None)

@@ -19,6 +19,14 @@ export function VideoDemoSection({ content }: VideoDemoSectionProps) {
             {content.body}
           </p>
 
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {['Fast to scan', 'Easy to explain', 'Strong enough to sell'].map((item) => (
+              <div key={item} className="rounded-[1.2rem] bg-[#f5f5f7] px-4 py-3 text-sm font-medium text-slate-700">
+                {item}
+              </div>
+            ))}
+          </div>
+
           <div className="mt-8 flex flex-col gap-4 sm:flex-row">
             <a
               href={content.primaryHref}
@@ -66,15 +74,15 @@ export function VideoDemoSection({ content }: VideoDemoSectionProps) {
             {[
               {
                 title: 'Enquiry',
-                body: 'A user asks for help in a way that feels natural and urgent.',
+                body: 'A buyer asks naturally, like they would in real life.',
               },
               {
                 title: 'Recommendation',
-                body: 'The product surfaces the strongest match and why it fits.',
+                body: 'The strongest option is surfaced with reasons to trust it.',
               },
               {
                 title: 'Booking',
-                body: 'The story ends with a clear commercial next step, not just chat.',
+                body: 'The story ends with a buying step, not just another reply.',
               },
             ].map((item) => (
               <article key={item.title} className="rounded-[1.3rem] bg-slate-950 px-4 py-4 text-white">

@@ -38,6 +38,13 @@ class Settings:
     n8n_booking_webhook_url: str
     n8n_api_key: str
     n8n_webhook_bearer_token: str
+    discord_webhook_url: str
+    discord_webhook_username: str
+    discord_webhook_avatar_url: str
+    discord_application_id: str
+    discord_bot_token: str
+    discord_public_key: str
+    discord_guild_id: str
     stripe_secret_key: str
     stripe_publishable_key: str
     stripe_currency: str
@@ -68,6 +75,22 @@ class Settings:
     email_imap_password: str
     email_imap_mailbox: str
     email_imap_use_ssl: bool
+    sms_provider: str
+    sms_twilio_account_sid: str
+    sms_twilio_auth_token: str
+    sms_twilio_api_key_sid: str
+    sms_twilio_api_key_secret: str
+    sms_from_number: str
+    sms_messaging_service_sid: str
+    whatsapp_provider: str
+    whatsapp_twilio_account_sid: str
+    whatsapp_twilio_auth_token: str
+    whatsapp_twilio_api_key_sid: str
+    whatsapp_twilio_api_key_secret: str
+    whatsapp_from_number: str
+    whatsapp_meta_phone_number_id: str
+    whatsapp_meta_access_token: str
+    whatsapp_verify_token: str
     admin_username: str
     admin_password: str
     admin_api_token: str
@@ -187,6 +210,13 @@ def get_settings() -> Settings:
         n8n_booking_webhook_url=os.getenv("N8N_BOOKING_WEBHOOK_URL", ""),
         n8n_api_key=os.getenv("N8N_API_KEY", ""),
         n8n_webhook_bearer_token=os.getenv("N8N_WEBHOOK_BEARER_TOKEN", ""),
+        discord_webhook_url=os.getenv("DISCORD_WEBHOOK_URL", ""),
+        discord_webhook_username=os.getenv("DISCORD_WEBHOOK_USERNAME", "BookedAI Ops"),
+        discord_webhook_avatar_url=os.getenv("DISCORD_WEBHOOK_AVATAR_URL", ""),
+        discord_application_id=os.getenv("DISCORD_APPLICATION_ID", ""),
+        discord_bot_token=os.getenv("DISCORD_BOT_TOKEN", ""),
+        discord_public_key=os.getenv("DISCORD_PUBLIC_KEY", ""),
+        discord_guild_id=os.getenv("DISCORD_GUILD_ID", ""),
         stripe_secret_key=os.getenv("STRIPE_SECRET_KEY", ""),
         stripe_publishable_key=os.getenv("STRIPE_PUBLISHABLE_KEY", ""),
         stripe_currency=os.getenv("STRIPE_CURRENCY", "aud"),
@@ -235,6 +265,34 @@ def get_settings() -> Settings:
         email_imap_password=os.getenv("EMAIL_IMAP_PASSWORD", ""),
         email_imap_mailbox=os.getenv("EMAIL_IMAP_MAILBOX", "INBOX"),
         email_imap_use_ssl=env_bool("EMAIL_IMAP_USE_SSL", True),
+        sms_provider=os.getenv("SMS_PROVIDER", "twilio"),
+        sms_twilio_account_sid=os.getenv("SMS_TWILIO_ACCOUNT_SID", ""),
+        sms_twilio_auth_token=os.getenv("SMS_TWILIO_AUTH_TOKEN", ""),
+        sms_twilio_api_key_sid=os.getenv("SMS_TWILIO_API_KEY_SID", ""),
+        sms_twilio_api_key_secret=os.getenv("SMS_TWILIO_API_KEY_SECRET", ""),
+        sms_from_number=os.getenv("SMS_FROM_NUMBER", ""),
+        sms_messaging_service_sid=os.getenv("SMS_MESSAGING_SERVICE_SID", ""),
+        whatsapp_provider=os.getenv("WHATSAPP_PROVIDER", "twilio"),
+        whatsapp_twilio_account_sid=os.getenv(
+            "WHATSAPP_TWILIO_ACCOUNT_SID",
+            os.getenv("SMS_TWILIO_ACCOUNT_SID", ""),
+        ),
+        whatsapp_twilio_auth_token=os.getenv(
+            "WHATSAPP_TWILIO_AUTH_TOKEN",
+            os.getenv("SMS_TWILIO_AUTH_TOKEN", ""),
+        ),
+        whatsapp_twilio_api_key_sid=os.getenv(
+            "WHATSAPP_TWILIO_API_KEY_SID",
+            os.getenv("SMS_TWILIO_API_KEY_SID", ""),
+        ),
+        whatsapp_twilio_api_key_secret=os.getenv(
+            "WHATSAPP_TWILIO_API_KEY_SECRET",
+            os.getenv("SMS_TWILIO_API_KEY_SECRET", ""),
+        ),
+        whatsapp_from_number=os.getenv("WHATSAPP_FROM_NUMBER", ""),
+        whatsapp_meta_phone_number_id=os.getenv("WHATSAPP_META_PHONE_NUMBER_ID", ""),
+        whatsapp_meta_access_token=os.getenv("WHATSAPP_META_ACCESS_TOKEN", ""),
+        whatsapp_verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", ""),
         admin_username=os.getenv("ADMIN_USERNAME", "admin"),
         admin_password=os.getenv(
             "ADMIN_PASSWORD",

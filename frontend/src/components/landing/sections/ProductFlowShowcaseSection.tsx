@@ -30,14 +30,14 @@ export function ProductFlowShowcaseSection({ demo }: ProductFlowShowcaseSectionP
 
   return (
     <section className="mx-auto w-full max-w-7xl px-6 pb-18 lg:px-8 lg:pb-24">
-      <div className="apple-card p-6 lg:p-8">
+      <div className="template-card p-6 lg:p-8">
         <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <div className="max-w-3xl">
-            <div className="text-sm font-semibold text-[#0071e3]">Visual story</div>
-            <h2 className="apple-title mt-3 max-w-2xl text-3xl font-semibold text-[#1d1d1f] sm:text-4xl">
+            <div className="template-kicker text-sm tracking-[0.14em]">Visual story</div>
+            <h2 className="template-title mt-3 max-w-2xl text-3xl font-semibold text-[#1d1d1f] sm:text-4xl">
               One visual path from intent to booking
             </h2>
-            <p className="apple-body mt-4 max-w-2xl text-base leading-7">
+            <p className="template-body mt-4 max-w-2xl text-base leading-7">
               Show the product like a sales deck: enquiry in, qualification, recommendation, booking-ready next step.
             </p>
 
@@ -58,7 +58,7 @@ export function ProductFlowShowcaseSection({ demo }: ProductFlowShowcaseSectionP
             {storyboardCards.map((card, index) => (
               <article
                 key={card.title}
-                className="relative overflow-hidden rounded-[1.7rem] bg-[#f5f5f7] p-5"
+                className="template-card-subtle relative overflow-hidden p-5"
               >
                 <div className="flex items-center justify-between gap-3">
                   <div className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#0071e3]">
@@ -142,7 +142,7 @@ export function ProductFlowShowcaseSection({ demo }: ProductFlowShowcaseSectionP
                       </div>
                       <button
                         type="button"
-                        className="apple-button w-full px-4 py-3 text-sm font-semibold"
+                        className="booked-button w-full px-4 py-3 text-sm font-semibold"
                       >
                         {primaryResult.actionLabel}
                       </button>

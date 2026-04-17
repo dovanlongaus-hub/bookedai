@@ -1,0 +1,132 @@
+/*
+ * BOOKEDAI — Apple Design Token Reference
+ *
+ * This file documents all available design tokens.
+ * Import minimal-bento-template.css (already done in styles.css) to use them.
+ *
+ * ── CSS Variables (use in any .css / inline styles) ─────────────────────────
+ *
+ * COLORS
+ *   var(--apple-blue)           #0071e3   Primary CTA — ONLY accent color
+ *   var(--apple-blue-hover)     #0077ed   Hover state for blue elements
+ *   var(--apple-blue-active)    #006edb   Active/pressed state
+ *   var(--apple-link-light)     #0066cc   Inline links on light backgrounds
+ *   var(--apple-link-dark)      #2997ff   Inline links on dark backgrounds
+ *   var(--apple-black)          #000000   Dark section backgrounds
+ *   var(--apple-near-black)     #1d1d1f   Primary text, dark button fill
+ *   var(--apple-light)          #f5f5f7   Light section backgrounds
+ *   var(--apple-white)          #ffffff   Pure white surfaces
+ *   var(--apple-dark-1)         #1c1c1e   Elevated card on black bg
+ *   var(--apple-dark-2)         #272729   Standard dark card
+ *   var(--apple-dark-3)         #2a2a2c   Subtle dark surface variation
+ *   var(--apple-dark-4)         #2c2c2e   Higher dark elevation
+ *   var(--apple-dark-5)         #3a3a3c   Subtle dividers on dark
+ *   var(--apple-success)        #34c759   Success state (Apple system green)
+ *   var(--apple-warning)        #ff9f0a   Warning state (Apple amber)
+ *   var(--apple-danger)         #ff3b30   Error/danger state (Apple red)
+ *   var(--apple-overlay)        rgba(210,210,215,0.64)   Media control bg
+ *   var(--apple-btn-filter-bg)  #fafafc   Filter/search button bg
+ *   var(--apple-btn-active-bg)  #ededf2   Active button state bg
+ *
+ * TEXT
+ *   var(--apple-text-primary)   #1d1d1f              Headings, primary text on light
+ *   var(--apple-text-secondary) rgba(0,0,0,0.8)      Body text on light
+ *   var(--apple-text-tertiary)  rgba(0,0,0,0.48)     Captions, disabled states
+ *   var(--apple-text-dark)      #f5f5f7              Primary text on dark
+ *   var(--apple-text-dark-2)    rgba(255,255,255,0.8)  Body text on dark
+ *   var(--apple-text-dark-3)    rgba(255,255,255,0.56) Secondary on dark
+ *
+ * FONTS
+ *   var(--apple-font-display)   SF Pro Display → Inter → system
+ *   var(--apple-font-text)      SF Pro Text → Inter → system
+ *   var(--apple-font-mono)      SF Mono → Menlo → monospace
+ *
+ * BORDER RADIUS
+ *   var(--apple-radius-micro)        5px    Small tags, badges
+ *   var(--apple-radius-standard)     8px    Buttons, product cards
+ *   var(--apple-radius-comfortable)  11px   Search inputs, filter buttons
+ *   var(--apple-radius-large)        12px   Feature panels, cards
+ *   var(--apple-radius-pill)         980px  CTA links, "Learn more" pills
+ *
+ * SHADOWS
+ *   var(--apple-shadow)    rgba(0,0,0,0.22) 3px 5px 30px 0px   Card elevation
+ *   var(--apple-shadow-sm) rgba(0,0,0,0.12) 0px 2px 12px 0px   Subtle lift
+ *
+ * NAV
+ *   var(--apple-nav-bg)     rgba(0,0,0,0.8)   Glass nav background
+ *   var(--apple-nav-height) 48px              Fixed nav height
+ *
+ * FOCUS
+ *   var(--apple-focus-ring) 2px solid #0071e3  Keyboard focus outline
+ *
+ * ── Tailwind Utilities (use directly in JSX className) ──────────────────────
+ *   bg-apple-blue, bg-apple-light, bg-apple-black, bg-apple-near-black
+ *   bg-apple-dark-1 … bg-apple-dark-5
+ *   bg-apple-filter-bg, bg-apple-overlay
+ *   text-apple-blue, text-apple-link-light, text-apple-link-dark
+ *   text-apple-near-black, text-apple-light, text-apple-white
+ *   text-apple-success, text-apple-warning, text-apple-danger
+ *   rounded-apple-micro, rounded-apple-standard, rounded-apple-comfortable
+ *   rounded-apple-large, rounded-apple-pill
+ *   shadow-apple, shadow-apple-sm
+ *   font-display, font-body, font-mono
+ *
+ * ── Component Classes (use in JSX className) ────────────────────────────────
+ *
+ * SHELLS (app root)
+ *   .booked-shell              Public app — #f5f5f7 bg
+ *   .booked-admin-shell        Admin — #f5f5f7 bg
+ *   .booked-product-shell      Product — #000 bg
+ *   .booked-runtime-shell      Booking widget shell
+ *
+ * NAVIGATION
+ *   .apple-glass-nav / .template-nav   Sticky dark glass 48px nav
+ *   .booked-nav-link                   Nav link (white, 12px)
+ *
+ * SECTIONS
+ *   .template-section / .apple-section-light   Light gray section
+ *   .apple-section-white                       White section
+ *   .apple-section-dark                        Black section
+ *
+ * CARDS
+ *   .template-card / .apple-card          White card, shadow, 12px radius
+ *   .template-card-subtle / .apple-card-soft   Light gray card
+ *   .template-card-dark / .apple-card-dark     Dark surface card (#272729)
+ *   .booked-runtime-card                   Wide booking widget card
+ *   .booked-stat-card                      Dashboard stat card
+ *   .booked-workspace-card                 Workspace selector card
+ *   .booked-workspace-card--active         Active workspace (near-black bg)
+ *
+ * TYPOGRAPHY
+ *   .template-title / .apple-title   Display headline (56px scale)
+ *   .template-body / .apple-body     Body text style
+ *   .template-kicker / .apple-kicker  Eyebrow label (blue, 12px)
+ *   .booked-title                     Heading alias
+ *   .booked-body                      Body alias
+ *
+ * BADGES
+ *   .template-chip / .apple-chip      Inline badge (5px radius, gray bg)
+ *   .booked-pill                       Pill badge (blue border)
+ *   .booked-pill--brand               Blue filled pill
+ *
+ * BUTTONS
+ *   .booked-button / .template-button     Primary blue CTA (8px radius)
+ *   .booked-button-secondary              Pill "Learn more" (980px radius)
+ *   .apple-button-dark                    Dark CTA (near-black, 8px radius)
+ *   .apple-btn-filter                     Filter/search (11px radius)
+ *   .apple-btn-media                      Circular media control (50%)
+ *
+ * FORMS
+ *   .booked-field                     Input field (11px radius, focus ring)
+ *   .dropzone / .template-upload-dropzone   Upload dropzone
+ *
+ * ADMIN
+ *   .booked-admin-login-shell          Dark admin login page
+ *   .booked-admin-login-card           White card on dark login bg
+ *
+ * ANIMATIONS
+ *   .animate-booking-pulse   Blue pulse ring (use on CTA buttons)
+ *   .animate-booking-wave    Gradient wave (loading states)
+ *   .animate-apple-reveal    Slide-up reveal (page sections)
+ *   .animate-apple-fade      Fade in (dialogs, tooltips)
+ */

@@ -1,431 +1,99 @@
 @import "tailwindcss";
+@import "./theme/minimal-bento-template.css";
 
-@layer base {
-  :root {
-    color-scheme: light;
-    --apple-black: #000000;
-    --apple-ink: #1d1d1f;
-    --apple-gray: #f5f5f7;
-    --apple-blue: #0071e3;
-    --apple-link-blue: #0066cc;
-    --apple-bright-blue: #2997ff;
-    --apple-surface-dark: #272729;
-    --apple-border: rgba(29, 29, 31, 0.08);
-    --apple-shadow: rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
-    --apple-font:
-      "SF Pro Text", "SF Pro Display", "SF Pro Icons", "Helvetica Neue",
-      Helvetica, Arial, sans-serif;
-  }
+/* ─── Tailwind v4 @theme — Apple Design Tokens ──────────────────────────────── */
+/* Exposes Apple tokens as Tailwind utilities:                                   */
+/*   bg-apple-blue, text-apple-near-black, rounded-apple-standard, etc.         */
 
-  * {
-    box-sizing: border-box;
-  }
+@theme {
+  /* Colors */
+  --color-apple-blue:        #0071e3;
+  --color-apple-blue-hover:  #0077ed;
+  --color-apple-blue-active: #006edb;
+  --color-apple-link-light:  #0066cc;
+  --color-apple-link-dark:   #2997ff;
+  --color-apple-black:       #000000;
+  --color-apple-near-black:  #1d1d1f;
+  --color-apple-light:       #f5f5f7;
+  --color-apple-white:       #ffffff;
+  --color-apple-dark-1:      #1c1c1e;
+  --color-apple-dark-2:      #272729;
+  --color-apple-dark-3:      #2a2a2c;
+  --color-apple-dark-4:      #2c2c2e;
+  --color-apple-dark-5:      #3a3a3c;
+  --color-apple-success:     #34c759;
+  --color-apple-warning:     #ff9f0a;
+  --color-apple-danger:      #ff3b30;
+  --color-apple-filter-bg:   #fafafc;
+  --color-apple-overlay:     rgba(210, 210, 215, 0.64);
 
-  html {
-    scroll-behavior: smooth;
-  }
+  /* Typography */
+  --font-display: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body:    "SF Pro Text",    -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-mono:    "SF Mono", SFMono-Regular, ui-monospace, Menlo, Monaco, "Courier New", monospace;
 
-  body {
-    margin: 0;
-    min-width: 320px;
-    background: var(--apple-gray);
-    color: var(--apple-ink);
-    font-family: var(--apple-font);
-    letter-spacing: -0.022em;
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
-  }
+  /* Border Radius */
+  --radius-apple-micro:       5px;
+  --radius-apple-standard:    8px;
+  --radius-apple-comfortable: 11px;
+  --radius-apple-large:       12px;
+  --radius-apple-pill:        980px;
 
-  a {
-    color: inherit;
-    text-decoration: none;
-  }
-
-  button {
-    font: inherit;
-  }
-
-  #root {
-    min-height: 100vh;
-  }
-
-  button,
-  input,
-  select,
-  textarea {
-    font: inherit;
-  }
+  /* Shadows */
+  --shadow-apple:    rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
+  --shadow-apple-sm: rgba(0, 0, 0, 0.12) 0px 2px 12px 0px;
 }
 
-@layer components {
-  .apple-public-shell {
-    min-height: 100vh;
-    background: var(--apple-gray);
-    color: var(--apple-ink);
-    font-family: var(--apple-font);
-  }
-
-  .apple-product-shell {
-    background:
-      radial-gradient(circle at top left, rgba(0, 113, 227, 0.12), transparent 28%),
-      radial-gradient(circle at 88% 12%, rgba(41, 151, 255, 0.1), transparent 22%),
-      linear-gradient(180deg, #ffffff 0%, #f5f5f7 38%, #edf1f7 100%);
-  }
-
-  .apple-product-band {
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: saturate(180%) blur(22px);
-    border-bottom: 1px solid rgba(29, 29, 31, 0.08);
-  }
-
-  .apple-product-chip {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    border-radius: 999px;
-    border: 1px solid rgba(29, 29, 31, 0.08);
-    background: rgba(255, 255, 255, 0.78);
-    padding: 0.5rem 0.8rem;
-    font-size: 0.78rem;
-    font-weight: 600;
-    letter-spacing: -0.01em;
-    color: rgba(29, 29, 31, 0.72);
-    backdrop-filter: blur(18px);
-  }
-
-  .apple-product-card {
-    border-radius: 28px;
-    border: 1px solid rgba(29, 29, 31, 0.08);
-    background: rgba(255, 255, 255, 0.82);
-    box-shadow: rgba(0, 0, 0, 0.08) 0 18px 48px;
-    backdrop-filter: blur(18px);
-  }
-
-  .apple-product-frame {
-    border-radius: 32px;
-    border: 1px solid rgba(29, 29, 31, 0.08);
-    background: rgba(255, 255, 255, 0.9);
-    box-shadow: rgba(0, 0, 0, 0.1) 0 24px 60px;
-  }
-
-  .apple-product-flow-step {
-    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(249, 249, 251, 0.95) 100%);
-  }
-
-  .apple-product-quiet {
-    color: rgba(29, 29, 31, 0.64);
-  }
-
-  .apple-admin-shell {
-    min-height: 100vh;
-    background: linear-gradient(180deg, #fbfbfd 0%, var(--apple-gray) 100%);
-    color: var(--apple-ink);
-    font-family: var(--apple-font);
-  }
-
-  .apple-glass-nav {
-    background: rgba(0, 0, 0, 0.8);
-    color: #fff;
-    backdrop-filter: saturate(180%) blur(20px);
-  }
-
-  .apple-section-light {
-    background: var(--apple-gray);
-    color: var(--apple-ink);
-  }
-
-  .apple-section-dark {
-    background: #000;
-    color: #fff;
-  }
-
-  .apple-card {
-    border-radius: 28px;
-    background: #fff;
-    box-shadow: var(--apple-shadow);
-  }
-
-  .apple-card-soft {
-    border-radius: 24px;
-    background: #fff;
-    box-shadow: rgba(0, 0, 0, 0.1) 0 12px 40px;
-  }
-
-  .apple-card-dark {
-    border-radius: 28px;
-    background: var(--apple-surface-dark);
-    color: #fff;
-  }
-
-  .apple-button {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    border: 1px solid transparent;
-    background: var(--apple-blue);
-    color: #fff;
-    transition:
-      background-color 180ms ease,
-      color 180ms ease,
-      border-color 180ms ease;
-  }
-
-  .apple-button:hover {
-    background: #0077ed;
-  }
-
-  .apple-button-secondary {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    border-radius: 999px;
-    border: 1px solid var(--apple-link-blue);
-    background: transparent;
-    color: var(--apple-link-blue);
-    transition:
-      background-color 180ms ease,
-      color 180ms ease,
-      border-color 180ms ease;
-  }
-
-  .apple-button-secondary:hover {
-    background: rgba(0, 102, 204, 0.06);
-  }
-
-  .apple-chip {
-    border-radius: 999px;
-    background: rgba(29, 29, 31, 0.06);
-    color: rgba(29, 29, 31, 0.8);
-  }
-
-  .apple-kicker {
-    color: var(--apple-blue);
-    letter-spacing: 0;
-  }
-
-  .apple-title {
-    letter-spacing: -0.045em;
-    line-height: 1.07;
-  }
-
-  .apple-body {
-    color: rgba(29, 29, 31, 0.8);
-    letter-spacing: -0.022em;
-  }
-
-  .apple-dark-link {
-    color: var(--apple-bright-blue);
-  }
-
-  .apple-light-link {
-    color: var(--apple-link-blue);
-  }
-
-  .apple-floating-widget {
-    background: rgba(0, 0, 0, 0.88);
-    color: #fff;
-    box-shadow: rgba(0, 0, 0, 0.28) 0 24px 80px;
-    backdrop-filter: saturate(160%) blur(18px);
-  }
-
-  .apple-admin-shell section[class*="bg-white"],
-  .apple-admin-shell article[class*="bg-white"] {
-    box-shadow: rgba(0, 0, 0, 0.12) 0 12px 40px;
-  }
-}
+/* ─── Keyframe Animations ────────────────────────────────────────────────────── */
 
 @layer utilities {
   @keyframes bookingPulse {
     0%,
     100% {
       transform: scale(1);
-      box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.18);
+      box-shadow: 0 0 0 0 rgba(0, 113, 227, 0.16);
     }
-
     50% {
-      transform: scale(1.04);
-      box-shadow: 0 0 0 10px rgba(56, 189, 248, 0);
+      transform: scale(1.025);
+      box-shadow: 0 0 0 10px rgba(0, 113, 227, 0);
     }
   }
 
   @keyframes bookingWave {
-    0% {
-      background-position: 0% 50%;
-    }
-
-    100% {
-      background-position: 200% 50%;
-    }
+    0%   { background-position: 0% 50%; }
+    100% { background-position: 200% 50%; }
   }
 
-  @keyframes bookingFloat {
-    0%,
-    100% {
-      transform: translateY(0);
-    }
-
-    50% {
-      transform: translateY(-4px);
-    }
-  }
-
-  @keyframes bookingReveal {
-    0% {
+  @keyframes appleReveal {
+    from {
       opacity: 0;
-      transform: translateY(12px) scale(0.985);
+      transform: translateY(16px);
     }
-
-    100% {
+    to {
       opacity: 1;
-      transform: translateY(0) scale(1);
-    }
-  }
-
-  @keyframes bookingFocusIn {
-    0% {
-      box-shadow: 0 0 0 0 rgba(15, 23, 42, 0),
-        0 0 0 0 rgba(250, 204, 21, 0);
-      transform: translateY(6px);
-    }
-
-    100% {
-      box-shadow: 0 18px 48px rgba(15, 23, 42, 0.08),
-        0 0 0 1px rgba(250, 204, 21, 0.24);
       transform: translateY(0);
     }
   }
 
-  @keyframes bookingCardLift {
-    0% {
-      transform: scale(0.985);
-    }
-
-    55% {
-      transform: scale(1.015);
-    }
-
-    100% {
-      transform: scale(1);
-    }
+  @keyframes appleFade {
+    from { opacity: 0; }
+    to   { opacity: 1; }
   }
 
-  @keyframes bookingHandoff {
-    0% {
-      transform: translateY(10px);
-      opacity: 0.72;
-      box-shadow: 0 0 0 rgba(56, 189, 248, 0);
-    }
-
-    55% {
-      transform: translateY(-2px);
-      opacity: 1;
-      box-shadow: 0 16px 36px rgba(56, 189, 248, 0.12);
-    }
-
-    100% {
-      transform: translateY(0);
-      opacity: 1;
-      box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
-    }
+  .animate-booking-pulse {
+    animation: bookingPulse 2.4s ease-in-out infinite;
   }
 
-  @keyframes bookingProgressNudge {
-    0% {
-      transform: scaleX(0.985);
-      filter: saturate(1);
-    }
-
-    50% {
-      transform: scaleX(1.015);
-      filter: saturate(1.15);
-    }
-
-    100% {
-      transform: scaleX(1);
-      filter: saturate(1);
-    }
+  .animate-booking-wave {
+    animation: bookingWave 5s linear infinite;
+    background-size: 200% 200%;
   }
 
-  @keyframes partnersMarquee {
-    0% {
-      transform: translateX(0);
-    }
-
-    100% {
-      transform: translateX(-50%);
-    }
+  .animate-apple-reveal {
+    animation: appleReveal 0.56s cubic-bezier(0.28, 0.11, 0.32, 1) forwards;
   }
 
-  .booking-step-live {
-    box-shadow: 0 0 0 2px rgba(0, 113, 227, 0.22),
-      0 12px 30px rgba(0, 0, 0, 0.12);
-  }
-
-  .booking-step-dot {
-    animation: bookingPulse 1.8s ease-in-out infinite;
-  }
-
-  .booking-progress-bar {
-    background-size: 200% 100%;
-    animation: bookingWave 2.4s linear infinite;
-    transition: width 320ms ease;
-  }
-
-  .booking-listening {
-    animation: bookingPulse 1.25s ease-in-out infinite;
-  }
-
-  .booking-widget {
-    animation: bookingFloat 4s ease-in-out infinite;
-  }
-
-  .booking-widget-dot {
-    animation: bookingPulse 1.8s ease-in-out infinite;
-  }
-
-  .booking-reveal {
-    animation: bookingReveal 320ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .booking-focus-in {
-    animation: bookingFocusIn 360ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .booking-card-picked {
-    animation: bookingCardLift 300ms cubic-bezier(0.22, 1, 0.36, 1);
-  }
-
-  .booking-handoff {
-    animation: bookingHandoff 420ms cubic-bezier(0.22, 1, 0.36, 1);
-    transform-origin: top center;
-  }
-
-  .booking-progress-nudge {
-    animation:
-      bookingWave 2.4s linear infinite,
-      bookingProgressNudge 380ms cubic-bezier(0.22, 1, 0.36, 1);
-    transform-origin: left center;
-  }
-
-  .text-apple-blue {
-    color: var(--apple-blue);
-  }
-
-  .bg-apple-blue {
-    background: var(--apple-blue);
-  }
-
-  .border-apple-blue {
-    border-color: var(--apple-blue);
-  }
-
-  .partners-marquee {
-    animation: partnersMarquee 30s linear infinite;
-    will-change: transform;
-  }
-
-  .partners-marquee:hover {
-    animation-play-state: paused;
+  .animate-apple-fade {
+    animation: appleFade 0.4s ease forwards;
   }
 }

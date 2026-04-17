@@ -9,11 +9,47 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-from service_layer.prompt9_matching_service import filter_ranked_matches_for_relevance, rank_catalog_matches
+from service_layer.prompt9_matching_service import (
+    extract_booking_request_context,
+    extract_query_budget_limit,
+    extract_query_location_hint,
+    filter_ranked_matches_for_relevance,
+    rank_catalog_matches,
+)
 from service_layer.prompt9_matching_service import RankedServiceMatch
 
 
 class Prompt9MatchingServiceTestCase(TestCase):
+    def test_extract_query_location_hint_uses_query_when_explicit_location_missing(self):
+        self.assertEqual(
+            extract_query_location_hint("skin care in Sydney under 150", None),
+            "Sydney",
+        )
+        self.assertEqual(
+            extract_query_location_hint("team dinner near South Bank", None),
+            "South Bank",
+        )
+        self.assertEqual(
+            extract_query_location_hint("haircut near Fortitude Valley", None),
+            "Fortitude Valley",
+        )
+        self.assertEqual(
+            extract_query_location_hint("wedding hair around James Street", None),
+            "James Street",
+        )
+
+    def test_extract_query_budget_limit_uses_query_phrase_when_budget_payload_missing(self):
+        self.assertEqual(extract_query_budget_limit("skin care Sydney under 150", None), 150.0)
+        self.assertEqual(extract_query_budget_limit("team dinner below $90", None), 90.0)
+
+    def test_extract_booking_request_context_reads_party_size_schedule_and_intent(self):
+        context = extract_booking_request_context("Book a team dinner for 8 people tonight")
+
+        self.assertEqual(context.party_size, 8)
+        self.assertEqual(context.schedule_hint, "tonight")
+        self.assertEqual(context.intent_label, "ready_to_book")
+        self.assertIn("for 8", context.summary or "")
+
     def test_rank_catalog_matches_prefers_exact_location_and_budget_fit(self):
         services = [
             SimpleNamespace(
@@ -312,6 +348,203 @@ class Prompt9MatchingServiceTestCase(TestCase):
 
         self.assertEqual(ranked[0].service.service_id, "svc_membership")
         self.assertIn("name_overlap", ranked[0].evidence)
+
+    def test_rank_catalog_matches_prefers_sign_products_over_generic_print_stock_for_signage_queries(self):
+        services = [
+            SimpleNamespace(
+                service_id="svc_snap_frame",
+                business_name="NOVO PRINT",
+                name="Snap A Frame Pavement Sign Display",
+                summary="Portable outdoor sign for storefront promotions and signage.",
+                category="Print and Signage",
+                venue_name="NOVO PRINT",
+                location="Castle Hill, Sydney NSW, Australia",
+                amount_aud=150,
+                tags_json=["signage", "sydney"],
+                featured=0,
+                booking_url="https://example.com/snap-frame",
+            ),
+            SimpleNamespace(
+                service_id="svc_print_stock",
+                business_name="NOVO PRINT",
+                name="350gsm Silk Coated Print Stock",
+                summary="Premium smooth unlaminated print stock for flyers and brochures.",
+                category="Print and Signage",
+                venue_name="NOVO PRINT",
+                location="Castle Hill, Sydney NSW, Australia",
+                amount_aud=26.5,
+                tags_json=["signage", "sydney"],
+                featured=0,
+                booking_url="https://example.com/print-stock",
+            ),
+        ]
+
+        ranked = rank_catalog_matches(
+            query="signage Sydney",
+            services=services,
+            location_hint="Sydney",
+        )
+
+        self.assertEqual(ranked[0].service.service_id, "svc_snap_frame")
+        self.assertIn("name_overlap", ranked[0].evidence)
+
+    def test_rank_catalog_matches_expands_phrase_aliases_for_team_dinner_queries(self):
+        services = [
+            SimpleNamespace(
+                service_id="svc_private_dining",
+                business_name="Harbour Dining",
+                name="Private Dining Room",
+                summary="Private dining experience for group celebrations and team dinners.",
+                category="Food and Beverage",
+                venue_name="Harbour Dining",
+                location="Melbourne VIC 3000",
+                amount_aud=85,
+                tags_json=["private dining", "group", "restaurant"],
+                featured=1,
+                booking_url="https://book.example.com/private-dining",
+            ),
+            SimpleNamespace(
+                service_id="svc_haircut",
+                business_name="Studio Cut",
+                name="Express Haircut",
+                summary="Quick haircut appointment.",
+                category="Salon",
+                venue_name="Studio Cut",
+                location="Melbourne VIC 3000",
+                amount_aud=45,
+                tags_json=["haircut", "salon"],
+                featured=0,
+                booking_url=None,
+            ),
+        ]
+
+        ranked = rank_catalog_matches(
+            query="team dinner Melbourne under 90",
+            services=services,
+        )
+
+        self.assertEqual(ranked[0].service.service_id, "svc_private_dining")
+        self.assertIn("within_budget", ranked[0].evidence)
+        self.assertIn("location_overlap", ranked[0].evidence)
+        self.assertIn("topic_mismatch", ranked[1].evidence)
+
+    def test_rank_catalog_matches_expands_suburb_to_metro_location_signals(self):
+        services = [
+            SimpleNamespace(
+                service_id="svc_sydney_cbd_facial",
+                business_name="City Glow",
+                name="CBD Facial Reset",
+                summary="Facial treatment in central Sydney.",
+                category="Spa",
+                venue_name="City Glow",
+                location="Sydney CBD NSW 2000",
+                amount_aud=110,
+                tags_json=["facial", "skin", "spa"],
+                featured=1,
+                booking_url=None,
+            ),
+            SimpleNamespace(
+                service_id="svc_brisbane_facial",
+                business_name="River Glow",
+                name="River Facial Reset",
+                summary="Facial treatment in Brisbane.",
+                category="Spa",
+                venue_name="River Glow",
+                location="Brisbane City QLD 4000",
+                amount_aud=110,
+                tags_json=["facial", "skin", "spa"],
+                featured=0,
+                booking_url=None,
+            ),
+        ]
+
+        ranked = rank_catalog_matches(
+            query="facial Paddington under 120",
+            services=services,
+        )
+
+        self.assertEqual(ranked[0].service.service_id, "svc_sydney_cbd_facial")
+        self.assertIn("location_overlap", ranked[0].evidence)
+        self.assertIn("location_mismatch", ranked[1].evidence)
+
+    def test_rank_catalog_matches_expands_brisbane_precinct_signals_for_hair_queries(self):
+        services = [
+            SimpleNamespace(
+                service_id="svc_fortitude_valley_hair",
+                business_name="James Street Studio",
+                name="Wedding Hair Styling",
+                summary="Bridal and wedding hair styling in Fortitude Valley.",
+                category="Salon",
+                venue_name="James Street Studio",
+                location="James Street, Fortitude Valley QLD 4006",
+                amount_aud=160,
+                tags_json=["hair", "bridal", "wedding", "styling"],
+                featured=1,
+                booking_url="https://book.example.com/bridal-hair",
+            ),
+            SimpleNamespace(
+                service_id="svc_melbourne_hair",
+                business_name="Laneway Hair",
+                name="Wedding Hair Styling Melbourne",
+                summary="Bridal hair styling in Melbourne CBD.",
+                category="Salon",
+                venue_name="Laneway Hair",
+                location="Melbourne VIC 3000",
+                amount_aud=155,
+                tags_json=["hair", "bridal", "wedding", "styling"],
+                featured=0,
+                booking_url=None,
+            ),
+        ]
+
+        ranked = rank_catalog_matches(
+            query="wedding hair Fortitude Valley",
+            services=services,
+        )
+
+        self.assertEqual(ranked[0].service.service_id, "svc_fortitude_valley_hair")
+        self.assertIn("location_overlap", ranked[0].evidence)
+        self.assertIn("location_mismatch", ranked[1].evidence)
+        self.assertIn("name_overlap", ranked[0].evidence)
+
+    def test_rank_catalog_matches_expands_gp_clinic_phrase_aliases(self):
+        services = [
+            SimpleNamespace(
+                service_id="svc_gp",
+                business_name="Harbour Medical",
+                name="General Practice Consultation",
+                summary="Doctor consultation and repeat prescriptions.",
+                category="Healthcare Service",
+                venue_name="Harbour Medical",
+                location="Sydney NSW 2000",
+                amount_aud=89,
+                tags_json=["gp", "doctor", "medical", "clinic"],
+                featured=1,
+                booking_url=None,
+            ),
+            SimpleNamespace(
+                service_id="svc_spa",
+                business_name="Glow Studio",
+                name="Glow Facial Studio",
+                summary="Beauty treatment and glow facial.",
+                category="Spa",
+                venue_name="Glow Studio",
+                location="Sydney NSW 2000",
+                amount_aud=119,
+                tags_json=["skin", "facial", "beauty"],
+                featured=0,
+                booking_url=None,
+            ),
+        ]
+
+        ranked = rank_catalog_matches(
+            query="gp clinic Sydney",
+            services=services,
+        )
+
+        self.assertEqual(ranked[0].service.service_id, "svc_gp")
+        self.assertIn("name_overlap", ranked[0].evidence)
+        self.assertIn("topic_mismatch", ranked[1].evidence)
 
     def test_filter_ranked_matches_for_relevance_drops_low_semantic_tail_even_with_weak_overlap(self):
         relevant = RankedServiceMatch(

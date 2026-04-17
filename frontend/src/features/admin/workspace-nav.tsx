@@ -40,21 +40,21 @@ export function AdminWorkspaceNav({
   onWorkspaceChange,
 }: AdminWorkspaceNavProps) {
   return (
-    <section className="apple-card mt-6 p-6">
+    <section className="template-card mt-6 p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="text-sm font-semibold text-[#0071e3]">
+          <div className="template-kicker text-sm tracking-[0.14em]">
             Admin workspaces
           </div>
-          <h2 className="apple-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
+          <h2 className="template-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
             Prompt 8 admin IA is now split by operator intent
           </h2>
-          <p className="apple-body mt-2 max-w-3xl text-sm leading-7">
+          <p className="template-body mt-2 max-w-3xl text-sm leading-7">
             Each workspace keeps one operational job clear instead of forcing the whole admin
             surface into a single scrolling dashboard.
           </p>
         </div>
-        <div className="rounded-[1.25rem] bg-[#f5f5f7] px-4 py-3 text-sm text-black/70">
+        <div className="booked-note-surface px-4 py-3 text-sm text-black/70">
           <div className="text-xs font-semibold uppercase tracking-[0.08em] text-black/48">
             Runtime linkage
           </div>
@@ -71,11 +71,7 @@ export function AdminWorkspaceNav({
               key={workspace.id}
               type="button"
               onClick={() => onWorkspaceChange(workspace.id)}
-              className={`rounded-[1.6rem] p-5 text-left transition ${
-                isActive
-                  ? 'bg-[#1d1d1f] text-white shadow-[rgba(0,0,0,0.18)_0_18px_45px]'
-                  : 'bg-[#f5f5f7] text-[#1d1d1f] hover:bg-white'
-              }`}
+              className={`booked-workspace-card p-5 text-left ${isActive ? 'booked-workspace-card--active' : ''}`}
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
@@ -83,8 +79,8 @@ export function AdminWorkspaceNav({
                   <div className={`mt-2 text-sm leading-6 ${isActive ? 'text-white/75' : 'text-black/70'}`}>{workspace.summary}</div>
                 </div>
                 <span
-                  className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.08em] ${
-                    isActive ? 'bg-white text-[#0071e3]' : 'bg-white text-black/60'
+                  className={`booked-pill px-3 py-1 ${
+                    isActive ? 'bg-white text-[#2563eb]' : 'bg-white text-black/60'
                   }`}
                 >
                   {isActive ? 'Active workspace' : 'Open workspace'}

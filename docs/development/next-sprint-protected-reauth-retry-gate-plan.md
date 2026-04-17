@@ -12,6 +12,10 @@ It is intentionally narrow:
 
 Date of plan: `2026-04-16`
 
+Latest execution note:
+
+- `./scripts/run_release_rehearsal.sh --skip-stack-healthcheck` now ends `promote_ready` via `artifacts/release-rehearsal/release-rehearsal-20260416T141613Z.md`, so the release-gate lane has cleared and the next planning focus can move back toward the following roadmap phase instead of chained-gate stabilization.
+
 ## Sprint goal
 
 Deliver one hardening sprint that improves operational safety without widening the production blast radius:
@@ -34,6 +38,7 @@ Responsibilities:
 - sequence the three lanes
 - integrate docs, roadmap, and execution updates
 - keep verification and rollback rules aligned
+- enforce the rule that no live-promoted slice is considered complete until implementation tracking, the relevant sprint or requirement doc, and the matching roadmap or phase doc are all updated in the same closure pass
 
 Files owned:
 
@@ -167,6 +172,7 @@ Definition of done:
 - backend contract and lifecycle test command is documented in the same gate
 - promote/hold/rollback checklist is explicit
 - docs describe the same command order as local execution
+- promote-ready closure also requires synced write-back into implementation progress, the relevant sprint or requirement document, and the matching roadmap or phase artifact
 
 Verification:
 

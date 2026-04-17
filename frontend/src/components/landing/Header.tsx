@@ -1,6 +1,6 @@
 import { useState } from 'react';
+import { roadmapHref, videoDemoHref } from './data';
 import { LogoMark } from './ui/LogoMark';
-import { brandName, roadmapHref, videoDemoHref } from './data';
 
 type HeaderProps = {
   navItems: string[];
@@ -17,42 +17,38 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-30">
-      <div className="apple-glass-nav mx-auto flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
-        <div className="flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center overflow-hidden rounded-[0.9rem] bg-white/10 p-1">
-            <LogoMark className="h-full w-full object-contain" />
-          </div>
-          <div>
-            <div className="text-xl font-semibold tracking-[-0.03em] text-white">
-              {brandName}<span className="text-white/70">.au</span>
-            </div>
-          </div>
-        </div>
+      <div className="template-nav mx-auto flex w-full items-center justify-between gap-4 px-4 py-3 sm:px-6 lg:px-8">
+        <a href="/" className="flex min-w-0 max-w-[13rem] items-center sm:max-w-[16rem] lg:max-w-[17.5rem]">
+          <LogoMark
+            variant="light"
+            className="booked-brand-image booked-brand-image--frameless booked-brand-image--landing-nav w-full"
+          />
+        </a>
 
-        <div className="hidden items-center gap-3 md:flex">
+        <div className="hidden items-center gap-3 md:!flex">
           <a
             href={roadmapHref}
-            className="text-xs text-white/82 transition hover:text-white"
+            className="booked-nav-link"
           >
             Roadmap
           </a>
           <a
             href={videoDemoHref}
-            className="text-xs text-white/82 transition hover:text-white"
+            className="booked-nav-link"
           >
             Watch Demo
           </a>
           <button
             type="button"
             onClick={onBookDemo}
-            className="apple-button-secondary border-white/24 px-4 py-2 text-sm text-white hover:bg-white/10"
+            className="booked-button-secondary px-4 py-2 text-sm font-semibold"
           >
             Book a Demo
           </button>
           <button
             type="button"
             onClick={onStartTrial}
-            className="apple-button px-4 py-2 text-sm font-semibold"
+            className="booked-button px-4 py-2 text-sm font-semibold"
           >
             Start Free Trial
           </button>
@@ -63,21 +59,21 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
           aria-expanded={isMobileMenuOpen}
           aria-controls="mobile-nav"
           onClick={() => setIsMobileMenuOpen((current) => !current)}
-          className="inline-flex h-10 items-center justify-center rounded-full border border-white/15 bg-white/10 px-4 text-sm font-semibold text-white transition hover:bg-white/15 md:hidden"
+          className="booked-menu-button inline-flex h-10 px-4 text-sm font-semibold md:!hidden"
         >
           {isMobileMenuOpen ? 'Close' : 'Menu'}
         </button>
       </div>
 
       <nav
-        className="apple-glass-nav hidden items-center justify-center gap-8 px-4 py-3 text-xs text-white/72 md:flex"
+        className="template-nav hidden items-center justify-center gap-2 px-4 py-3 md:!flex"
         aria-label="Primary"
       >
         {navItems.map((item) => (
           <a
             key={item}
             href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
-            className="transition hover:text-white"
+            className="booked-nav-link"
           >
             {item}
           </a>
@@ -87,7 +83,7 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
       {isMobileMenuOpen ? (
         <div
           id="mobile-nav"
-          className="apple-glass-nav m-4 rounded-[1.5rem] p-4 md:hidden"
+          className="template-nav m-4 rounded-[1.5rem] p-4 md:hidden"
         >
           <nav className="flex flex-col gap-2" aria-label="Mobile primary">
             {navItems.map((item) => (
@@ -95,7 +91,7 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
                 key={item}
                 href={`#${item.toLowerCase().replace(/\s+/g, '-')}`}
                 onClick={closeMobileMenu}
-                className="rounded-2xl bg-white/8 px-4 py-3 text-sm font-medium text-white transition hover:bg-white/12"
+                className="booked-menu-button justify-start rounded-2xl px-4 py-3 text-sm font-semibold"
               >
                 {item}
               </a>
@@ -106,14 +102,14 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
             <a
               href={roadmapHref}
               onClick={closeMobileMenu}
-              className="apple-button-secondary border-white/24 px-4 py-3 text-center text-sm text-white hover:bg-white/10"
+              className="booked-button-secondary px-4 py-3 text-center text-sm font-semibold"
             >
               Roadmap
             </a>
             <a
               href={videoDemoHref}
               onClick={closeMobileMenu}
-              className="apple-button-secondary border-white/24 px-4 py-3 text-center text-sm text-white hover:bg-white/10"
+              className="booked-button-secondary px-4 py-3 text-center text-sm font-semibold"
             >
               Watch Demo
             </a>
@@ -123,7 +119,7 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
                 closeMobileMenu();
                 onBookDemo();
               }}
-              className="apple-button-secondary border-white/24 px-4 py-3 text-center text-sm text-white hover:bg-white/10"
+              className="booked-button-secondary px-4 py-3 text-center text-sm font-semibold"
             >
               Book a Demo
             </button>
@@ -133,7 +129,7 @@ export function Header({ navItems, onStartTrial, onBookDemo }: HeaderProps) {
                 closeMobileMenu();
                 onStartTrial();
               }}
-              className="apple-button px-4 py-3 text-sm font-semibold"
+              className="booked-button px-4 py-3 text-sm font-semibold"
             >
               Start Free Trial
             </button>

@@ -13,7 +13,11 @@ export function CustomerShowcaseSection({
   products,
 }: CustomerShowcaseSectionProps) {
   const bookedAiProductHost = 'product.bookedai.au';
+  const bookedAiLandingDemoPath = '/?demo=open';
   const getActionLabel = (href: string) => {
+    if (href === bookedAiLandingDemoPath) {
+      return 'View demo';
+    }
     try {
       return new URL(href).hostname === bookedAiProductHost
         ? 'View product'
@@ -67,8 +71,8 @@ export function CustomerShowcaseSection({
                 </p>
                 <a
                   href={product.href}
-                  target="_blank"
-                  rel="noreferrer"
+                  target={product.href === bookedAiLandingDemoPath ? undefined : '_blank'}
+                  rel={product.href === bookedAiLandingDemoPath ? undefined : 'noreferrer'}
                   className="mt-auto pt-5 inline-flex text-sm font-semibold text-sky-700 transition hover:text-sky-800"
                 >
                   {getActionLabel(product.href)}

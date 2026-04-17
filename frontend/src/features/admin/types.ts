@@ -109,6 +109,11 @@ export type EmailSendResponse = {
   message: string;
 };
 
+export type AdminDiscordHandoffResponse = {
+  status: string;
+  message: string;
+};
+
 export type PartnerProfileItem = {
   id: number;
   name: string;

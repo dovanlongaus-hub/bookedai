@@ -4,6 +4,7 @@ import type {
   CheckAvailabilityRequest,
   CreateBookingIntentRequest,
   CreateLeadRequest,
+  MatchCandidate,
   ResolveBookingPathRequest,
   SearchCandidatesRequest,
   V1AttributionContext,
@@ -36,13 +37,24 @@ type PublicBookingAssistantSearchParams = {
 
 type PublicBookingAssistantLiveReadResult = {
   candidateIds: string[];
+  rankedCandidates: MatchCandidate[];
   suggestedServiceId: string | null;
+  semanticAssistSummary: {
+    provider: string | null;
+    providerChain: string[];
+    fallbackApplied: boolean;
+    normalizedQuery: string | null;
+    inferredLocation: string | null;
+    inferredCategory: string | null;
+  } | null;
+  warnings: string[];
   trustSummary: {
     availabilityState: string;
     bookingConfidence: string;
     recommendedBookingPath: V1BookingPathOption | null;
     warnings: string[];
   } | null;
+  bookingRequestSummary: string | null;
   bookingPathSummary: {
     pathType: V1BookingPathOption;
     nextStep: string;
@@ -93,6 +105,37 @@ function buildAttributionContext(sourcePage: string, keyword?: string | null): V
   }
 
   return attribution;
+}
+
+function shouldReuseSelectedServiceContext(query: string, selectedServiceId: string | null) {
+  if (!selectedServiceId) {
+    return false;
+  }
+
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) {
+    return false;
+  }
+
+  return /\b(this|that|same|selected|book it|book this|book that|this one|that one|the one above|above option|first one|second one)\b/.test(
+    normalizedQuery,
+  );
+}
+
+function buildSearchPreferences(params: PublicBookingAssistantSearchParams) {
+  const reuseSelectedContext = shouldReuseSelectedServiceContext(
+    params.query,
+    params.selectedServiceId,
+  );
+
+  if (!reuseSelectedContext) {
+    return null;
+  }
+
+  return {
+    requested_service_id: params.selectedServiceId ?? null,
+    service_category: params.serviceCategory ?? null,
+  };
 }
 
 function buildLeadContact(params: {
@@ -154,10 +197,7 @@ export async function shadowPublicBookingAssistantSearch(
     const request: SearchCandidatesRequest = {
       query: params.query.trim(),
       location: params.locationHint?.trim() || null,
-      preferences: {
-        requested_service_id: params.selectedServiceId ?? null,
-        service_category: params.serviceCategory ?? null,
-      },
+      preferences: buildSearchPreferences(params),
       channel_context: {
         channel: 'public_web',
         deployment_mode: 'standalone_app',
@@ -189,8 +229,12 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
   if (!isPublicBookingAssistantV1LiveReadEnabled() || !params.query.trim()) {
     return {
       candidateIds: [],
+      rankedCandidates: [],
       suggestedServiceId: null,
+      semanticAssistSummary: null,
+      warnings: [],
       trustSummary: null,
+      bookingRequestSummary: null,
       bookingPathSummary: null,
       usedLiveRead: false,
     };
@@ -200,10 +244,7 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
     const request: SearchCandidatesRequest = {
       query: params.query.trim(),
       location: params.locationHint?.trim() || null,
-      preferences: {
-        requested_service_id: params.selectedServiceId ?? null,
-        service_category: params.serviceCategory ?? null,
-      },
+      preferences: buildSearchPreferences(params),
       channel_context: {
         channel: 'public_web',
         deployment_mode: 'standalone_app',
@@ -213,13 +254,40 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
     };
 
     const searchResponse = await apiV1.searchCandidates(request);
-    if (!('data' in searchResponse) || !searchResponse.data.candidates.length) {
+    if (!('data' in searchResponse)) {
       return {
         candidateIds: [],
+        rankedCandidates: [],
         suggestedServiceId: null,
+        semanticAssistSummary: null,
+        warnings: [],
         trustSummary: null,
+        bookingRequestSummary: null,
         bookingPathSummary: null,
         usedLiveRead: false,
+      };
+    }
+
+    if (!searchResponse.data.candidates.length) {
+      return {
+        candidateIds: [],
+        rankedCandidates: [],
+        suggestedServiceId: null,
+        semanticAssistSummary: searchResponse.data.semantic_assist
+          ? {
+              provider: searchResponse.data.semantic_assist.provider ?? null,
+              providerChain: searchResponse.data.semantic_assist.providerChain ?? [],
+              fallbackApplied: Boolean(searchResponse.data.semantic_assist.fallbackApplied),
+              normalizedQuery: searchResponse.data.semantic_assist.normalizedQuery ?? null,
+              inferredLocation: searchResponse.data.semantic_assist.inferredLocation ?? null,
+              inferredCategory: searchResponse.data.semantic_assist.inferredCategory ?? null,
+            }
+          : null,
+        warnings: searchResponse.data.warnings ?? [],
+        trustSummary: null,
+        bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
+        bookingPathSummary: null,
+        usedLiveRead: true,
       };
     }
 
@@ -231,16 +299,29 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
       ),
     );
     const topCandidateId =
-      searchResponse.data.recommendations[0]?.candidate_id ??
+      searchResponse.data.recommendations[0]?.candidateId ??
       searchResponse.data.candidates[0]?.candidateId ??
       null;
     if (!topCandidateId) {
       return {
         candidateIds,
+        rankedCandidates: searchResponse.data.candidates,
         suggestedServiceId: null,
+        semanticAssistSummary: searchResponse.data.semantic_assist
+          ? {
+              provider: searchResponse.data.semantic_assist.provider ?? null,
+              providerChain: searchResponse.data.semantic_assist.providerChain ?? [],
+              fallbackApplied: Boolean(searchResponse.data.semantic_assist.fallbackApplied),
+              normalizedQuery: searchResponse.data.semantic_assist.normalizedQuery ?? null,
+              inferredLocation: searchResponse.data.semantic_assist.inferredLocation ?? null,
+              inferredCategory: searchResponse.data.semantic_assist.inferredCategory ?? null,
+            }
+          : null,
+        warnings: searchResponse.data.warnings ?? [],
         trustSummary: null,
+        bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
         bookingPathSummary: null,
-        usedLiveRead: false,
+        usedLiveRead: true,
       };
     }
 
@@ -255,10 +336,23 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
     if (!('data' in trustResponse)) {
       return {
         candidateIds,
+        rankedCandidates: searchResponse.data.candidates,
         suggestedServiceId: null,
+        semanticAssistSummary: searchResponse.data.semantic_assist
+          ? {
+              provider: searchResponse.data.semantic_assist.provider ?? null,
+              providerChain: searchResponse.data.semantic_assist.providerChain ?? [],
+              fallbackApplied: Boolean(searchResponse.data.semantic_assist.fallbackApplied),
+              normalizedQuery: searchResponse.data.semantic_assist.normalizedQuery ?? null,
+              inferredLocation: searchResponse.data.semantic_assist.inferredLocation ?? null,
+              inferredCategory: searchResponse.data.semantic_assist.inferredCategory ?? null,
+            }
+          : null,
+        warnings: searchResponse.data.warnings ?? [],
         trustSummary: null,
+        bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
         bookingPathSummary: null,
-        usedLiveRead: false,
+        usedLiveRead: true,
       };
     }
 
@@ -277,8 +371,21 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
     if (!('data' in pathResponse)) {
       return {
         candidateIds,
+        rankedCandidates: searchResponse.data.candidates,
         suggestedServiceId: null,
+        semanticAssistSummary: searchResponse.data.semantic_assist
+          ? {
+              provider: searchResponse.data.semantic_assist.provider ?? null,
+              providerChain: searchResponse.data.semantic_assist.providerChain ?? [],
+              fallbackApplied: Boolean(searchResponse.data.semantic_assist.fallbackApplied),
+              normalizedQuery: searchResponse.data.semantic_assist.normalizedQuery ?? null,
+              inferredLocation: searchResponse.data.semantic_assist.inferredLocation ?? null,
+              inferredCategory: searchResponse.data.semantic_assist.inferredCategory ?? null,
+            }
+          : null,
+        warnings: searchResponse.data.warnings ?? [],
         trustSummary: null,
+        bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
         bookingPathSummary: null,
         usedLiveRead: false,
       };
@@ -286,7 +393,20 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
 
     return {
       candidateIds,
+      rankedCandidates: searchResponse.data.candidates,
       suggestedServiceId: topCandidateId,
+      semanticAssistSummary: searchResponse.data.semantic_assist
+        ? {
+            provider: searchResponse.data.semantic_assist.provider ?? null,
+            providerChain: searchResponse.data.semantic_assist.providerChain ?? [],
+            fallbackApplied: Boolean(searchResponse.data.semantic_assist.fallbackApplied),
+            normalizedQuery: searchResponse.data.semantic_assist.normalizedQuery ?? null,
+            inferredLocation: searchResponse.data.semantic_assist.inferredLocation ?? null,
+            inferredCategory: searchResponse.data.semantic_assist.inferredCategory ?? null,
+          }
+        : null,
+      warnings: searchResponse.data.warnings ?? [],
+      bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
       trustSummary: {
         availabilityState: trustResponse.data.availability_state,
         bookingConfidence: trustResponse.data.booking_confidence,
@@ -304,8 +424,12 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
   } catch {
     return {
       candidateIds: [],
+      rankedCandidates: [],
       suggestedServiceId: null,
+      semanticAssistSummary: null,
+      warnings: [],
       trustSummary: null,
+      bookingRequestSummary: null,
       bookingPathSummary: null,
       usedLiveRead: false,
     };

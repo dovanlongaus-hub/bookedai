@@ -183,6 +183,18 @@ class AdminBookingConfirmationRequest(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
 
 
+class AdminDiscordHandoffRequest(BaseModel):
+    title: str = Field(min_length=1, max_length=200)
+    summary: str = Field(min_length=1, max_length=8000)
+    lane_label: str | None = Field(default=None, max_length=100)
+    handoff_format: str | None = Field(default=None, max_length=50)
+
+
+class AdminDiscordHandoffResponse(BaseModel):
+    status: str
+    message: str
+
+
 class AdminApiRoute(BaseModel):
     path: str
     methods: list[str]

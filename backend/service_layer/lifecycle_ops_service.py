@@ -4,6 +4,7 @@ from dataclasses import dataclass, field
 import json
 from uuid import uuid4
 
+from db import ConversationEvent
 from repositories.base import RepositoryContext
 from repositories.crm_repository import CrmSyncRepository
 from repositories.email_repository import EmailRepository
@@ -19,6 +20,16 @@ class CrmSyncOperationResult:
 @dataclass
 class LifecycleEmailOperationResult:
     message_id: str
+    delivery_status: str
+    record_status: str
+    provider: str
+    warning_codes: list[str] = field(default_factory=list)
+
+
+@dataclass
+class CommunicationOperationResult:
+    message_id: str
+    channel: str
     delivery_status: str
     record_status: str
     provider: str
@@ -259,3 +270,63 @@ async def record_lifecycle_email(
         event_payload=event_payload,
     )
     return result.message_id
+
+
+async def orchestrate_communication_touch(
+    session,
+    *,
+    tenant_id: str,
+    channel: str,
+    to: str,
+    body: str,
+    provider: str,
+    delivery_status: str,
+    actor_channel: str | None = None,
+    template_key: str | None = None,
+    metadata: dict[str, object | None] | None = None,
+) -> CommunicationOperationResult:
+    message_id = str(uuid4())
+    warning_codes: list[str] = []
+    record_status = delivery_status
+
+    if provider.endswith("unconfigured"):
+        record_status = "manual_review_required"
+        warning_codes.append("provider_unconfigured")
+    elif delivery_status == "failed":
+        record_status = "failed"
+        warning_codes.append("delivery_failed")
+
+    session.add(
+        ConversationEvent(
+            source=channel,
+            event_type=f"outbound_{channel}",
+            conversation_id=message_id,
+            sender_name="Bookedai.au",
+            sender_email=None,
+            message_text=body,
+            ai_intent="lifecycle_message",
+            ai_reply=None,
+            workflow_status=record_status,
+            metadata_json={
+                "tenant_id": tenant_id,
+                "channel": channel,
+                "provider": provider,
+                "delivery_status": delivery_status,
+                "record_status": record_status,
+                "to": to,
+                "template_key": template_key,
+                "actor_channel": actor_channel,
+                "warning_codes": warning_codes,
+                **(metadata or {}),
+            },
+        )
+    )
+
+    return CommunicationOperationResult(
+        message_id=message_id,
+        channel=channel,
+        delivery_status=delivery_status,
+        record_status=record_status,
+        provider=provider,
+        warning_codes=warning_codes,
+    )

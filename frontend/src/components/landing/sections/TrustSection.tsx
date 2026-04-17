@@ -1,4 +1,5 @@
 import type { FAQItem, TrustItem } from '../data';
+import { brandName } from '../data';
 import { SectionHeading } from '../ui/SectionHeading';
 
 type TrustSectionProps = {
@@ -9,7 +10,7 @@ type TrustSectionProps = {
 const headingContent = {
   kicker: 'Trust',
   kickerClassName: 'text-emerald-600',
-  title: 'Show buyers how BookedAI works in the real world',
+  title: `Show buyers how ${brandName} works in the real world`,
   body: 'Clear examples, practical FAQs, and grounded outcomes make the product feel safer to adopt for service businesses that cannot afford to miss enquiries.',
 };
 

@@ -114,7 +114,7 @@ export function PublicApp() {
   }, []);
 
   return (
-    <main className="apple-public-shell relative overflow-hidden">
+    <main className="booked-shell relative overflow-hidden">
       {bookingBanner ? (
         <div className="sticky top-0 z-50 border-b border-black/10 bg-[#f5f5f7]/95 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
           <div
@@ -131,7 +131,7 @@ export function PublicApp() {
             <button
               type="button"
               onClick={() => setBookingBanner(null)}
-              className="apple-button-secondary px-3 py-1 text-xs font-semibold"
+              className="booked-button-secondary px-3 py-1 text-xs font-semibold"
             >
               Dismiss
             </button>
@@ -144,7 +144,7 @@ export function PublicApp() {
         onStartTrial={() => setIsAssistantOpen(true)}
         onBookDemo={() => setIsDemoOpen(true)}
       />
-      <section className="apple-section-light relative overflow-hidden border-y border-black/5">
+      <section className="template-section relative overflow-hidden border-y border-black/5">
         <HeroSection
           content={heroContent}
           demo={demoContent}

@@ -159,13 +159,26 @@ def test_search_candidates_returns_catalog_matches(client, monkeypatch):
 
     body = assert_success_envelope(response, actor_type="public_web")
     assert body["data"]["candidates"][0]["candidate_id"] == "svc_123"
+    assert body["data"]["candidates"][0]["category"] == "spa"
+    assert body["data"]["candidates"][0]["location"] == "Sydney"
+    assert body["data"]["candidates"][0]["booking_url"] == "https://book.example.com/facial"
+    assert body["data"]["candidates"][0]["tags"] == ["facial", "skin"]
     assert body["data"]["recommendations"][0]["path_type"] == "book_on_partner_site"
+    assert body["data"]["recommendations"][0]["next_step"]
+    assert body["data"]["recommendations"][0]["warnings"] == []
+    assert body["data"]["booking_context"]["summary"] is None
     assert body["data"]["candidates"][0]["match_score"] >= 0.45
     assert body["data"]["candidates"][0]["trust_signal"] in {"partner_verified", "partner_routed"}
     assert body["data"]["confidence"]["gating_state"] in {"medium", "high"}
     assert "evidence" in body["data"]["confidence"]
     assert body["data"]["search_strategy"] == "catalog_term_retrieval_with_prompt9_rerank_with_relevance_gate"
     assert body["data"]["semantic_assist"]["applied"] is False
+    assert body["data"]["semantic_assist"]["provider_chain"] == []
+    assert body["data"]["semantic_assist"]["fallback_applied"] is False
+    assert body["data"]["semantic_assist"]["normalized_query"] is None
+    assert body["data"]["semantic_assist"]["inferred_location"] is None
+    assert body["data"]["semantic_assist"]["inferred_category"] is None
+    assert body["data"]["semantic_assist"]["budget_summary"] is None
 
 
 def test_check_availability_returns_booking_trust_contract(client, monkeypatch):

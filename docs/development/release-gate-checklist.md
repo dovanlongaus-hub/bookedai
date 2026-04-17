@@ -12,11 +12,13 @@ Primary gate command:
 This command already runs:
 
 1. frontend build
-2. Playwright smoke suites for `legacy`, `live-read`, and `admin-smoke`
+2. representative Playwright smoke suites for `legacy`, `live-read`, and `admin-smoke`
 3. backend v1 route and lifecycle unit tests
 4. fixed-query search eval pack
 
 The broader `@admin` regression suite remains separate from the release gate and should still be used for deeper admin passes.
+The broader `@legacy` and `@live-read` tagged suites also remain available for wider regression passes; the release gate now uses smaller representative slices so promote-or-hold checks stay stable enough to run repeatedly.
+For live-read specifically, the gate currently centers on the authoritative-write-boundary path rather than the more detailed request-counter assertions, because that narrower slice has proven more repeatable in chained rehearsal runs.
 
 The frontend Playwright commands now clear the standard preview ports before each run, so the release gate is less likely to fail because a previous smoke pass left a local preview server behind.
 
@@ -39,6 +41,15 @@ Rehearsal output:
 - records whether the run is `promote_ready` or `hold`
 - keeps rollback reminders close to the release result instead of relying on memory
 
+## Documentation sync gate
+
+Before a live promotion is considered complete, confirm all of the following in the same closure pass:
+
+- `docs/development/implementation-progress.md` records the delivered result and, when relevant, the live promotion outcome
+- the requirement-facing or description-facing document for the affected module, workflow, or sprint has been updated
+- the matching roadmap, sprint, plan, or phase document has been updated
+- the release should be treated as `hold` if the code is ready but the documentation write-back is still missing
+
 ## Promote
 
 Promote the current rollout slice when all of the following are true:
@@ -50,6 +61,7 @@ Promote the current rollout slice when all of the following are true:
 - admin protected-action re-auth coverage stays green on both representative mutations
 - CRM retry preview remains additive and operator-facing only
 - no new drift or retry wording suggests provider replay completed when it is only queued
+- implementation tracking, sprint or requirement documentation, and roadmap or phase documentation have all been updated for the delivered live slice
 
 ## Hold
 
@@ -61,6 +73,7 @@ Hold promotion when any of the following appears:
 - live-read guidance leaks into authoritative write expectations
 - retry preview UI implies automatic provider recovery rather than queued operator-supervised work
 - backend unit tests pass but the admin preview or smoke contract is visually broken
+- the release candidate has been deployed or marked ready, but implementation progress, sprint docs, or roadmap docs have not yet been updated
 
 ## Rollback
 

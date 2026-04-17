@@ -156,6 +156,24 @@ const recommendations: Recommendation[] = [
   },
 ];
 
+const pricingSignals = [
+  {
+    label: 'Starting point',
+    value: 'A$79/mo',
+    detail: 'Low-friction entry for service businesses',
+  },
+  {
+    label: 'Trial offer',
+    value: '30 days free',
+    detail: 'Move into rollout after confidence is clear',
+  },
+  {
+    label: 'Rollout mode',
+    value: 'Online first',
+    detail: 'Onsite only when the business actually needs it',
+  },
+];
+
 const visiblePlans = plans.slice(0, 2);
 const advancedPlan = plans[2];
 
@@ -358,20 +376,20 @@ function PlanCard({
   onOpenConsultation: (planId: PlanId) => void;
 }) {
   const cardClassName = plan.featured
-    ? 'border-cyan-300/50 bg-[linear-gradient(180deg,rgba(8,47,73,0.92)_0%,rgba(14,116,144,0.22)_100%)] shadow-[0_32px_80px_rgba(6,182,212,0.24)] ring-1 ring-cyan-300/30'
-    : 'border-white/10 bg-white/[0.05] shadow-[0_24px_60px_rgba(2,6,23,0.34)]';
+    ? 'template-card-dark ring-1 ring-cyan-300/20'
+    : 'template-card';
 
   const badgeClassName = plan.featured
     ? 'bg-cyan-300/18 text-cyan-100 ring-1 ring-cyan-200/35'
-    : 'bg-white/8 text-slate-200 ring-1 ring-white/10';
+    : 'booked-pill booked-pill--brand';
 
   const ctaClassName = plan.featured
-    ? 'bg-white text-slate-950 hover:-translate-y-0.5 hover:bg-cyan-50'
-    : 'bg-cyan-400 text-slate-950 hover:-translate-y-0.5 hover:bg-cyan-300';
+    ? 'booked-button-secondary bg-white text-slate-950 hover:bg-cyan-50'
+    : 'booked-button';
 
   return (
     <article
-      className={`group relative overflow-hidden rounded-[2rem] border p-7 backdrop-blur-xl transition duration-300 hover:-translate-y-2 hover:shadow-[0_30px_90px_rgba(8,145,178,0.18)] sm:p-8 ${cardClassName}`}
+      className={`group relative overflow-hidden p-7 transition duration-300 hover:-translate-y-2 sm:p-8 ${cardClassName}`}
     >
       <div
         aria-hidden="true"
@@ -380,13 +398,13 @@ function PlanCard({
       <div className="relative">
         <div className="flex items-start justify-between gap-4">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
+            <div className={`text-[11px] font-semibold uppercase tracking-[0.2em] ${plan.featured ? 'text-cyan-200' : 'text-[#2563eb]'}`}>
               {plan.introLabel}
             </div>
-            <div className="text-xl font-semibold tracking-tight text-white">
+            <div className={`text-xl font-semibold tracking-tight ${plan.featured ? 'text-white' : 'text-slate-950'}`}>
               {plan.name}
             </div>
-            <p className="mt-2 text-sm leading-6 text-slate-300">{plan.subtitle}</p>
+            <p className={`mt-2 text-sm leading-6 ${plan.featured ? 'text-slate-300' : 'text-slate-600'}`}>{plan.subtitle}</p>
           </div>
           <span
             className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${badgeClassName}`}
@@ -396,23 +414,23 @@ function PlanCard({
         </div>
 
         <div className="mt-8 flex items-end gap-2">
-          <div className="text-5xl font-semibold tracking-tight text-white">
+          <div className={`text-5xl font-semibold tracking-tight ${plan.featured ? 'text-white' : 'text-slate-950'}`}>
             {plan.price}
           </div>
-          <div className="pb-2 text-sm font-medium text-slate-400">/mo</div>
+          <div className={`pb-2 text-sm font-medium ${plan.featured ? 'text-slate-400' : 'text-slate-500'}`}>/mo</div>
         </div>
-        <p className="mt-2 text-sm font-semibold text-cyan-100">First 30 days free</p>
-        <p className="mt-3 text-sm font-medium text-cyan-100">{plan.microcopy}</p>
+        <p className={`mt-2 text-sm font-semibold ${plan.featured ? 'text-cyan-100' : 'text-[#2563eb]'}`}>First 30 days free</p>
+        <p className={`mt-3 text-sm font-medium ${plan.featured ? 'text-cyan-100' : 'text-slate-700'}`}>{plan.microcopy}</p>
         {plan.supportingText ? (
-          <p className="mt-2 text-sm leading-6 text-slate-300">{plan.supportingText}</p>
+          <p className={`mt-2 text-sm leading-6 ${plan.featured ? 'text-slate-300' : 'text-slate-600'}`}>{plan.supportingText}</p>
         ) : (
           <div className="mt-2 h-12" aria-hidden="true" />
         )}
 
         <ul className="mt-8 space-y-3">
           {plan.features.map((feature) => (
-            <li key={feature} className="flex items-start gap-3 text-sm leading-6 text-slate-200">
-              <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-300/12">
+            <li key={feature} className={`flex items-start gap-3 text-sm leading-6 ${plan.featured ? 'text-slate-200' : 'text-slate-700'}`}>
+              <span className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${plan.featured ? 'bg-cyan-300/12' : 'bg-[#eaf3ff]'}`}>
                 <CheckIcon />
               </span>
               <span>{feature}</span>
@@ -423,7 +441,7 @@ function PlanCard({
         <button
           type="button"
           onClick={() => onOpenConsultation(plan.id)}
-          className={`mt-8 flex w-full items-center justify-center gap-2 rounded-2xl px-5 py-4 text-sm font-semibold transition ${ctaClassName}`}
+          className={`mt-8 flex w-full items-center justify-center gap-2 px-5 py-4 text-sm font-semibold ${ctaClassName}`}
         >
           {plan.ctaLabel}
           <ArrowIcon />
@@ -600,20 +618,20 @@ export function PricingSection() {
     <section
       id="pricing"
       ref={sectionRef}
-      className="relative overflow-hidden bg-[#020617] px-6 py-24 text-white sm:py-28 lg:px-8"
+      className="template-section relative overflow-hidden px-6 py-24 sm:py-28 lg:px-8"
     >
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(34,211,238,0.2),transparent_26%),radial-gradient(circle_at_85%_18%,rgba(59,130,246,0.18),transparent_28%),linear-gradient(180deg,#020617_0%,#030712_40%,#020617_100%)]"
+        className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top,rgba(37,99,235,0.16),transparent_24%),radial-gradient(circle_at_85%_18%,rgba(249,115,22,0.12),transparent_22%),linear-gradient(180deg,#fcfaf6_0%,#f5f1e8_45%,#ede4d5_100%)]"
       />
       <div
         aria-hidden="true"
-        className="pointer-events-none absolute inset-x-0 top-1/3 h-72 bg-[radial-gradient(circle,rgba(14,165,233,0.16),transparent_58%)] blur-3xl"
+        className="pointer-events-none absolute inset-x-0 top-1/3 h-72 bg-[radial-gradient(circle,rgba(37,99,235,0.12),transparent_58%)] blur-3xl"
       />
 
       <div className="relative mx-auto max-w-7xl">
         {showReturnMessage ? (
-          <div className="mx-auto mb-6 flex max-w-3xl items-start justify-between gap-4 rounded-[1.5rem] border border-cyan-300/20 bg-cyan-300/10 px-5 py-4 text-sm text-cyan-50 shadow-[0_20px_60px_rgba(6,182,212,0.12)]">
+          <div className="template-card-subtle mx-auto mb-6 flex max-w-3xl items-start justify-between gap-4 px-5 py-4 text-sm text-slate-700">
             <p className="leading-6">
               Thanks, your request has been captured. You can keep exploring the homepage now, and
               the calendar invite plus confirmation email will continue from here.
@@ -621,7 +639,7 @@ export function PricingSection() {
             <button
               type="button"
               onClick={() => setShowReturnMessage(false)}
-              className="shrink-0 rounded-full border border-white/15 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white transition hover:border-white/30"
+              className="booked-button-secondary shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]"
             >
               Dismiss
             </button>
@@ -629,42 +647,59 @@ export function PricingSection() {
         ) : null}
 
         <div className="mx-auto max-w-3xl text-center">
-          <div className="inline-flex items-center justify-center rounded-full border border-cyan-300/20 bg-white/6 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-cyan-100 shadow-[0_12px_40px_rgba(6,182,212,0.12)] backdrop-blur-xl">
+          <div className="template-chip inline-flex items-center justify-center px-4 py-2 text-[11px] uppercase tracking-[0.24em]">
             30-day free trial • simple SME pricing
           </div>
-          <h2 className="mt-6 text-4xl font-semibold tracking-tight text-white sm:text-5xl lg:text-6xl">
+          <h2 className="template-title mt-6 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
             Simple pricing that feels easy to book now
           </h2>
-          <p className="mx-auto mt-5 max-w-2xl text-lg leading-8 text-slate-300">
+          <p className="template-body mx-auto mt-5 max-w-2xl text-lg leading-8">
             Start free for 30 days, then move to a clear monthly plan that fits your stage.
             We have lowered the entry price and simplified the offer so SMEs can decide faster.
           </p>
-          <p className="mx-auto mt-4 max-w-3xl text-sm leading-6 text-slate-400 sm:text-base">
+          <p className="template-body mx-auto mt-4 max-w-3xl text-sm leading-6 sm:text-base">
             Built for salons, clinics, swim schools, tutors, trades, hospitality, and other
             local businesses across Australia. Online rollout covers most teams, and we only
             quote extra when you need onsite support or a more custom implementation.
           </p>
+
+          <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
+            {pricingSignals.map((item) => (
+              <article
+                key={item.label}
+                className="template-card-subtle px-5 py-4"
+              >
+                <div className="template-kicker text-[11px]">
+                  {item.label}
+                </div>
+                <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  {item.value}
+                </div>
+                <div className="mt-1 text-sm leading-6 text-slate-600">{item.detail}</div>
+              </article>
+            ))}
+          </div>
         </div>
 
         <div className="mt-12 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
-          <div className="rounded-[2rem] border border-cyan-300/20 bg-white/[0.06] p-7 shadow-[0_24px_80px_rgba(2,6,23,0.36)] backdrop-blur-xl sm:p-8">
+          <div className="template-card p-7 sm:p-8">
             <div className="flex flex-wrap items-start justify-between gap-4">
               <div>
-                <p className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200">
+                <p className="template-kicker text-sm">
                   Special offers first
                 </p>
-                <h3 className="mt-3 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+                <h3 className="template-title mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
                   Three clear plans, one easy buying decision
                 </h3>
               </div>
-              <div className="rounded-[1.5rem] border border-white/10 bg-slate-950/45 px-5 py-4 text-right">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-400">
+              <div className="booked-note-surface px-5 py-4 text-right">
+                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
                   Starts from
                 </div>
-                <div className="mt-1 text-3xl font-semibold text-white">A$79/mo</div>
+                <div className="mt-1 text-3xl font-semibold text-slate-950">A$79/mo</div>
               </div>
             </div>
-            <p className="mt-5 max-w-2xl text-base leading-7 text-slate-300">
+            <p className="template-body mt-5 max-w-2xl text-base leading-7">
               Pick the plan that matches your current volume and workflow. Every `Book` action
               takes you straight into the onboarding flow, timing selection, confirmation email,
               and payment preparation.
@@ -673,19 +708,31 @@ export function PricingSection() {
               {topOffers.map((offer) => (
                 <div
                   key={offer.title}
-                  className="rounded-[1.5rem] border border-white/10 bg-slate-950/35 px-5 py-5"
+                  className="template-card-subtle px-5 py-5"
                 >
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                  <div className="template-kicker text-[11px]">
                     {offer.eyebrow}
                   </div>
-                  <div className="mt-2 text-lg font-semibold text-white">{offer.title}</div>
-                  <div className="mt-2 text-sm leading-6 text-slate-300">{offer.body}</div>
+                  <div className="mt-2 text-lg font-semibold text-slate-950">{offer.title}</div>
+                  <div className="mt-2 text-sm leading-6 text-slate-600">{offer.body}</div>
                 </div>
               ))}
             </div>
+
+            <div className="template-card-subtle mt-6 px-5 py-5">
+              <div className="template-kicker text-[11px]">
+                Buying story
+              </div>
+              <div className="mt-2 text-lg font-semibold text-slate-950">
+                Start with the smallest confident yes, then expand once the conversion layer is proven.
+              </div>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                The packaging is designed to reduce decision fatigue for SMEs while still leaving a clear path into richer automation later.
+              </p>
+            </div>
           </div>
 
-          <div className="rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(8,47,73,0.38)_0%,rgba(15,23,42,0.88)_100%)] p-7 shadow-[0_24px_80px_rgba(2,6,23,0.42)] backdrop-blur-xl sm:p-8">
+          <div className="template-card-dark p-7 sm:p-8">
             <div className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200">
               How setup works
             </div>
@@ -711,7 +758,7 @@ export function PricingSection() {
               {highlightPoints.map((point) => (
                 <span
                   key={point}
-                  className="rounded-full border border-cyan-300/18 bg-slate-950/45 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-cyan-100"
+                  className="template-chip border-cyan-300/18 bg-slate-950/45 px-3 py-2 text-xs text-cyan-100"
                 >
                   {point}
                 </span>
@@ -724,7 +771,7 @@ export function PricingSection() {
           {visiblePlans.map((plan) => (
             <PlanCard key={plan.id} plan={plan} onOpenConsultation={openConsultation} />
           ))}
-          <article className="relative overflow-hidden rounded-[2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(15,23,42,0.96)_0%,rgba(2,6,23,0.96)_100%)] p-7 shadow-[0_24px_60px_rgba(2,6,23,0.34)] backdrop-blur-xl sm:p-8">
+          <article className="template-card-dark relative overflow-hidden p-7 sm:p-8">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-x-6 top-0 h-24 rounded-full bg-cyan-300/10 blur-3xl"
@@ -772,7 +819,7 @@ export function PricingSection() {
               <button
                 type="button"
                 onClick={() => openConsultation(advancedPlan.id, 'guided')}
-                className="mt-8 flex w-full items-center justify-center gap-2 rounded-2xl border border-cyan-300/30 bg-transparent px-5 py-4 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:border-cyan-200/60 hover:text-cyan-100"
+                className="booked-button-secondary mt-8 flex w-full items-center justify-center gap-2 border-cyan-300/30 bg-transparent px-5 py-4 text-sm font-semibold text-white hover:border-cyan-200/60 hover:text-cyan-100"
               >
                 Talk To Us About Pro
                 <ArrowIcon />
@@ -781,19 +828,33 @@ export function PricingSection() {
           </article>
         </div>
 
-        <div className="mt-8 rounded-[2rem] border border-white/10 bg-white/[0.05] p-7 shadow-[0_24px_80px_rgba(2,6,23,0.36)] backdrop-blur-xl sm:p-8">
+        <div className="template-card mt-8 p-7 sm:p-8">
           <div className="grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-center">
             <div>
-              <div className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200">
+              <div className="template-kicker text-sm">
                 Need help choosing?
               </div>
-              <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white sm:text-3xl">
+              <h3 className="template-title mt-3 text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
                 Choose the plan that matches where your business is today
               </h3>
-              <p className="mt-4 max-w-2xl text-base leading-7 text-slate-300">
+              <p className="template-body mt-4 max-w-2xl text-base leading-7">
                 Starter is the lowest-risk entry and Growth is the best-value default for most SMEs.
                 If your rollout is more complex, we can scope Pro with you separately.
               </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                {[
+                  'Low-friction entry',
+                  'Best-value default',
+                  'Custom scope when complexity is real',
+                ].map((item) => (
+                  <span
+                    key={item}
+                    className="template-chip px-3 py-2 text-[11px]"
+                  >
+                    {item}
+                  </span>
+                ))}
+              </div>
             </div>
 
             <div className="grid gap-3">
@@ -802,14 +863,14 @@ export function PricingSection() {
                   key={item.label}
                   className={`flex items-center justify-between rounded-[1.5rem] border px-5 py-4 transition ${
                     item.featured
-                      ? 'border-cyan-300/35 bg-cyan-300/10 text-white shadow-[0_20px_60px_rgba(6,182,212,0.16)]'
-                      : 'border-white/10 bg-slate-950/35 text-slate-200'
+                      ? 'border-cyan-300/35 bg-cyan-300/10 text-slate-950 shadow-[0_20px_60px_rgba(6,182,212,0.16)]'
+                      : 'border-slate-200 bg-white text-slate-700'
                   }`}
                 >
                   <div className="text-lg font-semibold tracking-tight">{item.label}</div>
                   <div
                     className={`text-sm font-medium ${
-                      item.featured ? 'text-cyan-100' : 'text-slate-400'
+                      item.featured ? 'text-slate-700' : 'text-slate-500'
                     }`}
                   >
                     {item.detail}
@@ -820,7 +881,7 @@ export function PricingSection() {
               <button
                 type="button"
                 onClick={() => openConsultation('standard', 'guided')}
-                className="mt-3 inline-flex items-center justify-center gap-2 rounded-[1.5rem] bg-cyan-400 px-5 py-4 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-300"
+                className="booked-button mt-3 inline-flex items-center justify-center gap-2 px-5 py-4 text-sm font-semibold"
               >
                 Book Recommended Plan
                 <ArrowIcon />
@@ -832,27 +893,27 @@ export function PricingSection() {
 
       {isDialogOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
-          <div className="relative max-h-[90vh] w-full max-w-3xl overflow-auto rounded-[2rem] border border-white/10 bg-[#08111f] p-6 text-white shadow-[0_30px_100px_rgba(2,6,23,0.55)] sm:p-8">
+          <div className="template-card relative max-h-[90vh] w-full max-w-3xl overflow-auto p-6 text-slate-700 sm:p-8">
             <button
               type="button"
               onClick={() => closeConsultation()}
-              className="absolute right-4 top-4 rounded-full border border-white/10 px-3 py-1 text-sm text-slate-300 transition hover:border-white/20 hover:text-white"
+              className="booked-button-secondary absolute right-4 top-4 px-3 py-1 text-sm"
             >
               Close
             </button>
 
             <div className="max-w-2xl">
-              <div className="inline-flex rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
+              <div className="booked-pill booked-pill--brand px-4 py-2 text-[11px]">
                 {flowMode === 'guided' ? 'Recommended package flow' : 'Plan booking flow'}
               </div>
-              <h3 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+              <h3 className="template-title mt-5 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
                 {consultationStep === 'contact'
                   ? `Book the ${selectedPlan.name} package`
                   : consultationStep === 'calendar'
                     ? 'Choose your onboarding time'
                     : `${selectedPlan.name} onboarding reserved`}
               </h3>
-              <p className="mt-4 text-base leading-7 text-slate-300">
+              <p className="template-body mt-4 text-base leading-7">
                 {consultationStep === 'contact'
                   ? 'Share the essentials first. We use them to prepare your package onboarding, trial offer, confirmation email, and payment flow.'
                   : consultationStep === 'calendar'
@@ -864,7 +925,7 @@ export function PricingSection() {
             {consultationStep === 'contact' ? (
               <div className="mt-8 grid gap-5 sm:grid-cols-2">
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-200">Selected plan</span>
+                  <span className="text-sm font-medium text-slate-700">Selected plan</span>
                   <select
                     value={formState.planId}
                     onChange={(event) =>
@@ -873,7 +934,7 @@ export function PricingSection() {
                         planId: event.target.value as PlanId,
                       }))
                     }
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/60"
+                    className="booked-field rounded-2xl px-4 py-3 text-sm"
                   >
                     {plans.map((plan) => (
                       <option key={plan.id} value={plan.id}>
@@ -884,7 +945,7 @@ export function PricingSection() {
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-200">Phone number</span>
+                  <span className="text-sm font-medium text-slate-700">Phone number</span>
                   <input
                     type="tel"
                     value={formState.customerPhone}
@@ -895,12 +956,12 @@ export function PricingSection() {
                       }))
                     }
                     placeholder="Optional"
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                    className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-200">Your name</span>
+                  <span className="text-sm font-medium text-slate-700">Your name</span>
                   <input
                     type="text"
                     value={formState.customerName}
@@ -911,12 +972,12 @@ export function PricingSection() {
                       }))
                     }
                     placeholder="How should we address you?"
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                    className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-200">Setup mode</span>
+                  <span className="text-sm font-medium text-slate-700">Setup mode</span>
                   <select
                     value={formState.onboardingMode}
                     onChange={(event) =>
@@ -925,7 +986,7 @@ export function PricingSection() {
                         onboardingMode: event.target.value as OnboardingMode,
                       }))
                     }
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/60"
+                    className="booked-field rounded-2xl px-4 py-3 text-sm"
                   >
                     <option value="online">Online setup</option>
                     <option value="onsite">Onsite setup</option>
@@ -933,7 +994,7 @@ export function PricingSection() {
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-200">Work email</span>
+                  <span className="text-sm font-medium text-slate-700">Work email</span>
                   <input
                     type="email"
                     value={formState.customerEmail}
@@ -944,11 +1005,11 @@ export function PricingSection() {
                       }))
                     }
                     placeholder="you@business.com.au"
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                    className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                 </label>
 
-                <label className="sm:col-span-2 flex items-start gap-3 rounded-[1.25rem] border border-white/10 bg-slate-950/35 px-4 py-4">
+                <label className="template-card-subtle sm:col-span-2 flex items-start gap-3 px-4 py-4">
                   <input
                     type="checkbox"
                     checked={formState.startupReferralEligible}
@@ -958,9 +1019,9 @@ export function PricingSection() {
                         startupReferralEligible: event.target.checked,
                       }))
                     }
-                    className="mt-1 h-4 w-4 rounded border-white/20 bg-slate-950 text-cyan-400"
+                    className="mt-1 h-4 w-4 rounded border-slate-300 bg-white text-[#2563eb]"
                   />
-                  <span className="text-sm leading-6 text-slate-300">
+                  <span className="text-sm leading-6 text-slate-700">
                     We are a startup team referred by an accelerator or incubator and want to claim the 3-month free offer.
                   </span>
                 </label>
@@ -968,7 +1029,7 @@ export function PricingSection() {
                 {formState.startupReferralEligible ? (
                   <>
                     <label className="flex flex-col gap-2">
-                      <span className="text-sm font-medium text-slate-200">Accelerator or incubator</span>
+                      <span className="text-sm font-medium text-slate-700">Accelerator or incubator</span>
                       <input
                         type="text"
                         value={formState.referralPartner}
@@ -979,12 +1040,12 @@ export function PricingSection() {
                           }))
                         }
                         placeholder="Startmate, UNSW Founders, Stone & Chalk, Antler..."
-                        className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                    className="booked-field rounded-2xl px-4 py-3 text-sm"
                       />
                     </label>
 
                     <label className="flex flex-col gap-2">
-                      <span className="text-sm font-medium text-slate-200">Startup city or hub</span>
+                      <span className="text-sm font-medium text-slate-700">Startup city or hub</span>
                       <input
                         type="text"
                         value={formState.referralLocation}
@@ -995,14 +1056,14 @@ export function PricingSection() {
                           }))
                         }
                         placeholder="Sydney, Melbourne, Perth, Brisbane, Adelaide, Darwin..."
-                        className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                        className="booked-field rounded-2xl px-4 py-3 text-sm"
                       />
                     </label>
                   </>
                 ) : null}
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-200">Business name</span>
+                  <span className="text-sm font-medium text-slate-700">Business name</span>
                   <input
                     type="text"
                     value={formState.businessName}
@@ -1013,12 +1074,12 @@ export function PricingSection() {
                       }))
                     }
                     placeholder="Your company or venue"
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                    className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                 </label>
 
                 <label className="flex flex-col gap-2 sm:col-span-2">
-                  <span className="text-sm font-medium text-slate-200">Business type</span>
+                  <span className="text-sm font-medium text-slate-700">Business type</span>
                   <input
                     list="pricing-business-types"
                     value={formState.businessType}
@@ -1029,7 +1090,7 @@ export function PricingSection() {
                       }))
                     }
                     placeholder="Choose one or enter your own"
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                    className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                   <datalist id="pricing-business-types">
                     {businessTypeSuggestions.map((item) => (
@@ -1048,12 +1109,12 @@ export function PricingSection() {
                   <button
                     type="button"
                     onClick={handleContactContinue}
-                    className="inline-flex items-center justify-center gap-2 rounded-[1.5rem] bg-cyan-400 px-5 py-4 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-300"
+                    className="booked-button inline-flex items-center justify-center gap-2 px-5 py-4 text-sm font-semibold"
                   >
                     Continue to installation calendar
                     <ArrowIcon />
                   </button>
-                  <p className="text-sm leading-6 text-slate-400">
+                  <p className="template-body text-sm leading-6">
                     We will use this to send your onboarding confirmation, trial offer summary, and calendar invite.
                   </p>
                 </div>
@@ -1062,13 +1123,13 @@ export function PricingSection() {
 
             {consultationStep === 'calendar' ? (
               <form className="mt-8 grid gap-5 sm:grid-cols-2" onSubmit={handleSubmit}>
-                <div className="sm:col-span-2 rounded-[1.5rem] border border-cyan-300/20 bg-white/[0.04] p-4 text-sm leading-6 text-slate-300">
-                  Package reserved for <span className="font-semibold text-white">{formState.customerEmail}</span>.
+                  <div className="template-card-subtle sm:col-span-2 p-4 text-sm leading-6 text-slate-600">
+                  Package reserved for <span className="font-semibold text-slate-950">{formState.customerEmail}</span>.
                   Choose the onboarding time below, then we will create the calendar step and prepare payment for the selected plan. Subscription and setup are handled as separate commercial items.
                 </div>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-200">Preferred time</span>
+                  <span className="text-sm font-medium text-slate-700">Preferred time</span>
                   <input
                     type="datetime-local"
                     value={formState.preferredSlot}
@@ -1078,21 +1139,21 @@ export function PricingSection() {
                         preferredSlot: event.target.value,
                       }))
                     }
-                    className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition focus:border-cyan-300/60"
+                    className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-200">Selected plan</span>
+                  <span className="text-sm font-medium text-slate-700">Selected plan</span>
                   <input
                     value={`${selectedPlan.name} (${selectedPlan.price}/mo after ${formState.startupReferralEligible ? '3-month' : '30-day'} free subscription period)`}
                     readOnly
-                    className="rounded-2xl border border-white/10 bg-slate-950/40 px-4 py-3 text-sm text-slate-200 outline-none"
+                    className="booked-field rounded-2xl px-4 py-3 text-sm text-slate-600"
                   />
                 </label>
 
                 <label className="flex flex-col gap-2 sm:col-span-2">
-                  <span className="text-sm font-medium text-slate-200">Notes</span>
+                  <span className="text-sm font-medium text-slate-700">Notes</span>
                   <textarea
                     value={formState.notes}
                     onChange={(event) =>
@@ -1103,7 +1164,7 @@ export function PricingSection() {
                     }
                     rows={4}
                     placeholder="Anything helpful before the call, like channels, booking volume, or key integrations."
-                    className="rounded-[1.5rem] border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                    className="booked-field rounded-[1.5rem] px-4 py-3 text-sm"
                   />
                 </label>
 
@@ -1120,14 +1181,14 @@ export function PricingSection() {
                       setSubmitError('');
                       setConsultationStep('contact');
                     }}
-                    className="inline-flex items-center justify-center gap-2 rounded-[1.5rem] border border-white/15 px-5 py-4 text-sm font-semibold text-white transition hover:border-cyan-300/40 hover:text-cyan-100"
+                    className="booked-button-secondary inline-flex items-center justify-center gap-2 px-5 py-4 text-sm font-semibold"
                   >
                     Back
                   </button>
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="inline-flex items-center justify-center gap-2 rounded-[1.5rem] bg-cyan-400 px-5 py-4 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="booked-button inline-flex items-center justify-center gap-2 px-5 py-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
                   >
                     {isSubmitting ? 'Booking package flow...' : 'Book now and open payment + calendar'}
                     <ArrowIcon />
@@ -1137,34 +1198,34 @@ export function PricingSection() {
             ) : null}
 
             {consultationStep === 'confirmed' && result ? (
-              <div className="mt-8 rounded-[1.75rem] border border-cyan-300/20 bg-white/[0.04] p-5 sm:p-6">
-                <div className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200">
+              <div className="template-card-subtle mt-8 p-5 sm:p-6">
+                <div className="template-kicker text-sm">
                   Package reserved
                 </div>
-                <div className="mt-3 text-2xl font-semibold tracking-tight text-white">
+                <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
                   {result.plan_name} plan for {result.amount_label}
                 </div>
-                <p className="mt-3 text-sm leading-6 text-cyan-100">{result.trial_summary}</p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
+                <p className="mt-3 text-sm leading-6 text-[#2563eb]">{result.trial_summary}</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Setup fee is treated separately from subscription. Online launch setup may be waived for eligible early customers, while onsite rollout is quoted separately where needed.
                 </p>
-                <p className="mt-3 text-sm leading-6 text-slate-300">
+                <p className="mt-3 text-sm leading-6 text-slate-600">
                   Reference: {result.consultation_reference}
                 </p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Preferred time: {formatConsultationDateTime(result)} {result.timezone}
                 </p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Setup mode: {result.onboarding_mode === 'onsite' ? 'Onsite installation' : 'Online installation'}
                 </p>
-                <p className="mt-2 text-sm leading-6 text-slate-300">
+                <p className="mt-2 text-sm leading-6 text-slate-600">
                   Email status: {result.email_status === 'sent' ? 'Sent' : 'Pending manual follow-up'}
                 </p>
                 {result.startup_offer_summary ? (
-                  <p className="mt-2 text-sm leading-6 text-cyan-100">{result.startup_offer_summary}</p>
+                  <p className="mt-2 text-sm leading-6 text-[#2563eb]">{result.startup_offer_summary}</p>
                 ) : null}
                 {result.onsite_travel_fee_note ? (
-                  <p className="mt-2 text-sm leading-6 text-slate-300">{result.onsite_travel_fee_note}</p>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">{result.onsite_travel_fee_note}</p>
                 ) : null}
 
                 <div className="mt-5 flex flex-wrap gap-3">
@@ -1173,7 +1234,7 @@ export function PricingSection() {
                       href={googleCalendarUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                      className="booked-button inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold"
                     >
                       Add to Google Calendar
                       <ArrowIcon />
@@ -1184,7 +1245,7 @@ export function PricingSection() {
                     <a
                       href={icsDownloadUrl}
                       download={`bookedai-${result.consultation_reference}.ics`}
-                      className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:border-cyan-300/40 hover:text-cyan-100"
+                      className="booked-button-secondary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold"
                     >
                       Download ICS
                       <ArrowIcon />
@@ -1196,7 +1257,7 @@ export function PricingSection() {
                       href={result.meeting_join_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-50"
+                      className="booked-button-secondary inline-flex items-center gap-2 bg-white px-4 py-2 text-sm font-semibold text-slate-950 hover:bg-cyan-50"
                     >
                       Open Zoho meeting
                       <ArrowIcon />
@@ -1208,7 +1269,7 @@ export function PricingSection() {
                       href={result.meeting_event_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:border-cyan-300/40 hover:text-cyan-100"
+                      className="booked-button-secondary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold"
                     >
                       View calendar event
                       <ArrowIcon />
@@ -1220,7 +1281,7 @@ export function PricingSection() {
                       href={result.payment_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="inline-flex items-center gap-2 rounded-full bg-cyan-400 px-4 py-2 text-sm font-semibold text-slate-950 transition hover:bg-cyan-300"
+                      className="booked-button inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold"
                     >
                       Continue to Stripe
                       <ArrowIcon />
@@ -1230,7 +1291,7 @@ export function PricingSection() {
                   <button
                     type="button"
                     onClick={() => closeConsultation({ showMessage: true })}
-                    className="inline-flex items-center gap-2 rounded-full border border-white/15 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 hover:text-slate-100"
+                    className="booked-button-secondary inline-flex items-center gap-2 px-4 py-2 text-sm font-semibold"
                   >
                     Close
                   </button>

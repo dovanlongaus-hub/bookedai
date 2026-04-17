@@ -8,234 +8,40 @@
       name="description"
       content="BookedAI demo hub showing how BookedAI turns a real customer enquiry into a match, booking trust decision, payment path, and revenue outcome."
     />
+    <link rel="stylesheet" href="/template.css" />
     <style>
-      :root {
-        color-scheme: dark;
-        --bg: #020617;
-        --panel: rgba(15, 23, 42, 0.88);
-        --panel-border: rgba(51, 65, 85, 0.85);
-        --text: #e2e8f0;
-        --muted: #94a3b8;
-        --accent: #38bdf8;
-        --accent-strong: #0ea5e9;
+      body.template-static-page-dark .panel,
+      body.template-static-page-dark .card,
+      body.template-static-page-dark .scenario-card {
+        border-color: rgba(148, 163, 184, 0.18);
+        background: rgba(8, 15, 28, 0.78);
       }
 
-      * {
-        box-sizing: border-box;
+      body.template-static-page-dark .eyebrow,
+      body.template-static-page-dark .scenario-tag {
+        color: #bfdbfe;
+        background: rgba(37, 99, 235, 0.18);
       }
 
-      body {
-        margin: 0;
-        min-height: 100vh;
-        font-family: "Segoe UI", Arial, sans-serif;
-        background:
-          radial-gradient(circle at top left, rgba(14, 165, 233, 0.22), transparent 30%),
-          linear-gradient(180deg, #020617 0%, #020617 100%);
-        color: var(--text);
+      body.template-static-page-dark .lead,
+      body.template-static-page-dark .scenario-copy,
+      body.template-static-page-dark .note,
+      body.template-static-page-dark ul {
+        color: rgba(226, 232, 240, 0.78);
       }
 
-      main {
-        width: min(1100px, calc(100% - 32px));
-        margin: 0 auto;
-        padding: 56px 0 72px;
+      body.template-static-page-dark .button-secondary,
+      body.template-static-page-dark .mini-button-secondary {
+        background: rgba(255, 255, 255, 0.06);
+        color: #dbeafe;
       }
 
-      .panel {
-        border: 1px solid var(--panel-border);
-        border-radius: 32px;
-        background: var(--panel);
-        padding: 32px;
-        backdrop-filter: blur(16px);
-      }
-
-      .eyebrow {
-        margin: 0 0 12px;
-        font-size: 12px;
-        font-weight: 700;
-        letter-spacing: 0.2em;
-        text-transform: uppercase;
-        color: var(--accent);
-      }
-
-      h1 {
-        margin: 0;
-        font-size: clamp(40px, 6vw, 64px);
-        line-height: 1.02;
-      }
-
-      .lead {
-        max-width: 760px;
-        margin: 20px 0 0;
-        font-size: 18px;
-        line-height: 1.8;
-        color: var(--muted);
-      }
-
-      .grid {
-        display: grid;
-        gap: 24px;
-        margin-top: 32px;
-      }
-
-      .player {
-        width: 100%;
-        display: block;
-        border: 1px solid var(--panel-border);
-        border-radius: 24px;
-        background: #000;
-        margin-top: 28px;
-      }
-
-      @media (min-width: 860px) {
-        .grid {
-          grid-template-columns: 1.15fr 0.85fr;
-        }
-      }
-
-      .card {
-        border: 1px solid var(--panel-border);
-        border-radius: 24px;
-        background: rgba(2, 6, 23, 0.68);
-        padding: 24px;
-      }
-
-      h2 {
-        margin: 0 0 16px;
-        font-size: 24px;
-      }
-
-      ul {
-        margin: 0;
-        padding-left: 20px;
-        color: var(--muted);
-        line-height: 1.8;
-      }
-
-      li + li {
-        margin-top: 10px;
-      }
-
-      .actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 14px;
-        margin-top: 28px;
-      }
-
-      .button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 18px;
-        padding: 14px 22px;
-        text-decoration: none;
-        font-weight: 700;
-      }
-
-      .button-primary {
-        background: var(--accent);
-        color: #082f49;
-      }
-
-      .button-primary:hover {
-        background: var(--accent-strong);
-      }
-
-      .button-secondary {
-        border: 1px solid var(--panel-border);
-        color: var(--text);
-        background: rgba(15, 23, 42, 0.78);
-      }
-
-      .note {
-        margin-top: 18px;
-        font-size: 14px;
-        color: var(--muted);
-      }
-
-      .scenario-grid {
-        display: grid;
-        gap: 20px;
-        margin-top: 32px;
-      }
-
-      @media (min-width: 860px) {
-        .scenario-grid {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-        }
-      }
-
-      .scenario-card {
-        border: 1px solid var(--panel-border);
-        border-radius: 24px;
-        background: rgba(2, 6, 23, 0.68);
-        padding: 24px;
-      }
-
-      .scenario-card.is-active {
-        border-color: rgba(56, 189, 248, 0.7);
-        box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.24);
-      }
-
-      .scenario-tag {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        padding: 8px 12px;
-        font-size: 11px;
-        font-weight: 700;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: #bae6fd;
-        background: rgba(14, 165, 233, 0.14);
-      }
-
-      .scenario-card h3 {
-        margin: 14px 0 10px;
-        font-size: 24px;
-      }
-
-      .scenario-copy {
-        margin: 0;
-        color: var(--muted);
-        line-height: 1.7;
-      }
-
-      .scenario-list {
-        margin-top: 16px;
-      }
-
-      .scenario-actions {
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        margin-top: 18px;
-      }
-
-      .mini-button {
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        border-radius: 14px;
-        padding: 10px 14px;
-        text-decoration: none;
-        font-size: 14px;
-        font-weight: 700;
-      }
-
-      .mini-button-primary {
-        background: rgba(56, 189, 248, 0.18);
-        color: #bae6fd;
-      }
-
-      .mini-button-secondary {
-        border: 1px solid var(--panel-border);
-        background: rgba(15, 23, 42, 0.6);
-        color: var(--text);
+      body.template-static-page-dark .player {
+        border-color: rgba(148, 163, 184, 0.18);
       }
     </style>
   </head>
-  <body>
+  <body class="template-static-page template-static-page-dark">
     <main>
       <section class="panel">
         <p class="eyebrow" id="scenario-eyebrow">Demo Hub</p>
@@ -266,7 +72,7 @@
           <article class="card">
             <h2 id="proof-title">What This Shows</h2>
             <ul id="proof-list">
-              <li>AI matching instead of generic chatbot responses.</li>
+              <li>AI matching instead of generic low-context responses.</li>
               <li>Booking trust through clear available options and next steps.</li>
               <li>A payment or confirmation path that leads toward revenue.</li>
               <li>A founder-friendly demo asset you can share after events and calls.</li>
@@ -414,7 +220,7 @@
           ],
           proofTitle: "Why Salon Teams Care",
           proof: [
-            "AI matching instead of generic chatbot responses.",
+            "AI matching instead of generic low-context responses.",
             "Booking trust through clear available options and next steps.",
             "A fast route from web enquiry to real appointment confirmation.",
             "A founder-friendly demo asset you can share after events and calls."

@@ -8,6 +8,7 @@ export type ApiChannel =
   | 'public_web'
   | 'embedded_widget'
   | 'tenant_app'
+  | 'sms'
   | 'whatsapp'
   | 'admin';
 

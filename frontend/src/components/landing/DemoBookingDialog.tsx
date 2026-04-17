@@ -282,20 +282,20 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
-      <div className="relative max-h-[92vh] w-full max-w-7xl overflow-auto rounded-[2rem] border border-white/10 bg-[#08111f] p-6 text-white shadow-[0_30px_100px_rgba(2,6,23,0.55)] sm:p-8">
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-white/10 pb-5 pr-16">
+      <div className="template-card relative max-h-[92vh] w-full max-w-7xl overflow-auto p-6 text-slate-700 sm:p-8">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5 pr-16">
           <div>
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200">
+            <div className="template-kicker text-xs">
               Tutor demo
             </div>
-            <div className="mt-2 text-lg font-semibold text-white">
+            <div className="mt-2 text-lg font-semibold text-slate-950">
               Close this demo to return to the main landing page
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/30 hover:bg-white/15"
+            className="booked-button-secondary px-4 py-2 text-sm font-semibold"
           >
             Back to landing page
           </button>
@@ -304,40 +304,40 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
         <button
           type="button"
           onClick={onClose}
-          className="absolute right-4 top-4 rounded-full border border-white/10 px-3 py-1 text-sm text-slate-300 transition hover:border-white/20 hover:text-white"
+          className="booked-button-secondary absolute right-4 top-4 px-3 py-1 text-sm"
         >
           Close
         </button>
 
         <div className="max-w-3xl pr-10">
-          <div className="inline-flex rounded-full border border-cyan-300/25 bg-cyan-300/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.22em] text-cyan-100">
+          <div className="booked-pill booked-pill--brand px-4 py-2 text-[11px]">
             {brandName} demo
           </div>
-          <div className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-cyan-200/80">
+          <div className="template-kicker mt-3 text-xs opacity-80">
             {brandDescriptor}
           </div>
-          <h3 className="mt-5 text-3xl font-semibold tracking-tight text-white sm:text-4xl">
+          <h3 className="template-title mt-5 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
             Share your context, then choose the best time
           </h3>
-          <p className="mt-4 text-base leading-7 text-slate-300">
+          <p className="template-body mt-4 text-base leading-7">
             Leave your demo brief on the left so our team has background before the call, then
             lock in the most suitable consultation slot from the live calendar.
           </p>
         </div>
 
         <div className="mt-8 grid gap-6 xl:grid-cols-[0.95fr_1.45fr]">
-          <section className="rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-5 sm:p-6">
+          <section className="template-card-subtle p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <div className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                <div className="template-kicker text-sm">
                   Demo brief
                 </div>
-                <p className="mt-3 text-sm leading-6 text-slate-300">
+                <p className="mt-3 text-sm leading-6 text-slate-600">
                   This helps us tailor the consultation to your booking flow, channels, and
                   current bottlenecks.
                 </p>
               </div>
-              <div className="rounded-full border border-white/10 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              <div className="booked-pill px-3 py-1 text-[11px] text-slate-500">
                 Optional but useful
               </div>
             </div>
@@ -423,7 +423,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                   value={customerName}
                   onChange={(event) => setCustomerName(event.target.value)}
                   placeholder="How should we address you?"
-                  className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                  className="booked-field rounded-2xl px-4 py-3 text-sm"
                 />
               </label>
 
@@ -434,7 +434,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                   value={customerEmail}
                   onChange={(event) => setCustomerEmail(event.target.value)}
                   placeholder="you@business.com.au"
-                  className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                  className="booked-field rounded-2xl px-4 py-3 text-sm"
                 />
               </label>
 
@@ -445,7 +445,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                   value={customerPhone}
                   onChange={(event) => setCustomerPhone(event.target.value)}
                   placeholder="Optional"
-                  className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                  className="booked-field rounded-2xl px-4 py-3 text-sm"
                 />
               </label>
 
@@ -456,7 +456,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                   value={businessName}
                   onChange={(event) => setBusinessName(event.target.value)}
                   placeholder="Your company or venue"
-                  className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                  className="booked-field rounded-2xl px-4 py-3 text-sm"
                 />
               </label>
 
@@ -467,7 +467,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                   value={businessType}
                   onChange={(event) => setBusinessType(event.target.value)}
                   placeholder="Salon, clinic, cafe, events, trades, healthcare..."
-                  className="rounded-2xl border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                  className="booked-field rounded-2xl px-4 py-3 text-sm"
                 />
               </label>
 
@@ -478,7 +478,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                   onChange={(event) => setNotes(event.target.value)}
                   rows={5}
                   placeholder="Share your booking channels, monthly volume, current tools, or what you want the consultation to focus on."
-                  className="rounded-[1.5rem] border border-white/10 bg-slate-950/60 px-4 py-3 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cyan-300/60"
+                  className="booked-field rounded-[1.5rem] px-4 py-3 text-sm"
                 />
               </label>
 
@@ -492,18 +492,18 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                 <button
                   type="submit"
                   disabled={isSubmittingBrief}
-                  className="inline-flex items-center justify-center rounded-[1.5rem] bg-cyan-400 px-5 py-4 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-300 disabled:cursor-not-allowed disabled:opacity-70"
+                  className="booked-button inline-flex items-center justify-center px-5 py-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {isSubmittingBrief ? 'Saving demo brief...' : 'Save demo brief'}
                 </button>
-                <p className="text-sm leading-6 text-slate-400">
+                <p className="template-body text-sm leading-6">
                   After saving, continue in the calendar to choose the exact consultation time.
                 </p>
               </div>
             </form>
           </section>
 
-          <section className="rounded-[1.75rem] border border-white/10 bg-slate-950/40 p-3 sm:p-4">
+          <section className="template-card-dark p-3 sm:p-4">
             <div className="flex flex-col gap-2 border-b border-white/10 px-3 pb-4 pt-1 sm:px-4">
               <div className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">
                 Live calendar
@@ -558,7 +558,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                 href={EMBED_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="inline-flex items-center justify-center rounded-[1.5rem] border border-cyan-300/30 bg-cyan-300/10 px-5 py-3 text-sm font-semibold text-cyan-100 transition hover:border-cyan-200/50 hover:bg-cyan-300/15 hover:text-white"
+                className="booked-button-secondary inline-flex items-center justify-center border-cyan-300/30 bg-cyan-300/10 px-5 py-3 text-sm font-semibold text-cyan-100 hover:border-cyan-200/50 hover:bg-cyan-300/15 hover:text-white"
               >
                 Open full booking page
               </a>

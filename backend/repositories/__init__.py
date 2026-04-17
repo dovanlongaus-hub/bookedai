@@ -9,6 +9,7 @@ from .email_repository import EmailRepository
 from .feature_flag_repository import FeatureFlagRepository
 from .idempotency_repository import IdempotencyRepository
 from .integration_repository import IntegrationRepository
+from .job_run_repository import JobRunRepository
 from .lead_repository import LeadRepository
 from .outbox_repository import OutboxRepository
 from .payment_intent_repository import PaymentIntentRepository
@@ -26,6 +27,7 @@ __all__ = [
     "FeatureFlagRepository",
     "IdempotencyRepository",
     "IntegrationRepository",
+    "JobRunRepository",
     "LeadRepository",
     "OutboxRepository",
     "PaymentIntentRepository",

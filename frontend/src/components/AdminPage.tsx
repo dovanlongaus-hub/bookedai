@@ -261,7 +261,7 @@ export function AdminPage() {
   }
 
   return (
-    <main className="apple-admin-shell px-4 py-6 lg:px-8">
+    <main className="booked-admin-shell px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-[1600px]">
         <AdminDashboardHeader
           username={username}
@@ -421,14 +421,14 @@ export function AdminPage() {
         {activeWorkspace === 'reliability' ? (
           <Suspense
             fallback={
-              <section className="apple-card mt-6 p-6">
-                <div className="text-sm font-semibold text-[#0071e3]">
+              <section className="template-card mt-6 p-6">
+                <div className="template-kicker text-sm tracking-[0.14em]">
                   Reliability workspace
                 </div>
-                <h2 className="apple-title mt-3 text-xl font-semibold text-[#1d1d1f]">
+                <h2 className="template-title mt-3 text-xl font-semibold text-[#1d1d1f]">
                   Loading reliability triage module
                 </h2>
-                <p className="apple-body mt-2 max-w-3xl text-sm leading-6">
+                <p className="template-body mt-2 max-w-3xl text-sm leading-6">
                   Prompt 8 now ships reliability as a dedicated admin workspace module so the rest
                   of the admin shell can stay lighter during initial load.
                 </p>
@@ -440,6 +440,8 @@ export function AdminPage() {
               selectedServiceId={selectedBooking?.booking.service_id ?? null}
               configItems={configItems}
               apiRoutes={apiRoutes}
+              apiBaseUrl={apiBaseUrl}
+              sessionToken={sessionToken}
               onPanelNavigate={changePanel}
             />
           </Suspense>

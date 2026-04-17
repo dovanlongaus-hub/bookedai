@@ -1,131 +1,270 @@
 # Roadmap Sprint Document Register
 
-Date: `2026-04-16`
+Date: `2026-04-17`
 
 ## Purpose
 
-This register maps each roadmap sprint to the real implementation documents that currently carry the delivery plan, architectural constraints, and execution evidence.
+This register maps each active roadmap sprint to the source documents that define the current BookedAI delivery plan.
 
-It is meant to keep the roadmap UI compact while still pointing the team to the actual repo documents behind each sprint.
+The current register has been updated to match the revenue-engine repositioning of BookedAI.
 
-## Sprint Register
+## Documentation synchronization rule
+
+For any meaningful product or architecture change:
+
+- re-read the existing source document first
+- update the requirement-side source document
+- update the execution-side implementation document
+- update the relevant roadmap or sprint document
+- if the change affects the public narrative, update the PRD and public-growth planning docs in the same pass
+
+## Sprint register
 
 ### Sprint 1
 
-- `docs/architecture/mvp-sprint-execution-plan.md`
+- `docs/architecture/bookedai-master-prd.md`
+- `docs/architecture/phase-0-detailed-implementation-plan.md`
+- `docs/architecture/phase-0-epic-story-task-breakdown.md`
+- `docs/architecture/target-platform-architecture.md`
 - `docs/architecture/implementation-phase-roadmap.md`
-- `docs/development/implementation-progress.md`
+- `docs/architecture/solution-architecture-master-execution-plan.md`
+- `docs/architecture/mvp-sprint-execution-plan.md`
+- `docs/architecture/pricing-packaging-monetization-strategy.md`
+- `docs/architecture/landing-page-system-requirements.md`
+- `docs/development/sprint-1-owner-execution-checklist.md`
 
 Focus:
-- baseline release framing
-- roadmap and architecture alignment
-- contract inventory and operating cadence
+
+- PRD reset
+- architecture reset
+- revenue-engine product definition
+- setup fee plus commission pricing definition
 
 ### Sprint 2
 
-- `docs/architecture/repo-module-strategy.md`
-- `docs/development/prompt-5-api-v1-execution-package.md`
-- `docs/development/implementation-progress.md`
+- `docs/architecture/bookedai-master-prd.md`
+- `docs/architecture/phase-1-2-detailed-implementation-package.md`
+- `docs/architecture/phase-1-2-epic-story-task-breakdown.md`
+- `docs/architecture/public-growth-app-strategy.md`
+- `docs/architecture/implementation-phase-roadmap.md`
+- `docs/development/sprint-2-owner-execution-checklist.md`
 
 Focus:
-- bounded modules
-- service and repository seams
-- shared contract ownership
+
+- brand system
+- landing page architecture
+- public section hierarchy
+- premium UI and design-token alignment
 
 ### Sprint 3
 
-- `docs/architecture/data-architecture-migration-strategy.md`
-- `docs/architecture/auth-rbac-multi-tenant-security-strategy.md`
-- `docs/development/rollout-feature-flags.md`
+- `docs/architecture/phase-1-2-detailed-implementation-package.md`
+- `docs/architecture/phase-1-2-epic-story-task-breakdown.md`
+- `docs/architecture/public-growth-app-strategy.md`
+- `docs/architecture/pricing-packaging-monetization-strategy.md`
+- `docs/development/implementation-progress.md`
+- `docs/development/sprint-3-owner-execution-checklist.md`
 
 Focus:
-- tenant anchor
-- safety tables
-- feature flags, idempotency, and audit foundations
+
+- public landing implementation
+- premium hero and widget UI
+- pricing rollout
 
 ### Sprint 4
 
-- `docs/architecture/phase-2-6-detailed-implementation-package.md`
-- `docs/architecture/prompt-5-to-11-gap-map.md`
-- `docs/development/implementation-progress.md`
+- `docs/architecture/phase-3-6-detailed-implementation-package.md`
+- `docs/architecture/phase-3-6-epic-story-task-breakdown.md`
+- `docs/architecture/analytics-metrics-revenue-bi-strategy.md`
+- `docs/architecture/crm-email-revenue-lifecycle-strategy.md`
+- `docs/architecture/implementation-phase-roadmap.md`
+- `docs/development/sprint-4-owner-execution-checklist.md`
 
 Focus:
-- dual-write mirrors
-- callback normalization
-- reconciliation-safe shadow truth
+
+- revenue contracts
+- attribution contracts
+- missed revenue and commission data foundations
 
 ### Sprint 5
 
-- `docs/development/prompt-5-api-v1-execution-package.md`
-- `docs/development/prompt-5-ui-adoption-plan.md`
-- `docs/architecture/prompt-5-to-11-gap-map.md`
+- `docs/architecture/phase-3-6-detailed-implementation-package.md`
+- `docs/architecture/phase-3-6-epic-story-task-breakdown.md`
+- `docs/architecture/analytics-metrics-revenue-bi-strategy.md`
+- `docs/development/implementation-progress.md`
+- `docs/architecture/tenant-app-strategy.md`
+- `docs/development/sprint-5-owner-execution-checklist.md`
 
 Focus:
-- additive `/api/v1/*`
-- typed public/admin clients
-- v1-centered rollout path
+
+- dashboard read models
+- widget semantics
+- reporting UI alignment
 
 ### Sprint 6
 
+- `docs/architecture/phase-3-6-detailed-implementation-package.md`
+- `docs/architecture/phase-3-6-epic-story-task-breakdown.md`
 - `docs/architecture/ai-router-matching-search-strategy.md`
-- `docs/architecture/prompt-5-to-11-gap-map.md`
-- `docs/development/implementation-progress.md`
+- `docs/architecture/analytics-metrics-revenue-bi-strategy.md`
+- `docs/development/sprint-6-search-quality-execution-package.md`
+- `docs/development/sprint-6-owner-execution-checklist.md`
 
 Focus:
-- matching quality
-- trust diagnostics
-- escalation-ready booking-path policy
+
+- multi-channel attribution
+- search-to-booking funnel quality
+- booking-context handoff into commercial reporting
 
 ### Sprint 7
 
-- `docs/architecture/pricing-packaging-monetization-strategy.md`
-- `docs/architecture/demo-script-storytelling-video-strategy.md`
-- `docs/development/prompt-5-ui-adoption-plan.md`
+- `docs/architecture/phase-3-6-detailed-implementation-package.md`
+- `docs/architecture/phase-3-6-epic-story-task-breakdown.md`
+- `docs/architecture/crm-email-revenue-lifecycle-strategy.md`
+- `docs/architecture/integration-hub-sync-architecture.md`
+- `docs/development/implementation-progress.md`
+- `docs/development/sprint-7-owner-execution-checklist.md`
 
 Focus:
-- pricing and demo conversion
-- GTM storytelling
-- public growth instrumentation
+
+- recovery workflows
+- follow-up automation
+- payment reminder and missed-call recovery operations
 
 ### Sprint 8
 
-- `docs/architecture/internal-admin-app-strategy.md`
-- `docs/development/next-sprint-protected-reauth-retry-gate-plan.md`
-- `docs/development/implementation-progress.md`
+- `docs/architecture/phase-3-6-detailed-implementation-package.md`
+- `docs/architecture/phase-3-6-epic-story-task-breakdown.md`
+- `docs/architecture/tenant-app-strategy.md`
+- `docs/architecture/analytics-metrics-revenue-bi-strategy.md`
+- `docs/architecture/implementation-phase-roadmap.md`
+- `docs/development/sprint-8-owner-execution-checklist.md`
 
 Focus:
-- admin IA split
-- reliability workspaces
-- issue-first operator lanes
+
+- tenant revenue workspace
+- revenue dashboard
+- missed revenue and commission visibility
 
 ### Sprint 9
 
-- `docs/architecture/tenant-app-strategy.md`
-- `docs/architecture/auth-rbac-multi-tenant-security-strategy.md`
-- `docs/architecture/implementation-phase-roadmap.md`
+- `docs/architecture/phase-3-6-detailed-implementation-package.md`
+- `docs/architecture/phase-3-6-epic-story-task-breakdown.md`
+- `docs/architecture/internal-admin-app-strategy.md`
+- `docs/architecture/integration-hub-sync-architecture.md`
+- `docs/development/implementation-progress.md`
+- `docs/development/sprint-9-owner-execution-checklist.md`
 
 Focus:
-- tenant-safe shell
-- role model and permission abstraction
-- scoped read-heavy tenant overview
+
+- admin commercial operations
+- reconciliation
+- attribution and commission support flows
 
 ### Sprint 10
 
-- `docs/development/next-sprint-protected-reauth-retry-gate-plan.md`
-- `docs/development/release-gate-checklist.md`
+- `docs/architecture/phase-3-6-detailed-implementation-package.md`
+- `docs/architecture/phase-3-6-epic-story-task-breakdown.md`
 - `docs/architecture/qa-testing-reliability-ai-evaluation-strategy.md`
+- `docs/development/release-gate-checklist.md`
+- `docs/development/implementation-progress.md`
+- `docs/development/sprint-10-owner-execution-checklist.md`
 
 Focus:
-- protected re-auth
-- CRM retry truth and reconciliation drill-in
-- release gate and promote-or-hold discipline
+
+- optimization loops
+- release gating for commercial reporting
+- hardening and scale readiness
+
+### Sprint 11
+
+- `docs/architecture/phase-7-8-detailed-implementation-package.md`
+- `docs/architecture/phase-7-8-epic-story-task-breakdown.md`
+- `docs/architecture/tenant-app-strategy.md`
+- `docs/architecture/implementation-phase-roadmap.md`
+- `docs/development/sprint-11-owner-execution-checklist.md`
+
+Focus:
+
+- tenant workspace IA
+- tenant shell and route boundaries
+- tenant-safe contract alignment
+
+### Sprint 12
+
+- `docs/architecture/phase-7-8-detailed-implementation-package.md`
+- `docs/architecture/phase-7-8-epic-story-task-breakdown.md`
+- `docs/architecture/tenant-app-strategy.md`
+- `docs/architecture/analytics-metrics-revenue-bi-strategy.md`
+- `docs/development/sprint-12-owner-execution-checklist.md`
+
+Focus:
+
+- tenant revenue workspace implementation
+- action queues
+- payment, recovery, and commission visibility
+
+### Sprint 13
+
+- `docs/architecture/phase-7-8-detailed-implementation-package.md`
+- `docs/architecture/phase-7-8-epic-story-task-breakdown.md`
+- `docs/architecture/internal-admin-app-strategy.md`
+- `docs/architecture/integration-hub-sync-architecture.md`
+- `docs/development/sprint-13-owner-execution-checklist.md`
+
+Focus:
+
+- internal admin commercial IA
+- tenant drill-ins
+- issue-first operational workflows
+
+### Sprint 14
+
+- `docs/architecture/phase-7-8-detailed-implementation-package.md`
+- `docs/architecture/phase-7-8-epic-story-task-breakdown.md`
+- `docs/architecture/internal-admin-app-strategy.md`
+- `docs/development/implementation-progress.md`
+- `docs/development/sprint-14-owner-execution-checklist.md`
+
+Focus:
+
+- admin support tooling
+- reconciliation polish
+- rollout readiness for tenant and admin surfaces
+
+### Sprint 15
+
+- `docs/architecture/phase-9-detailed-implementation-package.md`
+- `docs/architecture/phase-9-epic-story-task-breakdown.md`
+- `docs/architecture/qa-testing-reliability-ai-evaluation-strategy.md`
+- `docs/development/release-gate-checklist.md`
+- `docs/development/sprint-15-owner-execution-checklist.md`
+
+Focus:
+
+- telemetry and replay readiness
+- commercial regression coverage
+- cross-surface consistency validation
+
+### Sprint 16
+
+- `docs/architecture/phase-9-detailed-implementation-package.md`
+- `docs/architecture/phase-9-epic-story-task-breakdown.md`
+- `docs/architecture/qa-testing-reliability-ai-evaluation-strategy.md`
+- `docs/development/release-gate-checklist.md`
+- `docs/development/sprint-16-owner-execution-checklist.md`
+
+Focus:
+
+- release gates
+- rollback discipline
+- scale-readiness review
 
 ## Current follow-on execution note
 
-The current follow-on implementation wave remains centered on Sprint 10 hardening work:
+The immediate next implementation wave should stay centered on:
 
-1. deepen provider-side retry and reconciliation truth
-2. keep admin reliability visibility additive
-3. tighten release-gate and rollout decision framing
-
-The roadmap UI now surfaces these references directly inside sprint detail so operators can move from the visual timeline into the correct repo document without scanning the whole documentation tree.
+1. shipping the public revenue-engine narrative
+2. defining normalized revenue, attribution, missed-revenue, payment, and commission contracts
+3. wiring the first reporting widgets to truthful read models
+4. expanding recovery workflows and commercial admin support

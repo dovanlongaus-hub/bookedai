@@ -5,25 +5,25 @@ const sourceHtml = await readFile(htmlPath, 'utf8');
 
 const variants = [
   {
-    filename: 'product.html',
+    filename: 'admin.html',
     replacements: [
-      ['BookedAI.au | AI Receptionist for Australian SMEs', 'BookedAI Product | Live AI Booking Assistant'],
+      ['BookedAI | The AI Revenue Engine for Service Businesses', 'BookedAI Admin | Operations Workspace'],
       [
-        'BookedAI replies instantly, qualifies leads, and turns enquiries into booked jobs for salons, clinics, trades, kids services, and local service businesses across Australia.',
-        'Try the live BookedAI product assistant on product.bookedai.au and experience the booking-ready search flow in a dedicated product runtime.',
+        'BookedAI captures demand across website, calls, chat, email, and follow-up, then converts it into bookings, revenue, and recovery opportunities for service businesses.',
+        'Manage partner profiles, booking workflows, revenue signals, and operating data inside the BookedAI admin workspace.',
       ],
-      ['https://bookedai.au/', 'https://product.bookedai.au/'],
+      ['https://bookedai.au/', 'https://admin.bookedai.au/'],
     ],
   },
   {
-    filename: 'admin.html',
+    filename: 'product.html',
     replacements: [
-      ['BookedAI.au | AI Receptionist for Australian SMEs', 'BookedAI Admin | Operations Workspace'],
+      ['BookedAI | The AI Revenue Engine for Service Businesses', 'BookedAI Product | Live Revenue Flow'],
       [
-        'BookedAI replies instantly, qualifies leads, and turns enquiries into booked jobs for salons, clinics, trades, kids services, and local service businesses across Australia.',
-        'Manage partner profiles, booking workflows, and operating data inside the BookedAI admin workspace.',
+        'BookedAI captures demand across website, calls, chat, email, and follow-up, then converts it into bookings, revenue, and recovery opportunities for service businesses.',
+        'Explore the live BookedAI revenue flow in a native-style product surface built for fast search, best-fit results, and booking-ready action.',
       ],
-      ['https://bookedai.au/', 'https://admin.bookedai.au/'],
+      ['https://bookedai.au/', 'https://product.bookedai.au/'],
     ],
   },
 ];

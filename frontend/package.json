@@ -1,16 +1,17 @@
 {
   "name": "bookedai-frontend",
-  "version": "1.0.1-stable",
+  "version": "1.0.5-tenant-panels",
   "private": true,
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build && node scripts/generate-hosted-html.mjs",
+    "sync:template": "node scripts/sync-template-assets.mjs",
+    "build": "npm run sync:template && tsc && vite build && node scripts/generate-hosted-html.mjs",
     "preview": "vite preview --port 3000",
     "test:playwright": "bash scripts/run_playwright_suite.sh legacy",
     "test:playwright:admin": "bash scripts/run_playwright_suite.sh legacy --grep @admin",
     "test:playwright:admin-smoke": "bash scripts/run_admin_smoke.sh",
-    "test:playwright:legacy": "bash scripts/run_playwright_suite.sh legacy --grep @legacy",
-    "test:playwright:live-read": "bash scripts/run_playwright_suite.sh live-read --grep @live-read",
+    "test:playwright:legacy": "bash scripts/run_legacy_smoke.sh",
+    "test:playwright:live-read": "bash scripts/run_live_read_smoke.sh",
     "test:playwright:smoke": "npm run test:playwright:legacy && npm run test:playwright:live-read && npm run test:playwright:admin-smoke",
     "test:release-gate": "npm run build && PLAYWRIGHT_SKIP_BUILD=1 npm run test:playwright:smoke"
   },

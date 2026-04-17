@@ -21,6 +21,7 @@ from sqlalchemy import desc, func, select
 
 from config import Settings, get_settings
 from core.feature_flags import is_flag_enabled
+from core.logging import get_logger
 from db import (
     ConversationEvent,
     PartnerProfile,
@@ -33,12 +34,16 @@ from db import (
 from integrations.ai_models import SemanticSearchAdapter
 from rate_limit import InMemoryRateLimiter, TooManyRequestsError
 from repositories.base import RepositoryContext
+from repositories.idempotency_repository import IdempotencyRepository
 from repositories.tenant_repository import TenantRepository
+from repositories.webhook_repository import WebhookEventRepository
 from schemas import BookingWorkflowPayload, TawkMessage, TawkWebhookResponse
 from schemas import (
     AdminConfigResponse,
     AdminBookingDetailResponse,
     AdminBookingConfirmationRequest,
+    AdminDiscordHandoffRequest,
+    AdminDiscordHandoffResponse,
     AdminBookingsResponse,
     AdminApiInventoryResponse,
     AdminLoginRequest,
@@ -85,6 +90,9 @@ from service_layer.admin_dashboard_service import (
     build_admin_overview_payload,
     send_admin_booking_confirmation_email,
 )
+from service_layer.communication_service import CommunicationService
+from service_layer.discord_bot_service import DiscordBotService
+from service_layer.discord_service import DiscordService
 from service_layer.booking_mirror_service import dual_write_booking_assistant_session
 from service_layer.booking_mirror_service import (
     dual_write_demo_request,
@@ -112,6 +120,7 @@ from services import (
 from service_layer.upload_service import save_uploaded_file
 
 settings = get_settings()
+logger = get_logger("bookedai.api.route_handlers")
 
 DEFAULT_PARTNER_PROFILES = [
     {
@@ -128,7 +137,7 @@ DEFAULT_PARTNER_PROFILES = [
         "name": "Carelogix",
         "category": "Health AI Partner",
         "website_url": None,
-        "description": "Carelogix is presented as a healthcare-oriented AI partner on the BookedAI ecosystem wall.",
+        "description": "Carelogix is presented as a healthcare-oriented AI partner on the Bookedai.au ecosystem wall.",
         "logo_url": "https://upload.bookedai.au/images/e26b/bxVyyqW-QH4J9AplLIpe0Q.png",
         "image_url": "https://upload.bookedai.au/images/e26b/bxVyyqW-QH4J9AplLIpe0Q.png",
         "featured": 1,
@@ -138,7 +147,7 @@ DEFAULT_PARTNER_PROFILES = [
         "name": "ClearPath",
         "category": "AI Partner",
         "website_url": None,
-        "description": "ClearPath appears on the BookedAI partner wall as part of the current AI and startup partner lineup.",
+        "description": "ClearPath appears on the Bookedai.au partner wall as part of the current AI and startup partner lineup.",
         "logo_url": "https://upload.bookedai.au/images/8429/c31vEhemWqkAEE5_LWukOg.png",
         "image_url": "https://upload.bookedai.au/images/8429/c31vEhemWqkAEE5_LWukOg.png",
         "featured": 1,
@@ -148,7 +157,7 @@ DEFAULT_PARTNER_PROFILES = [
         "name": "METALMIND AI",
         "category": "AI Partner",
         "website_url": None,
-        "description": "MetalMind AI is featured on the BookedAI partner wall as an AI-focused collaborator with cross-border trade positioning.",
+        "description": "MetalMind AI is featured on the Bookedai.au partner wall as an AI-focused collaborator with cross-border trade positioning.",
         "logo_url": "https://upload.bookedai.au/images/2766/0cbr3ibd6HU7ziF5_J-tEQ.jpg",
         "image_url": "https://upload.bookedai.au/images/2766/0cbr3ibd6HU7ziF5_J-tEQ.jpg",
         "featured": 1,
@@ -178,7 +187,7 @@ DEFAULT_PARTNER_PROFILES = [
         "name": "Zoho for Startups",
         "category": "CRM and Email Partner",
         "website_url": "https://www.zoho.com/startups/",
-        "description": "Zoho supports CRM and email operations that help BookedAI manage follow-up, customer records, and lifecycle communication.",
+        "description": "Zoho supports CRM and email operations that help Bookedai.au manage follow-up, customer records, and lifecycle communication.",
         "logo_url": "/partners/zoho-startups.svg",
         "image_url": "/partners/zoho-startups.svg",
         "featured": 1,
@@ -198,7 +207,7 @@ DEFAULT_PARTNER_PROFILES = [
         "name": "OpenAI for Startups",
         "category": "AI Model Partner",
         "website_url": "https://openai.com/",
-        "description": "OpenAI supports BookedAI with ChatGPT and API model capabilities that power conversational booking intelligence and assistant orchestration.",
+        "description": "OpenAI supports Bookedai.au with ChatGPT and API model capabilities that power conversational booking intelligence and assistant orchestration.",
         "logo_url": "/partners/openai-startups.svg",
         "image_url": "/partners/openai-startups.svg",
         "featured": 1,
@@ -228,7 +237,7 @@ DEFAULT_PARTNER_PROFILES = [
         "name": "Supabase",
         "category": "Backend Platform Partner",
         "website_url": "https://supabase.com/",
-        "description": "Supabase supports authentication, data, storage, and backend service foundations used across the BookedAI platform.",
+        "description": "Supabase supports authentication, data, storage, and backend service foundations used across the Bookedai.au platform.",
         "logo_url": "/partners/supabase.svg",
         "image_url": "/partners/supabase.svg",
         "featured": 1,
@@ -238,7 +247,7 @@ DEFAULT_PARTNER_PROFILES = [
         "name": "Codex Property",
         "category": "Housing Partner",
         "website_url": "https://codexproperty.com.au",
-        "description": "Codex Property helps BookedAI extend the partner network into housing discovery and project consultation journeys.",
+        "description": "Codex Property helps Bookedai.au extend the partner network into housing discovery and project consultation journeys.",
         "logo_url": "/partners/codex-property.svg",
         "image_url": "/partners/codex-property.svg",
         "featured": 1,
@@ -276,6 +285,9 @@ async def lifespan(app: FastAPI):
     app.state.openai_service = OpenAIService(settings)
     app.state.n8n_service = N8NService(settings)
     app.state.email_service = EmailService(settings)
+    app.state.communication_service = CommunicationService(settings)
+    app.state.discord_bot_service = DiscordBotService(settings)
+    app.state.discord_service = DiscordService(settings)
     app.state.booking_assistant_service = booking_assistant_service
     app.state.pricing_service = pricing_service
     app.state.semantic_search_service = semantic_search_service
@@ -318,6 +330,147 @@ def slugify_value(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", ascii_value).strip("-") or "item"
 
 
+def _normalize_whatsapp_phone(value: str | None) -> str | None:
+    raw_value = str(value or "").strip()
+    if not raw_value:
+        return None
+    if raw_value.startswith("whatsapp:"):
+        raw_value = raw_value.removeprefix("whatsapp:")
+    digits = re.sub(r"[^\d+]", "", raw_value)
+    if not digits:
+        return None
+    if digits.startswith("+"):
+        return digits
+    return f"+{digits}"
+
+
+def _build_whatsapp_event_text(body: str | None, *, message_type: str | None = None) -> str:
+    normalized_body = str(body or "").strip()
+    if normalized_body:
+        return normalized_body
+    normalized_type = str(message_type or "").strip().lower()
+    if normalized_type:
+        return f"[WhatsApp {normalized_type} message]"
+    return "[WhatsApp message]"
+
+
+def _extract_twilio_whatsapp_payload(payload: dict[str, object]) -> tuple[TawkMessage, dict[str, object]]:
+    sender_phone = _normalize_whatsapp_phone(
+        str(payload.get("WaId") or payload.get("From") or "").strip()
+    )
+    to_phone = _normalize_whatsapp_phone(str(payload.get("To") or "").strip())
+    profile_name = str(payload.get("ProfileName") or payload.get("From") or "").strip() or None
+    provider_message_id = str(payload.get("MessageSid") or "").strip() or None
+    conversation_id = (
+        str(payload.get("ConversationSid") or "").strip()
+        or sender_phone
+        or provider_message_id
+        or f"whatsapp-{uuid4().hex[:12]}"
+    )
+    body = _build_whatsapp_event_text(str(payload.get("Body") or "").strip(), message_type="text")
+    message = TawkMessage(
+        conversation_id=conversation_id,
+        message_id=provider_message_id,
+        text=body,
+        sender_name=profile_name,
+        sender_phone=sender_phone,
+        metadata={
+            "channel": "whatsapp",
+            "provider": "twilio",
+        },
+    )
+    metadata = {
+        "channel": "whatsapp",
+        "provider": "twilio",
+        "direction": "inbound",
+        "provider_message_id": provider_message_id,
+        "sender_phone": sender_phone,
+        "to": to_phone,
+        "wa_id": str(payload.get("WaId") or "").strip() or None,
+        "profile_name": profile_name,
+        "raw_payload": payload,
+    }
+    return message, metadata
+
+
+def _iter_meta_whatsapp_payload(
+    payload: dict[str, object],
+) -> list[tuple[TawkMessage, dict[str, object]]]:
+    normalized_messages: list[tuple[TawkMessage, dict[str, object]]] = []
+    entries = payload.get("entry")
+    if not isinstance(entries, list):
+        return normalized_messages
+
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        changes = entry.get("changes")
+        if not isinstance(changes, list):
+            continue
+        for change in changes:
+            if not isinstance(change, dict):
+                continue
+            value = change.get("value")
+            if not isinstance(value, dict):
+                continue
+            contacts = value.get("contacts")
+            contact = contacts[0] if isinstance(contacts, list) and contacts else {}
+            profile = contact.get("profile") if isinstance(contact, dict) else {}
+            metadata = value.get("metadata") if isinstance(value.get("metadata"), dict) else {}
+            inbound_messages = value.get("messages")
+            if not isinstance(inbound_messages, list):
+                continue
+
+            for inbound_message in inbound_messages:
+                if not isinstance(inbound_message, dict):
+                    continue
+                message_type = str(inbound_message.get("type") or "").strip().lower() or None
+                sender_phone = _normalize_whatsapp_phone(
+                    str(inbound_message.get("from") or contact.get("wa_id") or "").strip()
+                )
+                profile_name = (
+                    str(profile.get("name") or contact.get("wa_id") or "").strip() or None
+                )
+                provider_message_id = str(inbound_message.get("id") or "").strip() or None
+                text_payload = inbound_message.get("text")
+                body = None
+                if isinstance(text_payload, dict):
+                    body = text_payload.get("body")
+                conversation_id = (
+                    sender_phone
+                    or provider_message_id
+                    or f"whatsapp-{uuid4().hex[:12]}"
+                )
+                normalized_messages.append(
+                    (
+                        TawkMessage(
+                            conversation_id=conversation_id,
+                            message_id=provider_message_id,
+                            text=_build_whatsapp_event_text(body, message_type=message_type),
+                            sender_name=profile_name,
+                            sender_phone=sender_phone,
+                            metadata={
+                                "channel": "whatsapp",
+                                "provider": "meta",
+                            },
+                        ),
+                        {
+                            "channel": "whatsapp",
+                            "provider": "meta",
+                            "direction": "inbound",
+                            "provider_message_id": provider_message_id,
+                            "sender_phone": sender_phone,
+                            "profile_name": profile_name,
+                            "phone_number_id": metadata.get("phone_number_id"),
+                            "display_phone_number": metadata.get("display_phone_number"),
+                            "message_type": message_type,
+                            "raw_payload": inbound_message,
+                        },
+                    )
+                )
+    return normalized_messages
+
+
 def get_admin_session_secret(cfg: Settings) -> str:
     return cfg.admin_api_token or cfg.admin_password
 
@@ -356,6 +509,104 @@ def verify_admin_session_token(cfg: Settings, token: str) -> str:
     if not username or expires_at <= int(datetime.now(UTC).timestamp()):
         raise ValueError("Admin session expired")
     return username
+
+
+async def _register_whatsapp_webhook_event(
+    session,
+    *,
+    provider: str,
+    external_event_id: str | None,
+    payload: dict[str, object],
+) -> tuple[bool, int | None, str | None]:
+    try:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_id = await tenant_repository.get_default_tenant_id()
+        idempotency_repository = IdempotencyRepository(
+            RepositoryContext(session=session, tenant_id=tenant_id)
+        )
+        webhook_repository = WebhookEventRepository(
+            RepositoryContext(session=session, tenant_id=tenant_id)
+        )
+
+        if external_event_id:
+            reservation = await idempotency_repository.reserve_key(
+                tenant_id=tenant_id,
+                scope=f"whatsapp_inbound:{provider}",
+                idempotency_key=external_event_id,
+                response_json={"status": "received"},
+            )
+            if not reservation.get("created"):
+                return False, None, tenant_id
+
+        event_id = await webhook_repository.record_event(
+            tenant_id=tenant_id,
+            provider=f"whatsapp_{provider}",
+            external_event_id=external_event_id,
+            payload=payload,
+        )
+        return True, event_id, tenant_id
+    except Exception as exc:
+        logger.warning(
+            "whatsapp_webhook_foundation_record_failed",
+            extra={
+                "event_type": "whatsapp_webhook_foundation_record_failed",
+                "tenant_id": None,
+                "status": 0,
+                "route": "/api/webhooks/whatsapp",
+                "request_id": "",
+                "integration_name": "whatsapp",
+                "conversation_id": "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+        return True, None, None
+
+
+async def _complete_whatsapp_webhook_event(
+    session,
+    *,
+    event_id: int | None,
+    tenant_id: str | None,
+    provider: str,
+    external_event_id: str | None,
+    response_payload: dict[str, object],
+) -> None:
+    try:
+        if event_id is not None:
+            webhook_repository = WebhookEventRepository(
+                RepositoryContext(session=session, tenant_id=tenant_id)
+            )
+            await webhook_repository.mark_processed(event_id, status="processed")
+
+        if external_event_id:
+            idempotency_repository = IdempotencyRepository(
+                RepositoryContext(session=session, tenant_id=tenant_id)
+            )
+            await idempotency_repository.record_response(
+                scope=f"whatsapp_inbound:{provider}",
+                idempotency_key=external_event_id,
+                response_json=response_payload,
+            )
+    except Exception as exc:
+        logger.warning(
+            "whatsapp_webhook_foundation_complete_failed",
+            extra={
+                "event_type": "whatsapp_webhook_foundation_complete_failed",
+                "tenant_id": tenant_id,
+                "status": 0,
+                "route": "/api/webhooks/whatsapp",
+                "request_id": "",
+                "integration_name": "whatsapp",
+                "conversation_id": "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
 
 
 def require_admin_access(
@@ -518,7 +769,7 @@ async def enforce_rate_limit(
 
 @api.get("/")
 async def api_root() -> dict[str, str]:
-    return {"message": "Welcome to BookedAI API"}
+    return {"message": "Welcome to Bookedai.au API"}
 
 
 @api.get("/health")
@@ -814,7 +1065,7 @@ async def demo_request(
                 message=TawkMessage(
                     conversation_id=result.demo_reference,
                     message_id=result.demo_reference,
-                    text=payload.notes or "BookedAI demo request",
+                    text=payload.notes or "Bookedai.au demo request",
                     sender_name=payload.customer_name,
                     sender_email=payload.customer_email.strip().lower(),
                     sender_phone=payload.customer_phone,
@@ -971,6 +1222,83 @@ async def tawk_webhook(request: Request) -> TawkWebhookResponse:
     )
 
 
+@api.get("/webhooks/whatsapp")
+async def whatsapp_webhook_verify(request: Request) -> Response:
+    mode = request.query_params.get("hub.mode")
+    verify_token = request.query_params.get("hub.verify_token")
+    challenge = request.query_params.get("hub.challenge")
+    expected_verify_token = request.app.state.settings.whatsapp_verify_token.strip()
+
+    if not mode and not verify_token and not challenge:
+        raise HTTPException(status_code=400, detail="Verification query parameters are required")
+
+    if mode != "subscribe":
+        raise HTTPException(status_code=400, detail="Unsupported WhatsApp verification mode")
+
+    if not expected_verify_token or verify_token != expected_verify_token:
+        raise HTTPException(status_code=403, detail="WhatsApp verification token mismatch")
+
+    return Response(content=str(challenge or ""), media_type="text/plain")
+
+
+@api.post("/webhooks/whatsapp")
+async def whatsapp_webhook(request: Request) -> dict[str, object]:
+    content_type = request.headers.get("content-type", "").lower()
+    normalized_messages: list[tuple[TawkMessage, dict[str, object]]] = []
+
+    if "application/json" in content_type:
+        try:
+            payload = await request.json()
+        except JSONDecodeError as exc:
+            raise HTTPException(status_code=400, detail="Webhook payload must be valid JSON") from exc
+        if not isinstance(payload, dict):
+            raise HTTPException(status_code=400, detail="WhatsApp payload must be a JSON object")
+        normalized_messages = _iter_meta_whatsapp_payload(payload)
+    else:
+        form = await request.form()
+        payload = {key: value for key, value in form.multi_items()}
+        normalized_messages = [_extract_twilio_whatsapp_payload(payload)]
+
+    if not normalized_messages:
+        return {"status": "ignored", "messages_processed": 0}
+
+    messages_processed = 0
+    async with get_session(request.app.state.session_factory) as session:
+        for message, metadata in normalized_messages:
+            external_event_id = str(
+                metadata.get("provider_message_id") or message.message_id or ""
+            ).strip() or None
+            should_process, webhook_event_id, tenant_id = await _register_whatsapp_webhook_event(
+                session,
+                provider=str(metadata.get("provider") or "unknown"),
+                external_event_id=external_event_id,
+                payload=metadata,
+            )
+            if not should_process:
+                continue
+            await store_event(
+                session,
+                source="whatsapp",
+                event_type="whatsapp_inbound",
+                message=message,
+                ai_intent="inbound_message",
+                ai_reply=None,
+                workflow_status="received",
+                metadata=metadata,
+            )
+            await _complete_whatsapp_webhook_event(
+                session,
+                event_id=webhook_event_id,
+                tenant_id=tenant_id,
+                provider=str(metadata.get("provider") or "unknown"),
+                external_event_id=external_event_id,
+                response_payload={"status": "processed", "message_id": message.message_id},
+            )
+            messages_processed += 1
+
+    return {"status": "processed", "messages_processed": messages_processed}
+
+
 @api.post("/automation/booking-callback")
 async def booking_callback(
     request: Request,
@@ -1095,33 +1423,33 @@ async def admin_bookings(
     response.headers["X-BookedAI-Admin-Bookings-View"] = (
         "enhanced" if bookings_view_enabled else "legacy"
     )
-    response.headers["X-BookedAI-Admin-Bookings-Shadow"] = str(shadow_summary["status"])
-    response.headers["X-BookedAI-Admin-Bookings-Shadow-Matched"] = str(shadow_summary["matched_count"])
-    response.headers["X-BookedAI-Admin-Bookings-Shadow-Mismatch"] = str(shadow_summary["mismatch_count"])
-    response.headers["X-BookedAI-Admin-Bookings-Shadow-Missing"] = str(shadow_summary["missing_count"])
+    response.headers["X-BookedAI-Admin-Bookings-Shadow"] = str(shadow_summary.get("status", "disabled"))
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Matched"] = str(shadow_summary.get("matched_count", 0))
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Mismatch"] = str(shadow_summary.get("mismatch_count", 0))
+    response.headers["X-BookedAI-Admin-Bookings-Shadow-Missing"] = str(shadow_summary.get("missing_count", 0))
     response.headers["X-BookedAI-Admin-Bookings-Shadow-Payment-Status-Mismatch"] = str(
-        shadow_summary["payment_status_mismatch_count"]
+        shadow_summary.get("payment_status_mismatch_count", 0)
     )
     response.headers["X-BookedAI-Admin-Bookings-Shadow-Amount-Mismatch"] = str(
-        shadow_summary["amount_mismatch_count"]
+        shadow_summary.get("amount_mismatch_count", 0)
     )
     response.headers["X-BookedAI-Admin-Bookings-Shadow-Meeting-Status-Mismatch"] = str(
-        shadow_summary["meeting_status_mismatch_count"]
+        shadow_summary.get("meeting_status_mismatch_count", 0)
     )
     response.headers["X-BookedAI-Admin-Bookings-Shadow-Workflow-Status-Mismatch"] = str(
-        shadow_summary["workflow_status_mismatch_count"]
+        shadow_summary.get("workflow_status_mismatch_count", 0)
     )
     response.headers["X-BookedAI-Admin-Bookings-Shadow-Email-Status-Mismatch"] = str(
-        shadow_summary["email_status_mismatch_count"]
+        shadow_summary.get("email_status_mismatch_count", 0)
     )
     response.headers["X-BookedAI-Admin-Bookings-Shadow-Field-Parity-Mismatch"] = str(
-        shadow_summary["field_parity_mismatch_count"]
+        shadow_summary.get("field_parity_mismatch_count", 0)
     )
     response.headers["X-BookedAI-Admin-Bookings-Shadow-Top-Drift-References"] = str(
-        shadow_summary["top_drift_references"]
+        shadow_summary.get("top_drift_references", [])
     )
     response.headers["X-BookedAI-Admin-Bookings-Shadow-Recent-Drift-Examples"] = str(
-        shadow_summary["recent_drift_examples"]
+        shadow_summary.get("recent_drift_examples", [])
     )
     return AdminBookingsResponse(**payload)
 
@@ -1171,6 +1499,30 @@ async def admin_booking_confirm_email(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return EmailSendResponse(**payload_data)
+
+
+@api.post("/admin/reliability/handoff/discord", response_model=AdminDiscordHandoffResponse)
+async def admin_reliability_handoff_discord(
+    request: Request,
+    payload: AdminDiscordHandoffRequest,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+) -> AdminDiscordHandoffResponse:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    discord_service: DiscordService = request.app.state.discord_service
+    result = await discord_service.send_handoff_summary(
+        title=payload.title,
+        body=payload.summary,
+        lane_label=payload.lane_label,
+        handoff_format=payload.handoff_format,
+    )
+    if result.status == "not_configured":
+        raise HTTPException(status_code=400, detail=result.message)
+    if result.status != "sent":
+        raise HTTPException(status_code=502, detail=result.message)
+
+    return AdminDiscordHandoffResponse(status=result.status, message=result.message)
 
 
 @api.get("/admin/apis", response_model=AdminApiInventoryResponse)
@@ -1608,6 +1960,13 @@ async def admin_config(
         ("N8N_BOOKING_WEBHOOK_URL", cfg.n8n_booking_webhook_url, "n8n", False),
         ("N8N_API_KEY", cfg.n8n_api_key, "n8n", True),
         ("N8N_WEBHOOK_BEARER_TOKEN", cfg.n8n_webhook_bearer_token, "n8n", True),
+        ("DISCORD_WEBHOOK_URL", cfg.discord_webhook_url, "Discord", True),
+        ("DISCORD_WEBHOOK_USERNAME", cfg.discord_webhook_username, "Discord", False),
+        ("DISCORD_WEBHOOK_AVATAR_URL", cfg.discord_webhook_avatar_url, "Discord", False),
+        ("DISCORD_APPLICATION_ID", cfg.discord_application_id, "Discord", False),
+        ("DISCORD_BOT_TOKEN", cfg.discord_bot_token, "Discord", True),
+        ("DISCORD_PUBLIC_KEY", cfg.discord_public_key, "Discord", True),
+        ("DISCORD_GUILD_ID", cfg.discord_guild_id, "Discord", False),
         ("STRIPE_SECRET_KEY", cfg.stripe_secret_key, "Stripe", True),
         ("STRIPE_PUBLISHABLE_KEY", cfg.stripe_publishable_key, "Stripe", True),
         ("STRIPE_CURRENCY", cfg.stripe_currency, "Stripe", False),

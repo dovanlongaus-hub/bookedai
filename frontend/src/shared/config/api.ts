@@ -1,12 +1,4 @@
 export function getApiBaseUrl() {
-  if (
-    typeof window !== 'undefined' &&
-    (window.location.hostname === 'product.bookedai.au' ||
-      window.location.hostname === 'admin.bookedai.au')
-  ) {
-    return '/api';
-  }
-
   const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/^['"]|['"]$/g, '');
   if (configuredBaseUrl) {
     try {
@@ -20,6 +12,15 @@ export function getApiBaseUrl() {
     }
   }
 
+  if (
+    typeof window !== 'undefined' &&
+    (window.location.hostname === 'product.bookedai.au' ||
+      window.location.hostname === 'admin.bookedai.au' ||
+      window.location.hostname === 'tenant.bookedai.au')
+  ) {
+    return '/api';
+  }
+
   if (typeof window === 'undefined') {
     return '/api';
   }
@@ -30,4 +31,15 @@ export function getApiBaseUrl() {
   }
 
   return '/api';
+}
+
+export function shouldUseLocalStaticPublicData() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname } = window.location;
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/^['"]|['"]$/g, '');
+
+  return (hostname === 'localhost' || hostname === '127.0.0.1') && !configuredBaseUrl;
 }

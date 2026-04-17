@@ -172,14 +172,31 @@ export interface SearchCandidatesRequest {
 }
 
 export interface MatchRecommendation {
-  candidate_id: string;
+  candidateId: string;
   reason?: string | null;
-  path_type?: V1BookingPathOption | null;
+  pathType?: V1BookingPathOption | null;
+  nextStep?: string | null;
+  warnings?: string[];
+}
+
+export interface BookingRequestContextSummary {
+  partySize?: number | null;
+  requestedDate?: string | null;
+  requestedTime?: string | null;
+  scheduleHint?: string | null;
+  intentLabel?: string | null;
+  summary?: string | null;
 }
 
 export interface SemanticAssistSummary {
   applied: boolean;
   provider?: string | null;
+  providerChain?: string[];
+  fallbackApplied?: boolean;
+  normalizedQuery?: string | null;
+  inferredLocation?: string | null;
+  inferredCategory?: string | null;
+  budgetSummary?: string | null;
   evidence: string[];
 }
 
@@ -190,6 +207,7 @@ export interface SearchCandidatesResponse {
   confidence: MatchConfidence;
   warnings: string[];
   search_strategy?: string | null;
+  booking_context?: BookingRequestContextSummary | null;
   semantic_assist?: SemanticAssistSummary | null;
 }
 
@@ -286,6 +304,23 @@ export interface SendLifecycleEmailRequest {
 export interface SendLifecycleEmailResponse {
   message_id: string;
   delivery_status: EmailDeliveryStatus;
+  provider_message_id?: string | null;
+  warnings: string[];
+}
+
+export interface SendCommunicationMessageRequest {
+  to: string;
+  body?: string | null;
+  template_key?: string | null;
+  variables?: Record<string, string>;
+  context?: Record<string, unknown> | null;
+  actor_context: ApiActorContext;
+}
+
+export interface SendCommunicationMessageResponse {
+  message_id: string;
+  delivery_status: string;
+  provider: string;
   provider_message_id?: string | null;
   warnings: string[];
 }
@@ -418,6 +453,93 @@ export interface IntegrationReconciliationDetailsResponse {
   sections: IntegrationReconciliationDetailSection[];
 }
 
+export interface IntegrationRuntimeActivityItem {
+  source: string;
+  item_id: string;
+  title: string;
+  status: string;
+  summary?: string | null;
+  occurred_at?: string | null;
+  started_at?: string | null;
+  finished_at?: string | null;
+  external_ref?: string | null;
+  attempt_count?: number;
+}
+
+export interface IntegrationRuntimeActivityResponse {
+  status: string;
+  checked_at?: string | null;
+  items: IntegrationRuntimeActivityItem[];
+}
+
+export interface IntegrationOutboxBacklogItem {
+  outbox_event_id: number;
+  event_type: string;
+  aggregate_type?: string | null;
+  aggregate_id?: string | null;
+  status: string;
+  attempt_count: number;
+  last_error?: string | null;
+  last_error_at?: string | null;
+  processed_at?: string | null;
+  available_at?: string | null;
+  idempotency_key?: string | null;
+  created_at?: string | null;
+  recommended_action: string;
+}
+
+export interface IntegrationOutboxBacklogResponse {
+  status: string;
+  checked_at?: string | null;
+  summary: {
+    failed_events: number;
+    retrying_events: number;
+    pending_events: number;
+  };
+  items: IntegrationOutboxBacklogItem[];
+}
+
+export interface DispatchOutboxRequest {
+  limit?: number;
+  actor_context?: ApiActorContext | null;
+}
+
+export interface DispatchOutboxResponse {
+  job_run_id?: number | null;
+  dispatch_status: string;
+  detail?: string | null;
+  retryable: boolean;
+  metadata: Record<string, unknown>;
+}
+
+export interface OutboxDispatchedAuditItem {
+  id: number;
+  tenant_id?: string | null;
+  actor_type?: string | null;
+  actor_id?: string | null;
+  event_type: string;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  payload: Record<string, unknown>;
+  created_at: string;
+}
+
+export interface OutboxDispatchedAuditResponse {
+  items: OutboxDispatchedAuditItem[];
+}
+
+export interface ReplayOutboxEventRequest {
+  outbox_event_id: number;
+  actor_context?: ApiActorContext | null;
+}
+
+export interface ReplayOutboxEventResponse {
+  outbox_event_id: number;
+  status: string;
+  available_at?: string | null;
+  warnings: string[];
+}
+
 export interface RetryCrmSyncRequest {
   crm_sync_record_id: number;
   actor_context?: ApiActorContext | null;
@@ -427,4 +549,81 @@ export interface RetryCrmSyncResponse {
   crm_sync_record_id: number;
   sync_status: string;
   warnings: string[];
+}
+
+export interface TenantOverviewTenantProfile {
+  id: string;
+  slug: string;
+  name: string;
+  status?: string | null;
+  timezone?: string | null;
+  locale?: string | null;
+  industry?: string | null;
+}
+
+export interface TenantOverviewShellState {
+  current_role: string;
+  read_only: boolean;
+  tenant_mode_enabled: boolean;
+  deployment_mode: string;
+}
+
+export interface TenantOverviewSummary {
+  total_leads: number;
+  active_leads: number;
+  booking_requests: number;
+  open_booking_requests: number;
+  payment_attention_count: number;
+  lifecycle_attention_count: number;
+}
+
+export interface TenantOverviewPriority {
+  title: string;
+  body: string;
+  tone: 'attention' | 'monitor' | 'healthy' | string;
+}
+
+export interface TenantOverviewRecentBooking {
+  booking_reference?: string | null;
+  service_name?: string | null;
+  requested_date?: string | null;
+  requested_time?: string | null;
+  timezone?: string | null;
+  confidence_level?: string | null;
+  status?: string | null;
+  payment_dependency_state?: string | null;
+  created_at?: string | null;
+}
+
+export interface TenantOverviewResponse {
+  tenant: TenantOverviewTenantProfile;
+  shell: TenantOverviewShellState;
+  summary: TenantOverviewSummary;
+  integration_snapshot: {
+    connected_count: number;
+    attention_count: number;
+    providers: IntegrationProviderStatusItem[];
+  };
+  recent_bookings: TenantOverviewRecentBooking[];
+  priorities: TenantOverviewPriority[];
+}
+
+export interface TenantBookingsResponse {
+  tenant: TenantOverviewTenantProfile;
+  status_summary: {
+    pending_confirmation: number;
+    active: number;
+    completed: number;
+    cancelled: number;
+    other: number;
+  };
+  items: TenantOverviewRecentBooking[];
+}
+
+export interface TenantIntegrationsResponse {
+  tenant: TenantOverviewTenantProfile;
+  providers: IntegrationProviderStatusItem[];
+  attention: IntegrationAttentionItem[];
+  reconciliation: IntegrationReconciliationDetailsResponse;
+  crm_retry_backlog: CrmRetryBacklogResponse;
 }

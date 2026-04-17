@@ -69,7 +69,7 @@ export function ServiceCatalogSection({
           <h2 className="text-xl font-bold">Live service catalog import</h2>
           <p className="mt-1 text-sm text-slate-600">
             Scan a real SME website once, extract services, prices, location, and booking
-            details, then make them available to the BookedAI agent.
+            details, then make them available to the BookedAI revenue engine.
           </p>
         </div>
         <div className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">

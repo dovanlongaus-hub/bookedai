@@ -29,7 +29,7 @@ def _build_demo_brief_email_lines(
     notes: str,
 ) -> tuple[list[str], list[str]]:
     internal_lines = [
-        "A new BookedAI demo brief was submitted from the website.",
+        "A new Bookedai.au demo brief was submitted from the website.",
         "",
         f"Reference: {brief_reference}",
         f"Name: {payload.customer_name}",
@@ -47,7 +47,7 @@ def _build_demo_brief_email_lines(
     customer_lines = [
         f"Hello {payload.customer_name},",
         "",
-        "Thanks for sharing your demo brief with BookedAI.",
+        "Thanks for sharing your demo brief with Bookedai.au.",
         "You can now choose the most suitable consultation time in the live booking calendar on our website.",
         "",
         f"Reference: {brief_reference}",
@@ -57,7 +57,7 @@ def _build_demo_brief_email_lines(
         "Notes we received:",
         notes or "No additional notes provided.",
         "",
-        "BookedAI team",
+        "Bookedai.au team",
     ]
     return internal_lines, customer_lines
 
@@ -113,13 +113,13 @@ async def submit_demo_brief(
     if email_service.smtp_configured():
         await email_service.send_email(
             to=[settings.booking_business_email],
-            subject=f"New BookedAI demo brief ({brief_reference})",
+            subject=f"New Bookedai.au demo brief ({brief_reference})",
             text="\n".join(internal_lines),
         )
         await email_service.send_email(
             to=[payload.customer_email.strip().lower()],
             cc=[settings.booking_business_email],
-            subject=f"BookedAI demo brief received ({brief_reference})",
+            subject=f"Bookedai.au demo brief received ({brief_reference})",
             text="\n".join(customer_lines),
         )
         email_status = "sent"
@@ -132,7 +132,7 @@ async def submit_demo_brief(
             message=TawkMessage(
                 conversation_id=brief_reference,
                 message_id=brief_reference,
-                text=notes or "BookedAI demo brief submitted",
+                text=notes or "Bookedai.au demo brief submitted",
                 sender_name=payload.customer_name,
                 sender_email=payload.customer_email.strip().lower(),
                 sender_phone=payload.customer_phone,
@@ -205,7 +205,7 @@ async def sync_demo_booking_from_brief(
             business_name=business_name,
             business_type=business_type,
             confirmation_message=(
-                "Your demo brief is saved. Once the Zoho booking is completed, we will sync it into BookedAI automatically."
+                "Your demo brief is saved. Once the Zoho booking is completed, we will sync it into Bookedai.au automatically."
             ),
         )
 
@@ -255,7 +255,7 @@ async def sync_demo_booking_from_brief(
                 timezone=str(existing_metadata.get("timezone") or timezone or ""),
                 meeting_event_url=str(existing_metadata.get("meeting_event_url") or summary_url or ""),
                 email_status=str(existing_metadata.get("email_status") or "pending_manual_followup"),  # type: ignore[arg-type]
-                confirmation_message="Your Zoho booking is already linked and recorded in BookedAI.",
+                confirmation_message="Your Zoho booking is already linked and recorded in Bookedai.au.",
             )
 
         email_status = "pending_manual_followup"
@@ -263,7 +263,7 @@ async def sync_demo_booking_from_brief(
             f"{preferred_date or 'Unknown date'} {preferred_time or 'Unknown time'} {timezone}".strip()
         )
         internal_lines = [
-            "A Zoho Bookings demo appointment has been linked to a saved BookedAI demo brief.",
+            "A Zoho Bookings demo appointment has been linked to a saved Bookedai.au demo brief.",
             "",
             f"Brief reference: {normalized_reference}",
             f"Zoho booking ID: {booking_id}",
@@ -282,20 +282,20 @@ async def sync_demo_booking_from_brief(
         customer_lines = [
             f"Hello {customer_name or sender_name or 'there'},",
             "",
-            "Your Zoho Bookings demo appointment has now been linked with your BookedAI demo brief.",
+            "Your Zoho Bookings demo appointment has now been linked with your Bookedai.au demo brief.",
             f"Reference: {normalized_reference}",
             f"Zoho booking ID: {booking_id}",
             f"Scheduled time: {start_label}",
         ]
         if summary_url:
             customer_lines.append(f"Booking summary: {summary_url}")
-        customer_lines.extend(["", "BookedAI team"])
+        customer_lines.extend(["", "Bookedai.au team"])
 
         if email_service.smtp_configured() and customer_email:
             await email_service.send_email(
                 to=[customer_email],
                 cc=[settings.booking_business_email],
-                subject=f"BookedAI demo booking linked ({normalized_reference})",
+                subject=f"Bookedai.au demo booking linked ({normalized_reference})",
                 text="\n".join(customer_lines),
             )
             await email_service.send_email(
@@ -351,6 +351,6 @@ async def sync_demo_booking_from_brief(
         meeting_event_url=summary_url,
         email_status=email_status,  # type: ignore[arg-type]
         confirmation_message=(
-            "Your Zoho Bookings appointment has been linked to your demo brief and recorded in BookedAI."
+            "Your Zoho Bookings appointment has been linked to your demo brief and recorded in Bookedai.au."
         ),
     )

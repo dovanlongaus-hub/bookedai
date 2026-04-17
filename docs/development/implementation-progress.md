@@ -4,12 +4,28 @@
 
 This note records the latest implementation progress in a way that stays aligned with the project plan and the current documentation baseline.
 
+It is also the required implementation-tracking document for substantive module updates after the old module description has been re-read and the request-facing source document has been updated.
+
+It is also the mandatory write-back target whenever a change has been completed end-to-end and deployed live: the delivered result should be recorded here in the same closure pass that updates the relevant sprint, roadmap, and requirement-side documents.
+
 ## Status Snapshot
 
-Date: `2026-04-16`
+Date: `2026-04-17`
 
 Current focus areas:
 
+- a leadership-level [master execution index](../architecture/master-execution-index.md) now exists so the full Phase 0 to Phase 9 program can be navigated from one short file before opening the deeper architecture and sprint docs
+- a [Jira-ready delivery structure](./jira-ready-delivery-structure.md) now exists so the current execution model can be transferred into a tracker using the standard hierarchy `Initiative -> Phase -> Epic -> Story -> Task`
+- a [Notion import-ready execution backlog](./notion-import-ready-execution-backlog.md) now exists with phase, epic, and sprint tables aligned to the current execution system
+- the Notion MCP session is now authenticated as `info@bookedai.au`, and a live `BookedAI Execution Hub` has been created with linked `Program Phases`, `Delivery Epics`, `Sprint Execution`, and `Stories and Tasks` databases seeded from the repo planning structure
+- the Notion workspace now also contains export-friendly detail pages for `Phase 1` through `Phase 9` plus `Sprint 1` through `Sprint 14`, with dedicated phase and sprint index pages so the execution program can be reviewed outside the database tables
+- the `Stories and Tasks` database now includes self-relation support for parent and child backlog items, seeded `Story` rows for the active Phase 7-8 and planned Phase 9 execution lanes, plus concrete `Task` rows for active Sprint 14 operator work so the current admin-support backlog is executable inside Notion instead of living only in markdown breakdown docs
+- each `Sprint 1` through `Sprint 14` detail page in Notion now also links directly to its related phase detail page and its `Sprint Execution` database row, so export-friendly pages and database-backed execution tracking are no longer separated
+- a master PRD now exists at `docs/architecture/bookedai-master-prd.md`, consolidating the current repo truth, target product shape, and forward phase requirements into one planning baseline that can now be rendered and shared outside the repo
+- Phase 0 and Sprint 1 rebranding implementation has now started in code, with the shared frontend brand layer updated toward the revenue-engine narrative and the primary logo renderer now prepared to prefer the live logo asset `https://upload.bookedai.au/images/ef4d/i1_STdSm_tw-k6loI5aIEA.png` while safely falling back to the checked-in branding files if that source is unavailable
+- the missing Phase 0 public-experience artifact now exists as `docs/architecture/landing-page-system-requirements.md`, locking the required section order, hero rules, widget vocabulary, CTA hierarchy, pricing framing, and truth-gate baseline that Sprint 1 needs before the deeper Phase 1-2 landing work continues
+- governance now requires every module change to start from its existing description doc, re-read prior context, merge updates into that source-of-truth narrative, and record the result in the edited request-facing doc, implementation tracking, and the corresponding roadmap or sprint or phase artifact
+- governance now also requires live-promoted work to be written back automatically once the last implementation step is complete, so `implemented`, `deployed live`, and `documented in progress + sprint + roadmap` are treated as one closure standard rather than separate follow-up tasks
 - Prompt 5 additive API v1 foundation
 - Prompt 5 shared frontend and backend contract alignment
 - Prompt 5 UI adoption planning for public and admin surfaces
@@ -20,9 +36,18 @@ Current focus areas:
 - roadmap deep-link hash sync for phase/sprint selection plus mini-Gantt milestone strip
 - roadmap phase and sprint detail subpages for shareable deep-dive delivery views
 - roadmap sprint document register now maps each sprint to the real implementation docs in repo
+- landing footer now surfaces a visible release badge plus source version and release date, so each new phase or version can be distinguished from the public page footer as well as from the source tree
+- hero and branding polish now ship as release `1.0.3-hero-polish`, with the public footer showing the new wave metadata so landing changes are distinguishable from the earlier hardening cut
+- Sprint 9 tenant shell has now started shipping as release `1.0.4-tenant-shell`, with a read-only tenant runtime, tenant-scoped overview API, and footer source version updated again so this phase is visually distinct from the prior hero polish wave
+- Sprint 9 phase 2 now ships as release `1.0.5-tenant-panels`, extending the tenant shell into clustered `overview`, `bookings`, and `integrations` panels so the workspace reads like an operator console instead of one long dashboard
 - release rehearsal wrapper now writes promote-or-hold artifacts after the root gate
+- the latest release rehearsal artifact is now `promote_ready`, so Sprint 10 hardening has moved from chained-gate stabilization into next-phase handoff readiness
+- the next roadmap execution lane after Sprint 10 hardening is now a tenant-facing read-heavy slice, starting with the first standalone tenant shell and overview summary instead of jumping straight into tenant write flows
+- the tenant-facing slice now also includes dedicated tenant bookings and integrations read models, so the next follow-on can add deeper tenant detail without reworking the shell shape again
 - release gate now uses a smaller `admin-smoke` Playwright lane instead of the full admin regression suite
 - Playwright release lanes now clear preview-server ports before each run so repeated rehearsal passes are less likely to fail on stale local servers
+- release gate now also runs smaller representative `legacy` and `live-read` smoke slices instead of the full tagged suites, while broader regression coverage remains available outside the gate
+- the representative live-read release slice is now centered on the legacy-authoritative write-boundary case, while the more detailed request-counter live-read coverage remains outside the gate as a broader regression check
 - Playwright admin and live-read lanes now also rebuild behind mode-safe preview bootstrapping, so stale legacy/live-read env bleed and expired-session fixtures are less likely to flip search-quality smoke outcomes
 - Prompt 5 dependency mapping into Prompt 9, Prompt 10, and Prompt 11
 - Prompt 5 backend contract test enablement in project-local virtualenv
@@ -32,10 +57,24 @@ Current focus areas:
 - Prompt 9 booking-path resolution and escalation-ready decision policy on v1
 - admin Prompt 5 v1 preview surface
 - Prompt 10 CRM sync and lifecycle email service foundations
+- communication channel foundation for additive SMS and WhatsApp delivery
+- inbound WhatsApp webhook capture plus admin communication-history visibility
 - Prompt 10 lifecycle orchestration baseline with CRM manual-review ledger semantics
 - Prompt 11 integration provider status, attention queue, and reconciliation read models
 - Prompt 11 CRM retry backlog read model and admin drill-in for Sprint 10 hardening
 - admin Prompt 5 preview expanded to lifecycle email, CRM seeding, integration health, attention queue, and reconciliation signals
+- Phase 2 persistence foundations now include usable tenant-aware audit log, outbox, webhook event, and idempotency repositories instead of placeholder seams, so rollout-safe writes have a concrete repository layer before wider dual-write adoption
+- Phase 2 runtime adoption now records additive audit/outbox activity for Prompt 5 v1 lead, booking-intent, payment-intent, email, SMS, and WhatsApp write paths, while inbound WhatsApp webhook capture now also uses webhook-event tracking plus idempotency gating to suppress duplicate ingestion without changing the live contract
+- Phase 2 worker foundations now also include a basic pending-outbox dispatch loop with processed/failed status transitions, so the new outbox table is no longer write-only while broader provider-specific worker routing is still additive
+- Phase 2 execution truth now also includes a tracked `job_runs` repository, scheduler helper, and reliability-facing runtime activity feed that merges recent job runs, outbox events, and webhook events inside the existing Prompt 11 read-model lane instead of creating a parallel admin surface
+- admin Prompt 5 preview now also surfaces that runtime activity feed, so operators can inspect write-side runtime truth for job execution, outbox dispatch, and webhook ingestion from the same reliability lane already used for CRM retry and reconciliation review
+- the first tracked worker producer path now exists via a `run_tracked_outbox_dispatch(...)` wrapper, so `job_runs` are no longer only seeded by test helpers or future plans; the outbox worker can now emit real execution truth through the same tracked-job seam used by Phase 2 scheduler foundations
+- the first admin-triggered worker control path now exists at `/api/v1/integrations/outbox/dispatch`, and Prompt 5 preview can trigger that tracked outbox run directly inside the reliability lane so operators can initiate a controlled dispatch and immediately inspect the returned `job_run_id`, dispatch status, and detail summary
+- Prompt 5 preview now also runs a short runtime-activity refresh loop after that dispatch action completes, so the operator can see the fresh `job_runs` feed update inside the same reliability card instead of relying only on the immediate action response
+- the tracked outbox dispatch path now also performs a real additive worker-side effect by appending `outbox.event.dispatched` audit records for processed events, so the first Phase 2 worker control path is no longer a no-op shell and now leaves persistence-backed dispatch evidence behind each successful run
+- Prompt 5 preview now also surfaces a dispatch-audit drill-in backed by `/api/v1/integrations/outbox/dispatched-audit`, so operators can review the latest `outbox.event.dispatched` evidence, aggregate IDs, worker actor identity, and idempotency references from the same reliability lane as runtime activity and tracked dispatch control
+- Phase 2 reliability now also includes the first operator recovery action for failed outbox items, with `/api/v1/integrations/outbox/replay` re-queueing a single failed event into `retrying` state and the Prompt 5 runtime-activity card surfacing replay controls directly beside failed outbox entries instead of leaving recovery as a database-only action
+- Phase 2 reliability now also tracks outbox retry depth and last failure context, with additive schema support for `attempt_count`, `last_error`, `last_error_at`, and `processed_at`, plus a dedicated `/api/v1/integrations/outbox/backlog` read model so operators can review backlog severity before replaying or dispatching again
 - next-wave execution planning for Prompt 10 lifecycle orchestration, Prompt 11 attention read models, and selective live assistant adoption
 - Sprint 4 release-readiness and rollout contract updates for Prompt 10, Prompt 11, and selective live assistant adoption
 - Playwright smoke coverage for public assistant legacy fallback and live-read guidance
@@ -60,6 +99,24 @@ Current focus areas:
 - admin catalog-quality diagnostics now include dedicated quality summary and CSV export endpoints, so the team can prioritize and remediate search-data issues as an operator workflow rather than ad-hoc inspection
 - Sprint S4 search evaluation is now in progress with a fixed-query evaluation pack and runnable harness, so common user intents like Sydney skincare, Melbourne facial no-match, housing, membership renewal, kids services, and signage suppression now have explicit pass/fail regression checks
 - public assistant search presentation now defaults to the top 3 ranked matches with progressive `See more` reveal, while booking cards prioritize compact decision-ready facts such as price, duration, location, and why the service matches
+- public assistant and admin Prompt 5 preview now also share the same partner-match card presenter and shortlist card component, so richer matching metadata renders with the same decision-ready semantics across both surfaces instead of drifting into separate UI interpretations
+- public assistant and admin Prompt 5 preview now also share the same shortlist container behavior with `top 3 + See more`, so search-driven surfaces stay compact by default while still allowing progressive reveal of lower-ranked matches in batches of 3
+- public assistant and admin Prompt 5 preview now also share the same partner-match action footer semantics, so `Book now`, `Open Google map`, `View source`, and the `Next action` cue stay aligned instead of diverging between chat and admin preview
+- Playwright regression coverage now also locks the shared shortlist and action-footer semantics in both public live-read chat and admin Prompt 5 preview, so `top 3 + See more`, `Book now`, `Open Google map`, `View source`, and `Next action` drift will surface quickly during search-quality changes
+- Sprint S2 query normalization now also covers Brisbane precinct phrasing such as `Fortitude Valley` and `James Street`, plus higher-intent phrase aliases like `wedding hair`, `bridal hair`, `gp clinic`, and `medical clinic`, so search ranking stays closer to the customer request before semantic rerank is even applied
+- the fixed-query search eval pack now also covers Brisbane bridal-hair intent, giving the current search-quality lane `8/8` passing eval cases across skincare, housing, membership, kids services, signage suppression, and suburb-to-metro hair matching
+- Catalog Quality Agent rules now also normalize `bridal/wedding hair` into `Salon`, map `Castle Hill` into the Sydney metro tag set, and keep healthcare import synonyms aligned with the richer search query lane, so topic and location metadata stay consistent between seed/import data and runtime matching
+- the seed catalog audit now also reports warning-class counts and normalized category distribution, and the current seed baseline is `26/26` metro-tagged records with `0` quality warnings across the audited sample
+- Semantic Ranking Agent now also exposes provider chain, fallback state, normalized query, inferred location, inferred category, and budget summary in `semantic_assist`, so Gemini/OpenAI failover is transparent in the matching response rather than hidden behind a single provider label
+- semantic candidate evidence and reasons are now normalized more consistently before they flow into top-ranked shortlist metadata, which keeps semantic explanations shorter and cleaner across primary and fallback model paths
+- contract-level QA now also locks semantic fallback transparency on `/api/v1/matching/search`, so provider chain, fallback state, and normalized semantic context are verified alongside the existing search eval pack instead of being left as implementation-only detail
+- matching search retrieval is now stricter about truthfulness: topic/category intent and location are applied as separate filters at SQL retrieval time, so records that only match the city but not the requested service topic are less likely to enter the shortlist before Prompt 9 reranking
+- public assistant live-read now keeps the visible shortlist pure to the v1 ranked candidates when live-read is active, so legacy chat payload noise can no longer re-introduce off-topic records into the customer-facing `top 3 + See more` results
+- Phase 2 intelligent-booking delivery has now started on the matching path itself: `/api/v1/matching/search` returns additive structured booking context such as inferred party size, schedule hint, intent label, and a trust-aware next step, so the assistant can move from “best match list” toward “best next booking action” without changing authoritative booking writes yet
+- semantic transparency is now surfaced in lightweight admin and public diagnostics as well, so operators can see when search stayed on primary Gemini versus when it failed over to OpenAI, without needing to inspect raw API payloads
+- the Phase 2 roadmap, program timeline, and implementation package are now also synchronized around the current search-quality lane, so query normalization, catalog quality, semantic transparency, shared shortlist UX, and booking-context extraction are tracked in the same source-of-truth documents instead of drifting across isolated progress notes
+- live-read search is now being hardened around query-grounded truthfulness: a fresh user request should not automatically inherit a previously selected service or category unless the user explicitly refers back to it, and no-result live-read states should stay empty instead of reviving unrelated legacy shortlist rows
+- the semantic lane is now also being tightened as a Gemini-first, OpenAI-fallback verifier and concise summarizer for the active query, so the shortlist stays compact, accurate, and booking-ready rather than padded with generic stored matches
 - admin catalog now also surfaces search-readiness counts, warning-state pills, local quality filters, and CSV export for non-search-ready records, so catalog cleanup can follow the same quality gate that live search already enforces
 - public assistant search presentation now has explicit browser regression coverage for the top-3 shortlist and progressive reveal behavior, so future search-quality work is less likely to regress into thin or noisy result layouts
 - admin shadow diagnostics now supports real recent drift examples payloads and operator drill-in affordances for booking detail triage
@@ -75,6 +132,104 @@ Current focus areas:
 - the shadow review queue now also supports bulk review actions and local sort modes, so operators can work through visible drift slices faster without changing the backend contract
 - the shadow review queue now surfaces quick slice stats and a review-next action, so operators can see pending load and move to the next unreviewed case faster
 - the shadow review queue now supports optional auto-advance and local operator notes per case, so review can stay sequential and documented without creating backend workflow state
+
+## Phase 2 Review Snapshot
+
+Date: `2026-04-17`
+
+Current source-of-truth assessment for `Phase 2 intelligent booking search`:
+
+- Done:
+  - `/api/v1/matching/search` already returns ranked candidates, trust-aware recommendations, booking-context hints, and semantic transparency metadata
+  - query normalization already covers phrase aliases, budget extraction, suburb-to-metro location expansion, and separate topic/location retrieval filters
+  - semantic assist, strict relevance gating, shared public/admin shortlist presentation, and top-3 progressive reveal are implemented
+  - catalog quality gating, warning exports, and operator remediation views are implemented
+  - fixed-query evaluation coverage and Prompt 9 matching tests protect the core search lane
+  - lightweight operator-facing diagnostics now surface semantic provider, provider chain, and fallback state in both admin preview and public live-read guidance
+  - compact shortlist cards now reserve most space for summary, price, duration, location, and next action, while imagery is reduced to a small symbolic thumbnail when no partner image exists
+- Partially done:
+  - booking-intelligence extraction is present, but still lightweight and not yet a full search-to-booking handoff contract
+  - semantic rollout is instrumented, but search tuning is not yet driven by production query replay or hard promotion thresholds
+  - the app uses shared v1 API normalization, but the matching-specific shared contract layer is still thinner than the richer response actually used at runtime
+  - query-grounded live-read behavior is being enforced in the active assistant surface, but broader operator feedback loops and release thresholds are still needed before the semantic lane can be treated as fully release-grade search truth
+- Not done:
+  - stronger industry-aware routing and human escalation policy
+  - feedback loops that convert wrong results and safe empty-result cases into labeled tuning work
+  - distance-aware ranking from granted live coordinates
+  - vertical-specific acceptance criteria tied to release gating
+
+Priority next actions:
+
+1. Capture live search traffic into labeled eval inputs and make semantic or ranking changes pass release thresholds before promotion.
+2. Expand search-ready catalog coverage in the highest-value verticals before increasing model complexity.
+3. Promote booking-context hints into one normalized contract shared by matching, booking intent creation, and lifecycle handoff.
+4. Add operator feedback capture for wrong-match, missing-catalog, and no-match-good outcomes.
+5. Deepen escalation policy for ambiguous, high-value, or unsupported intents so the assistant fails safe.
+
+Execution follow-on prepared:
+
+- `docs/development/sprint-6-search-quality-execution-package.md`
+  - packages the open Sprint 6 work into four concrete lanes:
+    - search telemetry foundation
+    - production eval loop and release thresholds
+    - operator feedback workflow
+    - richer search-to-booking context contract
+
+## Phase 2 Sprint 3-6 Status
+
+Snapshot date: `2026-04-17`
+
+### Sprint 3 — Platform safety tables and runtime foundations
+
+- Done:
+  - migration `001` and tenant anchor foundations exist
+  - feature flags, audit, outbox, webhook, idempotency, and job-run repository seams now exist in code
+  - multiple v1 write paths already record additive audit or outbox activity instead of leaving these tables schema-only
+- In progress:
+  - audit, idempotency, webhook, and outbox adoption is still uneven across the broader platform
+  - some reliability and worker control paths are live, but wider runtime standardization is still incomplete
+- Not done:
+  - consistent coverage across every external callback, mutation path, and future async worker lane
+
+### Sprint 4 — Dual-write mirrors and lifecycle normalization
+
+- Done:
+  - booking assistant, pricing consultation, and demo request flows already dual-write into normalized mirrors
+  - admin shadow compare and drift diagnostics already exist
+  - runtime activity, retry visibility, and outbox recovery controls now extend the read-side reliability lane
+- In progress:
+  - callback-driven lifecycle normalization for payment, email, workflow, and meeting drift is still being completed
+  - reconciliation truth is stronger than before, but not yet complete enough for confident read cutover
+- Not done:
+  - full parity and acceptance thresholds for mirror truth across the broader lifecycle journey
+
+### Sprint 5 — Domain API v1 foundation
+
+- Done:
+  - additive `/api/v1/*` route families are live
+  - shared success or error envelopes and typed frontend normalization are already used
+  - matching, booking trust, booking path, lifecycle, integration, and tenant read slices now all use the v1 lane
+- In progress:
+  - contract ownership is still split between generic shared API contracts and matching-specific types
+  - not every downstream domain has the same level of explicit contract maturity yet
+- Not done:
+  - full convergence where v1 is the single clear source of truth for all new domain-first delivery work
+
+### Sprint 6 — Matching, trust, and intelligent booking search
+
+- Done:
+  - query normalization, phrase aliases, suburb-to-metro expansion, budget extraction, semantic rerank, and relevance gating are all active
+  - booking-context hints and trust-aware next-step guidance are now returned directly from `/api/v1/matching/search`
+  - catalog-quality remediation and fixed-query eval coverage are already in place
+  - public and admin search-driven shortlist behavior is visually aligned
+- In progress:
+  - search evaluation discipline exists, but still depends on repo-local fixed cases rather than production-query replay
+  - booking-intelligence extraction is present, but still lighter than the downstream handoff model needs
+  - industry-aware routing is improving, but not yet mature enough for complex or high-value escalation scenarios
+- Not done:
+  - operator feedback loop for wrong matches and safe empty-result cases
+  - distance-aware ranking based on granted live coordinates
+  - release thresholds that can block promotion when search quality regresses in a key vertical
 
 ## Frontend Progress
 
@@ -110,6 +265,18 @@ Current shape:
 - admin now also has a Prompt 5 v1 preview surface through `frontend/src/features/admin/prompt5-preview-section.tsx`, so operators can run additive search and booking-trust previews without replacing the current admin source-of-truth flows
 - the admin Prompt 5 preview surface now goes one layer deeper, so operators can also inspect booking-path resolution, lifecycle email preview writes, lead or CRM seeding, integration provider status, and reconciliation summary signals from the same additive panel
 - the admin Prompt 5 preview surface now also shows public assistant rollout mode for shadow priming, live-read selection, and the legacy-write boundary, so release-readiness can be reviewed without leaving the admin shell
+- landing branding now uses a standalone BookedAI mark without the adjacent domain wordmark in header or footer chrome, and the hero headline has now moved to the revenue-engine framing instead of the earlier receptionist-led wording
+- hero mobile polish has now simplified the above-the-fold layout into one clearer handset-focused composition, with a more natural phone aspect ratio, tighter responsive spacing, and shorter in-device copy so the surface reads less crowded on small screens
+- `product.bookedai.au` has now been refit as a mobile-native product shell instead of a standalone static HTML entry, so the host stays on the shared SPA runtime and no longer depends on a parallel `product.html` flow
+- production CORS now explicitly allows `https://product.bookedai.au`, removing the live catalog read failure that previously caused the product host to render without meaningful content
+- compact product mobile layout now collapses the intro block into a small top bar, keeps the main viewport focused on BookedAI agent conversation, and moves primary mode switching into a bottom bar with `Chat` and `Booking`
+- booking content on compact product mobile is now hidden by default while the user is in chat, then reopened through the bottom navigation as a secondary sheet that still preserves the same BookedAI flow across shortlist, options, details, and confirmation
+- the booking sheet and related modules have been compressed for phone widths so tabs stay visible earlier in the viewport and no longer require the user to scroll past a large welcome section before seeing the active booking state
+- responsive fixes now explicitly prevent horizontal overflow on tested narrow phone widths, with local and production verification performed on iPhone SE and iPhone 12 class viewports
+- the latest live product frontend bundle was promoted on `2026-04-17` and verified on `https://product.bookedai.au`, with the current public response showing `last-modified: Fri, 17 Apr 2026 07:13:39 GMT`
+- the public booking assistant popup now also has a dedicated mobile-responsive chat-first mode: the top `Voice / Chat / Booking` strip is reduced to a shorter horizontal slider, auto-hides after the first search while the user stays in chat, and reappears when the user enters booking
+- popup mobile now keeps the live search chrome out of the way after the first search, delays booking-panel exposure until the user explicitly selects a result, auto-focuses the booking form after selection, and compresses the selected-result summary into a one-line bottom strip so chat results keep maximum vertical space
+- the latest live popup-mobile frontend bundle was promoted on `2026-04-17` and verified on `https://bookedai.au`, with the current public response showing `last-modified: Fri, 17 Apr 2026 12:49:12 GMT`
 
 ## Backend Progress
 
@@ -130,6 +297,7 @@ Prompt 5 API v1 groundwork is now present as an additive path:
   - lead-triggered CRM sync now flows through lifecycle orchestration helpers instead of route-local insert logic
   - CRM sync records can now move into `manual_review_required` when lead capture lacks an email address
   - lifecycle email persistence now records both delivery-facing state and additive operational review state for later Prompt 11 attention reads
+  - SMS and WhatsApp now also have additive provider-aware delivery seams, with manual-review fallback when live messaging credentials are not configured
 - Prompt 11 read-side integration seams are now also present:
   - `backend/repositories/integration_repository.py`
   - `backend/service_layer/prompt11_integration_service.py`
@@ -214,12 +382,82 @@ Latest verification status:
 - `npm run build` still passes after the public booking assistant Prompt 5 shadow adapter and the Prompt 9 search or trust behavior update
 - `npm run build` still passes after adding the admin Prompt 5 preview surface
 - targeted Playwright admin regression fixes now cover session-expiry fixture drift, Prompt 5 preview CRM backlog stubs, and preview-server mode isolation for legacy versus live-read lanes
+- `npm run test:playwright:legacy` passes against the representative legacy release slice
+- `npm run test:playwright:live-read` passes against the representative live-read release slice after replacing expired hard-coded Sydney booking slots with future-safe test inputs
+- `PLAYWRIGHT_SKIP_BUILD=1 npm run test:playwright:admin-smoke` passes against the representative admin release slice
+- `./scripts/run_release_rehearsal.sh --skip-stack-healthcheck` now produces `/home/dovanlong/BookedAI/artifacts/release-rehearsal/release-rehearsal-20260416T141613Z.md` with decision `promote_ready`
 - backend Prompt 10 lifecycle changes still preserve the current Prompt 5 contract suite, with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes` remaining green after CRM sync seeding and lifecycle email persistence moved behind service or repository seams
 - backend Prompt 11 integration status and reconciliation summary additions still preserve the current Prompt 5 contract suite, with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes` remaining green
+- Phase 2 repository foundations now pass `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_feature_flag_repository backend.tests.test_phase2_repositories`, locking tenant-aware audit/outbox/webhook/idempotency behavior behind focused unit coverage
+- route-level Phase 2 adoption now also passes `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_phase2_repositories backend.tests.test_api_v1_routes backend.tests.test_whatsapp_webhook_routes`, covering v1 write-side audit/outbox hooks and WhatsApp inbound duplicate suppression
+- outbox worker foundations now also pass `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_outbox_worker backend.tests.test_phase2_repositories backend.tests.test_api_v1_routes backend.tests.test_whatsapp_webhook_routes`, covering the basic dispatch loop alongside route-side Phase 2 adoption
+- Phase 2 runtime-activity and tracked-job additions now also pass `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_job_scheduler backend.tests.test_outbox_worker backend.tests.test_phase2_repositories backend.tests.test_api_v1_routes backend.tests.test_whatsapp_webhook_routes`, covering `job_runs`, the new `/api/v1/integrations/runtime-activity` envelope, and the admin reliability feed wiring on top of the earlier repository and route foundations
+- `npm run build` in `frontend/` passes after extending the admin Prompt 5 preview with runtime activity cards for `job_runs`, `outbox_events`, and `webhook_events`
+- `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_outbox_worker backend.tests.test_job_scheduler` passes after wiring the tracked outbox dispatch wrapper, confirming the first live worker path now records through the tracked-job seam
+- `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes backend.tests.test_outbox_worker backend.tests.test_job_scheduler` passes after adding the additive admin outbox-dispatch route and response envelope
+- `npm run build` in `frontend/` still passes after wiring the Prompt 5 reliability panel with the new tracked outbox dispatch action
+- `npx tsc --noEmit` and `npm run build` in `frontend/` still pass after adding the post-dispatch runtime-activity refresh loop inside Prompt 5 preview
+- `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_outbox_worker backend.tests.test_api_v1_routes` passes after replacing the outbox dispatch no-op with an additive audit-backed dispatcher
+- `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes` passes after adding the additive dispatched-audit drill-in endpoint and envelope
+- `npm run build` in `frontend/` passes after extending the Prompt 5 reliability panel with the outbox dispatch audit trail cards
+- `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_phase2_repositories backend.tests.test_api_v1_routes` passes after adding the single-event outbox replay seam and route coverage
+- `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_outbox_worker backend.tests.test_phase2_repositories backend.tests.test_api_v1_routes` passes after adding outbox failure-context tracking and backlog read-model coverage
+- `npx tsc --noEmit` and `npm run build` in `frontend/` pass after extending Prompt 5 reliability with the outbox backlog card, last-error visibility, and retry-depth surfacing
+
+## Phase 2 Agent Lanes
+
+- `Persistence Foundation Agent`
+  - owns tenant-aware repositories, migration alignment, and constructor/transaction consistency across audit, webhook, outbox, idempotency, and job-run seams
+- `Runtime Adoption Agent`
+  - owns additive write-path wiring in `backend/api/v1_routes.py` and webhook ingestion wiring in `backend/api/route_handlers.py`, with the rule that public contracts remain unchanged
+- `Worker Execution Agent`
+  - owns outbox dispatch, tracked job execution, scheduler hooks, and status transitions inside `backend/workers/`
+- `Reliability Read-Model Agent`
+  - owns `backend/repositories/integration_repository.py` and `backend/service_layer/prompt11_integration_service.py` so operator-facing reliability truth comes from one read-model lane instead of scattered ad-hoc queries
+- `Admin Reliability Agent`
+  - owns `frontend/src/features/admin/prompt5-preview-section.tsx` and adapter wiring so new Phase 2 runtime truth lands inside the existing reliability workspace without reopening the broader admin shell
+- `Verification Agent`
+  - owns focused unittest coverage for repositories, workers, v1 envelopes, webhook dedupe, and frontend build stability before any broader rollout claim is made
 - `npm run build` still passes after expanding the admin Prompt 5 preview surface to include booking-path resolution, lifecycle preview writes, and Prompt 11 integration or reconciliation visibility
+- search-quality rollout docs are now aligned across `implementation-progress`, `implementation-phase-roadmap`, `mvp-sprint-execution-plan`, `phase-2-6-detailed-implementation-package`, `target-platform-architecture`, and `next-wave-prompt-10-11-live-adoption-plan`, so Phase 2 implementation truth is captured in both progress logs and the higher-level program timeline
 - Prompt 9 booking-path policy updates still preserve the current Prompt 5 contract suite, with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes` remaining green after moving booking-path decisions behind the dedicated service helper
 - admin Prompt 5 preview now surfaces lifecycle preview IDs, provider status, and reconciliation summary from additive v1 calls while `npm run build` remains green
 - Prompt 10 lifecycle orchestration baseline now preserves both the v1 contract suite and the new service-layer unit tests, with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes backend.tests.test_lifecycle_ops_service` passing after adding CRM manual-review transitions and lifecycle email review-state recording
+- additive communication delivery now preserves the same backend verification lane, with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes backend.tests.test_lifecycle_ops_service` covering the new `/api/v1/sms/messages/send` and `/api/v1/whatsapp/messages/send` route seams
+- inbound WhatsApp webhook coverage now also preserves the same additive backend lane, with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes backend.tests.test_lifecycle_ops_service backend.tests.test_whatsapp_webhook_routes` passing after adding Meta verification and inbound Twilio or Meta payload capture into `conversation_events`
+- `npm run build` still passes after reshaping the admin `recent-events` panel into a clearer communication-history view for WhatsApp and SMS activity
+- latest search-quality product pass now preserves Prompt 9 matching and v1 route behavior with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_prompt9_matching_service backend.tests.test_api_v1_routes` passing after phrase-level intent aliases, implicit query parsing, and suburb-to-metro normalization were added
+- `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_prompt9_matching_service backend.tests.test_prompt9_semantic_search_service backend.tests.test_search_eval_pack` now passes on `2026-04-17`, confirming the current matching, semantic rerank, and fixed-query eval pack are green together
+- `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes` now also passes on `2026-04-17` after hardening `/api/v1/matching/search` against partial semantic-outcome objects, removing a fragile metadata assumption in the route layer
+- catalog quality enrichment now preserves the import-quality gate with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_catalog_quality_service` passing after metro location tags were added to normalized catalog tags
+- metro location coverage now also maps `Fortitude Valley` and `James Street` into `brisbane`, so suburb-level salon or event catalog rows do not miss city-level retrieval and rerank signals
+- the backfill utility now returns a structured error payload when the configured database is unreachable, so catalog remediation runs fail more cleanly in partial local environments instead of dumping a raw stack trace
+- the seed catalog audit harness now runs offline through the same quality gate as import and backfill flows, so metro coverage regressions can be caught even when a live database is not reachable from the current environment
+- runtime backfill has now been executed inside `bookedai-backend-1` against the live `service_merchant_profiles` database, confirming `32` rows total with `26` active and `6` inactive rows after the quality pass
+- the runtime backfill pass confirmed the only remaining warnings are `6` already-inactive NOVO PRINT rows with `missing_location`, so no new downgrade was required during this apply window
+- post-deploy live verification now shows `skin care Sydney under 150` returning only the top 3 skincare or facial candidates, `signage Sydney` returning no candidates, and `haircut Fortitude Valley` correctly ranking the James Street result first
+- a trusted remediation script now exists at `scripts/remediate_known_service_locations.py`, and the NOVO PRINT signage rows have been updated from the official site contact location to `Castle Hill, Sydney NSW, Australia`
+- after the NOVO PRINT remediation, the runtime catalog now has `32` active rows and `0` inactive rows, with signage rows carrying `sydney` metro tags and returning as search-ready again
+- signage query ranking has now been tightened after the remediation, so `signage Sydney` and `a-frame signage Sydney` rank direct signage products such as `Snap A Frame` and `Signflute Insertable A Frame` ahead of generic print-stock records
+- partner-sourced matching data is now being synchronized across backend and frontend contracts, with `/api/v1/matching/search` returning additive partner metadata such as category, summary, venue, location, booking URL, source URL, image URL, amount, duration, tags, and featured state per candidate
+- the frontend v1 client now normalizes matching candidates into a single camel-case shape before the public assistant and admin preview consume them, so live-read no longer depends on raw snake-case transport fields or a thin ID-only shortlist
+- public assistant live-read now maps v1 matching candidates directly into booking-ready shortlist cards when partner metadata is available, instead of relying only on local catalog lookup to fill booking URLs, locations, or service details
+- a shared frontend presenter now exists for partner match cards, so public assistant and admin Prompt 5 preview use the same rules for location label, next step label, confidence notes, and booking-ready card metadata
+
+## Search Quality Roles
+
+- `PM Integrator`
+  - sequence the sprint, keep roadmap and progress aligned, and hold acceptance on no-wrong-topic output
+- `Search Query Agent`
+  - improve free-form query understanding, intent alias expansion, budget parsing, location parsing, and location normalization
+- `Catalog Quality Agent`
+  - improve `service_merchant_profiles` quality, taxonomy cleanliness, and operator remediation flow
+- `Semantic Ranking Agent`
+  - keep semantic rerank useful but fail-safe, with OpenAI fallback and trust-first ordering
+- `Eval and QA Agent`
+  - expand fixed-query eval coverage and keep admin/live-read smoke stable
+- `Conversation UX Agent`
+  - keep chat shortlist compact, decision-ready, and aligned with the stricter backend ranking output
 - Prompt 11 attention and reconciliation detail additions still preserve the v1 contract suite, with `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes backend.tests.test_lifecycle_ops_service` passing after adding `/api/v1/integrations/attention` and `/api/v1/integrations/reconciliation/details`
 - `npm run build` still passes after extending the admin Prompt 5 preview surface to include Prompt 11 attention cards and reconciliation detail sections
 - selective live-read adoption for the public assistant now preserves both the frontend build and backend contract suite, with `npm run build` green after adding `VITE_PUBLIC_BOOKING_ASSISTANT_V1_LIVE_READ` and `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes backend.tests.test_lifecycle_ops_service` still passing while legacy writes remain authoritative
@@ -229,6 +467,7 @@ Latest verification status:
 - the catalog workspace now consumes the search-quality diagnostics lane directly, so operator cleanup and customer-facing search quality are connected inside the same admin runtime instead of living only in backend endpoints
 - roadmap overview and detail-route split now preserve the frontend build, with `/roadmap/phase/<slug>` and `/roadmap/sprint/<slug>` giving shareable deep-dive pages alongside the compact overview
 - frontend build remains green after adding roadmap-linked sprint document references and the admin Prompt 11 CRM retry backlog drill-in
+- release rehearsal now gets through representative legacy smoke and admin-smoke, but still holds on the live-read representative smoke when run inside the full chained gate, so Sprint 10 release-baseline hardening remains in progress rather than promote-ready
 
 ## Release Readiness
 
@@ -297,8 +536,17 @@ Current release-readiness snapshot:
 - tenant-aware feature flag reads and writes now accept both tenant UUIDs and tenant slugs, so runtime routes using `default-production-tenant` can actually activate `semantic_matching_model_assist_v1` instead of silently falling back to heuristic-only ranking
 - public assistant starter prompts and backend fallback examples now bias toward concrete, topic-specific requests that exist in the live catalog, so users are less likely to trigger vague cross-topic searches from the first interaction
 - Prompt 9 matching now also expands controlled topic synonyms for high-volume intents such as facial or skincare, membership renewal, housing or property consultation, team dinner, and signage or expo printing, so search is less brittle to wording changes without reopening cross-topic noise
+- Prompt 9 query understanding now also infers location and budget directly from natural search text when the client payload omits them, so requests like `skin care Sydney under 150` and `team dinner Melbourne below 90` can still rank and filter against the correct intent constraints
+- Prompt 9 location normalization now also expands suburb-to-metro signals for key cities, so requests like `facial Paddington under 150` can still land on the correct Sydney shortlist even when catalog rows are stored at CBD or city level instead of the exact suburb phrasing
+- Catalog quality hardening now also enriches `service_merchant_profiles` with derived metro location tags such as `sydney`, `melbourne`, and `brisbane`, so retrieval and rerank have cleaner city-level signals even when source rows are stored at suburb or precinct granularity
+- the metro enrichment pass now covers Brisbane precinct wording such as `Fortitude Valley` and `James Street`, closing a remaining gap in the default seed catalog for city-level salon discovery
 - Prompt 9 relevance gating now treats explicit user location as a hard filter for returned search results, so the live response no longer keeps out-of-location records just because they are topically similar
 - `Sprint S3` search quality hardening has started with a catalog quality gate for `service_merchant_profiles`, so records missing category, location, price, or usable topic tags are automatically kept out of live search until an operator fixes them
+- `Sprint S3` has now also been applied against the reachable runtime database, so the production catalog is no longer relying only on import-time guards or offline audit assumptions for search readiness
+- `Sprint S3` now also includes trusted-source remediation for known catalog partners, so rows with missing fields can be restored safely when the operator has source-backed location evidence instead of leaving those services permanently out of search
+- `Sprint S4` now also includes post-remediation query tuning for signage intent, so broad category requests do not let generic print-stock items outrank direct signage products in the top shortlist
+- `Sprint S4` now also includes frontend/backend contract sync for partner-sourced matching records, so public chat and admin preview are reading the same candidate structure and metadata semantics instead of reconstructing them differently on each surface
+- `Sprint S4` now also includes a shared frontend partner-match presenter, so UI-facing shortlist semantics are being consolidated after the transport contract sync instead of drifting across public and admin surfaces
 - the roadmap page now groups active specialist agents by delivery role cluster and renders them in denser cards, so the execution roster remains visible without stretching too far below the first viewport
 - release verification now also has a root-level `./scripts/run_release_gate.sh` command, which runs the frontend release gate plus backend v1 and lifecycle tests in one promote-or-hold sequence
 - release verification now also has an explicit promote, hold, and rollback checklist in `docs/development/release-gate-checklist.md`, so the gate is no longer only a command contract

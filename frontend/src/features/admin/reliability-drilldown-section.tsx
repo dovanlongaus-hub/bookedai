@@ -12,6 +12,9 @@ type ReliabilityDrilldownSectionProps = {
   configItemsCount: number;
   apiRoutesCount: number;
   selectedServiceId?: string | null;
+  apiBaseUrl: string;
+  sessionToken: string;
+  discordConfigured: boolean;
   onPanelNavigate: (panel: Extract<AdminWorkspacePanelId, 'prompt5-preview' | 'live-configuration' | 'api-inventory'>) => void;
 };
 
@@ -86,6 +89,9 @@ export function ReliabilityDrilldownSection({
   configItemsCount,
   apiRoutesCount,
   selectedServiceId,
+  apiBaseUrl,
+  sessionToken,
+  discordConfigured,
   onPanelNavigate,
 }: ReliabilityDrilldownSectionProps) {
   const mode = buildMode(activePanel, configItemsCount, apiRoutesCount, selectedServiceId);
@@ -183,6 +189,9 @@ export function ReliabilityDrilldownSection({
           primaryActionLabel={mode.primaryActionLabel}
           checklist={mode.checklist}
           storageKey={storageKey}
+          apiBaseUrl={apiBaseUrl}
+          sessionToken={sessionToken}
+          discordConfigured={discordConfigured}
         />
       </Suspense>
     </section>

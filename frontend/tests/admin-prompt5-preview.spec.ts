@@ -137,6 +137,17 @@ async function stubAdminApis(page: Parameters<typeof test>[0]['page']) {
     });
   });
 
+  await page.route('**/api/admin/reliability/handoff/discord', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'sent',
+        message: 'Discord handoff was posted successfully.',
+      }),
+    });
+  });
+
   await page.route('**/api/admin/config', async (route) => {
     await route.fulfill({
       status: 200,
@@ -160,6 +171,12 @@ async function stubAdminApis(page: Parameters<typeof test>[0]['page']) {
             key: 'STRIPE_WEBHOOK_SECRET',
             value: '',
             category: 'Payments',
+            masked: true,
+          },
+          {
+            key: 'DISCORD_WEBHOOK_URL',
+            value: 'disc***hook',
+            category: 'Discord',
             masked: true,
           },
         ],
@@ -289,11 +306,15 @@ async function stubAdminPreviewV1(page: Parameters<typeof test>[0]['page']) {
           request_id: 'admin-match',
           candidates: [
             {
-              candidateId: 'service-admin',
-              providerName: 'Preview Studio',
-              serviceName: 'Preview Haircut',
-              sourceType: 'service_catalog',
-              distanceKm: null,
+              candidate_id: 'service-admin',
+              provider_name: 'Preview Studio',
+              service_name: 'Preview Haircut',
+              source_type: 'service_catalog',
+              category: 'Hair',
+              location: 'Sydney NSW 2000',
+              booking_url: 'https://book.example.com/preview-haircut',
+              source_url: 'https://example.com/preview-haircut',
+              distance_km: null,
               explanation: 'Admin preview candidate.',
             },
           ],
@@ -304,6 +325,18 @@ async function stubAdminPreviewV1(page: Parameters<typeof test>[0]['page']) {
             gating_state: 'high',
           },
           warnings: [],
+          search_strategy: 'catalog_term_retrieval_with_prompt9_rerank_plus_semantic_model_assist_with_relevance_gate',
+          semantic_assist: {
+            applied: true,
+            provider: 'openai',
+            provider_chain: ['gemini', 'openai'],
+            fallback_applied: true,
+            normalized_query: 'haircut',
+            inferred_location: 'Sydney',
+            inferred_category: 'Hair',
+            budget_summary: null,
+            evidence: ['semantic_model_rerank'],
+          },
         },
         meta: { version: 'v1', tenant_id: 'tenant-test' },
       }),
@@ -626,6 +659,19 @@ test('admin prompt 5 preview shows rollout mode and runs additive preview flow @
   await page.getByRole('button', { name: 'Run preview' }).click();
 
   await expect(page.getByText('Preview Haircut').first()).toBeVisible();
+  await expect(page.getByText('Next action').first()).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Book now' }).first()).toHaveAttribute(
+    'href',
+    'https://book.example.com/preview-haircut',
+  );
+  await expect(page.getByRole('link', { name: 'View source' }).first()).toHaveAttribute(
+    'href',
+    'https://example.com/preview-haircut',
+  );
+  await expect(page.getByText('Ready to book').first()).toBeVisible();
+  await expect(page.getByText('Primary openai')).toBeVisible();
+  await expect(page.getByText('OpenAI fallback')).toBeVisible();
+  await expect(page.getByText('Provider chain: gemini -> openai')).toBeVisible();
   await expect(page.getByText('CRM retry lane')).toBeVisible();
   await expect(page.getByText('Queued CRM retries are in progress; not manual review yet.')).toBeVisible();
   await expect(
@@ -969,4 +1015,19 @@ test('reliability handoff packaging supports richer export formats without backe
   await expect(drilldownSection.locator('textarea').nth(1)).toHaveValue(
     /Suggested use: release hold, incident journal, or escalation note\./,
   );
+
+  await drilldownSection.getByRole('button', { name: 'Discord format' }).click();
+  await expect(
+    drilldownSection.getByRole('button', { name: 'Discord format' }),
+  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(drilldownSection.locator('textarea').nth(1)).toHaveValue(
+    /Team update: Contract review/,
+  );
+  await expect(
+    drilldownSection.getByText('Discord webhook: configured and ready to post.'),
+  ).toBeVisible();
+  await drilldownSection.getByRole('button', { name: 'Send to Discord' }).click();
+  await expect(
+    drilldownSection.getByText('Discord handoff was posted successfully.'),
+  ).toBeVisible();
 });

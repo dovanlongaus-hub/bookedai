@@ -6,6 +6,7 @@ from schemas import (
     AdminBookingDetailResponse,
     AdminBookingsResponse,
     AdminConfigResponse,
+    AdminDiscordHandoffResponse,
     AdminOverviewResponse,
     AdminServiceCatalogQualityResponse,
     AdminServiceMerchantListResponse,
@@ -46,6 +47,12 @@ router.add_api_route(
     handlers.admin_booking_confirm_email,
     methods=["POST"],
     response_model=EmailSendResponse,
+)
+router.add_api_route(
+    "/admin/reliability/handoff/discord",
+    handlers.admin_reliability_handoff_discord,
+    methods=["POST"],
+    response_model=AdminDiscordHandoffResponse,
 )
 router.add_api_route(
     "/admin/apis",

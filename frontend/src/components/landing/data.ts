@@ -117,6 +117,7 @@ export type TeamMember = {
   bio: string;
   imageSrc: string;
   imageAlt: string;
+  badges?: string[];
 };
 
 export type VideoDemoContent = {
@@ -300,7 +301,7 @@ export const demoCtaHref =
   '/?demo=open';
 
 export const roadmapHref = '/roadmap';
-export const productHref = 'https://product.bookedai.au';
+export const productHref = demoCtaHref;
 
 export const videoDemoHref = '/video-demo.html';
 
@@ -309,12 +310,21 @@ export const privacyHref = '/privacy-policy.html';
 export const termsHref = '/terms.html';
 
 export const brandName = 'BookedAI';
-export const brandDomainLabel = 'BookedAI.au';
-export const brandDescriptor = 'AI Receptionist & Booking for SMEs';
+export const brandDomainLabel = 'bookedai.au';
+export const brandDescriptor = 'AI Revenue Engine for Service Businesses';
 export const brandPositioning =
-  'AI receptionist for service SMEs that turns conversations into bookings.';
+  'Multi-channel AI revenue engine that captures demand, converts it into bookings, and helps recover missed revenue.';
 export const brandHomeUrl = 'https://bookedai.au/';
-export const brandLogoPath = '/branding/bookedai-logo.png';
+export const brandPreferredLogoPath = 'https://upload.bookedai.au/images/ef4d/i1_STdSm_tw-k6loI5aIEA.png';
+export const brandLogoPath = '/branding/bookedai-logo-cropped.png';
+export const brandLogoOnDarkPath = '/branding/bookedai-logo-cropped.png';
+export const brandLogoSquarePath = '/branding/bookedai-logo-square.png';
+export const brandFaviconPath = '/favicon.png';
+export const brandContactEmail = 'info@bookedai.au';
+export const brandWhatsAppHref =
+  'https://wa.me/14155238886?text=Hi%20BookedAI%2C%20I%20want%20to%20see%20how%20the%20AI%20Revenue%20Engine%20works.';
+export const brandLinkedInHref = 'https://www.linkedin.com/company/booked-ai-aus/';
+export const brandXHref = 'https://twitter.com/BookedAIAU';
 
 export const navItems: NavItem[] = [
   'Problem',
@@ -326,21 +336,21 @@ export const navItems: NavItem[] = [
 ];
 
 export const heroContent: HeroContent = {
-  eyebrow: 'AI Receptionist & Booking for SMEs',
-  title: 'Turn enquiries into booked jobs',
-  bodyLead: 'BookedAI responds fast, qualifies intent, and keeps the next step clear.',
+  eyebrow: 'The AI Revenue Engine for Service Businesses',
+  title: 'Capture Demand. Convert It Into Revenue.',
+  bodyLead: 'BookedAI captures inbound demand across website, calls, chat, email, and follow-up, then moves customers into the right booking path without adding admin overhead.',
   bodyRest:
-    'Built for service SMEs that want a premium front-desk experience, less admin, and more bookings across chat, calls, calendar, and workflows.',
-  note: 'For SME operators: fewer missed leads and less admin. For investors: a repeatable conversion wedge with clear expansion potential.',
+    'Built for service operators that want one premium system for qualification, booking, payment readiness, and recovery workflows.',
+  note: 'More bookings generated, less manual follow-up, and clearer revenue visibility from first enquiry to confirmed outcome.',
   primaryCta: 'Start Free Trial',
-  secondaryCta: 'View Product',
+  secondaryCta: 'View Demo',
   primaryHref: primaryCtaHref,
   secondaryHref: productHref,
 };
 
 export const demoContent: DemoContent = {
-  title: 'BookedAI search preview',
-  subtitle: 'Live search, ranking, and booking handoff in a mobile-first UI',
+  title: 'BookedAI revenue-engine preview',
+  subtitle: 'Live capture, ranking, and booking handoff in a mobile-first UI',
   status: 'Online',
   query: 'Swimming lessons for a 7-year-old near Caringbah',
   messages: [
@@ -407,8 +417,8 @@ export const proofContent: ProofContent = {
   section: {
     kicker: 'Solution',
     kickerClassName: 'text-sky-400',
-    title: 'A simple conversion layer for service SMEs',
-    body: 'BookedAI gives SMEs one clear system to respond faster, qualify better, and move real demand into booked revenue.',
+    title: 'A revenue engine built for service operators',
+    body: 'BookedAI gives service businesses one clear system to capture demand faster, qualify it better, and move real enquiries into booked revenue.',
   },
 };
 
@@ -439,7 +449,7 @@ export const showcaseContent: SectionContent = {
   kicker: 'Product Screens',
   kickerClassName: 'text-fuchsia-300',
   title: 'A closer look at the BookedAI experience',
-  body: 'Real interface moments from the live demo help buyers picture how BookedAI can guide enquiries, offer appointment options, and confirm bookings without extra admin.',
+  body: 'Real interface moments from the live demo help buyers picture how BookedAI captures enquiries, offers decision-ready options, and confirms the next commercial step without extra admin.',
 };
 
 export const showcaseImages: ShowcaseImage[] = [
@@ -481,15 +491,15 @@ export const problemCards: InfoCard[] = [
 export const solutionContent: SectionContent = {
   kicker: 'Solution',
   kickerClassName: 'text-emerald-400',
-  title: 'One AI receptionist layer from first message to booked outcome',
-  body: 'Answer, qualify, recommend, book, and hand off in one visible flow.',
+  title: 'One revenue flow from first message to booked outcome',
+  body: 'Capture, qualify, recommend, book, and hand off in one visible commercial flow.',
 };
 
 export const implementationContent: SectionContent = {
   kicker: 'Implementation',
   kickerClassName: 'text-cyan-500',
   title: 'Start standalone now, extend into widget, plugin, or mobile later',
-  body: 'Launch BookedAI as a hosted booking surface first, then expand into an embedded receptionist, plugin-integrated workflow, or future mobile experience without changing the core conversion engine.',
+  body: 'Launch BookedAI as a hosted conversion surface first, then expand into an embedded assistant, plugin-integrated workflow, or future mobile experience without changing the core revenue engine.',
 };
 
 export const solutionCards: InfoCard[] = [
@@ -523,8 +533,8 @@ export const metrics: Metric[] = [
 export const pricingContent: PricingContent = {
   kicker: 'Pricing',
   kickerClassName: 'text-indigo-400',
-  title: 'Simple monthly pricing for SMEs',
-  body: 'Start free for 30 days, then move to a clear monthly plan with an easy setup path.',
+  title: 'Simple entry pricing with a clear rollout path',
+  body: 'Start with a low-friction trial and onboarding path, then move into the commercial model that matches your rollout stage.',
   planLabel: 'Starter plan',
   planPrice: 'A$79/mo',
   planCaption: 'after your 30-day free subscription period',
@@ -568,7 +578,7 @@ export const trustItems: TrustItem[] = [
     name: 'Priya',
     business: 'Operations lead, mobile trades team',
     quote:
-      'What mattered to us was speed and consistency. The workflow was clearer than a generic chatbot and closer to how a real receptionist would qualify jobs.',
+      'What mattered to us was speed and consistency. The workflow was clearer than a generic AI widget and closer to how a real commercial front desk would qualify jobs.',
   },
 ];
 
@@ -586,7 +596,7 @@ export const faqItems: FAQItem[] = [
   {
     question: 'Do I need to change my calendar or tools?',
     answer:
-      'No full stack change is required. BookedAI is positioned to work with your existing calendar and workflow setup, including follow-up automations.',
+      'No full stack change is required. BookedAI is designed to work with your existing calendar and workflow setup, including follow-up automations.',
   },
 ];
 
@@ -594,15 +604,24 @@ export const teamSectionContent: SectionContent = {
   kicker: 'Team Members',
   kickerClassName: 'text-indigo-400',
   title: 'Built by operators, engineers, and product-minded problem solvers',
-  body: 'BookedAI brings together technical depth, operational quality experience, and practical business thinking to build AI tools that work in the real world.',
+  body: 'BookedAI brings together technical depth, operational quality experience, and practical business thinking to build AI systems that work in the real world.',
 };
 
 export const teamMembers: TeamMember[] = [
+  {
+    name: 'Do Van Long',
+    role: 'CEO',
+    imageSrc: 'https://upload.bookedai.au/images/e40f/k262gljWOBBiDXdMf6hfCA.png',
+    imageAlt: 'Portrait of Do Van Long',
+    badges: ['CEO', 'AI Builder', 'Former CTO', 'Tech Founder'],
+    bio: 'Do Van Long is the CEO of BookedAI, a former CTO, and a tech founder with 26 years of experience building digital products, platforms, and technology ventures. He focuses on turning emerging technology into practical products that can scale in real operating environments.',
+  },
   {
     name: 'Angus Hoy',
     role: 'CTO',
     imageSrc: 'https://upload.bookedai.au/images/da31/Wlht-j7K3zXyML3hYqnn8A.png',
     imageAlt: 'Portrait of Angus Hoy',
+    badges: ['CTO', 'Systems Engineering', 'Backend & AI'],
     bio: 'Studied computer science and mathematics at the University of Melbourne. Worked as a freelancer for a few years, then in embedded systems developing motor drive PCBs. Currently works at a fraud detection scale-up doing backend Python development.',
   },
   {
@@ -610,6 +629,7 @@ export const teamMembers: TeamMember[] = [
     role: 'COO',
     imageSrc: 'https://upload.bookedai.au/images/3cd9/gOd4m5mT7aQilr_RySfoTQ.png',
     imageAlt: 'Portrait of Yogesh Kumar',
+    badges: ['COO', 'Operations', 'IT & Markets'],
     bio: 'Master of IT from Queensland University of Technology with 6 years of experience in financial markets. Currently works as an IT Engineer at ASX and is also an AI enthusiast.',
   },
   {
@@ -617,14 +637,8 @@ export const teamMembers: TeamMember[] = [
     role: 'CMO',
     imageSrc: 'https://upload.bookedai.au/images/5a63/bISqviktp9_R_jFQwcTBew.jpg',
     imageAlt: 'Portrait of Tommy Dam',
+    badges: ['CMO', 'Quality Systems', 'Service Growth'],
     bio: 'Bachelor of Science with a major in Chemistry. Worked in manufacturing of medical devices as a QA chemist, quality assurance for laboratory services in clinical trials, and quality assurance for NDIS and aged care service providers. Currently works in the NDIS and aged care industry.',
-  },
-  {
-    name: 'Do Van Long',
-    role: 'CEO',
-    imageSrc: 'https://upload.bookedai.au/images/e40f/k262gljWOBBiDXdMf6hfCA.png',
-    imageAlt: 'Portrait of Do Van Long',
-    bio: 'Do Van Long is a builder at heart: founder, technologist, and innovator in AI, blockchain, and digital business. He is passionate about turning emerging technology into real-world products that scale across markets.',
   },
 ];
 
@@ -1286,14 +1300,16 @@ export const roadmapContent: RoadmapContent = {
       name: 'Phase 2',
       timing: 'Booking Intelligence',
       windowLabel: 'Sprint S3-S6',
-      focusLabel: 'Matching, trust, escalation, and normalized booking payloads',
-      milestoneLabel: 'Prompt 9 search quality and trust-first booking-path logic are underway',
-      summary: 'Deepen qualification, routing, and trust so conversations become cleaner booking outcomes.',
+      focusLabel: 'Search quality, trust-first routing, booking context, and safer escalation',
+      milestoneLabel: 'Prompt 9 search quality is live, but feedback loops and industry-aware routing still need work',
+      summary: 'Deepen qualification, ranking, and trust so conversations become cleaner and safer booking outcomes.',
       tasks: [
         { title: 'Expand structured lead qualification fields per service type', status: 'In Progress' },
         { title: 'Add richer search result ranking and trust diagnostics', status: 'In Progress' },
+        { title: 'Keep non-search-ready catalog rows out of live search and expose operator remediation', status: 'Completed' },
+        { title: 'Protect core search intents with a fixed-query eval pack and regression coverage', status: 'In Progress' },
         { title: 'Improve human escalation paths for high-value enquiries', status: 'Planned' },
-        { title: 'Refine prompt routing by industry and booking intent', status: 'Planned' },
+        { title: 'Refine prompt routing by industry and booking intent', status: 'In Progress' },
         { title: 'Normalize downstream booking payloads before workflow handoff', status: 'In Progress' },
         { title: 'Introduce review feedback loops for quality tuning', status: 'Planned' },
       ],
@@ -1435,13 +1451,13 @@ export const roadmapContent: RoadmapContent = {
       timing: 'Platform safety tables',
       status: 'In Progress',
       windowLabel: 'M1 • Sprint 3',
-      focusLabel: 'Tenant anchor, feature flags, audit, webhook, and outbox foundation',
-      milestoneLabel: 'Migration 001 and tenant-safe platform foundations are already present',
-      summary: 'This sprint lays down platform-safety tables and tenant foundations that later dual-write and integration work depend on.',
+      focusLabel: 'Tenant-safe runtime foundations, auditability, and worker-safe write seams',
+      milestoneLabel: 'Schema foundations are live and runtime adoption has started, but coverage is still uneven',
+      summary: 'This sprint lays down platform-safety tables and starts moving them into real write and reliability paths so later domain work can stay rollout-safe.',
       evidence:
-        'Migration `001_platform_safety_and_tenant_anchor.sql`, tenant repository, feature-flag repository, and `backend/core/feature_flags.py` are already live in repo.',
+        'Migration `001`, tenant repository, feature-flag repository, audit or outbox repositories, webhook or idempotency seams, and first runtime adoption in v1 write or reliability paths are already live.',
       mainGap:
-        'Wire audit, idempotency, webhook, and outbox foundations into more runtime paths instead of stopping at schema readiness.',
+        'Standardize audit, idempotency, webhook, and outbox adoption across more callbacks, mutation paths, and worker producers instead of leaving coverage uneven.',
       nextPrompt: 'Prompt 4, Prompt 12, Prompt 13',
       ownerGroup: 'Backend execution',
       agents: ['PM Integrator', 'Worker A'],
@@ -1449,6 +1465,9 @@ export const roadmapContent: RoadmapContent = {
         { title: 'Apply and validate migration 001 safely', status: 'Completed' },
         { title: 'Expose default tenant anchor and feature-flag repository access', status: 'Completed' },
         { title: 'Integrate audit, idempotency, webhook, and outbox hooks into more runtime paths', status: 'In Progress' },
+      ],
+      riskNotes: [
+        'Platform-safety tables exist, but uneven runtime adoption can still create blind spots when new write paths are added quickly.',
       ],
       references: [
         {
@@ -1469,13 +1488,13 @@ export const roadmapContent: RoadmapContent = {
       timing: 'Dual-write mirrors',
       status: 'In Progress',
       windowLabel: 'M1 • Sprint 4',
-      focusLabel: 'Normalized lead, booking, payment, and lifecycle mirrors beside legacy flows',
-      milestoneLabel: 'Booking assistant, pricing, and demo already dual-write into mirror truth',
-      summary: 'Normalized mirrors are being written in parallel so future read-side cutovers can happen safely against comparable truth.',
+      focusLabel: 'Mirror truth, drift visibility, and reconciliation-safe lifecycle normalization',
+      milestoneLabel: 'Dual-write and drift visibility are real, but parity is not complete enough for read cutover',
+      summary: 'Normalized mirrors are being written in parallel and surfaced through shadow diagnostics so future read-side cutovers can happen against comparable truth instead of assumptions.',
       evidence:
-        '`backend/service_layer/booking_mirror_service.py`, dual-write coverage for booking/pricing/demo, and admin shadow compare support are already present.',
+        '`backend/service_layer/booking_mirror_service.py`, dual-write coverage for booking or pricing or demo, admin shadow compare support, runtime activity, retry, replay, and backlog visibility are already present.',
       mainGap:
-        'Finish callback-driven mirror updates and reconciliation coverage for payment, email, workflow, and meeting lifecycle state.',
+        'Finish callback-driven mirror updates and reconciliation coverage for payment, email, workflow, and meeting lifecycle state, then prove stronger parity.',
       nextPrompt: 'Prompt 3, Prompt 4, Prompt 10, Prompt 11',
       ownerGroup: 'Backend execution',
       agents: ['Member A', 'Member B', 'PM Integrator'],
@@ -1483,6 +1502,9 @@ export const roadmapContent: RoadmapContent = {
         { title: 'Dual-write booking assistant, pricing, and demo flows', status: 'Completed' },
         { title: 'Support reconciliation and shadow compare for normalized mirrors', status: 'Completed' },
         { title: 'Complete callback-driven lifecycle mirror normalization', status: 'In Progress' },
+      ],
+      riskNotes: [
+        'Mirror depth is ahead of parity proof, so cutover decisions would still be premature without stronger lifecycle acceptance thresholds.',
       ],
       references: [
         {
@@ -1499,15 +1521,15 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Sprint 5',
-      phaseName: 'Phase 3',
+      phaseName: 'Phase 2',
       timing: 'Domain API v1 foundation',
       status: 'Completed',
       windowLabel: 'M2 • Sprint 5',
-      focusLabel: 'Additive `/api/v1/*`, shared contracts, and initial UI adoption',
-      milestoneLabel: 'Prompt 5 v1 routes and typed clients are already live in repo',
-      summary: 'Although the original plan treated this sprint as future work, the repo now already has additive v1 routes, shared contracts, and selective public/admin adoption.',
+      focusLabel: 'Additive `/api/v1/*`, shared contracts, and domain-first delivery seams',
+      milestoneLabel: 'Prompt 5 v1 routes and typed clients are already live and now act as the base for Phase 2 search or trust work',
+      summary: 'The repo already has additive v1 routes, shared contracts, and selective public or admin adoption, so Sprint 5 is effectively complete enough to serve as the contract base for later matching work.',
       evidence:
-        '`backend/api/v1_routes.py`, shared contracts, typed client, admin preview wiring, and selective live-read assistant behavior are already implemented.',
+        '`backend/api/v1_routes.py`, shared contracts, typed client normalization, admin preview wiring, and selective live-read assistant behavior are already implemented.',
       mainGap:
         'Round out remaining domain shells, tighten contract coverage, and keep v1 as the center of future logic rather than a side path.',
       nextPrompt: 'Prompt 9, Prompt 10',
@@ -1517,6 +1539,9 @@ export const roadmapContent: RoadmapContent = {
         { title: 'Ship additive `/api/v1/*` endpoint families', status: 'Completed' },
         { title: 'Provide shared envelopes and typed public/admin client support', status: 'Completed' },
         { title: 'Expand contract coverage and remaining domain shells', status: 'In Progress' },
+      ],
+      riskNotes: [
+        'The v1 path is real, but overlapping contract layers can still create drift if new matching or lifecycle payloads bypass the richer shared API layer.',
       ],
       references: [
         {
@@ -1537,26 +1562,38 @@ export const roadmapContent: RoadmapContent = {
       timing: 'Matching and trust',
       status: 'In Progress',
       windowLabel: 'M2 • Sprint 6',
-      focusLabel: 'Trust-first matching, booking-path policy, and escalation-ready routing',
-      milestoneLabel: 'Search rerank, trust signals, and booking-path logic are already in motion',
-      summary: 'This sprint moves the assistant away from generic chat and toward booking-safe trust and routing behavior.',
+      focusLabel: 'Search quality maturity, booking-context extraction, and trust-first routing',
+      milestoneLabel: 'Search rerank and relevance gating are live; eval-driven tuning and escalation policy are next',
+      summary: 'This sprint moves the assistant away from generic chat and toward measurable, booking-safe search and routing behavior.',
       evidence:
-        'Admin shadow diagnostics, drift taxonomy, semantic rerank, strict relevance gating, booking-trust helpers, and booking-path policy now exist.',
+        'Semantic rerank, strict relevance gating, booking-context extraction, shared shortlist UI, catalog-quality operator tooling, and fixed-query eval coverage now exist.',
       mainGap:
-        'Complete deeper AI routing, stronger industry-aware escalation policy, and more explicit human handoff logic.',
+        'Complete production-query eval loops, stronger industry-aware escalation policy, richer downstream booking contracts, and explicit human handoff logic.',
       nextPrompt: 'Prompt 9, Prompt 14',
       ownerGroup: 'Platform and intelligence',
       agents: ['Member B', 'Member C', 'PM Integrator'],
       tasks: [
         { title: 'Improve search ranking, semantic assist, and trust diagnostics', status: 'In Progress' },
+        { title: 'Normalize booking-context hints inside matching responses', status: 'Completed' },
+        { title: 'Expose catalog-quality remediation to keep live search clean', status: 'Completed' },
+        { title: 'Add search evaluation discipline and release-safe regression coverage', status: 'In Progress' },
         { title: 'Expose booking-path policy and safer next-action logic', status: 'Completed' },
-        { title: 'Deepen human escalation and industry-aware routing', status: 'Planned' },
+        { title: 'Deepen human escalation and industry-aware routing', status: 'In Progress' },
+        { title: 'Add operator feedback loops for wrong-match and no-match-good review', status: 'Planned' },
+      ],
+      riskNotes: [
+        'Search quality is improving faster than the feedback loop around it; without production query replay the team can still overfit to static eval cases.',
       ],
       references: [
         {
           title: 'AI Router Matching Search Strategy',
           path: 'docs/architecture/ai-router-matching-search-strategy.md',
           summary: 'Search relevance, rerank, and routing strategy behind Prompt 9 behavior.',
+        },
+        {
+          title: 'Sprint 6 Search Quality Execution Package',
+          path: 'docs/development/sprint-6-search-quality-execution-package.md',
+          summary: 'Execution-ready package for telemetry, replayable eval loops, operator feedback capture, and richer search-to-booking contracts.',
         },
         {
           title: 'Prompt 5 To Prompt 11 Dependency Gap Map',
@@ -1885,7 +1922,7 @@ export const imageUploadContent: ImageUploadContent = {
 export const customerShowcaseContent: CustomerShowcaseContent = {
   kicker: 'Customer Spotlight',
   kickerClassName: 'text-amber-300',
-  title: 'BookedAI fits service-led SMEs across Australia',
+  title: 'BookedAI fits service-led businesses across Australia',
   body: 'BookedAI is made for operators with urgent enquiries and customers who expect quick answers, from hospitality and health to beauty, events, trades, tutoring, and print.',
   customerName: 'NOVO PRINT AND SIGNS',
   customerUrl: 'https://novoprints.com.au/',

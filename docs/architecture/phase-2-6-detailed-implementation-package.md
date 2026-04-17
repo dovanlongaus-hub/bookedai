@@ -78,6 +78,8 @@ Turn the platform from route-driven orchestration into domain-driven application
 - thin route handlers that delegate into bounded application services
 - shared request and response contracts for frontend and backend
 - normalized write orchestration using repository calls rather than direct legacy reconstruction paths
+- intelligent matching contracts that carry search context, semantic transparency, and booking-context hints without changing authoritative write behavior
+- rollout-safe diagnostics that let operator surfaces see whether search stayed on primary Gemini or failed over to OpenAI
 
 ### Stack and module focus
 
@@ -108,6 +110,28 @@ Turn the platform from route-driven orchestration into domain-driven application
 
 ### Detailed workstreams
 
+### Execution status update for Phase 2 search and intelligent booking
+
+Snapshot date: `2026-04-17`
+
+What is already implemented:
+
+- `/api/v1/matching/search` returns ranked candidates, semantic-assist metadata, booking-context hints, and trust-aware recommendations
+- query understanding already normalizes phrase aliases, implicit budget hints, implicit location hints, and suburb-to-metro phrasing for key metros
+- retrieval now applies topic/category and location as separate truthfulness filters before rerank
+- semantic assist already exposes provider chain and fallback state, and lightweight diagnostics now surface this in admin preview and public live-read guidance
+- public and admin search-driven surfaces now share shortlist presentation semantics, compact cards, `top 3 + See more`, and booking-ready action guidance
+- live-read search is now being hardened so the active query stays authoritative: stale selected-service hints are only reused for explicit referential turns, while no-result states should stay empty rather than reviving unrelated legacy shortlist rows
+- catalog quality gates, backfill tools, remediation rules, and operator cleanup views are already part of the live search lane
+
+What remains open:
+
+- promotion thresholds and production-query replay are still missing, so semantic tuning is not yet governed by release-grade evidence
+- booking-context hints are still lighter than the downstream lifecycle and booking-intent model needs
+- operator feedback loops for wrong matches, safe empty-result cases, and missing-catalog cases are not yet closed
+- industry-aware escalation policy is still partial for ambiguous or high-value requests
+- model-assisted search remains a verifier and summarizer over catalog candidates rather than a wider external retrieval system, so ongoing quality gains still depend on truthful retrieval and strong catalog coverage
+
 #### Workstream A - API contract normalization
 
 1. Inventory the highest-risk current response shapes:
@@ -125,6 +149,8 @@ Turn the platform from route-driven orchestration into domain-driven application
    - contact identity
    - payment intent summary
    - CRM sync status
+   - matching candidate summary with provider, location, booking URL, source URL, trust cues, and semantic metadata
+   - booking-context hints extracted during search, including party size, schedule hint, and intent label
 4. Keep legacy external payload shapes stable while mapping them through new DTO builders.
 
 #### Workstream B - Domain service buildout
@@ -134,9 +160,17 @@ Turn the platform from route-driven orchestration into domain-driven application
    - pricing consultation capture
    - demo request capture
    - booking confirmation state transitions
+   - structured booking-context extraction from natural chat queries before booking-intent creation
+   - search-to-booking interpretation that can recommend the next safe booking action before a booking-intent write exists
 2. Create payment domain services for:
    - payment intent creation
    - payment link orchestration
+3. Keep Prompt 9 matching behavior inside service-layer seams rather than route-local branching:
+   - query normalization
+   - truthful retrieval filters
+   - semantic rerank and fail-open fallback
+   - strict relevance gating
+   - provider-fallback transparency for operator-facing diagnostics
    - payment state reconciliation
 3. Create CRM and email lifecycle services for:
    - lead promotion
@@ -178,6 +212,7 @@ Turn the platform from route-driven orchestration into domain-driven application
 - shared frontend/backend contracts for booking and payment surfaces
 - thinner route handlers for the migrated flows
 - repository-backed write path for booking-like flows
+- additive matching-contract booking context so search results can include party size, schedule hint, and trust-aware next-step guidance before authoritative writes occur
 - admin shadow comparison tooling or verification logs for old-vs-new summaries
 
 ### Exit criteria

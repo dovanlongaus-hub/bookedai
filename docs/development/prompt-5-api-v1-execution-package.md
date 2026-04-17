@@ -117,6 +117,8 @@ The current additive Prompt 5 v1 surface includes:
 - `POST /api/v1/bookings/intents`
 - `POST /api/v1/payments/intents`
 - `POST /api/v1/email/messages/send`
+- `POST /api/v1/sms/messages/send`
+- `POST /api/v1/whatsapp/messages/send`
 
 ## Module linkage map
 
@@ -142,6 +144,8 @@ The current additive Prompt 5 v1 surface includes:
   - persists normalized payment intents
 - `backend/service_layer/email_service.py`
   - handles lifecycle email delivery when SMTP is configured
+- `backend/service_layer/communication_service.py`
+  - handles additive SMS and WhatsApp delivery with provider-aware fallback and safe config summaries
 
 ### Frontend linkage
 
@@ -166,6 +170,21 @@ The current additive Prompt 5 v1 surface includes:
 4. add feature-gated consumption in one admin read-only surface
 5. extend Prompt 5 routes with deeper domain behavior required by Prompt 9, Prompt 10, and Prompt 11
 6. only then consider replacing existing production contract paths
+
+## Phase 2 execution lanes
+
+- `Persistence Foundation Agent`
+  - keeps repository seams, tenant lookup, feature-flag lookup, and migration-safe DB behavior aligned
+- `Runtime Adoption Agent`
+  - wires additive audit, outbox, webhook, and idempotency behavior into live v1 or webhook paths without changing envelopes
+- `Worker Execution Agent`
+  - extends outbox dispatch and tracked job execution behind `backend/workers/` before provider-specific automation expands
+- `Reliability Read-Model Agent`
+  - keeps Prompt 11 read models authoritative for runtime activity, reconciliation, and operator attention instead of duplicating admin-only queries
+- `Admin Reliability Agent`
+  - surfaces those additive runtime signals in the existing admin reliability workspace and Prompt 5 preview lane
+- `Verification Agent`
+  - owns route, repository, worker, webhook, and frontend-build verification before rollout posture changes
 
 ## Risks to watch
 

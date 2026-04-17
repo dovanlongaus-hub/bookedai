@@ -1,6 +1,6 @@
 # BookedAI
 
-BookedAI is a Docker-based full-stack application for the `bookedai.au` domain, with self-hosted Supabase, n8n, and Hermes running on the same Docker host.
+BookedAI is a Docker-based full-stack application for the `bookedai.au` domain, built around the product direction `BookedAI - The AI Revenue Engine for Service Businesses`, with self-hosted Supabase, n8n, and Hermes running on the same Docker host.
 
 Current application release baseline: `1.0.1-stable`.
 
@@ -116,6 +116,10 @@ Additional developer references:
 - `OPENAI_API_KEY`
 - `N8N_BOOKING_WEBHOOK_URL`
 - `N8N_API_KEY` or `N8N_WEBHOOK_BEARER_TOKEN`
+- `DISCORD_WEBHOOK_URL` if you want admin reliability handoff summaries pushed into a Discord channel
+- optional `DISCORD_WEBHOOK_USERNAME` and `DISCORD_WEBHOOK_AVATAR_URL` for the webhook sender identity
+- `DISCORD_APPLICATION_ID`, `DISCORD_BOT_TOKEN`, and `DISCORD_PUBLIC_KEY` if you want a real Discord slash-command bot for team chat
+- optional `DISCORD_GUILD_ID` if you want faster guild-scoped command registration during rollout
 - `ADMIN_API_TOKEN` for protected email admin routes
 - `TAWK_WEBHOOK_SECRET` if you enable signature verification
 - `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_SMTP_PASSWORD`, `EMAIL_SMTP_FROM`
@@ -177,6 +181,39 @@ Additional developer references:
 - `/var/log/bookedai-healthcheck.log`
 
 8. Optional dynamic IP sync to Cloudflare on each reboot:
+
+## Discord team assistant
+
+The backend now supports Discord Interactions at:
+
+- `POST /api/discord/interactions`
+
+Recommended setup:
+
+1. Create a Discord app and bot in the Discord Developer Portal.
+2. Copy `DISCORD_APPLICATION_ID`, `DISCORD_BOT_TOKEN`, and `DISCORD_PUBLIC_KEY` into your environment.
+3. Set the Interactions Endpoint URL to:
+
+   ```text
+   https://api.bookedai.au/api/discord/interactions
+   ```
+
+4. Register slash commands:
+
+   ```sh
+   python3 scripts/register_discord_commands.py
+   ```
+
+Quick setup snapshot:
+
+```sh
+python3 scripts/discord_setup_helper.py
+```
+
+The current command surface is:
+
+- `/bookedai ask prompt:"..."` for repo-backed team Q&A
+- `/bookedai summary topic:all|implementation|sprint14|roadmap` for quick progress summaries
 
    ```sh
    sudo bash scripts/install_cloudflare_dns_autoupdate.sh

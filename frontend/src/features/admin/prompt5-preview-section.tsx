@@ -5,18 +5,38 @@ import {
   isPublicBookingAssistantV1LiveReadEnabled,
 } from '../../shared/config/publicBookingAssistant';
 import {
+  fetchPrompt5OutboxBacklogPreview,
+  fetchPrompt5OutboxDispatchedAuditPreview,
+  fetchPrompt5RuntimeActivityPreview,
   type Prompt5CandidatePreview,
   type Prompt5IntegrationAttentionItem,
   type Prompt5IntegrationStatus,
   type Prompt5CrmRetryBacklog,
+  type Prompt5CommunicationPreviewResult,
+  type DispatchPrompt5OutboxResult,
+  type Prompt5OutboxBacklog,
+  type Prompt5OutboxDispatchAudit,
+  type Prompt5SemanticAssistPreview,
+  type ReplayPrompt5OutboxResult,
   type Prompt5ReconciliationDetails,
   type Prompt5ReconciliationSummary,
+  type Prompt5RuntimeActivity,
   type Prompt5ResolutionSummary,
   type Prompt5TriageSnapshot,
   type Prompt5TrustSummary,
   queuePrompt5CrmRetryPreview,
+  dispatchPrompt5OutboxPreview,
+  replayPrompt5OutboxPreview,
   runPrompt5SupportPreview,
+  sendPrompt5CommunicationPreview,
 } from './prompt5-support-adapter';
+import {
+  buildPartnerMatchActionFooterModel,
+  buildPartnerMatchCardModel,
+} from '../../shared/presenters/partnerMatch';
+import { PartnerMatchActionFooter } from '../../shared/components/PartnerMatchActionFooter';
+import { PartnerMatchCard } from '../../shared/components/PartnerMatchCard';
+import { PartnerMatchShortlist } from '../../shared/components/PartnerMatchShortlist';
 
 type Prompt5PreviewSectionProps = {
   selectedServiceId?: string | null;
@@ -36,6 +56,7 @@ export function Prompt5PreviewSection({
   const [resolutionSummary, setResolutionSummary] = useState<Prompt5ResolutionSummary | null>(
     null,
   );
+  const [semanticAssist, setSemanticAssist] = useState<Prompt5SemanticAssistPreview | null>(null);
   const [leadPreviewId, setLeadPreviewId] = useState<string | null>(null);
   const [emailPreviewId, setEmailPreviewId] = useState<string | null>(null);
   const [integrationStatuses, setIntegrationStatuses] = useState<Prompt5IntegrationStatus[]>([]);
@@ -44,6 +65,11 @@ export function Prompt5PreviewSection({
   >([]);
   const [reconciliationSummary, setReconciliationSummary] =
     useState<Prompt5ReconciliationSummary | null>(null);
+  const [runtimeActivity, setRuntimeActivity] = useState<Prompt5RuntimeActivity | null>(null);
+  const [outboxBacklog, setOutboxBacklog] = useState<Prompt5OutboxBacklog | null>(null);
+  const [outboxDispatchAudit, setOutboxDispatchAudit] = useState<Prompt5OutboxDispatchAudit>([]);
+  const [outboxAuditQuery, setOutboxAuditQuery] = useState('');
+  const [outboxAuditEventType, setOutboxAuditEventType] = useState<string | null>(null);
   const [triageSnapshot, setTriageSnapshot] = useState<Prompt5TriageSnapshot | null>(null);
   const [crmRetryBacklog, setCrmRetryBacklog] = useState<Prompt5CrmRetryBacklog | null>(null);
   const [reconciliationDetails, setReconciliationDetails] =
@@ -56,6 +82,51 @@ export function Prompt5PreviewSection({
     syncStatus: string;
     warnings: string[];
   } | null>(null);
+  const [communicationChannel, setCommunicationChannel] = useState<'sms' | 'whatsapp'>('sms');
+  const [communicationTo, setCommunicationTo] = useState('');
+  const [communicationTemplate, setCommunicationTemplate] = useState('bookedai_booking_confirmation');
+  const [communicationSubmitting, setCommunicationSubmitting] = useState(false);
+  const [communicationError, setCommunicationError] = useState('');
+  const [communicationResult, setCommunicationResult] =
+    useState<Prompt5CommunicationPreviewResult | null>(null);
+  const [outboxDispatchSubmitting, setOutboxDispatchSubmitting] = useState(false);
+  const [outboxDispatchError, setOutboxDispatchError] = useState('');
+  const [outboxDispatchResult, setOutboxDispatchResult] =
+    useState<DispatchPrompt5OutboxResult | null>(null);
+  const [outboxReplaySubmittingId, setOutboxReplaySubmittingId] = useState<string | null>(null);
+  const [outboxReplayError, setOutboxReplayError] = useState('');
+  const [outboxReplayResult, setOutboxReplayResult] =
+    useState<ReplayPrompt5OutboxResult | null>(null);
+
+  async function refreshRuntimeActivityLoop() {
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const latestRuntimeActivity = await fetchPrompt5RuntimeActivityPreview();
+        const latestOutboxBacklog = await fetchPrompt5OutboxBacklogPreview();
+        const latestAudit = await fetchPrompt5OutboxDispatchedAuditPreview();
+        if (latestRuntimeActivity) {
+          setRuntimeActivity(latestRuntimeActivity);
+          setOutboxBacklog(latestOutboxBacklog);
+          setOutboxDispatchAudit(latestAudit);
+          if (
+            latestRuntimeActivity.items.some(
+              (item) =>
+                item.source === 'job_runs' &&
+                item.title === 'dispatch_outbox_events',
+            )
+          ) {
+            return;
+          }
+        }
+      } catch {
+        // Keep the existing activity feed if refresh polling fails.
+      }
+
+      if (attempt < 2) {
+        await new Promise((resolve) => window.setTimeout(resolve, 1200));
+      }
+    }
+  }
   const crmRetryAttention = integrationAttention.find(
     (item) => item.source === 'crm_sync' && item.issueType === 'retrying',
   );
@@ -65,6 +136,40 @@ export function Prompt5PreviewSection({
   const crmManualReviewCount = crmRetryDetail?.manualReviewCount ?? 0;
   const crmFailedCount = crmRetryDetail?.failedCount ?? 0;
   const crmQueuedRetryCount = crmRetryAttention?.itemCount ?? crmRetryDetail?.pendingCount ?? 0;
+  const outboxAuditEventTypes = Array.from(
+    new Set(
+      outboxDispatchAudit
+        .map((item) => item.outboxEventType)
+        .filter((value): value is string => Boolean(value)),
+    ),
+  );
+  const normalizedOutboxAuditQuery = outboxAuditQuery.trim().toLowerCase();
+  const filteredOutboxDispatchAudit = outboxDispatchAudit.filter((item) => {
+    const matchesEventType =
+      !outboxAuditEventType || item.outboxEventType === outboxAuditEventType;
+    if (!matchesEventType) {
+      return false;
+    }
+    if (!normalizedOutboxAuditQuery) {
+      return true;
+    }
+    const haystacks = [
+      item.entityId,
+      item.aggregateId,
+      item.idempotencyKey,
+      item.outboxEventType,
+      item.entityType,
+      item.aggregateType,
+    ]
+      .filter((value): value is string => Boolean(value))
+      .map((value) => value.toLowerCase());
+    return haystacks.some((value) => value.includes(normalizedOutboxAuditQuery));
+  });
+  const failedOutboxActivityItems = runtimeActivity
+    ? runtimeActivity.items.filter(
+        (item) => item.source === 'outbox_events' && item.status === 'failed',
+      )
+    : [];
 
   async function queueCrmRetryPreview() {
     const parsedRecordId = Number.parseInt(crmRetryRecordId, 10);
@@ -108,6 +213,7 @@ export function Prompt5PreviewSection({
       setCandidates(preview.candidates);
       setTrustSummary(preview.trustSummary);
       setResolutionSummary(preview.resolutionSummary);
+      setSemanticAssist(preview.semanticAssist);
       setLeadPreviewId(preview.leadPreviewId);
       setEmailPreviewId(preview.emailPreviewId);
       setIntegrationStatuses(preview.integrationStatuses);
@@ -116,11 +222,15 @@ export function Prompt5PreviewSection({
       setCrmRetryBacklog(preview.crmRetryBacklog);
       setReconciliationSummary(preview.reconciliationSummary);
       setReconciliationDetails(preview.reconciliationDetails);
+      setRuntimeActivity(preview.runtimeActivity);
+      setOutboxBacklog(preview.outboxBacklog);
+      setOutboxDispatchAudit(preview.outboxDispatchAudit);
     } catch (requestError) {
       setError(requestError instanceof Error ? requestError.message : 'Prompt 5 preview failed.');
       setCandidates([]);
       setTrustSummary(null);
       setResolutionSummary(null);
+      setSemanticAssist(null);
       setLeadPreviewId(null);
       setEmailPreviewId(null);
       setIntegrationStatuses([]);
@@ -129,8 +239,88 @@ export function Prompt5PreviewSection({
       setCrmRetryBacklog(null);
       setReconciliationSummary(null);
       setReconciliationDetails(null);
+      setRuntimeActivity(null);
+      setOutboxBacklog(null);
+      setOutboxDispatchAudit([]);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function sendCommunicationPreview() {
+    if (!communicationTo.trim()) {
+      setCommunicationError('Enter a destination number in E.164 format, for example +61400111222.');
+      setCommunicationResult(null);
+      return;
+    }
+
+    setCommunicationSubmitting(true);
+    setCommunicationError('');
+
+    try {
+      const result = await sendPrompt5CommunicationPreview({
+        channel: communicationChannel,
+        to: communicationTo.trim(),
+        templateKey: communicationTemplate,
+        variables: {
+          customer_name: 'BookedAI Demo',
+          service_name: communicationChannel === 'sms' ? 'SMS follow-up' : 'WhatsApp follow-up',
+          slot_label: 'Today, 3:00 PM',
+          booking_reference: 'BK-Preview',
+          payment_link: 'https://bookedai.au',
+        },
+      });
+      setCommunicationResult(result);
+    } catch (requestError) {
+      setCommunicationResult(null);
+      setCommunicationError(
+        requestError instanceof Error ? requestError.message : 'Communication preview failed.',
+      );
+    } finally {
+      setCommunicationSubmitting(false);
+    }
+  }
+
+  async function runOutboxDispatchPreview() {
+    setOutboxDispatchSubmitting(true);
+    setOutboxDispatchError('');
+
+    try {
+      const result = await dispatchPrompt5OutboxPreview();
+      setOutboxDispatchResult(result);
+      void refreshRuntimeActivityLoop();
+    } catch (requestError) {
+      setOutboxDispatchResult(null);
+      setOutboxDispatchError(
+        requestError instanceof Error ? requestError.message : 'Outbox dispatch preview failed.',
+      );
+    } finally {
+      setOutboxDispatchSubmitting(false);
+    }
+  }
+
+  async function replayOutboxEvent(itemId: string) {
+    const outboxEventId = Number.parseInt(itemId, 10);
+    if (!Number.isFinite(outboxEventId) || outboxEventId <= 0) {
+      setOutboxReplayError('This outbox item cannot be replayed because its event ID is invalid.');
+      setOutboxReplayResult(null);
+      return;
+    }
+
+    setOutboxReplaySubmittingId(itemId);
+    setOutboxReplayError('');
+
+    try {
+      const result = await replayPrompt5OutboxPreview(outboxEventId);
+      setOutboxReplayResult(result);
+      void refreshRuntimeActivityLoop();
+    } catch (requestError) {
+      setOutboxReplayResult(null);
+      setOutboxReplayError(
+        requestError instanceof Error ? requestError.message : 'Outbox replay preview failed.',
+      );
+    } finally {
+      setOutboxReplaySubmittingId(null);
     }
   }
 
@@ -220,22 +410,65 @@ export function Prompt5PreviewSection({
             </div>
             <div className="mt-3 space-y-3">
               {candidates.length > 0 ? (
-                candidates.slice(0, 4).map((candidate) => (
-                  <article
-                    key={candidate.candidateId}
-                    className="rounded-2xl border border-slate-200 bg-white p-4"
-                  >
-                    <div className="text-sm font-semibold text-slate-950">
-                      {candidate.serviceName}
-                    </div>
-                    <div className="mt-1 text-xs font-medium uppercase tracking-[0.14em] text-slate-500">
-                      {candidate.providerName}
-                    </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">
-                      {candidate.explanation ?? 'Prompt 5 candidate generated from the current catalog.'}
-                    </p>
-                  </article>
-                ))
+                <PartnerMatchShortlist
+                  items={candidates}
+                  batchSize={3}
+                  resetKey={`${query}-${location}-${candidates.length}`}
+                  emptyState={null}
+                  listClassName="space-y-3"
+                  renderMeta={({ visibleCount, totalCount }) =>
+                    totalCount > 3 ? (
+                      <div className="flex justify-end">
+                        <div className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-slate-600">
+                          Showing {visibleCount} of {totalCount}
+                        </div>
+                      </div>
+                    ) : null
+                  }
+                  renderItem={(candidate) => {
+                    const matchCandidate = {
+                      candidateId: candidate.candidateId,
+                      providerName: candidate.providerName,
+                      serviceName: candidate.serviceName,
+                      sourceType: 'service_catalog' as const,
+                      category: candidate.category ?? null,
+                      summary: null,
+                      venueName: candidate.providerName,
+                      location: candidate.location ?? null,
+                      bookingUrl: candidate.bookingUrl ?? null,
+                      mapUrl: null,
+                      sourceUrl: candidate.sourceUrl ?? null,
+                      imageUrl: null,
+                      amountAud: candidate.amountAud ?? null,
+                      durationMinutes: candidate.durationMinutes ?? null,
+                      tags: [],
+                      featured: false,
+                      distanceKm: null,
+                      matchScore: candidate.matchScore ?? null,
+                      semanticScore: candidate.semanticScore ?? null,
+                      trustSignal: candidate.trustSignal ?? null,
+                      isPreferred: false,
+                      explanation: candidate.explanation ?? null,
+                    };
+                    const card = buildPartnerMatchCardModel(matchCandidate);
+                    const actionFooter = buildPartnerMatchActionFooterModel(matchCandidate, {
+                      includeSourceLink: true,
+                    });
+
+                    return (
+                      <div
+                        key={candidate.candidateId}
+                        className="rounded-2xl border border-slate-200 bg-white p-4"
+                      >
+                        <PartnerMatchCard
+                          card={card}
+                          trailingLabel={candidate.category ?? null}
+                        />
+                        <PartnerMatchActionFooter model={actionFooter} />
+                      </div>
+                    );
+                  }}
+                />
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
                   No Prompt 5 preview results yet.
@@ -248,19 +481,65 @@ export function Prompt5PreviewSection({
             <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
               Booking trust
             </div>
-            {trustSummary ? (
+            {trustSummary || semanticAssist ? (
               <div className="mt-3 space-y-3">
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="text-sm font-semibold text-slate-950">
-                    {trustSummary.availabilityState}
+                {semanticAssist ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Semantic lane
+                    </div>
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      <span className="rounded-full bg-slate-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+                        {semanticAssist.applied
+                          ? `Primary ${semanticAssist.provider ?? 'unknown'}`
+                          : 'Heuristic only'}
+                      </span>
+                      {semanticAssist.fallbackApplied ? (
+                        <span className="rounded-full bg-amber-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">
+                          OpenAI fallback
+                        </span>
+                      ) : null}
+                    </div>
+                    {semanticAssist.providerChain.length > 0 ? (
+                      <p className="mt-3 text-sm text-slate-600">
+                        Provider chain: {semanticAssist.providerChain.join(' -> ')}
+                      </p>
+                    ) : null}
+                    {semanticAssist.searchStrategy ? (
+                      <p className="mt-2 text-sm text-slate-600">
+                        Strategy: {semanticAssist.searchStrategy}
+                      </p>
+                    ) : null}
+                    {semanticAssist.normalizedQuery ? (
+                      <p className="mt-2 text-sm text-slate-600">
+                        Normalized query: {semanticAssist.normalizedQuery}
+                      </p>
+                    ) : null}
+                    {(semanticAssist.inferredLocation || semanticAssist.inferredCategory) ? (
+                      <p className="mt-2 text-sm text-slate-600">
+                        Inferred: {[semanticAssist.inferredLocation, semanticAssist.inferredCategory].filter(Boolean).join(' • ')}
+                      </p>
+                    ) : null}
+                    {semanticAssist.budgetSummary ? (
+                      <p className="mt-2 text-sm text-slate-600">
+                        Budget: {semanticAssist.budgetSummary}
+                      </p>
+                    ) : null}
                   </div>
-                  <div className="mt-1 text-sm text-slate-600">
-                    Confidence: {trustSummary.bookingConfidence}
+                ) : null}
+                {trustSummary ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="text-sm font-semibold text-slate-950">
+                      {trustSummary.availabilityState}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-600">
+                      Confidence: {trustSummary.bookingConfidence}
+                    </div>
+                    <div className="mt-1 text-sm text-slate-600">
+                      Recommended path: {trustSummary.recommendedBookingPath ?? 'Not set'}
+                    </div>
                   </div>
-                  <div className="mt-1 text-sm text-slate-600">
-                    Recommended path: {trustSummary.recommendedBookingPath ?? 'Not set'}
-                  </div>
-                </div>
+                ) : null}
                 {resolutionSummary ? (
                   <div className="rounded-2xl border border-slate-200 bg-white p-4">
                     <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -278,20 +557,22 @@ export function Prompt5PreviewSection({
                     </p>
                   </div>
                 ) : null}
-                <div className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Warnings
+                {trustSummary ? (
+                  <div className="rounded-2xl border border-slate-200 bg-white p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Warnings
+                    </div>
+                    <div className="mt-2 space-y-2 text-sm text-slate-600">
+                      {trustSummary.warnings.length > 0 ? (
+                        trustSummary.warnings.map((warning) => (
+                          <p key={warning}>{warning}</p>
+                        ))
+                      ) : (
+                        <p>No warnings returned by the Prompt 5 preview.</p>
+                      )}
+                    </div>
                   </div>
-                  <div className="mt-2 space-y-2 text-sm text-slate-600">
-                    {trustSummary.warnings.length > 0 ? (
-                      trustSummary.warnings.map((warning) => (
-                        <p key={warning}>{warning}</p>
-                      ))
-                    ) : (
-                      <p>No warnings returned by the Prompt 5 preview.</p>
-                    )}
-                  </div>
-                </div>
+                ) : null}
               </div>
             ) : (
               <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
@@ -455,8 +736,364 @@ export function Prompt5PreviewSection({
                         </div>
                       )}
                     </div>
+                    <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        Dispatch audit trail
+                      </div>
+                      <div className="mt-3 grid gap-3 lg:grid-cols-[1fr_auto]">
+                        <input
+                          value={outboxAuditQuery}
+                          onChange={(event) => setOutboxAuditQuery(event.target.value)}
+                          placeholder="Filter by aggregate ID, entity ID, or idempotency key"
+                          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOutboxAuditQuery('');
+                            setOutboxAuditEventType(null);
+                          }}
+                          className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                        >
+                          Clear filters
+                        </button>
+                      </div>
+                      {outboxAuditEventTypes.length > 0 ? (
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {outboxAuditEventTypes.map((eventType) => {
+                            const active = outboxAuditEventType === eventType;
+                            return (
+                              <button
+                                key={eventType}
+                                type="button"
+                                onClick={() =>
+                                  setOutboxAuditEventType((current) =>
+                                    current === eventType ? null : eventType,
+                                  )
+                                }
+                                className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] transition ${
+                                  active
+                                    ? 'bg-sky-100 text-sky-700'
+                                    : 'bg-white text-slate-600 ring-1 ring-slate-200'
+                                }`}
+                              >
+                                {eventType}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      ) : null}
+                      <div className="mt-3 space-y-3">
+                        {filteredOutboxDispatchAudit.length > 0 ? (
+                          filteredOutboxDispatchAudit.slice(0, 4).map((item) => (
+                            <div
+                              key={`outbox-audit-${item.id}`}
+                              className="rounded-2xl border border-slate-200 bg-white p-3"
+                            >
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setOutboxAuditEventType(item.outboxEventType ?? null);
+                                  setOutboxAuditQuery(item.entityId ?? item.aggregateId ?? '');
+                                }}
+                                className="block w-full text-left"
+                              >
+                              <div className="font-semibold text-slate-950">
+                                {item.outboxEventType ?? 'outbox.event.dispatched'}
+                              </div>
+                              <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                {item.entityType ?? item.aggregateType ?? 'outbox_event'}
+                                {item.entityId || item.aggregateId ? ` • ${item.entityId ?? item.aggregateId}` : ''}
+                              </div>
+                              <p className="mt-2 text-sm leading-6 text-slate-700">
+                                Actor: {item.actorType ?? 'unknown'}
+                                {item.actorId ? ` • ${item.actorId}` : ''}
+                              </p>
+                              <p className="mt-2 text-xs leading-5 text-slate-500">
+                                {item.createdAt}
+                                {item.idempotencyKey ? ` • ${item.idempotencyKey}` : ''}
+                              </p>
+                              </button>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
+                            No outbox dispatch audit entries match the current filters.
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 ) : null}
+                {runtimeActivity ? (
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-slate-950">Runtime activity</div>
+                        <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Job runs, outbox, and webhook feed
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+                        {runtimeActivity.status}
+                      </span>
+                    </div>
+                    <p className="mt-3 leading-6">
+                      Latest activity checkpoint: {runtimeActivity.checkedAt ?? 'Not reported in this preview'}
+                    </p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        void runOutboxDispatchPreview();
+                      }}
+                      disabled={outboxDispatchSubmitting}
+                      className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {outboxDispatchSubmitting ? 'Dispatching outbox...' : 'Run tracked outbox dispatch'}
+                    </button>
+                    {outboxDispatchError ? (
+                      <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                        {outboxDispatchError}
+                      </div>
+                    ) : null}
+                    {outboxDispatchResult ? (
+                      <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                        <p className="font-semibold">
+                          Outbox dispatch run {outboxDispatchResult.jobRunId ?? 'queued'} finished as {outboxDispatchResult.dispatchStatus}.
+                        </p>
+                        <p className="mt-2">{outboxDispatchResult.detail ?? 'No detail returned.'}</p>
+                      </div>
+                    ) : null}
+                    {failedOutboxActivityItems.length > 0 ? (
+                      <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="font-semibold">Failed outbox recovery</div>
+                            <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
+                              Operator replay lane
+                            </div>
+                          </div>
+                          <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700 ring-1 ring-amber-200">
+                            {failedOutboxActivityItems.length} failed
+                          </span>
+                        </div>
+                        <p className="mt-3 leading-6">
+                          Replay a failed event to move it back into the `retrying` queue, then run
+                          dispatch again to attempt delivery.
+                        </p>
+                        {outboxReplayError ? (
+                          <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                            {outboxReplayError}
+                          </div>
+                        ) : null}
+                        {outboxReplayResult ? (
+                          <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                            <p className="font-semibold">
+                              Outbox event {outboxReplayResult.outboxEventId} moved to {outboxReplayResult.status}.
+                            </p>
+                            <p className="mt-2">
+                              {outboxReplayResult.availableAt
+                                ? `Available at ${outboxReplayResult.availableAt}.`
+                                : 'Availability timestamp not returned.'}
+                            </p>
+                          </div>
+                        ) : null}
+                        <div className="mt-3 space-y-3">
+                          {failedOutboxActivityItems.slice(0, 3).map((item) => (
+                            <div
+                              key={`failed-outbox-${item.itemId}`}
+                              className="rounded-2xl border border-amber-200 bg-white p-3"
+                            >
+                              <div className="flex items-start justify-between gap-3">
+                                <div>
+                                  <div className="font-semibold text-slate-950">{item.title}</div>
+                                  <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                    outbox_events • failed • event {item.itemId}
+                                  </div>
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    void replayOutboxEvent(item.itemId);
+                                  }}
+                                  disabled={outboxReplaySubmittingId === item.itemId}
+                                  className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] text-slate-900 transition hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
+                                >
+                                  {outboxReplaySubmittingId === item.itemId ? 'Replaying...' : 'Replay event'}
+                                </button>
+                              </div>
+                              <p className="mt-2 leading-6">{item.summary ?? 'No extra summary recorded yet.'}</p>
+                              <p className="mt-2 text-xs leading-5 text-slate-500">
+                                Occurred: {item.occurredAt ?? 'Unknown'}
+                                {item.externalRef ? ` • Ref ${item.externalRef}` : ''}
+                              </p>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                    <div className="mt-3 space-y-3">
+                      {runtimeActivity.items.length > 0 ? (
+                        runtimeActivity.items.slice(0, 4).map((item) => (
+                          <div
+                            key={`${item.source}-${item.itemId}`}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="font-semibold text-slate-950">{item.title}</div>
+                                <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                  {item.source} • {item.status}
+                                </div>
+                              </div>
+                              {item.attemptCount > 0 ? (
+                                <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 ring-1 ring-slate-200">
+                                  Attempts {item.attemptCount}
+                                </span>
+                              ) : null}
+                            </div>
+                            <p className="mt-2 leading-6">{item.summary ?? 'No extra summary recorded yet.'}</p>
+                            <p className="mt-2 text-xs leading-5 text-slate-500">
+                              Occurred: {item.occurredAt ?? 'Unknown'}
+                              {item.externalRef ? ` • Ref ${item.externalRef}` : ''}
+                            </p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                          No runtime activity items returned yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+                {outboxBacklog ? (
+                  <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="font-semibold text-slate-950">Outbox backlog</div>
+                        <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Failure reason and retry depth
+                        </div>
+                      </div>
+                      <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700">
+                        {outboxBacklog.status}
+                      </span>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                      <p>Failed events: {outboxBacklog.summary.failedEvents}</p>
+                      <p>Retrying events: {outboxBacklog.summary.retryingEvents}</p>
+                      <p>Pending events: {outboxBacklog.summary.pendingEvents}</p>
+                      <p>Latest backlog signal: {outboxBacklog.checkedAt ?? 'Not reported in this preview'}</p>
+                    </div>
+                    <div className="mt-3 space-y-3">
+                      {outboxBacklog.items.length > 0 ? (
+                        outboxBacklog.items.slice(0, 4).map((item) => (
+                          <div
+                            key={`outbox-backlog-${item.outboxEventId}`}
+                            className="rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div>
+                                <div className="font-semibold text-slate-950">{item.eventType}</div>
+                                <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                  {item.aggregateType ?? 'outbox_event'}
+                                  {item.aggregateId ? ` • ${item.aggregateId}` : ''}
+                                  {` • ${item.status}`}
+                                </div>
+                              </div>
+                              <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-700 ring-1 ring-slate-200">
+                                Attempts {item.attemptCount}
+                              </span>
+                            </div>
+                            <p className="mt-2 leading-6">
+                              {item.lastError ?? item.recommendedAction}
+                            </p>
+                            <p className="mt-2 text-xs leading-5 text-slate-500">
+                              {item.lastErrorAt
+                                ? `Last error: ${item.lastErrorAt}`
+                                : `Available at: ${item.availableAt ?? 'Unknown'}`}
+                              {item.idempotencyKey ? ` • ${item.idempotencyKey}` : ''}
+                            </p>
+                            <p className="mt-2 leading-6 text-slate-500">{item.recommendedAction}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
+                          No outbox backlog items returned yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                ) : null}
+                <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                  <div className="font-semibold text-slate-950">BookedAI communication test</div>
+                  <p className="mt-2 leading-6">
+                    Send a BookedAI template through SMS or WhatsApp using the current provider configuration.
+                  </p>
+                  <div className="mt-3 grid gap-3 md:grid-cols-3">
+                    <select
+                      value={communicationChannel}
+                      onChange={(event) =>
+                        setCommunicationChannel(event.target.value as 'sms' | 'whatsapp')
+                      }
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white"
+                    >
+                      <option value="sms">SMS</option>
+                      <option value="whatsapp">WhatsApp</option>
+                    </select>
+                    <select
+                      value={communicationTemplate}
+                      onChange={(event) => setCommunicationTemplate(event.target.value)}
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white"
+                    >
+                      <option value="bookedai_booking_confirmation">Booking confirmation</option>
+                      <option value="bookedai_demo_reminder">Demo reminder</option>
+                      <option value="bookedai_payment_followup">Payment follow-up</option>
+                      <option value="bookedai_manual_review">Manual review</option>
+                    </select>
+                    <input
+                      value={communicationTo}
+                      onChange={(event) => setCommunicationTo(event.target.value)}
+                      placeholder="+61400111222"
+                      className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void sendCommunicationPreview();
+                    }}
+                    disabled={communicationSubmitting}
+                    className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {communicationSubmitting ? 'Sending...' : 'Send BookedAI test message'}
+                  </button>
+                  {communicationError ? (
+                    <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                      {communicationError}
+                    </div>
+                  ) : null}
+                  {communicationResult ? (
+                    <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+                      <p className="font-semibold">
+                        {communicationChannel === 'sms' ? 'SMS' : 'WhatsApp'} preview sent.
+                      </p>
+                      <p className="mt-2">Provider: {communicationResult.provider}</p>
+                      <p className="mt-2">Delivery status: {communicationResult.deliveryStatus}</p>
+                      <p className="mt-2">Message ID: {communicationResult.messageId}</p>
+                      <p className="mt-2">
+                        Provider message ID: {communicationResult.providerMessageId ?? 'Not reported'}
+                      </p>
+                      <p className="mt-2">
+                        Warnings:{' '}
+                        {communicationResult.warnings.length > 0
+                          ? communicationResult.warnings.join(', ')
+                          : 'None'}
+                      </p>
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </div>
           </div>

@@ -73,6 +73,23 @@ const liveReadService: ServiceCatalogItem = {
   featured: true,
 };
 
+const unrelatedLegacyService: ServiceCatalogItem = {
+  id: 'service-unrelated-legacy',
+  name: 'Legacy GP Clinic',
+  category: 'Medical',
+  summary: 'Legacy-only clinic result that should not appear in a live-read hair shortlist.',
+  duration_minutes: 20,
+  amount_aud: 90,
+  image_url: null,
+  map_snapshot_url: null,
+  venue_name: 'Legacy Clinic',
+  location: 'Sydney',
+  map_url: null,
+  booking_url: null,
+  tags: ['medical', 'clinic'],
+  featured: false,
+};
+
 const legacyBookingSessionResult: BookingAssistantSessionResponse = {
   status: 'ok',
   booking_reference: 'BR-1001',
@@ -117,6 +134,39 @@ const stripeReadyBookingSessionResult: BookingAssistantSessionResponse = {
   workflow_status: 'scheduled',
 };
 
+function buildFutureSydneyDatetimeLocal(hours: number, minutes: number) {
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Australia/Sydney',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    hourCycle: 'h23',
+  });
+  const parts = formatter.formatToParts(new Date());
+  const year = Number(parts.find((part) => part.type === 'year')?.value ?? '0');
+  const month = Number(parts.find((part) => part.type === 'month')?.value ?? '1');
+  const day = Number(parts.find((part) => part.type === 'day')?.value ?? '1');
+  const nextDate = new Date(Date.UTC(year, month - 1, day + 1, hours, minutes, 0, 0));
+  const nextDateParts = formatter.formatToParts(nextDate);
+  const nextYear = nextDateParts.find((part) => part.type === 'year')?.value ?? `${year}`;
+  const nextMonth =
+    nextDateParts.find((part) => part.type === 'month')?.value ??
+    `${month}`.padStart(2, '0');
+  const nextDay =
+    nextDateParts.find((part) => part.type === 'day')?.value ??
+    `${day}`.padStart(2, '0');
+  const nextHour =
+    nextDateParts.find((part) => part.type === 'hour')?.value ??
+    `${hours}`.padStart(2, '0');
+  const nextMinute =
+    nextDateParts.find((part) => part.type === 'minute')?.value ??
+    `${minutes}`.padStart(2, '0');
+
+  return `${nextYear}-${nextMonth}-${nextDay}T${nextHour}:${nextMinute}`;
+}
+
 function buildService(index: number): ServiceCatalogItem {
   return {
     id: `service-v${index}`,
@@ -129,8 +179,8 @@ function buildService(index: number): ServiceCatalogItem {
     map_snapshot_url: null,
     venue_name: `Studio ${index}`,
     location: 'Sydney',
-    map_url: null,
-    booking_url: null,
+    map_url: `https://maps.example.com/service-v${index}`,
+    booking_url: `https://book.example.com/service-v${index}`,
     tags: [`style-${index}`],
     featured: index === 1,
   };
@@ -325,6 +375,11 @@ test.describe('public assistant rollout smoke', () => {
     page,
   }) => {
     const rankedServices = Array.from({ length: 6 }, (_, index) => buildService(index + 1));
+    const legacyOnlyNoise = {
+      ...unrelatedLegacyService,
+      id: 'service-legacy-noise',
+      name: 'Legacy Clinic Noise',
+    };
 
     await page.route('**/api/booking-assistant/catalog', async (route) => {
       await route.fulfill({
@@ -346,7 +401,7 @@ test.describe('public assistant rollout smoke', () => {
         body: JSON.stringify({
           status: 'ok',
           reply: 'I found several strong matches for your request.',
-          matched_services: [...rankedServices].reverse(),
+          matched_services: [legacyOnlyNoise, ...rankedServices].reverse(),
           matched_events: [],
           suggested_service_id: rankedServices[5].id,
           should_request_location: false,
@@ -379,11 +434,15 @@ test.describe('public assistant rollout smoke', () => {
           data: {
             request_id: 'match-ranked',
             candidates: rankedServices.map((service) => ({
-              candidateId: service.id,
-              providerName: service.venue_name,
-              serviceName: service.name,
-              sourceType: 'service_catalog',
-              distanceKm: null,
+              candidate_id: service.id,
+              provider_name: service.venue_name,
+              service_name: service.name,
+              source_type: 'service_catalog',
+              distance_km: null,
+              category: service.category,
+              location: service.location,
+              booking_url: service.booking_url,
+              map_url: service.map_url,
               explanation: `${service.name} stays in the ranked shortlist.`,
             })),
             recommendations: [
@@ -399,6 +458,17 @@ test.describe('public assistant rollout smoke', () => {
               gating_state: 'high',
             },
             warnings: [],
+            semantic_assist: {
+              applied: true,
+              provider: 'openai',
+              provider_chain: ['gemini', 'openai'],
+              fallback_applied: true,
+              normalized_query: 'need a haircut in sydney',
+              inferred_location: 'Sydney',
+              inferred_category: 'Hair',
+              budget_summary: null,
+              evidence: ['semantic_model_rerank'],
+            },
           },
           meta: { version: 'v1', tenant_id: 'tenant-test' },
         }),
@@ -450,20 +520,140 @@ test.describe('public assistant rollout smoke', () => {
     await expect(page.getByText('Result Service 1', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Result Service 2', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Result Service 3', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Legacy Clinic Noise', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Result Service 4', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Result Service 6', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('AI search: openai fallback • gemini -> openai').first()).toBeVisible();
+    await expect(page.getByText('Next action').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Open Google map' }).first()).toHaveAttribute(
+      'href',
+      'https://maps.example.com/service-v1',
+    );
+    await expect(page.getByRole('link', { name: 'Book now' }).first()).toHaveAttribute(
+      'href',
+      'https://book.example.com/service-v1',
+    );
+    await expect(page.getByText('Ready to book').first()).toBeVisible();
 
     await page.getByRole('button', { name: 'See more results' }).first().click();
 
     await expect(page.getByText('Result Service 4', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Result Service 5', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Result Service 6', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Legacy Clinic Noise', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Open Google map' }).nth(3)).toHaveAttribute(
+      'href',
+      'https://maps.example.com/service-v4',
+    );
+    await expect(page.getByRole('link', { name: 'Book now' }).nth(3)).toHaveAttribute(
+      'href',
+      'https://book.example.com/service-v4',
+    );
+  });
+
+  test('live-read no-result state does not rehydrate unrelated legacy matches into chat @live-read', async ({
+    page,
+  }) => {
+    const legacyOnlyNoise = {
+      ...unrelatedLegacyService,
+      id: 'service-legacy-noise',
+      name: 'Legacy Clinic Noise',
+    };
+
+    await page.route('**/api/booking-assistant/catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          business_email: 'hello@example.com',
+          stripe_enabled: false,
+          services: [legacyOnlyNoise],
+        }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'Legacy thinks it found something.',
+          matched_services: [legacyOnlyNoise],
+          matched_events: [],
+          suggested_service_id: legacyOnlyNoise.id,
+          should_request_location: false,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-no-result',
+            channel_session_id: 'chan-no-result',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-no-result',
+            candidates: [],
+            recommendations: [],
+            confidence: {
+              score: 0.18,
+              reason: 'No strong catalog candidate was found for this query.',
+              gating_state: 'low',
+            },
+            warnings: ['No strong relevant catalog candidates were found.'],
+            semantic_assist: {
+              applied: true,
+              provider: 'openai',
+              provider_chain: ['gemini', 'openai'],
+              fallback_applied: true,
+              normalized_query: 'private dining melbourne',
+              inferred_location: 'Melbourne',
+              inferred_category: 'Restaurant',
+              budget_summary: null,
+              evidence: ['semantic_model_rerank'],
+            },
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await openAssistant(page);
+    await page.locator('#assistant-chat-input').fill('private dining Melbourne');
+    await page.locator('#assistant-chat-input').press('Enter');
+
+    await expect(page.getByText('Legacy Clinic Noise', { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText(
+        'No strong relevant catalog candidates were found. I stayed grounded to private dining melbourne, so I am not showing unrelated stored results.',
+      ),
+    ).toBeVisible();
   });
 
   test('booking submit still uses legacy session as the authoritative write when live-read is enabled @live-read', async ({ page }) => {
     let legacySessionRequests = 0;
     let shadowLeadRequests = 0;
     let shadowBookingIntentRequests = 0;
+    const requestedSlot = buildFutureSydneyDatetimeLocal(14, 0);
 
     await stubAssistantApis(page);
 
@@ -493,11 +683,15 @@ test.describe('public assistant rollout smoke', () => {
             request_id: 'match-2',
             candidates: [
               {
-                candidateId: liveReadService.id,
-                providerName: liveReadService.venue_name,
-                serviceName: liveReadService.name,
-                sourceType: 'service_catalog',
-                distanceKm: null,
+                candidate_id: liveReadService.id,
+                provider_name: liveReadService.venue_name,
+                service_name: liveReadService.name,
+                source_type: 'service_catalog',
+                distance_km: null,
+                category: liveReadService.category,
+                location: liveReadService.location,
+                booking_url: liveReadService.booking_url,
+                map_url: liveReadService.map_url,
                 explanation: 'Prompt 5 ranked this as the strongest match.',
               },
             ],
@@ -616,10 +810,16 @@ test.describe('public assistant rollout smoke', () => {
     await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
     await page.locator('#assistant-chat-input').press('Enter');
 
-    const bookingForm = page.locator('form').filter({ has: page.getByRole('button', { name: 'Create Booking Request' }) });
-    await bookingForm.locator('label:has-text("Name") input[type="text"]').fill('BookedAI Customer');
+    await expect(page.getByText(liveReadService.name, { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Ready to book').first()).toBeVisible();
+
+    const bookingForm = page
+      .locator('form')
+      .filter({ has: page.getByRole('button', { name: 'Create Booking Request' }) });
+    await expect(bookingForm).toBeVisible();
+    await bookingForm.getByLabel('Name').fill('BookedAI Customer');
     await bookingForm.locator('input[type="email"][placeholder="Email address"]').fill('customer@example.com');
-    await bookingForm.locator('input[type="datetime-local"]').fill('2026-04-16T14:00');
+    await bookingForm.locator('input[type="datetime-local"]').fill(requestedSlot);
     await page.getByRole('button', { name: 'Create Booking Request' }).click();
 
     await expect(page.getByText('Booking reference')).toBeVisible();
@@ -633,6 +833,8 @@ test.describe('public assistant rollout smoke', () => {
   test('payment and confirmation success card surfaces stripe, calendar, and email handoff states @live-read', async ({
     page,
   }) => {
+    const requestedSlot = buildFutureSydneyDatetimeLocal(10, 30);
+
     await stubAssistantApis(page);
 
     await page.route('**/api/v1/conversations/sessions', async (route) => {
@@ -781,12 +983,16 @@ test.describe('public assistant rollout smoke', () => {
     await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
     await page.locator('#assistant-chat-input').press('Enter');
 
+    await expect(page.getByText(liveReadService.name, { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Ready to book').first()).toBeVisible();
+
     const bookingForm = page
       .locator('form')
       .filter({ has: page.getByRole('button', { name: 'Create Booking Request' }) });
-    await bookingForm.locator('label:has-text("Name") input[type="text"]').fill('BookedAI Customer');
+    await expect(bookingForm).toBeVisible();
+    await bookingForm.getByLabel('Name').fill('BookedAI Customer');
     await bookingForm.locator('input[type="email"][placeholder="Email address"]').fill('customer@example.com');
-    await bookingForm.locator('input[type="datetime-local"]').fill('2026-04-17T10:30');
+    await bookingForm.locator('input[type="datetime-local"]').fill(requestedSlot);
     await page.getByRole('button', { name: 'Create Booking Request' }).click();
 
     await expect(page.getByText('BR-2002', { exact: true })).toBeVisible();

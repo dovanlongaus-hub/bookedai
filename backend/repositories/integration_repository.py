@@ -8,6 +8,131 @@ from repositories.base import BaseRepository
 class IntegrationRepository(BaseRepository):
     """Read-oriented seam for integration connection health and reconciliation status."""
 
+    async def list_recent_runtime_activity(
+        self,
+        *,
+        tenant_id: str,
+        limit: int = 12,
+    ) -> list[dict[str, object | None]]:
+        per_source_limit = max(1, min(limit, 12))
+        result = await self.session.execute(
+            text(
+                """
+                with recent_jobs as (
+                  select
+                    'job_runs' as source,
+                    id::text as item_id,
+                    job_name as title,
+                    status,
+                    detail,
+                    attempt_count,
+                    created_at as occurred_at,
+                    started_at,
+                    finished_at,
+                    null::text as external_ref
+                  from job_runs
+                  where tenant_id = cast(:tenant_id as uuid)
+                  order by coalesce(finished_at, started_at, created_at) desc
+                  limit :per_source_limit
+                ),
+                recent_webhooks as (
+                  select
+                    'webhook_events' as source,
+                    id::text as item_id,
+                    provider as title,
+                    status,
+                    null::text as detail,
+                    null::int as attempt_count,
+                    received_at as occurred_at,
+                    received_at as started_at,
+                    processed_at as finished_at,
+                    external_event_id as external_ref
+                  from webhook_events
+                  where tenant_id = cast(:tenant_id as uuid)
+                  order by received_at desc
+                  limit :per_source_limit
+                ),
+                recent_outbox as (
+                  select
+                    'outbox_events' as source,
+                    id::text as item_id,
+                    event_type as title,
+                    status,
+                    coalesce(last_error, aggregate_type) as detail,
+                    attempt_count,
+                    created_at as occurred_at,
+                    available_at as started_at,
+                    processed_at as finished_at,
+                    idempotency_key as external_ref
+                  from outbox_events
+                  where tenant_id = cast(:tenant_id as uuid)
+                  order by created_at desc
+                  limit :per_source_limit
+                )
+                select *
+                from (
+                  select * from recent_jobs
+                  union all
+                  select * from recent_webhooks
+                  union all
+                  select * from recent_outbox
+                ) as runtime_activity
+                order by occurred_at desc nulls last
+                limit :limit
+                """
+            ),
+            {
+                "tenant_id": tenant_id,
+                "per_source_limit": per_source_limit,
+                "limit": limit,
+            },
+        )
+        return [dict(row._mapping) for row in result]
+
+    async def list_outbox_backlog(
+        self,
+        *,
+        tenant_id: str,
+        limit: int = 8,
+    ) -> list[dict[str, object | None]]:
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  id,
+                  event_type,
+                  aggregate_type,
+                  aggregate_id,
+                  status,
+                  attempt_count,
+                  last_error,
+                  last_error_at,
+                  processed_at,
+                  available_at,
+                  idempotency_key,
+                  created_at
+                from outbox_events
+                where tenant_id = cast(:tenant_id as uuid)
+                  and status in ('failed', 'retrying', 'pending')
+                order by
+                  case status
+                    when 'failed' then 0
+                    when 'retrying' then 1
+                    when 'pending' then 2
+                    else 3
+                  end,
+                  coalesce(last_error_at, available_at, created_at) desc,
+                  id desc
+                limit :limit
+                """
+            ),
+            {
+                "tenant_id": tenant_id,
+                "limit": limit,
+            },
+        )
+        return [dict(row._mapping) for row in result]
+
     async def list_crm_retry_backlog(
         self,
         *,

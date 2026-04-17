@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { brandName } from '../../components/landing/data';
+import { sendAdminDiscordHandoff } from './api';
 
-type HandoffFormat = 'slack' | 'ticket' | 'incident';
+type HandoffFormat = 'discord' | 'slack' | 'ticket' | 'incident';
 
 const handoffFormats: {
   value: HandoffFormat;
@@ -10,6 +11,13 @@ const handoffFormats: {
   suggestedTitle: string;
   intro: string;
 }[] = [
+  {
+    value: 'discord',
+    label: 'Discord',
+    audience: 'Team channel update',
+    suggestedTitle: `${brandName} team update`,
+    intro: 'Use this format to post a quick progress summary into the shared Discord channel.',
+  },
   {
     value: 'slack',
     label: 'Slack',
@@ -40,6 +48,9 @@ type ReliabilityHandoffPanelProps = {
   primaryActionLabel: string;
   checklist: string[];
   storageKey: string;
+  apiBaseUrl: string;
+  sessionToken: string;
+  discordConfigured: boolean;
 };
 
 export function ReliabilityHandoffPanel({
@@ -49,10 +60,14 @@ export function ReliabilityHandoffPanel({
   primaryActionLabel,
   checklist,
   storageKey,
+  apiBaseUrl,
+  sessionToken,
+  discordConfigured,
 }: ReliabilityHandoffPanelProps) {
   const [operatorNote, setOperatorNote] = useState('');
   const [exportStatus, setExportStatus] = useState('No export package prepared yet.');
-  const [handoffFormat, setHandoffFormat] = useState<HandoffFormat>('slack');
+  const [handoffFormat, setHandoffFormat] = useState<HandoffFormat>('discord');
+  const [sendingDiscord, setSendingDiscord] = useState(false);
   const laneToken = useMemo(
     () => laneLabel.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''),
     [laneLabel],
@@ -75,6 +90,18 @@ export function ReliabilityHandoffPanel({
 
   const exportSummary = useMemo(() => {
     const followUpNote = operatorNote.trim() || 'No local operator note recorded yet.';
+    if (handoffFormat === 'discord') {
+      return [
+        `Team update: ${laneLabel}`,
+        `Summary: ${laneSummary}`,
+        `Primary action: ${primaryActionLabel}`,
+        `Operator note: ${followUpNote}`,
+        'Checklist:',
+        ...checklist.map((item, index) => `${index + 1}. ${item}`),
+        'Suggested use: Discord team update or async ops channel summary.',
+      ].join('\n');
+    }
+
     if (handoffFormat === 'ticket') {
       return [
         `Title: Reliability follow-up - ${laneLabel}`,
@@ -128,6 +155,29 @@ export function ReliabilityHandoffPanel({
       setExportStatus('Export package copied to clipboard and ready for handoff.');
     } catch {
       setExportStatus('Export package refreshed for handoff.');
+    }
+  }
+
+  async function sendDiscordUpdate() {
+    if (!discordConfigured || sendingDiscord) {
+      return;
+    }
+
+    setSendingDiscord(true);
+    setExportStatus('Sending handoff to Discord...');
+
+    try {
+      const response = await sendAdminDiscordHandoff(apiBaseUrl, sessionToken, {
+        title: `${laneTitle}`,
+        summary: exportSummary,
+        lane_label: laneLabel,
+        handoff_format: handoffFormat,
+      });
+      setExportStatus(response.message);
+    } catch (error) {
+      setExportStatus(error instanceof Error ? error.message : 'Could not send Discord handoff.');
+    } finally {
+      setSendingDiscord(false);
     }
   }
 
@@ -195,6 +245,20 @@ export function ReliabilityHandoffPanel({
           </button>
           <button
             type="button"
+            onClick={() => {
+              void sendDiscordUpdate();
+            }}
+            disabled={!discordConfigured || sendingDiscord}
+            className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
+              discordConfigured && !sendingDiscord
+                ? 'bg-violet-600 text-white hover:bg-violet-500'
+                : 'cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400'
+            }`}
+          >
+            {sendingDiscord ? 'Sending to Discord...' : 'Send to Discord'}
+          </button>
+          <button
+            type="button"
             onClick={clearOperatorNote}
             className="rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white"
           >
@@ -209,6 +273,9 @@ export function ReliabilityHandoffPanel({
         </div>
         <p className="mt-3 text-sm leading-6 text-slate-600">
           Use this summary in Slack, ticket handoff, or incident notes.
+        </p>
+        <p className="mt-2 text-sm leading-6 text-slate-600">
+          Discord webhook: {discordConfigured ? 'configured and ready to post.' : 'not configured yet.'}
         </p>
         <div className="mt-3 grid gap-3 md:grid-cols-2">
           <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3">

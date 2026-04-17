@@ -82,7 +82,7 @@ export function AdminBookingsSection({
     shadowRecentDriftExamples.length > 0 ? shadowRecentDriftExamples : shadowTopDriftReferences;
 
   return (
-    <section className="apple-card p-6">
+    <section className="template-card p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <AdminBookingsSummary
           bookingsTotal={bookingsTotal}

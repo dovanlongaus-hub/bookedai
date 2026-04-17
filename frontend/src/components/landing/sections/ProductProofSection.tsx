@@ -10,6 +10,12 @@ export function ProductProofSection({
   content,
   items,
 }: ProductProofSectionProps) {
+  const proofOutcomes = [
+    'Faster first response',
+    'Cleaner qualification',
+    'Stronger booking intent',
+  ];
+
   const proofSignals = [
     {
       title: 'Respond',
@@ -26,29 +32,27 @@ export function ProductProofSection({
   ];
 
   return (
-    <section id="solution" className="mx-auto w-full max-w-7xl px-6 py-8 lg:px-8">
-      <div className="overflow-hidden rounded-[2.5rem] border border-black/5 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.05)]">
-        <div className="border-b border-slate-200 px-8 py-5 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-          Works across the channels service businesses already use
-        </div>
-        <div className="grid gap-px bg-slate-200 md:grid-cols-5">
-          {content.channels.map((channel) => (
-            <div
-              key={channel}
-              className="bg-white px-6 py-5 text-center text-sm font-medium text-slate-700"
-            >
-              {channel}
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="mt-10 grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
-        <div>
+    <section id="solution" className="mx-auto w-full max-w-7xl px-6 py-10 lg:px-8 lg:py-12">
+      <div className="grid gap-5 lg:grid-cols-[0.88fr_1.12fr] lg:items-start">
+        <div className="template-card p-7 lg:p-8">
           <SectionHeading {...content.section} />
 
           <div className="mt-8 overflow-hidden rounded-[2rem] border border-black/5 bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_24%,#f8fbff_100%)] p-5 shadow-[0_18px_50px_rgba(15,23,42,0.04)]">
-            <div className="grid gap-4 lg:grid-cols-[0.58fr_0.42fr]">
+            <div className="border-b border-black/6 pb-4 text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
+              Works across the channels service businesses already use
+            </div>
+            <div className="mt-4 grid gap-2 sm:grid-cols-2">
+              {content.channels.map((channel) => (
+                <div
+                  key={channel}
+                  className="rounded-[1.2rem] border border-white/80 bg-white/92 px-4 py-3 text-sm font-semibold text-slate-700"
+                >
+                  {channel}
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 grid gap-4 lg:grid-cols-[0.58fr_0.42fr]">
               <div className="grid gap-3">
                 {proofSignals.map((item, index) => (
                   <div
@@ -66,19 +70,15 @@ export function ProductProofSection({
                 ))}
               </div>
 
-              <div className="rounded-[1.5rem] bg-[#1d1d1f] p-5 text-white">
+              <div className="template-card-dark p-5 text-white">
                 <div className="text-xs font-semibold uppercase tracking-[0.22em] text-[#2997ff]">
                   Conversion layer
                 </div>
                 <div className="mt-3 text-2xl font-semibold tracking-[-0.03em]">
-                  A clearer booking story in one compact system.
+                  One compact layer buyers understand fast.
                 </div>
                 <div className="mt-4 grid gap-3">
-                  {[
-                    'More live leads stay in play',
-                    'Less front-desk repetition',
-                    'A scalable SME software wedge',
-                  ].map((line) => (
+                  {proofOutcomes.map((line) => (
                     <div key={line} className="rounded-[1.1rem] bg-white/8 px-4 py-3 text-sm text-white/80">
                       {line}
                     </div>
@@ -93,7 +93,7 @@ export function ProductProofSection({
           {items.map((item, index) => (
             <article
               key={item.title}
-              className="relative flex h-full flex-col overflow-hidden rounded-[1.75rem] border border-black/5 bg-white p-7 shadow-[0_20px_60px_rgba(15,23,42,0.04)]"
+              className="template-card-subtle relative flex h-full flex-col overflow-hidden p-7"
             >
               <div
                 aria-hidden="true"
@@ -113,10 +113,12 @@ export function ProductProofSection({
               <p className="mt-3 text-sm leading-7 text-slate-600">
                 {item.body}
               </p>
-              <div className="mt-5 rounded-[1.2rem] bg-[#f8fafc] px-4 py-3 text-sm leading-6 text-slate-700">
-                {index % 2 === 0
-                  ? 'Buyer-facing impact'
-                  : 'Operational and investor-facing impact'}
+              <div className="mt-auto pt-5">
+                <div className="rounded-[1.2rem] bg-[#f8fafc] px-4 py-3 text-sm leading-6 text-slate-700">
+                  {index % 2 === 0
+                    ? 'Clear for buyers at the moment of decision'
+                    : 'Useful for operators after the chat ends'}
+                </div>
               </div>
             </article>
           ))}

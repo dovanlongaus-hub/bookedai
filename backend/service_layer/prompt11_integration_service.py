@@ -195,6 +195,82 @@ async def build_crm_retry_backlog(
     }
 
 
+async def build_outbox_backlog(
+    session,
+    *,
+    tenant_id: str,
+) -> dict[str, object | None]:
+    repository = IntegrationRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    items = await repository.list_outbox_backlog(tenant_id=tenant_id)
+
+    failed_count = 0
+    retrying_count = 0
+    pending_count = 0
+    latest_at = None
+    backlog_items: list[dict[str, object | None]] = []
+
+    for item in items:
+        status = str(item.get("status") or "pending")
+        attempt_count = int(item.get("attempt_count") or 0)
+        last_error_at = item.get("last_error_at")
+        available_at = item.get("available_at")
+        created_at = item.get("created_at")
+        latest_marker = last_error_at or available_at or created_at
+
+        if status == "failed":
+            failed_count += 1
+        elif status == "retrying":
+            retrying_count += 1
+        elif status == "pending":
+            pending_count += 1
+
+        if latest_marker and (latest_at is None or str(latest_marker) > str(latest_at)):
+            latest_at = latest_marker
+
+        recommended_action = "Dispatch pending outbox work when you are ready to process the queue."
+        if status == "failed":
+            recommended_action = "Review the last error, replay this event, then rerun dispatch."
+        elif status == "retrying":
+            recommended_action = "Rerun dispatch so the queued retry can be attempted."
+        elif attempt_count >= 2:
+            recommended_action = "Escalate if this event keeps cycling without a successful dispatch."
+
+        backlog_items.append(
+            {
+                "outbox_event_id": item.get("id"),
+                "event_type": item.get("event_type"),
+                "aggregate_type": item.get("aggregate_type"),
+                "aggregate_id": item.get("aggregate_id"),
+                "status": status,
+                "attempt_count": attempt_count,
+                "last_error": item.get("last_error"),
+                "last_error_at": last_error_at,
+                "processed_at": item.get("processed_at"),
+                "available_at": available_at,
+                "idempotency_key": item.get("idempotency_key"),
+                "created_at": created_at,
+                "recommended_action": recommended_action,
+            }
+        )
+
+    overall_status = "healthy"
+    if failed_count:
+        overall_status = "attention_required"
+    elif retrying_count or pending_count:
+        overall_status = "monitoring"
+
+    return {
+        "status": overall_status,
+        "checked_at": latest_at,
+        "summary": {
+            "failed_events": failed_count,
+            "retrying_events": retrying_count,
+            "pending_events": pending_count,
+        },
+        "items": backlog_items,
+    }
+
+
 async def build_reconciliation_details(
     session,
     *,
@@ -260,6 +336,54 @@ async def build_reconciliation_details(
             "healthy_sections": sum(1 for section in sections if section["status"] == "healthy"),
         },
         "sections": sections,
+    }
+
+
+async def build_recent_runtime_activity(
+    session,
+    *,
+    tenant_id: str,
+) -> dict[str, object | None]:
+    repository = IntegrationRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    items = await repository.list_recent_runtime_activity(tenant_id=tenant_id)
+    normalized_items: list[dict[str, object | None]] = []
+    latest_at = None
+
+    for item in items:
+        occurred_at = item.get("occurred_at")
+        if occurred_at and (latest_at is None or str(occurred_at) > str(latest_at)):
+            latest_at = occurred_at
+
+        source = str(item.get("source") or "unknown")
+        status = str(item.get("status") or "unknown")
+        title = str(item.get("title") or source)
+        summary = item.get("detail")
+        if source == "job_runs":
+            summary = item.get("detail") or f"Attempt count {int(item.get('attempt_count') or 0)}"
+        elif source == "webhook_events":
+            summary = item.get("external_ref") or "Webhook event"
+        elif source == "outbox_events":
+            summary = item.get("detail") or "Outbox event"
+
+        normalized_items.append(
+            {
+                "source": source,
+                "item_id": item.get("item_id"),
+                "title": title,
+                "status": status,
+                "summary": summary,
+                "occurred_at": occurred_at,
+                "started_at": item.get("started_at"),
+                "finished_at": item.get("finished_at"),
+                "external_ref": item.get("external_ref"),
+                "attempt_count": int(item.get("attempt_count") or 0),
+            }
+        )
+
+    return {
+        "status": "healthy" if normalized_items else "idle",
+        "checked_at": latest_at,
+        "items": normalized_items,
     }
 
 

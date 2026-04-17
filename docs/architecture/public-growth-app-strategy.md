@@ -22,6 +22,7 @@ This strategy inherits and aligns with:
 - Prompt 3 additive foundations
 - Prompt 4 data architecture direction
 - Prompt 5 API and contract strategy
+- the Phase 0 landing-page system requirements baseline in `docs/architecture/landing-page-system-requirements.md`
 
 ## Section 1 — Executive summary
 

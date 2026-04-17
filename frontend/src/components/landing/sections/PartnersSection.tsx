@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 
 import { fallbackPartners, type PartnersSectionContent } from '../data';
-import { getApiBaseUrl } from '../../../shared/config/api';
+import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../../shared/config/api';
 import { SectionHeading } from '../ui/SectionHeading';
 
 type PartnerProfileItem = {
@@ -80,6 +80,12 @@ export function PartnersSection({ content }: PartnersSectionProps) {
     let cancelled = false;
 
     async function loadPartners() {
+      if (shouldUseLocalStaticPublicData()) {
+        setLoading(false);
+        setError('');
+        return;
+      }
+
       try {
         setLoading(true);
         setError('');
@@ -101,11 +107,7 @@ export function PartnersSection({ content }: PartnersSectionProps) {
         }
       } catch (requestError) {
         if (!cancelled) {
-          setError(
-            requestError instanceof Error
-              ? requestError.message
-              : 'Could not load partner profiles.',
-          );
+          setError(visibleFallbackError(requestError));
         }
       } finally {
         if (!cancelled) {
@@ -157,11 +159,16 @@ export function PartnersSection({ content }: PartnersSectionProps) {
   const visibleItems = mergedItems.filter((item) => item.logo_url || item.image_url);
   const infrastructurePartners = visibleItems.filter(isInfrastructurePartner);
   const ecosystemPartners = visibleItems.filter((item) => !isInfrastructurePartner(item));
+  const trustSignals = [
+    `${visibleItems.length || fallbackPartners.length} visible trust points`,
+    'Startup infrastructure plus real ecosystem presence',
+    'Curated to support buyer confidence, not just decorate the page',
+  ];
 
   return (
     <section id="partners" className="mx-auto w-full max-w-7xl px-6 py-24 lg:px-8">
       <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
-        <div>
+        <div className="template-card p-7 lg:p-8">
           <SectionHeading
             kicker={content.kicker}
             kickerClassName={content.kickerClassName}
@@ -178,6 +185,22 @@ export function PartnersSection({ content }: PartnersSectionProps) {
                 {item}
               </div>
             ))}
+          </div>
+
+          <div className="booked-note-surface mt-5 p-5">
+            <div className="template-kicker text-[11px]">
+              Trust frame
+            </div>
+            <div className="mt-3 grid gap-3">
+              {trustSignals.map((item) => (
+                <div
+                  key={item}
+                  className="rounded-[1.15rem] bg-white px-4 py-3 text-sm font-medium leading-6 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+                >
+                  {item}
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
@@ -316,4 +339,12 @@ export function PartnersSection({ content }: PartnersSectionProps) {
       </div>
     </section>
   );
+}
+
+function visibleFallbackError(error: unknown) {
+  if (error instanceof Error && /401|403|unauthorized|forbidden/i.test(error.message)) {
+    return '';
+  }
+
+  return error instanceof Error ? error.message : 'Could not load partner profiles.';
 }

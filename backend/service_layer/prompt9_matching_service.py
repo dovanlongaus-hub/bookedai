@@ -19,6 +19,18 @@ class RankedServiceMatch:
     semantic_reason: str | None = None
 
 
+@dataclass(frozen=True)
+class BookingRequestContext:
+    party_size: int | None
+    requested_date: str | None
+    requested_time: str | None
+    schedule_hint: str | None
+    intent_label: str | None
+    summary: str | None
+    near_me_requested: bool = False
+    is_chat_style: bool = False
+
+
 MATCH_INTENT_EVIDENCE = {
     "exact_name_phrase",
     "exact_provider_phrase",
@@ -53,16 +65,324 @@ NON_TOPIC_TERMS = {
     "with",
 }
 
+LOCATION_ALIASES = {
+    "sydney": "Sydney",
+    "sydney cbd": "Sydney CBD",
+    "melbourne": "Melbourne",
+    "melbourne cbd": "Melbourne CBD",
+    "brisbane": "Brisbane",
+    "brisbane city": "Brisbane City",
+    "brisbane cbd": "Brisbane CBD",
+    "perth": "Perth",
+    "perth cbd": "Perth CBD",
+    "adelaide": "Adelaide",
+    "canberra": "Canberra",
+    "gold coast": "Gold Coast",
+    "sunshine coast": "Sunshine Coast",
+    "newcastle": "Newcastle",
+    "wollongong": "Wollongong",
+    "hobart": "Hobart",
+    "darwin": "Darwin",
+    "geelong": "Geelong",
+    "townsville": "Townsville",
+    "cairns": "Cairns",
+    "castle hill": "Castle Hill",
+    "fortitude valley": "Fortitude Valley",
+    "james street": "James Street",
+    "parramatta": "Parramatta",
+    "paddington": "Paddington",
+    "surry hills": "Surry Hills",
+    "south bank": "South Bank",
+    "southbank": "Southbank",
+    "olympic park": "Sydney Olympic Park",
+    "north sydney": "North Sydney",
+    "manly": "Manly",
+    "bondi": "Bondi",
+    "bondi junction": "Bondi Junction",
+    "chatswood": "Chatswood",
+    "hornsby": "Hornsby",
+    "penrith": "Penrith",
+    "liverpool": "Liverpool",
+    "blacktown": "Blacktown",
+    "cronulla": "Cronulla",
+    "st leonards": "St Leonards",
+    "neutral bay": "Neutral Bay",
+    "mosman": "Mosman",
+    "newtown": "Newtown",
+    "glebe": "Glebe",
+    "pyrmont": "Pyrmont",
+    "darlinghurst": "Darlinghurst",
+    "chippendale": "Chippendale",
+    "redfern": "Redfern",
+    "zetland": "Zetland",
+    "mascot": "Mascot",
+    "st kilda": "St Kilda",
+    "fitzroy": "Fitzroy",
+    "collingwood": "Collingwood",
+    "richmond": "Richmond",
+    "brunswick": "Brunswick",
+    "footscray": "Footscray",
+    "hawthorn": "Hawthorn",
+    "prahran": "Prahran",
+    "south yarra": "South Yarra",
+    "toorak": "Toorak",
+    "new farm": "New Farm",
+    "west end": "West End",
+    "spring hill": "Spring Hill",
+    "kangaroo point": "Kangaroo Point",
+    "chermside": "Chermside",
+    "indooroopilly": "Indooroopilly",
+    "surfers paradise": "Surfers Paradise",
+    "broadbeach": "Broadbeach",
+    "burleigh heads": "Burleigh Heads",
+    "noosa": "Noosa",
+    "caloundra": "Caloundra",
+}
+
+LOCATION_SIGNAL_GROUPS: dict[str, set[str]] = {
+    "sydney": {
+        "sydney",
+        "sydney cbd",
+        "cbd",
+        "paddington",
+        "surry hills",
+        "parramatta",
+        "sydney olympic park",
+        "olympic park",
+        "western sydney",
+        "north sydney",
+        "manly",
+        "bondi",
+        "bondi junction",
+        "chatswood",
+        "hornsby",
+        "penrith",
+        "liverpool",
+        "blacktown",
+        "cronulla",
+        "st leonards",
+        "neutral bay",
+        "mosman",
+        "newtown",
+        "glebe",
+        "pyrmont",
+        "darlinghurst",
+        "chippendale",
+        "redfern",
+        "zetland",
+        "mascot",
+        "castle hill",
+    },
+    "melbourne": {
+        "melbourne",
+        "melbourne cbd",
+        "southbank",
+        "south bank melbourne",
+        "collins street",
+        "st kilda",
+        "fitzroy",
+        "collingwood",
+        "richmond",
+        "brunswick",
+        "footscray",
+        "hawthorn",
+        "prahran",
+        "south yarra",
+        "toorak",
+    },
+    "brisbane": {
+        "brisbane",
+        "brisbane city",
+        "brisbane cbd",
+        "south bank brisbane",
+        "south bank",
+        "fortitude valley",
+        "james street",
+        "new farm",
+        "west end",
+        "spring hill",
+        "kangaroo point",
+        "chermside",
+        "indooroopilly",
+    },
+    "gold coast": {
+        "gold coast",
+        "surfers paradise",
+        "broadbeach",
+        "burleigh heads",
+        "robina",
+        "southport",
+        "coolangatta",
+    },
+    "sunshine coast": {
+        "sunshine coast",
+        "noosa",
+        "caloundra",
+        "maroochydore",
+        "mooloolaba",
+    },
+    "perth": {
+        "perth",
+        "perth cbd",
+        "fremantle",
+        "subiaco",
+        "cottesloe",
+        "scarborough",
+        "joondalup",
+        "cannington",
+    },
+    "adelaide": {
+        "adelaide",
+        "adelaide cbd",
+        "norwood",
+        "glenelg",
+        "unley",
+    },
+    "canberra": {
+        "canberra",
+        "act",
+        "belconnen",
+        "woden",
+        "tuggeranong",
+        "gungahlin",
+    },
+    "wollongong": {
+        "wollongong",
+        "illawarra",
+        "wollongong cbd",
+    },
+    "newcastle": {
+        "newcastle",
+        "newcastle cbd",
+        "hunter valley",
+        "maitland",
+        "cessnock",
+    },
+}
+
+TOPIC_PHRASE_SYNONYMS: dict[str, set[str]] = {
+    "skin care": {"skincare", "skin", "facial", "spa", "beauty"},
+    "skin treatment": {"skincare", "skin", "facial", "spa", "beauty"},
+    "private dining": {"private", "dining", "dinner", "restaurant", "group", "table"},
+    "team dinner": {"team", "dinner", "dining", "restaurant", "group", "table"},
+    "team lunch": {"team", "lunch", "dining", "restaurant", "group", "table"},
+    "group dinner": {"group", "dinner", "dining", "restaurant", "table"},
+    "membership renewal": {"membership", "member", "renew", "renewal", "signup", "join"},
+    "member renewal": {"membership", "member", "renew", "renewal", "signup", "join"},
+    "sign printing": {"signage", "print", "printing", "banner", "expo", "booth"},
+    "event signage": {"signage", "print", "printing", "banner", "expo", "booth"},
+    "expo printing": {"signage", "print", "printing", "banner", "expo", "booth"},
+    "a frame signage": {"signage", "sign", "frame", "banner"},
+    "pavement sign": {"signage", "sign", "frame", "banner"},
+    "bridal hair": {"hair", "haircut", "salon", "bridal", "wedding", "styling"},
+    "wedding hair": {"hair", "haircut", "salon", "bridal", "wedding", "styling"},
+    "hair styling": {"hair", "haircut", "salon", "styling", "colour", "color"},
+    "skin clinic": {"skin", "facial", "spa", "beauty", "treatment"},
+    "gp clinic": {"gp", "doctor", "medical", "clinic", "consultation"},
+    "medical clinic": {"gp", "doctor", "medical", "clinic", "consultation"},
+    # Chat-style natural language patterns
+    "looking for": set(),  # intent marker only, no expansion
+    "need a massage": {"massage", "remedial", "relaxation", "therapy", "spa"},
+    "need a facial": {"facial", "skincare", "beauty", "spa", "treatment"},
+    "want a haircut": {"hair", "haircut", "salon", "barber", "cut"},
+    "get a haircut": {"hair", "haircut", "salon", "barber", "cut"},
+    "something to eat": {"restaurant", "dining", "dinner", "lunch", "cafe", "food"},
+    "place to eat": {"restaurant", "dining", "dinner", "lunch", "cafe", "food"},
+    "good restaurant": {"restaurant", "dining", "dinner", "lunch", "cafe"},
+    "beauty treatment": {"beauty", "facial", "spa", "skincare", "treatment", "glow"},
+    "pampering session": {"spa", "facial", "massage", "beauty", "treatment", "glow"},
+    "relaxation massage": {"massage", "remedial", "relaxation", "therapy", "spa"},
+    "sports massage": {"massage", "remedial", "sports", "therapy", "physio"},
+    "deep tissue": {"massage", "remedial", "deep tissue", "therapy"},
+    "hair colour": {"hair", "colour", "color", "salon", "highlights", "balayage"},
+    "hair color": {"hair", "colour", "color", "salon", "highlights", "balayage"},
+    "nail appointment": {"nail", "nails", "manicure", "pedicure", "beauty"},
+    "nail salon": {"nail", "nails", "manicure", "pedicure", "beauty"},
+    "manicure pedicure": {"nail", "nails", "manicure", "pedicure", "beauty"},
+    "teeth whitening": {"teeth", "whitening", "dental", "smile", "cosmetic"},
+    "dental checkup": {"dental", "dentist", "checkup", "oral", "teeth"},
+    "personal training": {"personal", "trainer", "training", "fitness", "gym", "workout"},
+    "personal trainer": {"personal", "trainer", "training", "fitness", "gym"},
+    "pilates class": {"pilates", "yoga", "fitness", "class", "studio"},
+    "yoga class": {"yoga", "pilates", "fitness", "class", "studio", "wellness"},
+    "gym membership": {"gym", "fitness", "membership", "workout", "training"},
+    "brow lamination": {"brow", "eyebrow", "lamination", "beauty", "wax"},
+    "lash lift": {"lash", "eyelash", "lift", "beauty", "extensions"},
+    "eyelash extensions": {"lash", "eyelash", "extensions", "beauty"},
+    "spray tan": {"tan", "spray", "beauty", "tanning"},
+    "wax appointment": {"wax", "waxing", "beauty", "hair removal"},
+    "laser hair removal": {"laser", "hair removal", "beauty", "ipl"},
+    "photo shoot": {"photo", "photography", "shoot", "portrait", "headshot"},
+    "photography session": {"photo", "photography", "shoot", "portrait"},
+    "function venue": {"venue", "function", "event", "party", "hire"},
+    "event space": {"venue", "event", "function", "space", "hire"},
+    "party venue": {"venue", "party", "function", "event", "hire"},
+    "birthday party": {"birthday", "party", "venue", "function", "event"},
+    "corporate event": {"corporate", "event", "venue", "function", "conference"},
+    "osteopath appointment": {"osteo", "osteopath", "therapy", "rehab", "clinic"},
+    "chiropractic": {"chiro", "chiropractor", "spine", "therapy", "rehab"},
+    "physio appointment": {"physio", "physiotherapy", "therapy", "rehab", "clinic"},
+    "acupuncture": {"acupuncture", "tcm", "therapy", "wellness", "holistic"},
+    "naturopath": {"naturopath", "holistic", "wellness", "natural", "therapy"},
+    "psychology appointment": {"psychology", "psychologist", "mental health", "therapy", "counselling"},
+    "counselling": {"counselling", "counselor", "mental health", "therapy", "psychology"},
+    "life coaching": {"coaching", "coach", "life coach", "wellness", "mindset"},
+    "property consultation": {"property", "real estate", "investment", "consultation"},
+    "financial advice": {"financial", "finance", "advice", "planning", "investment"},
+}
+
 TOPIC_SYNONYM_GROUPS: tuple[set[str], ...] = (
-    {"facial", "facials", "spa", "beauty", "skincare", "skin", "glow", "led"},
-    {"hair", "haircut", "colour", "color", "salon", "styling"},
-    {"physio", "physiotherapy", "physical", "therapy", "rehab", "rehabilitation"},
-    {"restaurant", "dining", "dinner", "table", "cafe", "private", "group"},
-    {"venue", "function", "party", "event"},
+    {"facial", "facials", "spa", "beauty", "skincare", "skin", "glow", "led", "pampering"},
+    {"hair", "haircut", "haircuts", "colour", "color", "salon", "styling", "bridal", "wedding", "barber", "balayage", "highlights"},
+    {"massage", "remedial", "relaxation", "sports massage", "deep tissue", "swedish"},
+    {"nail", "nails", "manicure", "pedicure", "gel", "shellac"},
+    {"lash", "eyelash", "brow", "eyebrow", "lamination", "extensions", "lift"},
+    {"tan", "tanning", "spray tan", "sunless"},
+    {"wax", "waxing", "ipl", "laser", "hair removal"},
+    {"physio", "physiotherapy", "physical", "therapy", "rehab", "rehabilitation", "osteo", "osteopath", "chiro", "chiropractor"},
+    {"yoga", "pilates", "fitness", "gym", "workout", "studio", "class", "training"},
+    {"personal", "trainer", "personal trainer", "pt"},
+    {"gp", "doctor", "medical", "clinic", "consultation", "dental", "dentist", "teeth"},
+    {"psychology", "psychologist", "counselling", "counselor", "mental health", "therapy", "coaching"},
+    {"acupuncture", "naturopath", "holistic", "wellness", "natural", "tcm"},
+    {"restaurant", "dining", "dinner", "table", "cafe", "private", "group", "food", "lunch"},
+    {"venue", "function", "party", "event", "hire", "space"},
     {"membership", "member", "renew", "renewal", "signup", "join"},
     {"housing", "property", "project", "apartment", "townhouse", "home", "estate", "investment"},
-    {"signage", "printing", "print", "expo", "booth", "banner"},
+    {"signage", "sign", "banner", "frame", "expo", "booth", "media", "wall"},
+    {"photo", "photography", "shoot", "portrait", "headshot", "photographer"},
+    {"teeth", "whitening", "dental", "dentist", "smile", "cosmetic"},
+    {"financial", "finance", "advice", "planning", "investment", "mortgage"},
+    {"corporate", "conference", "meeting", "workshop", "seminar"},
 )
+
+_NEAR_ME_PATTERNS = re.compile(
+    r"\b(near me|nearby|close to me|around me|around here|in my area|close by|near here|"
+    r"within walking distance|close enough|my location|current location)\b",
+    re.IGNORECASE,
+)
+
+_CHAT_STYLE_MARKERS = re.compile(
+    r"\b(i need|i want|i am looking|i'm looking|looking for|can you|do you have|"
+    r"recommend|suggest|help me|where can i|what is|whats the best|best|"
+    r"any good|something for|good place|please|thanks|thank you)\b",
+    re.IGNORECASE,
+)
+
+
+def is_near_me_requested(query: str | None) -> bool:
+    if not query:
+        return False
+    return bool(_NEAR_ME_PATTERNS.search(query))
+
+
+def is_chat_style_query(query: str | None) -> bool:
+    if not query:
+        return False
+    words = query.split()
+    if len(words) >= 5:
+        return True
+    return bool(_CHAT_STYLE_MARKERS.search(query))
 
 
 def _normalized_terms(value: str | None) -> set[str]:
@@ -70,19 +390,184 @@ def _normalized_terms(value: str | None) -> set[str]:
     return {term for term in normalized.split() if term}
 
 
+def _normalized_text(value: str | None) -> str:
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).split())
+
+
+def expand_location_terms(terms: set[str], *, text: str | None = None) -> set[str]:
+    expanded_terms = set(terms)
+    normalized_text = _normalized_text(text)
+    for canonical, aliases in LOCATION_SIGNAL_GROUPS.items():
+        alias_hit = any(
+            re.search(rf"(^| )({re.escape(alias)})( |$)", normalized_text)
+            for alias in aliases
+        ) if normalized_text else False
+        if alias_hit or canonical in expanded_terms:
+            expanded_terms.add(canonical)
+    return expanded_terms
+
+
+def _location_signals(value: str | None) -> set[str]:
+    terms = set(_normalized_terms(value))
+    normalized_text = _normalized_text(value)
+    for canonical, aliases in LOCATION_SIGNAL_GROUPS.items():
+        alias_hit = any(
+            re.search(rf"(^| )({re.escape(alias)})( |$)", normalized_text)
+            for alias in aliases
+        ) if normalized_text else False
+        if alias_hit or canonical in terms:
+            terms.add(f"metro:{canonical}")
+    return terms
+
+
+def extract_query_location_hint(query: str | None, location_hint: str | None = None) -> str | None:
+    explicit_location = _string_or_none(location_hint)
+    if explicit_location:
+        return explicit_location
+
+    normalized_query = _normalized_text(query)
+    if not normalized_query:
+        return None
+
+    for phrase, canonical in sorted(LOCATION_ALIASES.items(), key=lambda item: len(item[0]), reverse=True):
+        if re.search(rf"(^| )({re.escape(phrase)})( |$)", normalized_query):
+            return canonical
+    return None
+
+
+def extract_query_budget_limit(query: str | None, budget: dict[str, Any] | None = None) -> float | None:
+    explicit_budget_limit = _extract_budget_limit(budget)
+    if explicit_budget_limit is not None:
+        return explicit_budget_limit
+
+    normalized_query = _normalized_text(query)
+    if not normalized_query:
+        return None
+
+    patterns = (
+        r"(?:under|below|less than|max|up to|within)\s+\$?\s*(\d+(?:\.\d+)?)",
+        r"\$?\s*(\d+(?:\.\d+)?)\s*(?:or less|and under|maximum)",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, normalized_query)
+        if not match:
+            continue
+        try:
+            amount = float(match.group(1))
+        except (TypeError, ValueError):
+            continue
+        if amount > 0:
+            return amount
+    return None
+
+
+def extract_booking_request_context(
+    query: str | None,
+    time_window: dict[str, Any] | None = None,
+) -> BookingRequestContext:
+    normalized_query = _normalized_text(query)
+    if not normalized_query and not time_window:
+        return BookingRequestContext(
+            party_size=None,
+            requested_date=None,
+            requested_time=None,
+            schedule_hint=None,
+            intent_label=None,
+            summary=None,
+        )
+
+    requested_date = _string_or_none(str((time_window or {}).get("date") or ""))
+    requested_time = _string_or_none(str((time_window or {}).get("time") or ""))
+    schedule_hint = _string_or_none(str((time_window or {}).get("label") or ""))
+    party_size: int | None = None
+    intent_label: str | None = None
+
+    party_match = re.search(
+        r"(?:for|party of)\s+(\d{1,2})(?:\s+(?:people|guests|adults|kids|children|persons))?|(\d{1,2})\s+(?:people|guests|adults|kids|children|persons)",
+        normalized_query,
+    )
+    if party_match:
+        for index in (1, 2):
+            value = party_match.group(index)
+            if value and value.isdigit():
+                parsed_party_size = int(value)
+                if parsed_party_size > 0:
+                    party_size = parsed_party_size
+                break
+
+    if "tonight" in normalized_query:
+        schedule_hint = schedule_hint or "tonight"
+    elif "tomorrow" in normalized_query:
+        schedule_hint = schedule_hint or "tomorrow"
+    elif "this weekend" in normalized_query or "weekend" in normalized_query:
+        schedule_hint = schedule_hint or "this weekend"
+
+    if not requested_time:
+        for label in ("morning", "afternoon", "evening"):
+            if label in normalized_query:
+                requested_time = label
+                break
+
+    if any(term in normalized_query for term in {"book", "booking", "reserve", "reservation"}):
+        intent_label = "ready_to_book"
+    elif any(term in normalized_query for term in {"consult", "consultation", "call", "quote"}):
+        intent_label = "consultation"
+    elif any(term in normalized_query for term in {"compare", "options"}):
+        intent_label = "compare_options"
+    elif any(term in normalized_query for term in {"recommend", "suggest", "best", "good", "looking for", "need", "want"}):
+        intent_label = "recommendation_request"
+
+    near_me = is_near_me_requested(query)
+    chat_style = is_chat_style_query(query)
+
+    summary_parts: list[str] = []
+    if near_me:
+        summary_parts.append("near user location")
+    if party_size:
+        summary_parts.append(f"for {party_size}")
+    if schedule_hint:
+        summary_parts.append(schedule_hint)
+    elif requested_date or requested_time:
+        summary_parts.append("at requested time")
+    if intent_label == "consultation":
+        summary_parts.append("consultation flow")
+    elif intent_label == "ready_to_book":
+        summary_parts.append("booking-ready")
+    elif intent_label == "compare_options":
+        summary_parts.append("compare-first")
+    elif intent_label == "recommendation_request":
+        summary_parts.append("recommendation")
+
+    return BookingRequestContext(
+        party_size=party_size,
+        requested_date=requested_date,
+        requested_time=requested_time,
+        schedule_hint=schedule_hint,
+        intent_label=intent_label,
+        summary=", ".join(summary_parts) or None,
+        near_me_requested=near_me,
+        is_chat_style=chat_style,
+    )
+
+
 def _topical_terms(query: str | None, *, location_hint: str | None = None) -> set[str]:
     query_terms = _normalized_terms(query)
-    location_terms = _normalized_terms(location_hint)
+    location_terms = _location_signals(extract_query_location_hint(query, location_hint))
     topical_terms = {
         term
         for term in query_terms
         if term not in location_terms and term not in NON_TOPIC_TERMS and not term.isdigit()
     }
-    return expand_topic_terms(topical_terms)
+    return expand_topic_terms(topical_terms, query=query)
 
 
-def expand_topic_terms(terms: set[str]) -> set[str]:
+def expand_topic_terms(terms: set[str], *, query: str | None = None) -> set[str]:
     expanded_terms = set(terms)
+    normalized_query = _normalized_text(query)
+    if normalized_query:
+        for phrase, phrase_terms in TOPIC_PHRASE_SYNONYMS.items():
+            if re.search(rf"(^| )({re.escape(phrase)})( |$)", normalized_query):
+                expanded_terms |= phrase_terms
     for group in TOPIC_SYNONYM_GROUPS:
         if expanded_terms & group:
             expanded_terms |= group
@@ -178,10 +663,11 @@ def rank_catalog_matches(
 ) -> list[RankedServiceMatch]:
     normalized_query = " ".join((query or "").strip().lower().split())
     query_terms = _normalized_terms(query)
-    topical_terms = _topical_terms(query, location_hint=location_hint)
-    location_terms = _normalized_terms(location_hint)
+    effective_location_hint = extract_query_location_hint(query, location_hint)
+    topical_terms = _topical_terms(query, location_hint=effective_location_hint)
+    location_terms = _location_signals(effective_location_hint)
     category_terms = _normalized_terms(requested_category)
-    budget_limit = _extract_budget_limit(budget)
+    budget_limit = extract_query_budget_limit(query, budget)
     requested_service_id_normalized = (requested_service_id or "").strip().lower()
 
     ranked: list[RankedServiceMatch] = []
@@ -202,7 +688,7 @@ def rank_catalog_matches(
         tags_terms = {term for tag in tags for term in _normalized_terms(tag)}
         category_value = _string_or_none(getattr(service, "category", None))
         category_service_terms = _normalized_terms(category_value)
-        location_service_terms = _normalized_terms(location) | venue_terms
+        location_service_terms = _location_signals(location) | _location_signals(venue_name)
 
         overlap_name = len(topical_terms & service_terms)
         overlap_business = len(topical_terms & business_terms)
@@ -354,6 +840,8 @@ def build_booking_trust_payload(
         )
 
     warnings: list[str] = []
+    category_value = _string_or_none(getattr(service, "category", None))
+    featured = bool(getattr(service, "featured", 0))
     if desired_date and desired_time:
         warnings.append("Availability is estimated from catalog metadata until provider verification is connected.")
 
@@ -367,10 +855,10 @@ def build_booking_trust_payload(
             "book_on_partner_site",
             warnings,
             False,
-            "high" if service.featured else "medium",
+            "high" if featured else "medium",
         )
 
-    if service.category and service.category.lower() in {"event", "events", "venue", "private dining"}:
+    if category_value and category_value.lower() in {"event", "events", "venue", "private dining"}:
         warnings.append("Event and venue bookings usually require manual confirmation.")
         return (
             "needs_manual_confirmation",
@@ -387,7 +875,7 @@ def build_booking_trust_payload(
         "request_callback",
         warnings,
         True,
-        "medium" if service.featured else "low",
+        "medium" if featured else "low",
     )
 
 
@@ -405,7 +893,7 @@ def resolve_booking_path_policy(
     if availability_state == "partner_booking_only":
         return (
             "book_on_partner_site",
-            "Redirect the customer to the partner booking flow and keep BookedAI advisory only.",
+            "Redirect the customer to the partner booking flow and keep Bookedai.au advisory only.",
             warnings,
             False,
         )

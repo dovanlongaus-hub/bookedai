@@ -30,11 +30,17 @@ const implementationSignals = [
   'Expand delivery modes without rebuilding the product logic.',
 ];
 
+const rolloutPhases = [
+  { title: 'Launch now', body: 'Standalone booking surface live first.' },
+  { title: 'Embed next', body: 'Reuse the same engine inside a website widget.' },
+  { title: 'Extend later', body: 'Add CRM, calendar, payment, and app surfaces.' },
+];
+
 export function ImplementationSection({ content }: ImplementationSectionProps) {
   return (
     <section id="implementation" className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-8 lg:py-16">
-      <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
-        <div className="apple-card p-8 lg:p-10">
+      <div className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr] lg:items-start">
+        <div className="template-card p-8 lg:p-10">
           <SectionHeading {...content} />
 
           <div className="mt-8 grid gap-3">
@@ -50,28 +56,39 @@ export function ImplementationSection({ content }: ImplementationSectionProps) {
               </div>
             ))}
           </div>
+
+          <div className="mt-6 grid gap-3 sm:grid-cols-3">
+            {rolloutPhases.map((phase, index) => (
+              <article key={phase.title} className="rounded-[1.35rem] bg-[#f5f5f7] px-4 py-4">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Phase 0{index + 1}
+                </div>
+                <div className="mt-2 text-sm font-semibold text-[#1d1d1f]">{phase.title}</div>
+                <div className="mt-2 text-sm leading-6 text-black/62">{phase.body}</div>
+              </article>
+            ))}
+          </div>
         </div>
 
         <div className="grid gap-4 md:grid-cols-2">
-          {deploymentModes.map((mode) => (
-            <article key={mode.title} className="apple-card-soft h-full p-6">
-              <div className="text-sm font-semibold text-[#0071e3]">{mode.title}</div>
-              <p className="mt-3 text-sm leading-6 text-black/70">{mode.body}</p>
-            </article>
-          ))}
-
-          <article className="rounded-[1.9rem] bg-[#1d1d1f] p-6 text-white md:col-span-2">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#2997ff]">
+          <article className="template-card-dark p-6 md:col-span-2">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7dd3fc]">
               Product direction
             </div>
             <div className="mt-3 text-2xl font-semibold tracking-[-0.03em]">
-              One booking engine that can live on a site, in a widget, or inside an app.
+              One booking engine that can sell now and expand later.
             </div>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-white/78">
-              That keeps the brand adaptable for future naming decisions while the user
-              experience and conversion logic stay consistent for SME customers.
+              Start with the cleanest path to revenue, then extend distribution without rebuilding the core buying flow.
             </p>
           </article>
+
+          {deploymentModes.map((mode) => (
+            <article key={mode.title} className="template-card-subtle h-full p-6">
+              <div className="template-kicker text-sm tracking-[0.12em]">{mode.title}</div>
+              <p className="mt-3 text-sm leading-6 text-black/70">{mode.body}</p>
+            </article>
+          ))}
         </div>
       </div>
     </section>

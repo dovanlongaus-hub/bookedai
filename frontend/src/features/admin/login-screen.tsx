@@ -1,5 +1,6 @@
 import { FormEvent } from 'react';
-import { brandDescriptor, brandLogoPath, brandName } from '../../components/landing/data';
+import { brandDescriptor, brandName } from '../../components/landing/data';
+import { LogoMark } from '../../components/landing/ui/LogoMark';
 
 type AdminLoginScreenProps = {
   username: string;
@@ -21,23 +22,21 @@ export function AdminLoginScreen({
   onSubmit,
 }: AdminLoginScreenProps) {
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,#dbeafe,transparent_24%),linear-gradient(180deg,#0f172a_0%,#111827_45%,#e2e8f0_100%)] px-6 py-10 text-white lg:px-8">
+    <main className="booked-admin-login-shell lg:px-8">
       <div className="mx-auto max-w-5xl">
         <div className="grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
-          <section className="rounded-[2rem] border border-white/10 bg-white/10 p-8 backdrop-blur">
+          <section className="booked-admin-login-hero p-8">
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">
               Admin Portal
             </div>
-            <div className="mt-5 flex h-18 w-18 items-center justify-center overflow-hidden rounded-[1.25rem] bg-white/10 p-2">
-              <img
-                src={brandLogoPath}
-                alt={`${brandName} logo`}
-                className="h-full w-full object-contain"
-                loading="eager"
+            <div className="mt-5 max-w-[17rem] sm:max-w-[19rem]">
+              <LogoMark
+                variant="dark"
+                className="booked-brand-image booked-brand-image--hero booked-brand-image--soft w-full"
               />
             </div>
             <h1 className="mt-4 text-4xl font-bold tracking-tight">
-              {brandName} operations dashboard for bookings, payment flow, and messaging
+              {brandName} operations dashboard for revenue flow, bookings, and messaging
             </h1>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-200">
               Sign in to review live booking references, payment readiness, workflow callbacks,
@@ -62,7 +61,7 @@ export function AdminLoginScreen({
             </div>
           </section>
 
-          <section className="rounded-[2rem] border border-white/10 bg-white p-8 text-slate-950 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+          <section className="booked-admin-login-card p-8">
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-700">
               Sign in
             </div>
@@ -74,7 +73,7 @@ export function AdminLoginScreen({
                   type="text"
                   value={username}
                   onChange={(event) => onUsernameChange(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-sky-400"
+                  className="booked-field"
                   placeholder="info@bookedai.au"
                   autoComplete="username"
                 />
@@ -85,7 +84,7 @@ export function AdminLoginScreen({
                   type="password"
                   value={password}
                   onChange={(event) => onPasswordChange(event.target.value)}
-                  className="w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none transition focus:border-sky-400"
+                  className="booked-field"
                   placeholder="Enter admin password"
                   autoComplete="current-password"
                 />
@@ -93,7 +92,7 @@ export function AdminLoginScreen({
               <button
                 type="submit"
                 disabled={!username || !password || loggingIn}
-                className="w-full rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="booked-button w-full px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loggingIn ? 'Signing in...' : 'Sign in to admin'}
               </button>

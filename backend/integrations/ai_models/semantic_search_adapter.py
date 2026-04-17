@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 import json
+import re
 from typing import Any
 
 import httpx
@@ -47,6 +48,9 @@ class SemanticSearchAssessment:
     evidence: tuple[str, ...]
     ranked_candidates: tuple[SemanticSearchCandidateAssessment, ...]
     provider_label: str
+    provider_chain: tuple[str, ...] = ()
+    fallback_applied: bool = False
+    location_permission_needed: bool = False
 
 
 @dataclass(frozen=True)
@@ -74,6 +78,10 @@ class SemanticSearchAdapter(AIModelAdapter):
         budget: dict[str, Any] | None,
         preferences: dict[str, Any] | None,
         candidates: list[SemanticSearchCandidateInput],
+        user_location: dict[str, Any] | None = None,
+        near_me_requested: bool = False,
+        chat_context: list[dict[str, Any]] | None = None,
+        is_chat_style: bool = False,
     ) -> SemanticSearchAssessment | None:
         if not self.is_configured() or not candidates:
             return None
@@ -86,6 +94,7 @@ class SemanticSearchAdapter(AIModelAdapter):
                 "inferred_location": {"type": ["string", "null"]},
                 "inferred_category": {"type": ["string", "null"]},
                 "budget_summary": {"type": ["string", "null"]},
+                "location_permission_needed": {"type": "boolean"},
                 "evidence": {
                     "type": "array",
                     "items": {"type": "string"},
@@ -125,34 +134,36 @@ class SemanticSearchAdapter(AIModelAdapter):
                 "inferred_location",
                 "inferred_category",
                 "budget_summary",
+                "location_permission_needed",
                 "evidence",
                 "ranked_candidates",
             ],
         }
-        prompt = (
-            "You are BookedAI semantic search assist for service discovery. "
-            "Rerank only the supplied catalog candidates for the user's request. "
-            "Do not invent new candidates or new facts. "
-            "Treat availability as unknown unless the candidate explicitly has a direct booking path flag. "
-            "Prefer the candidate that best matches the user's service intent, location, category, budget, and specificity. "
-            "Use the heuristic score as a hint, not the sole answer. "
-            "Keep reasons concrete and operational. "
-            "If two candidates are close, preserve safer trust-first ordering. "
-            "Return only valid JSON matching the schema."
+        prompt = self._build_search_prompt(
+            near_me_requested=near_me_requested,
+            has_user_location=bool(user_location),
+            is_chat_style=is_chat_style,
         )
-        payload = {
+        payload: dict[str, Any] = {
             "query": query,
             "location_hint": location_hint,
             "budget": budget or {},
             "preferences": preferences or {},
             "candidates": [candidate.__dict__ for candidate in candidates],
+            "near_me_requested": near_me_requested,
         }
+        if user_location:
+            payload["user_location"] = user_location
+        if chat_context:
+            payload["recent_context"] = chat_context[-3:]
 
-        response_text, provider_label = await self._generate_structured_json(
+        response_text, provider_label, provider_chain = await self._generate_structured_json(
             prompt=prompt,
             payload=payload,
             schema=schema,
             location_hint=location_hint,
+            near_me_requested=near_me_requested,
+            has_user_location=bool(user_location),
         )
         if not response_text:
             return None
@@ -164,29 +175,50 @@ class SemanticSearchAdapter(AIModelAdapter):
                 SemanticSearchCandidateAssessment(
                     candidate_id=str(item.get("candidate_id") or "").strip(),
                     semantic_score=max(0.0, min(float(item.get("semantic_score") or 0.0), 1.0)),
-                    reason=str(item.get("reason") or "").strip() or "Semantic relevance supports this candidate.",
+                    reason=self._normalize_reason(
+                        str(item.get("reason") or "").strip()
+                        or "Semantic relevance supports this candidate."
+                    ),
                     trust_signal=str(item.get("trust_signal") or "").strip() or None,
                     is_preferred=bool(item.get("is_preferred")),
-                    evidence=tuple(
-                        str(value).strip()
-                        for value in item.get("evidence", [])
-                        if str(value).strip()
+                    evidence=self._normalize_evidence(
+                        tuple(
+                            str(value).strip()
+                            for value in item.get("evidence", [])
+                            if str(value).strip()
+                        )
                     ),
                 )
             )
+
+        fallback_applied = bool(provider_chain) and provider_chain[0] != provider_label
+        location_permission_needed = bool(parsed.get("location_permission_needed"))
+        # Override: if user already granted GPS, permission is not needed
+        if user_location:
+            location_permission_needed = False
+        assessment_evidence = self._normalize_evidence(
+            tuple(
+                str(value).strip() for value in parsed.get("evidence", []) if str(value).strip()
+            )
+            + (f"semantic_provider_{provider_label}",)
+            + ((f"semantic_fallback_from_{provider_chain[0]}",) if fallback_applied else ())
+            + (("near_me_intent",) if near_me_requested else ())
+            + (("location_permission_needed",) if location_permission_needed else ())
+        )
 
         return SemanticSearchAssessment(
             normalized_query=str(parsed.get("normalized_query") or "").strip() or None,
             inferred_location=str(parsed.get("inferred_location") or "").strip() or None,
             inferred_category=str(parsed.get("inferred_category") or "").strip() or None,
             budget_summary=str(parsed.get("budget_summary") or "").strip() or None,
-            evidence=tuple(
-                str(value).strip() for value in parsed.get("evidence", []) if str(value).strip()
-            ),
+            location_permission_needed=location_permission_needed,
+            evidence=assessment_evidence,
             ranked_candidates=tuple(
                 item for item in ranked_candidates if item.candidate_id
             ),
             provider_label=provider_label,
+            provider_chain=provider_chain,
+            fallback_applied=fallback_applied,
         )
 
     async def _generate_structured_json(
@@ -196,9 +228,13 @@ class SemanticSearchAdapter(AIModelAdapter):
         payload: dict[str, Any],
         schema: dict[str, Any],
         location_hint: str | None,
-    ) -> tuple[str, str]:
+        near_me_requested: bool = False,
+        has_user_location: bool = False,
+    ) -> tuple[str, str, tuple[str, ...]]:
         last_error: Exception | None = None
+        attempted_providers: list[str] = []
         for provider in self._provider_configs():
+            attempted_providers.append(provider.provider_name)
             try:
                 provider_name = provider.provider_name.lower()
                 if provider_name == "gemini" or "generativelanguage.googleapis.com" in provider.base_url:
@@ -209,8 +245,11 @@ class SemanticSearchAdapter(AIModelAdapter):
                             payload=payload,
                             schema=schema,
                             location_hint=location_hint,
+                            near_me_requested=near_me_requested,
+                            has_user_location=has_user_location,
                         ),
                         provider.provider_name,
+                        tuple(attempted_providers),
                     )
                 return (
                     await self._generate_openai_compatible_json(
@@ -220,6 +259,7 @@ class SemanticSearchAdapter(AIModelAdapter):
                         schema=schema,
                     ),
                     provider.provider_name,
+                    tuple(attempted_providers),
                 )
             except Exception as exc:
                 last_error = exc
@@ -228,6 +268,67 @@ class SemanticSearchAdapter(AIModelAdapter):
         if last_error is not None:
             raise last_error
         raise RuntimeError("Semantic search provider is not configured.")
+
+    @staticmethod
+    def _build_search_prompt(
+        *,
+        near_me_requested: bool,
+        has_user_location: bool,
+        is_chat_style: bool,
+    ) -> str:
+        base = (
+            "You are BookedAI intelligent search assistant for Australian service discovery. "
+            "Your role is to understand the user's real intent from their natural language query and rerank catalog candidates accordingly. "
+            "Rerank ONLY the supplied catalog candidates — do not invent new candidates or facts. "
+            "Stay grounded in the current user request. Do not treat previously selected services, stored catalog defaults, or unrelated prior chat context as relevant unless the current query explicitly refers to them. "
+            "Treat service availability as unknown unless the candidate explicitly has a direct booking path flag. "
+            "The platform serves users across Australia so recognise Australian slang, suburb names, and service terminology. "
+        )
+        if is_chat_style:
+            base += (
+                "The query is conversational — interpret natural language intent carefully. "
+                "Phrases like 'I need', 'looking for', 'something for', 'any good' signal service discovery intent. "
+                "Extract the core service type even when the query is vague or indirect. "
+            )
+        if near_me_requested and has_user_location:
+            base += (
+                "The user has shared their GPS location and wants nearby services. "
+                "Strongly prefer candidates whose location metadata matches or is close to the user's position. "
+                "Set location_permission_needed to false. "
+            )
+        elif near_me_requested and not has_user_location:
+            base += (
+                "The user asked for services 'near me' or 'nearby' but no GPS location was provided. "
+                "Set location_permission_needed to true to prompt the frontend to request location access. "
+                "Still rank the best topical matches you can find from the catalog. "
+            )
+        base += (
+            "Scoring guidance: prefer candidates that best match service intent, location, category, budget, and specificity. "
+            "Use the heuristic_score as a directional hint only — semantic understanding should drive reranking. "
+            "If the supplied candidates are weak or off-topic, score them low instead of trying to force a match. "
+            "Keep reasons concrete and under 200 characters. "
+            "If two candidates are very close, prefer the one with partner_verified trust or a direct booking path. "
+            "Return only valid JSON matching the schema."
+        )
+        return base
+
+    @staticmethod
+    def _normalize_reason(reason: str) -> str:
+        cleaned = " ".join(reason.split()).strip()
+        if not cleaned:
+            return "Semantic relevance supports this candidate."
+        return cleaned[:220]
+
+    @staticmethod
+    def _normalize_evidence(values: tuple[str, ...]) -> tuple[str, ...]:
+        normalized: list[str] = []
+        for value in values:
+            cleaned = re.sub(r"[^a-z0-9_]+", "_", value.strip().lower()).strip("_")
+            if cleaned and cleaned not in normalized:
+                normalized.append(cleaned)
+            if len(normalized) >= 8:
+                break
+        return tuple(normalized)
 
     def _provider_configs(self) -> list[SemanticProviderConfig]:
         providers: list[SemanticProviderConfig] = []
@@ -324,6 +425,8 @@ class SemanticSearchAdapter(AIModelAdapter):
         payload: dict[str, Any],
         schema: dict[str, Any],
         location_hint: str | None,
+        near_me_requested: bool = False,
+        has_user_location: bool = False,
     ) -> str:
         endpoint_base = provider.base_url.rstrip("/") or "https://generativelanguage.googleapis.com/v1beta"
         endpoint = f"{endpoint_base}/models/{provider.model}:generateContent"
@@ -345,11 +448,12 @@ class SemanticSearchAdapter(AIModelAdapter):
                 "temperature": 0.1,
             },
         }
-        if (
-            self.settings.semantic_search_gemini_maps_grounding_enabled
-            and location_hint
-            and location_hint.strip()
-        ):
+        use_maps_grounding = self.settings.semantic_search_gemini_maps_grounding_enabled and (
+            (location_hint and location_hint.strip())
+            or near_me_requested
+            or has_user_location
+        )
+        if use_maps_grounding:
             request_payload["tools"] = [{"googleMaps": {}}]
         headers = {
             "Content-Type": "application/json",

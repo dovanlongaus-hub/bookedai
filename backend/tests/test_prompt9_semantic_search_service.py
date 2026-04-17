@@ -83,6 +83,8 @@ class Prompt9SemanticSearchServiceTestCase(IsolatedAsyncioTestCase):
                         ),
                     ),
                     provider_label="gemini",
+                    provider_chain=("gemini",),
+                    fallback_applied=False,
                 )
 
         service = Prompt9SemanticSearchService(_FakeAdapter())
@@ -100,6 +102,9 @@ class Prompt9SemanticSearchServiceTestCase(IsolatedAsyncioTestCase):
             "catalog_term_retrieval_with_prompt9_rerank_plus_semantic_model_assist",
         )
         self.assertEqual(outcome.provider, "gemini")
+        self.assertEqual(outcome.provider_chain, ("gemini",))
+        self.assertFalse(outcome.fallback_applied)
+        self.assertEqual(outcome.normalized_query, "signature facial")
         self.assertEqual(outcome.ranked_matches[0].service.service_id, "svc_b")
         self.assertEqual(outcome.ranked_matches[0].trust_signal, "partner_verified")
         self.assertEqual(outcome.ranked_matches[0].semantic_score, 0.97)
@@ -144,3 +149,66 @@ class Prompt9SemanticSearchServiceTestCase(IsolatedAsyncioTestCase):
         self.assertFalse(outcome.applied)
         self.assertEqual(outcome.ranked_matches, ranked_matches)
         self.assertEqual(outcome.strategy, "catalog_term_retrieval_with_prompt9_rerank")
+
+    async def test_assist_catalog_ranking_runs_for_single_candidate_to_validate_truthfulness(self):
+        ranked_matches = [
+            RankedServiceMatch(
+                service=SimpleNamespace(
+                    service_id="svc_only",
+                    business_name="Harbour Clinic",
+                    name="General Practice Consultation",
+                    booking_url="https://book.example.com",
+                    featured=0,
+                ),
+                score=0.51,
+                explanation="Baseline healthcare match.",
+                trust_signal="partner_routed",
+                is_preferred=False,
+                evidence=("summary_overlap",),
+            )
+        ]
+
+        class _FakeAdapter:
+            def __init__(self):
+                self.settings = SimpleNamespace(semantic_search_max_candidates=8)
+
+            def is_configured(self):
+                return True
+
+            async def assess_catalog_candidates(self, **_kwargs):
+                return SemanticSearchAssessment(
+                    normalized_query="gp clinic sydney",
+                    inferred_location="Sydney",
+                    inferred_category="Healthcare Service",
+                    budget_summary=None,
+                    evidence=("current_query_grounded",),
+                    ranked_candidates=(
+                        SemanticSearchCandidateAssessment(
+                            candidate_id="svc_only",
+                            semantic_score=0.93,
+                            reason="Best fit for a GP clinic request in Sydney.",
+                            trust_signal="partner_verified",
+                            is_preferred=True,
+                            evidence=("semantic_service_fit",),
+                        ),
+                    ),
+                    provider_label="openai",
+                    provider_chain=("gemini", "openai"),
+                    fallback_applied=True,
+                )
+
+        service = Prompt9SemanticSearchService(_FakeAdapter())
+        outcome = await service.assist_catalog_ranking(
+            query="gp clinic Sydney",
+            location_hint="Sydney",
+            budget=None,
+            preferences=None,
+            ranked_matches=ranked_matches,
+            is_chat_style=True,
+        )
+
+        self.assertTrue(outcome.applied)
+        self.assertEqual(outcome.provider, "openai")
+        self.assertEqual(outcome.provider_chain, ("gemini", "openai"))
+        self.assertTrue(outcome.fallback_applied)
+        self.assertEqual(outcome.ranked_matches[0].semantic_score, 0.93)

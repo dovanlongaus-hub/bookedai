@@ -246,7 +246,7 @@ async def dual_write_demo_request(
         booking_reference=result.demo_reference,
         conversation_id=result.demo_reference,
         source="demo",
-        service_name="BookedAI demo request",
+        service_name="Bookedai.au demo request",
         service_id="bookedai-demo",
         requested_date=result.preferred_date,
         requested_time=result.preferred_time,

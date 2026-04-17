@@ -10,11 +10,24 @@ export interface MatchCandidate {
   providerName: string;
   serviceName: string;
   sourceType: string;
+  category?: string | null;
+  summary?: string | null;
+  venueName?: string | null;
+  location?: string | null;
+  bookingUrl?: string | null;
+  mapUrl?: string | null;
+  sourceUrl?: string | null;
+  imageUrl?: string | null;
+  amountAud?: number | null;
+  durationMinutes?: number | null;
+  tags?: string[];
+  featured?: boolean;
   distanceKm?: number | null;
   matchScore?: number | null;
   semanticScore?: number | null;
   trustSignal?: string | null;
   isPreferred?: boolean;
+  displaySummary?: string | null;
   explanation?: string | null;
 }
 

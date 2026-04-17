@@ -22,6 +22,13 @@ The immediate follow-on sprint is tracked separately in:
 
 - [Next Sprint Protected Reauth Retry Gate Plan](./next-sprint-protected-reauth-retry-gate-plan.md)
 
+The roadmap execution lane after that hardening sprint is now also active:
+
+1. Sprint 9 tenant shell and read-heavy tenant overview
+2. additive tenant runtime routing in frontend
+3. tenant-scoped overview API and read-only operator posture before any tenant write cutover
+4. clustered tenant panels for overview, bookings, and integrations so deeper read models can expand without reintroducing long-form dashboard sprawl
+
 That follow-on sprint keeps the same PM-led specialist pattern, but narrows the next slice to:
 
 1. protected-action re-auth on admin mutations
@@ -33,6 +40,42 @@ The current Prompt 8 follow-on after that narrower slice is now:
 1. split further only if reliability outgrows the current three-lane issue-first model
 2. revisit chunk reduction only if a heavier reliability surface is added later
 3. revisit handoff tooling only if operators need shared or server-backed note state
+
+## Parallel Landing UX Slice
+
+This plan now also tracks one low-risk public-surface polish slice that can run beside the deeper backend roadmap without changing source-of-truth behavior:
+
+1. `Brand Surface Agent`
+   - owns public logo cleanup, version visibility in footer, and release differentiation across landing updates
+2. `Hero UX Agent`
+   - owns headline lock, above-the-fold simplification, handset realism, and mobile readability
+
+Current task status:
+
+- completed: footer release badge plus source version/date
+- completed: standalone logo mark extraction for public header/footer use
+- completed: hero headline lock to `Turn Conversations to Revenues, Automatically.`
+- completed: hero mobile/handset polish with simpler above-the-fold composition
+
+## Search Quality Follow-on
+
+The current search-quality follow-on now runs as a parallel product lane with explicit role ownership:
+
+1. `Search Query Agent`
+   - own query understanding, phrase aliases, implicit budget parsing, implicit location parsing, and suburb-to-metro normalization
+   - current status: query normalization now also covers Brisbane precinct aliases such as `Fortitude Valley` and `James Street`, together with higher-intent phrase aliases like `wedding hair`, `bridal hair`, `gp clinic`, and `medical clinic`; retrieval now also applies topic/category and location as separate filters before reranking, booking context extraction now reads party size and schedule hints from natural chat text, the fixed-query eval pack now includes a passing Brisbane bridal-hair case, and previously selected service context is now being limited to explicit referential turns instead of biasing every new search
+2. `Catalog Quality Agent`
+   - own `service_merchant_profiles` enrichment, metro coverage, category cleanliness, import normalization, offline audit, and backfill tooling
+   - current status: runtime backfill has been executed from `bookedai-backend-1`, the remaining NOVO PRINT `missing_location` rows have now been remediated from an official-source location into active Sydney signage records, and the offline seed audit now shows `26/26` metro-tagged records with `0` quality warnings while also covering bridal-hair and Castle Hill normalization rules
+3. `Semantic Ranking Agent`
+   - own semantic rerank quality, fallback posture, and trust-first tie-break discipline
+   - current status: semantic assist now returns provider-chain, fallback-applied state, normalized query, inferred location/category, and budget summary in the response contract, semantic evidence and reasons are normalized more consistently across Gemini and OpenAI fallback paths, that fallback posture is now also surfaced in lightweight admin/public diagnostics instead of living only in the API envelope, and the lane is being tightened as a Gemini-first, OpenAI-fallback verifier plus concise summarizer for the active query
+4. `Eval and QA Agent`
+   - own fixed-query evaluation, no-false-positive regression checks, and smoke reliability for admin/live-read lanes
+   - current status: targeted Playwright coverage now locks shared shortlist and action-footer semantics for public live-read and admin Prompt 5 preview, fixed-query evals remain green, contract regression now also checks semantic provider-chain and fallback transparency on `/api/v1/matching/search`, and browser-level diagnostics now surface the same semantic fallback posture in admin/public preview surfaces
+5. `Conversation UX Agent`
+   - own top-3 shortlist presentation, progressive reveal, and prompt wording alignment with the stricter backend ranking contract
+   - current status: live-read shortlist can now consume richer partner candidate metadata directly from the v1 matching contract, a shared frontend presenter plus shared shortlist card/container/action footer now keep public and admin booking-ready semantics aligned with the same `top 3 + See more` behavior, customer-visible live-read results now stay constrained to the v1 ranked shortlist instead of re-merging unrelated legacy chat matches, the UI can now surface both parsed booking context and semantic-provider fallback status beside trust guidance for the selected match across operator and customer-facing rollout slices, and compact partner cards now keep imagery to a small symbolic thumbnail so the main space is reserved for summary, price, duration, location, and next action
 
 ## Delivery goal
 

@@ -4,6 +4,10 @@ __pycache__/
 *.pyc
 *.log
 .playwright-cli/
+.claude/
+.venv*/
+artifacts/
+test-results/
 output/
 tmp/
 storage/

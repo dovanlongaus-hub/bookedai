@@ -16,6 +16,10 @@ const RoadmapApp = lazy(async () => {
   const module = await import('../apps/public/RoadmapApp');
   return { default: module.RoadmapApp };
 });
+const TenantApp = lazy(async () => {
+  const module = await import('../apps/tenant/TenantApp');
+  return { default: module.TenantApp };
+});
 
 function isAdminRuntime() {
   if (typeof window === 'undefined') {
@@ -39,22 +43,35 @@ function isProductRuntime() {
     return false;
   }
 
-  return window.location.hostname === 'product.bookedai.au';
+  const { hostname, pathname } = window.location;
+  return (
+    hostname === 'product.bookedai.au' ||
+    pathname === '/product' ||
+    pathname === '/product/' ||
+    pathname === '/product.html'
+  );
+}
+
+function isTenantRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname, pathname } = window.location;
+  return hostname === 'tenant.bookedai.au' || pathname === '/tenant' || pathname.startsWith('/tenant/');
 }
 
 export function AppRouter() {
   const fallback = (
-    <main className="min-h-screen bg-[#f4f7fb] px-4 py-10 text-slate-950 lg:px-8">
-      <div className="mx-auto max-w-[1200px] rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_24px_60px_rgba(15,23,42,0.06)]">
-        <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-          BookedAI runtime
-        </div>
-        <h1 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
+    <main className="booked-runtime-shell lg:px-8">
+      <div className="booked-runtime-card">
+        <div className="booked-runtime-eyebrow">BookedAI runtime</div>
+        <h1 className="booked-title mt-3 text-2xl font-bold text-slate-950">
           Loading application shell
         </h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-          Route-level code splitting is enabled so public, product, roadmap, and admin runtimes can
-          load their own bundles more efficiently.
+        <p className="booked-body mt-3 max-w-2xl text-sm leading-6">
+          Route-level code splitting is enabled so public, product, roadmap, tenant, and admin
+          runtimes can load their own bundles more efficiently.
         </p>
       </div>
     </main>
@@ -87,6 +104,14 @@ export function AppRouter() {
             window.location.href = '/?demo=open';
           }}
         />
+      </Suspense>
+    );
+  }
+
+  if (isTenantRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <TenantApp />
       </Suspense>
     );
   }

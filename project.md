@@ -22,9 +22,11 @@ From this point onward, it serves three purposes:
 - [System Overview](./docs/architecture/system-overview.md)
 - [Module Hierarchy](./docs/architecture/module-hierarchy.md)
 - [Target Platform Architecture](./docs/architecture/target-platform-architecture.md)
+- [BookedAI Product Requirements Document](./docs/architecture/bookedai-master-prd.md)
 - [SaaS Domain Foundation](./docs/architecture/saas-domain-foundation.md)
 - [Phase 0-1 Execution Blueprint](./docs/architecture/phase-0-1-execution-blueprint.md)
 - [Implementation Phase Roadmap](./docs/architecture/implementation-phase-roadmap.md)
+- [Master Execution Index](./docs/architecture/master-execution-index.md)
 - [MVP Sprint Execution Plan](./docs/architecture/mvp-sprint-execution-plan.md)
 - [Team Task Breakdown](./docs/architecture/team-task-breakdown.md)
 - [Jira Epic Story Task Structure](./docs/architecture/jira-epic-story-task-structure.md)
@@ -68,6 +70,12 @@ The project documentation is now organized according to a professional structure
 2. module documents describe responsibilities and integration points
 3. audience guides describe the platform by user type
 4. governance documents define how changes must be synchronized
+5. a master execution index provides leadership-level navigation across the full program
+6. phase-level execution packages define implementation detail
+7. phase-level Epic -> Story -> Task documents define backlog structure
+8. sprint-level owner execution checklists define practical delivery control
+9. a Jira-ready delivery structure provides tracker translation guidance
+10. a Notion import-ready execution backlog provides phase, epic, and sprint seed data for workspace import
 
 ## Mandatory Rules for Future Requests
 
@@ -80,6 +88,14 @@ Minimum reading path:
 - this file
 - the relevant architecture document
 - the relevant audience document
+
+If the request is for an existing module or workflow, also read the prior description for that exact area first and use it as the baseline for any merge, correction, or upgrade.
+
+When the request asks to edit or adjust an existing module, do not start from scratch:
+
+- find the existing description document for that module first
+- re-read the prior context and current documented scope
+- merge or revise that existing source-of-truth document according to the new request instead of writing a disconnected replacement
 
 ### 2. Summarize every new request
 
@@ -111,6 +127,21 @@ Documentation capture rule:
 
 - when a prompt contains substantial architecture, product, system, repo, module, migration, workflow, or governance description, that description should be recorded into the appropriate `.md` files in `docs/` and reflected in `project.md`
 - this rule should be treated as the default working expectation for future prompts unless the user explicitly asks not to update documentation
+- when updating an existing area, do not write the new state in isolation; merge it into the existing source description for that area after re-reading the prior context
+- each substantive update should be recorded in three places: the edited request-facing document, the implementation-tracking document, and the corresponding roadmap or sprint or plan or phase artifact
+
+Three-place recording rule for module changes:
+
+- update the requirement-facing document that was changed or reinterpreted
+- update the implementation or execution tracking document that explains what is now being done
+- update the corresponding roadmap or sprint or plan or phase document so scheduling and delivery context stay synchronized
+
+Live-promotion closure rule:
+
+- whenever an update has been implemented successfully through the final step and promoted to live, automatically write the delivered result back into implementation tracking before considering the work closed
+- update the corresponding sprint, requirement, or module description document in the same completion pass
+- update the matching roadmap or sprint or phase artifact in the same completion pass
+- treat `implemented + live deployed + documented` as one completion standard
 
 ### 5. Upgrade old features with full context
 
@@ -120,6 +151,7 @@ When enhancing an existing feature:
 - compare it with the current code state
 - update all dependent areas together
 - record the upgraded state in the proper document
+- make sure the upgraded state is also reflected in implementation tracking and the relevant roadmap or sprint or phase plan
 
 ## Synchronization Checklist
 

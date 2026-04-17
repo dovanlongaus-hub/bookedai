@@ -69,6 +69,7 @@ Prompt 5 target:
 - use `apiV1.createBookingIntent()` when the user commits to a booking
 - use `apiV1.createPaymentIntent()` when checkout or payment is required
 - use `apiV1.sendLifecycleEmail()` for follow-up and confirmation handoff
+- use `apiV1.sendSmsMessage()` or `apiV1.sendWhatsAppMessage()` when a messaging-led follow-up path is introduced on public, tenant, or admin support surfaces
 
 Migration note:
 

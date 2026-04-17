@@ -9,15 +9,13 @@ export function AdminApp() {
   return (
     <Suspense
       fallback={
-        <main className="apple-admin-shell px-4 py-10 lg:px-8">
-          <div className="apple-card mx-auto max-w-[1200px] p-8">
-            <div className="text-sm font-semibold text-[#0071e3]">
-              Admin runtime
-            </div>
-            <h1 className="apple-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
+        <main className="booked-admin-shell px-4 py-10 lg:px-8">
+          <div className="booked-runtime-card">
+            <div className="booked-runtime-eyebrow">Admin runtime</div>
+            <h1 className="booked-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
               Loading admin workspace
             </h1>
-            <p className="apple-body mt-3 max-w-2xl text-sm leading-6">
+            <p className="booked-body mt-3 max-w-2xl text-sm leading-6">
               The admin route now loads as its own application slice so public and admin bundles do
               not have to bootstrap together.
             </p>

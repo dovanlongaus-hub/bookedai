@@ -21,6 +21,7 @@ class IntegrationRuntimeConfig:
     ai_fallback_model: str
     stripe_currency: str
     n8n_booking_webhook_configured: bool
+    discord_webhook_configured: bool
     zoho_calendar_configured: bool
     email_smtp_configured: bool
     email_imap_configured: bool
@@ -43,6 +44,7 @@ def build_integration_runtime_config(settings: Settings) -> IntegrationRuntimeCo
         ai_fallback_model=settings.ai_fallback_model,
         stripe_currency=settings.stripe_currency,
         n8n_booking_webhook_configured=bool(settings.n8n_booking_webhook_url),
+        discord_webhook_configured=bool(settings.discord_webhook_url),
         zoho_calendar_configured=bool(
             settings.zoho_calendar_uid and settings.zoho_calendar_access_token
         ),
@@ -62,4 +64,3 @@ def build_integration_runtime_config(settings: Settings) -> IntegrationRuntimeCo
 
 def get_runtime_settings() -> Settings:
     return get_settings()
-

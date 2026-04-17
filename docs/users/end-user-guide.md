@@ -34,6 +34,13 @@ The assistant is intended to:
 - optionally consider location context
 - show event-related recommendations when the user asks about AI events
 
+On `product.bookedai.au`, especially on phone-sized screens, the user should now see:
+
+- a compact top bar instead of a tall introductory hero once the chat-led product surface is active
+- the largest share of the screen reserved for BookedAI agent conversation and message history
+- a bottom bar for switching between `Chat` and `Booking`
+- the same underlying BookedAI shortlist and booking flow, but opened in a clearer secondary booking panel instead of always filling the main chat viewport
+
 ### Start a booking
 
 When a user wants to book:
@@ -61,6 +68,7 @@ The experience should feel:
 - fast
 - mobile-friendly
 - consistent from assistant response to booking confirmation
+- native-app-like on `product.bookedai.au` phone layouts, with no horizontal overflow and no hidden primary content area
 
 ## User-Facing Dependencies
 

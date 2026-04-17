@@ -7,6 +7,7 @@ from repositories.base import RepositoryContext
 from repositories.tenant_repository import TenantRepository
 from repositories.base import RepositoryContext
 from repositories.conversation_repository import ConversationRepository
+from service_layer.communication_service import render_bookedai_confirmation_email
 from service_layer.admin_booking_shadow_service import build_admin_booking_shadow_summary
 from service_layer.admin_presenters import (
     build_booking_record,
@@ -173,21 +174,6 @@ async def send_admin_booking_confirmation_email(
     if not recipient:
         raise ValueError("Booking does not include a customer email")
 
-    lines = [
-        f"Hello {booking.get('customer_name') or 'there'},",
-        "",
-        "This is your manual booking confirmation from BookedAI.",
-        f"Booking reference: {booking_reference}",
-        f"Service: {booking.get('service_name') or 'Not specified'}",
-        f"Requested date: {booking.get('requested_date') or 'Not specified'}",
-        f"Requested time: {booking.get('requested_time') or 'Not specified'}",
-        f"Timezone: {booking.get('timezone') or 'Australia/Sydney'}",
-    ]
-    if booking.get("payment_url"):
-        lines.extend(["", f"Checkout link: {booking.get('payment_url')}"])
-    if note:
-        lines.extend(["", "Additional note:", note.strip()])
-
     business_recipient = (
         str(booking.get("business_email") or "").strip().lower() or booking_business_email
     )
@@ -196,14 +182,38 @@ async def send_admin_booking_confirmation_email(
         for email in [business_recipient, booking_business_email]
         if email and email.lower() != recipient.lower()
     ]
-    lines.extend(["", f"Reply to {business_recipient} if you need help."])
+    rendered_email = render_bookedai_confirmation_email(
+        variables={
+            "customer_name": str(booking.get("customer_name") or "there"),
+            "service_name": str(booking.get("service_name") or "Bookedai.au booking"),
+            "slot_label": " ".join(
+                part
+                for part in [
+                    str(booking.get("requested_date") or "").strip(),
+                    str(booking.get("requested_time") or "").strip(),
+                ]
+                if part
+            )
+            or "To be confirmed",
+            "timezone": str(booking.get("timezone") or "Australia/Sydney"),
+            "booking_reference": booking_reference,
+            "business_name": business_recipient,
+            "venue_name": str(booking.get("service_name") or business_recipient),
+            "support_email": business_recipient,
+            "payment_link": str(booking.get("payment_url") or ""),
+            "manage_link": str(booking.get("payment_url") or ""),
+            "additional_note": note.strip() if note else "",
+        },
+        public_app_url="https://bookedai.au",
+    )
 
     try:
         await email_service.send_email(
             to=[recipient],
             cc=cc_recipients,
-            subject=f"BookedAI booking confirmation {booking_reference}",
-            text="\n".join(lines),
+            subject=rendered_email.subject,
+            text=rendered_email.text,
+            html=rendered_email.html,
         )
     except ValueError as exc:
         raise ValueError(str(exc)) from exc

@@ -2,6 +2,7 @@ import {
   ADMIN_SESSION_EXPIRED_MESSAGE,
 } from './session';
 import {
+  AdminDiscordHandoffResponse,
   AdminApiInventoryResponse,
   AdminBookingDetailResponse,
   AdminBookingsResponse,
@@ -314,6 +315,37 @@ export async function sendAdminConfirmationEmail(
     throw new Error(parseErrorMessage(payload, 'Could not send confirmation email.'));
   }
   return payload as EmailSendResponse;
+}
+
+export async function sendAdminDiscordHandoff(
+  apiBaseUrl: string,
+  sessionToken: string,
+  payload: {
+    title: string;
+    summary: string;
+    lane_label?: string;
+    handoff_format?: string;
+  },
+) {
+  const response = await fetch(`${apiBaseUrl}/admin/reliability/handoff/discord`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...createAdminAuthHeaders(sessionToken),
+    },
+    body: JSON.stringify(payload),
+  });
+  const responsePayload = (await parseJsonOrNull(response)) as
+    | AdminDiscordHandoffResponse
+    | { detail?: string }
+    | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(responsePayload, 'Could not send Discord handoff.'));
+  }
+  return responsePayload as AdminDiscordHandoffResponse;
 }
 
 export async function uploadAdminImage(
