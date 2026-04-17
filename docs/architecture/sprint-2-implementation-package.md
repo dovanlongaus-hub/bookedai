@@ -1,125 +1,351 @@
 # BookedAI Sprint 2 Implementation Package
 
-## Purpose
+Date: `2026-04-17`
 
-This document turns Sprint 2 into a concrete implementation package aligned with:
+Document status: `active sprint execution package`
 
-- `mvp-sprint-execution-plan.md`
-- `coding-implementation-phases.md`
-- `coding-phase-file-mapping.md`
-- `coding-phase-1-2-3-technical-checklist.md`
+## 1. Purpose
 
-Sprint 2 is the package for:
+This document turns Sprint 2 into a concrete implementation package for the first execution sprint after the Phase 0 reset.
 
-- modular seam creation
-- adapter seam cleanup
-- shared contract alignment
-- first low-risk refactors in real code
+Sprint 2 is not a backend modularization sprint.
 
-## Sprint 2 target outcome
+Sprint 2 is the blueprint-lock sprint for the public revenue-engine rebuild.
+
+It exists to make sure Sprint 3 can begin coding the premium landing experience without unresolved ambiguity around:
+
+- brand system
+- design tokens
+- section hierarchy
+- component tree
+- widget vocabulary
+- CTA hierarchy
+- instrumentation assumptions
+
+This package should be read together with:
+
+- `docs/architecture/phase-0-exit-review.md`
+- `docs/architecture/landing-page-system-requirements.md`
+- `docs/architecture/frontend-theme-design-token-map.md`
+- `docs/architecture/landing-component-tree-and-file-ownership.md`
+- `docs/architecture/landing-page-execution-task-map.md`
+- `docs/architecture/phase-1-2-detailed-implementation-package.md`
+- `docs/architecture/public-growth-app-strategy.md`
+- `docs/architecture/pricing-packaging-monetization-strategy.md`
+- `docs/development/sprint-2-owner-execution-checklist.md`
+
+## 2. Sprint 2 mission
+
+Finish the public blueprint so Sprint 3 can build the premium BookedAI landing page from one approved system instead of from scattered assumptions.
+
+## 3. Target outcome
 
 By the end of Sprint 2, the team should have:
 
-- safer modular seams in code
-- less pressure on `route_handlers.py` and `services.py`
-- clearer homes for new domain logic
-- cleaner shared frontend/backend DTO direction
+- one locked landing-page narrative system
+- one approved visual token baseline
+- one approved public component tree
+- one approved widget and proof-block vocabulary
+- one approved file mapping into the current frontend repo
+- one explicit list of open implementation risks for Sprint 3
 
-## Scope
+## 4. Sprint 2 scope
 
-### Backend scope
+### In scope
 
-- `backend/domain/*`
-- `backend/integrations/*`
-- `backend/core/contracts/*`
-- `backend/core/feature_flags.py`
-- `backend/service_layer/*`
-- `backend/api/route_handlers.py`
-- `backend/services.py`
+- public brand system
+- public headline and CTA system
+- landing-page section order
+- public widget vocabulary
+- design tokens and UI primitives
+- component tree and file ownership plan
+- CTA source and attribution instrumentation assumptions
+- metadata and public copy alignment needed before the build sprint
 
-### Frontend scope
+### Out of scope
 
-- `frontend/src/shared/contracts/*`
-- `frontend/src/shared/api/client.ts`
-- selected large UI components with embedded API choreography
+- full landing implementation
+- full tenant or admin UI changes
+- new backend reporting endpoints
+- live attribution reporting logic
+- broader SEO page-family rollout
 
-## Work package A — Domain seam reinforcement
+## 5. Source-of-truth outputs required in Sprint 2
 
-### Tasks
+Sprint 2 must produce or finalize:
 
-- define responsibility boundary for each existing domain service
-- stop new policy logic from landing directly in `services.py`
-- move low-risk helper logic into `backend/domain/*` or `backend/service_layer/*`
-- keep route handlers thin for new edits
+- locked landing-page copy system
+- locked CTA system
+- locked public widget vocabulary
+- locked design-token system
+- locked component tree
+- locked file mapping into `frontend/src/components/landing/`
+- Sprint 3 coding handoff with known risks
 
-### Candidate files
+## 6. Frontend repo mapping baseline
 
-- `backend/domain/growth/service.py`
-- `backend/domain/conversations/service.py`
-- `backend/domain/matching/service.py`
-- `backend/domain/booking_trust/service.py`
-- `backend/domain/payments/service.py`
-- `backend/domain/crm/service.py`
-- `backend/domain/email/service.py`
+Sprint 2 should assume implementation lands primarily in:
 
-## Work package B — Integration seam reinforcement
+- `frontend/index.html`
+- `frontend/src/components/landing/data.ts`
+- `frontend/src/components/landing/`
+- `frontend/src/components/landing/sections/`
+- `frontend/src/components/landing/ui/`
+- `frontend/src/styles.css`
+- `frontend/src/theme/`
+- `frontend/src/apps/public/PublicApp.tsx`
 
-### Tasks
+Sprint 2 should preserve the current repo shape and avoid rewrite-first architectural churn.
 
-- confirm provider-specific logic home in `backend/integrations/*`
-- define or normalize adapter conventions
-- move low-risk vendor-specific helpers out of shared service logic where possible
+## 7. Work packages
 
-### Candidate files
+## Work package A — Narrative and CTA lock
 
-- `backend/integrations/stripe/adapter.py`
-- `backend/integrations/email/adapter.py`
-- `backend/integrations/n8n/adapter.py`
-- `backend/integrations/zoho_crm/adapter.py`
-- `backend/integrations/ai_models/adapter.py`
-- `backend/integrations/search/adapter.py`
+### Objective
 
-## Work package C — Shared contract cleanup
-
-### Tasks
-
-- align frontend shared contracts to backend contract intent
-- create missing shared DTO exports
-- reduce UI-local duplicate typing
-- prepare common success and error envelope direction
-
-### Candidate files
-
-- `frontend/src/shared/contracts/common.ts`
-- `frontend/src/shared/contracts/matching.ts`
-- `frontend/src/shared/contracts/booking-trust.ts`
-- `frontend/src/shared/contracts/payments.ts`
-- `frontend/src/shared/contracts/index.ts`
-
-## Work package D — First code refactors
+Freeze the public content and conversion system before the build sprint begins.
 
 ### Tasks
 
-- extract low-risk helper group from `backend/api/route_handlers.py`
-- extract low-risk provider/helper group from `backend/services.py`
-- extract frontend API choreography out of one large UI component where safe
+- confirm approved hero headline, supporting line, and eyebrow
+- confirm section-by-section narrative intent
+- confirm CTA hierarchy across header, hero, pricing, floating actions, footer, and demo surfaces
+- confirm pricing explanation wording
+- confirm FAQ and trust-line wording
+- confirm footer narrative and contact actions
 
-### Recommended first refactor order
+### Primary source documents
 
-1. upload/file helpers from `route_handlers.py`
-2. admin support or projection helpers from `route_handlers.py`
-3. provider-specific helpers from `services.py`
-4. selected frontend API helpers from large UI files
+- `docs/architecture/landing-page-system-requirements.md`
+- `docs/architecture/pricing-packaging-monetization-strategy.md`
+- `frontend/src/components/landing/data.ts`
 
-## Definition of done
+### Deliverable
 
-- the codebase has at least one real modular refactor landed safely
-- engineers can add new logic into bounded modules without defaulting to hotspot files
-- shared contract cleanup has started with visible repo structure improvement
+- locked public content system ready for Sprint 3 implementation
 
-## Recommended owners
+## Work package B — Visual token system
 
-- Backend: domain and service layer refactors
-- Frontend: shared DTO and client cleanup
-- Product/Architecture: approve boundary decisions
-- QA: regression verification on touched flows
+### Objective
+
+Define the premium visual language in a form that can be implemented directly in the current frontend.
+
+### Tasks
+
+- define typography scale and role usage
+- define brand and support color roles
+- define spacing rhythm and section density rules
+- define radius, border, and shadow rules
+- define button hierarchy and badge styles
+- define card, glass, and dashboard-widget treatment
+- define mobile-safe usage rules
+
+### Expected token categories
+
+- type scale
+- color roles
+- spacing scale
+- radii
+- shadows
+- borders
+- motion rules
+- widget and card variants
+
+### Primary file targets
+
+- `frontend/src/styles.css`
+- `frontend/src/theme/apple-tokens.css`
+- `frontend/src/theme/minimal-bento-template.css`
+
+### Deliverable
+
+- approved design-token baseline and usage rules
+
+## Work package C — Component tree and primitive map
+
+### Objective
+
+Turn the landing-page requirements into a concrete component architecture that fits the current repo.
+
+### Tasks
+
+- define required section components
+- define reusable UI primitives
+- define widget-shell primitives
+- define content/config boundaries versus presentational boundaries
+- define which existing components are retained, reshaped, or removed
+- confirm ownership boundaries between `data.ts`, section components, and UI primitives
+
+### Required component groups
+
+- page chrome
+- section heading and narrative primitives
+- buttons and CTA primitives
+- chips, badges, and proof pills
+- stat cards and dashboard cards
+- pricing blocks
+- FAQ and trust cards
+- partner and proof-grid primitives
+
+### Deliverable
+
+- approved component tree and primitive inventory
+
+## Work package D — Section-by-section implementation map
+
+### Objective
+
+Translate the approved section order into a coding-ready map for Sprint 3.
+
+### Required section mapping
+
+1. Header
+2. Hero
+3. Problem
+4. Solution
+5. Product proof or showcase
+6. Booking assistant or live-flow preview
+7. Trust or FAQ
+8. Partners
+9. Pricing
+10. Final CTA
+11. Footer
+
+### Tasks
+
+- define purpose of each section
+- define required copy inputs for each section
+- define required widget or proof blocks per section
+- define responsive constraints per section
+- define keep, reshape, or remove decisions for current sections
+
+### Deliverable
+
+- section-by-section implementation map ready for Sprint 3 coding
+
+## Work package E — Widget vocabulary and truth boundary
+
+### Objective
+
+Keep the public commercial language aligned with later tenant and admin product surfaces without overclaiming backend reality.
+
+### Tasks
+
+- freeze widget naming for:
+  - Revenue Generated
+  - Missed Revenue
+  - Search to Booking Conversion
+  - Call to Booking Conversion
+  - Email to Booking Conversion
+  - Booking Confirmed
+  - Stripe Payment Success
+  - Channel Attribution
+  - Commission Summary
+- define which widgets are conceptual preview blocks versus later live operational widgets
+- confirm wording that is safe before reporting truth is fully implemented
+
+### Deliverable
+
+- approved public widget vocabulary and truth boundary notes
+
+## Work package F — Instrumentation assumptions
+
+### Objective
+
+Make sure Sprint 3 can wire public interaction tracking without reopening the product narrative.
+
+### Tasks
+
+- define CTA source naming convention
+- define section-origin naming for major actions
+- define expected propagation points for demo and pricing consultation flows
+- confirm backend-safe placeholder assumptions for later attribution support
+- confirm no public copy depends on already-live commercial reporting APIs
+
+### Deliverable
+
+- approved public instrumentation baseline for Sprint 3
+
+## 8. Recommended implementation sequence inside Sprint 2
+
+1. freeze narrative system
+2. freeze widget vocabulary
+3. freeze design tokens
+4. freeze component tree
+5. freeze section mapping
+6. freeze instrumentation assumptions
+7. record open risks and Sprint 3 handoff
+
+## 9. Open-risk categories Sprint 2 must explicitly record
+
+Sprint 2 must call out any risk in:
+
+- responsive behavior
+- visual token complexity
+- too many unique card variants
+- oversized hero scope
+- pricing language drift from the approved model
+- unsupported public reporting claims
+- component ownership confusion between content and presentation layers
+
+## 10. Definition of done
+
+Sprint 2 is complete when:
+
+- content source of truth is frozen
+- design tokens are frozen
+- component tree is frozen
+- widget vocabulary is frozen
+- section-by-section implementation map is frozen
+- instrumentation assumptions are accepted
+- Sprint 3 coding can begin without strategic rework
+
+## 11. Recommended owners
+
+- Product:
+  - narrative system
+  - CTA hierarchy
+  - pricing and trust wording
+- Frontend:
+  - design tokens
+  - component tree
+  - section mapping
+  - repo file mapping
+- Architecture:
+  - widget vocabulary alignment
+  - truth boundary review
+- Backend:
+  - instrumentation assumption review
+  - unsupported-claim review
+- QA or release owner:
+  - Sprint 3 implementation guardrails
+  - closeout measurability review
+
+## 12. Sprint 3 handoff expectation
+
+Sprint 3 should start from this package by implementing:
+
+- shared public primitives
+- hero and sticky CTA
+- section-by-section landing build
+- pricing and trust sections
+- metadata and instrumentation wiring
+
+Sprint 3 should not reopen:
+
+- core positioning
+- core pricing model
+- section order
+- widget naming
+
+unless a truth-gate issue is discovered.
+
+## 13. Related references
+
+- [Sprint 2 Owner Execution Checklist](../development/sprint-2-owner-execution-checklist.md)
+- [Landing Page System Requirements](./landing-page-system-requirements.md)
+- [Frontend Theme Design Token Map](./frontend-theme-design-token-map.md)
+- [Landing Component Tree And File Ownership](./landing-component-tree-and-file-ownership.md)
+- [Landing Page Execution Task Map](./landing-page-execution-task-map.md)
+- [Phase 1-2 Detailed Implementation Package](./phase-1-2-detailed-implementation-package.md)
+- [Public Growth App Strategy](./public-growth-app-strategy.md)

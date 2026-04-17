@@ -89,6 +89,10 @@ Finish the brand system, landing-page information architecture, design tokens, a
 ### Checklist
 
 - review component tree
+- review `docs/architecture/sprint-2-implementation-package.md`
+- review `docs/architecture/frontend-theme-design-token-map.md`
+- review `docs/architecture/landing-component-tree-and-file-ownership.md`
+- review `docs/architecture/landing-page-execution-task-map.md`
 - review UI primitive list
 - review file mapping against current frontend structure
 - review design token application plan
@@ -148,6 +152,10 @@ Finish the brand system, landing-page information architecture, design tokens, a
 - freeze design tokens
 - freeze component tree
 - freeze widget vocabulary
+- complete `docs/architecture/sprint-2-implementation-package.md`
+- complete `docs/architecture/frontend-theme-design-token-map.md`
+- complete `docs/architecture/landing-component-tree-and-file-ownership.md`
+- complete `docs/architecture/landing-page-execution-task-map.md`
 - record any open implementation risks
 - approve Sprint 3 coding start
 
@@ -160,4 +168,3 @@ Sprint 3 can start only when:
 - Architecture approves the public commercial vocabulary
 - Backend confirms instrumentation assumptions are acceptable
 - QA or release owner confirms implementation guardrails are clear
-

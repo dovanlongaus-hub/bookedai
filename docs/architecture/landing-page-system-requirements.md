@@ -17,6 +17,9 @@ This document should be read together with:
 - `docs/architecture/public-growth-app-strategy.md`
 - `docs/architecture/pricing-packaging-monetization-strategy.md`
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
+- `docs/architecture/frontend-theme-design-token-map.md`
+- `docs/architecture/landing-component-tree-and-file-ownership.md`
+- `docs/architecture/landing-page-execution-task-map.md`
 
 ## 2. System role
 
@@ -49,6 +52,58 @@ The page must not frame BookedAI as:
 - generic automation software
 - a product with unsupported reporting certainty
 
+## 3.1 Visual storytelling requirements
+
+The landing page must now follow a visual-first presentation model for the active rebuild phase.
+
+Core section design rule:
+
+- each major landing section should target roughly `80%` visual communication and `20%` text communication
+
+Visual communication includes:
+
+- product-like dashboard blocks
+- infographic rails
+- flow diagrams
+- status cards
+- proof cards
+- compact charts or funnel bars
+- showcase imagery and structured visual grouping
+
+Text communication should be limited to:
+
+- essential positioning statements
+- commercial keywords
+- proof labels
+- decision-critical explanations
+- CTA language
+
+The public page should therefore read as:
+
+- graphic-led
+- premium and professional
+- fast to scan
+- commercially legible in under a minute
+
+The public page must not drift back into:
+
+- long paragraph-first storytelling
+- blog-like section bodies
+- dense explanatory copy blocks that overpower the proof visuals
+
+This rule now applies end to end across:
+
+- hero
+- problem
+- solution
+- product proof
+- booking assistant or live-flow preview
+- trust
+- partner and infrastructure trust wall
+- pricing
+- pricing plan cards
+- final CTA
+
 ## 4. Primary audience
 
 The landing page is primarily for:
@@ -78,6 +133,9 @@ The landing page is successful when:
 - the commercial widgets preview the product story without pretending unsupported live metrics
 - the page feels premium on desktop and decisive on mobile
 - every section supports one coherent revenue-engine narrative
+- pricing, trust, and closing CTA surfaces follow the same visual-first system as the narrative sections above them instead of reverting to text-heavier legacy layouts
+- pricing plan cards and partner trust surfaces feel like scan-friendly proof systems rather than legacy list or logo blocks
+- the booking assistant preview behaves as a product-proof surface with visual framing and scan-friendly state signals, not as an isolated raw demo widget
 
 ## 6. Information architecture requirements
 
@@ -138,6 +196,7 @@ The hero must include:
 - one primary CTA
 - one secondary CTA
 - one visual proof system that feels product-real rather than decorative
+- a graphic-led composition where charts, status signals, product surfaces, or funnel visuals occupy more attention than body copy
 
 The hero must not:
 
@@ -169,6 +228,12 @@ These blocks may be represented as:
 - pricing-adjacent explanation widgets
 
 These blocks must be framed as product vocabulary, not fake audited numbers, unless the data is genuinely backed by the product.
+
+Visual proof presentation requirements:
+
+- proof blocks should be arranged as compact, scan-friendly visual systems rather than long explanatory text cards
+- charts, funnel bars, activity states, and grouped proof cards should carry the main explanatory load where possible
+- supporting text should only clarify the commercial meaning of the visuals instead of duplicating them
 
 ## 10. CTA system requirements
 
@@ -334,4 +399,7 @@ The landing-page system requirements are complete when:
 - [Public Growth App Strategy](./public-growth-app-strategy.md)
 - [Pricing, Packaging, and Monetization Strategy](./pricing-packaging-monetization-strategy.md)
 - [Phase 1-2 Detailed Implementation Package](./phase-1-2-detailed-implementation-package.md)
+- [Frontend Theme Design Token Map](./frontend-theme-design-token-map.md)
+- [Landing Component Tree And File Ownership](./landing-component-tree-and-file-ownership.md)
+- [Landing Page Execution Task Map](./landing-page-execution-task-map.md)
 - [Sprint 1 Owner Execution Checklist](../development/sprint-1-owner-execution-checklist.md)

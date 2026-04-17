@@ -92,6 +92,7 @@ Implement the premium landing page foundation, hero experience, core sections, p
 - implement hero and premium widgets
 - implement middle sections
 - implement bottom conversion sections
+- keep each core landing section visually led, targeting roughly `80%` graphics, flows, proof states, and infographic treatment with only the highest-value copy occupying the remaining space
 - confirm responsive behavior across core breakpoints
 - confirm anchors, hover states, and spacing rhythm
 
@@ -148,6 +149,7 @@ Implement the premium landing page foundation, hero experience, core sections, p
 
 - confirm all required public sections exist
 - confirm premium hero and widgets are complete
+- confirm hero, problem, solution, and product-proof sections remain visual-first rather than text-heavy after polish passes
 - confirm pricing and CTA surfaces are live in the build
 - record instrumentation and polish tasks for the next sprint
 - confirm no blocking copy or design ambiguity remains
@@ -160,4 +162,3 @@ Sprint 4 can start only when:
 - Frontend confirms the landing foundation is stable
 - Backend confirms public integration points are intact
 - QA or release owner confirms the build is ready for instrumentation and polish
-
