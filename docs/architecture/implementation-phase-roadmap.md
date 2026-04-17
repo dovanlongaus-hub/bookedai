@@ -394,6 +394,12 @@ Focus:
 Evidence already present:
 
 - search quality and booking-context work is materially underway
+- compact search-result presentation is already live in the public assistant, and the thumbnail summary now sits on the left edge of both service and event result cards so the scan order matches the booking facts more naturally
+- the new landing template now also carries a larger and more balanced BookedAI logo treatment in header and footer chrome, so the brand presence is stronger without weakening nav or CTA hierarchy
+- the landing rebuild has now advanced from shared card primitives into a more professional visual-first narrative layer, with hero, problem, solution, and product-proof sections rebuilt around graphics, status imagery, funnel bars, flow diagrams, and compact commercial keyword blocks instead of long-form copy
+- pricing, trust, and final CTA surfaces are now also aligned to that same visual-first system, so the current landing path is coherently graphic-led from hero through closeout rather than only in the upper narrative stack
+- pricing plan cards and the partner trust wall now also follow the same scan-first visual language, so commercial choice blocks and credibility blocks are no longer the weaker visual segment of the page
+- the booking assistant preview block is now also framed as a premium product-proof surface with signal cards and a stronger live shell, so the interactive demo no longer breaks the visual rhythm established by the rebuilt narrative sections
 
 New interpretation under the upgraded roadmap:
 

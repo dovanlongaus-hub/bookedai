@@ -40,6 +40,8 @@ On `product.bookedai.au`, especially on phone-sized screens, the user should now
 - the largest share of the screen reserved for BookedAI agent conversation and message history
 - a bottom bar for switching between `Chat` and `Booking`
 - the same underlying BookedAI shortlist and booking flow, but opened in a clearer secondary booking panel instead of always filling the main chat viewport
+- search-result cards that keep the image thumbnail on the left side, with the service or event title and key booking facts flowing immediately to the right for faster scanning
+- the refreshed landing template keeps the BookedAI logo larger and easier to recognize in the main header and footer, while still leaving the navigation and CTA area feeling balanced rather than crowded
 
 ### Start a booking
 

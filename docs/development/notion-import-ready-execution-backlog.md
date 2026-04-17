@@ -185,3 +185,10 @@ Backlog execution seeding now in place:
 - `Story` rows are seeded for active `Phase 7-8` and planned `Phase 9` execution lanes with sprint, epic, owner, status, source-doc, and embedded task checklist content
 - concrete `Task` rows are now seeded for active `Sprint 14` work, linked back to their parent stories for admin support tooling, reconciliation, and rollout-readiness execution
 - each sprint detail page from `Sprint 1` through `Sprint 14` now contains direct cross-links to the matching phase detail page and the live `Sprint Execution` row in the database
+- each phase detail page now also links back to the relevant sprint detail pages, while Sprint 11 through Sprint 14 detail pages now include direct links to the seeded story rows that belong to those sprints
+- export coverage now also includes `Sprint 15` and `Sprint 16`, with `Phase 9` linking back to both pages and each page linking into its matching `Sprint Execution` row plus its seeded Phase 9 story rows
+- final export entry page: `https://www.notion.so/345b21fdf8c781ac8089c5bdb1f4bc41`
+- the final export entry page now opens with an executive summary layer before the full navigation tree, making it suitable for leadership review, handoff, and export without extra reformatting
+- the executive summary layer has now been refined against the current Sprint 14 checklist and implementation progress so it reflects present support-tooling, reconciliation, rollout, and remaining-risk reality rather than generic sprint labels
+- the Sprint 14 owner close-out items are now rendered as interactive checkboxes on both the Sprint 14 detail page and the Final Export Index page so export review and real execution tracking stay in the same Notion layer
+- Sprint 14 close-out has now also been synchronized into the `Stories and Tasks` database as a dedicated story plus twelve task rows linked to Sprint 14, making the export layer and the structured backlog point to the same close-out work

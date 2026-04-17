@@ -21,9 +21,19 @@ Current focus areas:
 - the Notion workspace now also contains export-friendly detail pages for `Phase 1` through `Phase 9` plus `Sprint 1` through `Sprint 14`, with dedicated phase and sprint index pages so the execution program can be reviewed outside the database tables
 - the `Stories and Tasks` database now includes self-relation support for parent and child backlog items, seeded `Story` rows for the active Phase 7-8 and planned Phase 9 execution lanes, plus concrete `Task` rows for active Sprint 14 operator work so the current admin-support backlog is executable inside Notion instead of living only in markdown breakdown docs
 - each `Sprint 1` through `Sprint 14` detail page in Notion now also links directly to its related phase detail page and its `Sprint Execution` database row, so export-friendly pages and database-backed execution tracking are no longer separated
+- the phase detail pages now also link back to their covered sprint detail pages, and Sprint 11 through Sprint 14 detail pages now deep-link into the seeded story rows that make up the active tenant and admin execution backlog
+- the export-friendly Notion layer is now complete through `Sprint 16`: Sprint 15 and Sprint 16 detail pages now exist, Phase 9 links back to them, and both pages link into their seeded Phase 9 story rows plus the live `Sprint Execution` database rows
+- a single `BookedAI Final Export Index` page now exists in Notion as the top-level share/export entry point for the full hub, databases, phase pages, sprint pages, and active execution links
+- the final export page has now been reorganized into an executive-facing layout with `Executive snapshot`, `Current status`, `Next up`, `Key links`, and `Active execution links` ahead of the full navigation section so leadership can scan the program in under a minute
+- that executive snapshot now also reflects the actual current Sprint 14 state from the repo docs: admin Prompt 5 preview and reconciliation reads are already present, Sprint 14 close-out still centers on support-flow completeness and rollout guardrails, and reconciliation is stronger but not yet presented as broad read-cutover truth
+- Sprint 14 close-out review is now interactive in Notion: both the Sprint 14 detail page and the Final Export Index page include checkbox-based close-out items mapped from the owner checklist so sprint review can happen directly in the export workspace
+- Sprint 14 close-out is now also database-backed in `Stories and Tasks` through one dedicated close-out story plus twelve linked task rows, so the same review lane can be tracked in table, board, page, and export views without duplicating execution state
 - a master PRD now exists at `docs/architecture/bookedai-master-prd.md`, consolidating the current repo truth, target product shape, and forward phase requirements into one planning baseline that can now be rendered and shared outside the repo
 - Phase 0 and Sprint 1 rebranding implementation has now started in code, with the shared frontend brand layer updated toward the revenue-engine narrative and the primary logo renderer now prepared to prefer the live logo asset `https://upload.bookedai.au/images/ef4d/i1_STdSm_tw-k6loI5aIEA.png` while safely falling back to the checked-in branding files if that source is unavailable
 - the missing Phase 0 public-experience artifact now exists as `docs/architecture/landing-page-system-requirements.md`, locking the required section order, hero rules, widget vocabulary, CTA hierarchy, pricing framing, and truth-gate baseline that Sprint 1 needs before the deeper Phase 1-2 landing work continues
+- a formal `docs/architecture/phase-0-exit-review.md` now exists as the closeout record for the reset phase, marking the core documentation stack as materially aligned, recording the remaining non-blocking assumptions, and stating that Sprint 2 is ready for explicit owner signoff rather than remaining informally implied
+- `docs/architecture/sprint-2-implementation-package.md` has now been rewritten to match the actual Phase 1-2 plan, replacing an outdated backend-refactor framing with the correct Sprint 2 execution package for public brand system lock, design tokens, component tree, section mapping, widget vocabulary, and instrumentation assumptions
+- Sprint 2 planning now also has concrete implementation-side companion artifacts for `frontend/src/theme/*`, `frontend/src/styles.css`, and `frontend/src/components/landing/*`, with `frontend-theme-design-token-map.md`, `landing-component-tree-and-file-ownership.md`, and `landing-page-execution-task-map.md` turning the landing requirements into file-level ownership and task-level execution guidance instead of leaving them as high-level requirements only
 - governance now requires every module change to start from its existing description doc, re-read prior context, merge updates into that source-of-truth narrative, and record the result in the edited request-facing doc, implementation tracking, and the corresponding roadmap or sprint or phase artifact
 - governance now also requires live-promoted work to be written back automatically once the last implementation step is complete, so `implemented`, `deployed live`, and `documented in progress + sprint + roadmap` are treated as one closure standard rather than separate follow-up tasks
 - Prompt 5 additive API v1 foundation
@@ -276,6 +286,9 @@ Current shape:
 - the latest live product frontend bundle was promoted on `2026-04-17` and verified on `https://product.bookedai.au`, with the current public response showing `last-modified: Fri, 17 Apr 2026 07:13:39 GMT`
 - the public booking assistant popup now also has a dedicated mobile-responsive chat-first mode: the top `Voice / Chat / Booking` strip is reduced to a shorter horizontal slider, auto-hides after the first search while the user stays in chat, and reappears when the user enters booking
 - popup mobile now keeps the live search chrome out of the way after the first search, delays booking-panel exposure until the user explicitly selects a result, auto-focuses the booking form after selection, and compresses the selected-result summary into a one-line bottom strip so chat results keep maximum vertical space
+- compact search-result cards now place the thumbnail summary on the left side instead of the right for both service matches and event matches, so the eye can scan image -> title -> price/duration/location in a more natural left-to-right rhythm across popup and product surfaces
+- the new landing template now gives the BookedAI logo more visual weight and cleaner spacing in the main header and footer, so the brand reads larger, clearer, and more professionally balanced without crowding the navigation or CTA controls
+- the public landing rebuild is now also materially aligned to the visual-first design requirement itself: hero, problem, solution, and product-proof sections now communicate primarily through graphics, funnel/status imagery, and infographic-style layout while keeping only concise commercial copy and keyword-level support text
 - the latest live popup-mobile frontend bundle was promoted on `2026-04-17` and verified on `https://bookedai.au`, with the current public response showing `last-modified: Fri, 17 Apr 2026 12:49:12 GMT`
 
 ## Backend Progress
@@ -746,6 +759,59 @@ Current execution has also been running through a specialist multi-agent pattern
   - status: `Completed`
 
 ## Related References
+
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: added shared landing UI primitives in `frontend/src/components/landing/ui/*` and refactored `HeroSection`, `ProblemSection`, `SolutionSection`, and `CallToActionSection` onto reusable `SectionCard`, `SignalPill`, and `FeatureCard` patterns
+  - verification: `npm run build` in `frontend/`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: extended the same shared primitives into `ProductProofSection`, `TrustSection`, and the top narrative surfaces of `PricingSection` so the public landing path now shares a more consistent card and signal vocabulary without changing booking-flow logic
+  - verification: `npm run build` in `frontend/`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: moved more of the pricing modal and `DemoBookingDialog` surfaces onto shared `SectionCard` and `SignalPill` primitives so the booking and consultation layers now reuse the same card and badge system as the landing path
+  - verification: `npm run build` in `frontend/`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: redesigned `HeroSection`, `ProblemSection`, `SolutionSection`, and `ProductProofSection` toward a more professional visual-first landing narrative, where each section now spends most of its surface on graphics, infographic-style status blocks, flow rails, proof cards, and conversion visuals while reserving copy for high-value keywords and decision-critical statements
+  - verification: `npm run build` in `frontend/`; deployed `frontend/dist` to `bookedai-web-1` and `bookedai-beta-web-1`; `curl -Ik https://bookedai.au` returned `HTTP/2 200` with `last-modified: Fri, 17 Apr 2026 15:32:37 GMT`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: completed the same visual-first treatment across `PricingSection`, `TrustSection`, and `CallToActionSection`, adding pricing flow graphics, proof-wall trust blocks, FAQ signal boards, and a more graphic-led closing CTA so the whole landing path now follows the same `80%` visual and `20%` high-value copy system instead of mixing redesigned sections with older text-heavier layouts
+  - verification: `npm run build` in `frontend/`; deployed refreshed `frontend/dist` to `bookedai-web-1` and `bookedai-beta-web-1`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: polished `PricingPlanCard` and `PartnersSection` so pricing choices now read as compact decision cards with stronger scan cues, while the partner and infrastructure trust wall now uses signal metrics, grouped trust framing, and badge-led logo cards that match the premium visual-first landing system
+  - verification: `npm run build` in `frontend/`; deployed refreshed `frontend/dist` to `bookedai-web-1` and `bookedai-beta-web-1`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: upgraded `BookingAssistantSection` to the same premium visual-first system, adding a proof-led intro column, live-flow signal cards, and a stronger framed product shell around the existing chat and booking preview so the interactive demo now reads like core product storytelling instead of a utility-only widget
+  - verification: `npm run build` in `frontend/`; deployed refreshed `frontend/dist` to `bookedai-web-1` and `bookedai-beta-web-1`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: extracted the stateful pricing plan card into `frontend/src/components/landing/sections/PricingPlanCard.tsx`, reducing `PricingSection` size and aligning plan-card rendering with the shared landing card and pill system
+  - verification: `npm run build` in `frontend/`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: extracted the recommendation block and consultation modal out of `PricingSection` into `PricingRecommendationPanel.tsx` and `PricingConsultationModal.tsx`, leaving the section closer to orchestration-only while preserving the existing package-booking flow behavior
+  - verification: `npm run build` in `frontend/`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: centralized pricing types, constants, and pure helpers into `frontend/src/components/landing/sections/pricing-shared.ts`, so the pricing section and its child components now share one source of truth for plan data, recommendations, booking helpers, and consultation-form contracts
+  - verification: `npm run build` in `frontend/`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: finished shared-surface cleanup for the remaining landing lanes in `Footer`, `ImplementationSection`, `TeamSection`, and `ProductFlowShowcaseSection`, and upgraded brand presentation so the landing header logo is larger and the hero now includes a dedicated prominent logo banner instead of a barely visible mark
+  - verification: `npm run build` in `frontend/`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: restructured the visible landing layout toward a more professional visual-first sales surface by tightening text blocks, shifting the main sections to heavier visualization ratios, upgrading header and footer hierarchy, and making `Hero`, `Problem`, `ProductProof`, `Solution`, and `Trust` read more like infographic boards than long-form copy sections
+  - verification: `npm run build` in `frontend/`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: ran screenshot-based desktop and mobile visual QA against the local landing preview, then tightened logo cropping and responsive brand presentation in `Header`, `HeroSection`, `Footer`, and theme sizing so the new mark reads clearly instead of disappearing inside oversized whitespace on smaller screens
+  - verification: `npm run build` in `frontend/`; reviewed `frontend/output/playwright/landing-qa/desktop-full.png` and `frontend/output/playwright/landing-qa/mobile-top-v2.png`
 
 - [Project Documentation Root](../../project.md)
 - [Documentation Root](../README.md)
