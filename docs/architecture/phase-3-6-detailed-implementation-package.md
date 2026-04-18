@@ -27,6 +27,7 @@ It aligns with:
 - `docs/architecture/crm-email-revenue-lifecycle-strategy.md`
 - `docs/architecture/integration-hub-sync-architecture.md`
 - `docs/architecture/tenant-app-strategy.md`
+- `docs/development/sprint-dependency-and-inheritance-map.md`
 
 ## 2. Phase definitions used here
 
@@ -45,6 +46,8 @@ Recovery, payments, and commission operations
 ### Phase 6
 
 Optimization, evaluation, and scale hardening
+
+These phases should now be read as the shared commercial-truth cluster that later tenant, admin, and hardening work inherits.
 
 ## 3. Strategic outcome for Phase 3-6
 
@@ -325,4 +328,3 @@ Phase 6 depends on:
 - do not treat missed revenue as pure AI interpretation with no explicit rules
 - do not split tenant and admin views onto conflicting contracts
 - do not ship recovery automation without auditability and suppression controls
-

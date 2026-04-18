@@ -24,12 +24,15 @@ It aligns with:
 - `docs/architecture/qa-testing-reliability-ai-evaluation-strategy.md`
 - `docs/development/release-gate-checklist.md`
 - `docs/development/implementation-progress.md`
+- `docs/development/sprint-dependency-and-inheritance-map.md`
 
 ## 2. Phase definition used here
 
 ### Phase 9
 
 QA, release discipline, and scale hardening
+
+Phase 9 inherits the active public, tenant, and admin commercial surfaces from the earlier phases and should use the sprint dependency map as the execution reference for deciding which surfaces and workflows must already be active before hardening and release gates are treated as meaningful.
 
 ## 3. Strategic outcome for Phase 9
 
@@ -179,4 +182,3 @@ Phase 9 depends on:
 - do not release with undocumented hold or rollback conditions
 - do not exclude tenant and admin commercial workflows from release readiness
 - do not consider code done if documentation synchronization is still missing
-

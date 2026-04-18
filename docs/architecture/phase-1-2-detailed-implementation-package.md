@@ -28,6 +28,7 @@ This package should be read together with:
 - `docs/architecture/mvp-sprint-execution-plan.md`
 - `docs/architecture/public-growth-app-strategy.md`
 - `docs/architecture/pricing-packaging-monetization-strategy.md`
+- `docs/development/sprint-dependency-and-inheritance-map.md`
 
 ## 2. Phase definitions used here
 
@@ -40,6 +41,8 @@ Premium public narrative and brand system
 Landing implementation and growth instrumentation
 
 These phases should be treated as tightly linked. Phase 1 defines the system to build. Phase 2 implements it in the product.
+
+These phases also define the baseline later commercial and reporting work must inherit rather than reinterpret.
 
 ## 3. Strategic outcome for Phase 1-2
 

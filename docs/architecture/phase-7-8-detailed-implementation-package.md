@@ -22,6 +22,7 @@ It aligns with:
 - `docs/architecture/internal-admin-app-strategy.md`
 - `docs/architecture/analytics-metrics-revenue-bi-strategy.md`
 - `docs/architecture/integration-hub-sync-architecture.md`
+- `docs/development/sprint-dependency-and-inheritance-map.md`
 
 ## 2. Phase definitions used here
 
@@ -32,6 +33,8 @@ Tenant revenue workspace
 ### Phase 8
 
 Internal admin optimization and support platform
+
+These phases inherit the commercial contracts and workflow truth from Phase 3-6 and should not redefine shared state names, issue taxonomy, or commercial semantics unless an explicit upstream change has been approved.
 
 ## 3. Strategic outcome for Phase 7-8
 
@@ -239,4 +242,3 @@ Phase 8 depends on:
 - do not create tenant dashboards that show data without action context
 - do not expose admin override actions without audit visibility
 - do not let tenant and admin surfaces diverge in commercial vocabulary or state names
-

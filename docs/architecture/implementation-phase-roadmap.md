@@ -20,6 +20,7 @@ This roadmap aligns with:
 - `docs/architecture/pricing-packaging-monetization-strategy.md`
 - `docs/architecture/analytics-metrics-revenue-bi-strategy.md`
 - `docs/architecture/crm-email-revenue-lifecycle-strategy.md`
+- `docs/development/sprint-dependency-and-inheritance-map.md`
 
 ## Planning principles
 
@@ -29,6 +30,28 @@ This roadmap aligns with:
 - build the data model for revenue, missed revenue, attribution, and commission before overbuilding UI
 - keep rollout additive and feature-flagged
 - preserve one shared commercial truth across public, tenant, and admin surfaces
+
+## Execution dependency rule
+
+The roadmap should now be read with one explicit cross-sprint dependency reference:
+
+- `docs/development/sprint-dependency-and-inheritance-map.md`
+
+That document is the execution companion for this roadmap and should be used to determine:
+
+- which sprint outputs are hard start gates for later sprints
+- which baseline documents and implementation choices later sprints must inherit
+- which sprint groups can overlap safely once their shared contracts and vocabulary stop moving
+
+Roadmap sequencing should not be interpreted as meaning every sprint is strictly isolated or strictly serial.
+
+Instead:
+
+- Sprint 1 through Sprint 3 remain the baseline-locking chain
+- Sprint 4 through Sprint 7 form the first commercial-contract and workflow cluster
+- Sprint 8 through Sprint 9 can run as parallel tenant and admin delivery tracks after the commercial baseline is credible
+- Sprint 11 through Sprint 14 should inherit the Phase 3-6 commercial truth and may split tenant and admin work into parallel tracks where the dependency map permits
+- Sprint 15 through Sprint 16 remain the release-discipline closeout chain
 
 ## Execution layers
 

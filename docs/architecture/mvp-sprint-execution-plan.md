@@ -22,6 +22,26 @@ The MVP is:
 - release style: additive and feature-flagged where needed
 - current production stack remains in place during rollout
 
+## Execution dependency note
+
+This sprint plan should now be read together with:
+
+- `docs/development/sprint-dependency-and-inheritance-map.md`
+
+The sprint dependency map is the active reference for:
+
+- hard gates between successive sprint waves
+- required inheritance of approved baselines from earlier sprints
+- controlled overlap between sprint tracks once shared contracts, vocabulary, and state names are stable
+
+In practical terms:
+
+- Sprint 1 through Sprint 3 are still the baseline-setting chain
+- Sprint 5 and Sprint 6 may overlap after Sprint 4 freezes commercial contracts
+- Sprint 8 and Sprint 9 may run in parallel once Sprint 4 through Sprint 7 have produced stable commercial truth
+- Sprint 11 and Sprint 13 may run in parallel as tenant and admin planning or implementation tracks
+- Sprint 15 and Sprint 16 should remain sequential
+
 ## MVP definition
 
 The MVP target for this cycle is:

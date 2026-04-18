@@ -18,6 +18,14 @@ For any meaningful product or architecture change:
 - update the relevant roadmap or sprint document
 - if the change affects the public narrative, update the PRD and public-growth planning docs in the same pass
 
+Default inherited checklist for every sprint:
+
+- `docs/development/project-wide-sprint-execution-checklist.md`
+
+Cross-sprint dependency and inheritance reference:
+
+- `docs/development/sprint-dependency-and-inheritance-map.md`
+
 ## Sprint register
 
 ### Sprint 1
@@ -54,6 +62,8 @@ Focus:
 - `docs/architecture/phase-1-2-epic-story-task-breakdown.md`
 - `docs/architecture/public-growth-app-strategy.md`
 - `docs/architecture/implementation-phase-roadmap.md`
+- `docs/development/sprint-2-code-ready-development-handoff.md`
+- `docs/development/sprint-2-code-ready-implementation-slices.md`
 - `docs/development/sprint-2-owner-execution-checklist.md`
 
 Focus:
@@ -64,6 +74,8 @@ Focus:
 - premium UI and design-token alignment
 - CTA/source attribution baseline
 - forward-compatible App Router starter baseline
+- code-ready development handoff for immediate implementation under the new direction
+- implementation slices for immediate lane-by-lane execution
 
 ### Sprint 3
 
@@ -80,6 +92,9 @@ Focus:
 - `docs/development/sprint-3-owner-execution-checklist.md`
 - `docs/development/sprint-3-kickoff-checklist.md`
 - `docs/development/sprint-3-task-board-seed.md`
+- `docs/development/sprint-3-code-ready-development-handoff.md`
+- `docs/development/sprint-3-code-ready-implementation-slices.md`
+- `docs/development/sprint-3-visual-review-rubric.md`
 
 Focus:
 

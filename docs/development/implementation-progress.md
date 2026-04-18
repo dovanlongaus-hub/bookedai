@@ -14,6 +14,7 @@ Date: `2026-04-17`
 
 Current focus areas:
 
+- a dedicated [Sprint Dependency And Inheritance Map](./sprint-dependency-and-inheritance-map.md) now exists, exporting the hard gates, inheritance rules, and parallel-execution allowances across Sprint 1 through Sprint 16 so teams no longer need to reconstruct cross-sprint sequencing from scattered roadmap and phase documents
 - a leadership-level [master execution index](../architecture/master-execution-index.md) now exists so the full Phase 0 to Phase 9 program can be navigated from one short file before opening the deeper architecture and sprint docs
 - a [Jira-ready delivery structure](./jira-ready-delivery-structure.md) now exists so the current execution model can be transferred into a tracker using the standard hierarchy `Initiative -> Phase -> Epic -> Story -> Task`
 - a [Notion import-ready execution backlog](./notion-import-ready-execution-backlog.md) now exists with phase, epic, and sprint tables aligned to the current execution system
