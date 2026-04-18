@@ -10,6 +10,7 @@ This document turns the Sprint 2 design-token requirement into an explicit imple
 
 - `frontend/src/theme/apple-tokens.css`
 - `frontend/src/theme/minimal-bento-template.css`
+- `frontend/src/theme/bookedai-brand-kit.css`
 - `frontend/src/styles.css`
 
 It exists so the frontend team can freeze where tokens live, what each file owns, and how future landing work should consume those tokens without creating another parallel styling system.
@@ -27,7 +28,12 @@ The token system must follow this ownership order:
    - app-level imports
    - animation utilities
    - any thin glue needed to expose token values to JSX utility usage
-3. `frontend/src/theme/apple-tokens.css`
+3. `frontend/src/theme/bookedai-brand-kit.css`
+   - BookedAI dark-mode-first brand token layer
+   - revenue-engine gradients
+   - brand-kit component primitives
+   - exact premium SaaS token set for new brand work
+4. `frontend/src/theme/apple-tokens.css`
    - human-readable token reference and documentation layer
    - no competing visual truth beyond documenting what the system already exposes
 
@@ -62,6 +68,17 @@ Owns:
 - thin compatibility helpers only when needed by the app shell
 
 Must not become a second full design-system file.
+
+### `frontend/src/theme/bookedai-brand-kit.css`
+
+Owns:
+
+- the exact dark-mode-first BookedAI brand token layer
+- premium revenue-engine gradient definitions
+- glass-card, gradient-border, and CTA-brand classes
+- new brand UI kit primitives intended for Next.js-ready reuse
+
+Must stay aligned with the BookedAI brand UI kit source document.
 
 ### `frontend/src/theme/apple-tokens.css`
 

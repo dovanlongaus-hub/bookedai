@@ -103,6 +103,8 @@ The current repo already has valuable production foundations:
 - Stripe checkout initiation
 - calendar and email integrations
 - rollout and reliability foundations
+- BookedAI brand UI kit foundation with local SVG assets, reusable brand primitives, and dark-mode token layer
+- root App Router starter baseline that now builds successfully as a forward-compatible translation target for the new brand system
 
 The next roadmap change is not to discard that work.
 
@@ -361,13 +363,19 @@ Open gap:
 
 - synchronize all linked architecture and roadmap documents
 
-### Sprint 2 - Pending
+### Sprint 2 - Complete for blueprint lock and rollout baseline
 
-Focus:
+Evidence already present:
 
-- formalize public brand system
-- lock section-by-section component architecture
-- align design tokens and UX rules with the existing frontend reality
+- `docs/architecture/sprint-2-closeout-review.md` now records Sprint 2 as materially complete
+- `docs/architecture/bookedai-brand-ui-kit.md` now exists as the concrete brand-system source document
+- local SVG logo variants, a dark-mode-first token layer, and reusable brand-kit primitives now exist in repo
+- public CTA/source instrumentation baseline now exists across assistant entry, pricing consultation, and demo brief flows
+- a root Next.js App Router starter baseline now exists and `npm run build` passes at repo root
+
+Remaining handoff:
+
+- Sprint 3 should build the live landing runtime on top of the frozen content, token, component, and attribution baseline instead of reopening Sprint 2 strategy
 
 ### Sprint 3 - Pending
 

@@ -402,6 +402,14 @@ class PricingConsultationRequest(BaseModel):
     preferred_time: time
     timezone: str = "Australia/Sydney"
     notes: str | None = Field(default=None, max_length=1000)
+    source_page: str | None = Field(default=None, max_length=120)
+    source_section: str | None = Field(default=None, max_length=120)
+    source_cta: str | None = Field(default=None, max_length=120)
+    source_detail: str | None = Field(default=None, max_length=255)
+    source_plan_id: str | None = Field(default=None, max_length=50)
+    source_flow_mode: str | None = Field(default=None, max_length=50)
+    source_path: str | None = Field(default=None, max_length=500)
+    source_referrer: str | None = Field(default=None, max_length=500)
 
 
 class PricingConsultationResponse(BaseModel):
@@ -438,6 +446,12 @@ class DemoBookingRequest(BaseModel):
     preferred_time: time
     timezone: str = "Australia/Sydney"
     notes: str | None = Field(default=None, max_length=1000)
+    source_page: str | None = Field(default=None, max_length=120)
+    source_section: str | None = Field(default=None, max_length=120)
+    source_cta: str | None = Field(default=None, max_length=120)
+    source_detail: str | None = Field(default=None, max_length=255)
+    source_path: str | None = Field(default=None, max_length=500)
+    source_referrer: str | None = Field(default=None, max_length=500)
 
 
 class DemoBookingResponse(BaseModel):
@@ -460,6 +474,12 @@ class DemoBriefRequest(BaseModel):
     business_name: str = Field(min_length=2, max_length=255)
     business_type: str = Field(min_length=2, max_length=120)
     notes: str | None = Field(default=None, max_length=1000)
+    source_page: str | None = Field(default=None, max_length=120)
+    source_section: str | None = Field(default=None, max_length=120)
+    source_cta: str | None = Field(default=None, max_length=120)
+    source_detail: str | None = Field(default=None, max_length=255)
+    source_path: str | None = Field(default=None, max_length=500)
+    source_referrer: str | None = Field(default=None, max_length=500)
 
 
 class DemoBriefResponse(BaseModel):

@@ -24,3 +24,5 @@ supabase/.env
 supabase/.env.old
 supabase/volumes/db/data/
 supabase/volumes/storage/
+node_modules
+.next/

@@ -18,6 +18,7 @@ This document should be read together with:
 - `docs/architecture/pricing-packaging-monetization-strategy.md`
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
 - `docs/architecture/frontend-theme-design-token-map.md`
+- `docs/architecture/bookedai-brand-ui-kit.md`
 - `docs/architecture/landing-component-tree-and-file-ownership.md`
 - `docs/architecture/landing-page-execution-task-map.md`
 

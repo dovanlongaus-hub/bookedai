@@ -1,12 +1,18 @@
 import { useEffect, useState } from 'react';
 
 import {
+  buildAssistantSourcePath,
+  buildPublicCtaAttribution,
+  dispatchPublicCtaAttribution,
+  type PublicCtaAttribution,
+} from '../../components/landing/attribution';
+import {
   bookingAssistantContent,
   ctaContent,
-  demoContent,
+  faqItems,
   flowSteps,
+  demoContent,
   heroContent,
-  implementationContent,
   navItems,
   partnersSectionContent,
   problemCards,
@@ -15,9 +21,7 @@ import {
   proofItems,
   solutionCards,
   solutionContent,
-  teamMembers,
-  teamSectionContent,
-  videoDemoContent,
+  trustItems,
 } from '../../components/landing/data';
 import { Footer } from '../../components/landing/Footer';
 import { Header } from '../../components/landing/Header';
@@ -26,19 +30,20 @@ import { DemoBookingDialog } from '../../components/landing/DemoBookingDialog';
 import { BookingAssistantSection } from '../../components/landing/sections/BookingAssistantSection';
 import { CallToActionSection } from '../../components/landing/sections/CallToActionSection';
 import { HeroSection } from '../../components/landing/sections/HeroSection';
-import { ImplementationSection } from '../../components/landing/sections/ImplementationSection';
 import { PartnersSection } from '../../components/landing/sections/PartnersSection';
 import { PricingSection } from '../../components/landing/sections/PricingSection';
 import { ProblemSection } from '../../components/landing/sections/ProblemSection';
-import { ProductFlowShowcaseSection } from '../../components/landing/sections/ProductFlowShowcaseSection';
 import { ProductProofSection } from '../../components/landing/sections/ProductProofSection';
 import { SolutionSection } from '../../components/landing/sections/SolutionSection';
-import { TeamSection } from '../../components/landing/sections/TeamSection';
-import { VideoDemoSection } from '../../components/landing/sections/VideoDemoSection';
+import { TrustSection } from '../../components/landing/sections/TrustSection';
 
 export function PublicApp() {
   const [isAssistantOpen, setIsAssistantOpen] = useState(false);
   const [isDemoOpen, setIsDemoOpen] = useState(false);
+  const [assistantEntryAttribution, setAssistantEntryAttribution] =
+    useState<PublicCtaAttribution | null>(null);
+  const [demoEntryAttribution, setDemoEntryAttribution] =
+    useState<PublicCtaAttribution | null>(null);
   const [bookingBanner, setBookingBanner] = useState<{
     tone: 'success' | 'neutral';
     title: string;
@@ -113,6 +118,28 @@ export function PublicApp() {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   }, []);
 
+  function openAssistant(input: {
+    source_section: PublicCtaAttribution['source_section'];
+    source_cta: PublicCtaAttribution['source_cta'];
+    source_detail?: string | null;
+  }) {
+    const nextAttribution = buildPublicCtaAttribution(input);
+    dispatchPublicCtaAttribution(nextAttribution);
+    setAssistantEntryAttribution(nextAttribution);
+    setIsAssistantOpen(true);
+  }
+
+  function openDemo(input: {
+    source_section: PublicCtaAttribution['source_section'];
+    source_cta: PublicCtaAttribution['source_cta'];
+    source_detail?: string | null;
+  }) {
+    const nextAttribution = buildPublicCtaAttribution(input);
+    dispatchPublicCtaAttribution(nextAttribution);
+    setDemoEntryAttribution(nextAttribution);
+    setIsDemoOpen(true);
+  }
+
   return (
     <main className="booked-shell relative overflow-hidden">
       {bookingBanner ? (
@@ -141,14 +168,31 @@ export function PublicApp() {
 
       <Header
         navItems={navItems}
-        onStartTrial={() => setIsAssistantOpen(true)}
-        onBookDemo={() => setIsDemoOpen(true)}
+        onStartTrial={() =>
+          openAssistant({
+            source_section: 'header',
+            source_cta: 'start_free_trial',
+          })}
+        onBookDemo={() =>
+          openDemo({
+            source_section: 'header',
+            source_cta: 'book_demo',
+          })}
       />
       <section className="template-section relative overflow-hidden border-y border-black/5">
         <HeroSection
           content={heroContent}
           demo={demoContent}
-          onStartTrial={() => setIsAssistantOpen(true)}
+          onStartTrial={() =>
+            openAssistant({
+              source_section: 'hero',
+              source_cta: 'start_free_trial',
+            })}
+          onBookDemo={() =>
+            openDemo({
+              source_section: 'hero',
+              source_cta: 'view_demo',
+            })}
         />
         <ProblemSection content={problemContent} cards={problemCards} />
         <ProductProofSection content={proofContent} items={proofItems} />
@@ -157,35 +201,58 @@ export function PublicApp() {
           cards={solutionCards}
           flowSteps={flowSteps}
         />
-        <ProductFlowShowcaseSection demo={demoContent} />
-        <VideoDemoSection content={videoDemoContent} />
-        <ImplementationSection content={implementationContent} />
       </section>
+      <BookingAssistantSection
+        content={bookingAssistantContent}
+        onOpenAssistant={() =>
+          openAssistant({
+            source_section: 'booking_assistant',
+            source_cta: 'open_full_assistant',
+          })}
+      />
+      <TrustSection items={trustItems} faqItems={faqItems} />
+      <PartnersSection content={partnersSectionContent} />
       <PricingSection />
       <CallToActionSection
         content={ctaContent}
-        onStartTrial={() => setIsAssistantOpen(true)}
-        onBookDemo={() => setIsDemoOpen(true)}
+        onStartTrial={() =>
+          openAssistant({
+            source_section: 'call_to_action',
+            source_cta: 'start_free_trial',
+          })}
+        onBookDemo={() =>
+          openDemo({
+            source_section: 'call_to_action',
+            source_cta: 'book_demo',
+          })}
       />
-      <BookingAssistantSection
-        content={bookingAssistantContent}
-        onOpenAssistant={() => setIsAssistantOpen(true)}
-      />
-      <PartnersSection content={partnersSectionContent} />
-      <TeamSection content={teamSectionContent} members={teamMembers} />
       <Footer
-        onStartTrial={() => setIsAssistantOpen(true)}
-        onBookDemo={() => setIsDemoOpen(true)}
+        onStartTrial={() =>
+          openAssistant({
+            source_section: 'footer',
+            source_cta: 'start_free_trial',
+          })}
+        onBookDemo={() =>
+          openDemo({
+            source_section: 'footer',
+            source_cta: 'book_demo',
+          })}
       />
 
       <BookingAssistantDialog
         content={bookingAssistantContent}
         isOpen={isAssistantOpen}
         onClose={() => setIsAssistantOpen(false)}
+        entrySourcePath={
+          assistantEntryAttribution
+            ? buildAssistantSourcePath(assistantEntryAttribution)
+            : null
+        }
       />
       <DemoBookingDialog
         isOpen={isDemoOpen}
         onClose={() => setIsDemoOpen(false)}
+        entryAttribution={demoEntryAttribution}
       />
     </main>
   );

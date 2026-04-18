@@ -1,11 +1,15 @@
 import { FormEvent, useEffect, useId, useState } from 'react';
 
+import { buildPublicCtaAttribution, dispatchPublicCtaAttribution, type PublicCtaAttribution } from './attribution';
 import { brandDescriptor, brandName } from './data';
 import { ApiClientError, apiFetch } from '../../shared/api/client';
+import { SectionCard } from './ui/SectionCard';
+import { SignalPill } from './ui/SignalPill';
 
 type DemoBookingDialogProps = {
   isOpen: boolean;
   onClose: () => void;
+  entryAttribution?: PublicCtaAttribution | null;
 };
 
 function resolveApiErrorMessage(error: unknown, fallback: string) {
@@ -98,7 +102,11 @@ function ensureEmbedScript() {
   });
 }
 
-export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
+export function DemoBookingDialog({
+  isOpen,
+  onClose,
+  entryAttribution = null,
+}: DemoBookingDialogProps) {
   const inlineContainerId = useId().replace(/:/g, '');
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -260,6 +268,13 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
 
     setIsSubmittingBrief(true);
     try {
+      dispatchPublicCtaAttribution(
+        buildPublicCtaAttribution({
+          source_section: 'demo_dialog',
+          source_cta: 'submit_demo_brief',
+          source_detail: entryAttribution?.source_cta ?? null,
+        }),
+      );
       const payload = await apiFetch<DemoBriefResponse>('/demo/brief', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -270,6 +285,12 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
           business_name: businessName.trim(),
           business_type: businessType.trim(),
           notes: notes.trim() || null,
+          source_page: entryAttribution?.source_page ?? null,
+          source_section: entryAttribution?.source_section ?? null,
+          source_cta: entryAttribution?.source_cta ?? null,
+          source_detail: entryAttribution?.source_detail ?? null,
+          source_path: entryAttribution?.source_path ?? null,
+          source_referrer: entryAttribution?.source_referrer ?? null,
         }),
       });
       setBriefResult(payload);
@@ -282,7 +303,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
-      <div className="template-card relative max-h-[92vh] w-full max-w-7xl overflow-auto p-6 text-slate-700 sm:p-8">
+      <SectionCard className="relative max-h-[92vh] w-full max-w-7xl overflow-auto p-6 text-slate-700 sm:p-8">
         <div className="mb-6 flex flex-wrap items-center justify-between gap-4 border-b border-slate-200 pb-5 pr-16">
           <div>
             <div className="template-kicker text-xs">
@@ -310,9 +331,9 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
         </button>
 
         <div className="max-w-3xl pr-10">
-          <div className="booked-pill booked-pill--brand px-4 py-2 text-[11px]">
+          <SignalPill variant="brand" className="px-4 py-2 text-[11px]">
             {brandName} demo
-          </div>
+          </SignalPill>
           <div className="template-kicker mt-3 text-xs opacity-80">
             {brandDescriptor}
           </div>
@@ -326,7 +347,7 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
         </div>
 
         <div className="mt-8 grid gap-6 xl:grid-cols-[0.95fr_1.45fr]">
-          <section className="template-card-subtle p-5 sm:p-6">
+          <SectionCard as="section" tone="subtle" className="p-5 sm:p-6">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <div className="template-kicker text-sm">
@@ -337,9 +358,9 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                   current bottlenecks.
                 </p>
               </div>
-              <div className="booked-pill px-3 py-1 text-[11px] text-slate-500">
+              <SignalPill variant="brand" className="px-3 py-1 text-[11px] text-slate-500">
                 Optional but useful
-              </div>
+              </SignalPill>
             </div>
 
             {briefResult ? (
@@ -501,9 +522,9 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                 </p>
               </div>
             </form>
-          </section>
+          </SectionCard>
 
-          <section className="template-card-dark p-3 sm:p-4">
+          <SectionCard as="section" tone="dark" className="p-3 sm:p-4">
             <div className="flex flex-col gap-2 border-b border-white/10 px-3 pb-4 pt-1 sm:px-4">
               <div className="text-sm font-semibold uppercase tracking-[0.18em] text-cyan-200">
                 Live calendar
@@ -563,9 +584,9 @@ export function DemoBookingDialog({ isOpen, onClose }: DemoBookingDialogProps) {
                 Open full booking page
               </a>
             </div>
-          </section>
+          </SectionCard>
         </div>
-      </div>
+      </SectionCard>
     </div>
   );
 }

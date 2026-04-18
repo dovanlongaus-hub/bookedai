@@ -127,6 +127,7 @@ type BookingAssistantDialogProps = {
   standalone?: boolean;
   closeLabel?: string;
   layoutMode?: 'default' | 'product_app';
+  entrySourcePath?: string | null;
 };
 
 type ProductSheetSnap = 'peek' | 'half' | 'full';
@@ -866,6 +867,7 @@ export function BookingAssistantDialog({
   standalone = false,
   closeLabel,
   layoutMode = 'default',
+  entrySourcePath = null,
 }: BookingAssistantDialogProps) {
   const isProductAppLayout = standalone && layoutMode === 'product_app';
   const isDefaultPopupLayout = !standalone && layoutMode === 'default';
@@ -1096,11 +1098,17 @@ export function BookingAssistantDialog({
     void primePublicBookingAssistantSession({
       anonymousSessionId: bookingAssistantV1SessionId,
       sourcePage:
-        typeof window !== 'undefined'
+        entrySourcePath ??
+        (typeof window !== 'undefined'
           ? `${window.location.pathname}${window.location.search}`
-          : '/',
+          : '/'),
     });
-  }, [isOpen, bookingAssistantV1Enabled, bookingAssistantV1LiveReadEnabled]);
+  }, [
+    isOpen,
+    bookingAssistantV1Enabled,
+    bookingAssistantV1LiveReadEnabled,
+    entrySourcePath,
+  ]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -1545,9 +1553,10 @@ export function BookingAssistantDialog({
         ? getPublicBookingAssistantLiveReadRecommendation({
             query: trimmedMessage,
             sourcePage:
-              typeof window !== 'undefined'
+              entrySourcePath ??
+              (typeof window !== 'undefined'
                 ? `${window.location.pathname}${window.location.search}`
-                : '/',
+                : '/'),
             locationHint: userGeoContext?.locality ?? null,
             serviceCategory: selectedService?.category ?? null,
             selectedServiceId: selectedServiceId || null,
@@ -1567,9 +1576,10 @@ export function BookingAssistantDialog({
         ? shadowPublicBookingAssistantSearch({
             query: trimmedMessage,
             sourcePage:
-              typeof window !== 'undefined'
+              entrySourcePath ??
+              (typeof window !== 'undefined'
                 ? `${window.location.pathname}${window.location.search}`
-                : '/',
+                : '/'),
             locationHint: userGeoContext?.locality ?? null,
             serviceCategory: selectedService?.category ?? null,
             selectedServiceId: selectedServiceId || null,
@@ -1757,9 +1767,10 @@ export function BookingAssistantDialog({
     if (bookingAssistantV1Enabled) {
       void shadowPublicBookingAssistantLeadAndBookingIntent({
         sourcePage:
-          typeof window !== 'undefined'
+          entrySourcePath ??
+          (typeof window !== 'undefined'
             ? `${window.location.pathname}${window.location.search}`
-            : '/',
+            : '/'),
         serviceId: selectedService.id,
         serviceName: selectedService.name,
         serviceCategory: selectedService.category,
@@ -1888,7 +1899,7 @@ export function BookingAssistantDialog({
           className={`relative flex w-full flex-col overflow-hidden ${
             standalone
               ? isProductAppLayout
-                ? 'h-full min-h-0 bg-transparent shadow-none sm:h-[min(84dvh,46rem)] sm:w-[min(100%,24rem)] lg:h-[min(82dvh,44rem)] lg:w-[23rem]'
+                ? 'h-full min-h-0 bg-transparent shadow-none sm:h-[min(84dvh,46rem)] sm:w-[min(100%,32rem)] lg:h-[min(82dvh,48rem)] lg:w-[min(100%,36rem)] xl:w-[min(100%,40rem)]'
                 : 'min-h-screen bg-[#f8fafc] shadow-[0_35px_120px_rgba(15,23,42,0.35)] sm:min-h-0 sm:h-[min(96dvh,58rem)] sm:w-[min(94vw,30rem)] sm:rounded-[2rem] sm:border sm:border-white/20'
               : 'h-[100dvh] bg-[#f8fafc] shadow-[0_35px_120px_rgba(15,23,42,0.35)] sm:h-auto sm:max-h-[96dvh] sm:w-[min(90vw,88rem)] sm:rounded-[2rem] sm:border sm:border-white/20'
           }`}
@@ -1896,7 +1907,7 @@ export function BookingAssistantDialog({
           <div
                 className={
                   isProductAppLayout
-                    ? 'relative mx-auto flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden border-0 border-slate-900/10 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] shadow-none sm:max-w-[27rem] sm:border sm:border-white/40 sm:rounded-[2.3rem] sm:shadow-[0_35px_120px_rgba(15,23,42,0.22)] sm:ring-1 sm:ring-black/5'
+                    ? 'relative mx-auto flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden border-0 border-slate-900/10 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] shadow-none sm:max-w-[34rem] sm:border sm:border-white/40 sm:rounded-[2.3rem] sm:shadow-[0_35px_120px_rgba(15,23,42,0.22)] sm:ring-1 sm:ring-black/5 lg:max-w-[38rem]'
                     : 'relative flex min-h-0 flex-1 flex-col'
                 }
           >
@@ -2451,7 +2462,7 @@ export function BookingAssistantDialog({
                           Ask like a customer and let {brandName} keep the top result ready for booking.
                         </p>
 
-                        <div className="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-3">
+                        <div className="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
                           {productWelcomeSignals.map((signal) => (
                             <div
                               key={signal.label}
@@ -2489,7 +2500,7 @@ export function BookingAssistantDialog({
                       <div className={`mt-3 ${
                         isCompactMobileViewport
                           ? '-mx-1 flex gap-2 overflow-x-auto px-1 pb-1'
-                          : 'grid grid-cols-1 gap-2 min-[360px]:grid-cols-2'
+                        : 'grid grid-cols-1 gap-2 sm:grid-cols-2'
                       }`}>
                         {popupShortcutTopics.map((topic) => (
                           <button
@@ -2648,6 +2659,15 @@ export function BookingAssistantDialog({
                             >
                               {/* Compact event layout: badges + title + thumbnail */}
                               <div className="flex items-start gap-3">
+                                {imageUrl ? (
+                                  <div className="relative shrink-0 overflow-hidden rounded-xl border border-black/8 bg-slate-100" style={{ width: 68, height: 68 }}>
+                                    <img src={imageUrl} alt={event.title} className="h-full w-full object-cover" loading="lazy" />
+                                  </div>
+                                ) : (
+                                  <div className="flex shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-[linear-gradient(135deg,#dbeafe,#dcfce7)] text-[9px] font-bold uppercase tracking-widest text-slate-500" style={{ width: 68, height: 68 }}>
+                                    Event
+                                  </div>
+                                )}
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-1.5">
                                     <div
@@ -2678,15 +2698,6 @@ export function BookingAssistantDialog({
                                     </div>
                                   ) : null}
                                 </div>
-                                {imageUrl ? (
-                                  <div className="relative shrink-0 overflow-hidden rounded-xl border border-black/8 bg-slate-100" style={{ width: 68, height: 68 }}>
-                                    <img src={imageUrl} alt={event.title} className="h-full w-full object-cover" loading="lazy" />
-                                  </div>
-                                ) : (
-                                  <div className="flex shrink-0 items-center justify-center rounded-xl border border-slate-100 bg-[linear-gradient(135deg,#dbeafe,#dcfce7)] text-[9px] font-bold uppercase tracking-widest text-slate-500" style={{ width: 68, height: 68 }}>
-                                    Event
-                                  </div>
-                                )}
                               </div>
                               <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-slate-500">
                                 {event.summary}
@@ -2901,11 +2912,11 @@ export function BookingAssistantDialog({
               ref={bookingScrollRef}
                 className={`min-h-0 overflow-y-auto overscroll-contain bg-[#f8fafc] px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-6 sm:py-5 ${
                 isProductAppLayout
-                  ? `absolute inset-x-0 bottom-0 z-20 flex max-h-[82%] flex-col overflow-hidden rounded-t-[1.5rem] border border-slate-200 bg-[#f8fafc] shadow-[0_-24px_60px_rgba(15,23,42,0.18)] ${
+                  ? `absolute inset-x-0 bottom-0 z-20 flex max-h-[82%] w-full max-w-full flex-col overflow-hidden rounded-t-[1.5rem] border border-slate-200 bg-[#f8fafc] shadow-[0_-24px_60px_rgba(15,23,42,0.18)] ${
                       productSheetDragOffset !== 0 ? '' : 'transition-transform duration-300 ease-out'
                     } ${isCompactMobileViewport ? 'max-h-[76%] px-2 py-2' : ''} ${
                       shouldUseProductBottomNav ? 'pb-[calc(env(safe-area-inset-bottom)+4.5rem)]' : ''
-                    } sm:left-3 sm:right-3 sm:max-h-[88%] sm:rounded-t-[2rem] ${
+                    } sm:left-3 sm:right-3 sm:mx-auto sm:max-h-[88%] sm:max-w-[calc(100%_-_1.5rem)] sm:rounded-t-[2rem] ${
                       isCompactMobileViewport ? '' : ''
                     }`
                   : isDefaultPopupLayout
@@ -3051,7 +3062,7 @@ export function BookingAssistantDialog({
                       ? 'hidden'
                       : isCompactMobileViewport
                         ? 'grid-cols-3 gap-1.5'
-                        : 'grid-cols-1 gap-2 min-[360px]:grid-cols-3'
+                        : 'grid-cols-1 gap-2 sm:grid-cols-3'
                   }`}>
                     {bookingJourneySteps.map((step, index) => (
                       <div
@@ -3079,7 +3090,7 @@ export function BookingAssistantDialog({
                 <div className={`sticky top-0 z-10 -mx-4 mb-4 border-b border-slate-200 bg-[#f8fafc]/96 px-4 pb-3 pt-1 backdrop-blur sm:-mx-6 sm:px-6 ${
                   isCompactMobileViewport ? 'hidden' : ''
                 }`}>
-                  <div className="grid grid-cols-2 gap-2 min-[420px]:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
                     {productModuleTabs.map((tab) => (
                       <button
                         key={tab.id}
@@ -3518,7 +3529,7 @@ export function BookingAssistantDialog({
                           </div>
                       </div>
 
-                      <div className="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 xl:grid-cols-4">
+                      <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
                           <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                             Price
@@ -3630,7 +3641,7 @@ export function BookingAssistantDialog({
                     <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Booking journey
                     </div>
-                    <div className="mt-2 grid grid-cols-1 gap-2 min-[360px]:grid-cols-3">
+                    <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-3">
                       {bookingJourneySteps.map((step, index) => (
                         <div
                           key={`journey-${step.id}`}
@@ -3860,7 +3871,7 @@ export function BookingAssistantDialog({
                       </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-1 gap-2 min-[360px]:grid-cols-3">
+                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
                       <div className="rounded-[1rem] bg-white/10 px-3 py-3 ring-1 ring-white/10">
                         <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/70">
                           Service
@@ -3889,7 +3900,7 @@ export function BookingAssistantDialog({
                     </div>
                   </div>
 
-                  <div className="mt-5 grid grid-cols-1 gap-2 text-slate-600 min-[360px]:grid-cols-2">
+                  <div className="mt-5 grid grid-cols-1 gap-2 text-slate-600 sm:grid-cols-2">
                     <div className="rounded-[1rem] bg-[#f5f5f7] px-3 py-3">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                         Requested slot
@@ -3925,7 +3936,7 @@ export function BookingAssistantDialog({
                     ))}
                   </div>
 
-                  <div className="mt-5 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+                  <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
                     <a
                       href={result.payment_url}
                       target="_blank"

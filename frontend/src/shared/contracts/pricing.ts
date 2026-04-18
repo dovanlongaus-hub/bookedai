@@ -17,6 +17,14 @@ export interface PricingConsultationRequest {
   preferred_time: string;
   timezone: string;
   notes?: string | null;
+  source_page?: string | null;
+  source_section?: string | null;
+  source_cta?: string | null;
+  source_detail?: string | null;
+  source_plan_id?: string | null;
+  source_flow_mode?: string | null;
+  source_path?: string | null;
+  source_referrer?: string | null;
 }
 
 export interface PricingConsultationResponse {

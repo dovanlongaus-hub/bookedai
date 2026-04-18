@@ -315,11 +315,11 @@ export const brandDescriptor = 'AI Revenue Engine for Service Businesses';
 export const brandPositioning =
   'Multi-channel AI revenue engine that captures demand, converts it into bookings, and helps recover missed revenue.';
 export const brandHomeUrl = 'https://bookedai.au/';
-export const brandPreferredLogoPath = 'https://upload.bookedai.au/images/ef4d/i1_STdSm_tw-k6loI5aIEA.png';
-export const brandLogoPath = '/branding/bookedai-logo-cropped.png';
-export const brandLogoOnDarkPath = '/branding/bookedai-logo-cropped.png';
-export const brandLogoSquarePath = '/branding/bookedai-logo-square.png';
-export const brandFaviconPath = '/favicon.png';
+export const brandPreferredLogoPath = '/branding/bookedai-revenue-engine-dark.svg';
+export const brandLogoPath = '/branding/bookedai-revenue-engine-dark.svg';
+export const brandLogoOnDarkPath = '/branding/bookedai-revenue-engine-white.svg';
+export const brandLogoSquarePath = '/branding/bookedai-revenue-engine-icon.svg';
+export const brandFaviconPath = '/branding/bookedai-revenue-engine-icon.svg';
 export const brandContactEmail = 'info@bookedai.au';
 export const brandWhatsAppHref =
   'https://wa.me/14155238886?text=Hi%20BookedAI%2C%20I%20want%20to%20see%20how%20the%20AI%20Revenue%20Engine%20works.';
@@ -328,10 +328,10 @@ export const brandXHref = 'https://twitter.com/BookedAIAU';
 
 export const navItems: NavItem[] = [
   'Problem',
-  'Solution',
   'How it Works',
-  'Demo',
-  'Implementation',
+  'Live Flow',
+  'Trust',
+  'Partners',
   'Pricing',
 ];
 

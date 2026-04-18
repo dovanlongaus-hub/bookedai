@@ -90,7 +90,9 @@ Finish the brand system, landing-page information architecture, design tokens, a
 
 - review component tree
 - review `docs/architecture/sprint-2-implementation-package.md`
+- review `docs/architecture/sprint-2-closeout-review.md`
 - review `docs/architecture/frontend-theme-design-token-map.md`
+- review `docs/architecture/bookedai-brand-ui-kit.md`
 - review `docs/architecture/landing-component-tree-and-file-ownership.md`
 - review `docs/architecture/landing-page-execution-task-map.md`
 - review UI primitive list
@@ -153,9 +155,12 @@ Finish the brand system, landing-page information architecture, design tokens, a
 - freeze component tree
 - freeze widget vocabulary
 - complete `docs/architecture/sprint-2-implementation-package.md`
+- complete `docs/architecture/sprint-2-closeout-review.md`
 - complete `docs/architecture/frontend-theme-design-token-map.md`
+- complete `docs/architecture/bookedai-brand-ui-kit.md`
 - complete `docs/architecture/landing-component-tree-and-file-ownership.md`
 - complete `docs/architecture/landing-page-execution-task-map.md`
+- confirm the additive App Router starter baseline builds successfully
 - record any open implementation risks
 - approve Sprint 3 coding start
 

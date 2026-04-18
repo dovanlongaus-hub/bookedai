@@ -34,6 +34,10 @@ Current focus areas:
 - a formal `docs/architecture/phase-0-exit-review.md` now exists as the closeout record for the reset phase, marking the core documentation stack as materially aligned, recording the remaining non-blocking assumptions, and stating that Sprint 2 is ready for explicit owner signoff rather than remaining informally implied
 - `docs/architecture/sprint-2-implementation-package.md` has now been rewritten to match the actual Phase 1-2 plan, replacing an outdated backend-refactor framing with the correct Sprint 2 execution package for public brand system lock, design tokens, component tree, section mapping, widget vocabulary, and instrumentation assumptions
 - Sprint 2 planning now also has concrete implementation-side companion artifacts for `frontend/src/theme/*`, `frontend/src/styles.css`, and `frontend/src/components/landing/*`, with `frontend-theme-design-token-map.md`, `landing-component-tree-and-file-ownership.md`, and `landing-page-execution-task-map.md` turning the landing requirements into file-level ownership and task-level execution guidance instead of leaving them as high-level requirements only
+- Sprint 2 closeout now also has an explicit review artifact at `docs/architecture/sprint-2-closeout-review.md`, and the repo now includes an additive public CTA/source instrumentation baseline so pricing consultations, demo briefs, and assistant entry flows preserve originating section and CTA context instead of collapsing into one generic landing source
+- the repo now also includes a concrete BookedAI brand UI kit artifact at `docs/architecture/bookedai-brand-ui-kit.md`, local SVG logo variants, a dark-mode-first `bookedai-brand-kit.css` token layer, and reusable `frontend/src/components/brand-kit/*` primitives so future Next.js-ready brand work can ship from one implementation baseline instead of ad-hoc landing-only styling
+- a standalone Next.js App Router starter foundation now also exists at repo root through `app/page.tsx`, `app/globals.css`, `components/brand/logo.tsx`, `components/ui/button.tsx`, `components/ui/glass-card.tsx`, `components/sections/*`, and `tailwind.config.ts`, so the new BookedAI revenue-engine brand can be lifted into a production-ready Next app without re-translating the token system first
+- that standalone Next starter now also includes `app/layout.tsx`, `package.json`, `tsconfig.json`, `next-env.d.ts`, `next.config.mjs`, `postcss.config.js`, and dedicated `TrustBar` plus `FinalCTASection` blocks, so the root App Router foundation is no longer just loose page fragments and now has the minimum project wiring needed for a real Next.js install-and-run path
 - governance now requires every module change to start from its existing description doc, re-read prior context, merge updates into that source-of-truth narrative, and record the result in the edited request-facing doc, implementation tracking, and the corresponding roadmap or sprint or phase artifact
 - governance now also requires live-promoted work to be written back automatically once the last implementation step is complete, so `implemented`, `deployed live`, and `documented in progress + sprint + roadmap` are treated as one closure standard rather than separate follow-up tasks
 - Prompt 5 additive API v1 foundation
@@ -761,6 +765,22 @@ Current execution has also been running through a specialist multi-agent pattern
 ## Related References
 
 - `2026-04-17`
+  - lane: `Brand UI kit starter code`
+  - update: generated the first App Router starter files for the BookedAI revenue-engine brand, including root `app/page.tsx`, `app/globals.css`, reusable logo/button/glass-card components, hero/pricing/dashboard sections, and a matching `tailwind.config.ts` that uses the exact dark-mode brand tokens
+  - verification: source files created and aligned to the documented brand token system
+- `2026-04-18`
+  - lane: `Brand UI kit starter code`
+  - update: completed the missing Next.js App Router scaffolding by adding root layout, Next package/config files, TS alias config, PostCSS wiring, and the missing trust/final-CTA sections so the BookedAI revenue-engine starter is structurally ready for dependency install and runtime boot
+  - verification: `npm install` and `npm run build` at repo root passed after narrowing the Next starter `tsconfig.json` scope to the App Router starter files instead of the whole monorepo
+- `2026-04-17`
+  - lane: `Sprint 2 brand system foundation`
+  - update: added a concrete BookedAI revenue-engine brand UI kit with local SVG logo variants, exact dark-mode brand tokens, Tailwind theme exposure, reusable foundation and CTA components, and a source document structured for direct Next.js App Router adoption
+  - verification: `npm run build` in `frontend/`
+- `2026-04-17`
+  - lane: `Sprint 2 closeout and rollout baseline`
+  - update: completed a formal `sprint-2-closeout-review.md` artifact and implemented additive public CTA attribution across landing CTA opens, pricing consultation submissions, demo brief submissions, backend event metadata, and dual-write mirrors so Sprint 2 is no longer only a planning lock but also a rollout-ready source baseline
+  - verification: `npm run build` in `frontend/`
+- `2026-04-17`
   - lane: `Sprint 3 landing rebuild`
   - update: added shared landing UI primitives in `frontend/src/components/landing/ui/*` and refactored `HeroSection`, `ProblemSection`, `SolutionSection`, and `CallToActionSection` onto reusable `SectionCard`, `SignalPill`, and `FeatureCard` patterns
   - verification: `npm run build` in `frontend/`
@@ -812,6 +832,14 @@ Current execution has also been running through a specialist multi-agent pattern
   - lane: `Sprint 3 landing rebuild`
   - update: ran screenshot-based desktop and mobile visual QA against the local landing preview, then tightened logo cropping and responsive brand presentation in `Header`, `HeroSection`, `Footer`, and theme sizing so the new mark reads clearly instead of disappearing inside oversized whitespace on smaller screens
   - verification: `npm run build` in `frontend/`; reviewed `frontend/output/playwright/landing-qa/desktop-full.png` and `frontend/output/playwright/landing-qa/mobile-top-v2.png`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: polished the final commercial conversion surfaces by upgrading `PricingRecommendationPanel` into a more visual decision board with recommendation rails and scan-friendly setup cues, and by rebuilding the closing `CallToActionSection` around a stronger visual closeout board so the last two landing sections now match the same visual-first language as the rest of the page
+  - verification: `npm run build` in `frontend/`
+- `2026-04-17`
+  - lane: `Sprint 3 landing rebuild`
+  - update: completed beta deploy acceptance for the refreshed landing by confirming `https://beta.bookedai.au` returned `HTTP/2 200`, `/api/health` returned `{"status":"ok","service":"backend"}`, and capturing desktop/mobile screenshots of the live `Pricing` and `CTA` surfaces for visual review
+  - verification: reviewed `frontend/output/playwright/landing-qa/beta-pricing-desktop.png`, `frontend/output/playwright/landing-qa/beta-cta-desktop.png`, `frontend/output/playwright/landing-qa/beta-pricing-mobile.png`, and `frontend/output/playwright/landing-qa/beta-cta-mobile.png`
 
 - [Project Documentation Root](../../project.md)
 - [Documentation Root](../README.md)

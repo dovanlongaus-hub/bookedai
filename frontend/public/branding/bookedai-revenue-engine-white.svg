@@ -1,0 +1,14 @@
+<svg width="512" height="128" viewBox="0 0 512 128" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="128" rx="32" fill="none"/>
+  <g transform="translate(20 20)">
+    <rect x="4" y="4" width="82" height="82" rx="26" stroke="#FFFFFF" stroke-width="8"/>
+    <path d="M24 66V24H49.5C61.3741 24 69 29.6881 69 39.5C69 47.1546 64.4495 52.1205 56.75 53.75L71.5 66H56.25L42.75 54.5H35V66H24Z" fill="#FFFFFF"/>
+    <path d="M24 54H60V66H24V54Z" fill="#FFFFFF"/>
+    <path d="M53 69L73 49" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round"/>
+    <path d="M62 49H73V60" stroke="#FFFFFF" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+  <g transform="translate(128 30)">
+    <text x="0" y="34" fill="#FFFFFF" font-size="34" font-weight="700" font-family="Inter, sans-serif" letter-spacing="-0.03em">BookedAI.au</text>
+    <text x="0" y="66" fill="#FFFFFF" opacity="0.72" font-size="16" font-weight="600" font-family="Inter, sans-serif" letter-spacing="0.18em">REVENUE ENGINE</text>
+  </g>
+</svg>

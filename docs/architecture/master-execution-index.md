@@ -62,7 +62,9 @@ Core docs:
 
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
 - `docs/architecture/sprint-2-implementation-package.md`
+- `docs/architecture/sprint-2-closeout-review.md`
 - `docs/architecture/frontend-theme-design-token-map.md`
+- `docs/architecture/bookedai-brand-ui-kit.md`
 - `docs/architecture/landing-component-tree-and-file-ownership.md`
 - `docs/architecture/landing-page-execution-task-map.md`
 - `docs/architecture/phase-1-2-epic-story-task-breakdown.md`

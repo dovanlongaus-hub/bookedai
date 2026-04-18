@@ -27,6 +27,7 @@ This package should be read together with:
 - `docs/architecture/phase-0-exit-review.md`
 - `docs/architecture/landing-page-system-requirements.md`
 - `docs/architecture/frontend-theme-design-token-map.md`
+- `docs/architecture/bookedai-brand-ui-kit.md`
 - `docs/architecture/landing-component-tree-and-file-ownership.md`
 - `docs/architecture/landing-page-execution-task-map.md`
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
@@ -78,8 +79,10 @@ Sprint 2 must produce or finalize:
 - locked CTA system
 - locked public widget vocabulary
 - locked design-token system
+- locked BookedAI brand UI kit baseline with logo system, dark-mode token system, and reusable foundation components
 - locked component tree
 - locked file mapping into `frontend/src/components/landing/`
+- one translation-ready App Router starter baseline for later Next.js adoption without reinterpreting the brand system from scratch
 - Sprint 3 coding handoff with known risks
 
 ## 6. Frontend repo mapping baseline
@@ -94,6 +97,22 @@ Sprint 2 should assume implementation lands primarily in:
 - `frontend/src/styles.css`
 - `frontend/src/theme/`
 - `frontend/src/apps/public/PublicApp.tsx`
+
+Sprint 2 may also create forward-compatible starter outputs in the repo root when they are explicitly positioned as:
+
+- additive starter code
+- brand-system translation outputs
+- non-blocking to the current frontend runtime
+
+Current additive root starter outputs now include:
+
+- `app/`
+- `components/`
+- `package.json`
+- `tsconfig.json`
+- `next.config.mjs`
+- `postcss.config.js`
+- `tailwind.config.ts`
 
 Sprint 2 should preserve the current repo shape and avoid rewrite-first architectural churn.
 
@@ -160,6 +179,7 @@ Define the premium visual language in a form that can be implemented directly in
 ### Deliverable
 
 - approved design-token baseline and usage rules
+- approved BookedAI dark-mode-first brand token layer suitable for both the current frontend and later Next.js adoption
 
 ## Work package C — Component tree and primitive map
 
@@ -190,6 +210,7 @@ Turn the landing-page requirements into a concrete component architecture that f
 ### Deliverable
 
 - approved component tree and primitive inventory
+- approved reusable brand primitives for logo, button, card, form, and status surfaces
 
 ## Work package D — Section-by-section implementation map
 
@@ -265,6 +286,7 @@ Make sure Sprint 3 can wire public interaction tracking without reopening the pr
 ### Deliverable
 
 - approved public instrumentation baseline for Sprint 3
+- additive CTA/source attribution baseline landed in code without changing the live commercial contract
 
 ## 8. Recommended implementation sequence inside Sprint 2
 
@@ -294,11 +316,17 @@ Sprint 2 is complete when:
 
 - content source of truth is frozen
 - design tokens are frozen
+- BookedAI brand UI kit source document and local SVG logo system exist
 - component tree is frozen
 - widget vocabulary is frozen
 - section-by-section implementation map is frozen
 - instrumentation assumptions are accepted
+- root App Router starter baseline exists and has been built successfully as an additive forward-compatible output
 - Sprint 3 coding can begin without strategic rework
+
+Current closeout artifact:
+
+- `docs/architecture/sprint-2-closeout-review.md`
 
 ## 11. Recommended owners
 
@@ -343,6 +371,8 @@ unless a truth-gate issue is discovered.
 ## 13. Related references
 
 - [Sprint 2 Owner Execution Checklist](../development/sprint-2-owner-execution-checklist.md)
+- [Sprint 2 Closeout Review](./sprint-2-closeout-review.md)
+- [BookedAI Brand UI Kit](./bookedai-brand-ui-kit.md)
 - [Landing Page System Requirements](./landing-page-system-requirements.md)
 - [Frontend Theme Design Token Map](./frontend-theme-design-token-map.md)
 - [Landing Component Tree And File Ownership](./landing-component-tree-and-file-ownership.md)

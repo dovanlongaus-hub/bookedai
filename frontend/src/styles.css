@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @import "./theme/minimal-bento-template.css";
+@import "./theme/bookedai-brand-kit.css";
 
 /* ─── Tailwind v4 @theme — Apple Design Tokens ──────────────────────────────── */
 /* Exposes Apple tokens as Tailwind utilities:                                   */
@@ -26,11 +27,31 @@
   --color-apple-danger:      #ff3b30;
   --color-apple-filter-bg:   #fafafc;
   --color-apple-overlay:     rgba(210, 210, 215, 0.64);
+  --color-bookedai-bg: #0B1020;
+  --color-bookedai-bg-soft: #121A2B;
+  --color-bookedai-surface: #182235;
+  --color-bookedai-surface-alt: rgba(255,255,255,0.04);
+  --color-bookedai-border: rgba(255,255,255,0.08);
+  --color-bookedai-text-primary: #F8FAFC;
+  --color-bookedai-text-secondary: #94A3B8;
+  --color-bookedai-primary-blue: #4F8CFF;
+  --color-bookedai-accent-green: #22C55E;
+  --color-bookedai-accent-purple: #8B5CF6;
+  --color-bookedai-warning-amber: #F59E0B;
+  --color-bookedai-danger-red: #EF4444;
 
   /* Typography */
   --font-display: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-body:    "SF Pro Text",    -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono:    "SF Mono", SFMono-Regular, ui-monospace, Menlo, Monaco, "Courier New", monospace;
+  --font-bookedai-sans: Inter, sans-serif;
+  --text-bookedai-hero-display: clamp(3rem, 6vw, 5.5rem);
+  --text-bookedai-h1: clamp(2.5rem, 5vw, 4.5rem);
+  --text-bookedai-h2: clamp(2rem, 4vw, 3rem);
+  --text-bookedai-h3: 1.5rem;
+  --text-bookedai-body-lg: 1.125rem;
+  --text-bookedai-body-md: 1rem;
+  --text-bookedai-body-sm: 0.875rem;
 
   /* Border Radius */
   --radius-apple-micro:       5px;
@@ -38,10 +59,17 @@
   --radius-apple-comfortable: 11px;
   --radius-apple-large:       12px;
   --radius-apple-pill:        980px;
+  --radius-bookedai-sm: 12px;
+  --radius-bookedai-md: 18px;
+  --radius-bookedai-lg: 24px;
+  --radius-bookedai-xl: 32px;
+  --radius-bookedai-pill: 9999px;
 
   /* Shadows */
   --shadow-apple:    rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
   --shadow-apple-sm: rgba(0, 0, 0, 0.12) 0px 2px 12px 0px;
+  --shadow-bookedai-card: 0 10px 40px rgba(2,6,23,0.38);
+  --shadow-bookedai-glow: 0 0 0 1px rgba(255,255,255,0.06), 0 18px 60px rgba(79,140,255,0.14);
 }
 
 /* ─── Keyframe Animations ────────────────────────────────────────────────────── */

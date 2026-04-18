@@ -4776,6 +4776,18 @@ class PricingService:
             ("subscription_data[metadata][plan_id]", plan.id),
             ("subscription_data[trial_period_days]", str(90 if bool(payload.startup_referral_eligible and (payload.referral_partner or "").strip()) else 30)),
         ]
+        if payload.source_page:
+            form_data.append(("metadata[source_page]", payload.source_page.strip()))
+        if payload.source_section:
+            form_data.append(("metadata[source_section]", payload.source_section.strip()))
+        if payload.source_cta:
+            form_data.append(("metadata[source_cta]", payload.source_cta.strip()))
+        if payload.source_plan_id:
+            form_data.append(("metadata[source_plan_id]", payload.source_plan_id.strip()))
+        if payload.source_flow_mode:
+            form_data.append(("metadata[source_flow_mode]", payload.source_flow_mode.strip()))
+        if payload.source_path:
+            form_data.append(("metadata[source_path]", payload.source_path.strip()))
         if payload.referral_partner:
             form_data.append(("metadata[referral_partner]", payload.referral_partner.strip()))
         if payload.referral_location:
@@ -4826,6 +4838,10 @@ class PricingService:
             lines.append(f"Referral partner: {payload.referral_partner.strip()}")
         if payload.referral_location:
             lines.append(f"Referral location: {payload.referral_location.strip()}")
+        if payload.source_section or payload.source_cta:
+            lines.append(
+                f"Source: {(payload.source_section or 'unknown')} / {(payload.source_cta or 'unknown')}"
+            )
         travel_fee_note = self._build_onsite_travel_fee_note(payload.onboarding_mode)
         if travel_fee_note:
             lines.append(travel_fee_note)
@@ -4872,6 +4888,12 @@ class PricingService:
             lines.append(f"Referral partner: {payload.referral_partner.strip()}")
         if payload.referral_location:
             lines.append(f"Referral location: {payload.referral_location.strip()}")
+        if payload.source_section or payload.source_cta:
+            lines.append(
+                f"Source: {(payload.source_section or 'unknown')} / {(payload.source_cta or 'unknown')}"
+            )
+        if payload.source_path:
+            lines.append(f"Source path: {payload.source_path}")
         travel_fee_note = self._build_onsite_travel_fee_note(payload.onboarding_mode)
         if travel_fee_note:
             lines.append(travel_fee_note)
@@ -4929,6 +4951,12 @@ class PricingService:
             f"Business type: {payload.business_type}",
             f"Preferred time: {payload.preferred_date.isoformat()} {payload.preferred_time.strftime('%H:%M')} {payload.timezone}",
         ]
+        if payload.source_section or payload.source_cta:
+            lines.append(
+                f"Source: {(payload.source_section or 'unknown')} / {(payload.source_cta or 'unknown')}"
+            )
+        if payload.source_path:
+            lines.append(f"Source path: {payload.source_path}")
         if meeting_join_url:
             lines.append(f"Zoho meeting link: {meeting_join_url}")
         if meeting_event_url:

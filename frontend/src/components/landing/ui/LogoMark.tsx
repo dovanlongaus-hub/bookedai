@@ -9,7 +9,7 @@ import {
 type LogoMarkProps = {
   className?: string;
   alt?: string;
-  variant?: 'light' | 'dark';
+  variant?: 'light' | 'dark' | 'transparent';
 };
 
 export function LogoMark({
@@ -18,8 +18,10 @@ export function LogoMark({
   variant = 'light',
 }: LogoMarkProps) {
   const logoCandidates = variant === 'dark'
-    ? [brandPreferredLogoPath, brandLogoOnDarkPath, brandLogoPath]
-    : [brandPreferredLogoPath, brandLogoPath, brandLogoOnDarkPath];
+    ? [brandLogoOnDarkPath, brandPreferredLogoPath, brandLogoPath]
+    : variant === 'transparent'
+      ? ['/branding/bookedai-revenue-engine-transparent.svg', brandLogoPath, brandLogoOnDarkPath]
+      : [brandPreferredLogoPath, brandLogoPath, brandLogoOnDarkPath];
   const [logoIndex, setLogoIndex] = useState(0);
   const logoPath = logoCandidates[Math.min(logoIndex, logoCandidates.length - 1)];
 

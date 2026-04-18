@@ -46,7 +46,9 @@ Focus:
 - `docs/architecture/bookedai-master-prd.md`
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
 - `docs/architecture/sprint-2-implementation-package.md`
+- `docs/architecture/sprint-2-closeout-review.md`
 - `docs/architecture/frontend-theme-design-token-map.md`
+- `docs/architecture/bookedai-brand-ui-kit.md`
 - `docs/architecture/landing-component-tree-and-file-ownership.md`
 - `docs/architecture/landing-page-execution-task-map.md`
 - `docs/architecture/phase-1-2-epic-story-task-breakdown.md`
@@ -60,21 +62,31 @@ Focus:
 - landing page architecture
 - public section hierarchy
 - premium UI and design-token alignment
+- CTA/source attribution baseline
+- forward-compatible App Router starter baseline
 
 ### Sprint 3
 
+- `docs/architecture/mvp-sprint-execution-plan.md`
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
+- `docs/architecture/sprint-3-implementation-package.md`
+- `docs/architecture/frontend-theme-design-token-map.md`
+- `docs/architecture/landing-component-tree-and-file-ownership.md`
+- `docs/architecture/landing-page-execution-task-map.md`
 - `docs/architecture/phase-1-2-epic-story-task-breakdown.md`
 - `docs/architecture/public-growth-app-strategy.md`
 - `docs/architecture/pricing-packaging-monetization-strategy.md`
 - `docs/development/implementation-progress.md`
 - `docs/development/sprint-3-owner-execution-checklist.md`
+- `docs/development/sprint-3-kickoff-checklist.md`
+- `docs/development/sprint-3-task-board-seed.md`
 
 Focus:
 
 - public landing implementation
+- shared primitives and page assembly
 - premium hero and widget UI
-- pricing rollout
+- trust, pricing, and conversion rollout
 
 ### Sprint 4
 
