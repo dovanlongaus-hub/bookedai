@@ -31,8 +31,8 @@ export function AdminLoginScreen({
             </div>
             <div className="mt-5 max-w-[17rem] sm:max-w-[19rem]">
               <LogoMark
-                variant="dark"
-                className="booked-brand-image booked-brand-image--hero booked-brand-image--soft w-full"
+                variant="white"
+                className="booked-brand-image booked-brand-image--hero booked-brand-image--soft w-full opacity-95"
               />
             </div>
             <h1 className="mt-4 text-4xl font-bold tracking-tight">

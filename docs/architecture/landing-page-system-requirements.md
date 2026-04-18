@@ -1,6 +1,6 @@
 # BookedAI Landing Page System Requirements
 
-Date: `2026-04-17`
+Date: `2026-04-18`
 
 Document status: `active phase-0 source of truth`
 
@@ -35,6 +35,36 @@ It must do five jobs at the same time:
 - teach booking trust and commercial realism without overclaiming
 - establish the visual and vocabulary baseline for later tenant and admin product surfaces
 - preserve attribution and CTA-source context for later commercial reporting
+
+Current inherited public-shell baseline:
+
+- the live homepage is now `search-first` instead of section-first
+- the live homepage uses a standalone homepage search runtime as the primary conversion surface instead of relying on a popup-first or embedded-assistant handoff
+- the public-shell copy baseline is now `English by default`
+- the top navigation must allow visible language switching, with the current approved options `English` and `Tiếng Việt`
+- the homepage should keep only the essential top-level commercial signals in the main body: approved logo, short revenue-engine positioning for service SMEs, and the primary search box
+- supporting explanation, product education, and secondary narrative should be pushed into the menu layer, top bar, or bottom bar so the main viewport stays focused on search results and the BookedAI flow
+- all later landing or homepage changes must treat mobile-safe search and booking progression as a higher priority than adding more section copy into the body
+- the homepage visual direction may be Google-inspired in its calm search-first shell, but it should remain clearly branded as BookedAI through the approved logo, color accents, and booking-specific results experience
+- the homepage should prefer a dedicated on-page search-results frame over assistant-popup styling, even when the underlying booking flow logic is shared
+- the homepage search-results experience should be implemented as its own UI layer rather than as a visually re-skinned popup dialog mounted inline
+- the approved runtime shell now uses a clearer `workspace` pattern: compact top navigation, one dominant search bar, suggestion chips directly attached to the search lane, a summary strip above results, and a dedicated booking rail
+- the shortlist UI should feel like a professional booking-search application rather than a generic marketing widget, with visible result ranking, decision-ready metadata, and direct action links such as booking, map, and next-step affordances
+- responsive behavior should preserve that workspace hierarchy on mobile by stacking search surface, shortlist, and booking rail cleanly without nested-scroll confusion
+
+## 2A. Governing design and product priorities
+
+When requirement or implementation tradeoffs appear, the landing system should resolve them in this order:
+
+1. preserve truthful revenue-engine positioning for service SMEs
+2. preserve the fastest path from search intent to shortlist and booking intent
+3. preserve responsive and mobile-safe execution of that path
+4. preserve clear menu, top-bar, and bottom-bar access to supporting information
+5. preserve aesthetic or narrative expansion only after the conversion path remains clean
+
+Interpretation rule:
+
+- if a proposed homepage change reduces the space or clarity available to the search-and-booking flow, it should be treated as a regression unless an updated requirement-side document explicitly approves that tradeoff
 
 ## 3. Product framing that the page must use
 
@@ -137,6 +167,7 @@ The landing page is successful when:
 - pricing, trust, and closing CTA surfaces follow the same visual-first system as the narrative sections above them instead of reverting to text-heavier legacy layouts
 - pricing plan cards and partner trust surfaces feel like scan-friendly proof systems rather than legacy list or logo blocks
 - the booking assistant preview behaves as a product-proof surface with visual framing and scan-friendly state signals, not as an isolated raw demo widget
+- the booking assistant preview shows a clear live-read waiting state with reassuring copy and visible search motion while the best-fit shortlist is still being prepared
 
 ## 6. Information architecture requirements
 
@@ -156,6 +187,18 @@ Required section order:
 10. final CTA
 11. footer
 
+Homepage interaction rule:
+
+- the opening hero should still read as a calm search-first homepage
+- the primary search box should feed the standalone homepage search runtime directly on the same page
+- the standalone homepage search runtime should render shortlist, booking, and confirmation states on-page through the live assistant APIs
+- the homepage body should dedicate maximum practical space to the search results and booking flow rather than to explanatory cards or long supporting sections
+- the homepage should treat the search bar and its immediate suggestion or action cluster as one cohesive command surface, not as disconnected hero decoration plus later utility controls
+- the shortlist should expose compact result state above the cards so the user can see active query, result count, and summary context without inspecting each card first
+- the booking rail should remain visually separate from the shortlist and should read as the selected-result workspace for booking details, booking form inputs, and confirmation states
+- later redesign work must not silently revert the public experience back to a popup-first or embedded-assistant assumption unless the requirement-side documents are explicitly updated first
+- supporting marketing, trust, SEO, comparison, and education content should be reachable through menu, top-bar, bottom-bar, or secondary routes before it is added back into the main homepage body
+
 Optional sections allowed during Phase 1-2 if they stay additive:
 
 - team
@@ -173,12 +216,16 @@ The header must:
 - include direct actions for `Book a Demo` and `Start Free Trial`
 - remain usable on mobile without hiding the primary action logic
 - avoid clutter from low-priority links
+- use the approved revenue-engine lockup or compact icon treatment without introducing a second visual identity
+- expose a visible language selector in the top navigation for the approved homepage locales
+- remain compact enough that the search-first body still feels dominant on mobile and desktop
 
 The header must not:
 
 - behave like a docs navbar
 - overload mobile with too many equal-priority actions
 - introduce route sprawl before the broader public IA is approved
+- hide locale switching so deeply that the multilingual shell baseline is effectively lost
 
 ## 8. Hero requirements
 
@@ -198,12 +245,16 @@ The hero must include:
 - one secondary CTA
 - one visual proof system that feels product-real rather than decorative
 - a graphic-led composition where charts, status signals, product surfaces, or funnel visuals occupy more attention than body copy
+- one primary search action that clearly signals the user can type the service they want to book immediately
+- no more than the essential commercial framing needed to support that search action
 
 The hero must not:
 
 - lead with vague AI language
 - over-index on conversational novelty
 - imply unsupported live financial certainty
+- imply that the user must leave the homepage or open a popup before seeing assistant results
+- compete with the live search area by introducing multiple dense proof panels, long-form section copy, or equal-priority secondary narratives above the fold
 
 ## 9. Required public widgets and proof blocks
 
@@ -235,6 +286,23 @@ Visual proof presentation requirements:
 - proof blocks should be arranged as compact, scan-friendly visual systems rather than long explanatory text cards
 - charts, funnel bars, activity states, and grouped proof cards should carry the main explanatory load where possible
 - supporting text should only clarify the commercial meaning of the visuals instead of duplicating them
+
+Booking assistant live-read waiting-state requirements:
+
+- when the public assistant is waiting on visible live-read search results, the UI must show an explicit in-progress state instead of a blank, frozen, or ambiguous panel
+- the in-progress state must include short reassurance copy equivalent to `we are finding the best service match for your request`
+- the in-progress state must include visible motion such as a spinner, search pulse, or equivalent loading indicator that makes active search obvious
+- the waiting-state treatment must stay consistent with the premium product-proof system used by the landing rather than falling back to a generic browser-looking loader
+- the waiting state must disappear as soon as the shortlist, no-result state, or location-required state is ready
+- while the waiting state is active, stale shortlist rows from the previous query must not remain visible
+- the waiting-state copy must promise best-fit effort and relevance, not unsupported certainty
+
+Inline assistant baseline requirements:
+
+- the live public assistant logic should be able to power a standalone homepage search runtime instead of only a modal dialog
+- the standalone homepage runtime must preserve the same API-backed search, shortlist, booking, and confirmation flow as the older popup shell
+- when the homepage search box is used, the user should see the dedicated search-results runtime update on-page rather than being forced into an overlay handoff
+- any later sprint that changes assistant IA must preserve this standalone homepage path unless the requirement-side docs are updated first
 
 ## 10. CTA system requirements
 
@@ -290,6 +358,7 @@ The page must not:
 - imply guaranteed direct booking in every case
 - hide escalation or handoff realities
 - sound like a generic “AI for business” template
+- leave the user with no visible feedback while live-read search is still resolving a new assistant query
 
 ## 13. Visual system requirements
 
@@ -311,6 +380,13 @@ The visual system must define:
 - button hierarchy
 - card and widget treatment
 - logo usage rules
+
+Logo implementation requirements:
+
+- the live public site must use the approved `RE` revenue-engine monogram and lockup from `docs/architecture/bookedai-brand-ui-kit.md`
+- favicon, app icon, touch icon, and compact-nav logo treatments must all derive from the same live icon geometry
+- public HTML should prefer versioned favicon paths when an icon refresh is deployed so browser or CDN cache does not preserve retired branding assets
+- logo behavior must stay consistent across `landing`, `product`, `admin`, and adjacent public-growth shells
 
 The public surface should visually bridge into later tenant and admin product surfaces without copying operational UI too literally.
 
@@ -334,6 +410,7 @@ The public metadata must:
 - avoid legacy receptionist-first framing
 - keep canonical and domain references correct
 - align title, description, and OG copy with the current product definition
+- point icon and touch-icon links at the current approved brand assets rather than legacy logo exports
 
 Phase 0 and Phase 1-2 do not require full SEO page-family rollout yet, but the homepage metadata must already reflect the repositioned offer.
 
@@ -358,6 +435,7 @@ The page must not claim:
 - unsupported commission logic
 - unsupported attribution certainty
 - unsupported payment or recovery outcomes
+- unsupported search certainty while the assistant is still loading a live-read answer
 
 ## 17. Build and content ownership
 
@@ -388,6 +466,7 @@ Primary source-of-truth ownership:
 The landing-page system requirements are complete when:
 
 - the page can be implemented without structural ambiguity
+- the approved logo system can be deployed to live public surfaces without reopening branding interpretation
 - required sections and widget vocabulary are explicit
 - CTA hierarchy is explicit
 - pricing and trust rules are explicit

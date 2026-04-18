@@ -7,13 +7,18 @@ import {
   type BookingAssistantContent,
 } from '../data';
 import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../../shared/config/api';
+import { getPublicBookingAssistantLiveReadRecommendation } from '../assistant/publicBookingAssistantV1';
 import {
   buildPartnerMatchActionFooterModelFromServiceItem,
   buildPartnerMatchCardModelFromServiceItem,
+  toBookingReadyServiceItem,
 } from '../../../shared/presenters/partnerMatch';
 import { PartnerMatchCard } from '../../../shared/components/PartnerMatchCard';
 import { PartnerMatchActionFooter } from '../../../shared/components/PartnerMatchActionFooter';
 import { PartnerMatchShortlist } from '../../../shared/components/PartnerMatchShortlist';
+import { SectionCard } from '../ui/SectionCard';
+import { SectionHeading } from '../ui/SectionHeading';
+import { SignalPill } from '../ui/SignalPill';
 
 type ServiceCatalogItem = {
   id: string;
@@ -318,6 +323,10 @@ function buildDefaultPreferredSlot() {
   return toDatetimeLocalValue(rounded.toISOString());
 }
 
+function buildJustInTimeLocationMessage() {
+  return 'Turn on location on this device so I can narrow nearby matches in real time instead of showing broad Australia-wide results.';
+}
+
 function buildEventBookingContext(event: AIEventItem, customerRequirement: string) {
   const lines = [
     `Event booking: ${event.title}`,
@@ -568,8 +577,6 @@ export function BookingAssistantSection({
   content,
   onOpenAssistant,
 }: BookingAssistantSectionProps) {
-  void content;
-  void onOpenAssistant;
   const [catalog, setCatalog] = useState<BookingAssistantCatalogResponse | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -807,6 +814,19 @@ export function BookingAssistantSection({
     setLoading(true);
 
     try {
+      const liveReadPromise = getPublicBookingAssistantLiveReadRecommendation({
+        query: message,
+        sourcePage: '/pitch-deck',
+        locationHint: userGeoContext?.locality ?? null,
+        serviceCategory: selectedService?.category ?? null,
+        selectedServiceId: selectedServiceId || null,
+        userLocation: userGeoContext
+          ? {
+              latitude: userGeoContext.latitude,
+              longitude: userGeoContext.longitude,
+            }
+          : null,
+      });
       let payload = await requestChatReply(nextMessages);
       if (
         payload.should_request_location &&
@@ -816,15 +836,40 @@ export function BookingAssistantSection({
         const geoContext = await requestGeoContext();
         if (geoContext) {
           payload = await requestChatReply(nextMessages, geoContext);
+        } else {
+          setMessages((current) => [
+            ...current,
+            {
+              role: 'assistant',
+              content: buildJustInTimeLocationMessage(),
+            },
+          ]);
         }
       }
+
+      const liveRead = await liveReadPromise;
+      const hasLiveReadSearchGrounding =
+        liveRead.rankedCandidates.length > 0 ||
+        liveRead.candidateIds.length > 0 ||
+        Boolean(liveRead.semanticAssistSummary) ||
+        liveRead.warnings.length > 0;
+      const liveReadMatchedServices = liveRead.rankedCandidates.map(toBookingReadyServiceItem);
+      const mergedMatchedServices = hasLiveReadSearchGrounding
+        ? curateServiceMatches(liveReadMatchedServices)
+        : curateServiceMatches(payload.matched_services);
+      const assistantReply = hasLiveReadSearchGrounding
+        ? liveRead.bookingPathSummary?.nextStep ?? liveRead.warnings[0] ?? payload.reply
+        : payload.reply;
+      const nextSuggestedServiceId = hasLiveReadSearchGrounding
+        ? liveRead.suggestedServiceId ?? mergedMatchedServices[0]?.id ?? null
+        : payload.suggested_service_id ?? mergedMatchedServices[0]?.id ?? null;
 
       setMessages((current) => [
         ...current,
         {
           role: 'assistant',
-          content: payload.reply,
-          matchedServices: curateServiceMatches(payload.matched_services),
+          content: assistantReply,
+          matchedServices: mergedMatchedServices,
           matchedEvents: curateEventMatches(payload.matched_events),
         },
       ]);
@@ -833,15 +878,11 @@ export function BookingAssistantSection({
         setSelectedEvent(null);
       }
 
-      if (payload.suggested_service_id) {
-        setSelectedServiceId(payload.suggested_service_id);
-      }
-      const nextCompareIds = curateServiceMatches(payload.matched_services)
+      setSelectedServiceId(nextSuggestedServiceId ?? '');
+      const nextCompareIds = mergedMatchedServices
         .slice(0, 2)
         .map((service) => service.id);
-      if (nextCompareIds.length) {
-        setCompareServiceIds(nextCompareIds);
-      }
+      setCompareServiceIds(nextCompareIds);
     } catch (error) {
       setChatError(error instanceof Error ? error.message : 'Unable to send message.');
     } finally {
@@ -968,18 +1009,130 @@ export function BookingAssistantSection({
     }
   }
 
+  const previewSignals = [
+    {
+      label: 'Live mode',
+      value: loading ? 'Searching' : bookingResult ? 'Booked' : selectedService ? 'Matched' : 'Ready',
+      detail: 'demo responds with chat-first booking flow',
+    },
+    {
+      label: 'Visible matches',
+      value: `${highlightedServices.length || 0}`,
+      detail: 'shortlist cards remain decision-ready',
+    },
+    {
+      label: 'Current focus',
+      value: activePreviewTab === 'booking' ? 'Booking' : 'Chat',
+      detail: 'chat and booking stay in one proof surface',
+    },
+  ];
+
+  const previewSteps = [
+    'Ask naturally',
+    'Review best-fit shortlist',
+    'Continue to booking',
+  ];
+
   return (
     <>
-      <section id="booking-assistant" className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-      <div className="mx-auto min-w-0 max-w-[520px]">
-        <div className="hidden rounded-[2.5rem] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.14),transparent_34%),linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-6 shadow-[0_28px_80px_rgba(15,23,42,0.10)]">
-              <div className="mx-auto w-full max-w-[400px]">
-                <div className="animate-[floatPhone_6s_ease-in-out_infinite] rounded-[2.75rem] bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] p-3 shadow-[0_38px_100px_rgba(15,23,42,0.34)]">
-                  <div className="rounded-[2.15rem] bg-[linear-gradient(180deg,#fff8f1_0%,#ffffff_20%,#f8fafc_100%)] p-3">
-                    <div className="mx-auto mb-3 flex h-7 w-36 items-center justify-center rounded-full bg-slate-950">
-                      <div className="h-2.5 w-16 rounded-full bg-slate-700" />
+      <section id="booking-assistant" className="mx-auto w-full max-w-7xl px-4 py-10 sm:px-6 lg:px-8 lg:py-14">
+        <div className="grid gap-6 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
+          <SectionCard className="p-7 lg:p-8">
+            <SectionHeading
+              kicker={content.kicker}
+              kickerClassName={content.kickerClassName}
+              title={content.title}
+              body={content.body}
+            />
+
+            <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
+              {previewSignals.map((item) => (
+                <SectionCard key={item.label} as="article" tone="subtle" className="rounded-[1.3rem] px-4 py-4">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {item.label}
+                  </div>
+                  <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">
+                    {item.value}
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-slate-600">{item.detail}</div>
+                </SectionCard>
+              ))}
+            </div>
+
+            <SectionCard tone="dark" className="mt-5 p-5">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7dd3fc]">
+                    Live-flow preview
+                  </div>
+                  <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
+                    Graphic-led product proof, not just a text demo.
+                  </div>
+                </div>
+                <SignalPill variant="inverse" className="px-3 py-1 text-[10px] uppercase tracking-[0.14em]">
+                  Interactive
+                </SignalPill>
+              </div>
+
+              <div className="mt-5 grid gap-3">
+                {previewSteps.map((step, index) => (
+                  <div key={step} className="flex items-center gap-3 rounded-[1.05rem] border border-white/10 bg-white/8 px-4 py-3 text-sm text-white/82">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-slate-950">
+                      {index + 1}
                     </div>
-                    <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                    <div>{step}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 flex flex-wrap gap-2">
+                {['Chat-first', 'Shortlist-ready', 'Booking-connected'].map((item) => (
+                  <SignalPill key={item} variant="inverse" className="px-3 py-1.5 text-[10px] uppercase tracking-[0.14em]">
+                    {item}
+                  </SignalPill>
+                ))}
+              </div>
+
+              <button
+                type="button"
+                onClick={onOpenAssistant}
+                className="booked-button-secondary mt-6 w-full border-white/12 bg-white/8 px-5 py-3 text-sm font-semibold text-white hover:bg-white/12"
+              >
+                Open Full Assistant
+              </button>
+            </SectionCard>
+          </SectionCard>
+
+          <div className="mx-auto min-w-0 w-full max-w-[560px]">
+            <div className="relative overflow-hidden rounded-[2.5rem] border border-slate-200 bg-[radial-gradient(circle_at_top,rgba(251,191,36,0.12),transparent_32%),linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-[0_28px_80px_rgba(15,23,42,0.10)] sm:p-5">
+              <div className="absolute inset-x-10 top-0 h-24 rounded-full bg-[radial-gradient(circle,rgba(14,165,233,0.16),transparent_72%)] blur-3xl" />
+              <div className="relative">
+                <div className="mb-4 flex flex-wrap items-center justify-between gap-3 px-1">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Product preview
+                    </div>
+                    <div className="mt-1 text-lg font-semibold tracking-[-0.03em] text-slate-950">
+                      {brandName} assistant live surface
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <SignalPill className="bg-emerald-50 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-emerald-700">
+                      {loading ? 'Searching' : 'Live'}
+                    </SignalPill>
+                    <SignalPill className="bg-slate-100 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-600">
+                      {messages.length} messages
+                    </SignalPill>
+                  </div>
+                </div>
+
+                <div className="mx-auto w-full max-w-[420px]">
+                  <div className="animate-[floatPhone_6s_ease-in-out_infinite] rounded-[2.75rem] bg-[linear-gradient(180deg,#111827_0%,#020617_100%)] p-3 shadow-[0_38px_100px_rgba(15,23,42,0.34)]">
+                    <div className="rounded-[2.15rem] bg-[linear-gradient(180deg,#fff8f1_0%,#ffffff_20%,#f8fafc_100%)] p-3">
+                      <div className="mx-auto mb-3 flex h-7 w-36 items-center justify-center rounded-full bg-slate-950">
+                        <div className="h-2.5 w-16 rounded-full bg-slate-700" />
+                      </div>
+                      <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                       <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
                         <div>
                           <div className="text-sm font-semibold text-slate-950">{brandName} Assistant</div>
@@ -993,7 +1146,7 @@ export function BookingAssistantSection({
                       </div>
 
                       <div className="border-b border-slate-200 bg-[#fffaf5] px-3 py-3">
-                        <div className="grid grid-cols-2 gap-2 rounded-full bg-white p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
+                        <div className="grid grid-cols-2 gap-2 rounded-full border border-slate-200 bg-white p-1 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)]">
                           <button
                             type="button"
                             onClick={() => setActivePreviewTab('chat')}
@@ -1016,6 +1169,18 @@ export function BookingAssistantSection({
                           >
                             Booking
                           </button>
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          <SignalPill className="bg-slate-100 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-600">
+                            Search
+                          </SignalPill>
+                          <SignalPill className="bg-amber-50 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-amber-800">
+                            Match
+                          </SignalPill>
+                          <SignalPill className="bg-emerald-50 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-emerald-700">
+                            Book
+                          </SignalPill>
                         </div>
 
                         <div className="mt-3 rounded-[1rem] border border-amber-200 bg-amber-50/80 px-3 py-2 text-[11px] font-medium text-amber-900">
@@ -1374,10 +1539,10 @@ export function BookingAssistantSection({
                                   </div>
                                 </>
                               ) : (
-                                <div className="mt-2 text-xs leading-5 text-slate-500">
-                                  Start with any booking request above. Once {brandName} finds the right option, the strongest match will stay pinned here for quick review.
-                                </div>
-                              )}
+                                  <div className="mt-2 text-xs leading-5 text-slate-500">
+                                    Start with any booking request above. Once {brandName} finds the right option, the strongest match will stay pinned here for quick review.
+                                  </div>
+                                )}
                             </div>
                           </div>
 
@@ -1518,6 +1683,7 @@ export function BookingAssistantSection({
                           </div>
                         </div>
                       )}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -1805,6 +1971,7 @@ export function BookingAssistantSection({
                   ) : null}
                 </div>
               ) : null}
+              </div>
             </div>
           </div>
         </section>

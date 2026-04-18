@@ -1665,23 +1665,14 @@ FOLLOW_UP_CONTEXT_TOKENS = {
     "nhanh",
     "tot",
 }
-AI_EVENT_KEYWORDS = {
-    "ai",
-    "artificial",
-    "intelligence",
+AI_EVENT_DISCOVERY_KEYWORDS = {
     "event",
     "events",
     "meetup",
     "workshop",
     "hackathon",
     "summit",
-    "startup",
-    "startups",
     "conference",
-    "wsti",
-    "western",
-    "sydney",
-    "innovators",
     "su",
     "kien",
     "hoi",
@@ -1695,10 +1686,22 @@ AI_EVENT_KEYWORDS = {
     "demo",
     "community",
 }
+AI_EVENT_TOPIC_KEYWORDS = {
+    "ai",
+    "artificial",
+    "intelligence",
+    "wsti",
+    "western",
+    "startup",
+    "startups",
+    "innovators",
+    "westernsydney",
+    "startuphub",
+    "spacecubed",
+}
 WSTI_KEYWORDS = {
     "wsti",
     "western",
-    "sydney",
     "startup",
     "startuphub",
     "spacecubed",
@@ -2196,6 +2199,394 @@ class AIEventSearchService:
 class OpenAIService:
     settings: Settings
 
+    @staticmethod
+    def _is_hospitality_booking_query(
+        query: str,
+        preferences: dict[str, Any] | None = None,
+    ) -> bool:
+        normalized_query = " ".join((query or "").strip().lower().split())
+        if not normalized_query:
+            return False
+
+        category = str((preferences or {}).get("service_category") or "").strip().lower()
+        hospitality_terms = {
+            "restaurant",
+            "dining",
+            "dinner",
+            "lunch",
+            "table",
+            "reservation",
+            "book a table",
+            "private dining",
+            "team dinner",
+            "group dinner",
+            "party dinner",
+            "hospitality",
+        }
+        if any(term in normalized_query for term in hospitality_terms):
+            return True
+        return category in {"food and beverage", "hospitality and events", "restaurant"}
+
+    @classmethod
+    def _build_public_web_fallback_prompt(
+        cls,
+        *,
+        query: str,
+        preferences: dict[str, Any] | None = None,
+        hospitality_retry: bool = False,
+    ) -> str:
+        prompt = (
+            "You are BookedAI's public web fallback search assistant for Australian services. "
+            "Use web search to find real service options only when tenant catalog results are absent or not relevant enough. "
+            "Prioritize official provider websites and real booking pages over directories or generic aggregator pages. "
+            "Return only options that closely match the user's current request, location intent, time intent, and booking constraints. "
+            "A result must not be returned if it only matches the city but not the requested service. "
+            "If time, party size, budget, or other booking constraints are present, use them as hard relevance inputs. "
+            "If the query is weakly matched on the web, return an empty results list instead of broad or wrong-domain options."
+        )
+        if cls._is_hospitality_booking_query(query, preferences):
+            prompt += (
+                " For restaurant, private dining, and hospitality booking queries, search specifically for named venues that have a real reservation flow. "
+                "Do not stop at generic city dining pages if a venue-level booking path exists. "
+                "Reputable live-booking platforms are acceptable when they lead directly to a real reservation flow for the requested venue or table booking. "
+                "Examples of acceptable booking platforms include OpenTable, SevenRooms, Quandoo, Tock, and Resy when they provide a direct book-now path for the actual venue. "
+                "Prefer venues that clearly support dinner service, table bookings, private dining, or group dining for the requested party size. "
+                "If you can find even one strong venue-level reservation option that fits the request, return it instead of an empty list."
+            )
+            if hospitality_retry:
+                prompt += (
+                    " This is a hospitality rescue pass because the first search returned no strong venue-level options. "
+                    "Actively search for named venues with 'book now', 'reservations', 'private dining', 'group dining', or 'book a table' flows in the requested location. "
+                    "Prefer venue-owned booking pages first, but do not miss strong reservation-platform links when they lead directly to a specific venue booking flow."
+                )
+        return prompt
+
+    @staticmethod
+    def _build_public_web_fallback_user_payload(
+        *,
+        query: str,
+        location_hint: str | None,
+        user_location: dict[str, Any] | None,
+        booking_context: dict[str, Any] | None,
+        budget: dict[str, Any] | None,
+        preferences: dict[str, Any] | None,
+        hospitality_retry: bool,
+    ) -> dict[str, Any]:
+        payload = {
+            "query": query,
+            "location_hint": location_hint,
+            "user_location": user_location,
+            "booking_context": booking_context,
+            "budget": budget,
+            "preferences": preferences,
+            "country": "AU",
+        }
+        if hospitality_retry:
+            party_size = (booking_context or {}).get("party_size")
+            schedule_hint = str((booking_context or {}).get("schedule_hint") or "").strip() or None
+            payload["search_focus"] = {
+                "mode": "hospitality_rescue_pass",
+                "goal": "Find named venues with a real reservation flow before returning an empty result.",
+                "preferred_signals": [
+                    "book now",
+                    "book a table",
+                    "reservations",
+                    "private dining",
+                    "group dining",
+                    "venue booking page",
+                ],
+                "party_size": party_size,
+                "schedule_hint": schedule_hint,
+            }
+        return payload
+
+    def _normalize_public_web_results(
+        self,
+        *,
+        results: list[Any],
+        location_hint: str | None,
+        booking_context: dict[str, Any] | None,
+        budget: dict[str, Any] | None,
+        preferences: dict[str, Any] | None,
+        hospitality_search_mode: bool,
+        hospitality_retry: bool,
+    ) -> list[dict[str, Any]]:
+        normalized_results: list[dict[str, Any]] = []
+        requested_time = str((booking_context or {}).get("requested_time") or "").strip()
+        schedule_hint = str((booking_context or {}).get("schedule_hint") or "").strip()
+        party_size = (booking_context or {}).get("party_size")
+        has_time_constraint = bool(requested_time or schedule_hint)
+        has_party_size_constraint = bool(isinstance(party_size, int) and party_size > 0)
+        has_budget_constraint = bool(budget)
+        has_category_preference = bool(str((preferences or {}).get("service_category") or "").strip())
+        minimum_match_score = 0.62 if hospitality_search_mode and hospitality_retry else 0.68
+        minimum_location_relevance = 0.5 if hospitality_search_mode and hospitality_retry else 0.58
+        minimum_time_relevance = 0.4 if hospitality_search_mode and hospitality_retry else 0.45
+        minimum_constraint_relevance = 0.4 if hospitality_search_mode and hospitality_retry else 0.45
+
+        for item in results:
+            if not isinstance(item, dict):
+                continue
+            source_url = str(item.get("source_url") or "").strip()
+            if not source_url:
+                continue
+            try:
+                match_score = max(0.0, min(float(item.get("match_score") or 0.0), 1.0))
+                service_relevance = max(0.0, min(float(item.get("service_relevance") or 0.0), 1.0))
+                location_relevance = max(0.0, min(float(item.get("location_relevance") or 0.0), 1.0))
+                time_relevance = max(0.0, min(float(item.get("time_relevance") or 0.0), 1.0))
+                constraint_relevance = max(0.0, min(float(item.get("constraint_relevance") or 0.0), 1.0))
+            except (TypeError, ValueError):
+                continue
+
+            official_source = bool(item.get("official_source"))
+            if service_relevance < 0.72:
+                continue
+            if location_hint and location_relevance < minimum_location_relevance:
+                continue
+            if has_time_constraint and time_relevance < minimum_time_relevance:
+                continue
+            if (
+                has_budget_constraint or has_party_size_constraint or has_category_preference
+            ) and constraint_relevance < minimum_constraint_relevance:
+                continue
+            if match_score < minimum_match_score:
+                continue
+            if not official_source and not str(item.get("booking_url") or "").strip():
+                continue
+
+            normalized_results.append(
+                {
+                    "candidate_id": str(item.get("candidate_id") or "").strip() or f"web_{len(normalized_results) + 1}",
+                    "provider_name": str(item.get("provider_name") or "").strip() or "Web result",
+                    "service_name": str(item.get("service_name") or "").strip() or "Service option",
+                    "summary": str(item.get("summary") or "").strip() or None,
+                    "location": str(item.get("location") or "").strip() or None,
+                    "source_url": source_url,
+                    "booking_url": str(item.get("booking_url") or "").strip() or None,
+                    "match_score": match_score,
+                    "service_relevance": service_relevance,
+                    "location_relevance": location_relevance,
+                    "time_relevance": time_relevance,
+                    "constraint_relevance": constraint_relevance,
+                    "official_source": official_source,
+                    "why_this_matches": str(item.get("why_this_matches") or "").strip() or None,
+                }
+            )
+
+        normalized_results.sort(
+            key=lambda item: (
+                float(item.get("match_score") or 0.0),
+                float(item.get("service_relevance") or 0.0),
+                float(item.get("location_relevance") or 0.0),
+                float(item.get("time_relevance") or 0.0),
+                float(item.get("constraint_relevance") or 0.0),
+                1 if item.get("booking_url") else 0,
+                1 if item.get("official_source") else 0,
+            ),
+            reverse=True,
+        )
+        return normalized_results[:3]
+
+    async def search_public_service_candidates(
+        self,
+        *,
+        query: str,
+        location_hint: str | None = None,
+        user_location: dict[str, Any] | None = None,
+        booking_context: dict[str, Any] | None = None,
+        budget: dict[str, Any] | None = None,
+        preferences: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
+        normalized_query = query.strip()
+        if not normalized_query:
+            return []
+        if not self.settings.openai_api_key.strip():
+            return []
+        if "api.openai.com" not in self.settings.openai_base_url:
+            return []
+
+        hospitality_search_mode = self._is_hospitality_booking_query(normalized_query, preferences)
+        schema = {
+            "type": "object",
+            "additionalProperties": False,
+            "properties": {
+                "results": {
+                    "type": "array",
+                    "maxItems": 5,
+                    "items": {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "properties": {
+                            "candidate_id": {"type": "string"},
+                            "provider_name": {"type": "string"},
+                            "service_name": {"type": "string"},
+                            "summary": {"type": ["string", "null"]},
+                            "location": {"type": ["string", "null"]},
+                            "source_url": {"type": "string"},
+                            "booking_url": {"type": ["string", "null"]},
+                            "match_score": {"type": "number", "minimum": 0, "maximum": 1},
+                            "service_relevance": {"type": "number", "minimum": 0, "maximum": 1},
+                            "location_relevance": {"type": "number", "minimum": 0, "maximum": 1},
+                            "time_relevance": {"type": "number", "minimum": 0, "maximum": 1},
+                            "constraint_relevance": {"type": "number", "minimum": 0, "maximum": 1},
+                            "official_source": {"type": "boolean"},
+                            "why_this_matches": {"type": ["string", "null"]},
+                        },
+                        "required": [
+                            "candidate_id",
+                            "provider_name",
+                            "service_name",
+                            "summary",
+                            "location",
+                            "source_url",
+                            "booking_url",
+                            "match_score",
+                            "service_relevance",
+                            "location_relevance",
+                            "time_relevance",
+                            "constraint_relevance",
+                            "official_source",
+                            "why_this_matches",
+                        ],
+                    },
+                }
+            },
+            "required": ["results"],
+        }
+
+        endpoint = f"{self.settings.openai_base_url.rstrip('/')}/responses"
+        attempt_flags = [False]
+        if hospitality_search_mode:
+            attempt_flags.append(True)
+
+        headers = {
+            "Authorization": f"Bearer {self.settings.openai_api_key}",
+            "Content-Type": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=self.settings.openai_timeout_seconds) as client:
+            for hospitality_retry in attempt_flags:
+                prompt = self._build_public_web_fallback_prompt(
+                    query=normalized_query,
+                    preferences=preferences,
+                    hospitality_retry=hospitality_retry,
+                )
+                request_payload: dict[str, Any] = {
+                    "model": self.settings.openai_model.strip() or "gpt-5-mini",
+                    "input": [
+                        {
+                            "role": "system",
+                            "content": [{"type": "input_text", "text": prompt}],
+                        },
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "input_text",
+                                    "text": json.dumps(
+                                        self._build_public_web_fallback_user_payload(
+                                            query=normalized_query,
+                                            location_hint=location_hint,
+                                            user_location=user_location,
+                                            booking_context=booking_context,
+                                            budget=budget,
+                                            preferences=preferences,
+                                            hospitality_retry=hospitality_retry,
+                                        )
+                                    ),
+                                }
+                            ],
+                        },
+                    ],
+                    "tools": [
+                        {
+                            "type": "web_search",
+                            "search_context_size": "medium" if hospitality_search_mode else "low",
+                            "user_location": {
+                                "type": "approximate",
+                                "country": "AU",
+                                **({"city": location_hint} if location_hint else {}),
+                            },
+                        }
+                    ],
+                    "text": {
+                        "format": {
+                            "type": "json_schema",
+                            "name": "public_web_service_search",
+                            "schema": schema,
+                            "strict": True,
+                        }
+                    },
+                    "reasoning": {"effort": "low"},
+                }
+                attempt_headers = {
+                    **headers,
+                    "X-Client-Request-Id": f"bookedai-public-web-{uuid4().hex}",
+                }
+
+                try:
+                    response = await client.post(
+                        endpoint,
+                        headers=attempt_headers,
+                        json=request_payload,
+                    )
+                    response.raise_for_status()
+                    data = response.json()
+                except httpx.HTTPStatusError as error:
+                    response = error.response
+                    logger.warning(
+                        "openai_public_web_search_http_error",
+                        extra={
+                            "status_code": response.status_code if response is not None else None,
+                            "x_request_id": response.headers.get("x-request-id") if response is not None else None,
+                            "response_body": (response.text[:1000] if response is not None else ""),
+                            "query": normalized_query[:160],
+                            "location_hint": (location_hint or "")[:80],
+                            "hospitality_retry": hospitality_retry,
+                        },
+                    )
+                    continue
+                except httpx.HTTPError as error:
+                    logger.warning(
+                        "openai_public_web_search_transport_error",
+                        extra={
+                            "error_type": type(error).__name__,
+                            "error_message": str(error)[:500],
+                            "query": normalized_query[:160],
+                            "location_hint": (location_hint or "")[:80],
+                            "hospitality_retry": hospitality_retry,
+                        },
+                    )
+                    continue
+
+                output_text = self._extract_openai_output_text(data)
+                if not output_text:
+                    continue
+
+                try:
+                    parsed = json.loads(output_text)
+                except json.JSONDecodeError:
+                    continue
+
+                results = parsed.get("results")
+                if not isinstance(results, list):
+                    continue
+
+                normalized_results = self._normalize_public_web_results(
+                    results=results,
+                    location_hint=location_hint,
+                    booking_context=booking_context,
+                    budget=budget,
+                    preferences=preferences,
+                    hospitality_search_mode=hospitality_search_mode,
+                    hospitality_retry=hospitality_retry,
+                )
+                if normalized_results:
+                    return normalized_results
+
+        return []
+
     async def triage_message(self, message: TawkMessage) -> AIBookingDecision:
         if not self.is_configured():
             return self.fallback_decision(message)
@@ -2423,6 +2814,8 @@ class OpenAIService:
         website_url: str,
         business_name: str | None = None,
         category_hint: str | None = None,
+        search_focus: str | None = None,
+        required_fields: list[str] | None = None,
     ) -> list[dict[str, Any]]:
         if not self.is_configured():
             return []
@@ -2480,7 +2873,8 @@ class OpenAIService:
             "You extract real service catalog data for SMEs from their website. "
             "Return only services that appear to be genuinely offered by the business. "
             "Prefer concrete details such as price, duration, venue, location, booking links, and short decision-useful summaries. "
-            "If a value is not clear, return null instead of guessing wildly."
+            "If a value is not clear, return null instead of guessing wildly. "
+            "Prioritize fields that directly affect booking and search quality."
         )
         schema = {
             "type": "object",
@@ -2533,6 +2927,8 @@ class OpenAIService:
                     "website_url": normalized_url,
                     "business_name": business_name,
                     "category_hint": category_hint,
+                    "search_focus": search_focus,
+                    "required_fields": required_fields or [],
                     "pages": [{"url": page["url"], "text": page["text"]} for page in pages],
                 },
                 schema_name="website_service_import",
@@ -2798,6 +3194,8 @@ class OpenAIService:
         )
 @dataclass
 class BookingAssistantService:
+    CUSTOMER_PORTAL_BASE_URL = "https://portal.bookedai.au"
+
     settings: Settings
 
     def get_catalog(
@@ -2843,6 +3241,10 @@ class BookingAssistantService:
             precomputed_signals=memory_signals,
         )
         shortlist = [item.service for item in ranked_matches[: max(MAX_SERVICE_MATCHES * 2, 6)]]
+        shortlist = self._filter_service_shortlist_for_category_intent(
+            effective_query,
+            shortlist,
+        )
         matched_services = self._curate_service_matches(shortlist)
         ai_shortlist = self._curate_service_matches(shortlist, limit=max(MAX_SERVICE_MATCHES * 2, 6))
         wants_services = self._should_match_services(message, matched_services)
@@ -2920,9 +3322,9 @@ class BookingAssistantService:
 
     def _should_search_ai_events(self, message: str) -> bool:
         tokens = tokenize_text(message)
-        has_ai_signal = bool(tokens & {"ai", "artificial", "intelligence", *WSTI_KEYWORDS})
-        has_event_signal = bool(tokens & AI_EVENT_KEYWORDS)
-        return has_event_signal and has_ai_signal
+        has_event_signal = bool(tokens & AI_EVENT_DISCOVERY_KEYWORDS)
+        has_ai_topic_signal = bool(tokens & AI_EVENT_TOPIC_KEYWORDS)
+        return has_event_signal and has_ai_topic_signal
 
     @staticmethod
     def _recent_user_context(
@@ -3000,6 +3402,28 @@ class BookingAssistantService:
             if len(curated) >= limit:
                 break
         return curated
+
+    @staticmethod
+    def _filter_service_shortlist_for_category_intent(
+        query: str,
+        services: list[ServiceCatalogItem],
+    ) -> list[ServiceCatalogItem]:
+        if not services:
+            return []
+
+        query_tokens = tokenize_text(query)
+        detected_categories = {
+            category
+            for category, keywords in CATEGORY_KEYWORDS.items()
+            if query_tokens & keywords
+        }
+        if not detected_categories:
+            return services
+
+        category_aligned = [
+            service for service in services if service.category in detected_categories
+        ]
+        return category_aligned or services
 
     @staticmethod
     def _curate_event_matches(
@@ -3185,6 +3609,7 @@ class BookingAssistantService:
         )
 
         booking_reference = f"BAI-{uuid4().hex[:8].upper()}"
+        portal_url = self._build_customer_portal_url(booking_reference)
         payment_status = "payment_follow_up_required"
         payment_url = self._build_manual_followup_url(booking_reference, service, payload)
         meeting_status = "configuration_required"
@@ -3314,6 +3739,7 @@ class BookingAssistantService:
         return BookingAssistantSessionResponse(
             status="ok",
             booking_reference=booking_reference,
+            portal_url=portal_url,
             service=service,
             amount_aud=service.amount_aud,
             amount_label=self._format_amount(service.amount_aud),
@@ -3322,7 +3748,7 @@ class BookingAssistantService:
             timezone=payload.timezone,
             payment_status=payment_status,
             payment_url=payment_url,
-            qr_code_url=self._build_qr_code_url(payment_url),
+            qr_code_url=self._build_qr_code_url(portal_url),
             email_status=email_status,
             meeting_status=meeting_status,  # type: ignore[arg-type]
             meeting_join_url=meeting_join_url,
@@ -3527,6 +3953,10 @@ class BookingAssistantService:
             (service.business_email or "").strip().lower() or self.settings.booking_business_email
         )
         return f"mailto:{business_recipient}?subject={subject}&body={body}"
+
+    @classmethod
+    def _build_customer_portal_url(cls, booking_reference: str) -> str:
+        return f"{cls.CUSTOMER_PORTAL_BASE_URL}/?booking_reference={quote(booking_reference, safe='')}"
 
     @staticmethod
     def _build_qr_code_url(target_url: str) -> str:

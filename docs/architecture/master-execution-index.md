@@ -31,6 +31,7 @@ Every meaningful initiative should now be captured through:
 3. Epic -> Story -> Task breakdown
 4. sprint owner execution checklist
 5. roadmap or sprint register alignment
+6. test-runner plan for any contract, integration, public conversion, or AI-trust behavior that will persist into later phases
 
 ## Phase map
 
@@ -63,6 +64,7 @@ Core docs:
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
 - `docs/architecture/sprint-2-implementation-package.md`
 - `docs/architecture/sprint-2-closeout-review.md`
+- `docs/architecture/sprint-2-read-code.md`
 - `docs/architecture/frontend-theme-design-token-map.md`
 - `docs/architecture/bookedai-brand-ui-kit.md`
 - `docs/architecture/landing-component-tree-and-file-ownership.md`
@@ -78,6 +80,7 @@ Commercial contracts, attribution, reporting, payments, recovery, tenant baselin
 Primary output:
 
 - working commercial system behind the public promise
+- first reusable contract, integration, and trust-sensitive runner foundation behind the commercial system
 
 Core docs:
 
@@ -115,6 +118,7 @@ QA, release discipline, and scale hardening
 Primary output:
 
 - promote, hold, and rollback discipline for the commercial platform
+- release-grade runner suites that can block promotion when high-risk flows regress
 
 Core docs:
 
@@ -130,18 +134,18 @@ Core docs:
 | 1 | Phase 0 reset and alignment |
 | 2 | Brand system and landing architecture |
 | 3 | Premium public implementation |
-| 4 | Commercial contracts |
+| 4 | Commercial contracts and first contract-runner scaffold |
 | 5 | Reporting and widget APIs |
-| 6 | Attribution and conversion metrics |
+| 6 | Attribution, conversion metrics, and search-quality runner growth |
 | 7 | Recovery workflows |
 | 8 | Tenant revenue baseline |
 | 9 | Admin commercial operations |
-| 10 | Optimization and hardening baseline |
+| 10 | Optimization, hardening baseline, and CI runner consolidation |
 | 11 | Tenant IA and API preparation |
 | 12 | Tenant workspace implementation |
 | 13 | Admin IA and commercial drill-ins |
 | 14 | Admin support tooling and rollout readiness |
-| 15 | Telemetry and regression coverage |
+| 15 | Telemetry, regression coverage, and release-grade runner enforcement |
 | 16 | Release gates and scale readiness |
 
 ## Leadership checkpoints

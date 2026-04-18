@@ -306,6 +306,12 @@ class SemanticSearchAdapter(AIModelAdapter):
             "Scoring guidance: prefer candidates that best match service intent, location, category, budget, and specificity. "
             "Use the heuristic_score as a directional hint only — semantic understanding should drive reranking. "
             "If the supplied candidates are weak or off-topic, score them low instead of trying to force a match. "
+            "Do not reward a candidate just because it matches the city, suburb, provider popularity, or a broad parent category. "
+            "The active query's core service terms must stay anchored. If the user asks for one service type, do not broaden into adjacent service types. "
+            "Examples: support worker is not generic housing, private dining is not generic healthcare, haircut is not generic beauty, and restaurant is not hotel accommodation. "
+            "If the current query implies one service domain and the supplied candidates belong to another domain, return an empty or near-empty ranked_candidates list rather than forcing a wrong-category recommendation. "
+            "Do not keep medical, dining, salon, housing, membership, events, or print candidates in the shortlist unless they truly match the active query intent. "
+            "For multilingual or conversational queries, normalize the request but preserve the exact requested service intent instead of broadening it. "
             "Keep reasons concrete and under 200 characters. "
             "If two candidates are very close, prefer the one with partner_verified trust or a direct booking path. "
             "Return only valid JSON matching the schema."
@@ -338,12 +344,9 @@ class SemanticSearchAdapter(AIModelAdapter):
             base_url=self.settings.semantic_search_base_url,
             model=self.settings.semantic_search_model,
         )
-        if primary is not None:
-            providers.append(primary)
-
         primary_name = (self.settings.semantic_search_provider or "").strip().lower()
         openai_key = self.settings.openai_api_key.strip()
-        if openai_key and primary_name != "openai":
+        if openai_key:
             providers.append(
                 SemanticProviderConfig(
                     provider_name="openai",
@@ -352,6 +355,9 @@ class SemanticSearchAdapter(AIModelAdapter):
                     model=self.settings.openai_model.strip() or "gpt-5-mini",
                 )
             )
+
+        if primary is not None and primary_name != "openai":
+            providers.append(primary)
 
         return providers
 

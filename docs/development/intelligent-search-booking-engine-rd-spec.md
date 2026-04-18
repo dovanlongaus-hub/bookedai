@@ -1,0 +1,323 @@
+# Intelligent Search Booking Engine R&D Spec
+
+## Status
+
+- owner: Codex R&D lane
+- date: `2026-04-18`
+- product area: BookedAI public search, matching, booking handoff
+- priority: critical
+
+## Objective
+
+BookedAI search must behave like a real booking engine, not a generic recommendation widget.
+
+The engine must:
+
+1. understand exactly what the user wants to book
+2. search tenant-owned SME data first when it truly matches
+3. search the public internet only when tenant data is insufficient
+4. enforce strict matching on:
+   - service intent
+   - location
+   - timing
+   - budget
+   - party size
+   - additional user conditions
+5. show only the best 3 results that survive those rules
+6. hand the chosen result into the booking flow cleanly
+
+## Product truth policy
+
+### Rule 1 — Tenant truth is primary
+
+If the system already has tenant or SME partner data that matches the request and satisfies the search conditions, that result must be preferred over public web results.
+
+### Rule 2 — Public internet is fallback, not default
+
+If tenant truth is absent or too weak, BookedAI may use OpenAI `Responses API + web_search` to find public web candidates.
+
+These results must still pass strict relevance gates before they are shown.
+
+### Rule 3 — No weak broad matches
+
+BookedAI must not show a result just because it shares the same city, category family, or broad parent domain.
+
+If search confidence is weak, the engine should show no result instead of a misleading result.
+
+### Rule 4 — Top 3 only
+
+The customer-facing result surface should show only the top 3 strongest results by default.
+
+## Search contract
+
+Every search request should be normalized into this internal contract:
+
+- `query_text`
+- `core_service_intent`
+- `location_hint`
+- `near_me_requested`
+- `requested_date`
+- `requested_time`
+- `schedule_hint`
+- `party_size`
+- `budget_max`
+- `service_category_preference`
+- `extra_constraints`
+- `channel_context`
+
+## Matching model
+
+### Stage A — Query understanding
+
+Extract:
+
+- exact service terms
+- city, suburb, metro, precinct
+- time phrases such as `today`, `tomorrow`, `tonight`, `this weekend`
+- explicit numeric constraints such as budget and party size
+- booking readiness signals such as `book`, `reserve`, `need`, `looking for`
+
+### Stage B — Tenant retrieval
+
+Tenant search must only retrieve candidates that are plausible on:
+
+- service topic
+- category alignment
+- location alignment
+- published catalog quality
+
+### Stage C — Tenant ranking and gates
+
+Tenant candidates must be ranked by:
+
+1. service-intent match
+2. location closeness
+3. booking readiness
+4. budget fit
+5. direct booking path quality
+6. trust and catalog completeness
+
+Hard gates:
+
+- reject `topic_mismatch`
+- reject `core_intent_mismatch`
+- reject `location_mismatch` when location is required
+- reject weak top matches before UI display
+
+### Stage D — Public web fallback
+
+Public web search should only run after tenant ranking returns no display-safe result.
+
+Public web search must prefer:
+
+- official provider websites
+- real booking pages
+- provider-owned service pages
+
+Public web search must reject:
+
+- broad directories
+- listicles
+- city-only weak matches
+- adjacent-domain pages
+- non-booking results that do not support the requested service
+
+### Stage E — Public web result gates
+
+Each public web candidate should be evaluated on:
+
+- `service_relevance`
+- `location_relevance`
+- `time_relevance`
+- `constraint_relevance`
+- `official_source`
+- `overall_match_score`
+
+Suggested acceptance thresholds:
+
+- `service_relevance >= 0.72`
+- if location is present: `location_relevance >= 0.58`
+- if time is present: `time_relevance >= 0.45`
+- if budget or party size or other constraints are present: `constraint_relevance >= 0.45`
+- `overall_match_score >= 0.68`
+- source must be official or include a direct booking path
+
+## Result policy
+
+### What may be displayed
+
+Only candidates that satisfy all required conditions may be shown.
+
+### What may not be displayed
+
+- off-topic services
+- wrong city or wrong suburb when location is explicit
+- web results that merely resemble the category
+- tenant rows that are incomplete or not search-ready
+- results that fail the search gates but would otherwise fill empty space
+
+### Result count
+
+- maximum 3 results shown in the primary customer shortlist
+- order by strongest combined relevance
+
+## Booking handoff policy
+
+When the user selects a result:
+
+- tenant-backed result:
+  - continue with the existing booking-trust and booking-path flow
+- public web result:
+  - keep BookedAI advisory
+  - open partner booking path or source page
+  - do not pretend availability was verified by BookedAI
+
+## Frontend requirements
+
+Frontend must:
+
+- show a live search loading state immediately
+- hide stale shortlist rows while a new query is in progress
+- keep the shortlist compact at 3 results
+- show location, timing, booking path, and why it matches
+- make public web sourced results visually distinguishable from tenant-owned results
+
+## Backend requirements
+
+Backend must:
+
+- maintain `tenant-first, public-web-second`
+- preserve strict display gates
+- pass normalized booking context into web fallback
+- log diagnostics for why candidates were shown or dropped
+- keep result shaping deterministic
+
+## API requirements
+
+`POST /api/v1/matching/search` should remain the main search endpoint.
+
+The response should always preserve:
+
+- `candidates`
+- `recommendations`
+- `confidence`
+- `warnings`
+- `booking_context`
+- `semantic_assist`
+- `search_diagnostics`
+
+## Current implementation progress
+
+Already in place as of `2026-04-18`:
+
+- tenant-first ranking and strict display gating
+- OpenAI Responses API `web_search` fallback
+- public web fallback now receives:
+  - `location_hint`
+  - `booking_context`
+  - `budget`
+  - `preferences`
+- public web results are now filtered by:
+  - service relevance
+  - location relevance
+  - time relevance
+  - constraint relevance
+  - official-source or booking-path quality
+- public web fallback returns only the top 3 surviving results
+
+## Verification strategy
+
+### Backend
+
+- unit test tenant exact match vs wrong-domain tenant noise
+- unit test tenant miss -> public web fallback
+- unit test web fallback receives timing and constraint context
+- unit test route keeps only top 3 public web results
+
+### Frontend
+
+- E2E tenant shortlist survives legacy noise
+- E2E public web fallback renders correctly
+- E2E loading state hides stale results
+- E2E chosen result enters booking flow
+
+## Phase plan
+
+### Phase 1 — Matching precision hardening
+
+- improve core intent extraction
+- improve location and metro matching
+- protect against category-only drift
+
+### Phase 2 — Web fallback precision
+
+- strengthen OpenAI web-search prompt
+- enforce strict public web result contract
+- add post-filter thresholds
+
+### Phase 3 — Result presentation
+
+- make result source explicit
+- keep top 3 default shortlist
+- tighten booking-ready explanation and next action
+
+### Phase 4 — Replay and telemetry
+
+- build English replay pack from real queries
+- track tenant-hit vs web-fallback rate
+- track wrong-result suppression rate
+- track booking-flow conversion by result source
+
+## English replay pack
+
+An initial English replay pack now exists at:
+
+- [docs/development/english-search-replay-pack.json](/home/dovanlong/BookedAI/docs/development/english-search-replay-pack.json)
+
+Current verticals covered:
+
+- haircut
+- restaurant
+- physio
+- dentist
+- childcare
+- support worker
+- private dining
+
+Run it with:
+
+```bash
+python scripts/run_matching_search_replay.py --cases-json docs/development/english-search-replay-pack.json --output pretty
+```
+
+Expected use:
+
+- validate whether top results stay tightly grounded to service intent
+- review replay rollups by outcome: `tenant_hit`, `web_fallback`, `missing_catalog`, `blocked_by_gates`
+- separate ranking problems from catalog-supply gaps before changing the engine
+
+Local fixed eval coverage in the repo now also includes:
+
+- `restaurant-table-melbourne`
+- `private-dining-southbank`
+- `support-worker-western-sydney-english`
+- verify location and timing constraints are preserved
+- inspect whether the engine correctly chooses tenant data or public web fallback
+- spot verticals where `missing_catalog` is the real problem instead of ranking logic
+
+## Official references reviewed
+
+Reviewed on `2026-04-18`:
+
+- OpenAI Responses API:
+  - https://platform.openai.com/docs/api-reference/responses/create?api-mode=responses
+- OpenAI tools guide:
+  - https://platform.openai.com/docs/guides/tools/file-search
+- OpenAI migration and structured-output guidance:
+  - https://platform.openai.com/docs/guides/responses-vs-chat-completions
+
+Inference from those sources:
+
+- OpenAI supports a hosted `web_search` tool in the Responses API
+- Structured Outputs with `json_schema` are appropriate for a strict result contract
+- BookedAI can use OpenAI as the official public web search layer without introducing a second search engine immediately

@@ -71,17 +71,19 @@ Primary children:
 3. `ProblemSection`
 4. `ProductProofSection`
 5. `SolutionSection`
-6. `ProductFlowShowcaseSection`
-7. `VideoDemoSection`
-8. `ImplementationSection`
+6. `BookingAssistantSection`
+7. `TrustSection`
+8. `PartnersSection`
 9. `PricingSection`
 10. `CallToActionSection`
-11. `BookingAssistantSection`
-12. `PartnersSection`
-13. `TeamSection`
-14. `Footer`
-15. `BookingAssistantDialog`
-16. `DemoBookingDialog`
+11. `Footer`
+12. `BookingAssistantDialog`
+13. `DemoBookingDialog`
+
+Current implementation note:
+
+- this list reflects the actual landing assembly in `frontend/src/apps/public/PublicApp.tsx`
+- additional section files exist in the repo, but they are additive inventory rather than part of the current locked primary conversion path
 
 ## 4.2 Page chrome layer
 
@@ -151,31 +153,33 @@ Owns:
   - owns conversion-flow narrative and core solution cards
 - `ProductProofSection.tsx`
   - owns top-level proof or capability explanation cards
-- `ProductFlowShowcaseSection.tsx`
-  - owns product-flow walkthrough framing
-- `ImplementationSection.tsx`
-  - owns rollout-path explanation
 - `PricingSection.tsx`
   - owns pricing explanation, consultation CTA flow, and pricing booking handoff
 - `CallToActionSection.tsx`
   - owns final conversion push
 
-### Trust and proof sections
+### Active trust and assistant sections
+
+- `BookingAssistantSection.tsx`
+  - owns in-page assistant preview and direct assistant-entry CTA
+- `TrustSection.tsx`
+  - owns trust framing, testimonial wall, and FAQ surface
+- `PartnersSection.tsx`
+  - owns partner and infrastructure trust proof
+
+### Additive or deferred section files present in repo
 
 - `VideoDemoSection.tsx`
-- `PartnersSection.tsx`
 - `TeamSection.tsx`
-- `TrustSection.tsx`
+- `ProductFlowShowcaseSection.tsx`
+- `ImplementationSection.tsx`
 - `ShowcaseSection.tsx`
 - `CustomerShowcaseSection.tsx`
 - `TechnicalArchitectureSection.tsx`
 - `RoadmapSection.tsx`
 - `ImageUploadSection.tsx`
 
-### Assistant-facing section
-
-- `BookingAssistantSection.tsx`
-  - owns in-page assistant preview and direct assistant-entry CTA
+These files should be treated as available implementation inventory, not as automatically in scope for the primary landing assembly.
 
 ## 4.5 UI primitive layer
 
@@ -255,34 +259,33 @@ Root-level landing components should be limited to:
 - `ProblemSection.tsx`
 - `SolutionSection.tsx`
 - `ProductProofSection.tsx`
-- `ProductFlowShowcaseSection.tsx`
+- `TrustSection.tsx`
 - `PricingSection.tsx`
 - `CallToActionSection.tsx`
 - `BookingAssistantSection.tsx`
 - `PartnersSection.tsx`
-- `TeamSection.tsx`
+
+## Keep as additive interaction files
+
+- `DemoBookingDialog.tsx`
+- `assistant/BookingAssistantDialog.tsx`
+- `assistant/publicBookingAssistantV1.ts`
+
+## Defer from the current mandatory landing assembly unless explicitly promoted
+
+- `ProductFlowShowcaseSection.tsx`
 - `VideoDemoSection.tsx`
 - `ImplementationSection.tsx`
-
-## Reshape during Sprint 3 as needed
-
+- `TeamSection.tsx`
 - `ShowcaseSection.tsx`
 - `CustomerShowcaseSection.tsx`
-- `TrustSection.tsx`
 - `TechnicalArchitectureSection.tsx`
 - `RoadmapSection.tsx`
-
-Reason:
-
-- these are useful supporting sections but should not compete with the mandatory landing sequence if the primary public narrative needs tighter focus
-
-## Defer from the mandatory landing critical path
-
 - `ImageUploadSection.tsx`
 
 Reason:
 
-- useful as a capability proof, but not part of the mandatory conversion sequence defined in the landing requirements
+- these files are useful supporting inventory, but they are not part of the current primary conversion spine defined by `PublicApp.tsx`
 
 ## 7. Sprint 2 concrete file ownership tasks
 

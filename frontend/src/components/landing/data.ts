@@ -1,4 +1,13 @@
-export type NavItem = string;
+export type NavItem = {
+  id: string;
+  label: string;
+};
+
+export type LandingSpineItem = {
+  id: string;
+  label: string;
+  includeInNav?: boolean;
+};
 
 export type InfoCard = {
   title: string;
@@ -315,34 +324,50 @@ export const brandDescriptor = 'AI Revenue Engine for Service Businesses';
 export const brandPositioning =
   'Multi-channel AI revenue engine that captures demand, converts it into bookings, and helps recover missed revenue.';
 export const brandHomeUrl = 'https://bookedai.au/';
-export const brandPreferredLogoPath = '/branding/bookedai-revenue-engine-dark.svg';
-export const brandLogoPath = '/branding/bookedai-revenue-engine-dark.svg';
-export const brandLogoOnDarkPath = '/branding/bookedai-revenue-engine-white.svg';
-export const brandLogoSquarePath = '/branding/bookedai-revenue-engine-icon.svg';
-export const brandFaviconPath = '/branding/bookedai-revenue-engine-icon.svg';
+export const brandAssetVersion = '20260418-brand-system';
+export const brandUnifiedLogoPath = `/branding/bookedai-logo-light.png?v=${brandAssetVersion}`;
+export const brandPreferredLogoPath = brandUnifiedLogoPath;
+export const brandLogoPath = `/branding/bookedai-logo-light.png?v=${brandAssetVersion}`;
+export const brandLogoOnDarkPath = `/branding/bookedai-logo-dark-badge.png?v=${brandAssetVersion}`;
+export const brandLogoBlackPath = `/branding/bookedai-logo-black.png?v=${brandAssetVersion}`;
+export const brandLogoTransparentPath = `/branding/bookedai-logo-light.png?v=${brandAssetVersion}`;
+export const brandLogoSquarePath = `/branding/bookedai-app-icon-1024.png?v=${brandAssetVersion}`;
+export const brandShortIconPath = `/branding/bookedai-mark-gradient.png?v=${brandAssetVersion}`;
+export const brandFaviconPath = `/branding/bookedai-icon-32.png?v=${brandAssetVersion}`;
+export const brandLandingDarkSurfaceLogoPath = brandLogoOnDarkPath;
+export const brandLandingLightSurfaceLogoPath = brandLogoPath;
 export const brandContactEmail = 'info@bookedai.au';
 export const brandWhatsAppHref =
   'https://wa.me/14155238886?text=Hi%20BookedAI%2C%20I%20want%20to%20see%20how%20the%20AI%20Revenue%20Engine%20works.';
 export const brandLinkedInHref = 'https://www.linkedin.com/company/booked-ai-aus/';
 export const brandXHref = 'https://twitter.com/BookedAIAU';
 
-export const navItems: NavItem[] = [
-  'Problem',
-  'How it Works',
-  'Live Flow',
-  'Trust',
-  'Partners',
-  'Pricing',
+export const publicLandingSpine: LandingSpineItem[] = [
+  { id: 'hero', label: 'Hero' },
+  { id: 'problem', label: 'Problem', includeInNav: true },
+  { id: 'solution', label: 'Solution', includeInNav: true },
+  { id: 'product-proof', label: 'Product Proof', includeInNav: true },
+  { id: 'booking-assistant', label: 'Live Assistant', includeInNav: true },
+  { id: 'trust', label: 'Trust', includeInNav: true },
+  { id: 'partners', label: 'Partners', includeInNav: true },
+  { id: 'team-members', label: 'Team Members', includeInNav: true },
+  { id: 'pricing', label: 'Pricing', includeInNav: true },
+  { id: 'call-to-action', label: 'Call to action' },
+  { id: 'footer', label: 'Footer' },
 ];
 
+export const navItems: NavItem[] = publicLandingSpine
+  .filter((item) => item.includeInNav)
+  .map((item) => ({ id: item.id, label: item.label }));
+
 export const heroContent: HeroContent = {
-  eyebrow: 'The AI Revenue Engine for Service Businesses',
-  title: 'Capture Demand. Convert It Into Revenue.',
-  bodyLead: 'BookedAI captures inbound demand across website, calls, chat, email, and follow-up, then moves customers into the right booking path without adding admin overhead.',
+  eyebrow: 'The AI Revenue Engine That Turns Conversations Into Revenue',
+  title: 'Turn Any Kind of Conversations Into Your Revenue.',
+  bodyLead: 'BookedAI captures inbound demand across website chat, calls, email, and follow-up, then moves customers into the right booking path without adding admin overhead.',
   bodyRest:
-    'Built for service operators that want one premium system for qualification, booking, payment readiness, and recovery workflows.',
+    'Built for service operators that want one premium system for qualification, booking, payment readiness, and revenue recovery workflows.',
   note: 'More bookings generated, less manual follow-up, and clearer revenue visibility from first enquiry to confirmed outcome.',
-  primaryCta: 'Start Free Trial',
+  primaryCta: 'Try Now',
   secondaryCta: 'View Demo',
   primaryHref: primaryCtaHref,
   secondaryHref: productHref,
@@ -545,15 +570,15 @@ export const pricingContent: PricingContent = {
     'n8n automation for follow-up and reminders',
     'Online setup review for your service workflow',
   ],
-  primaryCta: 'Start Free Trial',
+  primaryCta: 'Try Now',
   primaryHref: primaryCtaHref,
 };
 
 export const ctaContent: CallToActionContent = {
   kicker: 'Call to action',
-  title: 'Ready to trial BookedAI or map your rollout?',
-  body: 'If the problem, solution, demo, implementation path, and pricing all make sense, this is the right moment to take the next step.',
-  primaryCta: 'Start Free Trial',
+  title: 'Ready to turn conversations into revenue with BookedAI?',
+  body: 'If the conversational flow, proof, and booking path all make sense, this is the moment to start the next commercial step.',
+  primaryCta: 'Try Now',
   secondaryCta: 'Book a Demo',
   primaryHref: primaryCtaHref,
   secondaryHref: demoCtaHref,

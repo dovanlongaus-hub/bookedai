@@ -12,6 +12,8 @@ DOMAIN_API="${DOMAIN_API:-api.bookedai.au}"
 DOMAIN_ADMIN="${DOMAIN_ADMIN:-admin.bookedai.au}"
 DOMAIN_BETA="${DOMAIN_BETA:-beta.bookedai.au}"
 DOMAIN_PRODUCT="${DOMAIN_PRODUCT:-product.bookedai.au}"
+DOMAIN_PORTAL="${DOMAIN_PORTAL:-portal.bookedai.au}"
+DOMAIN_PITCH="${DOMAIN_PITCH:-pitch.bookedai.au}"
 DOMAIN_N8N="${DOMAIN_N8N:-n8n.bookedai.au}"
 DOMAIN_SUPABASE="${DOMAIN_SUPABASE:-supabase.bookedai.au}"
 DOMAIN_HERMES="${DOMAIN_HERMES:-hermes.bookedai.au}"
@@ -26,6 +28,8 @@ CERT_DOMAINS=(
   "${DOMAIN_ADMIN}"
   "${DOMAIN_BETA}"
   "${DOMAIN_PRODUCT}"
+  "${DOMAIN_PORTAL}"
+  "${DOMAIN_PITCH}"
   "${DOMAIN_N8N}"
   "${DOMAIN_SUPABASE}"
   "${DOMAIN_HERMES}"
@@ -72,6 +76,10 @@ elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_BET
   NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_PRODUCT}([, ]|$)"; then
   NEEDS_CERT_UPDATE="true"
+elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_PORTAL}([, ]|$)"; then
+  NEEDS_CERT_UPDATE="true"
+elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_PITCH}([, ]|$)"; then
+  NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_HERMES}([, ]|$)"; then
   NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_CALENDAR}([, ]|$)"; then
@@ -109,6 +117,8 @@ echo "Deployment completed."
 echo "App: https://${DOMAIN_ROOT}"
 echo "Beta: https://${DOMAIN_BETA}"
 echo "Product: https://${DOMAIN_PRODUCT}"
+echo "Portal: https://${DOMAIN_PORTAL}"
+echo "Pitch: https://${DOMAIN_PITCH}"
 echo "Admin: https://${DOMAIN_ADMIN}"
 echo "API: https://${DOMAIN_API}"
 echo "n8n: https://${DOMAIN_N8N}"

@@ -45,10 +45,12 @@ This strategy inherits and aligns with:
   - single-provider dependency
   - letting natural-language fluency override trust policy
 - Biggest provider and search decisions:
-  - current stack already fits an OpenAI-compatible first path
-  - Google should be treated as a strong grounding option for web freshness and local discovery
-  - a second high-quality synthesis provider should exist for fallback
-  - low-cost extraction and classification can use cheaper compatible models
+- current stack already fits an OpenAI-compatible first path
+- OpenAI Responses API with built-in `web_search` should be the official public internet-search fallback after tenant-catalog miss
+- the public assistant should preserve `tenant-first` truth and only surface OpenAI web results after tenant relevance gates fail
+- Google should be treated as a strong grounding option for web freshness and local discovery
+- a second high-quality synthesis provider should exist for fallback
+- low-cost extraction and classification can use cheaper compatible models
   - deterministic retrieval mode must exist for degraded or unsafe cases
 
 ## Section 2 — Role of AI in BookedAI

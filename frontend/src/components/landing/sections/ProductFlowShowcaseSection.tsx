@@ -1,4 +1,6 @@
 import type { DemoContent } from '../data';
+import { SectionCard } from '../ui/SectionCard';
+import { SignalPill } from '../ui/SignalPill';
 
 type ProductFlowShowcaseSectionProps = {
   demo: DemoContent;
@@ -30,7 +32,7 @@ export function ProductFlowShowcaseSection({ demo }: ProductFlowShowcaseSectionP
 
   return (
     <section className="mx-auto w-full max-w-7xl px-6 pb-18 lg:px-8 lg:pb-24">
-      <div className="template-card p-6 lg:p-8">
+      <SectionCard className="p-6 lg:p-8">
         <div className="grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-start">
           <div className="max-w-3xl">
             <div className="template-kicker text-sm tracking-[0.14em]">Visual story</div>
@@ -47,23 +49,25 @@ export function ProductFlowShowcaseSection({ demo }: ProductFlowShowcaseSectionP
                 'Easy to explain.',
                 'Clear to buy.',
               ].map((line) => (
-                <div key={line} className="rounded-[1.3rem] bg-[#f5f5f7] px-4 py-3 text-sm text-black/70">
+                <SectionCard key={line} className="rounded-[1.3rem] bg-[#f5f5f7] px-4 py-3 text-sm text-black/70 shadow-none">
                   {line}
-                </div>
+                </SectionCard>
               ))}
             </div>
           </div>
 
           <div className="grid gap-5 xl:grid-cols-3">
             {storyboardCards.map((card, index) => (
-              <article
+              <SectionCard
                 key={card.title}
-                className="template-card-subtle relative overflow-hidden p-5"
+                as="article"
+                tone="subtle"
+                className="relative overflow-hidden p-5"
               >
                 <div className="flex items-center justify-between gap-3">
-                  <div className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold text-[#0071e3]">
+                  <SignalPill variant="brand" className="bg-white px-3 py-1 text-[11px] font-semibold text-[#0071e3]">
                     {card.badge}
-                  </div>
+                  </SignalPill>
                   <div className="text-sm font-semibold tracking-[0.08em] text-black/48">
                     {card.step}
                   </div>
@@ -149,11 +153,11 @@ export function ProductFlowShowcaseSection({ demo }: ProductFlowShowcaseSectionP
                     </div>
                   ) : null}
                 </div>
-              </article>
+              </SectionCard>
             ))}
           </div>
         </div>
-      </div>
+      </SectionCard>
     </section>
   );
 }

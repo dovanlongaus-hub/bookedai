@@ -53,4 +53,4 @@ if ! curl -fsS "${SERVER_URL}" >/dev/null 2>&1; then
   exit 1
 fi
 
-PLAYWRIGHT_EXTERNAL_SERVER=1 playwright test "$@"
+PLAYWRIGHT_EXTERNAL_SERVER=1 npx playwright test "$@"

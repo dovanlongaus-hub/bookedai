@@ -1,22 +1,15 @@
-import * as React from "react";
+import { ReactNode } from "react";
 
-function cn(...values: Array<string | undefined | null | false>) {
-  return values.filter(Boolean).join(" ");
-}
-
-export type GlassCardProps = React.HTMLAttributes<HTMLDivElement> & {
-  glow?: boolean;
-};
-
-export function GlassCard({ className, glow = false, ...props }: GlassCardProps) {
+export function GlassCard({
+  children,
+  className = "",
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
   return (
-    <div
-      className={cn(
-        "glass-card rounded-lg p-6",
-        glow ? "gradient-card" : "",
-        className,
-      )}
-      {...props}
-    />
+    <div className={`glass rounded-brand ${className}`}>
+      {children}
+    </div>
   );
 }

@@ -29,12 +29,12 @@ This strategy inherits and aligns with:
 - Current public growth maturity:
   - BookedAI currently has a polished, mobile-aware, production-grade single-page landing experience plus a small set of static support pages.
   - The current public site already contains strong conversion primitives:
-    - homepage hero
-    - AI booking assistant entry
+    - search-first homepage hero
+    - standalone homepage search runtime on the homepage itself
+    - lean top-bar and menu-driven conversion surfaces with supporting content moved off the main search viewport
     - pricing consultation flow
     - demo request flow
-    - partner wall
-    - sticky floating assistant CTA
+    - top-level language switching for the public shell
   - However, the site is still structurally thin as a long-term growth engine because it does not yet have scalable page families for SEO, segmentation, trust education, or industry capture.
 - Target public growth direction:
   - Keep the current homepage and core routes stable.
@@ -47,7 +47,7 @@ This strategy inherits and aligns with:
     - deployment-mode pages
     - trust and commercial explanation pages
 - Biggest public-site opportunities:
-  - upgrade existing homepage messaging from "AI receptionist" toward "matching + booking trust + revenue lifecycle"
+  - upgrade existing homepage messaging from "AI receptionist" toward "search + booking trust + revenue lifecycle"
   - create new SEO page families without breaking the current homepage
   - improve CTA segmentation for cold traffic versus high-intent traffic
   - connect chat, demo, consultation, and quote flows more clearly to attribution and CRM lifecycle
@@ -84,22 +84,22 @@ See:
 
 ### Confirmed homepage structure today
 
-The homepage is a single long landing page assembled from:
+The homepage currently behaves as a search-first public shell with:
 
 - sticky header
-- hero
-- problem section
-- solution / how it works
-- product proof
-- booking assistant section
-- partners section
-- team section
-- pricing section
-- CTA section
-- footer
-- sticky floating assistant widget
-- demo booking modal
-- booking assistant modal
+- search-led hero
+- minimal top-of-page commercial framing
+- embedded live assistant runtime on the same page
+- menu-driven supporting narrative sections
+- bottom-bar and footer close
+
+The current conversion interpretation should be treated as:
+
+- user enters a service request from the homepage hero
+- the homepage itself renders shortlist, booking, and confirmation states through the embedded assistant
+- the public shell remains English by default
+- the header and menu expose locale switching for `English` and `Tiếng Việt`
+- the homepage body should reserve maximum practical space for the live assistant results and booking flow, while longer trust or education content is accessed through menu, top-bar, or bottom-bar surfaces
 
 Current public content/data is mainly driven by:
 
@@ -127,14 +127,15 @@ Current interaction endpoints live behind:
 ### Current strengths
 
 - Strong visual polish for a production landing page.
-- Clear primary action around trying the product.
+- Clear primary action around trying the product through search.
 - Useful demo and consultation capture flows already exist.
 - The site already hints at real product capability, not just marketing copy.
+- The homepage can now show live search-to-booking behavior directly on-page instead of hiding the main product proof behind a popup.
 - Mobile behavior appears intentionally designed:
   - mobile menu
   - large CTA buttons
-  - floating assistant trigger
-  - responsive section stacking
+  - visible locale switching path through the menu
+  - responsive inline assistant flow
 - Existing copy already leans toward practical SME operations rather than abstract AI hype.
 
 ### Current weaknesses
@@ -169,15 +170,20 @@ Current interaction endpoints live behind:
 
 ### Current mobile notes
 
-- Mobile responsiveness is already decent.
-- CTA visibility is strong.
-- The floating assistant is conversion-helpful.
-- But the site still needs a more explicit mobile-first CTA hierarchy so users do not have to infer whether they should:
-  - chat
-  - request a demo
-  - request a quote
-  - explore an industry use case
-  - understand booking trust first
+- Mobile responsiveness is now a product-critical requirement, not just a landing-page quality note.
+- CTA visibility should remain strong, but the main mobile goal is to keep the search field, shortlist, booking state, and next action visible without overload.
+- Mobile users should not need to dig through long narrative sections before seeing the live BookedAI flow.
+- Supporting narrative, SEO, trust, and education content should be reachable through menu and secondary surfaces rather than competing with the live search area on small screens.
+
+## Section 2A — Governing public-product principles
+
+The public growth app should now inherit these rules across homepage, landing experiments, SEO pages, and future surface extensions:
+
+- the public homepage is a live revenue-capture surface first and a narrative surface second
+- high-intent visitors should reach search, shortlist, booking, and confirmation with as little friction and as few competing elements as possible
+- supporting information should be distributed into menu layers, top-bar actions, bottom-bar support, and dedicated secondary pages when that preserves conversion focus
+- mobile-first responsive behavior is mandatory for any route or component that can influence search, booking, payment, or lead recovery
+- any redesign that adds weight to the homepage body must justify why that weight is better than giving the same space to search results, booking states, or conversion controls
 
 ### Confirmed assumptions
 
@@ -214,6 +220,12 @@ The acquisition layer should combine:
 ### Conversion strategy
 
 The public app should convert by matching visitor intent to the right CTA, not by forcing one action across the entire site.
+
+Current homepage conversion rule:
+
+- the search box and inline assistant are now the primary on-page conversion system for high-intent visitors
+- future public-growth work must not regress the homepage back into a popup-first assistant assumption unless the requirement-side architecture docs are explicitly revised
+- future public-growth work must not crowd the homepage body with secondary content that weakens the live search and booking area without an explicit source-of-truth update
 
 Primary conversion flows should include:
 

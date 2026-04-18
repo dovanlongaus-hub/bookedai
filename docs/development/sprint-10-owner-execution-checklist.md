@@ -14,11 +14,13 @@ Harden the commercial reporting and workflow system with telemetry, regression g
 
 - approve optimization priorities
 - approve release thresholds from a business-value standpoint
+- approve which search-truth failures block promotion immediately even if overall answer fluency looks acceptable
 
 ## Solution architect
 
 - confirm release gates cover reporting and workflow truth
 - confirm rollback conditions are explicit
+- confirm release gates also cover wrong-domain, wrong-location, and stale-context suppression in search
 
 ## PM or product ops
 
@@ -27,14 +29,16 @@ Harden the commercial reporting and workflow system with telemetry, regression g
 ## Frontend lead
 
 - confirm critical widget and workflow surfaces are covered by regression checks
+- confirm assistant surfaces have browser or API checks for no stale shortlist revival and no mixed-domain visible answer drift
 
 ## Backend lead
 
 - confirm telemetry, replay, and reliability hooks exist
 - confirm hardening of worker and integration flows
+- confirm search replay gates exist for top verticals and top trust-sensitive customer asks
 
 ## QA or release owner
 
 - own release-gate checklist
 - confirm regression coverage, rollback path, and promote-or-hold criteria
-
+- confirm promotion is blocked when search returns plausible but query-incorrect answers

@@ -18,6 +18,7 @@ import {
   shadowPublicBookingAssistantLeadAndBookingIntent,
   shadowPublicBookingAssistantSearch,
 } from './publicBookingAssistantV1';
+import { resolveAssistantEntrySourcePath } from '../attribution';
 import type { MatchCandidate } from '../../../shared/contracts';
 import {
   buildPartnerMatchActionFooterModelFromServiceItem,
@@ -56,6 +57,7 @@ type BookingAssistantCatalogResponse = {
 type BookingAssistantSessionResponse = {
   status: string;
   booking_reference: string;
+  portal_url: string;
   service: ServiceCatalogItem;
   amount_aud: number;
   amount_label: string;
@@ -125,9 +127,14 @@ type BookingAssistantDialogProps = {
   isOpen: boolean;
   onClose: () => void;
   standalone?: boolean;
+  embedded?: boolean;
+  hideCloseControl?: boolean;
   closeLabel?: string;
   layoutMode?: 'default' | 'product_app';
   entrySourcePath?: string | null;
+  initialQuery?: string | null;
+  initialQueryRequestId?: number;
+  surfaceVariant?: 'default' | 'homepage_search';
 };
 
 type ProductSheetSnap = 'peek' | 'half' | 'full';
@@ -331,6 +338,13 @@ function buildLiveReadAssistantReply(params: {
   inferredLocation: string | null;
   inferredCategory: string | null;
 }) {
+  const locationWarning = params.warnings.find((warning) =>
+    warning.toLowerCase().includes('location access is needed'),
+  );
+  if (!params.rankedCount && locationWarning) {
+    return `${buildJustInTimeLocationMessage()} I will rerun the nearby search as soon as location is available on this device.`;
+  }
+
   const descriptor = params.normalizedQuery
     ?? [params.inferredCategory, params.inferredLocation].filter(Boolean).join(' in ')
     ?? null;
@@ -348,6 +362,10 @@ function buildLiveReadAssistantReply(params: {
   }
 
   return `I found ${params.rankedCount} relevant result${params.rankedCount === 1 ? '' : 's'}. Here are the top ${shownCount} to compare first.`;
+}
+
+function buildJustInTimeLocationMessage() {
+  return 'Turn on location on this device so I can narrow nearby matches in real time instead of showing broad Australia-wide results.';
 }
 
 function validateBookingForm(params: {
@@ -810,6 +828,13 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
   ];
 }
 
+function getBookingPortalUrl(result: BookingAssistantSessionResponse) {
+  return (
+    result.portal_url?.trim() ||
+    `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(result.booking_reference)}`
+  );
+}
+
 function buildBookingJourneySteps(params: {
   selectedService: ServiceCatalogItem | null;
   preferredSlot: string;
@@ -865,21 +890,35 @@ export function BookingAssistantDialog({
   isOpen,
   onClose,
   standalone = false,
+  embedded = false,
+  hideCloseControl = false,
   closeLabel,
   layoutMode = 'default',
   entrySourcePath = null,
+  initialQuery = null,
+  initialQueryRequestId = 0,
+  surfaceVariant = 'default',
 }: BookingAssistantDialogProps) {
   const isProductAppLayout = standalone && layoutMode === 'product_app';
   const isDefaultPopupLayout = !standalone && layoutMode === 'default';
+  const isEmbeddedStandaloneLayout = standalone && embedded;
+  const isHomepageSearchSurface = isEmbeddedStandaloneLayout && surfaceVariant === 'homepage_search';
   const standaloneEyebrow = standalone ? brandDescriptor : 'Start Free Trial';
-  const standaloneTitle = standalone ? `${brandName} booking assistant` : 'AI booking agent popup';
+  const standaloneTitle = isHomepageSearchSurface
+    ? `${brandName} search results`
+    : standalone
+      ? `${brandName} booking assistant`
+      : 'AI booking agent popup';
   const standaloneDescription = standalone
-    ? 'Search, compare, and continue straight into booking.'
+    ? isHomepageSearchSurface
+      ? 'Search, compare, and continue into booking without leaving the homepage.'
+      : 'Search, compare, and continue straight into booking.'
     : `Search services, chat by text or voice, then watch ${brandName} build the booking outcome live.`;
   const [catalog, setCatalog] = useState<BookingAssistantCatalogResponse | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
+  const [pendingSearchQuery, setPendingSearchQuery] = useState('');
   const [chatError, setChatError] = useState('');
   const [userGeoContext, setUserGeoContext] = useState<UserGeoContext | null>(null);
   const [geoPromptState, setGeoPromptState] = useState<'idle' | 'granted' | 'denied'>('idle');
@@ -942,6 +981,7 @@ export function BookingAssistantDialog({
   const bookingDetailsSectionRef = useRef<HTMLFormElement | null>(null);
   const bookingConfirmedSectionRef = useRef<HTMLDivElement | null>(null);
   const customerNameInputRef = useRef<HTMLInputElement | null>(null);
+  const lastAutoSubmittedRequestIdRef = useRef<number>(0);
   const minDate = getSydneyToday();
   const bookingAssistantV1Enabled = isPublicBookingAssistantV1Enabled();
   const bookingAssistantV1LiveReadEnabled = isPublicBookingAssistantV1LiveReadEnabled();
@@ -950,6 +990,7 @@ export function BookingAssistantDialog({
   const bookingAssistantV1SessionId =
     bookingAssistantV1SessionIdRef.current ?? createPublicBookingAssistantSessionId();
   bookingAssistantV1SessionIdRef.current = bookingAssistantV1SessionId;
+  const assistantSourcePath = resolveAssistantEntrySourcePath(entrySourcePath);
 
   useEffect(() => {
     if (!isOpen) {
@@ -1057,6 +1098,7 @@ export function BookingAssistantDialog({
   useEffect(() => {
     if (!isOpen) {
       bookingAssistantV1SessionStartedRef.current = false;
+      lastAutoSubmittedRequestIdRef.current = 0;
       return;
     }
 
@@ -1071,7 +1113,7 @@ export function BookingAssistantDialog({
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') {
+      if (event.key === 'Escape' && !hideCloseControl) {
         onClose();
       }
     };
@@ -1083,7 +1125,7 @@ export function BookingAssistantDialog({
       }
       window.removeEventListener('keydown', handleKeyDown);
     };
-  }, [isOpen, onClose, standalone]);
+  }, [hideCloseControl, isOpen, onClose, standalone]);
 
   useEffect(() => {
     if (
@@ -1097,18 +1139,27 @@ export function BookingAssistantDialog({
     bookingAssistantV1SessionStartedRef.current = true;
     void primePublicBookingAssistantSession({
       anonymousSessionId: bookingAssistantV1SessionId,
-      sourcePage:
-        entrySourcePath ??
-        (typeof window !== 'undefined'
-          ? `${window.location.pathname}${window.location.search}`
-          : '/'),
+      sourcePage: assistantSourcePath,
     });
   }, [
     isOpen,
     bookingAssistantV1Enabled,
     bookingAssistantV1LiveReadEnabled,
-    entrySourcePath,
+    assistantSourcePath,
   ]);
+
+  useEffect(() => {
+    if (!isOpen) {
+      return;
+    }
+
+    const trimmedInitialQuery = initialQuery?.trim() ?? '';
+    if (!trimmedInitialQuery) {
+      return;
+    }
+
+    setChatInput(trimmedInitialQuery);
+  }, [initialQuery, initialQueryRequestId, isOpen]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -1199,9 +1250,29 @@ export function BookingAssistantDialog({
   }, [activeMobilePanel, isProductAppLayout, productSheetSnap]);
 
   const selectedService = useMemo(
-    () =>
-      catalog?.services.find((service) => service.id === selectedServiceId) ?? null,
-    [catalog?.services, selectedServiceId],
+    () => {
+      if (!selectedServiceId) {
+        return null;
+      }
+
+      const catalogMatch =
+        catalog?.services.find((service) => service.id === selectedServiceId) ?? null;
+      if (catalogMatch) {
+        return catalogMatch;
+      }
+
+      for (let index = messages.length - 1; index >= 0; index -= 1) {
+        const messageMatch =
+          messages[index]?.matchedServices?.find((service) => service.id === selectedServiceId) ??
+          null;
+        if (messageMatch) {
+          return messageMatch;
+        }
+      }
+
+      return null;
+    },
+    [catalog?.services, messages, selectedServiceId],
   );
   const latestCustomerRequirement = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
@@ -1220,17 +1291,21 @@ export function BookingAssistantDialog({
 
   const latestSuggestedServices = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
-      const matchedServices = messages[index]?.matchedServices;
-      if (matchedServices?.length) {
-        return curateServiceMatches(matchedServices);
+      const message = messages[index];
+      if (message?.role !== 'assistant' || message.matchedServices === undefined) {
+        continue;
       }
+
+      return curateServiceMatches(message.matchedServices);
     }
 
     return [];
-  }, [catalog?.services, messages]);
+  }, [messages]);
+  const isSearchResolving = chatLoading && pendingSearchQuery.trim().length > 0;
+  const visibleSuggestedServices = isSearchResolving ? [] : latestSuggestedServices;
   const comparisonPair = useMemo(
-    () => latestSuggestedServices.slice(0, 2),
-    [latestSuggestedServices],
+    () => visibleSuggestedServices.slice(0, 2),
+    [visibleSuggestedServices],
   );
   const hasConversationStarted = messages.length > 0 || chatLoading;
   const hasFirstSearchResult = useMemo(
@@ -1373,11 +1448,11 @@ export function BookingAssistantDialog({
     if (hasSelectionReadyForBooking) {
       return 'details';
     }
-    if (latestSuggestedServices.length > 0) {
+    if (visibleSuggestedServices.length > 0) {
       return 'options';
     }
     return 'overview';
-  }, [hasSelectionReadyForBooking, latestSuggestedServices.length, result]);
+  }, [hasSelectionReadyForBooking, result, visibleSuggestedServices.length]);
   const productModuleTabs = useMemo(() => {
     const tabs: Array<{
       id: ProductModuleTab;
@@ -1389,8 +1464,8 @@ export function BookingAssistantDialog({
       {
         id: 'options',
         label: 'Options',
-        badge: latestSuggestedServices.length ? `${latestSuggestedServices.length}` : undefined,
-        disabled: !latestSuggestedServices.length,
+        badge: visibleSuggestedServices.length ? `${visibleSuggestedServices.length}` : undefined,
+        disabled: !visibleSuggestedServices.length,
       },
       {
         id: 'details',
@@ -1404,7 +1479,7 @@ export function BookingAssistantDialog({
     }
 
     return tabs;
-  }, [hasSelectionReadyForBooking, latestSuggestedServices.length, result]);
+  }, [hasSelectionReadyForBooking, result, visibleSuggestedServices.length]);
 
   useEffect(() => {
     if (!isProductAppLayout) {
@@ -1450,6 +1525,56 @@ export function BookingAssistantDialog({
       bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       customerNameInputRef.current?.focus();
     }, 120);
+  }
+
+  function renderSearchResolvingPanel(className = '') {
+    if (!isSearchResolving) {
+      return null;
+    }
+
+    return (
+      <div
+        className={[
+          className,
+          'rounded-[1.35rem] border border-sky-100 bg-[linear-gradient(135deg,rgba(248,250,252,0.96),rgba(224,242,254,0.9))] p-5 shadow-[0_18px_40px_rgba(14,116,144,0.08)]',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
+        <div className="flex items-start gap-4">
+          <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_10px_24px_rgba(14,116,144,0.12)]">
+            <div className="h-5 w-5 animate-spin rounded-full border-2 border-sky-200 border-t-sky-600" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+              Live search in progress
+            </div>
+            <div className="mt-2 text-sm font-semibold text-slate-950">
+              BookedAI is finding the best option for your request.
+            </div>
+            <div className="mt-2 text-sm leading-6 text-slate-600">
+              {pendingSearchQuery
+                ? `Searching for "${pendingSearchQuery}" using the latest live-read shortlist and trust checks.`
+                : 'Searching with the latest live-read shortlist and trust checks.'}
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {['Checking locality', 'Verifying best fit', 'Preparing shortlist'].map((label, index) => (
+                <div
+                  key={label}
+                  className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-medium text-sky-700 ring-1 ring-sky-100"
+                  style={{ animationDelay: `${index * 120}ms` }}
+                >
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500" />
+                    {label}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   }
 
   function handleProductSheetPointerDown(event: PointerEvent<HTMLDivElement>) {
@@ -1536,6 +1661,8 @@ export function BookingAssistantDialog({
       return;
     }
 
+    const previousSelectedService = selectedService;
+
     const nextMessages: ChatMessage[] = [
       ...messages,
       {
@@ -1547,19 +1674,25 @@ export function BookingAssistantDialog({
     setMessages(nextMessages);
     setChatInput('');
     setChatError('');
+    setPendingSearchQuery(trimmedMessage);
     setChatLoading(true);
+    setSelectedServiceId('');
+    setSelectedEvent(null);
+    setLiveReadSummary(null);
     try {
       const liveReadPromise = bookingAssistantV1LiveReadEnabled
         ? getPublicBookingAssistantLiveReadRecommendation({
             query: trimmedMessage,
-            sourcePage:
-              entrySourcePath ??
-              (typeof window !== 'undefined'
-                ? `${window.location.pathname}${window.location.search}`
-                : '/'),
+            sourcePage: assistantSourcePath,
             locationHint: userGeoContext?.locality ?? null,
-            serviceCategory: selectedService?.category ?? null,
+            serviceCategory: previousSelectedService?.category ?? null,
             selectedServiceId: selectedServiceId || null,
+            userLocation: userGeoContext
+              ? {
+                  latitude: userGeoContext.latitude,
+                  longitude: userGeoContext.longitude,
+                }
+              : null,
           })
         : Promise.resolve({
             candidateIds: [] as string[],
@@ -1572,19 +1705,25 @@ export function BookingAssistantDialog({
             bookingPathSummary: null,
             usedLiveRead: false,
           });
-      const shadowCandidateIdsPromise = bookingAssistantV1Enabled
+      const shadowSearchPromise = bookingAssistantV1Enabled
         ? shadowPublicBookingAssistantSearch({
             query: trimmedMessage,
-            sourcePage:
-              entrySourcePath ??
-              (typeof window !== 'undefined'
-                ? `${window.location.pathname}${window.location.search}`
-                : '/'),
+            sourcePage: assistantSourcePath,
             locationHint: userGeoContext?.locality ?? null,
-            serviceCategory: selectedService?.category ?? null,
+            serviceCategory: previousSelectedService?.category ?? null,
             selectedServiceId: selectedServiceId || null,
+            userLocation: userGeoContext
+              ? {
+                  latitude: userGeoContext.latitude,
+                  longitude: userGeoContext.longitude,
+                }
+              : null,
           })
-        : Promise.resolve([] as string[]);
+        : Promise.resolve({
+            candidateIds: [] as string[],
+            rankedCandidates: [] as MatchCandidate[],
+            resolved: false,
+          });
 
       let payload = await requestChatReply(nextMessages);
       if (
@@ -1595,41 +1734,88 @@ export function BookingAssistantDialog({
         const geoContext = await requestGeoContext();
         if (geoContext) {
           payload = await requestChatReply(nextMessages, geoContext);
+        } else {
+          setMessages((current) => [
+            ...current,
+            {
+              role: 'assistant',
+              content: buildJustInTimeLocationMessage(),
+            },
+          ]);
         }
       }
 
       const liveRead = await liveReadPromise;
-      const shadowCandidateIds = await shadowCandidateIdsPromise;
-      const v1CandidateIds = liveRead.usedLiveRead ? liveRead.candidateIds : shadowCandidateIds;
-      const shadowMatchedServices = liveRead.usedLiveRead
+      const shadowSearch = await shadowSearchPromise;
+      const hasLiveReadSearchGrounding =
+        liveRead.rankedCandidates.length > 0 ||
+        liveRead.candidateIds.length > 0 ||
+        Boolean(liveRead.semanticAssistSummary) ||
+        liveRead.warnings.length > 0;
+      const groundedLiveReadCandidateIds = liveRead.candidateIds.length
+        ? liveRead.candidateIds
+        : liveRead.rankedCandidates
+            .map((candidate) => candidate.candidateId)
+            .filter((candidateId): candidateId is string => Boolean(candidateId));
+      const v1CandidateIds = hasLiveReadSearchGrounding
+        ? groundedLiveReadCandidateIds
+        : shadowSearch.candidateIds;
+      const shadowMatchedServices = hasLiveReadSearchGrounding
         ? liveRead.rankedCandidates.map(toBookingReadyServiceItem)
-        : v1CandidateIds
-            .map((candidateId) =>
-              catalog?.services.find((service) => service.id === candidateId) ?? null,
-            )
-            .filter((service): service is ServiceCatalogItem => Boolean(service));
-      const candidatePriorityIds = liveRead.usedLiveRead ? liveRead.candidateIds : shadowCandidateIds;
-      const mergedMatchedServices = liveRead.usedLiveRead
+        : shadowSearch.rankedCandidates.length > 0
+          ? shadowSearch.rankedCandidates.map(toBookingReadyServiceItem)
+          : v1CandidateIds
+              .map((candidateId) =>
+                catalog?.services.find((service) => service.id === candidateId) ?? null,
+              )
+              .filter((service): service is ServiceCatalogItem => Boolean(service));
+      const candidatePriorityIds = hasLiveReadSearchGrounding
+        ? groundedLiveReadCandidateIds
+        : shadowSearch.candidateIds;
+      const v1SearchGrounded = hasLiveReadSearchGrounding || shadowSearch.resolved;
+      const mergedMatchedServices = v1SearchGrounded
         ? curateServiceMatches(shadowMatchedServices, candidatePriorityIds)
         : curateServiceMatches(
             [...payload.matched_services, ...shadowMatchedServices],
             candidatePriorityIds,
           );
-      const suggestedServiceId = liveRead.usedLiveRead
+      const suggestedServiceId = v1SearchGrounded
         ? liveRead.suggestedServiceId ?? shadowMatchedServices[0]?.id ?? null
         : payload.suggested_service_id ?? shadowMatchedServices[0]?.id ?? null;
-      const assistantReply = liveRead.usedLiveRead
+      const nextSelectedServiceId =
+        suggestedServiceId ?? mergedMatchedServices[0]?.id ?? null;
+      const assistantReply = v1SearchGrounded
         ? buildLiveReadAssistantReply({
             rankedCount: mergedMatchedServices.length,
             warnings: liveRead.warnings,
-            normalizedQuery: liveRead.semanticAssistSummary?.normalizedQuery ?? null,
+            normalizedQuery:
+              liveRead.semanticAssistSummary?.normalizedQuery ?? trimmedMessage.toLowerCase(),
             inferredLocation: liveRead.semanticAssistSummary?.inferredLocation ?? null,
-            inferredCategory: liveRead.semanticAssistSummary?.inferredCategory ?? null,
+            inferredCategory:
+              liveRead.semanticAssistSummary?.inferredCategory ??
+              previousSelectedService?.category ??
+              null,
           })
         : payload.reply;
+      const shouldClearHistoricalMatches =
+        v1SearchGrounded &&
+        mergedMatchedServices.length === 0 &&
+        payload.matched_events.length === 0;
 
       setMessages((current) => [
-        ...current,
+        ...(shouldClearHistoricalMatches
+          ? current.map((message) =>
+              message.role === 'assistant' &&
+              ((message.matchedServices?.length ?? 0) > 0 ||
+                (message.matchedEvents?.length ?? 0) > 0)
+                ? {
+                    ...message,
+                    matchedServices: [],
+                    matchedEvents: [],
+                  }
+                : message,
+            )
+          : current),
         {
           role: 'assistant',
           content: assistantReply,
@@ -1641,11 +1827,12 @@ export function BookingAssistantDialog({
         setSelectedEvent(null);
       }
 
-      if (suggestedServiceId) {
-        const shouldAutoSelectSuggestedService = !shouldUseCompactPopupMobileUI;
+      if (nextSelectedServiceId) {
+        const shouldAutoSelectSuggestedService =
+          liveRead.usedLiveRead || !shouldUseCompactPopupMobileUI;
 
         if (shouldAutoSelectSuggestedService) {
-          setSelectedServiceId(suggestedServiceId);
+          setSelectedServiceId(nextSelectedServiceId);
         } else {
           setSelectedServiceId('');
         }
@@ -1654,7 +1841,7 @@ export function BookingAssistantDialog({
         }
         if (liveRead.usedLiveRead && liveRead.trustSummary && liveRead.bookingPathSummary) {
           setLiveReadSummary({
-            serviceId: suggestedServiceId,
+            serviceId: nextSelectedServiceId,
             semanticProvider: liveRead.semanticAssistSummary?.provider ?? null,
             semanticProviderChain: liveRead.semanticAssistSummary?.providerChain ?? [],
             semanticFallbackApplied: Boolean(liveRead.semanticAssistSummary?.fallbackApplied),
@@ -1677,7 +1864,7 @@ export function BookingAssistantDialog({
         setSelectionAnimationKey((current) => current + 1);
         setWorkflowHandoffKey((current) => current + 1);
       } else {
-        if (liveRead.usedLiveRead) {
+        if (v1SearchGrounded) {
           setSelectedServiceId('');
         }
         setLiveReadSummary(null);
@@ -1688,8 +1875,31 @@ export function BookingAssistantDialog({
       setChatError(messageText);
     } finally {
       setChatLoading(false);
+      setPendingSearchQuery('');
     }
   }
+
+  useEffect(() => {
+    if (!isOpen || !catalog || messages.length > 0 || chatLoading) {
+      return;
+    }
+
+    const trimmedInitialQuery = initialQuery?.trim() ?? '';
+    if (!trimmedInitialQuery) {
+      return;
+    }
+
+    if (initialQueryRequestId <= 0) {
+      return;
+    }
+
+    if (lastAutoSubmittedRequestIdRef.current === initialQueryRequestId) {
+      return;
+    }
+
+    lastAutoSubmittedRequestIdRef.current = initialQueryRequestId;
+    void sendChatMessage(trimmedInitialQuery);
+  }, [catalog, chatLoading, initialQuery, initialQueryRequestId, isOpen, messages.length]);
 
   function handleSelectService(serviceId: string) {
     setSelectedServiceId(serviceId);
@@ -1766,11 +1976,7 @@ export function BookingAssistantDialog({
 
     if (bookingAssistantV1Enabled) {
       void shadowPublicBookingAssistantLeadAndBookingIntent({
-        sourcePage:
-          entrySourcePath ??
-          (typeof window !== 'undefined'
-            ? `${window.location.pathname}${window.location.search}`
-            : '/'),
+        sourcePage: assistantSourcePath,
         serviceId: selectedService.id,
         serviceName: selectedService.name,
         serviceCategory: selectedService.category,
@@ -1873,7 +2079,11 @@ export function BookingAssistantDialog({
         standalone
           ? isProductAppLayout
             ? 'h-full min-h-0 overflow-hidden bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.18),transparent_30%),linear-gradient(180deg,#dbeafe_0%,#eef4ff_18%,#ffffff_100%)]'
-            : 'min-h-screen bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.12),transparent_38%),linear-gradient(180deg,#eef4fb_0%,#f8fafc_28%,#ffffff_100%)]'
+            : isEmbeddedStandaloneLayout
+              ? isHomepageSearchSurface
+                ? 'w-full overflow-visible'
+                : 'w-full overflow-hidden'
+              : 'min-h-screen bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.12),transparent_38%),linear-gradient(180deg,#eef4fb_0%,#f8fafc_28%,#ffffff_100%)]'
           : 'fixed inset-0 z-50'
       }
     >
@@ -1891,7 +2101,11 @@ export function BookingAssistantDialog({
           standalone
             ? isProductAppLayout
               ? 'mx-auto flex h-full min-h-0 w-full items-stretch justify-center overflow-hidden px-0 py-0 sm:px-5 sm:py-5'
-              : 'mx-auto flex min-h-screen w-full items-stretch justify-center p-0 sm:p-4'
+              : isEmbeddedStandaloneLayout
+                ? isHomepageSearchSurface
+                  ? 'mx-auto flex w-full items-stretch justify-center p-0'
+                  : 'mx-auto flex w-full items-stretch justify-center p-0'
+                : 'mx-auto flex min-h-screen w-full items-stretch justify-center p-0 sm:p-4'
             : 'absolute inset-0 mx-auto flex w-full items-end justify-center p-0 sm:items-center sm:p-4 lg:p-6'
         }
       >
@@ -1900,7 +2114,11 @@ export function BookingAssistantDialog({
             standalone
               ? isProductAppLayout
                 ? 'h-full min-h-0 bg-transparent shadow-none sm:h-[min(84dvh,46rem)] sm:w-[min(100%,32rem)] lg:h-[min(82dvh,48rem)] lg:w-[min(100%,36rem)] xl:w-[min(100%,40rem)]'
-                : 'min-h-screen bg-[#f8fafc] shadow-[0_35px_120px_rgba(15,23,42,0.35)] sm:min-h-0 sm:h-[min(96dvh,58rem)] sm:w-[min(94vw,30rem)] sm:rounded-[2rem] sm:border sm:border-white/20'
+                : isEmbeddedStandaloneLayout
+                  ? isHomepageSearchSurface
+                    ? 'bg-transparent shadow-none sm:rounded-none sm:border-0'
+                    : 'bg-[#f8fafc] shadow-[0_35px_120px_rgba(15,23,42,0.12)] sm:rounded-[2rem] sm:border sm:border-white/20'
+                  : 'min-h-screen bg-[#f8fafc] shadow-[0_35px_120px_rgba(15,23,42,0.35)] sm:min-h-0 sm:h-[min(96dvh,58rem)] sm:w-[min(94vw,30rem)] sm:rounded-[2rem] sm:border sm:border-white/20'
               : 'h-[100dvh] bg-[#f8fafc] shadow-[0_35px_120px_rgba(15,23,42,0.35)] sm:h-auto sm:max-h-[96dvh] sm:w-[min(90vw,88rem)] sm:rounded-[2rem] sm:border sm:border-white/20'
           }`}
         >
@@ -1919,7 +2137,11 @@ export function BookingAssistantDialog({
             ) : null}
           <div
             aria-hidden="true"
-            className={isProductAppLayout ? 'hidden' : 'pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),transparent_58%)]'}
+            className={
+              isProductAppLayout || isHomepageSearchSurface
+                ? 'hidden'
+                : 'pointer-events-none absolute inset-x-0 top-0 h-32 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.22),transparent_58%)]'
+            }
           />
           <div
             className={`border-b border-slate-200 bg-white/90 backdrop-blur-xl transition-all ${
@@ -1930,11 +2152,29 @@ export function BookingAssistantDialog({
                 : 'px-4 py-3 sm:px-6 sm:py-4'
             } ${isProductAppLayout ? 'px-3 py-1.5 sm:px-3 sm:py-2' : ''} ${
               isProductAppLayout && isCompactMobileViewport ? 'hidden' : ''
+            } ${
+              isHomepageSearchSurface
+                ? 'hidden border-b border-slate-200/90 bg-white px-3 py-2 shadow-none sm:block sm:px-6 sm:py-3'
+                : ''
             }`}
           >
             <div className={`flex items-center justify-between gap-2 ${isProductAppLayout ? '' : 'items-start'}`}>
               <div className="min-w-0">
-                {isProductAppLayout ? (
+                {isHomepageSearchSurface ? (
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d2e3fc] bg-[#e8f0fe] text-[10px] font-bold uppercase tracking-[0.12em] text-[#1a73e8] sm:h-10 sm:w-10 sm:text-[11px]">
+                      AI
+                    </div>
+                    <div className="min-w-0">
+                      <div className="line-clamp-1 text-[13px] font-semibold tracking-tight text-slate-950 sm:text-sm">
+                        {standaloneTitle}
+                      </div>
+                      <div className="mt-1 text-[11px] text-slate-500">
+                        {catalogError ? 'Assistant offline' : standaloneDescription}
+                      </div>
+                    </div>
+                  </div>
+                ) : isProductAppLayout ? (
                   <div className={`flex items-center justify-between gap-2 ${shouldCondenseProductChrome ? '' : 'sm:gap-3'}`}>
                     <div className="flex min-w-0 items-center gap-2">
                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-950 text-[10px] font-bold text-white sm:h-8 sm:w-8">
@@ -2004,7 +2244,7 @@ export function BookingAssistantDialog({
                 )}
               </div>
 
-              <div className="flex shrink-0 items-center gap-1.5">
+              <div className={`flex shrink-0 items-center gap-1.5 ${isHomepageSearchSurface ? 'hidden sm:flex' : ''}`}>
                 <button
                   type="button"
                   onClick={() => setVoiceRepliesEnabled((current) => !current)}
@@ -2030,23 +2270,25 @@ export function BookingAssistantDialog({
                     <span className="text-xs font-semibold">{voiceRepliesEnabled ? 'V' : 'M'}</span>
                   </button>
                 ) : null}
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className={`rounded-full border border-slate-200 bg-white font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 ${
-                    standalone
-                      ? isProductAppLayout
-                        ? 'h-8 w-8 px-0 py-0 text-[12px]'
-                        : 'px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm'
-                      : hasConversationStarted
-                      ? isCompactMobileViewport
-                        ? 'px-2 py-1 text-[11px] sm:px-4 sm:py-2 sm:text-sm'
-                        : 'px-2.5 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm'
-                      : 'px-3 py-2 text-sm sm:px-4'
-                  }`}
-                >
-                  {isProductAppLayout ? '←' : closeLabel ?? (standalone ? 'Back' : hasConversationStarted ? 'X' : 'Close')}
-                </button>
+                {!hideCloseControl ? (
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className={`rounded-full border border-slate-200 bg-white font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 ${
+                      standalone
+                        ? isProductAppLayout
+                          ? 'h-8 w-8 px-0 py-0 text-[12px]'
+                          : 'px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm'
+                        : hasConversationStarted
+                        ? isCompactMobileViewport
+                          ? 'px-2 py-1 text-[11px] sm:px-4 sm:py-2 sm:text-sm'
+                          : 'px-2.5 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm'
+                        : 'px-3 py-2 text-sm sm:px-4'
+                    }`}
+                  >
+                    {isProductAppLayout ? '←' : closeLabel ?? (standalone ? 'Back' : hasConversationStarted ? 'X' : 'Close')}
+                  </button>
+                ) : null}
               </div>
             </div>
 
@@ -2106,7 +2348,7 @@ export function BookingAssistantDialog({
               </div>
             ) : null}
 
-            {shouldShowCompactPopupTopStrip ? (
+            {shouldShowCompactPopupTopStrip && !isHomepageSearchSurface ? (
               <div className="-mx-1 mt-1 overflow-x-auto pb-0.5 sm:hidden">
                 <div className="flex min-w-max gap-1.5 px-1">
                   <button
@@ -2737,7 +2979,9 @@ export function BookingAssistantDialog({
                   </div>
                 ))}
 
-                {chatLoading ? (
+                {renderSearchResolvingPanel()}
+
+                {chatLoading && !isSearchResolving ? (
                   <div className="flex justify-start">
                     <div className="rounded-[1.5rem] rounded-bl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
                       {brandName} is thinking...
@@ -3277,11 +3521,13 @@ export function BookingAssistantDialog({
                   </div>
                 ) : null}
 
-                {latestSuggestedServices.length ? (
+                {isSearchResolving ? (
+                  renderSearchResolvingPanel('mt-4')
+                ) : visibleSuggestedServices.length ? (
                   <PartnerMatchShortlist
-                    items={latestSuggestedServices}
+                    items={visibleSuggestedServices}
                     batchSize={CHAT_RESULT_BATCH_SIZE}
-                    resetKey={latestSuggestedServices.map((service) => service.id).join('|')}
+                    resetKey={visibleSuggestedServices.map((service) => service.id).join('|')}
                     className="mt-4"
                     listClassName="grid gap-3"
                     emptyState={null}
@@ -3298,7 +3544,7 @@ export function BookingAssistantDialog({
                       const isSelected = service.id === selectedServiceId;
                       const decisionBadge = buildDecisionBadge(
                         service,
-                        latestSuggestedServices,
+                        visibleSuggestedServices,
                         index,
                         latestCustomerRequirement,
                       );
@@ -3861,6 +4107,27 @@ export function BookingAssistantDialog({
                         <p className="mt-3 max-w-xl text-sm leading-6 text-slate-100">
                           {result.confirmation_message}
                         </p>
+                        <div className="mt-4 rounded-[1rem] bg-white/10 px-3 py-3 ring-1 ring-white/10">
+                          <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                            Customer portal
+                          </div>
+                          <p className="mt-1 text-[12px] leading-5 text-white/90">
+                            Scan the QR or open the portal to view booking details, edit, cancel, or save this booking.
+                          </p>
+                          <a
+                            href={getBookingPortalUrl(result)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="mt-2 inline-flex items-center gap-2 text-[12px] font-semibold text-emerald-200 transition hover:text-white"
+                          >
+                            portal.bookedai.au
+                            <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current">
+                              <path d="M6 4h6v6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                              <path d="m10.5 4.5-5 5" strokeWidth="1.5" strokeLinecap="round" />
+                              <path d="M12 9.5V12H4V4h2.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                          </a>
+                        </div>
                       </div>
                       <div className="rounded-[1.25rem] bg-white p-2 shadow-sm">
                         <img
@@ -3868,6 +4135,9 @@ export function BookingAssistantDialog({
                           alt={`QR code for ${result.booking_reference}`}
                           className="h-24 w-24 rounded-xl bg-white object-cover"
                         />
+                        <div className="mt-2 rounded-[0.9rem] bg-slate-100 px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+                          Scan to open booking
+                        </div>
                       </div>
                     </div>
 
@@ -3936,43 +4206,54 @@ export function BookingAssistantDialog({
                     ))}
                   </div>
 
-                  <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <div className="mt-5 flex items-center gap-2 overflow-x-auto pb-1">
                     <a
                       href={result.payment_url}
                       target="_blank"
                       rel="noreferrer"
-                      className="col-span-full rounded-[1rem] bg-slate-950 px-3 py-3.5 text-center text-[12px] font-semibold leading-4 text-white transition hover:bg-slate-800 shadow-sm"
+                      aria-label={
+                        result.payment_status === 'stripe_checkout_ready'
+                          ? 'Open payment'
+                          : 'Open payment follow-up'
+                      }
+                      className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] bg-slate-950 px-3 py-2.5 text-[10px] font-semibold text-white transition hover:bg-slate-800"
                     >
-                      {result.payment_status === 'stripe_checkout_ready'
-                        ? 'Complete Payment via Stripe →'
-                        : 'Confirm Payment by Email →'}
+                      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current">
+                        <path d="M4 7.5h16v9H4z" strokeWidth="1.8" rx="2" />
+                        <path d="M4 10.5h16" strokeWidth="1.8" strokeLinecap="round" />
+                      </svg>
+                      <span>Payment</span>
                     </a>
-                    {result.meeting_event_url ? (
+                    {(result.meeting_event_url || result.calendar_add_url) ? (
                       <a
-                        href={result.meeting_event_url}
+                        href={result.meeting_event_url ?? result.calendar_add_url ?? '#'}
                         target="_blank"
                         rel="noreferrer"
-                        className="rounded-[1rem] border border-black/10 bg-white px-3 py-3 text-center text-[11px] font-semibold leading-4 text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
+                        aria-label="Add to calendar"
+                        className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] border border-black/10 bg-white px-3 py-2.5 text-[10px] font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
                       >
-                        View calendar event
+                        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current">
+                          <path d="M7 3.5v3M17 3.5v3M4 8.5h16M5.5 6h13a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-10A1.5 1.5 0 0 1 5.5 6Z" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        </svg>
+                        <span>Calendar</span>
                       </a>
                     ) : null}
-                    {!result.meeting_event_url && result.calendar_add_url ? (
-                      <a
-                        href={result.calendar_add_url}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="rounded-[1rem] border border-black/10 bg-white px-3 py-3 text-center text-[11px] font-semibold leading-4 text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
-                      >
-                        Add to Google Calendar
-                      </a>
-                    ) : null}
-                    <a
-                      href={`mailto:${result.contact_email}?subject=${encodeURIComponent(`${brandName} booking ${result.booking_reference}`)}`}
-                      className="rounded-[1rem] border border-black/10 bg-white px-3 py-3 text-center text-[11px] font-semibold leading-4 text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
+                    <button
+                      type="button"
+                      aria-label="Return home"
+                      onClick={() => {
+                        onClose();
+                        window.history.replaceState({}, '', '/');
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                      className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] border border-black/10 bg-white px-3 py-2.5 text-[10px] font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
                     >
-                      Contact provider
-                    </a>
+                      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current">
+                        <path d="M4 10.5 12 4l8 6.5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                        <path d="M6.5 9.5v9h11v-9" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+                      </svg>
+                      <span>Home</span>
+                    </button>
                   </div>
                   <p className="mt-3 text-[11px] leading-5 text-slate-500">
                     {result.meeting_status === 'scheduled'

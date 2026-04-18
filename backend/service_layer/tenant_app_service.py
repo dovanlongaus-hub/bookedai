@@ -1,9 +1,16 @@
 from __future__ import annotations
 
+from sqlalchemy import desc, select
+
+from db import ServiceMerchantProfile
 from repositories.base import RepositoryContext
 from repositories.feature_flag_repository import FeatureFlagRepository
 from repositories.reporting_repository import ReportingRepository
 from repositories.tenant_repository import TenantRepository
+from service_layer.admin_presenters import (
+    build_service_catalog_quality_counts,
+    build_service_merchant_item,
+)
 from service_layer.prompt11_integration_service import (
     build_crm_retry_backlog,
     build_integration_attention_items,
@@ -140,4 +147,83 @@ async def build_tenant_integrations_snapshot(session, *, tenant_ref: str | None 
         "attention": attention_items,
         "reconciliation": reconciliation,
         "crm_retry_backlog": crm_backlog,
+    }
+
+
+def _service_belongs_to_tenant(
+    service: ServiceMerchantProfile,
+    *,
+    tenant_profile: dict[str, str | None],
+    tenant_user_email: str | None,
+) -> bool:
+    tenant_id = str(tenant_profile.get("id") or "").strip()
+    service_tenant_id = str(getattr(service, "tenant_id", "") or "").strip()
+    if tenant_id and service_tenant_id and tenant_id == service_tenant_id:
+        return True
+
+    normalized_email = (tenant_user_email or "").strip().lower()
+    owner_email = str(getattr(service, "owner_email", "") or "").strip().lower()
+    if normalized_email and owner_email and normalized_email == owner_email:
+        return True
+
+    service_email = str(getattr(service, "business_email", "") or "").strip().lower()
+    if normalized_email and service_email and normalized_email == service_email:
+        return True
+
+    tenant_name = str(tenant_profile.get("name") or "").strip().lower()
+    business_name = str(getattr(service, "business_name", "") or "").strip().lower()
+    if tenant_name and business_name and (tenant_name == business_name or tenant_name in business_name):
+        return True
+
+    tenant_slug = str(tenant_profile.get("slug") or "").strip().lower()
+    source_url = str(getattr(service, "source_url", "") or "").strip().lower()
+    return bool(tenant_slug and source_url and tenant_slug in source_url)
+
+
+async def build_tenant_catalog_snapshot(
+    session,
+    *,
+    tenant_ref: str | None = None,
+    tenant_user_email: str | None = None,
+) -> dict:
+    tenant_profile, _tenant_id = await _load_tenant_context(session, tenant_ref=tenant_ref)
+    if not tenant_profile:
+        return {}
+
+    services = (
+        await session.execute(
+            select(ServiceMerchantProfile).order_by(
+                desc(ServiceMerchantProfile.featured),
+                ServiceMerchantProfile.business_name,
+                ServiceMerchantProfile.name,
+            )
+        )
+    ).scalars().all()
+
+    filtered_items = [
+        build_service_merchant_item(service)
+        for service in services
+        if _service_belongs_to_tenant(
+            service,
+            tenant_profile=tenant_profile,
+            tenant_user_email=tenant_user_email,
+        )
+    ]
+
+    return {
+        "tenant": tenant_profile,
+        "counts": build_service_catalog_quality_counts(filtered_items),
+        "items": filtered_items,
+        "import_guidance": {
+            "required_fields": [
+                "service_name",
+                "duration_minutes",
+                "location",
+                "amount_aud",
+                "summary",
+                "image_url",
+                "booking_url",
+            ],
+            "recommended_focus": "Capture only booking-relevant services and structured fields that improve search quality.",
+        },
     }

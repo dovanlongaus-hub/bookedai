@@ -10,6 +10,12 @@ This document is the real execution checklist for Sprint 2, organized by owner.
 
 Sprint 2 is the first execution sprint of Phase 1-2 and should lock the public rebuild blueprint before the implementation-heavy sprint begins.
 
+Historical interpretation note:
+
+- this checklist records the original blueprint-lock responsibilities for Sprint 2
+- the current implemented and live state of Sprint 2 is tracked in `docs/development/sprint-2-code-ready-development-handoff.md`
+- if this checklist conflicts with the later implemented closeout record, treat the code-ready handoff as the source of truth for what is already shipped, inherited, or carried forward
+
 ## 2. Sprint 2 mission
 
 Finish the brand system, landing-page information architecture, design tokens, and component architecture for the premium public rebuild.
@@ -95,6 +101,8 @@ Finish the brand system, landing-page information architecture, design tokens, a
 - review `docs/architecture/bookedai-brand-ui-kit.md`
 - review `docs/architecture/landing-component-tree-and-file-ownership.md`
 - review `docs/architecture/landing-page-execution-task-map.md`
+- review `docs/architecture/sprint-2-read-code.md`
+- review `docs/development/sprint-2-code-ready-development-handoff.md`
 - review UI primitive list
 - review file mapping against current frontend structure
 - review design token application plan
@@ -150,6 +158,7 @@ Finish the brand system, landing-page information architecture, design tokens, a
 
 ## 6. Sprint 2 closeout checklist
 
+- confirm the historical blueprint-lock checklist has been superseded where appropriate by the implemented closeout record in `docs/development/sprint-2-code-ready-development-handoff.md`
 - freeze content source of truth
 - freeze design tokens
 - freeze component tree
@@ -162,6 +171,8 @@ Finish the brand system, landing-page information architecture, design tokens, a
 - complete `docs/architecture/landing-page-execution-task-map.md`
 - confirm the additive App Router starter baseline builds successfully
 - record any open implementation risks
+- record any implemented or live outcomes that now exceed the original Sprint 2 blueprint-only scope
+- record any carry-forward fixes that now belong to Sprint 3+ execution rather than retroactively reopening Sprint 2 scope
 - approve Sprint 3 coding start
 
 ## 7. Sprint 3 start criteria

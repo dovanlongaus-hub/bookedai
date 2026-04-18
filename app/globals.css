@@ -5,21 +5,32 @@
 :root {
   color-scheme: dark;
   --bg: #0B1020;
+  --bg-soft: #121A2B;
   --bgSoft: #121A2B;
   --surface: #182235;
+  --surface-alt: rgba(255,255,255,0.04);
   --surfaceAlt: rgba(255,255,255,0.04);
   --border: rgba(255,255,255,0.08);
+  --text-primary: #F8FAFC;
   --textPrimary: #F8FAFC;
+  --text-secondary: #94A3B8;
   --textSecondary: #94A3B8;
+  --primary-blue: #4F8CFF;
   --primaryBlue: #4F8CFF;
+  --accent-green: #22C55E;
   --accentGreen: #22C55E;
+  --accent-purple: #8B5CF6;
   --accentPurple: #8B5CF6;
+  --warning-amber: #F59E0B;
   --warningAmber: #F59E0B;
+  --danger-red: #EF4444;
   --dangerRed: #EF4444;
   --brandGradient: linear-gradient(135deg, #4F8CFF 0%, #8B5CF6 50%, #22C55E 100%);
   --heroGlow: radial-gradient(circle at top left, rgba(79,140,255,0.24), transparent 45%);
   --greenGlow: radial-gradient(circle at top right, rgba(34,197,94,0.20), transparent 40%);
-  --fontSans: Inter, sans-serif;
+  --fontDisplay: "Space Grotesk", Inter, sans-serif;
+  --fontBody: "DM Sans", Inter, sans-serif;
+  --fontSans: var(--fontBody);
   --heroDisplay: clamp(3rem, 6vw, 5.5rem);
   --h1: clamp(2.5rem, 5vw, 4.5rem);
   --h2: clamp(2rem, 4vw, 3rem);
@@ -48,11 +59,11 @@ body {
   margin: 0;
   min-width: 320px;
   background:
-    var(--heroGlow),
-    var(--greenGlow),
-    linear-gradient(180deg, var(--bg) 0%, #0F172A 100%);
-  color: var(--textPrimary);
-  font-family: var(--fontSans);
+    radial-gradient(circle at top left, rgba(79,140,255,0.14), transparent 28%),
+    radial-gradient(circle at top right, rgba(34,197,94,0.10), transparent 22%),
+    var(--bg);
+  color: var(--text-primary);
+  font-family: var(--fontBody);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
@@ -67,6 +78,7 @@ a {
 *::before,
 *::after {
   box-sizing: border-box;
+  border-color: var(--border);
 }
 
 @layer base {
@@ -77,6 +89,7 @@ a {
   h5,
   h6 {
     margin: 0;
+    font-family: var(--fontDisplay);
   }
 
   p {
@@ -85,8 +98,20 @@ a {
 }
 
 @layer components {
+  .container-brand {
+    @apply mx-auto w-full max-w-container px-4 sm:px-6 lg:px-8;
+  }
+
+  .glass {
+    background: rgba(255,255,255,0.04);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: 0 10px 40px rgba(2,6,23,0.38);
+  }
+
   .gradient-text {
-    background: var(--brandGradient);
+    background: linear-gradient(135deg, #4F8CFF 0%, #8B5CF6 50%, #22C55E 100%);
     -webkit-background-clip: text;
     background-clip: text;
     color: transparent;
@@ -110,9 +135,17 @@ a {
   .section-shell {
     padding-block: var(--sectionYMobile);
   }
+
+  .section-y {
+    @apply py-20 md:py-24 lg:py-28;
+  }
 }
 
 @layer utilities {
+  .grid-auto {
+    @apply grid gap-6 md:grid-cols-2 xl:grid-cols-4;
+  }
+
   .text-balance {
     text-wrap: balance;
   }

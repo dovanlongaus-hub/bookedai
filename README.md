@@ -35,6 +35,7 @@ Production traffic is expected to follow this path:
 - `https://bookedai.au/` -> frontend
 - `https://api.bookedai.au/*` -> FastAPI backend
 - `https://admin.bookedai.au/` -> admin-facing frontend routes behind the same proxy
+- `https://portal.bookedai.au/` -> customer booking portal routes on the shared frontend plus backend proxy
 - `https://supabase.bookedai.au/` -> Supabase Studio, Auth, REST, Storage via Kong
 - `https://n8n.bookedai.au/` -> n8n editor and webhooks
 - `https://hermes.bookedai.au/` -> Hermes knowledge/documentation service
@@ -97,6 +98,7 @@ Additional developer references:
 - `A` record for `bookedai.au` -> your server public IP
 - `A` record for `www.bookedai.au` -> same public IP
 - `A` record for `api.bookedai.au` -> same public IP
+- `A` record for `portal.bookedai.au` -> same public IP
 - `A` record for `supabase.bookedai.au` -> same public IP
 - `A` record for `n8n.bookedai.au` -> same public IP
 - `A` record for `hermes.bookedai.au` -> same public IP
@@ -120,6 +122,7 @@ Additional developer references:
 - optional `DISCORD_WEBHOOK_USERNAME` and `DISCORD_WEBHOOK_AVATAR_URL` for the webhook sender identity
 - `DISCORD_APPLICATION_ID`, `DISCORD_BOT_TOKEN`, and `DISCORD_PUBLIC_KEY` if you want a real Discord slash-command bot for team chat
 - optional `DISCORD_GUILD_ID` if you want faster guild-scoped command registration during rollout
+- optional `DISCORD_ANNOUNCE_CHANNEL_ID` if you want delivery updates posted into a fixed Discord text channel
 - `ADMIN_API_TOKEN` for protected email admin routes
 - `TAWK_WEBHOOK_SECRET` if you enable signature verification
 - `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_SMTP_PASSWORD`, `EMAIL_SMTP_FROM`
@@ -163,6 +166,7 @@ Additional developer references:
 - App: `https://bookedai.au`
 - Beta: `https://beta.bookedai.au`
 - Admin: `https://admin.bookedai.au`
+- Portal: `https://portal.bookedai.au`
 - API docs: `https://api.bookedai.au/api/docs`
 - Supabase: `https://supabase.bookedai.au`
 - n8n: `https://n8n.bookedai.au`
@@ -191,14 +195,31 @@ The backend now supports Discord Interactions at:
 Recommended setup:
 
 1. Create a Discord app and bot in the Discord Developer Portal.
-2. Copy `DISCORD_APPLICATION_ID`, `DISCORD_BOT_TOKEN`, and `DISCORD_PUBLIC_KEY` into your environment.
-3. Set the Interactions Endpoint URL to:
+2. In `General Information`, copy:
+
+- `Application ID` -> `DISCORD_APPLICATION_ID`
+- `Public Key` -> `DISCORD_PUBLIC_KEY`
+
+3. In `Bot`, create or reset the bot token, then copy:
+
+- `Token` -> `DISCORD_BOT_TOKEN`
+
+4. Optional for faster testing in one server: enable `DISCORD_GUILD_ID` with your target guild ID.
+5. Set the Interactions Endpoint URL to:
 
    ```text
    https://api.bookedai.au/api/discord/interactions
    ```
 
-4. Register slash commands:
+6. Invite the bot to your Discord server after `DISCORD_APPLICATION_ID` is present:
+
+   ```sh
+   python3 scripts/discord_setup_helper.py
+   ```
+
+   The script prints the invite URL and a masked readiness snapshot.
+
+7. Register slash commands:
 
    ```sh
    python3 scripts/register_discord_commands.py
@@ -215,6 +236,23 @@ The current command surface is:
 - `/bookedai ask prompt:"..."` for repo-backed team Q&A
 - `/bookedai summary topic:all|implementation|sprint14|roadmap` for quick progress summaries
 
+For local completion updates after a sprint or phase closes, run:
+
+```sh
+python3 scripts/post_discord_delivery_update.py sprint 14
+python3 scripts/post_discord_delivery_update.py phase 8
+```
+
+The script reads `.env`, uses `DISCORD_GUILD_ID`, and posts to `DISCORD_ANNOUNCE_CHANNEL_ID` when present. If no announce channel is configured, it falls back to the guild system channel, then `#general`, then the first visible text channel.
+
+Discord Developer Portal checklist:
+
+- `Installation` / `OAuth2`: ensure the app can be installed to the target server.
+- `Bot`: keep the token private and regenerate it if it was ever exposed.
+- `General Information`: confirm the Interactions Endpoint URL saves successfully.
+- `General Information`: use the same `Application ID` and `Public Key` values in `.env`.
+- `Bot Permissions`: for this slash-command flow, `Send Messages` and `Use Slash Commands` are typically enough.
+
    ```sh
    sudo bash scripts/install_cloudflare_dns_autoupdate.sh
    ```
@@ -225,6 +263,7 @@ The current command surface is:
 - `www.bookedai.au`
 - `api.bookedai.au`
 - `admin.bookedai.au`
+- `portal.bookedai.au`
 - `n8n.bookedai.au`
 - `supabase.bookedai.au`
 - `upload.bookedai.au`
@@ -233,8 +272,8 @@ The current command surface is:
    You can customize the record list in root `.env`:
 
    ```env
-   CLOUDFLARE_AUTO_DNS_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,calendar.bookedai.au
-   CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,calendar.bookedai.au
+   CLOUDFLARE_AUTO_DNS_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,portal.bookedai.au,calendar.bookedai.au
+   CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,portal.bookedai.au,calendar.bookedai.au
    ```
 
    To run the sync manually at any time:

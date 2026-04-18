@@ -169,6 +169,10 @@ export interface SearchCandidatesRequest {
   time_window?: Record<string, unknown> | null;
   channel_context: V1BookingChannelContext;
   attribution?: V1AttributionContext | null;
+  user_location?: {
+    latitude: number;
+    longitude: number;
+  } | null;
 }
 
 export interface MatchRecommendation {
@@ -200,6 +204,26 @@ export interface SemanticAssistSummary {
   evidence: string[];
 }
 
+export interface SearchDiagnosticsDropSummary {
+  candidateId: string;
+  stage: string;
+  reason: string;
+}
+
+export interface SearchDiagnosticsSummary {
+  effectiveLocationHint?: string | null;
+  relevanceLocationHint?: string | null;
+  semanticRolloutEnabled: boolean;
+  semanticApplied: boolean;
+  retrievalCandidateCount: number;
+  heuristicCandidateIds: string[];
+  semanticCandidateIds: string[];
+  postRelevanceCandidateIds: string[];
+  postDomainCandidateIds: string[];
+  finalCandidateIds: string[];
+  droppedCandidates: SearchDiagnosticsDropSummary[];
+}
+
 export interface SearchCandidatesResponse {
   request_id: string;
   candidates: MatchCandidate[];
@@ -209,6 +233,7 @@ export interface SearchCandidatesResponse {
   search_strategy?: string | null;
   booking_context?: BookingRequestContextSummary | null;
   semantic_assist?: SemanticAssistSummary | null;
+  search_diagnostics?: SearchDiagnosticsSummary | null;
 }
 
 export interface CheckAvailabilityRequest {
@@ -626,4 +651,102 @@ export interface TenantIntegrationsResponse {
   attention: IntegrationAttentionItem[];
   reconciliation: IntegrationReconciliationDetailsResponse;
   crm_retry_backlog: CrmRetryBacklogResponse;
+}
+
+export interface TenantUserProfile {
+  email: string;
+  full_name?: string | null;
+  picture_url?: string | null;
+}
+
+export interface TenantAuthSessionResponse {
+  session_token: string;
+  expires_at: string;
+  provider: 'google';
+  user: TenantUserProfile;
+  tenant: TenantOverviewTenantProfile;
+  capabilities: string[];
+  membership?: {
+    tenant_id: string;
+    tenant_slug: string;
+    email: string;
+    role: string;
+    status: string;
+  };
+}
+
+export interface TenantCatalogItem {
+  id: number;
+  service_id: string;
+  tenant_id?: string | null;
+  business_name: string;
+  business_email?: string | null;
+  owner_email?: string | null;
+  name: string;
+  category?: string | null;
+  summary?: string | null;
+  amount_aud?: number | null;
+  duration_minutes?: number | null;
+  venue_name?: string | null;
+  location?: string | null;
+  map_url?: string | null;
+  booking_url?: string | null;
+  image_url?: string | null;
+  source_url?: string | null;
+  tags: string[];
+  featured: boolean;
+  is_active: boolean;
+  publish_state: string;
+  is_publish_ready: boolean;
+  is_search_ready: boolean;
+  quality_warnings: string[];
+  updated_at: string;
+}
+
+export interface TenantCatalogResponse {
+  tenant: TenantOverviewTenantProfile;
+  counts: {
+    total_records: number;
+    search_ready_records: number;
+    warning_records: number;
+    inactive_records: number;
+    published_records: number;
+    review_records: number;
+  };
+  items: TenantCatalogItem[];
+  import_guidance: {
+    required_fields: string[];
+    recommended_focus: string;
+  };
+}
+
+export interface TenantGoogleAuthRequest {
+  id_token: string;
+  tenant_ref?: string | null;
+}
+
+export interface TenantCatalogImportRequest {
+  website_url: string;
+  business_name?: string | null;
+  business_email?: string | null;
+  category?: string | null;
+  search_focus?: string | null;
+  location_hint?: string | null;
+}
+
+export interface TenantCatalogUpdateRequest {
+  business_name?: string | null;
+  business_email?: string | null;
+  name?: string | null;
+  category?: string | null;
+  summary?: string | null;
+  amount_aud?: number | null;
+  duration_minutes?: number | null;
+  venue_name?: string | null;
+  location?: string | null;
+  map_url?: string | null;
+  booking_url?: string | null;
+  image_url?: string | null;
+  tags?: string[];
+  featured?: boolean | null;
 }

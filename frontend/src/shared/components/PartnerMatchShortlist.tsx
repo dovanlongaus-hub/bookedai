@@ -21,7 +21,7 @@ export function PartnerMatchShortlist<T>({
   listClassName = 'space-y-3',
   className = '',
   buttonClassName = 'rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950',
-  buttonLabel = 'More results',
+  buttonLabel = 'See more results',
   renderMeta,
   resetKey,
 }: PartnerMatchShortlistProps<T>) {

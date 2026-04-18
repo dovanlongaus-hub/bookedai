@@ -6,36 +6,35 @@ Document status: `active sprint checklist`
 
 ## Mission
 
-Expand internal admin into a commercial operations and reconciliation workspace.
+Ship the first tenant-facing commercial workspace with a real shell, a search-ready catalog view, and tenant-safe authenticated actions.
 
 ## Owner checklist
 
 ## Product lead
 
-- approve admin commercial use cases
-- approve issue-first navigation priorities
+- approve tenant catalog and booking workflows as the first SME-facing action surface
+- approve the distinction between preview-safe visibility and Google-authenticated write actions
 
 ## Solution architect
 
-- confirm admin controls and drill-ins align with domain boundaries
-- confirm audit and override guardrails
+- confirm tenant workspace boundaries align with shared domain contracts
+- confirm Google-authenticated tenant actions stay separate from internal-only admin controls
 
 ## PM or product ops
 
-- coordinate support and operations workflows
-- confirm escalation and drill-in coverage
+- coordinate pilot-tenant onboarding assumptions
+- confirm catalog import, search-readiness review, and booking-workspace adoption flow
 
 ## Frontend lead
 
-- design or implement admin reconciliation and diagnostics views
-- confirm operator usability for dense workflows
+- implement tenant shell, panel navigation, and mobile-usable catalog workspace
+- confirm public and tenant search-result language stays visually aligned
 
 ## Backend lead
 
-- expose admin drill-in and reconciliation endpoints
-- support retry, replay, or audit views where approved
+- expose tenant auth, catalog snapshot, and tenant import endpoints
+- confirm imported booking-critical fields land in tenant-searchable supply safely
 
 ## QA or release owner
 
-- define regression and operator-flow QA coverage
-
+- define tenant auth, catalog import, and tenant-surface regression coverage

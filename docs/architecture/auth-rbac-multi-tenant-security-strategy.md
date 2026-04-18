@@ -136,6 +136,27 @@ Current repo does not confirm:
 - production tenant login
 - multi-role RBAC
 - centralized actor claims for tenant and internal surfaces
+- tenant-scoped catalog ownership that lets a signed-in SME expose only its own searchable or bookable products to public matching flows
+
+### Additional backend requirement from live search replay
+
+The `2026-04-18` production replay of trust-sensitive queries showed a second-order gap that auth and RBAC must cover:
+
+- some public queries now fail safely because there is no qualifying row in `service_merchant_profiles`
+- for example, `swimming Sydney` returned `retrieval_candidate_count = 0`
+- this is not only a ranking issue
+- it also means the platform still lacks a complete tenant-safe path for:
+  - tenant login and actor binding
+  - tenant-owned service or product records
+  - publish-state control for searchable or bookable catalog items
+  - public matching reads that can surface real SME data already saved in BookedAI
+
+This strategy should therefore also treat the following as required backend scope for the tenant-auth wave:
+
+- tenant-authenticated ownership over catalog rows and imported products
+- tenant-scoped claims that can authorize catalog create, update, publish, archive, and booking-path configuration
+- a safe published-catalog read seam for public `/api/v1/matching/search`
+- a later tenant-facing write path for adding bookable products without going through internal admin only
 
 ## Section 3 — Role model
 

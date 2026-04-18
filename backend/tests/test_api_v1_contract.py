@@ -179,6 +179,12 @@ def test_search_candidates_returns_catalog_matches(client, monkeypatch):
     assert body["data"]["semantic_assist"]["inferred_location"] is None
     assert body["data"]["semantic_assist"]["inferred_category"] is None
     assert body["data"]["semantic_assist"]["budget_summary"] is None
+    assert body["data"]["search_diagnostics"]["semantic_rollout_enabled"] is False
+    assert body["data"]["search_diagnostics"]["semantic_applied"] is False
+    assert body["data"]["search_diagnostics"]["retrieval_candidate_count"] == 1
+    assert body["data"]["search_diagnostics"]["heuristic_candidate_ids"] == ["svc_123"]
+    assert body["data"]["search_diagnostics"]["final_candidate_ids"] == ["svc_123"]
+    assert body["data"]["search_diagnostics"]["dropped_candidates"] == []
 
 
 def test_check_availability_returns_booking_trust_contract(client, monkeypatch):

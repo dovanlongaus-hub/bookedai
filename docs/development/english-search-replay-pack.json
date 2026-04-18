@@ -1,0 +1,51 @@
+[
+  {
+    "name": "haircut-sydney",
+    "query": "men's haircut in Sydney",
+    "location": "Sydney",
+    "service_category": "Salon",
+    "budget": { "max_aud": 80 },
+    "time_window": { "label": "tomorrow evening" }
+  },
+  {
+    "name": "restaurant-sydney-party-6-tonight",
+    "query": "restaurant table for 6 in Sydney tonight",
+    "location": "Sydney",
+    "service_category": "Food and Beverage",
+    "time_window": { "label": "tonight" }
+  },
+  {
+    "name": "physio-parramatta-shoulder-pain",
+    "query": "physio for shoulder pain near Parramatta tomorrow morning",
+    "location": "Parramatta",
+    "service_category": "Healthcare Service",
+    "time_window": { "label": "tomorrow morning" }
+  },
+  {
+    "name": "dentist-sydney-checkup",
+    "query": "dentist checkup in Sydney CBD this weekend",
+    "location": "Sydney CBD",
+    "service_category": "Healthcare Service",
+    "time_window": { "label": "this weekend" }
+  },
+  {
+    "name": "childcare-sydney",
+    "query": "childcare near Sydney for a 4 year old",
+    "location": "Sydney",
+    "service_category": "Kids Services"
+  },
+  {
+    "name": "support-worker-western-sydney",
+    "query": "NDIS support worker at home in Western Sydney tomorrow",
+    "location": "Western Sydney",
+    "service_category": "NDIS Support",
+    "time_window": { "label": "tomorrow" }
+  },
+  {
+    "name": "private-dining-melbourne",
+    "query": "private dining in Melbourne for 8 this Friday night",
+    "location": "Melbourne",
+    "service_category": "Food and Beverage",
+    "time_window": { "label": "friday night" }
+  }
+]

@@ -25,6 +25,7 @@ export function AdminDashboardHeader({
         <div className="flex items-start gap-4">
           <div className="shrink-0 pt-1">
             <LogoMark
+              variant="black"
               alt={`${brandName} logo`}
               className="booked-brand-image booked-brand-image--admin booked-brand-image--frameless"
             />

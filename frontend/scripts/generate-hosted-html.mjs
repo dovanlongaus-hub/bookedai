@@ -26,6 +26,17 @@ const variants = [
       ['https://bookedai.au/', 'https://product.bookedai.au/'],
     ],
   },
+  {
+    filename: 'pitch.html',
+    replacements: [
+      ['BookedAI | The AI Revenue Engine for Service Businesses', 'BookedAI Pitch | Revenue Engine Deck'],
+      [
+        'BookedAI captures demand across website, calls, chat, email, and follow-up, then converts it into bookings, revenue, and recovery opportunities for service businesses.',
+        'Investor and SME pitch surface for BookedAI, showing the problem, revenue-engine wedge, product proof, market fit, team, and rollout path.',
+      ],
+      ['https://bookedai.au/', 'https://pitch.bookedai.au/'],
+    ],
+  },
 ];
 
 await mkdir(new URL('../dist', import.meta.url), { recursive: true });

@@ -40,6 +40,7 @@ The platform is currently designed around a single Docker host with multiple rou
 | `bookedai.au` | Public website and in-site API proxy | frontend + backend |
 | `beta.bookedai.au` | Beta staging surface for pre-production validation | beta-web + beta-backend |
 | `admin.bookedai.au` | Admin-facing UI | frontend |
+| `portal.bookedai.au` | Customer booking portal and booking-detail host | frontend + backend |
 | `api.bookedai.au` | Direct API access | backend |
 | `supabase.bookedai.au` | Self-hosted Supabase gateway | Supabase Kong |
 | `n8n.bookedai.au` | Workflow editor and webhook host | n8n |
@@ -52,6 +53,7 @@ The platform is currently designed around a single Docker host with multiple rou
 
 - `bookedai.au`
 - `admin.bookedai.au`
+- `portal.bookedai.au`
 - `api.bookedai.au`
 
 ### Beta staging tier

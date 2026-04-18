@@ -1,33 +1,128 @@
-import type { HTMLAttributes, ImgHTMLAttributes, ReactNode } from 'react';
+import { type HTMLAttributes, type ReactNode } from 'react';
 
 import { cx } from './utils';
 
-const logoSources = {
-  dark: '/branding/bookedai-revenue-engine-dark.svg',
-  light: '/branding/bookedai-revenue-engine-light.svg',
-  white: '/branding/bookedai-revenue-engine-white.svg',
-  black: '/branding/bookedai-revenue-engine-black.svg',
-  transparent: '/branding/bookedai-revenue-engine-transparent.svg',
-  icon: '/branding/bookedai-revenue-engine-icon.svg',
+export const brandColorTokens = {
+  bg: '#0B1020',
+  bgSoft: '#121A2B',
+  surface: '#182235',
+  text: '#F8FAFC',
+  muted: '#94A3B8',
+  blue: '#4F8CFF',
+  green: '#22C55E',
+  purple: '#8B5CF6',
+  amber: '#F59E0B',
+  red: '#EF4444',
+  border: 'rgba(255,255,255,0.08)',
 } as const;
+
+const BRAND_ASSET_VERSION = '20260418-brand-system';
+const BRAND_LOGO_LIGHT = `/branding/bookedai-logo-light.png?v=${BRAND_ASSET_VERSION}`;
+const BRAND_LOGO_DARK = `/branding/bookedai-logo-dark-badge.png?v=${BRAND_ASSET_VERSION}`;
+const BRAND_LOGO_BLACK = `/branding/bookedai-logo-black.png?v=${BRAND_ASSET_VERSION}`;
+const BRAND_ICON = `/branding/bookedai-app-icon-1024.png?v=${BRAND_ASSET_VERSION}`;
+
+export const brandLogoSources = {
+  dark: BRAND_LOGO_DARK,
+  light: BRAND_LOGO_LIGHT,
+  monoWhite: BRAND_LOGO_DARK,
+  monoBlack: BRAND_LOGO_BLACK,
+  white: BRAND_LOGO_DARK,
+  black: BRAND_LOGO_BLACK,
+  transparent: BRAND_LOGO_LIGHT,
+  icon: BRAND_ICON,
+} as const;
+
+export type BrandLogoVariant = 'dark' | 'light' | 'monoWhite' | 'monoBlack';
+
+type LogoProps = {
+  variant?: BrandLogoVariant | 'white' | 'black' | 'icon' | 'transparent';
+  className?: string;
+  showTagline?: boolean;
+};
+
+function normalizeVariant(variant: LogoProps['variant']): BrandLogoVariant | 'icon' | 'transparent' {
+  if (variant === 'white') {
+    return 'monoWhite';
+  }
+
+  if (variant === 'black') {
+    return 'monoBlack';
+  }
+
+  return variant ?? 'dark';
+}
 
 export function Logo({
   variant = 'dark',
-  className,
-  alt = 'BookedAI.au logo',
-  ...props
-}: Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'> & {
-  variant?: keyof typeof logoSources;
-}) {
-  return <img src={logoSources[variant]} alt={alt} className={className} {...props} />;
+  className = '',
+  showTagline = false,
+}: LogoProps) {
+  const normalizedVariant = normalizeVariant(variant);
+
+  if (normalizedVariant === 'icon') {
+    return (
+      <div className={cx('inline-flex flex-col', className)}>
+        <img
+          src={brandLogoSources.icon}
+          alt="BookedAI.au logo"
+          className="h-auto w-[3.875rem]"
+        />
+        {showTagline ? (
+          <span className="mt-1 text-xs uppercase tracking-[0.24em] text-brand-muted">
+            The AI Revenue Engine
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
+  if (normalizedVariant === 'transparent') {
+    return (
+      <div className={cx('inline-flex flex-col', className)}>
+        <img
+          src={brandLogoSources.transparent}
+          alt="BookedAI.au logo"
+          className="h-auto w-[15rem]"
+        />
+        {showTagline ? (
+          <span className="mt-1 text-xs uppercase tracking-[0.24em] text-brand-muted">
+            The AI Revenue Engine
+          </span>
+        ) : null}
+      </div>
+    );
+  }
+
+  return (
+    <div className={cx('inline-flex flex-col', className)}>
+      <img
+        src={brandLogoSources[normalizedVariant]}
+        alt="BookedAI.au logo"
+        className="h-auto w-full max-w-[15rem]"
+      />
+
+      {showTagline ? (
+        <span className="mt-1 text-xs uppercase tracking-[0.24em] text-brand-muted">
+          The AI Revenue Engine
+        </span>
+      ) : null}
+    </div>
+  );
 }
 
 export function LogoIcon({
   className,
-  alt = 'BookedAI.au logo icon',
-  ...props
-}: Omit<ImgHTMLAttributes<HTMLImageElement>, 'src'>) {
-  return <img src={logoSources.icon} alt={alt} className={className} {...props} />;
+}: {
+  className?: string;
+}) {
+  return (
+    <img
+      src={brandLogoSources.icon}
+      alt="BookedAI.au logo icon"
+      className={cx(className)}
+    />
+  );
 }
 
 export function Eyebrow({

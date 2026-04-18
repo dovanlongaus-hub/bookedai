@@ -368,6 +368,7 @@ class BookingAssistantSessionRequest(BaseModel):
 class BookingAssistantSessionResponse(BaseModel):
     status: str
     booking_reference: str
+    portal_url: str
     service: ServiceCatalogItem
     amount_aud: float = Field(gt=0)
     amount_label: str

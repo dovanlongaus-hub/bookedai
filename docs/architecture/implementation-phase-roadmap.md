@@ -25,11 +25,15 @@ This roadmap aligns with:
 ## Planning principles
 
 - keep current production continuity first
+- prioritize direct revenue capture and booking conversion over brochure expansion
+- keep the public homepage lean so search, shortlist, booking, and confirmation have maximum practical space
+- treat mobile-first responsive execution as a hard requirement for any public conversion surface
 - ship the public revenue-engine narrative early
 - promote only the revenue claims that the product can support truthfully
 - build the data model for revenue, missed revenue, attribution, and commission before overbuilding UI
 - keep rollout additive and feature-flagged
 - preserve one shared commercial truth across public, tenant, and admin surfaces
+- build test runners as delivery infrastructure, not as end-of-program polish
 
 ## Execution dependency rule
 
@@ -48,8 +52,8 @@ Roadmap sequencing should not be interpreted as meaning every sprint is strictly
 Instead:
 
 - Sprint 1 through Sprint 3 remain the baseline-locking chain
-- Sprint 4 through Sprint 7 form the first commercial-contract and workflow cluster
-- Sprint 8 through Sprint 9 can run as parallel tenant and admin delivery tracks after the commercial baseline is credible
+- Sprint 4 through Sprint 7 form the first search-truth, contract, reporting, and workflow cluster
+- Sprint 8 through Sprint 10 form the first tenant, catalog-supply, and admin commercial delivery cluster after the commercial baseline is credible
 - Sprint 11 through Sprint 14 should inherit the Phase 3-6 commercial truth and may split tenant and admin work into parallel tracks where the dependency map permits
 - Sprint 15 through Sprint 16 remain the release-discipline closeout chain
 
@@ -98,29 +102,40 @@ Owns:
 - commission and reconciliation views
 - optimization and support controls
 
+### 6. Test runner layer
+
+Owns:
+
+- contract verification
+- integration and reconciliation verification
+- browser smoke verification
+- AI and search quality verification
+- release-gate suite composition
+
 ## Phase summary
 
 | Phase | Name | Primary outcome |
 |---|---|---|
 | 0 | Narrative and architecture reset | one aligned revenue-engine definition across docs and product surfaces |
 | 1 | Public growth and premium landing rebuild | premium public positioning, hero UI, multi-channel story, pricing explanation |
-| 2 | Commercial data foundation | revenue, attribution, missed revenue, payment, and commission domain models |
-| 3 | Multi-channel capture and conversion engine | search, website, calls, email, and follow-up normalized into one conversion flow |
-| 4 | Revenue workspace and reporting | tenant-facing revenue dashboard, funnel metrics, missed revenue, commission visibility |
-| 5 | Recovery, payments, and commission operations | recovery workflows, payment-linked reporting, commission support and reconciliation |
-| 6 | Optimization, evaluation, and scale hardening | closed-loop tuning, release gating, reporting quality, and SaaS hardening |
+| 2 | Commercial data foundation | revenue, attribution, missed revenue, payment, and commission domain models plus repository-ready verification seams |
+| 3 | Multi-channel capture and conversion engine | search, website, calls, email, and follow-up normalized into one conversion flow plus first trust-sensitive runner coverage |
+| 4 | Revenue workspace and reporting | tenant-facing revenue dashboard, funnel metrics, missed revenue, commission visibility, and reporting contract checks |
+| 5 | Recovery, payments, and commission operations | recovery workflows, payment-linked reporting, commission support, reconciliation, and integration-runner coverage |
+| 6 | Optimization, evaluation, and scale hardening | closed-loop tuning, release gating, reporting quality, SaaS hardening, and consolidated runner suites |
 | 7 | Tenant revenue workspace | tenant-facing operational revenue product with action queues and lifecycle visibility |
 | 8 | Internal admin optimization and support platform | issue-first commercial support, reconciliation, and audit-ready admin operations |
-| 9 | QA, release discipline, and scale hardening | regression protection, telemetry, release gates, rollback discipline, and scale readiness |
+| 9 | QA, release discipline, and scale hardening | regression protection, telemetry, release gates, rollback discipline, scale readiness, and release-grade runner enforcement |
 
 ## Current implementation snapshot
 
-Date: `2026-04-17`
+Date: `2026-04-18`
 
 The current repo already has valuable production foundations:
 
 - public marketing and demo flows
 - admin interface
+- routed customer portal host for booking-detail continuation on `portal.bookedai.au`
 - additive `/api/v1/*` contract seams
 - search and matching quality work
 - Stripe checkout initiation
@@ -139,6 +154,7 @@ The next roadmap change is to organize it under the revenue-engine model and fil
 - payment-linked reporting
 - recovery workflow reporting
 - tenant-facing commercial visibility
+- customer-facing booking portal continuity after confirmation through a dedicated routed production host
 
 ## Phase 0 - Narrative and architecture reset
 
@@ -162,7 +178,7 @@ Make the upgraded product definition official across core documentation and plan
 
 ### Objective
 
-Ship a premium public growth surface that clearly explains BookedAI as the AI revenue engine for service businesses.
+Ship a premium but lightweight public growth surface that clearly explains BookedAI as the AI revenue engine for service businesses while keeping the homepage optimized for live search and booking.
 
 ### Scope
 
@@ -194,7 +210,17 @@ Ship a premium public growth surface that clearly explains BookedAI as the AI re
 - public site explains the product in under five seconds
 - pricing model is clear
 - BookedAI no longer reads as a chat-first product
+- the homepage body remains intentionally minimal so the inline assistant has maximum practical space on desktop and mobile
+- the approved revenue-engine logo system is live across public logo, favicon, touch-icon, and app-icon treatments
+- `frontend/public/branding/` is now the single approved source of logo, short-mark, favicon, touch-icon, PWA icon, and mobile-responsive brand assets, and later execution should preserve shared brand mappings rather than introducing route-local or remote logo sources
 - Phase 1-2 implementation package is approved and mapped to sprint execution
+
+Current implementation evidence:
+
+- the revenue-engine logo family and live icon assets were refreshed and deployed on `2026-04-18`
+- production and beta now serve the approved revenue-engine favicon path instead of the retired legacy favicon reference
+- the live homepage shell was further upgraded on `2026-04-18` into a more professional workspace-style search runtime with a clearer top navigation, stronger search command surface, clearer shortlist hierarchy, and a dedicated booking rail
+- responsive and live-read regression coverage has been re-run against that shell, so later roadmap work should inherit the current `workspace-style homepage search runtime` baseline instead of the older inline-dialog or long-spine interpretations
 
 ## Phase 2 - Commercial data foundation
 
@@ -211,10 +237,12 @@ Build the normalized data and contract layer for commercial truth.
 - commission ledger summary model
 - payment-linked revenue read models
 - reporting contracts for tenant and admin
+- repository and contract runner seams
 
 ### Exit criteria
 
 - revenue, missed revenue, attribution, and commission can be queried from shared contracts
+- repository and contract verification can run without hand-checking every path
 
 ## Phase 3 - Multi-channel capture and conversion engine
 
@@ -231,10 +259,12 @@ Connect search, website, calls, email, and follow-up into one conversion flow.
 - missed-call recovery triggers
 - follow-up workflow triggers
 - incomplete-payment trigger support
+- first trust-sensitive assistant and public-flow runners
 
 ### Exit criteria
 
 - BookedAI can trace a meaningful part of the funnel from source to booking to payment state
+- core multi-channel and trust-sensitive flows have repeatable runner coverage
 
 ## Phase 4 - Revenue workspace and reporting
 
@@ -253,10 +283,12 @@ Ship the tenant-facing product modules that make the revenue-engine promise visi
 - recovered opportunities
 - payment completion status
 - commission summary
+- reporting contract and widget-read verification
 
 ### Exit criteria
 
 - operators can see what revenue was generated, what was missed, and what is recoverable
+- reporting surfaces have runner-backed confidence for key read models
 
 ## Phase 5 - Recovery, payments, and commission operations
 
@@ -305,6 +337,8 @@ Ship the tenant-facing revenue workspace that exposes BookedAI's value and actio
 
 - tenant information architecture
 - tenant dashboard
+- tenant onboarding and account claim
+- tenant-owned catalog review and publish workflows
 - missed revenue and recovered opportunity views
 - payment and follow-up action panels
 - commission summary visibility
@@ -313,6 +347,7 @@ Ship the tenant-facing revenue workspace that exposes BookedAI's value and actio
 ### Exit criteria
 
 - tenant users can understand value, risk, and next actions in one coherent workspace
+- tenant users can sign in, claim or enrich their business data, and publish search-ready catalog rows safely enough for public matching to use as offline truth
 
 ## Phase 8 - Internal admin optimization and support platform
 
@@ -358,16 +393,16 @@ Harden the full commercial platform so releases are governed by explicit regress
 |---|---|---|
 | Sprint 1 | PRD and architecture reset | core docs, scope, and product definition aligned |
 | Sprint 2 | Brand system and landing architecture | premium public structure and design primitives approved |
-| Sprint 3 | Hero, storytelling, and pricing surface | new landing page sections and setup-plus-commission pricing live |
-| Sprint 4 | Commercial data contracts | revenue, attribution, missed revenue, payment, and commission contracts added |
-| Sprint 5 | Dashboard and widget read models | commercial widgets backed by shared API responses |
-| Sprint 6 | Multi-channel attribution and conversion tracking | source-to-booking metrics stitched across channels |
-| Sprint 7 | Recovery workflows | missed-call, follow-up, quote, and payment recovery paths active |
-| Sprint 8 | Tenant revenue workspace | tenant-facing dashboard and funnel views shipped |
-| Sprint 9 | Admin commercial operations | admin reconciliation, commission, and support tooling expanded |
-| Sprint 10 | Optimization and hardening | eval loops, release gates, rollout controls, and scale readiness |
-| Sprint 11 | Tenant IA and API preparation | tenant shell, route boundaries, and tenant-safe contract usage aligned |
-| Sprint 12 | Tenant workspace implementation | first tenant-facing revenue workspace implemented |
+| Sprint 3 | Search-first homepage and mobile conversion execution | lightweight homepage, responsive inline assistant flow, menu/top-bottom information layout, and truthful conversion shell live |
+| Sprint 4 | Assistant truth and commercial contract baseline | search truth semantics, attribution, revenue, missed revenue, payment, and commission contracts defined |
+| Sprint 5 | Reporting read models and revenue widgets | shared commercial widgets backed by typed API responses and aligned with the revenue-engine story |
+| Sprint 6 | Search quality, telemetry, and release thresholds | replayable search evals, wrong-match feedback, locality gates, and promotion thresholds active |
+| Sprint 7 | Recovery workflows and payment-linked operations | missed-call, follow-up, quote, and payment recovery paths active |
+| Sprint 8 | Tenant onboarding and searchable supply foundation | claim, import, review, and publish-safe catalog workflows ready for real SME supply |
+| Sprint 9 | Tenant revenue workspace | tenant-facing dashboard, funnel, and next-action views shipped |
+| Sprint 10 | Admin commercial operations and release readiness | admin reconciliation, commission, support tooling, and commercial release controls expanded |
+| Sprint 11 | Tenant IA and mobile workspace hardening | tenant shell, route boundaries, action queues, and mobile-priority views aligned |
+| Sprint 12 | Tenant workspace expansion | deeper payment, recovery, integration, and commission visibility implemented |
 | Sprint 13 | Admin commercial IA and drill-ins | issue-first admin navigation and tenant commercial drill-ins shipped |
 | Sprint 14 | Admin support tooling and rollout readiness | reconciliation polish, support tooling, and rollout controls completed |
 | Sprint 15 | Telemetry and regression coverage | commercial telemetry, replay readiness, and regression scope established |
@@ -404,14 +439,16 @@ Remaining handoff:
 
 Focus:
 
-- implement the premium landing page
-- ship hero widgets, pricing explanation, comparison, FAQ, and CTA loops
+- preserve the minimal homepage body and inline assistant-first conversion path
+- verify responsive mobile-first behavior for search, shortlist, booking, and confirmation
+- keep supporting information in menu, top-bar, bottom-bar, or secondary surfaces rather than crowding the homepage body
 
 ### Sprint 4 - Pending
 
 Focus:
 
 - add revenue, missed revenue, attribution, and commission contracts
+- make assistant truth semantics explicit for domain intent, location truth, fallback scope, and escalation posture
 - define read models and migrations
 
 ### Sprint 5 - Pending
@@ -435,6 +472,7 @@ Evidence already present:
 New interpretation under the upgraded roadmap:
 
 - this work should now be tied to source attribution and conversion reporting rather than treated as isolated search quality only
+- this sprint is also the first formal release-threshold lane for wrong-domain, wrong-location, stale-context, and mobile-flow regressions in customer-facing search
 
 ### Sprint 7 - Pending
 
@@ -446,27 +484,32 @@ Focus:
 
 Focus:
 
-- tenant revenue dashboard and commercial workspace
+- tenant claim, onboarding, and searchable supply foundation
+- import review, publish-safe catalog rows, and supply truth for real SME search
 
-### Sprint 9 - In progress
+### Sprint 9 - Pending
+
+Focus:
+
+- tenant revenue dashboard and commercial workspace
+- mobile-priority next-action views once searchable supply is usable
 
 Evidence already present:
 
-- admin modularization and reliability views are already underway
-
-New interpretation under the upgraded roadmap:
-
-- these views should expand toward revenue, attribution, payment, and commission operations
+- tenant shell is no longer conceptual only; a dedicated tenant app route now ships with `overview`, `catalog`, `bookings`, and `integrations` panels
+- tenant workspace now includes the first controlled write path through Google-authenticated website import into tenant catalog data
+- tenant catalog now exposes search-readiness counts and review warnings, which means Sprint 9 has begun moving from read-heavy shell work into actionable searchable-supply operations
 
 ### Sprint 10 - In progress
 
 Evidence already present:
 
+- admin modularization and reliability views are already underway
 - rollout flags, QA scaffolding, and release-gate foundations exist
 
 New interpretation under the upgraded roadmap:
 
-- hardening should explicitly include commercial reporting truth and revenue-widget regression checks
+- these admin and release-readiness views should expand toward revenue, attribution, payment, commission operations, and release control for revenue-critical flows
 
 ### Sprint 11 - Pending
 
@@ -475,6 +518,11 @@ Focus:
 - tenant workspace information architecture
 - tenant shell and route boundaries
 - tenant-safe API and contract alignment
+
+Evidence already present:
+
+- tenant workspace IA now has a first live shape instead of only planning language, with search workspace patterns applied to tenant catalog operations
+- tenant auth and contract direction has started materializing through Google sign-in, tenant session tokens, tenant catalog snapshot endpoints, and website-import request contracts
 
 ### Sprint 12 - Pending
 

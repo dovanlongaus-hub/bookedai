@@ -2,8 +2,6 @@ import type { ReactNode } from 'react';
 
 import {
   brandContactEmail,
-  brandDescriptor,
-  brandDomainLabel,
   brandLinkedInHref,
   brandPositioning,
   brandWhatsAppHref,
@@ -13,7 +11,8 @@ import {
   termsHref,
   videoDemoHref,
 } from './data';
-import { LogoMark } from './ui/LogoMark';
+import { BrandLockup } from './ui/BrandLockup';
+import { SignalPill } from './ui/SignalPill';
 import {
   getReleaseBadgeLabel,
   getReleaseVersionLabel,
@@ -30,46 +29,62 @@ export function Footer({ onStartTrial, onBookDemo }: FooterProps) {
 
   return (
     <footer className="mx-auto w-full max-w-7xl px-6 pb-12 pt-4 lg:px-8">
-      <div className="template-card px-6 py-8 lg:px-8">
-        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex items-start gap-5">
-            <div className="shrink-0 pt-0.5">
-              <LogoMark
-                alt={`${brandDomainLabel} logo`}
-                className="booked-brand-image booked-brand-image--landing-footer booked-brand-image--frameless"
+      <div className="template-card overflow-hidden px-6 py-8 lg:px-8">
+        <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+          <div className="flex items-start gap-6">
+            <div className="flex shrink-0 items-center overflow-hidden rounded-[1.25rem] border border-black/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.68)_0%,rgba(248,250,252,0.9)_100%)] px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+              <BrandLockup
+                surface="light"
+                showDescriptor={false}
+                showEyebrow={false}
+                className="items-center"
+                logoClassName="booked-brand-image booked-brand-image--landing-footer max-w-[11rem] sm:max-w-[12rem]"
               />
             </div>
-            <div>
-              <div className="template-kicker mt-1 text-[11px]">
-                {brandDescriptor}
-              </div>
+            <div className="pt-1">
+              <div className="template-kicker text-[11px]">AI Revenue Engine for Service Businesses</div>
               <p className="template-body mt-2 max-w-2xl text-sm leading-7">
                 {brandPositioning}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-                <span className="booked-pill booked-pill--brand px-3 py-1">
+                <SignalPill variant="brand" className="px-3 py-1">
                   {releaseBadgeLabel}
-                </span>
+                </SignalPill>
                 <span className="template-body text-black/55">{releaseVersionLabel}</span>
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-3 text-sm">
-            <button
-              type="button"
-              onClick={onStartTrial}
-              className="booked-button px-4 py-2 font-semibold"
-            >
-              Start Free Trial
-            </button>
-            <button
-              type="button"
-              onClick={onBookDemo}
-              className="booked-button-secondary px-4 py-2 font-medium"
-            >
-              Book a Demo
-            </button>
+          <div className="grid gap-4">
+            <div className="grid gap-3 sm:grid-cols-3">
+              {[
+                ['Launch mode', 'Online first'],
+                ['Commercial model', 'Setup + subscription + commission'],
+                ['Operator view', 'Visible pipeline'],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-[1.25rem] bg-[#f5f5f7] px-4 py-4">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div>
+                  <div className="mt-2 text-sm font-semibold text-slate-950">{value}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="flex flex-wrap gap-3 text-sm">
+              <button
+                type="button"
+                onClick={onStartTrial}
+                className="booked-button px-4 py-2 font-semibold"
+              >
+                Try Now
+              </button>
+              <button
+                type="button"
+                onClick={onBookDemo}
+                className="booked-button-secondary px-4 py-2 font-medium"
+              >
+                Book a Demo
+              </button>
+            </div>
           </div>
         </div>
 

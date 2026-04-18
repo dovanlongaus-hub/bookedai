@@ -45,8 +45,26 @@ const pricingFlow = [
     body: 'Online first for most teams, onsite only when complexity justifies it.',
   },
   {
-    title: 'Lock consultation',
-    body: 'Calendar, confirmation, and payment prep continue from one buying path.',
+    title: 'Lock the close',
+    body: 'Consultation, confirmation, and the commercial next step continue from one buying path.',
+  },
+];
+
+const pricingModelPillars = [
+  {
+    label: 'Setup',
+    value: 'Separate',
+    detail: 'Quoted clearly so launch work does not blur with the monthly plan.',
+  },
+  {
+    label: 'Subscription',
+    value: 'Predictable',
+    detail: 'Simple monthly pricing keeps the first paid decision easy to understand.',
+  },
+  {
+    label: 'Commission',
+    value: 'Performance-based',
+    detail: 'Introduced only when the rollout context and revenue path are clear.',
   },
 ];
 
@@ -315,14 +333,14 @@ export function PricingSection() {
 
         <div className="mx-auto max-w-4xl text-center">
           <SignalPill className="inline-flex items-center justify-center px-4 py-2 text-[11px] uppercase tracking-[0.24em]">
-            30-day free trial • simple SME pricing
+            30-day free trial • setup + monthly plan + performance-based commission
           </SignalPill>
           <h2 className="template-title mt-6 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-            Simple pricing that feels easy to book now
+            Pricing that stays easy to understand at the moment of decision
           </h2>
           <p className="template-body mx-auto mt-5 max-w-2xl text-lg leading-8">
-            Start free for 30 days, then move to a clear monthly plan that fits your stage.
-            We have lowered the entry price and simplified the offer so SMEs can decide faster.
+            Start free for 30 days, then move into a clear monthly plan that fits your stage.
+            Setup stays separate, and performance-based commission only appears when the commercial context is real.
           </p>
           <p className="template-body mx-auto mt-4 max-w-3xl text-sm leading-6 sm:text-base">
             Built for salons, clinics, swim schools, tutors, trades, hospitality, and other
@@ -354,7 +372,7 @@ export function PricingSection() {
               <div>
                 <div className="template-kicker text-[11px]">Pricing flow graphic</div>
                 <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                  Pricing should read like a buying path, not a policy document.
+                  Pricing should read like a buying path, not a pricing maze.
                 </div>
               </div>
               <div className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
@@ -370,6 +388,16 @@ export function PricingSection() {
                   </div>
                   <div className="mt-4 text-lg font-semibold text-slate-950">{item.title}</div>
                   <div className="mt-2 text-sm leading-6 text-slate-600">{item.body}</div>
+                </SectionCard>
+              ))}
+            </div>
+
+            <div className="mt-5 grid gap-3 lg:grid-cols-3">
+              {pricingModelPillars.map((item) => (
+                <SectionCard key={item.label} as="article" tone="subtle" className="rounded-[1.4rem] px-5 py-5">
+                  <div className="template-kicker text-[11px]">{item.label}</div>
+                  <div className="mt-2 text-lg font-semibold text-slate-950">{item.value}</div>
+                  <div className="mt-2 text-sm leading-6 text-slate-600">{item.detail}</div>
                 </SectionCard>
               ))}
             </div>
@@ -395,9 +423,9 @@ export function PricingSection() {
               </div>
             </div>
             <p className="template-body mt-5 max-w-2xl text-base leading-7">
-              Pick the plan that matches your current volume and workflow. Every `Book` action
-              takes you straight into the onboarding flow, timing selection, confirmation email,
-              and payment preparation.
+              Pick the plan that matches your current volume and workflow. Every booking action
+              takes you into the same onboarding flow, timing selection, confirmation path, and
+              commercial handoff without hiding the setup or commission model.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {topOffers.map((offer) => (
@@ -430,7 +458,7 @@ export function PricingSection() {
                 </SignalPill>
               </div>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                The packaging is designed to reduce decision fatigue for SMEs while still leaving a clear path into richer automation later.
+                The packaging is designed to reduce decision fatigue for SMEs while still leaving room for setup scope and performance-based commission once results are in view.
               </p>
             </SectionCard>
           </SectionCard>
@@ -444,7 +472,7 @@ export function PricingSection() {
             </h3>
             <p className="mt-4 text-base leading-7 text-slate-300">
               Most SMEs can launch online first. If your team needs onsite support, training,
-              or a more hands-on rollout, we quote that separately so the base pricing stays clean.
+              or a more hands-on rollout, we quote that separately so the base subscription stays clean and the performance model stays credible.
             </p>
             <div className="mt-6 grid gap-3">
               {setupOptions.map((item) => (
@@ -495,7 +523,7 @@ export function PricingSection() {
                     {advancedPlan.name}
                   </div>
                   <p className="mt-2 text-sm leading-6 text-slate-300">
-                    Multi-location, more custom automation, or broader operational rollout.
+                    Multi-location, deeper automation, or broader operational rollout that needs custom setup and commercial shaping.
                   </p>
                 </div>
                 <SignalPill variant="inverse" className="px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-200 ring-1 ring-white/10">
@@ -511,7 +539,7 @@ export function PricingSection() {
               </p>
               <p className="mt-3 text-sm leading-6 text-slate-300">
                 We keep advanced rollout off the main buying path so smaller SMEs can decide
-                quickly, while larger operators can still get the right package.
+                quickly, while larger operators can still get the right package and performance model.
               </p>
 
               <ul className="mt-8 space-y-3">

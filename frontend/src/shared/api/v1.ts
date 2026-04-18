@@ -35,9 +35,14 @@ import type {
   SendLifecycleEmailResponse,
   StartChatSessionRequest,
   StartChatSessionResponse,
-  TenantOverviewResponse,
   TenantBookingsResponse,
+  TenantCatalogImportRequest,
+  TenantCatalogUpdateRequest,
+  TenantCatalogResponse,
+  TenantGoogleAuthRequest,
+  TenantAuthSessionResponse,
   TenantIntegrationsResponse,
+  TenantOverviewResponse,
 } from '../contracts';
 import type { MatchCandidate, MatchConfidence } from '../contracts';
 
@@ -109,32 +114,71 @@ function toStringArray(value: unknown): string[] {
   return value.filter((item): item is string => typeof item === 'string');
 }
 
+function readString(record: Record<string, unknown>, snakeKey: string, camelKey?: string) {
+  return toStringOrNull(record[snakeKey]) ?? (camelKey ? toStringOrNull(record[camelKey]) : null);
+}
+
+function readNumber(record: Record<string, unknown>, snakeKey: string, camelKey?: string) {
+  return toNumberOrNull(record[snakeKey]) ?? (camelKey ? toNumberOrNull(record[camelKey]) : null);
+}
+
+function readBoolean(record: Record<string, unknown>, snakeKey: string, camelKey?: string) {
+  return toBoolean(record[snakeKey]) || (camelKey ? toBoolean(record[camelKey]) : false);
+}
+
+function readStringList(record: Record<string, unknown>, snakeKey: string, camelKey?: string) {
+  const snakeValues = toStringArray(record[snakeKey]);
+  if (snakeValues.length > 0) {
+    return snakeValues;
+  }
+
+  return camelKey ? toStringArray(record[camelKey]) : [];
+}
+
+function readRecordList(record: Record<string, unknown>, snakeKey: string, camelKey?: string) {
+  const value = record[snakeKey];
+  if (Array.isArray(value)) {
+    return value.filter(isRecord);
+  }
+
+  if (!camelKey) {
+    return [];
+  }
+
+  const camelValue = record[camelKey];
+  if (!Array.isArray(camelValue)) {
+    return [];
+  }
+
+  return camelValue.filter(isRecord);
+}
+
 function normalizeMatchCandidate(value: unknown): MatchCandidate {
   const candidate = isRecord(value) ? value : {};
   return {
-    candidateId: toStringOrNull(candidate.candidate_id) ?? '',
-    providerName: toStringOrNull(candidate.provider_name) ?? '',
-    serviceName: toStringOrNull(candidate.service_name) ?? '',
-    sourceType: toStringOrNull(candidate.source_type) ?? 'service_catalog',
-    category: toStringOrNull(candidate.category),
-    summary: toStringOrNull(candidate.summary),
-    venueName: toStringOrNull(candidate.venue_name),
-    location: toStringOrNull(candidate.location),
-    bookingUrl: toStringOrNull(candidate.booking_url),
-    mapUrl: toStringOrNull(candidate.map_url),
-    sourceUrl: toStringOrNull(candidate.source_url),
-    imageUrl: toStringOrNull(candidate.image_url),
-    amountAud: toNumberOrNull(candidate.amount_aud),
-    durationMinutes: toNumberOrNull(candidate.duration_minutes),
-    tags: toStringArray(candidate.tags),
-    featured: toBoolean(candidate.featured),
-    distanceKm: toNumberOrNull(candidate.distance_km),
-    matchScore: toNumberOrNull(candidate.match_score),
-    semanticScore: toNumberOrNull(candidate.semantic_score),
-    trustSignal: toStringOrNull(candidate.trust_signal),
-    isPreferred: toBoolean(candidate.is_preferred),
-    displaySummary: toStringOrNull(candidate.display_summary),
-    explanation: toStringOrNull(candidate.explanation),
+    candidateId: readString(candidate, 'candidate_id', 'candidateId') ?? '',
+    providerName: readString(candidate, 'provider_name', 'providerName') ?? '',
+    serviceName: readString(candidate, 'service_name', 'serviceName') ?? '',
+    sourceType: readString(candidate, 'source_type', 'sourceType') ?? 'service_catalog',
+    category: readString(candidate, 'category'),
+    summary: readString(candidate, 'summary'),
+    venueName: readString(candidate, 'venue_name', 'venueName'),
+    location: readString(candidate, 'location'),
+    bookingUrl: readString(candidate, 'booking_url', 'bookingUrl'),
+    mapUrl: readString(candidate, 'map_url', 'mapUrl'),
+    sourceUrl: readString(candidate, 'source_url', 'sourceUrl'),
+    imageUrl: readString(candidate, 'image_url', 'imageUrl'),
+    amountAud: readNumber(candidate, 'amount_aud', 'amountAud'),
+    durationMinutes: readNumber(candidate, 'duration_minutes', 'durationMinutes'),
+    tags: readStringList(candidate, 'tags'),
+    featured: readBoolean(candidate, 'featured'),
+    distanceKm: readNumber(candidate, 'distance_km', 'distanceKm'),
+    matchScore: readNumber(candidate, 'match_score', 'matchScore'),
+    semanticScore: readNumber(candidate, 'semantic_score', 'semanticScore'),
+    trustSignal: readString(candidate, 'trust_signal', 'trustSignal'),
+    isPreferred: readBoolean(candidate, 'is_preferred', 'isPreferred'),
+    displaySummary: readString(candidate, 'display_summary', 'displaySummary'),
+    explanation: readString(candidate, 'explanation'),
   };
 }
 
@@ -169,41 +213,126 @@ function normalizeSearchCandidatesEnvelope(
         ? data.recommendations.map((item): SearchCandidatesResponse['recommendations'][number] => {
             const recommendation = isRecord(item) ? item : {};
             return {
-              candidateId: toStringOrNull(recommendation.candidate_id) ?? '',
-              reason: toStringOrNull(recommendation.reason),
+              candidateId: readString(recommendation, 'candidate_id', 'candidateId') ?? '',
+              reason: readString(recommendation, 'reason'),
               pathType:
-                (toStringOrNull(
-                  recommendation.path_type,
+                (readString(
+                  recommendation,
+                  'path_type',
+                  'pathType',
                 ) as SearchCandidatesResponse['recommendations'][number]['pathType']) ?? null,
-              nextStep: toStringOrNull(recommendation.next_step),
-              warnings: toStringArray(recommendation.warnings),
+              nextStep: readString(recommendation, 'next_step', 'nextStep'),
+              warnings: readStringList(recommendation, 'warnings'),
             };
           })
         : [],
       confidence: normalizeMatchConfidence(data.confidence),
-      warnings: toStringArray(data.warnings),
-      search_strategy: toStringOrNull(data.search_strategy),
+      warnings: readStringList(data, 'warnings'),
+      search_strategy: readString(data, 'search_strategy', 'searchStrategy'),
       booking_context: isRecord(data.booking_context)
         ? {
-            partySize: toNumberOrNull(data.booking_context.party_size),
-            requestedDate: toStringOrNull(data.booking_context.requested_date),
-            requestedTime: toStringOrNull(data.booking_context.requested_time),
-            scheduleHint: toStringOrNull(data.booking_context.schedule_hint),
-            intentLabel: toStringOrNull(data.booking_context.intent_label),
-            summary: toStringOrNull(data.booking_context.summary),
+            partySize: readNumber(data.booking_context, 'party_size', 'partySize'),
+            requestedDate: readString(data.booking_context, 'requested_date', 'requestedDate'),
+            requestedTime: readString(data.booking_context, 'requested_time', 'requestedTime'),
+            scheduleHint: readString(data.booking_context, 'schedule_hint', 'scheduleHint'),
+            intentLabel: readString(data.booking_context, 'intent_label', 'intentLabel'),
+            summary: readString(data.booking_context, 'summary'),
           }
         : null,
       semantic_assist: isRecord(data.semantic_assist)
         ? {
-            applied: toBoolean(data.semantic_assist.applied),
-            provider: toStringOrNull(data.semantic_assist.provider),
-            providerChain: toStringArray(data.semantic_assist.provider_chain),
-            fallbackApplied: toBoolean(data.semantic_assist.fallback_applied),
-            normalizedQuery: toStringOrNull(data.semantic_assist.normalized_query),
-            inferredLocation: toStringOrNull(data.semantic_assist.inferred_location),
-            inferredCategory: toStringOrNull(data.semantic_assist.inferred_category),
-            budgetSummary: toStringOrNull(data.semantic_assist.budget_summary),
-            evidence: toStringArray(data.semantic_assist.evidence),
+            applied: readBoolean(data.semantic_assist, 'applied'),
+            provider: readString(data.semantic_assist, 'provider'),
+            providerChain: readStringList(data.semantic_assist, 'provider_chain', 'providerChain'),
+            fallbackApplied: readBoolean(
+              data.semantic_assist,
+              'fallback_applied',
+              'fallbackApplied',
+            ),
+            normalizedQuery: readString(
+              data.semantic_assist,
+              'normalized_query',
+              'normalizedQuery',
+            ),
+            inferredLocation: readString(
+              data.semantic_assist,
+              'inferred_location',
+              'inferredLocation',
+            ),
+            inferredCategory: readString(
+              data.semantic_assist,
+              'inferred_category',
+              'inferredCategory',
+            ),
+            budgetSummary: readString(
+              data.semantic_assist,
+              'budget_summary',
+              'budgetSummary',
+            ),
+            evidence: readStringList(data.semantic_assist, 'evidence'),
+          }
+        : null,
+      search_diagnostics: isRecord(data.search_diagnostics)
+        ? {
+            effectiveLocationHint: readString(
+              data.search_diagnostics,
+              'effective_location_hint',
+              'effectiveLocationHint',
+            ),
+            relevanceLocationHint: readString(
+              data.search_diagnostics,
+              'relevance_location_hint',
+              'relevanceLocationHint',
+            ),
+            semanticRolloutEnabled: readBoolean(
+              data.search_diagnostics,
+              'semantic_rollout_enabled',
+              'semanticRolloutEnabled',
+            ),
+            semanticApplied: readBoolean(
+              data.search_diagnostics,
+              'semantic_applied',
+              'semanticApplied',
+            ),
+            retrievalCandidateCount: readNumber(
+              data.search_diagnostics,
+              'retrieval_candidate_count',
+              'retrievalCandidateCount',
+            ) ?? 0,
+            heuristicCandidateIds: readStringList(
+              data.search_diagnostics,
+              'heuristic_candidate_ids',
+              'heuristicCandidateIds',
+            ),
+            semanticCandidateIds: readStringList(
+              data.search_diagnostics,
+              'semantic_candidate_ids',
+              'semanticCandidateIds',
+            ),
+            postRelevanceCandidateIds: readStringList(
+              data.search_diagnostics,
+              'post_relevance_candidate_ids',
+              'postRelevanceCandidateIds',
+            ),
+            postDomainCandidateIds: readStringList(
+              data.search_diagnostics,
+              'post_domain_candidate_ids',
+              'postDomainCandidateIds',
+            ),
+            finalCandidateIds: readStringList(
+              data.search_diagnostics,
+              'final_candidate_ids',
+              'finalCandidateIds',
+            ),
+            droppedCandidates: readRecordList(
+              data.search_diagnostics,
+              'dropped_candidates',
+              'droppedCandidates',
+            ).map((item: Record<string, unknown>) => ({
+              candidateId: readString(item, 'candidate_id', 'candidateId') ?? '',
+              stage: readString(item, 'stage') ?? '',
+              reason: readString(item, 'reason') ?? '',
+            })),
           }
         : null,
     },
@@ -360,6 +489,87 @@ export async function getTenantIntegrations(tenantRef?: string | null) {
   return requestV1Envelope<TenantIntegrationsResponse>(`/v1/tenant/integrations${query}`);
 }
 
+export async function tenantGoogleAuth(request: TenantGoogleAuthRequest) {
+  return requestV1Envelope<TenantAuthSessionResponse>(
+    '/v1/tenant/auth/google',
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+export async function getTenantCatalog(tenantRef?: string | null, sessionToken?: string | null) {
+  const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantCatalogResponse>(`/v1/tenant/catalog${query}`, { headers });
+}
+
+export async function importTenantCatalogFromWebsite(
+  request: TenantCatalogImportRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantCatalogResponse>(
+    `/v1/tenant/catalog/import-website${query}`,
+    withJsonBody(request, { method: 'POST', headers }),
+  );
+}
+
+export async function updateTenantCatalogService(
+  serviceId: string,
+  request: TenantCatalogUpdateRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantCatalogResponse>(
+    `/v1/tenant/catalog/${encodeURIComponent(serviceId)}${query}`,
+    withJsonBody(request, { method: 'PATCH', headers }),
+  );
+}
+
+export async function publishTenantCatalogService(
+  serviceId: string,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantCatalogResponse>(
+    `/v1/tenant/catalog/${encodeURIComponent(serviceId)}/publish${query}`,
+    withJsonBody({}, { method: 'POST', headers }),
+  );
+}
+
+export async function archiveTenantCatalogService(
+  serviceId: string,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantCatalogResponse>(
+    `/v1/tenant/catalog/${encodeURIComponent(serviceId)}/archive${query}`,
+    withJsonBody({}, { method: 'POST', headers }),
+  );
+}
+
 export const apiV1 = {
   createLead,
   startChatSession,
@@ -383,7 +593,13 @@ export const apiV1 = {
   getOutboxDispatchedAudit,
   replayOutboxEvent,
   getTenantBookings,
+  getTenantCatalog,
   getTenantIntegrations,
   getTenantOverview,
+  archiveTenantCatalogService,
+  importTenantCatalogFromWebsite,
+  publishTenantCatalogService,
+  tenantGoogleAuth,
+  updateTenantCatalogService,
   retryCrmSync,
 };

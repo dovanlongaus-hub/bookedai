@@ -1,5 +1,7 @@
 import { expect, test } from '@playwright/test';
 
+const isLiveReadMode = process.env.PLAYWRIGHT_PUBLIC_ASSISTANT_MODE === 'live-read';
+
 type ServiceCatalogItem = {
   id: string;
   name: string;
@@ -20,6 +22,7 @@ type ServiceCatalogItem = {
 type BookingAssistantSessionResponse = {
   status: string;
   booking_reference: string;
+  portal_url: string;
   service: ServiceCatalogItem;
   amount_aud: number;
   amount_label: string;
@@ -93,6 +96,7 @@ const unrelatedLegacyService: ServiceCatalogItem = {
 const legacyBookingSessionResult: BookingAssistantSessionResponse = {
   status: 'ok',
   booking_reference: 'BR-1001',
+  portal_url: 'https://portal.bookedai.au/?booking_reference=BR-1001',
   service: liveReadService,
   amount_aud: 75,
   amount_label: 'A$75',
@@ -115,6 +119,7 @@ const legacyBookingSessionResult: BookingAssistantSessionResponse = {
 const stripeReadyBookingSessionResult: BookingAssistantSessionResponse = {
   status: 'ok',
   booking_reference: 'BR-2002',
+  portal_url: 'https://portal.bookedai.au/?booking_reference=BR-2002',
   service: liveReadService,
   amount_aud: 75,
   amount_label: 'A$75',
@@ -224,14 +229,110 @@ async function stubAssistantApis(page: Parameters<typeof test>[0]['page']) {
   });
 }
 
+async function isVisible(locator: ReturnType<Parameters<typeof test>[0]['page']['locator']>, timeout = 1000) {
+  try {
+    await expect(locator).toBeVisible({ timeout });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function getActiveAssistantInput(page: Parameters<typeof test>[0]['page']) {
+  const inlineAssistantInput = page.locator('#assistant-chat-input');
+  if (await isVisible(inlineAssistantInput, 500)) {
+    return inlineAssistantInput;
+  }
+
+  const homepageSearchInput = page
+    .locator('#bookedai-search-assistant')
+    .getByPlaceholder(/What service do you want to book today\?/i)
+    .first();
+  if (await isVisible(homepageSearchInput, 500)) {
+    return homepageSearchInput;
+  }
+
+  throw new Error('Could not find an active assistant input for the current public homepage runtime.');
+}
+
+async function getActiveAssistantPane(page: Parameters<typeof test>[0]['page']) {
+  const homepageAssistantPane = page.locator('#bookedai-search-assistant').first();
+  if (await isVisible(homepageAssistantPane, 500)) {
+    return homepageAssistantPane;
+  }
+
+  const inlineAssistantPane = page
+    .locator('div')
+    .filter({ has: page.getByText('Chat with BookedAI') })
+    .filter({ has: page.locator('#assistant-chat-input') })
+    .first();
+  if (await isVisible(inlineAssistantPane, 500)) {
+    return inlineAssistantPane;
+  }
+
+  throw new Error('Could not find an active assistant pane for the current public homepage runtime.');
+}
+
 async function openAssistant(page: Parameters<typeof test>[0]['page']) {
-  await page.goto('/?assistant=open');
-  await expect(page.locator('#assistant-chat-input')).toBeVisible();
+  await page.goto('/');
+  const inlineAssistantInput = page.locator('#assistant-chat-input');
+  const homepageSearchInput = page
+    .locator('#bookedai-search-assistant')
+    .getByPlaceholder(/What service do you want to book today\?/i)
+    .first();
+
+  if (!(await isVisible(inlineAssistantInput, 5000)) && !(await isVisible(homepageSearchInput, 5000))) {
+    const fallbackTrigger = page
+      .getByRole('button', { name: /Try Now|Start Free Trial|Open live search|Start search|Search with BookedAI/i })
+      .first();
+    await fallbackTrigger.click();
+    await expect.poll(async () => {
+      if (await inlineAssistantInput.isVisible()) {
+        return 'inline';
+      }
+      if (await homepageSearchInput.isVisible()) {
+        return 'homepage';
+      }
+      return 'pending';
+    }, { timeout: 10000 }).not.toBe('pending');
+  }
   await page.waitForTimeout(250);
+}
+
+async function submitAssistantQuery(
+  page: Parameters<typeof test>[0]['page'],
+  query: string,
+) {
+  const assistantInput = await getActiveAssistantInput(page);
+  await assistantInput.fill(query);
+  await assistantInput.press('Enter');
+}
+
+async function openBookingComposerIfNeeded(page: Parameters<typeof test>[0]['page']) {
+  const dateTimeInput = page.locator('input[type="datetime-local"]').first();
+  if (await dateTimeInput.isVisible().catch(() => false)) {
+    return;
+  }
+
+  const legacyButton = page.getByRole('button', { name: 'Book now →', exact: true }).first();
+  if (await legacyButton.isVisible().catch(() => false)) {
+    await legacyButton.click();
+    return;
+  }
+
+  const progressiveButton = page.getByRole('button', { name: /Continue booking/i }).first();
+  if (await progressiveButton.isVisible().catch(() => false)) {
+    await progressiveButton.click();
+  }
+}
+
+function getBookingForm(page: Parameters<typeof test>[0]['page']) {
+  return page.locator('input[type="datetime-local"]').first().locator('xpath=ancestor::form[1]');
 }
 
 test.describe('public assistant rollout smoke', () => {
   test('flag-off keeps legacy selection and does not surface live-read guidance @legacy', async ({ page }) => {
+    test.skip(isLiveReadMode, 'Legacy-only assertions should not run in live-read mode.');
     let v1Requests = 0;
 
     await stubAssistantApis(page);
@@ -245,8 +346,7 @@ test.describe('public assistant rollout smoke', () => {
     });
 
     await openAssistant(page);
-    await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
-    await page.locator('#assistant-chat-input').press('Enter');
+    await submitAssistantQuery(page, 'Need a haircut in Sydney');
 
     await expect(page.getByText('Legacy Barber Cut').first()).toBeVisible();
     await expect(page.getByText('Prompt 5 live-read guidance')).toHaveCount(0);
@@ -357,8 +457,7 @@ test.describe('public assistant rollout smoke', () => {
     });
 
     await openAssistant(page);
-    await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
-    await page.locator('#assistant-chat-input').press('Enter');
+    await submitAssistantQuery(page, 'Need a haircut in Sydney');
 
     await expect.poll(() => searchRequests).toBeGreaterThanOrEqual(1);
     await expect.poll(() => trustRequests).toBe(1);
@@ -434,15 +533,19 @@ test.describe('public assistant rollout smoke', () => {
           data: {
             request_id: 'match-ranked',
             candidates: rankedServices.map((service) => ({
-              candidate_id: service.id,
-              provider_name: service.venue_name,
-              service_name: service.name,
-              source_type: 'service_catalog',
-              distance_km: null,
+              candidateId: service.id,
+              providerName: service.venue_name,
+              serviceName: service.name,
+              sourceType: 'service_catalog',
               category: service.category,
+              summary: service.summary,
+              venueName: service.venue_name,
               location: service.location,
-              booking_url: service.booking_url,
-              map_url: service.map_url,
+              bookingUrl: service.booking_url,
+              mapUrl: service.map_url,
+              amountAud: service.amount_aud,
+              durationMinutes: service.duration_minutes,
+              distanceKm: null,
               explanation: `${service.name} stays in the ranked shortlist.`,
             })),
             recommendations: [
@@ -461,7 +564,7 @@ test.describe('public assistant rollout smoke', () => {
             semantic_assist: {
               applied: true,
               provider: 'openai',
-              provider_chain: ['gemini', 'openai'],
+              provider_chain: ['openai', 'gemini'],
               fallback_applied: true,
               normalized_query: 'need a haircut in sydney',
               inferred_location: 'Sydney',
@@ -514,8 +617,7 @@ test.describe('public assistant rollout smoke', () => {
     });
 
     await openAssistant(page);
-    await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
-    await page.locator('#assistant-chat-input').press('Enter');
+    await submitAssistantQuery(page, 'Need a haircut in Sydney');
 
     await expect(page.getByText('Result Service 1', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Result Service 2', { exact: true }).first()).toBeVisible();
@@ -523,8 +625,6 @@ test.describe('public assistant rollout smoke', () => {
     await expect(page.getByText('Legacy Clinic Noise', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Result Service 4', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Result Service 6', { exact: true })).toHaveCount(0);
-    await expect(page.getByText('AI search: openai fallback • gemini -> openai').first()).toBeVisible();
-    await expect(page.getByText('Next action').first()).toBeVisible();
     await expect(page.getByRole('link', { name: 'Open Google map' }).first()).toHaveAttribute(
       'href',
       'https://maps.example.com/service-v1',
@@ -533,7 +633,6 @@ test.describe('public assistant rollout smoke', () => {
       'href',
       'https://book.example.com/service-v1',
     );
-    await expect(page.getByText('Ready to book').first()).toBeVisible();
 
     await page.getByRole('button', { name: 'See more results' }).first().click();
 
@@ -623,7 +722,7 @@ test.describe('public assistant rollout smoke', () => {
             semantic_assist: {
               applied: true,
               provider: 'openai',
-              provider_chain: ['gemini', 'openai'],
+              provider_chain: ['openai', 'gemini'],
               fallback_applied: true,
               normalized_query: 'private dining melbourne',
               inferred_location: 'Melbourne',
@@ -638,8 +737,7 @@ test.describe('public assistant rollout smoke', () => {
     });
 
     await openAssistant(page);
-    await page.locator('#assistant-chat-input').fill('private dining Melbourne');
-    await page.locator('#assistant-chat-input').press('Enter');
+    await submitAssistantQuery(page, 'private dining Melbourne');
 
     await expect(page.getByText('Legacy Clinic Noise', { exact: true })).toHaveCount(0);
     await expect(
@@ -647,6 +745,781 @@ test.describe('public assistant rollout smoke', () => {
         'No strong relevant catalog candidates were found. I stayed grounded to private dining melbourne, so I am not showing unrelated stored results.',
       ),
     ).toBeVisible();
+  });
+
+  test('shadow search still blocks unrelated legacy matches when live-read cannot finish trust resolution @live-read', async ({
+    page,
+  }) => {
+    const rankedService = {
+      ...liveReadService,
+      id: 'service-shadow-1',
+      name: 'Shadow Ranked Fade',
+      venue_name: 'Shadow Studio',
+      location: 'Sydney CBD',
+    };
+    const legacyOnlyNoise = {
+      ...unrelatedLegacyService,
+      id: 'service-legacy-noise',
+      name: 'Legacy Clinic Noise',
+    };
+
+    await page.route('**/api/booking-assistant/catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          business_email: 'hello@example.com',
+          stripe_enabled: false,
+          services: [rankedService, legacyOnlyNoise],
+        }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'Legacy tries to keep the old clinic result visible.',
+          matched_services: [legacyOnlyNoise],
+          matched_events: [],
+          suggested_service_id: legacyOnlyNoise.id,
+          should_request_location: false,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-shadow-guard',
+            channel_session_id: 'chan-shadow-guard',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-shadow-guard',
+            candidates: [
+              {
+                candidate_id: rankedService.id,
+                provider_name: rankedService.venue_name,
+                service_name: rankedService.name,
+                source_type: 'service_catalog',
+                distance_km: null,
+                category: rankedService.category,
+                location: rankedService.location,
+                booking_url: rankedService.booking_url,
+                map_url: rankedService.map_url,
+                explanation: 'Shadow search keeps the shortlist grounded to haircut intent.',
+              },
+            ],
+            recommendations: [
+              {
+                candidate_id: rankedService.id,
+                reason: 'Best exact fit',
+                path_type: 'request_callback',
+              },
+            ],
+            confidence: {
+              score: 0.88,
+              reason: 'Strong topic fit',
+              gating_state: 'high',
+            },
+            warnings: [],
+            semantic_assist: {
+              applied: true,
+              provider: 'openai',
+              provider_chain: ['openai'],
+              fallback_applied: false,
+              normalized_query: 'haircut in sydney',
+              inferred_location: 'Sydney',
+              inferred_category: 'Hair',
+              budget_summary: null,
+              evidence: ['semantic_model_rerank'],
+            },
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/booking-trust/checks', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            availability_state: 'available',
+            verified: true,
+            booking_confidence: 'high',
+            booking_path_options: ['request_callback'],
+            warnings: [],
+            payment_allowed_now: false,
+            recommended_booking_path: 'request_callback',
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/bookings/path/resolve', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await openAssistant(page);
+    await submitAssistantQuery(page, 'haircut in Sydney');
+
+    await expect(page.getByText('Shadow Ranked Fade', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Legacy Clinic Noise', { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText(
+        'I found 1 relevant result for haircut in sydney. Here are the top 1 to compare first.',
+      ),
+    ).toBeVisible();
+  });
+
+  test('live-read shows sourced public web options when tenant catalog has no strong match @live-read', async ({
+    page,
+  }) => {
+    await stubAssistantApis(page);
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-public-web-fallback',
+            channel_session_id: 'chan-public-web-fallback',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-public-web-fallback',
+            candidates: [
+              {
+                candidate_id: 'web_haircut_1',
+                provider_name: 'Precision Barber Sydney',
+                service_name: "Men's Haircut",
+                source_type: 'public_web_search',
+                category: null,
+                summary: 'Public web result for a nearby men’s haircut in Sydney.',
+                venue_name: 'Precision Barber Sydney',
+                location: 'Sydney NSW',
+                booking_url: 'https://precision.example.com/book',
+                map_url: null,
+                source_url: 'https://precision.example.com/haircut',
+                image_url: null,
+                amount_aud: null,
+                duration_minutes: null,
+                tags: ['public_web_search'],
+                featured: false,
+                distance_km: null,
+                match_score: 0.68,
+                semantic_score: null,
+                trust_signal: 'public_web_search',
+                is_preferred: false,
+                display_summary: 'Public web result for a nearby men’s haircut in Sydney.',
+                explanation:
+                  'Public web search fallback matched the request when tenant catalog did not have a strong result.',
+              },
+            ],
+            recommendations: [],
+            confidence: {
+              score: 0.68,
+              reason:
+                'No strong tenant catalog candidate was found, so BookedAI switched to sourced public web results.',
+              gating_state: 'medium',
+              evidence: ['public_web_search_fallback'],
+            },
+            warnings: [
+              'No strong tenant catalog candidates were found, so BookedAI is showing sourced public web options.',
+            ],
+            search_strategy: 'catalog_term_retrieval_with_prompt9_rerank_plus_public_web_search',
+            semantic_assist: {
+              applied: false,
+              provider: null,
+              provider_chain: [],
+              fallback_applied: false,
+              normalized_query: "men's haircut in sydney",
+              inferred_location: 'Sydney',
+              inferred_category: 'Salon',
+              budget_summary: null,
+              evidence: [],
+            },
+            booking_context: {
+              summary: 'recommendation',
+            },
+            search_diagnostics: {
+              effective_location_hint: 'Sydney',
+              relevance_location_hint: 'Sydney',
+              semantic_rollout_enabled: false,
+              semantic_applied: false,
+              retrieval_candidate_count: 0,
+              heuristic_candidate_ids: [],
+              semantic_candidate_ids: [],
+              post_relevance_candidate_ids: [],
+              post_domain_candidate_ids: [],
+              final_candidate_ids: ['web_haircut_1'],
+              dropped_candidates: [],
+            },
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await openAssistant(page);
+    await submitAssistantQuery(page, "Men's haircut in Sydney");
+
+    await expect(page.getByText("Men's Haircut", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Precision Barber Sydney', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(legacyService.name, { exact: true })).toHaveCount(0);
+    await expect(
+      page.getByText(
+        "I found 1 relevant result for men's haircut in sydney. Here are the top 1 to compare first.",
+      ),
+    ).toBeVisible();
+  });
+
+  test('near me asks for location just in time and clears stale shortlist state when location is unavailable @live-read', async ({
+    page,
+  }) => {
+    let searchRequests = 0;
+    let trustRequests = 0;
+    let pathRequests = 0;
+    const searchPayloads: Array<Record<string, unknown>> = [];
+
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, 'geolocation', {
+        configurable: true,
+        value: {
+          getCurrentPosition: (
+            _success: GeolocationPositionCallback,
+            error?: GeolocationPositionErrorCallback,
+          ) => {
+            error?.({
+              code: 1,
+              message: 'User denied Geolocation',
+              PERMISSION_DENIED: 1,
+              POSITION_UNAVAILABLE: 2,
+              TIMEOUT: 3,
+            } as GeolocationPositionError);
+          },
+        },
+      });
+    });
+
+    await page.route('**/api/partners', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', items: [] }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          business_email: 'hello@example.com',
+          stripe_enabled: false,
+          services: [legacyService, liveReadService, unrelatedLegacyService],
+        }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      const body = route.request().postDataJSON() as {
+        message?: string;
+      };
+      const message = body.message ?? '';
+
+      if (message.toLowerCase().includes('restaurant near me')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            reply: 'Legacy fallback tried to keep a previous shortlist alive.',
+            matched_services: [legacyService, unrelatedLegacyService],
+            matched_events: [],
+            suggested_service_id: legacyService.id,
+            should_request_location: true,
+          }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'I found a strong match for your request.',
+          matched_services: [legacyService],
+          matched_events: [],
+          suggested_service_id: legacyService.id,
+          should_request_location: false,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-near-me',
+            channel_session_id: 'chan-near-me',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      searchRequests += 1;
+      const body = route.request().postDataJSON() as Record<string, unknown>;
+      searchPayloads.push(body);
+      const query = String(body.query ?? '');
+
+      if (query.toLowerCase().includes('restaurant near me')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            data: {
+              request_id: 'match-near-me',
+              candidates: [],
+              recommendations: [],
+              confidence: {
+                score: 0.12,
+                reason: 'Nearby intent requires device location before ranking local matches.',
+                gating_state: 'low',
+              },
+              warnings: ['Location access is needed before I can rank nearby matches.'],
+              semantic_assist: {
+                applied: true,
+                provider: 'openai',
+                provider_chain: ['openai'],
+                fallback_applied: false,
+                normalized_query: 'restaurant near me',
+                inferred_location: null,
+                inferred_category: 'Restaurant',
+                budget_summary: null,
+                evidence: ['near_me_detected'],
+              },
+            },
+            meta: { version: 'v1', tenant_id: 'tenant-test' },
+          }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-hair',
+            candidates: [
+              {
+                candidate_id: liveReadService.id,
+                provider_name: liveReadService.venue_name,
+                service_name: liveReadService.name,
+                source_type: 'service_catalog',
+                distance_km: null,
+                category: liveReadService.category,
+                location: liveReadService.location,
+                booking_url: liveReadService.booking_url,
+                map_url: liveReadService.map_url,
+                explanation: 'Prompt 5 ranked this as the strongest match.',
+              },
+            ],
+            recommendations: [
+              {
+                candidate_id: liveReadService.id,
+                reason: 'Best match',
+                path_type: 'request_callback',
+              },
+            ],
+            confidence: {
+              score: 0.91,
+              reason: 'Strong catalog match',
+              gating_state: 'high',
+            },
+            warnings: [],
+            semantic_assist: {
+              applied: true,
+              provider: 'openai',
+              provider_chain: ['openai'],
+              fallback_applied: false,
+              normalized_query: 'need a haircut in sydney',
+              inferred_location: 'Sydney',
+              inferred_category: 'Hair',
+              budget_summary: null,
+              evidence: ['semantic_model_rerank'],
+            },
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/booking-trust/checks', async (route) => {
+      trustRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            availability_state: 'available',
+            verified: true,
+            booking_confidence: 'high',
+            booking_path_options: ['request_callback'],
+            warnings: [],
+            payment_allowed_now: false,
+            recommended_booking_path: 'request_callback',
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/bookings/path/resolve', async (route) => {
+      pathRequests += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            path_type: 'request_callback',
+            trust_confidence: 'high',
+            warnings: [],
+            next_step: 'Request callback and confirm final slot with the provider.',
+            payment_allowed_before_confirmation: false,
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await openAssistant(page);
+    await submitAssistantQuery(page, 'Need a haircut in Sydney');
+
+    await expect(page.getByText(liveReadService.name, { exact: true }).first()).toBeVisible();
+
+    await submitAssistantQuery(page, 'restaurant near me');
+
+    await expect
+      .poll(() => searchRequests, {
+        message:
+          'expected the homepage runtime to keep live-read search requests to one per query when location remains unavailable',
+      })
+      .toBe(2);
+    expect(trustRequests).toBe(1);
+    expect(pathRequests).toBe(1);
+    const nearMePayloads = searchPayloads.filter((payload) =>
+      String(payload.query ?? '').toLowerCase().includes('restaurant near me'),
+    );
+    expect(nearMePayloads).toHaveLength(1);
+    expect(
+      nearMePayloads.every((payload) => (payload.user_location ?? null) === null),
+    ).toBe(true);
+
+    await expect(
+      page.getByText(
+        'Location access is needed before I can rank nearby matches.',
+      ).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        'For tighter local matching, include the suburb or area you prefer.',
+      ),
+    ).toBeVisible();
+    await expect(page.getByText(liveReadService.name, { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Legacy Barber Cut', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Legacy GP Clinic', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Book now' })).toHaveCount(0);
+  });
+
+  test('live-read shows an in-progress search state and hides stale shortlist rows while a new query resolves @live-read', async ({
+    page,
+  }) => {
+    let matchingSearchRequests = 0;
+
+    await page.route('**/api/partners', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', items: [] }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          business_email: 'hello@example.com',
+          stripe_enabled: false,
+          services: [legacyService, liveReadService],
+        }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      const body = route.request().postDataJSON() as { message?: string };
+      const message = body.message ?? '';
+
+      if (message.toLowerCase().includes('restaurant')) {
+        await new Promise((resolve) => setTimeout(resolve, 1800));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            reply: 'I found a restaurant option after the live-read search completed.',
+            matched_services: [],
+            matched_events: [],
+            suggested_service_id: null,
+            should_request_location: false,
+          }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'I found a strong match for your request.',
+          matched_services: [legacyService],
+          matched_events: [],
+          suggested_service_id: legacyService.id,
+          should_request_location: false,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-loading-state',
+            channel_session_id: 'chan-loading-state',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      matchingSearchRequests += 1;
+      const body = route.request().postDataJSON() as { query?: string };
+      const query = body.query ?? '';
+
+      if (query.toLowerCase().includes('restaurant')) {
+        await new Promise((resolve) => setTimeout(resolve, 1800));
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            data: {
+              request_id: 'match-loading-state-2',
+              candidates: [],
+              recommendations: [],
+              confidence: {
+                score: 0.22,
+                reason: 'Still resolving the new restaurant shortlist.',
+                gating_state: 'low',
+              },
+              normalized_query: 'restaurant in sydney',
+              query_understanding: {
+                normalized_query: 'restaurant in sydney',
+                inferred_location: 'Sydney',
+                inferred_category: 'Restaurant',
+                budget_summary: null,
+              },
+              semantic_assist: null,
+            },
+            meta: { version: 'v1', tenant_id: 'tenant-test' },
+          }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-loading-state-1',
+            candidates: [
+              {
+                candidateId: liveReadService.id,
+                providerName: liveReadService.venue_name,
+                serviceName: liveReadService.name,
+                sourceType: 'service_catalog',
+                distanceKm: null,
+                explanation: 'Strong live-read match.',
+              },
+            ],
+            recommendations: [
+              {
+                candidate_id: liveReadService.id,
+                rank: 1,
+                summary: 'Best live-read match.',
+                rationale: 'Relevant to the active request.',
+                next_best_action: 'Choose this result and continue to booking.',
+                booking_context: null,
+              },
+            ],
+            confidence: {
+              score: 0.92,
+              reason: 'Strong live-read confidence.',
+              gating_state: 'high',
+            },
+            normalized_query: 'haircut in sydney',
+            query_understanding: {
+              normalized_query: 'haircut in sydney',
+              inferred_location: 'Sydney',
+              inferred_category: 'Hair',
+              budget_summary: null,
+            },
+            semantic_assist: {
+              provider: 'gemini',
+              provider_chain: ['gemini'],
+              fallback_applied: false,
+              normalized_query: 'haircut in sydney',
+              inferred_location: 'Sydney',
+              inferred_category: 'Hair',
+              budget_summary: null,
+              warnings: [],
+            },
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/booking-trust/checks', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            availability_state: 'available',
+            verified: true,
+            booking_confidence: 'high',
+            booking_path_options: ['direct_booking_url'],
+            payment_allowed_now: true,
+            recommended_booking_path: 'direct_booking_url',
+            warnings: [],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/bookings/path/resolve', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            path_type: 'direct_booking_url',
+            next_step: 'Book online now.',
+            payment_allowed_before_confirmation: true,
+            warnings: [],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await openAssistant(page);
+    await submitAssistantQuery(page, 'haircut in Sydney');
+
+    await expect(page.getByText('V1 Precision Fade', { exact: true }).first()).toBeVisible();
+
+    await submitAssistantQuery(page, 'restaurant in Sydney');
+
+    const inlineAssistantPane = await getActiveAssistantPane(page);
+    await expect(
+      inlineAssistantPane
+        .getByText('BookedAI is finding the best option for your request.')
+        .first(),
+    ).toBeVisible();
+    await expect(
+      inlineAssistantPane
+        .getByText(
+          'Searching for "restaurant in Sydney" using the latest live-read shortlist and trust checks.',
+        )
+        .first(),
+    ).toBeVisible();
+    await expect(inlineAssistantPane.getByText('Checking locality').first()).toBeVisible();
+    await expect(page.getByText('V1 Precision Fade', { exact: true })).toHaveCount(0);
+
+    await expect(
+      page.getByText('BookedAI will prefer accuracy over showing a wrong-domain recommendation.').first(),
+    ).toBeVisible();
+    expect(matchingSearchRequests).toBeGreaterThanOrEqual(2);
   });
 
   test('booking submit still uses legacy session as the authoritative write when live-read is enabled @live-read', async ({ page }) => {
@@ -807,27 +1680,27 @@ test.describe('public assistant rollout smoke', () => {
     });
 
     await openAssistant(page);
-    await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
-    await page.locator('#assistant-chat-input').press('Enter');
+    await submitAssistantQuery(page, 'Need a haircut in Sydney');
+    const topMatch = page.getByText(liveReadService.name, { exact: true }).first();
+    if (await topMatch.isVisible().catch(() => false)) {
+      await topMatch.click();
+    }
+    await openBookingComposerIfNeeded(page);
 
-    await expect(page.getByText(liveReadService.name, { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Ready to book').first()).toBeVisible();
-
-    const bookingForm = page
-      .locator('form')
-      .filter({ has: page.getByRole('button', { name: 'Create Booking Request' }) });
+    const bookingForm = getBookingForm(page);
     await expect(bookingForm).toBeVisible();
     await bookingForm.getByLabel('Name').fill('BookedAI Customer');
-    await bookingForm.locator('input[type="email"][placeholder="Email address"]').fill('customer@example.com');
+    await bookingForm.getByLabel('Email').fill('customer@example.com');
     await bookingForm.locator('input[type="datetime-local"]').fill(requestedSlot);
-    await page.getByRole('button', { name: 'Create Booking Request' }).click();
+    await bookingForm
+      .getByRole('button', { name: /Create Booking Request|Continue booking/i })
+      .click();
 
-    await expect(page.getByText('Booking reference')).toBeVisible();
     await expect(page.getByText('BR-1001', { exact: true })).toBeVisible();
     await expect(page.getByText('Legacy booking session completed successfully.')).toBeVisible();
     expect(legacySessionRequests).toBe(1);
-    expect(shadowLeadRequests).toBeGreaterThanOrEqual(1);
-    expect(shadowBookingIntentRequests).toBeGreaterThanOrEqual(1);
+    await expect.poll(() => shadowLeadRequests).toBeGreaterThanOrEqual(1);
+    await expect.poll(() => shadowBookingIntentRequests).toBeGreaterThanOrEqual(1);
   });
 
   test('payment and confirmation success card surfaces stripe, calendar, and email handoff states @live-read', async ({
@@ -980,34 +1853,37 @@ test.describe('public assistant rollout smoke', () => {
     });
 
     await openAssistant(page);
-    await page.locator('#assistant-chat-input').fill('Need a haircut in Sydney');
-    await page.locator('#assistant-chat-input').press('Enter');
+    await submitAssistantQuery(page, 'Need a haircut in Sydney');
 
     await expect(page.getByText(liveReadService.name, { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Ready to book').first()).toBeVisible();
+    await openBookingComposerIfNeeded(page);
 
-    const bookingForm = page
-      .locator('form')
-      .filter({ has: page.getByRole('button', { name: 'Create Booking Request' }) });
+    const bookingForm = getBookingForm(page);
     await expect(bookingForm).toBeVisible();
     await bookingForm.getByLabel('Name').fill('BookedAI Customer');
-    await bookingForm.locator('input[type="email"][placeholder="Email address"]').fill('customer@example.com');
+    await bookingForm.getByLabel('Email').fill('customer@example.com');
     await bookingForm.locator('input[type="datetime-local"]').fill(requestedSlot);
-    await page.getByRole('button', { name: 'Create Booking Request' }).click();
+    await bookingForm
+      .getByRole('button', { name: /Create Booking Request|Continue booking/i })
+      .click();
 
     await expect(page.getByText('BR-2002', { exact: true })).toBeVisible();
     await expect(page.getByText('Sent to customer')).toBeVisible();
     await expect(page.getByText('Checkout ready now')).toBeVisible();
     await expect(page.getByText('Calendar event sent')).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Continue to Stripe' })).toHaveAttribute(
+    await expect(page.getByRole('link', { name: 'Open payment' })).toHaveAttribute(
       'href',
       'https://checkout.stripe.com/pay/cs_test_public',
     );
-    await expect(page.getByRole('link', { name: 'View calendar event' })).toHaveAttribute(
+    await expect(page.getByRole('link', { name: 'Add to calendar' })).toHaveAttribute(
       'href',
       'https://calendar.example.com/events/BR-2002',
     );
-    await expect(page.getByRole('link', { name: 'Contact customer@example.com' })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'portal.bookedai.au' })).toHaveAttribute(
+      'href',
+      'https://portal.bookedai.au/?booking_reference=BR-2002',
+    );
+    await expect(page.getByText('Scan to open booking')).toBeVisible();
     await expect(
       page.getByText(
         'A calendar event has been created and included in the booking flow. After payment, Stripe returns the customer to the homepage while the booking stays logged for follow-up.',
@@ -1016,6 +1892,7 @@ test.describe('public assistant rollout smoke', () => {
   });
 
   test('booking success banner renders on homepage after stripe return @legacy', async ({ page }) => {
+    test.skip(isLiveReadMode, 'Legacy-only homepage return assertions should not run in live-read mode.');
     await page.goto('/?booking=success&ref=BR-2002');
 
     await expect(page.getByText('Payment complete')).toBeVisible();

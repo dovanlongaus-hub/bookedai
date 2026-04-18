@@ -6,6 +6,16 @@ export const metadata: Metadata = {
   description:
     "BookedAI.au captures demand across search, website, calls, email, and follow-up — then converts it into confirmed bookings and revenue automatically.",
   metadataBase: new URL("https://bookedai.au"),
+  icons: {
+    icon: [
+      { url: "/branding/bookedai-icon-32.png?v=20260418-brand-system", sizes: "32x32", type: "image/png" },
+      { url: "/branding/bookedai-mobile-icon-192.png?v=20260418-brand-system", sizes: "192x192", type: "image/png" },
+    ],
+    apple: [
+      { url: "/branding/bookedai-apple-touch-icon.png?v=20260418-brand-system", sizes: "180x180", type: "image/png" },
+    ],
+    shortcut: ["/branding/bookedai-icon-32.png?v=20260418-brand-system"],
+  },
   openGraph: {
     title: "BookedAI.au | The AI Revenue Engine for Service Businesses",
     description:

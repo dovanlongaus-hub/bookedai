@@ -20,9 +20,9 @@ This strategy inherits and aligns with:
 ## Section 1 — Executive summary
 
 - Current tenant experience maturity:
-  - No dedicated tenant app is confirmed in the current repo.
-  - The closest existing surface is the internal admin runtime on `admin.bookedai.au` or `/admin`.
-  - That admin surface is real and operational, but it is not a tenant-ready SME product surface.
+  - A dedicated tenant app route is now confirmed in the current repo.
+  - The tenant surface now includes `overview`, `catalog`, `bookings`, and `integrations` panels.
+  - Google-authenticated tenant actions and AI-guided website import have started shipping, but the tenant app is still early and should not yet be treated as a fully mature SME product surface.
 - Target tenant app direction:
   - A mode-aware tenant app that serves as:
     - operational control surface
@@ -50,7 +50,16 @@ Confirmed from the current repo:
 - `frontend/src/app/AppRouter.tsx` chooses:
   - `PublicApp`
   - `AdminApp`
+  - `TenantApp`
 - `AdminApp` renders a single large [AdminPage](../../frontend/src/components/AdminPage.tsx)
+- `TenantApp` now renders a dedicated tenant workspace at the tenant route
+- the current tenant surface includes:
+  - overview summary cards
+  - tenant catalog workspace
+  - bookings panel
+  - integrations panel
+  - Google sign-in entry for tenant-authenticated actions
+  - AI-guided website import for booking-critical catalog extraction
 - The current admin surface includes:
   - admin login
   - overview metrics
@@ -78,20 +87,18 @@ Confirmed admin routes:
 
 ### What is missing
 
-No dedicated tenant-facing surface is confirmed yet for SMEs to self-serve:
+The tenant app now exists, but several SME self-serve areas are still missing:
 
-- no tenant overview dashboard
 - no lead lifecycle area
 - no conversation inbox area for SMEs
-- no matching-quality visibility area
 - no booking trust dashboard
 - no billing and subscription area
 - no CRM and lifecycle dashboard
 - no email communications workspace
 - no monthly value reporting workspace
-- no deployment-mode management page
-- no integrations management page for tenant operators
 - no team and role view for tenants
+- no full multi-step provenance-review workflow yet
+- no strong invitation or multi-user tenant-membership model beyond the current first authenticated slice
 
 ### What can be reused
 
@@ -124,8 +131,9 @@ Reusable concepts from current admin:
 Current maturity should be described as:
 
 - internal ops visibility exists
-- tenant self-serve product surface does not yet exist
-- the repo has enough structural foundation to design one safely
+- first tenant self-serve product surface now exists
+- tenant write actions now include Google-authenticated catalog import plus edit, publish, and archive actions for catalog rows
+- the repo still needs stronger auth, ownership, editing, and publish-state hardening before broader SME rollout
 
 ### Biggest gaps
 
@@ -404,6 +412,10 @@ Recommended tenant app areas:
   - strong for standalone and provider-driven setups
 - Mobile:
   - medium-low for heavy management, high for review
+- Product requirement:
+  - this area must eventually let a tenant sign in, manage real searchable or bookable services, and publish only customer-safe rows into public matching
+  - if a real SME customer already exists in BookedAI data, the tenant flow must provide a path to surface that truthful business information in search once the record is owned, completed, and published
+  - live examples such as `swimming Sydney` should be treated as catalog-supply and publish-readiness gaps when retrieval has zero candidates, not only as ranking defects
 
 #### Team And Roles
 
@@ -536,6 +548,13 @@ Matching area should show:
 - source type
 - verification level
 - whether availability is verified
+- catalog readiness state when the query fails because no tenant-published searchable record exists
+
+Matching area should eventually support:
+
+- visibility into whether a service is draft, published, search-ready, or blocked by missing metadata
+- operator-safe explanation of why a real business is not surfacing yet in public matching
+- handoff into Services And Providers so the tenant can complete the missing searchable or bookable product data
 
 ### Booking and availability
 
@@ -953,6 +972,7 @@ The safest plan is a parallel evolution, not a direct replacement.
 - introduce tenant app gradually as a separate tenant-facing surface
 - begin with read-heavy tenant views
 - add controlled actions later
+- add catalog publish controls only after tenant auth, ownership checks, and public-read safeguards exist
 
 ### What to build first
 
@@ -962,6 +982,7 @@ The safest plan is a parallel evolution, not a direct replacement.
 4. booking request and trust visibility
 5. billing summary
 6. integration health summary
+7. tenant-authenticated services and providers foundation for searchable or bookable products
 
 ### What can reuse current admin temporarily
 
@@ -1008,6 +1029,7 @@ The safest plan is a parallel evolution, not a direct replacement.
 - make billing, lifecycle, and integration value visible early
 - make the tenant experience deployment-mode-aware from the start
 - design mobile for triage, follow-up, and alert handling first
+- reserve explicit Phase 4 backend scope for tenant login plus searchable or bookable catalog ownership so public search can surface truthful SME data from real customers
 
 ### Anti-patterns to avoid
 

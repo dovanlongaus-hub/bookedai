@@ -9,6 +9,19 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        brand: {
+          bg: "#0B1020",
+          bgSoft: "#121A2B",
+          surface: "#182235",
+          text: "#F8FAFC",
+          muted: "#94A3B8",
+          blue: "#4F8CFF",
+          green: "#22C55E",
+          purple: "#8B5CF6",
+          amber: "#F59E0B",
+          red: "#EF4444",
+          border: "rgba(255,255,255,0.08)",
+        },
         bg: "#0B1020",
         bgSoft: "#121A2B",
         surface: "#182235",
@@ -23,6 +36,9 @@ const config: Config = {
         dangerRed: "#EF4444",
       },
       backgroundImage: {
+        "brand-gradient": "linear-gradient(135deg, #4F8CFF 0%, #8B5CF6 50%, #22C55E 100%)",
+        "hero-glow": "radial-gradient(circle at top left, rgba(79,140,255,0.24), transparent 45%)",
+        "green-glow": "radial-gradient(circle at top right, rgba(34,197,94,0.20), transparent 40%)",
         brandGradient: "linear-gradient(135deg, #4F8CFF 0%, #8B5CF6 50%, #22C55E 100%)",
         heroGlow: "radial-gradient(circle at top left, rgba(79,140,255,0.24), transparent 45%)",
         greenGlow: "radial-gradient(circle at top right, rgba(34,197,94,0.20), transparent 40%)",
@@ -40,6 +56,8 @@ const config: Config = {
         bodySm: "0.875rem",
       },
       borderRadius: {
+        brand: "24px",
+        brandxl: "32px",
         sm: "12px",
         md: "18px",
         lg: "24px",

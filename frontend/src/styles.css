@@ -30,21 +30,39 @@
   --color-bookedai-bg: #0B1020;
   --color-bookedai-bg-soft: #121A2B;
   --color-bookedai-surface: #182235;
+  --color-bookedai-surface-strong: #1E2B44;
+  --color-bookedai-surface-glass: rgba(15,23,42,0.72);
   --color-bookedai-surface-alt: rgba(255,255,255,0.04);
   --color-bookedai-border: rgba(255,255,255,0.08);
+  --color-bookedai-border-strong: rgba(139,92,246,0.28);
   --color-bookedai-text-primary: #F8FAFC;
   --color-bookedai-text-secondary: #94A3B8;
+  --color-bookedai-text-tertiary: rgba(248,250,252,0.64);
   --color-bookedai-primary-blue: #4F8CFF;
   --color-bookedai-accent-green: #22C55E;
   --color-bookedai-accent-purple: #8B5CF6;
+  --color-bookedai-accent-amber: #F97316;
   --color-bookedai-warning-amber: #F59E0B;
   --color-bookedai-danger-red: #EF4444;
+  --color-brand-bg: #0B1020;
+  --color-brand-bgSoft: #121A2B;
+  --color-brand-surface: #182235;
+  --color-brand-text: #F8FAFC;
+  --color-brand-muted: #94A3B8;
+  --color-brand-blue: #4F8CFF;
+  --color-brand-green: #22C55E;
+  --color-brand-purple: #8B5CF6;
+  --color-brand-amber: #F59E0B;
+  --color-brand-red: #EF4444;
+  --color-brand-border: rgba(255,255,255,0.08);
 
   /* Typography */
-  --font-display: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-body:    "SF Pro Text",    -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-display: "Space Grotesk", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --font-body:    "DM Sans", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --font-mono:    "SF Mono", SFMono-Regular, ui-monospace, Menlo, Monaco, "Courier New", monospace;
-  --font-bookedai-sans: Inter, sans-serif;
+  --font-bookedai-display: "Space Grotesk", Inter, sans-serif;
+  --font-bookedai-sans: "DM Sans", Inter, sans-serif;
+  --font-sans: "DM Sans", Inter, sans-serif;
   --text-bookedai-hero-display: clamp(3rem, 6vw, 5.5rem);
   --text-bookedai-h1: clamp(2.5rem, 5vw, 4.5rem);
   --text-bookedai-h2: clamp(2rem, 4vw, 3rem);
@@ -64,17 +82,175 @@
   --radius-bookedai-lg: 24px;
   --radius-bookedai-xl: 32px;
   --radius-bookedai-pill: 9999px;
+  --radius-brand: 24px;
+  --radius-brandxl: 32px;
 
   /* Shadows */
   --shadow-apple:    rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
   --shadow-apple-sm: rgba(0, 0, 0, 0.12) 0px 2px 12px 0px;
   --shadow-bookedai-card: 0 10px 40px rgba(2,6,23,0.38);
-  --shadow-bookedai-glow: 0 0 0 1px rgba(255,255,255,0.06), 0 18px 60px rgba(79,140,255,0.14);
+  --shadow-bookedai-glow: 0 0 0 1px rgba(255,255,255,0.06), 0 18px 60px rgba(139,92,246,0.16);
+  --shadow-bookedai-float: 0 20px 70px rgba(2,6,23,0.46);
+  --shadow-card: 0 10px 40px rgba(2,6,23,0.38);
+  --shadow-glow: 0 0 0 1px rgba(255,255,255,0.06), 0 18px 60px rgba(139,92,246,0.16);
+  --background-image-brand-gradient: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 42%, #4F8CFF 100%);
+  --background-image-hero-glow: radial-gradient(circle at top left, rgba(139,92,246,0.24), transparent 45%);
+  --background-image-green-glow: radial-gradient(circle at top right, rgba(79,140,255,0.16), transparent 40%);
+  --background-image-amber-glow: radial-gradient(circle at center top, rgba(196,181,253,0.16), transparent 28%);
+  --max-width-container: 1200px;
+}
+
+@layer base {
+  :root {
+    --bg: #0B1020;
+    --bg-soft: #121A2B;
+    --surface: #182235;
+    --surface-alt: rgba(255,255,255,0.04);
+    --border: rgba(255,255,255,0.08);
+    --text-primary: #F8FAFC;
+    --text-secondary: #94A3B8;
+    --primary-blue: #4F8CFF;
+    --accent-green: #22C55E;
+    --accent-purple: #8B5CF6;
+    --warning-amber: #F59E0B;
+    --danger-red: #EF4444;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background:
+      radial-gradient(circle at top left, rgba(139,92,246,0.16), transparent 28%),
+      radial-gradient(circle at top right, rgba(79,140,255,0.12), transparent 22%),
+      radial-gradient(circle at center top, rgba(196,181,253,0.10), transparent 18%),
+      var(--bg);
+    color: var(--text-primary);
+    font-family: var(--font-body);
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-family: var(--font-display);
+  }
+
+  * {
+    border-color: var(--border);
+  }
+}
+
+@layer components {
+  .container-brand {
+    @apply mx-auto w-full max-w-container px-4 sm:px-6 lg:px-8;
+  }
+
+  .glass {
+    background: linear-gradient(180deg, rgba(24,34,53,0.78) 0%, rgba(12,18,31,0.92) 100%);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border: 1px solid rgba(255,255,255,0.08);
+    box-shadow: var(--shadow-bookedai-float);
+  }
+
+  .gradient-text {
+    background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 44%, #4F8CFF 100%);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .section-y {
+    @apply py-20 md:py-24 lg:py-28;
+  }
+
+  .public-section-rhythm {
+    @apply py-12 sm:py-14 lg:py-16;
+  }
+
+  .public-hero-layout {
+    @apply grid gap-5 lg:grid-cols-[0.96fr_1.04fr] lg:items-start;
+  }
+
+  .public-search-panel {
+    border: 1px solid rgba(255,255,255,0.1);
+    background: linear-gradient(180deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.04) 100%);
+    box-shadow: 0 24px 90px rgba(2,6,23,0.24);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+  }
+
+  .public-accent-panel {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: linear-gradient(180deg, rgba(24,34,53,0.9) 0%, rgba(11,16,32,0.98) 100%);
+    box-shadow: var(--shadow-bookedai-float);
+  }
+
+  .public-accent-panel::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(139,92,246,0.7), rgba(79,140,255,0.62), transparent);
+    pointer-events: none;
+  }
+
+  .public-accent-panel::after {
+    content: '';
+    position: absolute;
+    right: -16%;
+    bottom: -28%;
+    width: 16rem;
+    height: 16rem;
+    border-radius: 9999px;
+    background: radial-gradient(circle, rgba(139,92,246,0.14), transparent 68%);
+    pointer-events: none;
+  }
+
+  .public-kicker {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    border-radius: 9999px;
+    border: 1px solid rgba(139,92,246,0.18);
+    background: rgba(139,92,246,0.12);
+    color: #ddd6fe;
+    padding: 0.5rem 0.9rem;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+  }
+
+  @media (max-width: 639px) {
+    .public-section-rhythm {
+      padding-top: 2.5rem;
+      padding-bottom: 2.5rem;
+    }
+
+    .public-hero-layout {
+      gap: 1rem;
+    }
+
+    .public-search-panel {
+      border-radius: 1.5rem;
+    }
+  }
 }
 
 /* ─── Keyframe Animations ────────────────────────────────────────────────────── */
 
 @layer utilities {
+  .grid-auto {
+    @apply grid gap-6 md:grid-cols-2 xl:grid-cols-4;
+  }
+
   @keyframes bookingPulse {
     0%,
     100% {
@@ -123,5 +299,45 @@
 
   .animate-apple-fade {
     animation: appleFade 0.4s ease forwards;
+  }
+
+  @keyframes bookedaiCursorBlink {
+    0%,
+    48% {
+      opacity: 1;
+    }
+    52%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  @keyframes bookedaiTypingDot {
+    0%,
+    80%,
+    100% {
+      transform: translateY(0);
+      opacity: 0.35;
+    }
+    40% {
+      transform: translateY(-3px);
+      opacity: 1;
+    }
+  }
+
+  .animate-bookedai-cursor {
+    animation: bookedaiCursorBlink 1s steps(1, end) infinite;
+  }
+
+  .animate-bookedai-typing span:nth-child(1) {
+    animation: bookedaiTypingDot 1.1s ease-in-out infinite;
+  }
+
+  .animate-bookedai-typing span:nth-child(2) {
+    animation: bookedaiTypingDot 1.1s ease-in-out 0.16s infinite;
+  }
+
+  .animate-bookedai-typing span:nth-child(3) {
+    animation: bookedaiTypingDot 1.1s ease-in-out 0.32s infinite;
   }
 }

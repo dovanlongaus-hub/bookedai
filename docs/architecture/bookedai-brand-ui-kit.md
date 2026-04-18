@@ -13,7 +13,8 @@ Foundation files:
 - `frontend/src/theme/bookedai-brand-kit.css`
 - `frontend/src/styles.css`
 - `frontend/src/components/brand-kit/*`
-- `frontend/public/branding/bookedai-revenue-engine-*.svg`
+- `frontend/public/branding/*`
+- `docs/architecture/unified-responsive-theme-system.md`
 
 Brand rules:
 
@@ -26,14 +27,29 @@ Brand rules:
 
 # B. Logo System
 
-SVG assets:
+Single source of truth:
 
-- primary on dark: `frontend/public/branding/bookedai-revenue-engine-dark.svg`
-- primary on light: `frontend/public/branding/bookedai-revenue-engine-light.svg`
-- icon-only: `frontend/public/branding/bookedai-revenue-engine-icon.svg`
-- white monochrome: `frontend/public/branding/bookedai-revenue-engine-white.svg`
-- black monochrome: `frontend/public/branding/bookedai-revenue-engine-black.svg`
-- transparent-ready: `frontend/public/branding/bookedai-revenue-engine-transparent.svg`
+- the only approved logo and icon source for every BookedAI surface is now `frontend/public/branding/`
+- this folder is the required asset source for all app, web, landing, single-page, admin, product, roadmap, pitch, favicon, PWA, iOS touch icon, and mobile-responsive brand usage
+- teams must not introduce a second logo system via remote URLs, inline SVG forks, ad hoc screenshots, or route-local logo exports when an equivalent asset already exists in `frontend/public/branding/`
+- when a new logo or icon is approved, it must be added into `frontend/public/branding/` first and then referenced from the shared brand config files, rather than linked directly from one page or one route
+- `frontend/src/components/landing/data.ts`, `frontend/src/components/landing/ui/BrandLockup.tsx`, `frontend/src/components/landing/ui/LogoMark.tsx`, and `frontend/src/components/brand-kit/brand.tsx` are the shared code entry points that should resolve assets from this folder
+
+Current approved checked-in assets:
+
+- wordmark on light surfaces: `frontend/public/branding/bookedai-logo-light.png`
+- wordmark on dark/gradient surfaces: `frontend/public/branding/bookedai-logo-dark-badge.png`
+- black wordmark for light neutral documents/embeds: `frontend/public/branding/bookedai-logo-black.png`
+- short mark / compact action icon: `frontend/public/branding/bookedai-mark-gradient.png`
+- square app icon master: `frontend/public/branding/bookedai-app-icon-1024.png`
+- favicon and responsive app sizes: `frontend/public/branding/bookedai-icon-16.png`, `32`, `48`, `64`, `96`, `180`, `192`, `256`, `512`
+- touch/mobile outputs: `frontend/public/branding/bookedai-apple-touch-icon.png`, `frontend/public/branding/bookedai-mobile-icon-192.png`, `frontend/public/branding/bookedai-mobile-icon-512.png`
+
+Legacy asset policy:
+
+- older logo families such as `bookedai-revenue-engine-*`, `bookedai-logo*`, `bookedai-mark*`, `bookedai-unified-logo`, legacy root favicons, and route-local icon files have now been retired from the active asset set
+- they should not exist as implementation dependencies in app code, HTML metadata, templates, or docs that describe the current production baseline
+- if one of those names appears again in a future change, it should be treated as a regression and removed before release
 
 Logo concept:
 
@@ -42,13 +58,19 @@ Logo concept:
 - geometric outer panel for product-grade SaaS feel
 - wordmark lockup: `BookedAI.au`
 - optional descriptor line: `REVENUE ENGINE`
+- dark panel should read like a compact revenue dashboard tile rather than a generic badge
+- the arrow should communicate booked demand turning into upward revenue movement, not abstract AI motion
+- purple should stay secondary as a soft sheen or depth cue, while blue and green carry the main commercial signal
+- the mark should remain readable at favicon and compact-nav sizes before decorative detail is added
 
 Recommended usage:
 
-- use `dark.svg` on dark shells and hero surfaces with full lockup
-- use `light.svg` on white or sand surfaces
-- use `icon.svg` for favicon, app icon, avatar chips, and compact nav
-- use monochrome variants only for one-color printing, watermarking, or constrained embeds
+- use `bookedai-logo-dark-badge.png` on dark shells and hero surfaces with full lockup
+- use `bookedai-logo-light.png` on white or neutral surfaces
+- use `bookedai-mark-gradient.png` for compact nav, button marks, avatar chips, and small action surfaces
+- use `bookedai-icon-32.png`, `bookedai-mobile-icon-192.png`, and `bookedai-apple-touch-icon.png` for favicon, PWA, and touch-icon treatments
+- use `bookedai-logo-black.png` only for one-color printing, watermarking, or constrained embeds
+- use `bookedai-apple-touch-icon.png` for iOS touch-icon treatment rather than reusing older square-logo exports
 
 Safe area rule:
 
@@ -57,8 +79,26 @@ Safe area rule:
 
 Favicon guidance:
 
-- use `bookedai-revenue-engine-icon.svg`
-- generate `32x32`, `64x64`, `180x180`, and pinned-tab exports from the same icon geometry
+- use `bookedai-mark-gradient.png` as the compact mark source and ship checked-in raster outputs from `frontend/public/branding/`
+- generate `32x32`, `64x64`, `180x180`, and larger responsive outputs from the same icon geometry
+- keep the favicon geometry aligned to the live icon asset instead of maintaining a separate simplified symbol
+
+Live implementation baseline:
+
+- `frontend/public/branding/bookedai-icon-32.png`
+- `frontend/public/branding/bookedai-mobile-icon-192.png`
+- `frontend/public/branding/bookedai-app-icon-1024.png`
+- `frontend/public/branding/bookedai-apple-touch-icon.png`
+- `frontend/public/branding/bookedai-logo-light.png`
+- `frontend/public/branding/bookedai-logo-dark-badge.png`
+- `frontend/public/branding/bookedai-mark-gradient.png`
+
+Production status:
+
+- the redesigned revenue-engine logo system was deployed live on `2026-04-18`
+- production HTML now points to the versioned checked-in raster icon assets in `frontend/public/branding/` to avoid long-lived cache drift from legacy favicon paths
+- `components/brand/logo.tsx` and `frontend/src/components/brand-kit/brand.tsx` now both resolve to the same checked-in raster asset family instead of maintaining divergent inline mark logic
+- on `2026-04-18`, the checked-in raster asset family in `frontend/public/branding/` also became the required single-source brand library for all current BookedAI apps and responsive surfaces, with shared route code resolving from that folder instead of mixing remote URLs and per-surface logo variants
 
 # C. CSS Variables
 
@@ -112,6 +152,7 @@ Exact tokens:
 Tailwind bridge lives in:
 
 - `frontend/src/styles.css`
+- `tailwind.config.ts`
 
 Exposed utilities:
 
@@ -124,6 +165,80 @@ Exposed utilities:
 - `shadow-bookedai-card`
 - `shadow-bookedai-glow`
 - `font-bookedai-sans`
+
+Canonical Tailwind extension:
+
+```ts
+import type { Config } from "tailwindcss";
+
+const config: Config = {
+  darkMode: ["class"],
+  content: [
+    "./app/**/*.{ts,tsx}",
+    "./components/**/*.{ts,tsx}",
+  ],
+  theme: {
+    extend: {
+      colors: {
+        brand: {
+          bg: "#0B1020",
+          bgSoft: "#121A2B",
+          surface: "#182235",
+          text: "#F8FAFC",
+          muted: "#94A3B8",
+          blue: "#4F8CFF",
+          green: "#22C55E",
+          purple: "#8B5CF6",
+          amber: "#F59E0B",
+          red: "#EF4444",
+          border: "rgba(255,255,255,0.08)",
+        },
+      },
+      maxWidth: {
+        container: "1200px",
+      },
+      borderRadius: {
+        brand: "24px",
+        brandxl: "32px",
+      },
+      boxShadow: {
+        card: "0 10px 40px rgba(2,6,23,0.38)",
+        glow: "0 0 0 1px rgba(255,255,255,0.06), 0 18px 60px rgba(79,140,255,0.14)",
+      },
+      backgroundImage: {
+        "brand-gradient":
+          "linear-gradient(135deg, #4F8CFF 0%, #8B5CF6 50%, #22C55E 100%)",
+        "hero-glow":
+          "radial-gradient(circle at top left, rgba(79,140,255,0.24), transparent 45%)",
+        "green-glow":
+          "radial-gradient(circle at top right, rgba(34,197,94,0.20), transparent 40%)",
+      },
+      fontFamily: {
+        sans: ["Inter", "sans-serif"],
+      },
+    },
+  },
+  plugins: [],
+};
+
+export default config;
+```
+
+Recommended Tailwind class usage:
+
+- `bg-brand-bg`
+- `bg-brand-surface`
+- `text-brand-text`
+- `text-brand-muted`
+- `border-brand-border`
+- `bg-brand-gradient`
+- `bg-hero-glow`
+- `bg-green-glow`
+- `rounded-brand`
+- `rounded-brandxl`
+- `shadow-card`
+- `shadow-glow`
+- `max-w-container`
 
 Required import order:
 
@@ -172,6 +287,12 @@ Source:
 
 - `frontend/src/components/brand-kit/index.ts`
 
+Implementation note:
+
+- this list is the actual exported inventory from `frontend/src/components/brand-kit/index.ts`
+- Sprint 2 supporting landing primitives such as `SectionCard`, `FeatureCard`, `SectionHeading`, `SignalPill`, and `LogoMark` live under `frontend/src/components/landing/ui/` rather than the reusable brand-kit export surface
+- do not treat conceptual examples from this document as already exported unless they exist in `brand-kit/index.ts`
+
 # F. Component Specs
 
 ## Foundations
@@ -206,6 +327,9 @@ Source:
 ### `Logo`
 
 - supports `dark`, `light`, `white`, `black`, `transparent`, `icon`
+- exported source map: `brandLogoSources`
+- exported variant type: `BrandLogoVariant`
+- exported palette map: `brandColorTokens`
 
 ### `BrandHeading`
 
@@ -349,12 +473,14 @@ Visual rules:
 frontend/
   public/
     branding/
-      bookedai-revenue-engine-dark.svg
-      bookedai-revenue-engine-light.svg
-      bookedai-revenue-engine-icon.svg
-      bookedai-revenue-engine-white.svg
-      bookedai-revenue-engine-black.svg
-      bookedai-revenue-engine-transparent.svg
+      bookedai-logo-light.png
+      bookedai-logo-dark-badge.png
+      bookedai-logo-black.png
+      bookedai-mark-gradient.png
+      bookedai-app-icon-1024.png
+      bookedai-icon-32.png
+      bookedai-mobile-icon-192.png
+      bookedai-apple-touch-icon.png
   src/
     components/
       brand-kit/

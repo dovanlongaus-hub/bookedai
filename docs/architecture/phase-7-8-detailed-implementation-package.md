@@ -41,6 +41,7 @@ These phases inherit the commercial contracts and workflow truth from Phase 3-6 
 At the end of Phase 7-8:
 
 - tenant users can understand what BookedAI generated, what is at risk, and what needs action
+- tenant users can also sign in, claim their business context, curate imported data, and publish searchable or bookable catalog truth safely
 - internal admin users can investigate, reconcile, and support commercial workflows at tenant and system levels
 - both surfaces use one shared commercial vocabulary and one shared contract model
 - the product moves from reporting-only to operational revenue management
@@ -52,6 +53,7 @@ At the end of Phase 7-8:
 - tenant revenue workspace IA
 - tenant dashboard and action queues
 - tenant payment, follow-up, and integration visibility
+- tenant onboarding, account-claim, and searchable catalog publication workflows
 - internal admin commercial IA
 - admin reconciliation and support views
 - admin issue-first navigation
@@ -84,6 +86,7 @@ Owns:
 - page map
 - role-safe page boundaries
 - action-first overview shell
+- onboarding, import-review, and publish-readiness route boundaries
 
 ## Workstream B - Tenant commercial dashboard and queues
 
@@ -105,7 +108,24 @@ Owns:
 - CRM and email status
 - integration health summary
 
-## Workstream D - Internal admin commercial IA
+## Workstream D - Tenant onboarding and catalog truth
+
+Owns:
+
+- tenant sign-in and account-claim entry points
+- website import and file import review surfaces
+- draft, review, published, and archived catalog states
+- searchable or bookable product completeness workflows
+- publish-safe feed into the offline search corpus
+
+Confirmed live baseline on `2026-04-18`:
+
+- tenant Google sign-in now creates a first persisted tenant membership record
+- tenant catalog rows now carry explicit `tenant_id`, `owner_email`, and `publish_state` fields
+- tenant catalog workflow now supports edit, save-to-draft-or-review, publish, and archive actions from the tenant surface
+- imported website rows now land in tenant review state first instead of becoming publicly searchable immediately
+
+## Workstream E - Internal admin commercial IA
 
 Owns:
 
@@ -114,7 +134,7 @@ Owns:
 - billing and revenue ops navigation
 - support and reconciliation navigation
 
-## Workstream E - Internal admin commercial tooling
+## Workstream F - Internal admin commercial tooling
 
 Owns:
 
@@ -124,7 +144,7 @@ Owns:
 - workflow and retry drill-ins
 - audit and notes support
 
-## Workstream F - Platform-safe rollout and usability hardening
+## Workstream G - Platform-safe rollout and usability hardening
 
 Owns:
 
@@ -149,6 +169,8 @@ Expose the full revenue-engine promise inside a tenant-safe operational product 
 - missed revenue and recovered opportunity views
 - payment and follow-up action views
 - commission summary visibility
+- tenant onboarding and account-claim flow
+- tenant-managed import review and publish-safe searchable catalog workflow
 
 ### Primary modules
 
@@ -158,6 +180,7 @@ Expose the full revenue-engine promise inside a tenant-safe operational product 
 - `backend/api/v1/tenant/*`
 - `backend/domain/reporting/`
 - `backend/domain/analytics/`
+- `backend/domain/catalog/`
 
 ### Implementation rules
 
@@ -165,10 +188,13 @@ Expose the full revenue-engine promise inside a tenant-safe operational product 
 - keep the surface action-oriented rather than dashboard-only
 - keep internal-only controls hidden
 - support mobile-usable daily operations for the highest-priority views
+- keep raw extracted website or file data in review state until a tenant or operator publishes a curated row
+- treat searchable catalog completeness as part of tenant value delivery, not as an internal-only admin concern
 
 ### Definition of done
 
 - tenant operators can see monthly value and immediate action items in one coherent workspace
+- tenant operators can claim or sign into their account, curate searchable services or products, and publish truthful rows that can later surface in public matching
 
 ## Phase 8 - Internal admin optimization and support platform
 
@@ -214,7 +240,7 @@ Tenant workspace IA and API boundary preparation
 
 ### Sprint 12
 
-Tenant revenue workspace implementation
+Tenant revenue workspace plus onboarding and catalog implementation
 
 ### Sprint 13
 
@@ -230,6 +256,7 @@ Phase 7 depends on:
 
 - reporting and workflow slices from Phase 3-6
 - tenant-safe API and auth direction
+- tenant-owned catalog and published-corpus direction from the tenant onboarding lane
 
 Phase 8 depends on:
 

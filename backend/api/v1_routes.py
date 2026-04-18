@@ -1,21 +1,26 @@
 from __future__ import annotations
 
+import base64
+import hashlib
+import hmac
 import json
 import re
+from datetime import UTC, datetime, timedelta
 from typing import Any
 from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Header, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import String, and_, cast, desc, or_, select, text
 
 from api.v1 import build_error_envelope, build_success_envelope
+from config import Settings
 from core.feature_flags import is_flag_enabled
 from core.errors import AppError, IntegrationAppError, PaymentAppError, ValidationAppError
 from core.logging import get_logger
-from db import ServiceMerchantProfile, get_session
+from db import ServiceMerchantProfile, TenantUserMembership, get_session
 from repositories.audit_repository import AuditLogRepository
 from repositories.base import RepositoryContext
 from repositories.booking_intent_repository import BookingIntentRepository
@@ -24,6 +29,8 @@ from repositories.lead_repository import LeadRepository
 from repositories.outbox_repository import OutboxRepository
 from repositories.payment_intent_repository import PaymentIntentRepository
 from repositories.tenant_repository import TenantRepository
+from service_layer.admin_presenters import build_service_merchant_item
+from service_layer.catalog_quality_service import apply_catalog_quality_gate
 from service_layer.email_service import EmailService
 from service_layer.lifecycle_ops_service import (
     orchestrate_communication_touch,
@@ -33,16 +40,20 @@ from service_layer.lifecycle_ops_service import (
 )
 from service_layer.communication_service import CommunicationService, render_bookedai_confirmation_email
 from service_layer.prompt9_matching_service import (
+    GENERIC_QUERY_STOPWORDS,
     build_booking_trust_payload,
+    extract_core_intent_terms,
     extract_booking_request_context,
     expand_location_terms,
     extract_query_location_hint,
     expand_topic_terms,
+    filter_ranked_matches_for_display_quality,
     filter_ranked_matches_for_relevance,
     is_near_me_requested,
     is_chat_style_query,
     rank_catalog_matches,
     resolve_booking_path_policy,
+    _normalized_text,
 )
 from service_layer.prompt11_integration_service import (
     build_attention_triage_snapshot,
@@ -55,15 +66,29 @@ from service_layer.prompt11_integration_service import (
     build_reconciliation_summary,
 )
 from service_layer.tenant_app_service import (
+    build_tenant_catalog_snapshot,
     build_tenant_bookings_snapshot,
     build_tenant_integrations_snapshot,
     build_tenant_overview,
 )
+from services import _build_google_maps_url
 from workers.outbox import dispatch_phase2_outbox_event, run_tracked_outbox_dispatch
 
 
 router = APIRouter(prefix="/api/v1")
 logger = get_logger("bookedai.api.v1")
+
+SEMANTIC_DOMAIN_STOP_WORDS = {
+    "around",
+    "compare",
+    "find",
+    "help",
+    "i",
+    "me",
+    "my",
+    "show",
+    "something",
+} | GENERIC_QUERY_STOPWORDS
 
 
 class ActorContextPayload(BaseModel):
@@ -221,6 +246,327 @@ class IntegrationStatusQueryPayload(BaseModel):
     tenant_id: str | None = None
 
 
+class TenantGoogleAuthRequestPayload(BaseModel):
+    id_token: str
+    tenant_ref: str | None = None
+
+
+class TenantCatalogImportRequestPayload(BaseModel):
+    website_url: str
+    business_name: str | None = None
+    business_email: str | None = None
+    category: str | None = None
+    search_focus: str | None = None
+    location_hint: str | None = None
+
+
+class TenantCatalogUpdateRequestPayload(BaseModel):
+    business_name: str | None = None
+    business_email: str | None = None
+    name: str | None = None
+    category: str | None = None
+    summary: str | None = None
+    amount_aud: float | None = None
+    duration_minutes: int | None = None
+    venue_name: str | None = None
+    location: str | None = None
+    map_url: str | None = None
+    booking_url: str | None = None
+    image_url: str | None = None
+    tags: list[str] | None = None
+    featured: bool | None = None
+
+
+def _slugify_value(value: str) -> str:
+    normalized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
+    return normalized.strip("-") or "service"
+
+
+def _get_tenant_session_secret(cfg: Settings) -> str:
+    return cfg.admin_api_token or cfg.admin_password
+
+
+def _create_tenant_session_token(
+    cfg: Settings,
+    *,
+    email: str,
+    tenant_ref: str,
+    name: str | None,
+    picture_url: str | None,
+    google_sub: str | None,
+) -> tuple[str, datetime]:
+    expires_at = datetime.now(UTC) + timedelta(hours=max(cfg.admin_session_ttl_hours, 1))
+    payload = {
+        "sub": email,
+        "tenant_ref": tenant_ref,
+        "name": name,
+        "picture_url": picture_url,
+        "google_sub": google_sub,
+        "exp": int(expires_at.timestamp()),
+    }
+    encoded = base64.urlsafe_b64encode(
+        json.dumps(payload, separators=(",", ":")).encode()
+    ).decode()
+    signature = hmac.new(
+        _get_tenant_session_secret(cfg).encode(),
+        encoded.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    return f"{encoded}.{signature}", expires_at
+
+
+def _verify_tenant_session_token(cfg: Settings, token: str) -> dict[str, str | None]:
+    if not token or "." not in token:
+        raise ValueError("Invalid tenant session")
+
+    encoded, provided_signature = token.rsplit(".", 1)
+    expected_signature = hmac.new(
+        _get_tenant_session_secret(cfg).encode(),
+        encoded.encode(),
+        hashlib.sha256,
+    ).hexdigest()
+    if not hmac.compare_digest(provided_signature, expected_signature):
+        raise ValueError("Invalid tenant session")
+
+    padded = encoded + "=" * (-len(encoded) % 4)
+    payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
+    expires_at = int(payload.get("exp", 0))
+    email = str(payload.get("sub", "")).strip().lower()
+    tenant_ref = str(payload.get("tenant_ref", "")).strip()
+    if not email or not tenant_ref or expires_at <= int(datetime.now(UTC).timestamp()):
+        raise ValueError("Tenant session expired")
+
+    return {
+        "email": email,
+        "tenant_ref": tenant_ref,
+        "name": str(payload.get("name") or "").strip() or None,
+        "picture_url": str(payload.get("picture_url") or "").strip() or None,
+        "google_sub": str(payload.get("google_sub") or "").strip() or None,
+    }
+
+
+def _extract_bearer_token(authorization: str | None) -> str | None:
+    if not authorization:
+        return None
+    value = authorization.strip()
+    if value.lower().startswith("bearer "):
+        return value[7:].strip() or None
+    return value or None
+
+
+async def _resolve_tenant_session(
+    request: Request,
+    authorization: str | None = None,
+) -> dict[str, str | None] | None:
+    token = _extract_bearer_token(authorization)
+    if not token:
+        return None
+
+    cfg: Settings = request.app.state.settings
+    try:
+        return _verify_tenant_session_token(cfg, token)
+    except ValueError:
+        return None
+
+
+async def _verify_google_identity_token(
+    cfg: Settings,
+    *,
+    id_token: str,
+) -> dict[str, str | None]:
+    async with httpx.AsyncClient(timeout=10) as client:
+        response = await client.get(
+            "https://oauth2.googleapis.com/tokeninfo",
+            params={"id_token": id_token},
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+    audience = str(payload.get("aud") or "").strip()
+    if cfg.google_oauth_client_id and audience != cfg.google_oauth_client_id:
+        raise ValidationAppError(
+            "google_audience_mismatch",
+            "Google sign-in was accepted by a different client application.",
+            details={"aud": audience},
+        )
+
+    if str(payload.get("email_verified") or "").lower() not in {"true", "1"}:
+        raise ValidationAppError(
+            "google_email_not_verified",
+            "Google account email must be verified before tenant access is granted.",
+        )
+
+    email = str(payload.get("email") or "").strip().lower()
+    if not email:
+        raise ValidationAppError(
+            "google_email_missing",
+            "Google sign-in did not provide a usable account email.",
+        )
+
+    return {
+        "email": email,
+        "name": str(payload.get("name") or "").strip() or None,
+        "picture_url": str(payload.get("picture") or "").strip() or None,
+        "google_sub": str(payload.get("sub") or "").strip() or None,
+    }
+
+
+async def _upsert_tenant_membership(
+    session,
+    *,
+    tenant_profile: dict[str, str | None],
+    email: str,
+    full_name: str | None,
+    google_sub: str | None,
+) -> dict[str, str | None]:
+    normalized_email = email.strip().lower()
+    tenant_id = str(tenant_profile.get("id") or "").strip()
+    tenant_slug = str(tenant_profile.get("slug") or "").strip()
+    existing = (
+        await session.execute(
+            select(TenantUserMembership).where(
+                TenantUserMembership.tenant_id == tenant_id,
+                TenantUserMembership.email == normalized_email,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if existing:
+        existing.full_name = full_name or existing.full_name
+        existing.provider_subject = google_sub or existing.provider_subject
+        existing.status = "active"
+        existing.role = existing.role or "tenant_admin"
+        membership = existing
+    else:
+        membership = TenantUserMembership(
+            tenant_id=tenant_id,
+            tenant_slug=tenant_slug,
+            email=normalized_email,
+            full_name=full_name,
+            auth_provider="google",
+            provider_subject=google_sub,
+            role="tenant_admin",
+            status="active",
+        )
+        session.add(membership)
+
+    await session.flush()
+    return {
+        "tenant_id": tenant_id,
+        "tenant_slug": tenant_slug,
+        "email": membership.email,
+        "role": membership.role,
+        "status": membership.status,
+    }
+
+
+async def _load_tenant_membership(
+    session,
+    *,
+    tenant_id: str,
+    email: str,
+) -> dict[str, str | None] | None:
+    membership = (
+        await session.execute(
+            select(TenantUserMembership).where(
+                TenantUserMembership.tenant_id == tenant_id,
+                TenantUserMembership.email == email.strip().lower(),
+                TenantUserMembership.status == "active",
+            )
+        )
+    ).scalar_one_or_none()
+    if not membership:
+        return None
+
+    return {
+        "tenant_id": membership.tenant_id,
+        "tenant_slug": membership.tenant_slug,
+        "email": membership.email,
+        "role": membership.role,
+        "status": membership.status,
+    }
+
+
+def _can_claim_tenant_service(
+    service: ServiceMerchantProfile,
+    *,
+    tenant_profile: dict[str, str | None],
+    tenant_user_email: str | None,
+) -> bool:
+    tenant_id = str(tenant_profile.get("id") or "").strip()
+    service_tenant_id = str(getattr(service, "tenant_id", "") or "").strip()
+    if tenant_id and service_tenant_id and tenant_id == service_tenant_id:
+        return True
+
+    normalized_email = str(tenant_user_email or "").strip().lower()
+    owner_email = str(getattr(service, "owner_email", "") or "").strip().lower()
+    if normalized_email and owner_email and normalized_email == owner_email:
+        return True
+
+    business_email = str(getattr(service, "business_email", "") or "").strip().lower()
+    if normalized_email and business_email and normalized_email == business_email:
+        return True
+
+    tenant_name = str(tenant_profile.get("name") or "").strip().lower()
+    business_name = str(getattr(service, "business_name", "") or "").strip().lower()
+    if tenant_name and business_name and (tenant_name == business_name or tenant_name in business_name):
+        return True
+
+    tenant_slug = str(tenant_profile.get("slug") or "").strip().lower()
+    source_url = str(getattr(service, "source_url", "") or "").strip().lower()
+    return bool(tenant_slug and source_url and tenant_slug in source_url)
+
+
+def _claim_tenant_service(
+    service: ServiceMerchantProfile,
+    *,
+    tenant_id: str,
+    tenant_user_email: str,
+) -> None:
+    service.tenant_id = tenant_id
+    service.owner_email = tenant_user_email.strip().lower()
+
+
+async def _resolve_tenant_catalog_service(
+    session,
+    *,
+    tenant_profile: dict[str, str | None],
+    service_id: str,
+    tenant_user_email: str,
+) -> ServiceMerchantProfile:
+    service = (
+        await session.execute(
+            select(ServiceMerchantProfile).where(ServiceMerchantProfile.service_id == service_id)
+        )
+    ).scalar_one_or_none()
+    if not service:
+        raise AppError(
+            code="tenant_catalog_service_not_found",
+            message="The requested tenant catalog service could not be found.",
+            status_code=404,
+            details={"service_id": service_id},
+        )
+
+    if not _can_claim_tenant_service(
+        service,
+        tenant_profile=tenant_profile,
+        tenant_user_email=tenant_user_email,
+    ):
+        raise AppError(
+            code="tenant_catalog_service_forbidden",
+            message="This catalog service does not belong to the authenticated tenant.",
+            status_code=403,
+            details={"service_id": service_id},
+        )
+
+    _claim_tenant_service(
+        service,
+        tenant_id=str(tenant_profile.get("id") or ""),
+        tenant_user_email=tenant_user_email,
+    )
+    return service
+
+
 async def _resolve_tenant_id(request: Request, actor_context: ActorContextPayload | None) -> str | None:
     if actor_context and actor_context.tenant_id:
         return actor_context.tenant_id
@@ -336,46 +682,34 @@ def _search_terms(
     location_hint: str | None = None,
     requested_category: str | None = None,
 ) -> list[str]:
-    stopwords = {
-        "a",
-        "an",
-        "and",
-        "the",
-        "in",
-        "at",
-        "on",
-        "for",
-        "to",
-        "of",
-        "with",
-        "near",
-        "under",
-        "over",
+    stopwords = GENERIC_QUERY_STOPWORDS | {
+        "aud",
         "best",
         "good",
-        "service",
-        "services",
-        "booking",
-        "book",
-        "request",
+        "over",
         "price",
         "pricing",
-        "aud",
+        "request",
+        "service",
+        "services",
     }
     terms: list[str] = []
 
     def _append_terms(value: str | None, *, expand_topics: bool) -> None:
-        normalized = re.sub(r"[^a-z0-9]+", " ", (value or "").lower())
-        raw_terms = {
-            term
-            for term in normalized.split()
-            if len(term) >= 2 and not term.isdigit() and term not in stopwords
-        }
+        normalized = _normalized_text(value)
+        ordered_raw_terms: list[str] = []
+        for term in normalized.split():
+            if len(term) < 2 or term.isdigit() or term in stopwords or term in ordered_raw_terms:
+                continue
+            ordered_raw_terms.append(term)
+
         if expand_topics:
-            candidate_terms = expand_topic_terms(raw_terms, query=value)
+            candidate_terms = expand_topic_terms(set(ordered_raw_terms), query=value)
         else:
-            candidate_terms = expand_location_terms(raw_terms, text=value)
-        for term in candidate_terms:
+            candidate_terms = expand_location_terms(set(ordered_raw_terms), text=value)
+
+        ordered_candidate_terms = ordered_raw_terms + sorted(candidate_terms - set(ordered_raw_terms))
+        for term in ordered_candidate_terms:
             if term not in terms:
                 terms.append(term)
 
@@ -425,8 +759,163 @@ def _topic_search_terms(
     return [term for term in terms if term not in location_terms]
 
 
+def _raw_query_intent_terms(
+    query: str | None,
+    *,
+    location_hint: str | None = None,
+) -> list[str]:
+    terms = list(extract_core_intent_terms(query, location_hint=location_hint, limit=6))
+    if {"support", "worker"} <= set(terms):
+        terms = [term for term in terms if term not in {"home", "community"}]
+    return terms
+
+
+def _query_intent_constraint_groups(query: str | None) -> list[list[str]]:
+    normalized_query = _normalized_text(query)
+    if not normalized_query:
+        return []
+
+    groups: list[list[str]] = []
+    if any(
+        phrase in normalized_query
+        for phrase in ("support worker", "ndis support", "in home support", "at home support")
+    ):
+        groups.extend(
+            [
+                ["support", "worker"],
+                ["ndis", "disability", "community"],
+            ]
+        )
+    if "private dining" in normalized_query:
+        groups.extend(
+            [
+                ["private", "group"],
+                ["dining", "restaurant", "table"],
+            ]
+        )
+    elif any(
+        phrase in normalized_query
+        for phrase in ("restaurant table", "table booking", "team dinner", "group dinner")
+    ):
+        groups.extend(
+            [
+                ["restaurant", "dining", "table"],
+                ["table", "booking", "reservation", "private", "group", "dinner", "lunch"],
+            ]
+        )
+    return groups
+
+
 def _location_search_terms(location_hint: str | None) -> list[str]:
     return _search_terms(None, location_hint, None)
+
+
+def _normalized_domain_terms(value: str | None) -> set[str]:
+    return {
+        term
+        for term in _normalized_text(value).split()
+        if term and term not in SEMANTIC_DOMAIN_STOP_WORDS and not term.isdigit()
+    }
+
+
+def _build_semantic_domain_terms(
+    query: str | None,
+    inferred_category: str | None,
+    location_hint: str | None,
+) -> set[str]:
+    query_terms = _normalized_domain_terms(query)
+    core_terms = set(extract_core_intent_terms(query, location_hint=location_hint, limit=6))
+    category_terms = _normalized_domain_terms(inferred_category)
+    location_terms = set(_search_terms(None, location_hint, None))
+    domain_terms = expand_topic_terms(query_terms | core_terms | category_terms, query=query)
+    return {term for term in domain_terms if term not in location_terms}
+
+
+def _build_service_domain_terms(service: ServiceMerchantProfile) -> set[str]:
+    fields = [
+        getattr(service, "name", None),
+        getattr(service, "business_name", None),
+        getattr(service, "summary", None),
+        getattr(service, "category", None),
+        getattr(service, "venue_name", None),
+    ]
+    terms: set[str] = set()
+    for value in fields:
+        terms |= _normalized_domain_terms(str(value) if value is not None else None)
+    for tag in getattr(service, "tags_json", None) or []:
+        terms |= _normalized_domain_terms(str(tag))
+    return expand_topic_terms(terms)
+
+
+def _filter_ranked_matches_for_semantic_domain(
+    ranked_matches: list[Any],
+    *,
+    query: str,
+    inferred_category: str | None,
+    location_hint: str | None,
+) -> list[Any]:
+    domain_terms = _build_semantic_domain_terms(query, inferred_category, location_hint)
+    if not domain_terms:
+        return ranked_matches
+
+    query_terms = _normalized_domain_terms(query)
+    filtered: list[Any] = []
+    for match in ranked_matches:
+        evidence = set(getattr(match, "evidence", ()) or ())
+        if "topic_mismatch" in evidence:
+            continue
+
+        service_terms = _build_service_domain_terms(match.service)
+        if domain_terms & service_terms:
+            filtered.append(match)
+            continue
+
+        # Keep strong direct-name matches even when catalog metadata is sparse.
+        if evidence & {"exact_name_phrase", "all_terms_in_name"}:
+            filtered.append(match)
+            continue
+
+        service_name_terms = _normalized_domain_terms(getattr(match.service, "name", None))
+        if query_terms and query_terms <= service_name_terms:
+            filtered.append(match)
+            continue
+
+        semantic_score = getattr(match, "semantic_score", None)
+        if semantic_score is not None and semantic_score >= 0.82 and "intent_mismatch" not in evidence:
+            filtered.append(match)
+
+    return filtered
+
+
+def _candidate_ids_from_matches(ranked_matches: list[Any], *, limit: int = 8) -> list[str]:
+    candidate_ids: list[str] = []
+    for match in ranked_matches[:limit]:
+        candidate_id = str(getattr(getattr(match, "service", None), "service_id", "") or "").strip()
+        if candidate_id:
+            candidate_ids.append(candidate_id)
+    return candidate_ids
+
+
+def _candidate_drop_entries(
+    before_matches: list[Any],
+    after_matches: list[Any],
+    *,
+    stage: str,
+    reason: str,
+    limit: int = 8,
+) -> list[dict[str, str]]:
+    after_ids = set(_candidate_ids_from_matches(after_matches, limit=limit))
+    entries: list[dict[str, str]] = []
+    for candidate_id in _candidate_ids_from_matches(before_matches, limit=limit):
+        if candidate_id not in after_ids:
+            entries.append(
+                {
+                    "candidate_id": candidate_id,
+                    "stage": stage,
+                    "reason": reason,
+                }
+            )
+    return entries
 
 
 def _build_search_filters(
@@ -440,6 +929,11 @@ def _build_search_filters(
         requested_category,
         location_hint=location_hint,
     )
+    raw_query_terms = _raw_query_intent_terms(
+        query,
+        location_hint=location_hint,
+    )
+    intent_constraint_groups = _query_intent_constraint_groups(query)
     location_terms = _location_search_terms(location_hint)
     fallback_terms = _search_terms(query, location_hint, requested_category)
 
@@ -447,10 +941,18 @@ def _build_search_filters(
         topic_clauses = _build_search_clauses(topic_terms, fields=TOPIC_SEARCH_FIELDS)
         if topic_clauses:
             filters.append(or_(*topic_clauses))
+        raw_query_clauses = _build_search_clauses(raw_query_terms, fields=TOPIC_SEARCH_FIELDS)
+        if raw_query_clauses:
+            filters.append(or_(*raw_query_clauses))
     elif fallback_terms:
         fallback_clauses = _build_search_clauses(fallback_terms, fields=FALLBACK_SEARCH_FIELDS)
         if fallback_clauses:
             filters.append(or_(*fallback_clauses))
+
+    for group in intent_constraint_groups:
+        group_clauses = _build_search_clauses(group, fields=TOPIC_SEARCH_FIELDS)
+        if group_clauses:
+            filters.append(or_(*group_clauses))
 
     if location_terms:
         location_clauses = _build_search_clauses(location_terms, fields=LOCATION_SEARCH_FIELDS)
@@ -483,6 +985,15 @@ def _build_match_confidence_payload(ranked_matches: list[Any]) -> dict[str, Any]
         "gating_state": gating_state,
         "evidence": list(dict.fromkeys([*top_match.evidence, *(["semantic_model_rerank"] if top_match.semantic_score is not None else [])])),
     }
+
+
+def _candidate_ids_from_payload(candidates: list[dict[str, Any]], *, limit: int = 8) -> list[str]:
+    candidate_ids: list[str] = []
+    for candidate in candidates[:limit]:
+        candidate_id = str(candidate.get("candidate_id") or candidate.get("candidateId") or "").strip()
+        if candidate_id:
+            candidate_ids.append(candidate_id)
+    return candidate_ids
 
 
 @router.post("/leads")
@@ -625,6 +1136,7 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
         requested_category=str((payload.preferences or {}).get("service_category") or ""),
         budget=payload.budget,
     )
+    heuristic_ranked_matches = list(ranked_matches)
     search_strategy = "catalog_term_retrieval_with_prompt9_rerank"
     semantic_assist: dict[str, Any] | None = None
     semantic_service = getattr(request.app.state, "semantic_search_service", None)
@@ -664,13 +1176,51 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
             }
     elif near_me and not user_location:
         location_permission_needed = True
+    semantic_ranked_matches = list(ranked_matches)
     semantic_applied = bool(semantic_assist and semantic_assist.get("applied"))
-    location_required = bool(re.sub(r"[^a-z0-9]+", " ", (effective_location_hint or "").lower()).split())
+    relevance_location_hint = effective_location_hint
+    if (
+        near_me
+        and user_location
+        and not relevance_location_hint
+        and semantic_assist
+        and semantic_assist.get("inferred_location")
+    ):
+        relevance_location_hint = str(semantic_assist.get("inferred_location") or "").strip() or None
+
+    location_required = bool(near_me and relevance_location_hint)
+    pre_relevance_matches = list(ranked_matches)
     ranked_matches = filter_ranked_matches_for_relevance(
         ranked_matches,
         semantic_applied=semantic_applied,
         require_location_match=location_required,
+        location_hint=relevance_location_hint,
     )
+    relevance_ranked_matches = list(ranked_matches)
+    if semantic_applied:
+        pre_domain_matches = list(ranked_matches)
+        ranked_matches = _filter_ranked_matches_for_semantic_domain(
+            ranked_matches,
+            query=payload.query,
+            inferred_category=(
+                str(semantic_assist.get("inferred_category") or "").strip()
+                if semantic_assist
+                else None
+            ),
+            location_hint=relevance_location_hint,
+        )
+    else:
+        pre_domain_matches = list(ranked_matches)
+    domain_ranked_matches = list(ranked_matches)
+    pre_display_matches = list(ranked_matches)
+    ranked_matches = filter_ranked_matches_for_display_quality(
+        ranked_matches,
+        semantic_applied=semantic_applied,
+    )
+    display_ranked_matches = list(ranked_matches)
+    if near_me and not user_location and location_permission_needed and not effective_location_hint:
+        ranked_matches = []
+    final_ranked_matches = list(ranked_matches)
     if semantic_applied:
         search_strategy = f"{search_strategy}_with_relevance_gate"
     elif ranked_matches:
@@ -708,49 +1258,195 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
         }
         for match in ranked_matches[:8]
     ]
+    openai_service = getattr(request.app.state, "openai_service", None)
+    public_web_fallback_candidates: list[dict[str, Any]] = []
+    if (
+        not candidates
+        and openai_service is not None
+        and not (near_me and not user_location and location_permission_needed and not effective_location_hint)
+        and hasattr(openai_service, "search_public_service_candidates")
+    ):
+        try:
+            web_results = await openai_service.search_public_service_candidates(
+                query=payload.query,
+                location_hint=relevance_location_hint,
+                user_location=user_location,
+                booking_context={
+                    "party_size": booking_request_context.party_size,
+                    "requested_date": booking_request_context.requested_date,
+                    "requested_time": booking_request_context.requested_time,
+                    "schedule_hint": booking_request_context.schedule_hint,
+                    "intent_label": booking_request_context.intent_label,
+                    "summary": booking_request_context.summary,
+                },
+                budget=payload.budget,
+                preferences=payload.preferences,
+            )
+        except Exception:
+            web_results = []
+
+        for item in web_results[:3]:
+            public_web_fallback_candidates.append(
+                {
+                    "candidate_id": item.get("candidate_id", ""),
+                    "provider_name": item.get("provider_name", ""),
+                    "service_name": item.get("service_name", ""),
+                    "source_type": "public_web_search",
+                    "category": None,
+                    "summary": item.get("summary"),
+                    "venue_name": item.get("provider_name", ""),
+                    "location": item.get("location"),
+                    "booking_url": item.get("booking_url"),
+                    "map_url": None,
+                    "source_url": item.get("source_url"),
+                    "image_url": None,
+                    "amount_aud": None,
+                    "duration_minutes": None,
+                    "tags": ["public_web_search"],
+                    "featured": False,
+                    "distance_km": None,
+                    "match_score": item.get("match_score"),
+                    "semantic_score": None,
+                    "trust_signal": "public_web_search",
+                    "is_preferred": False,
+                    "display_summary": item.get("summary"),
+                    "explanation": (
+                        item.get("why_this_matches")
+                        or "Public web search fallback matched the request when tenant catalog did not have a strong result."
+                    ),
+                }
+            )
+
+        if public_web_fallback_candidates:
+            candidates = public_web_fallback_candidates
     recommendations = []
     if candidates:
-        top_match = ranked_matches[0]
-        availability_state, _verified, recommended_path, trust_warnings, _payment_allowed_now, booking_confidence = (
-            build_booking_trust_payload(
-                top_match.service,
-                party_size=booking_request_context.party_size,
-                desired_date=booking_request_context.requested_date,
-                desired_time=booking_request_context.requested_time or booking_request_context.schedule_hint,
+        if ranked_matches:
+            top_match = ranked_matches[0]
+            availability_state, _verified, recommended_path, trust_warnings, _payment_allowed_now, booking_confidence = (
+                build_booking_trust_payload(
+                    top_match.service,
+                    party_size=booking_request_context.party_size,
+                    desired_date=booking_request_context.requested_date,
+                    desired_time=booking_request_context.requested_time or booking_request_context.schedule_hint,
+                )
             )
-        )
-        top_path, next_step, path_warnings, _payment_allowed = resolve_booking_path_policy(
-            availability_state=availability_state,
-            booking_confidence=booking_confidence,
-            payment_option=None,
-            context={
-                "party_size": booking_request_context.party_size,
-            },
-        )
-        recommendations.append(
-            {
-                "candidate_id": candidates[0]["candidate_id"],
-                "reason": top_match.explanation,
-                "path_type": recommended_path or top_path,
-                "next_step": next_step,
-                "warnings": list(dict.fromkeys([*trust_warnings, *path_warnings])),
-            }
-        )
+            top_path, next_step, path_warnings, _payment_allowed = resolve_booking_path_policy(
+                availability_state=availability_state,
+                booking_confidence=booking_confidence,
+                payment_option=None,
+                context={
+                    "party_size": booking_request_context.party_size,
+                },
+            )
+            recommendations.append(
+                {
+                    "candidate_id": candidates[0]["candidate_id"],
+                    "reason": top_match.explanation,
+                    "path_type": recommended_path or top_path,
+                    "next_step": next_step,
+                    "warnings": list(dict.fromkeys([*trust_warnings, *path_warnings])),
+                }
+            )
 
     warnings: list[str] = []
     if not candidates:
         warnings.append("No strong relevant catalog candidates were found.")
+    elif public_web_fallback_candidates:
+        warnings.append("No strong tenant catalog candidates were found, so BookedAI is showing sourced public web options.")
     if location_permission_needed:
         warnings.append("Location access is needed to find services near you.")
+
+    confidence_payload = _build_match_confidence_payload(ranked_matches)
+    if public_web_fallback_candidates and not ranked_matches:
+        confidence_payload = {
+            "score": max(
+                0.38,
+                min(
+                    max(float(item.get("match_score") or 0.0) for item in public_web_fallback_candidates),
+                    0.72,
+                ),
+            ),
+            "reason": "No strong tenant catalog candidate was found, so BookedAI switched to sourced public web results.",
+            "gating_state": "medium",
+            "evidence": ["public_web_search_fallback"],
+        }
+
+    search_diagnostics = {
+        "effective_location_hint": effective_location_hint,
+        "relevance_location_hint": relevance_location_hint,
+        "semantic_rollout_enabled": semantic_rollout_enabled,
+        "semantic_applied": semantic_applied,
+        "retrieval_candidate_count": len(services),
+        "heuristic_candidate_ids": _candidate_ids_from_matches(heuristic_ranked_matches),
+        "semantic_candidate_ids": _candidate_ids_from_matches(semantic_ranked_matches),
+        "post_relevance_candidate_ids": _candidate_ids_from_matches(relevance_ranked_matches),
+        "post_domain_candidate_ids": _candidate_ids_from_matches(domain_ranked_matches),
+        "final_candidate_ids": (
+            _candidate_ids_from_payload(public_web_fallback_candidates)
+            if public_web_fallback_candidates
+            else _candidate_ids_from_matches(final_ranked_matches)
+        ),
+        "dropped_candidates": [
+            *_candidate_drop_entries(
+                pre_relevance_matches,
+                relevance_ranked_matches,
+                stage="relevance_gate",
+                reason=(
+                    "location_required"
+                    if location_required
+                    else "low_relevance_or_topic_mismatch"
+                ),
+            ),
+            *_candidate_drop_entries(
+                pre_domain_matches,
+                domain_ranked_matches,
+                stage="semantic_domain_gate",
+                reason="semantic_domain_mismatch",
+            ),
+            *_candidate_drop_entries(
+                pre_display_matches,
+                display_ranked_matches,
+                stage="display_quality_gate",
+                reason="weak_top_match_or_low_display_confidence",
+            ),
+            *_candidate_drop_entries(
+                display_ranked_matches,
+                final_ranked_matches,
+                stage="location_permission_gate",
+                reason="location_permission_required",
+            ),
+        ],
+    }
+    logger.info(
+        "matching_search_diagnostics",
+        extra={
+            "request_id": "",
+            "tenant_id": tenant_id or "",
+            "route": "/api/v1/matching/search",
+            "status": 200,
+            "search_strategy": search_strategy,
+            "semantic_provider": (
+                str(semantic_assist.get("provider") or "")
+                if semantic_assist
+                else ""
+            ),
+            "search_diagnostics": search_diagnostics,
+        },
+    )
 
     return _success_response(
         {
             "request_id": f"match_{uuid4().hex[:12]}",
             "candidates": candidates,
             "recommendations": recommendations,
-            "confidence": _build_match_confidence_payload(ranked_matches),
+            "confidence": confidence_payload,
             "warnings": warnings,
-            "search_strategy": search_strategy,
+            "search_strategy": (
+                f"{search_strategy}_plus_public_web_search"
+                if public_web_fallback_candidates
+                else search_strategy
+            ),
             "query_context": {
                 "near_me_requested": near_me,
                 "location_permission_needed": location_permission_needed,
@@ -777,6 +1473,7 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
                 "budget_summary": None,
                 "evidence": [],
             },
+            "search_diagnostics": search_diagnostics,
         },
         tenant_id=tenant_id,
         actor_context=actor_context,
@@ -1458,6 +2155,164 @@ async def integration_outbox_backlog(request: Request):
     )
 
 
+@router.post("/tenant/auth/google")
+async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestPayload):
+    cfg: Settings = request.app.state.settings
+    google_identity = await _verify_google_identity_token(cfg, id_token=payload.id_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_id = await tenant_repository.resolve_tenant_id(payload.tenant_ref)
+        if not tenant_id:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved for Google sign-in.",
+                    status_code=404,
+                    details={"tenant_ref": payload.tenant_ref},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        tenant_profile = await tenant_repository.get_tenant_profile(payload.tenant_ref or tenant_id)
+        if not tenant_profile:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The tenant profile could not be loaded.",
+                    status_code=404,
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+        membership = await _upsert_tenant_membership(
+            session,
+            tenant_profile=tenant_profile,
+            email=google_identity["email"] or "",
+            full_name=google_identity["name"],
+            google_sub=google_identity["google_sub"],
+        )
+        await session.commit()
+
+    session_token, expires_at = _create_tenant_session_token(
+        cfg,
+        email=google_identity["email"] or "",
+        tenant_ref=tenant_profile["slug"] or tenant_id,
+        name=google_identity["name"],
+        picture_url=google_identity["picture_url"],
+        google_sub=google_identity["google_sub"],
+    )
+    actor_context = ActorContextPayload(
+        channel="tenant_app",
+        tenant_id=tenant_id,
+        role="tenant_admin",
+        deployment_mode="standalone_app",
+    )
+    return _success_response(
+        {
+            "session_token": session_token,
+            "expires_at": expires_at.isoformat(),
+            "provider": "google",
+            "user": {
+                "email": google_identity["email"],
+                "full_name": google_identity["name"],
+                "picture_url": google_identity["picture_url"],
+            },
+            "tenant": tenant_profile,
+            "capabilities": [
+                "tenant_overview",
+                "tenant_catalog_import",
+                "tenant_catalog_review",
+                "tenant_catalog_publish",
+            ],
+            "membership": membership,
+        },
+        tenant_id=tenant_id,
+        actor_context=actor_context,
+    )
+
+
+async def _resolve_tenant_request_context(
+    request: Request,
+    *,
+    authorization: str | None = None,
+) -> tuple[str | None, str | None, dict[str, str | None] | None, dict[str, str | None] | None]:
+    tenant_session = await _resolve_tenant_session(request, authorization=authorization)
+    tenant_ref = tenant_session["tenant_ref"] if tenant_session else request.query_params.get("tenant_ref")
+    membership: dict[str, str | None] | None = None
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_id = await tenant_repository.resolve_tenant_id(tenant_ref)
+        if tenant_session and tenant_id:
+            membership = await _load_tenant_membership(
+                session,
+                tenant_id=tenant_id,
+                email=tenant_session["email"] or "",
+            )
+
+    return tenant_ref, tenant_id, tenant_session, membership
+
+
+def _apply_tenant_catalog_update(
+    service: ServiceMerchantProfile,
+    payload: TenantCatalogUpdateRequestPayload,
+) -> None:
+    if payload.business_name is not None:
+        service.business_name = payload.business_name.strip() or service.business_name
+    if payload.business_email is not None:
+        service.business_email = payload.business_email.strip().lower() or None
+    if payload.name is not None:
+        service.name = payload.name.strip() or service.name
+    if payload.category is not None:
+        service.category = payload.category.strip() or None
+    if payload.summary is not None:
+        service.summary = payload.summary.strip() or None
+    if payload.amount_aud is not None:
+        service.amount_aud = payload.amount_aud
+    if payload.duration_minutes is not None:
+        service.duration_minutes = payload.duration_minutes
+    if payload.venue_name is not None:
+        service.venue_name = payload.venue_name.strip() or None
+    if payload.location is not None:
+        service.location = payload.location.strip() or None
+    if payload.map_url is not None:
+        service.map_url = payload.map_url.strip() or None
+    if payload.booking_url is not None:
+        service.booking_url = payload.booking_url.strip() or None
+    if payload.image_url is not None:
+        service.image_url = payload.image_url.strip() or None
+    if payload.tags is not None:
+        service.tags_json = [str(tag).strip() for tag in payload.tags if str(tag).strip()]
+    if payload.featured is not None:
+        service.featured = 1 if payload.featured else 0
+
+
+def _apply_catalog_quality_to_service(service: ServiceMerchantProfile) -> list[str]:
+    normalized_payload, quality_warnings = apply_catalog_quality_gate(
+        {
+            "name": service.name,
+            "category": service.category,
+            "summary": service.summary,
+            "amount_aud": service.amount_aud,
+            "duration_minutes": service.duration_minutes,
+            "venue_name": service.venue_name,
+            "location": service.location,
+            "map_url": service.map_url,
+            "booking_url": service.booking_url,
+            "image_url": service.image_url,
+            "tags_json": list(service.tags_json or []),
+            "is_active": service.is_active,
+        }
+    )
+    service.category = normalized_payload.get("category")
+    service.tags_json = list(normalized_payload.get("tags_json") or [])
+    if not service.map_url and (service.venue_name or service.location):
+        service.map_url = _build_google_maps_url(service.venue_name, service.location)
+    return quality_warnings
+
+
 @router.post("/integrations/outbox/dispatch")
 async def dispatch_outbox_events(request: Request, payload: DispatchOutboxRequestPayload):
     actor_context = payload.actor_context or ActorContextPayload(
@@ -1550,11 +2405,12 @@ async def replay_outbox_event(request: Request, payload: ReplayOutboxEventReques
 
 
 @router.get("/tenant/overview")
-async def tenant_overview(request: Request):
-    tenant_ref = request.query_params.get("tenant_ref")
+async def tenant_overview(request: Request, authorization: str | None = Header(default=None)):
+    tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
     async with get_session(request.app.state.session_factory) as session:
-        tenant_repository = TenantRepository(RepositoryContext(session=session))
-        tenant_id = await tenant_repository.resolve_tenant_id(tenant_ref)
         if not tenant_id:
             return _error_response(
                 AppError(
@@ -1574,18 +2430,19 @@ async def tenant_overview(request: Request):
         actor_context=ActorContextPayload(
             channel="tenant_app",
             tenant_id=tenant_id,
-            role="tenant_admin",
+            role="tenant_admin" if tenant_session else "tenant_preview",
             deployment_mode="standalone_app",
         ),
     )
 
 
 @router.get("/tenant/bookings")
-async def tenant_bookings(request: Request):
-    tenant_ref = request.query_params.get("tenant_ref")
+async def tenant_bookings(request: Request, authorization: str | None = Header(default=None)):
+    tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
     async with get_session(request.app.state.session_factory) as session:
-        tenant_repository = TenantRepository(RepositoryContext(session=session))
-        tenant_id = await tenant_repository.resolve_tenant_id(tenant_ref)
         if not tenant_id:
             return _error_response(
                 AppError(
@@ -1605,18 +2462,19 @@ async def tenant_bookings(request: Request):
         actor_context=ActorContextPayload(
             channel="tenant_app",
             tenant_id=tenant_id,
-            role="tenant_admin",
+            role="tenant_admin" if tenant_session else "tenant_preview",
             deployment_mode="standalone_app",
         ),
     )
 
 
 @router.get("/tenant/integrations")
-async def tenant_integrations(request: Request):
-    tenant_ref = request.query_params.get("tenant_ref")
+async def tenant_integrations(request: Request, authorization: str | None = Header(default=None)):
+    tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
     async with get_session(request.app.state.session_factory) as session:
-        tenant_repository = TenantRepository(RepositoryContext(session=session))
-        tenant_id = await tenant_repository.resolve_tenant_id(tenant_ref)
         if not tenant_id:
             return _error_response(
                 AppError(
@@ -1630,6 +2488,407 @@ async def tenant_integrations(request: Request):
             )
 
         snapshot = await build_tenant_integrations_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role="tenant_admin" if tenant_session else "tenant_preview",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.get("/tenant/catalog")
+async def tenant_catalog(request: Request, authorization: str | None = Header(default=None)):
+    tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    async with get_session(request.app.state.session_factory) as session:
+        if not tenant_id:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved.",
+                    status_code=404,
+                    details={"tenant_ref": tenant_ref},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        snapshot = await build_tenant_catalog_snapshot(
+            session,
+            tenant_ref=tenant_ref or tenant_id,
+            tenant_user_email=tenant_session["email"] if tenant_session else None,
+        )
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role="tenant_admin" if tenant_session else "tenant_preview",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.post("/tenant/catalog/import-website")
+async def tenant_catalog_import_website(
+    request: Request,
+    payload: TenantCatalogImportRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with the tenant Google account and an active tenant membership before importing catalog data.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    if not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_not_found",
+                message="The requested tenant could not be resolved.",
+                status_code=404,
+                details={"tenant_ref": tenant_ref},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    openai_service = request.app.state.openai_service
+    website_input = payload.website_url.strip()
+    website_url = await openai_service.resolve_business_website(
+        website_or_query=website_input,
+        business_name=payload.business_name,
+    )
+    if not website_url:
+        return _error_response(
+            ValidationAppError(
+                "tenant_import_website_not_found",
+                "Could not find the business website from that URL or business name.",
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    combined_focus = " | ".join(
+        value for value in [payload.search_focus, payload.location_hint] if value and value.strip()
+    ) or None
+    extracted = await openai_service.extract_services_from_website(
+        website_url=website_url,
+        business_name=payload.business_name,
+        category_hint=payload.category,
+        search_focus=combined_focus,
+        required_fields=[
+            "service_name",
+            "duration_minutes",
+            "location",
+            "amount_aud",
+            "summary",
+            "image_url",
+            "booking_url",
+        ],
+    )
+    if not extracted:
+        return _error_response(
+            ValidationAppError(
+                "tenant_import_no_services",
+                "Could not extract booking-relevant services from that website. Try a clearer service or pricing page.",
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    business_name = (payload.business_name or "").strip() or website_url.replace("https://", "").replace("http://", "").split("/")[0]
+    business_email = (payload.business_email or tenant_session["email"] or "").strip().lower() or None
+
+    async with get_session(request.app.state.session_factory) as session:
+        for item in extracted:
+            service_name = str(item.get("name") or "").strip()
+            if not service_name:
+                continue
+
+            service_id = _slugify_value(f"{business_name}-{service_name}")
+            existing = (
+                await session.execute(
+                    select(ServiceMerchantProfile).where(ServiceMerchantProfile.service_id == service_id)
+                )
+            ).scalar_one_or_none()
+
+            mapped_values = {
+                "service_id": service_id,
+                "tenant_id": tenant_id,
+                "business_name": business_name,
+                "business_email": business_email,
+                "owner_email": tenant_session["email"],
+                "name": service_name,
+                "category": str(item.get("category") or payload.category or "").strip() or None,
+                "summary": str(item.get("summary") or "").strip() or None,
+                "amount_aud": float(item["amount_aud"]) if item.get("amount_aud") is not None else None,
+                "duration_minutes": int(item["duration_minutes"]) if item.get("duration_minutes") is not None else None,
+                "venue_name": str(item.get("venue_name") or business_name).strip() or None,
+                "location": str(item.get("location") or payload.location_hint or "").strip() or None,
+                "map_url": str(item.get("map_url") or "").strip() or None,
+                "booking_url": str(item.get("booking_url") or website_url).strip() or None,
+                "image_url": str(item.get("image_url") or "").strip() or None,
+                "source_url": website_url,
+                "tags_json": [str(tag).strip() for tag in item.get("tags", []) if str(tag).strip()],
+                "featured": 1 if item.get("featured") else 0,
+                "is_active": 0,
+                "publish_state": "review",
+            }
+            mapped_values, _quality_warnings = apply_catalog_quality_gate(mapped_values)
+            mapped_values["is_active"] = 0
+            mapped_values["publish_state"] = "review"
+
+            if mapped_values["map_url"] is None and (mapped_values["venue_name"] or mapped_values["location"]):
+                mapped_values["map_url"] = _build_google_maps_url(
+                    mapped_values["venue_name"],
+                    mapped_values["location"],
+                )
+
+            if existing:
+                for key, value in mapped_values.items():
+                    setattr(existing, key, value)
+            else:
+                session.add(ServiceMerchantProfile(**mapped_values))
+
+        await session.commit()
+        snapshot = await build_tenant_catalog_snapshot(
+            session,
+            tenant_ref=tenant_ref or tenant_id,
+            tenant_user_email=tenant_session["email"],
+        )
+
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role="tenant_admin",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.patch("/tenant/catalog/{service_id}")
+async def tenant_catalog_update_service(
+    service_id: str,
+    request: Request,
+    payload: TenantCatalogUpdateRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="An authenticated tenant membership is required before editing catalog services.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref or tenant_id)
+        if not tenant_profile:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved.",
+                    status_code=404,
+                    details={"tenant_ref": tenant_ref},
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        try:
+            service = await _resolve_tenant_catalog_service(
+                session,
+                tenant_profile=tenant_profile,
+                service_id=service_id,
+                tenant_user_email=tenant_session["email"] or "",
+            )
+        except AppError as error:
+            return _error_response(error, tenant_id=tenant_id, actor_context=None)
+
+        _apply_tenant_catalog_update(service, payload)
+        quality_warnings = _apply_catalog_quality_to_service(service)
+        service.publish_state = "review" if quality_warnings else "draft"
+        service.is_active = 0
+        await session.commit()
+        snapshot = await build_tenant_catalog_snapshot(
+            session,
+            tenant_ref=tenant_ref or tenant_id,
+            tenant_user_email=tenant_session["email"],
+        )
+
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role="tenant_admin",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.post("/tenant/catalog/{service_id}/publish")
+async def tenant_catalog_publish_service(
+    service_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="An authenticated tenant membership is required before publishing catalog services.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref or tenant_id)
+        if not tenant_profile:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved.",
+                    status_code=404,
+                    details={"tenant_ref": tenant_ref},
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        try:
+            service = await _resolve_tenant_catalog_service(
+                session,
+                tenant_profile=tenant_profile,
+                service_id=service_id,
+                tenant_user_email=tenant_session["email"] or "",
+            )
+        except AppError as error:
+            return _error_response(error, tenant_id=tenant_id, actor_context=None)
+
+        quality_warnings = _apply_catalog_quality_to_service(service)
+        if quality_warnings:
+            return _error_response(
+                ValidationAppError(
+                    "This service cannot be published until booking-critical fields are complete.",
+                    details={"quality_warnings": quality_warnings, "service_id": service_id},
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        service.publish_state = "published"
+        service.is_active = 1
+        await session.commit()
+        snapshot = await build_tenant_catalog_snapshot(
+            session,
+            tenant_ref=tenant_ref or tenant_id,
+            tenant_user_email=tenant_session["email"],
+        )
+
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role="tenant_admin",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.post("/tenant/catalog/{service_id}/archive")
+async def tenant_catalog_archive_service(
+    service_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="An authenticated tenant membership is required before archiving catalog services.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref or tenant_id)
+        if not tenant_profile:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved.",
+                    status_code=404,
+                    details={"tenant_ref": tenant_ref},
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        try:
+            service = await _resolve_tenant_catalog_service(
+                session,
+                tenant_profile=tenant_profile,
+                service_id=service_id,
+                tenant_user_email=tenant_session["email"] or "",
+            )
+        except AppError as error:
+            return _error_response(error, tenant_id=tenant_id, actor_context=None)
+
+        service.publish_state = "archived"
+        service.is_active = 0
+        await session.commit()
+        snapshot = await build_tenant_catalog_snapshot(
+            session,
+            tenant_ref=tenant_ref or tenant_id,
+            tenant_user_email=tenant_session["email"],
+        )
+
     return _success_response(
         snapshot,
         tenant_id=tenant_id,

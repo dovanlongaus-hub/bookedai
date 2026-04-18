@@ -12,6 +12,12 @@ Sprint 2 is not a backend modularization sprint.
 
 Sprint 2 is the blueprint-lock sprint for the public revenue-engine rebuild.
 
+Historical interpretation note:
+
+- this implementation package describes the original Sprint 2 blueprint-lock target state
+- later implemented, deployed, and hotfix outcomes are tracked in `docs/development/sprint-2-code-ready-development-handoff.md`
+- when reviewing current repo state or deciding whether Sprint 3+ should inherit an implemented pattern, the later code-ready handoff and closeout record take precedence over this earlier blueprint-only framing
+
 It exists to make sure Sprint 3 can begin coding the premium landing experience without unresolved ambiguity around:
 
 - brand system
@@ -30,6 +36,8 @@ This package should be read together with:
 - `docs/architecture/bookedai-brand-ui-kit.md`
 - `docs/architecture/landing-component-tree-and-file-ownership.md`
 - `docs/architecture/landing-page-execution-task-map.md`
+- `docs/architecture/sprint-2-read-code.md`
+- `docs/development/sprint-2-code-ready-development-handoff.md`
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
 - `docs/architecture/public-growth-app-strategy.md`
 - `docs/architecture/pricing-packaging-monetization-strategy.md`
@@ -70,6 +78,11 @@ By the end of Sprint 2, the team should have:
 - new backend reporting endpoints
 - live attribution reporting logic
 - broader SEO page-family rollout
+
+Closeout clarification:
+
+- these out-of-scope lines describe the original planning boundary for Sprint 2
+- they should not be used to deny or erase implemented outcomes that were later completed, verified, and recorded in the Sprint 2 code-ready handoff
 
 ## 5. Source-of-truth outputs required in Sprint 2
 

@@ -393,6 +393,7 @@ Transform BookedAI from an operator-driven system into a tenant-aware product wi
 - tenant profile, catalog, and booking operations surfaces
 - lifecycle messaging and CRM sync memory
 - billing account and subscription flow foundations
+- tenant-owned searchable and bookable product records that can be safely published into public matching
 
 ### Stack and module focus
 
@@ -409,12 +410,14 @@ Transform BookedAI from an operator-driven system into a tenant-aware product wi
 - `backend/domain/email/`
 - `backend/domain/billing/`
 - `backend/domain/booking_paths/`
+- `backend/domain/catalog/`
 - `backend/repositories/`
 - auth and RBAC modules
 
 #### Data
 
 - tenant-bound contacts, bookings, CRM sync, email lifecycle, billing account, subscription, and role tables
+- tenant-bound service or product catalog rows with publish state, search visibility, booking metadata, and ownership lineage
 
 ### Detailed workstreams
 
@@ -430,6 +433,7 @@ Transform BookedAI from an operator-driven system into a tenant-aware product wi
    - tenant manager
    - tenant staff
    - internal admin
+4. Add authenticated tenant login and session handling that can authorize catalog writes, publish actions, and booking-surface configuration without reusing internal-admin trust assumptions.
 
 #### Workstream B - Tenant app shell
 
@@ -440,6 +444,11 @@ Transform BookedAI from an operator-driven system into a tenant-aware product wi
    - service catalog management
    - profile and availability settings
 3. Keep internal admin capabilities separate from tenant self-serve capabilities.
+4. Treat tenant catalog management as a production search dependency, not only a back-office CRUD view:
+   - tenant operators must be able to create and maintain real service or product records
+   - searchable rows must support title, category, location coverage, pricing posture, booking URL or booking path, and trust-safe business metadata
+   - publish state must distinguish draft, internal-only, and publicly searchable records
+   - public `/api/v1/matching/search` must only read published tenant-owned rows
 
 #### Workstream C - Lifecycle platform
 
@@ -464,6 +473,11 @@ Transform BookedAI from an operator-driven system into a tenant-aware product wi
    - plan assignment
    - invoice or payment summary linkage
 3. Add feature gating for monetized capabilities by plan.
+4. Define the catalog publication seam that later booking flows will depend on:
+   - tenant-authenticated write APIs for services or products
+   - repository and policy enforcement for tenant ownership
+   - public read model or index feed for only searchable and bookable rows
+   - rollout-safe backfill for already-onboarded SME customers whose data should surface in public search once published
 
 ### Recommended coding order
 
@@ -480,6 +494,8 @@ Transform BookedAI from an operator-driven system into a tenant-aware product wi
 - lifecycle persistence and messaging orchestration
 - CRM sync ledger with retry and ownership semantics
 - billing account and subscription domain foundations
+- tenant-authenticated catalog APIs and data model for searchable or bookable products
+- publish-safe feed from tenant catalog truth into public matching retrieval
 
 ### Exit criteria
 
@@ -487,6 +503,7 @@ Transform BookedAI from an operator-driven system into a tenant-aware product wi
 - role enforcement exists beyond internal admin-only access
 - lifecycle and CRM state survive outside volatile workflow memory
 - monetization gates exist for future packaging
+- at least one pilot tenant can sign in, manage a real catalog row, publish it, and then retrieve it through public matching with truthful SME information
 
 ### Rollout posture
 

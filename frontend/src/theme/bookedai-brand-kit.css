@@ -1,22 +1,36 @@
 :root {
   --bookedai-bg: #0B1020;
   --bookedai-bg-soft: #121A2B;
+  --bookedai-bg-deep: #070B16;
   --bookedai-surface: #182235;
+  --bookedai-surface-strong: #1E2B44;
   --bookedai-surface-alt: rgba(255, 255, 255, 0.04);
+  --bookedai-surface-glass: rgba(15, 23, 42, 0.72);
   --bookedai-border: rgba(255, 255, 255, 0.08);
+  --bookedai-border-strong: rgba(79, 140, 255, 0.24);
   --bookedai-text-primary: #F8FAFC;
   --bookedai-text-secondary: #94A3B8;
+  --bookedai-text-tertiary: rgba(248, 250, 252, 0.64);
   --bookedai-primary-blue: #4F8CFF;
   --bookedai-accent-green: #22C55E;
   --bookedai-accent-purple: #8B5CF6;
+  --bookedai-accent-amber: #F97316;
   --bookedai-warning-amber: #F59E0B;
   --bookedai-danger-red: #EF4444;
 
   --bookedai-brand-gradient: linear-gradient(135deg, #4F8CFF 0%, #8B5CF6 50%, #22C55E 100%);
   --bookedai-hero-glow: radial-gradient(circle at top left, rgba(79, 140, 255, 0.24), transparent 45%);
   --bookedai-green-glow: radial-gradient(circle at top right, rgba(34, 197, 94, 0.20), transparent 40%);
+  --bookedai-amber-glow: radial-gradient(circle at 50% 0%, rgba(249, 115, 22, 0.14), transparent 34%);
+  --bookedai-aurora-background:
+    radial-gradient(circle at top left, rgba(79, 140, 255, 0.22), transparent 30%),
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.16), transparent 26%),
+    radial-gradient(circle at center top, rgba(249, 115, 22, 0.10), transparent 22%),
+    linear-gradient(180deg, var(--bookedai-bg-deep) 0%, var(--bookedai-bg) 42%, #0F172A 100%);
 
-  --bookedai-font-sans: Inter, sans-serif;
+  --bookedai-font-display: "Space Grotesk", "SF Pro Display", Inter, sans-serif;
+  --bookedai-font-body: "DM Sans", "SF Pro Text", Inter, sans-serif;
+  --bookedai-font-sans: var(--bookedai-font-body);
   --bookedai-hero-display: clamp(3rem, 6vw, 5.5rem);
   --bookedai-h1: clamp(2.5rem, 5vw, 4.5rem);
   --bookedai-h2: clamp(2rem, 4vw, 3rem);
@@ -30,21 +44,25 @@
   --bookedai-radius-lg: 24px;
   --bookedai-radius-xl: 32px;
   --bookedai-radius-pill: 9999px;
+  --bookedai-nav-radius: 28px;
+  --bookedai-card-radius: 28px;
 
   --bookedai-shadow-card: 0 10px 40px rgba(2, 6, 23, 0.38);
   --bookedai-shadow-glow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 18px 60px rgba(79, 140, 255, 0.14);
+  --bookedai-shadow-float: 0 20px 70px rgba(2, 6, 23, 0.46);
+  --bookedai-shadow-soft: 0 12px 32px rgba(15, 23, 42, 0.18);
 
   --bookedai-container: 1200px;
+  --bookedai-reading-container: 760px;
   --bookedai-section-y-desktop: 112px;
   --bookedai-section-y-tablet: 88px;
   --bookedai-section-y-mobile: 72px;
+  --bookedai-grid-gap-desktop: 32px;
+  --bookedai-grid-gap-mobile: 20px;
 }
 
 .bookedai-brand-shell {
-  background:
-    var(--bookedai-hero-glow),
-    var(--bookedai-green-glow),
-    linear-gradient(180deg, var(--bookedai-bg) 0%, #0F172A 100%);
+  background: var(--bookedai-aurora-background);
   color: var(--bookedai-text-primary);
   font-family: var(--bookedai-font-sans);
 }
@@ -74,17 +92,17 @@
 .bookedai-brand-surface,
 .bookedai-glass-card,
 .bookedai-gradient-border-card {
-  border-radius: var(--bookedai-radius-lg);
+  border-radius: var(--bookedai-card-radius);
   border: 1px solid var(--bookedai-border);
   box-shadow: var(--bookedai-shadow-card);
 }
 
 .bookedai-brand-surface {
-  background: var(--bookedai-surface);
+  background: linear-gradient(180deg, rgba(30, 43, 68, 0.96) 0%, rgba(24, 34, 53, 0.98) 100%);
 }
 
 .bookedai-glass-card {
-  background: linear-gradient(180deg, rgba(24, 34, 53, 0.88) 0%, rgba(18, 26, 43, 0.92) 100%);
+  background: linear-gradient(180deg, rgba(24, 34, 53, 0.84) 0%, rgba(15, 23, 42, 0.9) 100%);
   backdrop-filter: blur(18px);
 }
 
@@ -118,10 +136,107 @@
 }
 
 .bookedai-brand-heading {
+  font-family: var(--bookedai-font-display);
   font-size: var(--bookedai-h2);
   line-height: 0.96;
   letter-spacing: -0.045em;
   font-weight: 700;
+}
+
+.bookedai-brand-display {
+  font-family: var(--bookedai-font-display);
+  font-size: var(--bookedai-hero-display);
+  line-height: 0.92;
+  letter-spacing: -0.055em;
+  font-weight: 700;
+}
+
+.bookedai-brand-copy {
+  color: var(--bookedai-text-secondary);
+  font-size: var(--bookedai-body-lg);
+  line-height: 1.7;
+}
+
+.bookedai-shell-nav {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--bookedai-nav-radius);
+  background: linear-gradient(180deg, rgba(10, 16, 32, 0.84) 0%, rgba(15, 23, 42, 0.72) 100%);
+  box-shadow: var(--bookedai-shadow-float);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+.bookedai-stage-frame {
+  position: relative;
+  overflow: hidden;
+  border-radius: calc(var(--bookedai-card-radius) + 4px);
+  border: 1px solid var(--bookedai-border);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.04) 0%, rgba(255, 255, 255, 0.01) 100%),
+    rgba(9, 14, 27, 0.9);
+  box-shadow: var(--bookedai-shadow-float);
+}
+
+.bookedai-stage-frame::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at top left, rgba(79, 140, 255, 0.22), transparent 26%),
+    radial-gradient(circle at bottom right, rgba(34, 197, 94, 0.16), transparent 24%);
+}
+
+.bookedai-mobile-sheet {
+  border-radius: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: linear-gradient(180deg, rgba(11, 16, 32, 0.94) 0%, rgba(18, 26, 43, 0.98) 100%);
+  box-shadow: var(--bookedai-shadow-float);
+  backdrop-filter: blur(22px);
+  -webkit-backdrop-filter: blur(22px);
+}
+
+.bookedai-signal-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  border-radius: var(--bookedai-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--bookedai-text-primary);
+  padding: 0.45rem 0.85rem;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.bookedai-command-input {
+  width: 100%;
+  border-radius: 22px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(7, 11, 22, 0.7);
+  color: var(--bookedai-text-primary);
+  padding: 1rem 1.1rem;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.bookedai-command-input::placeholder {
+  color: var(--bookedai-text-tertiary);
+}
+
+.bookedai-split-grid {
+  display: grid;
+  gap: var(--bookedai-grid-gap-mobile);
+}
+
+@media (min-width: 1024px) {
+  .bookedai-split-grid {
+    gap: var(--bookedai-grid-gap-desktop);
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 0.95fr);
+  }
 }
 
 .bookedai-button-primary,

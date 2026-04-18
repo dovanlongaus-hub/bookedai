@@ -1,5 +1,17 @@
 import os
 from dataclasses import dataclass
+from pathlib import Path
+
+from dotenv import load_dotenv
+
+
+BACKEND_ROOT = Path(__file__).resolve().parent
+PROJECT_ROOT = BACKEND_ROOT.parent
+
+# Support direct local runs from IDEs or `uvicorn` where the shell process
+# may not have sourced the repo's root `.env` file yet.
+load_dotenv(BACKEND_ROOT / ".env", override=False)
+load_dotenv(PROJECT_ROOT / ".env", override=False)
 
 
 @dataclass(frozen=True)
@@ -61,6 +73,7 @@ class Settings:
     zoho_bookings_client_id: str
     zoho_bookings_client_secret: str
     google_maps_static_api_key: str
+    google_oauth_client_id: str
     booking_business_email: str
     email_smtp_host: str
     email_smtp_port: int
@@ -173,7 +186,7 @@ def get_settings() -> Settings:
         public_api_url=os.getenv("PUBLIC_API_URL", "https://api.bookedai.au"),
         cors_allow_origins=os.getenv(
             "CORS_ALLOW_ORIGINS",
-            "http://localhost:3000,http://localhost:5173,https://bookedai.au,https://www.bookedai.au,https://admin.bookedai.au,https://product.bookedai.au,https://upload.bookedai.au",
+            "http://localhost:3000,http://localhost:5173,https://bookedai.au,https://www.bookedai.au,https://admin.bookedai.au,https://product.bookedai.au,https://portal.bookedai.au,https://upload.bookedai.au",
         ),
         supabase_url=os.getenv("SUPABASE_URL", "https://supabase.bookedai.au"),
         supabase_anon_key=os.getenv("SUPABASE_ANON_KEY", ""),
@@ -251,6 +264,7 @@ def get_settings() -> Settings:
             os.getenv("ZOHO_CALENDAR_CLIENT_SECRET", ""),
         ),
         google_maps_static_api_key=os.getenv("GOOGLE_MAPS_STATIC_API_KEY", ""),
+        google_oauth_client_id=os.getenv("GOOGLE_OAUTH_CLIENT_ID", ""),
         booking_business_email=os.getenv("BOOKING_BUSINESS_EMAIL", "info@bookedai.au"),
         email_smtp_host=os.getenv("EMAIL_SMTP_HOST", ""),
         email_smtp_port=env_int("EMAIL_SMTP_PORT", 587),

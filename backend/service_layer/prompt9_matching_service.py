@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 import re
 from typing import Any
+import unicodedata
 
 from db import ServiceMerchantProfile
 
@@ -37,6 +38,8 @@ MATCH_INTENT_EVIDENCE = {
     "exact_summary_phrase",
     "all_terms_in_name",
     "all_terms_in_catalog",
+    "core_intent_full_match",
+    "core_intent_partial_match",
     "name_overlap",
     "category_overlap",
     "summary_overlap",
@@ -45,25 +48,89 @@ MATCH_INTENT_EVIDENCE = {
     "requested_service_match",
 }
 
-NON_TOPIC_TERMS = {
+DISPLAY_QUALITY_STRONG_EVIDENCE = {
+    "exact_name_phrase",
+    "exact_summary_phrase",
+    "all_terms_in_name",
+    "all_terms_in_catalog",
+    "core_intent_full_match",
+    "core_intent_partial_match",
+    "requested_service_match",
+}
+
+GENERIC_QUERY_STOPWORDS = {
     "a",
     "an",
     "and",
     "at",
+    "ban",
+    "best",
     "book",
     "booking",
+    "buoi",
+    "can",
+    "cho",
+    "con",
+    "cua",
+    "dat",
+    "dich",
+    "duoc",
+    "find",
     "for",
     "from",
+    "gan",
+    "good",
+    "giup",
+    "help",
+    "hom",
     "in",
+    "lich",
+    "look",
+    "looking",
+    "mai",
+    "mot",
+    "muon",
+    "nay",
+    "near",
+    "ngay",
+    "nha",
+    "nhung",
     "near",
     "of",
+    "old",
+    "o",
     "on",
     "or",
+    "recommend",
+    "saturday",
+    "show",
+    "suggest",
+    "sunday",
+    "tai",
     "the",
+    "thang",
+    "this",
+    "today",
+    "tomorrow",
+    "tonight",
+    "thu",
+    "tim",
+    "toi",
     "to",
+    "trong",
+    "tuan",
     "under",
+    "vao",
+    "va",
+    "vu",
+    "want",
+    "week",
+    "weekend",
     "with",
+    "year",
 }
+
+NON_TOPIC_TERMS = GENERIC_QUERY_STOPWORDS
 
 LOCATION_ALIASES = {
     "sydney": "Sydney",
@@ -105,6 +172,9 @@ LOCATION_ALIASES = {
     "liverpool": "Liverpool",
     "blacktown": "Blacktown",
     "cronulla": "Cronulla",
+    "caringbah": "Caringbah",
+    "miranda": "Miranda",
+    "sutherland": "Sutherland",
     "st leonards": "St Leonards",
     "neutral bay": "Neutral Bay",
     "mosman": "Mosman",
@@ -160,6 +230,9 @@ LOCATION_SIGNAL_GROUPS: dict[str, set[str]] = {
         "liverpool",
         "blacktown",
         "cronulla",
+        "caringbah",
+        "miranda",
+        "sutherland",
         "st leonards",
         "neutral bay",
         "mosman",
@@ -263,7 +336,13 @@ LOCATION_SIGNAL_GROUPS: dict[str, set[str]] = {
 TOPIC_PHRASE_SYNONYMS: dict[str, set[str]] = {
     "skin care": {"skincare", "skin", "facial", "spa", "beauty"},
     "skin treatment": {"skincare", "skin", "facial", "spa", "beauty"},
+    "support worker": {"support", "worker", "ndis", "disability", "community", "home"},
+    "ndis support": {"ndis", "support", "worker", "disability", "community", "home"},
+    "in home support": {"support", "worker", "home", "community"},
+    "at home support": {"support", "worker", "home", "community"},
     "private dining": {"private", "dining", "dinner", "restaurant", "group", "table"},
+    "restaurant table": {"restaurant", "table", "booking", "reservation", "dining"},
+    "table booking": {"restaurant", "table", "booking", "reservation", "dining"},
     "team dinner": {"team", "dinner", "dining", "restaurant", "group", "table"},
     "team lunch": {"team", "lunch", "dining", "restaurant", "group", "table"},
     "group dinner": {"group", "dinner", "dining", "restaurant", "table"},
@@ -334,6 +413,7 @@ TOPIC_PHRASE_SYNONYMS: dict[str, set[str]] = {
 TOPIC_SYNONYM_GROUPS: tuple[set[str], ...] = (
     {"facial", "facials", "spa", "beauty", "skincare", "skin", "glow", "led", "pampering"},
     {"hair", "haircut", "haircuts", "colour", "color", "salon", "styling", "bridal", "wedding", "barber", "balayage", "highlights"},
+    {"support", "worker", "ndis", "disability", "community", "home"},
     {"massage", "remedial", "relaxation", "sports massage", "deep tissue", "swedish"},
     {"nail", "nails", "manicure", "pedicure", "gel", "shellac"},
     {"lash", "eyelash", "brow", "eyebrow", "lamination", "extensions", "lift"},
@@ -346,9 +426,10 @@ TOPIC_SYNONYM_GROUPS: tuple[set[str], ...] = (
     {"psychology", "psychologist", "counselling", "counselor", "mental health", "therapy", "coaching"},
     {"acupuncture", "naturopath", "holistic", "wellness", "natural", "tcm"},
     {"restaurant", "dining", "dinner", "table", "cafe", "private", "group", "food", "lunch"},
+    {"catering", "caterer", "buffet", "platters", "canapes"},
     {"venue", "function", "party", "event", "hire", "space"},
     {"membership", "member", "renew", "renewal", "signup", "join"},
-    {"housing", "property", "project", "apartment", "townhouse", "home", "estate", "investment"},
+    {"housing", "property", "project", "apartment", "townhouse", "estate", "investment"},
     {"signage", "sign", "banner", "frame", "expo", "booth", "media", "wall"},
     {"photo", "photography", "shoot", "portrait", "headshot", "photographer"},
     {"teeth", "whitening", "dental", "dentist", "smile", "cosmetic"},
@@ -386,12 +467,19 @@ def is_chat_style_query(query: str | None) -> bool:
 
 
 def _normalized_terms(value: str | None) -> set[str]:
-    normalized = re.sub(r"[^a-z0-9]+", " ", (value or "").lower())
+    normalized = _normalized_text(value)
     return {term for term in normalized.split() if term}
 
 
 def _normalized_text(value: str | None) -> str:
-    return " ".join(re.sub(r"[^a-z0-9]+", " ", (value or "").lower()).split())
+    folded = _fold_search_text(value)
+    return " ".join(re.sub(r"[^a-z0-9]+", " ", folded).split())
+
+
+def _fold_search_text(value: str | None) -> str:
+    normalized = unicodedata.normalize("NFKD", (value or "").strip().lower())
+    normalized = normalized.replace("đ", "d")
+    return "".join(character for character in normalized if not unicodedata.combining(character))
 
 
 def expand_location_terms(terms: set[str], *, text: str | None = None) -> set[str]:
@@ -574,6 +662,60 @@ def expand_topic_terms(terms: set[str], *, query: str | None = None) -> set[str]
     return expanded_terms
 
 
+def extract_core_intent_terms(
+    query: str | None,
+    *,
+    location_hint: str | None = None,
+    limit: int = 4,
+) -> tuple[str, ...]:
+    normalized_query = _normalized_text(query)
+    if not normalized_query:
+        return ()
+
+    location_terms = _location_signals(extract_query_location_hint(query, location_hint))
+    ordered_terms: list[str] = []
+    for term in normalized_query.split():
+        if (
+            len(term) < 2
+            or term.isdigit()
+            or term in NON_TOPIC_TERMS
+            or term in location_terms
+            or term in ordered_terms
+        ):
+            continue
+        ordered_terms.append(term)
+
+    return tuple(ordered_terms[:limit])
+
+
+def _topic_term_family(term: str) -> set[str]:
+    normalized_term = _normalized_text(term)
+    if not normalized_term:
+        return set()
+    for group in TOPIC_SYNONYM_GROUPS:
+        if normalized_term in group:
+            return set(group)
+    return {normalized_term}
+
+
+def _matches_core_intent_term(term: str, service_terms: set[str]) -> bool:
+    return bool(_topic_term_family(term) & service_terms)
+
+
+def _query_has_restaurant_booking_intent(
+    normalized_query: str,
+    topical_terms: set[str],
+) -> bool:
+    if {"restaurant", "dining", "table"} <= topical_terms:
+        return True
+    if "restaurant" in topical_terms and bool({"table", "booking", "reservation"} & topical_terms):
+        return True
+    return any(
+        phrase in normalized_query
+        for phrase in ("restaurant table", "table booking", "private dining", "team dinner", "group dinner")
+    )
+
+
 def _string_or_none(value: str | None) -> str | None:
     normalized = (value or "").strip()
     return normalized or None
@@ -612,25 +754,38 @@ def _has_intent_evidence(match: RankedServiceMatch) -> bool:
     return any(item in MATCH_INTENT_EVIDENCE for item in match.evidence)
 
 
+def _service_location_terms(match: RankedServiceMatch) -> set[str]:
+    location = _string_or_none(getattr(match.service, "location", None)) or ""
+    venue_name = _string_or_none(getattr(match.service, "venue_name", None)) or ""
+    return _location_signals(location) | _location_signals(venue_name)
+
+
 def filter_ranked_matches_for_relevance(
     ranked_matches: list[RankedServiceMatch],
     *,
     semantic_applied: bool,
     require_location_match: bool = False,
+    location_hint: str | None = None,
 ) -> list[RankedServiceMatch]:
     filtered: list[RankedServiceMatch] = []
+    location_terms = _location_signals(location_hint)
     for match in ranked_matches:
         has_intent_evidence = _has_intent_evidence(match)
         semantic_score = match.semantic_score if match.semantic_score is not None else None
+        core_intent_mismatch = "core_intent_mismatch" in match.evidence
         intent_mismatch = "intent_mismatch" in match.evidence
         topic_mismatch = "topic_mismatch" in match.evidence
         location_mismatch = "location_mismatch" in match.evidence
+        if location_terms:
+            location_mismatch = not bool(location_terms & _service_location_terms(match))
 
         if require_location_match and location_mismatch:
             continue
 
         if semantic_applied:
             if topic_mismatch:
+                continue
+            if core_intent_mismatch and (semantic_score is None or semantic_score < 0.78):
                 continue
             if semantic_score is not None and semantic_score < 0.2:
                 continue
@@ -641,6 +796,8 @@ def filter_ranked_matches_for_relevance(
         else:
             if topic_mismatch:
                 continue
+            if core_intent_mismatch:
+                continue
             if intent_mismatch and match.score < 0.25:
                 continue
 
@@ -650,6 +807,52 @@ def filter_ranked_matches_for_relevance(
         filtered.append(match)
 
     return filtered
+
+
+def filter_ranked_matches_for_display_quality(
+    ranked_matches: list[RankedServiceMatch],
+    *,
+    semantic_applied: bool,
+) -> list[RankedServiceMatch]:
+    if not ranked_matches:
+        return []
+
+    top_match = ranked_matches[0]
+    top_evidence = set(top_match.evidence)
+    has_strong_display_evidence = bool(top_evidence & DISPLAY_QUALITY_STRONG_EVIDENCE)
+    has_core_intent_support = "core_intent_mismatch" not in top_evidence and bool(
+        top_evidence & {"core_intent_full_match", "core_intent_partial_match", "name_overlap", "tag_overlap"}
+    )
+
+    if {"topic_mismatch", "intent_mismatch", "core_intent_mismatch"} & top_evidence:
+        return []
+
+    if top_match.score < 0.38:
+        return []
+
+    if top_match.score < 0.58 and not has_strong_display_evidence:
+        return []
+
+    if top_match.score < 0.66 and not has_core_intent_support:
+        return []
+
+    if semantic_applied and top_match.semantic_score is not None:
+        if top_match.semantic_score < 0.65 and not has_strong_display_evidence:
+            return []
+
+    display_matches: list[RankedServiceMatch] = []
+    cutoff_score = max(0.34, top_match.score - 0.22)
+    for match in ranked_matches:
+        evidence = set(match.evidence)
+        if {"topic_mismatch", "intent_mismatch", "core_intent_mismatch"} & evidence:
+            continue
+        if match.score < cutoff_score:
+            continue
+        if semantic_applied and match.semantic_score is not None and match.semantic_score < 0.25:
+            continue
+        display_matches.append(match)
+
+    return display_matches
 
 
 def rank_catalog_matches(
@@ -665,10 +868,12 @@ def rank_catalog_matches(
     query_terms = _normalized_terms(query)
     effective_location_hint = extract_query_location_hint(query, location_hint)
     topical_terms = _topical_terms(query, location_hint=effective_location_hint)
+    core_intent_terms = extract_core_intent_terms(query, location_hint=effective_location_hint)
     location_terms = _location_signals(effective_location_hint)
     category_terms = _normalized_terms(requested_category)
     budget_limit = extract_query_budget_limit(query, budget)
     requested_service_id_normalized = (requested_service_id or "").strip().lower()
+    restaurant_booking_intent = _query_has_restaurant_booking_intent(normalized_query, topical_terms)
 
     ranked: list[RankedServiceMatch] = []
     for service in services:
@@ -689,6 +894,9 @@ def rank_catalog_matches(
         category_value = _string_or_none(getattr(service, "category", None))
         category_service_terms = _normalized_terms(category_value)
         location_service_terms = _location_signals(location) | _location_signals(venue_name)
+        service_catalog_terms = (
+            service_terms | category_service_terms | summary_terms | tags_terms
+        )
 
         overlap_name = len(topical_terms & service_terms)
         overlap_business = len(topical_terms & business_terms)
@@ -703,6 +911,9 @@ def rank_catalog_matches(
         all_terms_in_name = bool(topical_terms) and topical_terms <= service_terms
         all_terms_in_service = bool(topical_terms) and topical_terms <= (
             service_terms | category_service_terms | summary_terms | tags_terms
+        )
+        core_intent_match_count = sum(
+            1 for term in core_intent_terms if _matches_core_intent_term(term, service_catalog_terms)
         )
 
         score += min(0.42, overlap_name * 0.14)
@@ -734,6 +945,20 @@ def rank_catalog_matches(
             score += 0.06
             reasons.append("All query terms are covered by the catalog metadata.")
             evidence.append("all_terms_in_catalog")
+
+        if core_intent_terms:
+            if core_intent_match_count == len(core_intent_terms):
+                score += 0.12
+                reasons.append("Core service terms align strongly with the current request.")
+                evidence.append("core_intent_full_match")
+            elif core_intent_match_count >= max(1, len(core_intent_terms) - 1):
+                score += 0.05
+                reasons.append("Most core service terms align with the current request.")
+                evidence.append("core_intent_partial_match")
+            else:
+                score -= 0.24
+                reasons.append("Candidate misses the core service terms in the current request.")
+                evidence.append("core_intent_mismatch")
 
         if getattr(service, "featured", 0):
             score += 0.04
@@ -770,6 +995,39 @@ def rank_catalog_matches(
         if category_value and preference_overlap:
             reasons.append("Matches the requested service category.")
             evidence.append("category_preference_match")
+
+        if restaurant_booking_intent:
+            restaurant_booking_terms = {"restaurant", "dining", "table", "reservation", "private"}
+            prominent_service_terms = service_terms | business_terms | summary_terms
+            prominent_identity_terms = service_terms | business_terms | venue_terms
+            visible_booking_terms = restaurant_booking_terms & (
+                prominent_service_terms | tags_terms | category_service_terms
+            )
+            prominent_catering_terms = {"catering", "caterer", "buffet", "platters", "canapes"} & (
+                service_terms | business_terms | summary_terms
+            )
+            prominent_restaurant_identity = restaurant_booking_terms & prominent_identity_terms
+            if visible_booking_terms:
+                score += 0.08
+                reasons.append("Catalog metadata clearly supports restaurant or table-booking intent.")
+                evidence.append("restaurant_booking_match")
+            if prominent_catering_terms and not prominent_restaurant_identity:
+                score -= 0.45
+                reasons.append("Candidate is prominently positioned as catering rather than a restaurant booking destination.")
+                evidence.append("prominent_identity_mismatch")
+                evidence.append("intent_mismatch")
+            elif prominent_catering_terms and not (restaurant_booking_terms & prominent_service_terms):
+                score -= 0.28
+                reasons.append("Candidate is positioned as catering rather than a true restaurant table-booking option.")
+                evidence.append("intent_mismatch")
+            elif prominent_catering_terms and not visible_booking_terms:
+                score -= 0.24
+                reasons.append("Candidate looks like catering rather than a true restaurant table-booking option.")
+                evidence.append("intent_mismatch")
+            elif not visible_booking_terms:
+                score -= 0.18
+                reasons.append("Candidate does not clearly support restaurant or table-booking intent.")
+                evidence.append("intent_mismatch")
 
         intent_overlap = overlap_name + overlap_business + overlap_summary + overlap_tags + overlap_category
         if query_terms and not phrase_in_name and not phrase_in_business and not phrase_in_summary and intent_overlap == 0:

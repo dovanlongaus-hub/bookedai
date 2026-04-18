@@ -36,9 +36,11 @@ Establish the commercial contract baseline for revenue, missed revenue, attribut
 - define typed API responses
 - define data ownership and fallback handling
 - confirm schema implications
+- define explicit matching-contract fields for `domain_intent`, `location_truth_state`, `fallback_scope`, and `escalation_reason`
+- define when out-of-region results are suppressed versus explicitly labeled fallback
 
 ## QA or release owner
 
 - define minimum contract validation expectations
 - confirm closeout criteria for Sprint 4
-
+- add contract checks proving customer-facing search cannot silently degrade into mixed-domain or stale-context answers

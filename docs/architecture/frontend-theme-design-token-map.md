@@ -4,6 +4,10 @@ Date: `2026-04-17`
 
 Document status: `active sprint-2 implementation source`
 
+Companion strategic theme document:
+
+- `docs/architecture/unified-responsive-theme-system.md`
+
 ## 1. Purpose
 
 This document turns the Sprint 2 design-token requirement into an explicit implementation map for:

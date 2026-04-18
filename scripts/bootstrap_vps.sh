@@ -11,6 +11,8 @@ DOMAIN_ROOT="${DOMAIN_ROOT:-bookedai.au}"
 DOMAIN_WWW="${DOMAIN_WWW:-www.bookedai.au}"
 DOMAIN_API="${DOMAIN_API:-api.bookedai.au}"
 DOMAIN_PRODUCT="${DOMAIN_PRODUCT:-product.bookedai.au}"
+DOMAIN_PORTAL="${DOMAIN_PORTAL:-portal.bookedai.au}"
+DOMAIN_PITCH="${DOMAIN_PITCH:-pitch.bookedai.au}"
 DOMAIN_N8N="${DOMAIN_N8N:-n8n.bookedai.au}"
 DOMAIN_SUPABASE="${DOMAIN_SUPABASE:-supabase.bookedai.au}"
 DOMAIN_UPLOAD="${DOMAIN_UPLOAD:-upload.bookedai.au}"
@@ -51,6 +53,6 @@ ufw allow 443/tcp || true
 ufw --force enable || true
 
 echo "Bootstrap completed."
-echo "DNS must already point ${DOMAIN_ROOT}, ${DOMAIN_WWW}, ${DOMAIN_API}, ${DOMAIN_PRODUCT}, ${DOMAIN_N8N}, ${DOMAIN_SUPABASE}, ${DOMAIN_UPLOAD}, ${DOMAIN_CALENDAR} to this server."
+echo "DNS must already point ${DOMAIN_ROOT}, ${DOMAIN_WWW}, ${DOMAIN_API}, ${DOMAIN_PRODUCT}, ${DOMAIN_PORTAL}, ${DOMAIN_PITCH}, ${DOMAIN_N8N}, ${DOMAIN_SUPABASE}, ${DOMAIN_UPLOAD}, ${DOMAIN_CALENDAR} to this server."
 echo "Next step:"
 echo "  sudo -u ${DEPLOY_USER} bash scripts/deploy_production.sh"

@@ -72,7 +72,7 @@ def render_bookedai_confirmation_email(
     timezone = _safe_value(variables, "timezone", "Australia/Sydney")
     additional_note = str((variables or {}).get("additional_note") or "").strip()
     app_url = str(public_app_url or "https://bookedai.au").rstrip("/")
-    logo_url = f"{app_url}/branding/bookedai-mark.png"
+    logo_url = f"{app_url}/branding/bookedai-mark-gradient.png?v=20260418-brand-system"
     primary_link = payment_link or manage_link or app_url
     primary_label = "Complete next step" if payment_link else "Open Bookedai.au"
 

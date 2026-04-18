@@ -329,7 +329,7 @@ async function stubAdminPreviewV1(page: Parameters<typeof test>[0]['page']) {
           semantic_assist: {
             applied: true,
             provider: 'openai',
-            provider_chain: ['gemini', 'openai'],
+            provider_chain: ['openai', 'gemini'],
             fallback_applied: true,
             normalized_query: 'haircut',
             inferred_location: 'Sydney',
@@ -670,8 +670,8 @@ test('admin prompt 5 preview shows rollout mode and runs additive preview flow @
   );
   await expect(page.getByText('Ready to book').first()).toBeVisible();
   await expect(page.getByText('Primary openai')).toBeVisible();
-  await expect(page.getByText('OpenAI fallback')).toBeVisible();
-  await expect(page.getByText('Provider chain: gemini -> openai')).toBeVisible();
+  await expect(page.getByText('Fallback applied')).toBeVisible();
+  await expect(page.getByText('Provider chain: openai -> gemini')).toBeVisible();
   await expect(page.getByText('CRM retry lane')).toBeVisible();
   await expect(page.getByText('Queued CRM retries are in progress; not manual review yet.')).toBeVisible();
   await expect(

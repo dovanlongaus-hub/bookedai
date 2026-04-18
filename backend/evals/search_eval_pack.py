@@ -141,6 +141,16 @@ SEARCH_EVAL_SERVICES: list[SimpleNamespace] = [
         amount_aud=50,
         tags=["hotel", "room", "reservation", "stay", "hospitality"],
     ),
+    _service(
+        service_id="ndis-support-worker-western-sydney",
+        name="NDIS Support Worker Home Visit",
+        summary="In-home disability support and community access visits in Western Sydney.",
+        category="NDIS Support",
+        location="Parramatta, Western Sydney NSW 2150",
+        amount_aud=95,
+        tags=["ndis", "support", "worker", "disability", "community"],
+        featured=True,
+    ),
 ]
 
 
@@ -234,6 +244,49 @@ SEARCH_EVAL_CASES: tuple[SearchEvalCase, ...] = (
         expected_ids=(),
         require_location_match=True,
     ),
+    SearchEvalCase(
+        name="vietnamese-ndis-support-western-sydney",
+        query="Toi can dich vu support worker NDIS tai nha o Western Sydney",
+        location_hint="Western Sydney",
+        requested_category="NDIS Support",
+        expected_ids=("ndis-support-worker-western-sydney",),
+        expected_top_id="ndis-support-worker-western-sydney",
+        require_location_match=True,
+    ),
+    SearchEvalCase(
+        name="english-haircut-should-not-fall_back_to_generic_beauty",
+        query="I need a haircut in Sydney",
+        location_hint="Sydney",
+        requested_category="Salon",
+        expected_ids=(),
+        require_location_match=True,
+    ),
+    SearchEvalCase(
+        name="restaurant-table-melbourne",
+        query="restaurant table in Melbourne",
+        location_hint="Melbourne",
+        requested_category="Food and Beverage",
+        expected_ids=("restaurant-table-booking",),
+        expected_top_id="restaurant-table-booking",
+        require_location_match=True,
+    ),
+    SearchEvalCase(
+        name="private-dining-southbank",
+        query="private dining Southbank",
+        requested_category="Food and Beverage",
+        expected_ids=("restaurant-table-booking",),
+        expected_top_id="restaurant-table-booking",
+        require_location_match=True,
+    ),
+    SearchEvalCase(
+        name="support-worker-western-sydney-english",
+        query="NDIS support worker at home in Western Sydney tomorrow",
+        location_hint="Western Sydney",
+        requested_category="NDIS Support",
+        expected_ids=("ndis-support-worker-western-sydney",),
+        expected_top_id="ndis-support-worker-western-sydney",
+        require_location_match=True,
+    ),
 )
 
 
@@ -249,6 +302,7 @@ def evaluate_search_case(case: SearchEvalCase) -> dict[str, Any]:
         ranked,
         semantic_applied=False,
         require_location_match=case.require_location_match,
+        location_hint=case.location_hint,
     )
     actual_ids = tuple(item.service.service_id for item in filtered)
     if len(case.expected_ids) <= 1:

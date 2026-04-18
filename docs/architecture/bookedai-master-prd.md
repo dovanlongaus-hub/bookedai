@@ -1,6 +1,6 @@
 # BookedAI Product Requirements Document
 
-Date: `2026-04-17`
+Date: `2026-04-18`
 
 Document status: `active planning baseline`
 
@@ -50,6 +50,34 @@ BookedAI helps service businesses answer faster, recover missed opportunities, a
 ### Positioning statement
 
 BookedAI is a multi-channel AI revenue engine for appointment-based and enquiry-driven service businesses. It captures inbound demand, responds instantly, qualifies leads, books appointments, follows up automatically, connects to calendar, CRM, and payment systems, and helps operators see what revenue was generated, what was missed, and what can still be recovered.
+
+### Current public experience baseline
+
+The current live public growth surface should now be treated as:
+
+- a search-first homepage
+- an inline assistant-led booking surface
+- an English-default public shell with visible locale switching
+- a lightweight conversion surface where the main viewport is reserved for search, shortlist, booking, and confirmation rather than long landing copy
+
+The current approved locale options for the public shell are:
+
+- English
+- Tiếng Việt
+
+The current homepage should therefore not be described in later planning as a popup-first public assistant unless the requirement-side source documents are explicitly revised.
+
+### Product operating principles now locked
+
+All requirement-side and execution-side documents should now inherit these product rules unless a newer approved source document explicitly replaces them:
+
+- BookedAI should always be presented and built as a revenue engine for service SMEs, not as a generic content site or AI brochure
+- the public homepage should optimize for search intent, booking intent, and conversion momentum before narrative density
+- the product should prefer lightweight, fast-scanning, mobile-safe interfaces over section-heavy storytelling when a workflow is active
+- responsive behavior should be treated as mobile-first for every customer-facing surface that directly affects search, shortlist, booking, payment, or recovery
+- when there is a tradeoff between explanatory content and live conversion space, the live conversion space should win by default
+- `frontend/public/branding/` should be treated as the only approved source of BookedAI logo, short-mark, favicon, touch-icon, PWA icon, and mobile-responsive brand assets across every app, web, site, single-page, and adjacent shell
+- all BookedAI surfaces should resolve brand assets through shared brand mappings rather than route-local logo files, remote logo URLs, or parallel logo systems
 
 ### Category
 
@@ -227,6 +255,13 @@ Needs:
 4. missed revenue recovered
 5. automation and AI underneath
 
+### Public-shell messaging baseline
+
+- English is the default public-shell copy language
+- additional locale options may be exposed through a visible top-level language selector
+- multilingual support must not introduce mixed-language English shells by accident; each locale should render intentionally
+- current follow-on sprint work should preserve the English-default plus language-selector baseline unless a later approved requirement update replaces it
+
 ### Voice and tone
 
 - clear
@@ -258,6 +293,12 @@ The following principles are mandatory:
 The current repository already runs as a live full-stack system with:
 
 - React, TypeScript, and Vite frontend
+
+Current public runtime interpretation:
+
+- the public homepage is no longer only a narrative landing that launches a popup assistant
+- the public homepage now includes a search-first hero that can drive an inline embedded assistant runtime on the same page
+- the embedded assistant is already expected to surface shortlist, booking, and confirmation states directly in the homepage flow
 - FastAPI backend
 - self-hosted Supabase Postgres
 - `n8n` automation layer
@@ -270,6 +311,7 @@ Current runtime capabilities already include:
 
 - public marketing website
 - booking assistant experience
+- customer booking portal host on `portal.bookedai.au` for post-booking detail, edit, cancel, and save flows
 - demo request and pricing consultation flows
 - admin interface
 - Stripe checkout session creation
@@ -289,6 +331,13 @@ The real gap is to turn the current platform into a clear revenue engine by addi
 - missed revenue tracking
 - source attribution
 - payment-linked reporting
+
+Portal requirement now locked for customer booking flows:
+
+- booking confirmation UX must expose a durable portal route on `portal.bookedai.au`
+- the portal host must be treated as a first-class production subdomain, not an ad-hoc link target
+- post-booking actions such as detail review, edit, cancel, save, and payment follow-up should converge on the portal host rather than fragmented one-off CTA destinations
+- DNS, TLS, Nginx routing, frontend runtime handling, and documentation must stay in sync whenever the portal host changes
 - recovery workflows
 - pricing and packaging aligned to outcomes
 

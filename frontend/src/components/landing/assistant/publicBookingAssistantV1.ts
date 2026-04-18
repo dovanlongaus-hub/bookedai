@@ -33,6 +33,16 @@ type PublicBookingAssistantSearchParams = {
   locationHint: string | null;
   serviceCategory: string | null;
   selectedServiceId: string | null;
+  userLocation?: {
+    latitude: number;
+    longitude: number;
+  } | null;
+};
+
+type PublicBookingAssistantShadowSearchResult = {
+  candidateIds: string[];
+  rankedCandidates: MatchCandidate[];
+  resolved: boolean;
 };
 
 type PublicBookingAssistantLiveReadResult = {
@@ -67,6 +77,60 @@ type PublicBookingAssistantLiveReadResult = {
 type PublicBookingAssistantSessionParams = {
   sourcePage: string;
   anonymousSessionId: string;
+};
+
+type CandidateLike = MatchCandidate & {
+  candidate_id?: string | null;
+  provider_name?: string | null;
+  service_name?: string | null;
+  source_type?: string | null;
+  distance_km?: number | null;
+  venue_name?: string | null;
+  duration_minutes?: number | null;
+  amount_aud?: number | null;
+  image_url?: string | null;
+  map_url?: string | null;
+  booking_url?: string | null;
+  source_url?: string | null;
+  display_summary?: string | null;
+  trust_signal?: string | null;
+};
+
+type SemanticAssistLike = {
+  provider?: string | null;
+  providerChain?: string[] | null;
+  provider_chain?: string[] | null;
+  fallbackApplied?: boolean | null;
+  fallback_applied?: boolean | null;
+  normalizedQuery?: string | null;
+  normalized_query?: string | null;
+  inferredLocation?: string | null;
+  inferred_location?: string | null;
+  inferredCategory?: string | null;
+  inferred_category?: string | null;
+};
+
+type SearchQueryUnderstandingLike = {
+  normalizedQuery?: string | null;
+  normalized_query?: string | null;
+  inferredLocation?: string | null;
+  inferred_location?: string | null;
+  inferredCategory?: string | null;
+  inferred_category?: string | null;
+};
+
+type SearchResponseDataLike = {
+  semantic_assist?: SemanticAssistLike | null;
+  semanticAssist?: SemanticAssistLike | null;
+  normalized_query?: string | null;
+  normalizedQuery?: string | null;
+  query_understanding?: SearchQueryUnderstandingLike | null;
+  queryUnderstanding?: SearchQueryUnderstandingLike | null;
+};
+
+type RecommendationLike = {
+  candidateId?: string | null;
+  candidate_id?: string | null;
 };
 
 function buildActorContext(): ApiActorContext {
@@ -157,6 +221,119 @@ function buildLeadContact(params: {
   };
 }
 
+function normalizeMatchCandidate(candidate: CandidateLike): MatchCandidate {
+  return {
+    ...candidate,
+    candidateId: candidate.candidateId ?? candidate.candidate_id ?? '',
+    providerName: candidate.providerName ?? candidate.provider_name ?? '',
+    serviceName: candidate.serviceName ?? candidate.service_name ?? '',
+    sourceType: candidate.sourceType ?? candidate.source_type ?? null,
+    distanceKm: candidate.distanceKm ?? candidate.distance_km ?? null,
+    venueName: candidate.venueName ?? candidate.venue_name ?? null,
+    durationMinutes: candidate.durationMinutes ?? candidate.duration_minutes ?? null,
+    amountAud: candidate.amountAud ?? candidate.amount_aud ?? null,
+    imageUrl: candidate.imageUrl ?? candidate.image_url ?? null,
+    mapUrl: candidate.mapUrl ?? candidate.map_url ?? null,
+    bookingUrl: candidate.bookingUrl ?? candidate.booking_url ?? null,
+    sourceUrl: candidate.sourceUrl ?? candidate.source_url ?? null,
+    displaySummary: candidate.displaySummary ?? candidate.display_summary ?? null,
+    trustSignal: candidate.trustSignal ?? candidate.trust_signal ?? null,
+  };
+}
+
+function normalizeCandidateId(candidate: RecommendationLike | CandidateLike | undefined) {
+  return candidate?.candidateId ?? candidate?.candidate_id ?? null;
+}
+
+function normalizeSemanticAssistSummary(semanticAssist: SemanticAssistLike | null | undefined) {
+  if (!semanticAssist) {
+    return null;
+  }
+
+  return {
+    provider: semanticAssist.provider ?? null,
+    providerChain: semanticAssist.providerChain ?? semanticAssist.provider_chain ?? [],
+    fallbackApplied: Boolean(
+      semanticAssist.fallbackApplied ?? semanticAssist.fallback_applied,
+    ),
+    normalizedQuery:
+      semanticAssist.normalizedQuery ?? semanticAssist.normalized_query ?? null,
+    inferredLocation:
+      semanticAssist.inferredLocation ?? semanticAssist.inferred_location ?? null,
+    inferredCategory:
+      semanticAssist.inferredCategory ?? semanticAssist.inferred_category ?? null,
+  };
+}
+
+function normalizeSemanticAssistSummaryFromSearchData(
+  searchData: (SearchResponseDataLike & Record<string, unknown>) | null | undefined,
+) {
+  if (!searchData) {
+    return null;
+  }
+
+  const semanticAssistSummary = normalizeSemanticAssistSummary(
+    (searchData.semanticAssist ?? searchData.semantic_assist) as
+      | SemanticAssistLike
+      | null
+      | undefined,
+  );
+  if (semanticAssistSummary) {
+    return semanticAssistSummary;
+  }
+
+  const queryUnderstanding = searchData.queryUnderstanding ?? searchData.query_understanding;
+  const normalizedQuery =
+    queryUnderstanding?.normalizedQuery ??
+    queryUnderstanding?.normalized_query ??
+    searchData.normalizedQuery ??
+    searchData.normalized_query ??
+    null;
+  const inferredLocation =
+    queryUnderstanding?.inferredLocation ??
+    queryUnderstanding?.inferred_location ??
+    null;
+  const inferredCategory =
+    queryUnderstanding?.inferredCategory ??
+    queryUnderstanding?.inferred_category ??
+    null;
+
+  if (!normalizedQuery && !inferredLocation && !inferredCategory) {
+    return null;
+  }
+
+  return {
+    provider: null,
+    providerChain: [],
+    fallbackApplied: false,
+    normalizedQuery,
+    inferredLocation,
+    inferredCategory,
+  };
+}
+
+function buildPublicWebBookingPathSummary(candidate: MatchCandidate) {
+  if (candidate.bookingUrl) {
+    return {
+      pathType: 'book_on_partner_site' as const,
+      nextStep: 'Open the provider booking page and confirm the final details there.',
+      paymentAllowedBeforeConfirmation: false,
+      warnings: ['BookedAI sourced this option from the public web because no strong tenant catalog match was available.'],
+    };
+  }
+
+  if (candidate.sourceUrl) {
+    return {
+      pathType: 'request_callback' as const,
+      nextStep: 'Review the sourced website and contact the provider directly from that page.',
+      paymentAllowedBeforeConfirmation: false,
+      warnings: ['BookedAI sourced this option from the public web because no strong tenant catalog match was available.'],
+    };
+  }
+
+  return null;
+}
+
 export function createPublicBookingAssistantSessionId() {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
     return crypto.randomUUID();
@@ -190,7 +367,11 @@ export async function shadowPublicBookingAssistantSearch(
   params: PublicBookingAssistantSearchParams,
 ) {
   if (!isPublicBookingAssistantV1Enabled() || !params.query.trim()) {
-    return [] as string[];
+    return {
+      candidateIds: [],
+      rankedCandidates: [],
+      resolved: false,
+    } satisfies PublicBookingAssistantShadowSearchResult;
   }
 
   try {
@@ -198,6 +379,7 @@ export async function shadowPublicBookingAssistantSearch(
       query: params.query.trim(),
       location: params.locationHint?.trim() || null,
       preferences: buildSearchPreferences(params),
+      user_location: params.userLocation ?? null,
       channel_context: {
         channel: 'public_web',
         deployment_mode: 'standalone_app',
@@ -208,18 +390,34 @@ export async function shadowPublicBookingAssistantSearch(
 
     const response = await apiV1.searchCandidates(request);
     if (!('data' in response)) {
-      return [];
+      return {
+        candidateIds: [],
+        rankedCandidates: [],
+        resolved: false,
+      } satisfies PublicBookingAssistantShadowSearchResult;
     }
 
-    return Array.from(
-      new Set(
-        response.data.candidates
-          .map((candidate) => candidate.candidateId)
-          .filter((candidateId) => Boolean(candidateId)),
-      ),
+    const rankedCandidates = response.data.candidates.map((candidate) =>
+      normalizeMatchCandidate(candidate as CandidateLike),
     );
+
+    return {
+      candidateIds: Array.from(
+        new Set(
+          rankedCandidates
+            .map((candidate) => candidate.candidateId)
+            .filter((candidateId) => Boolean(candidateId)),
+        ),
+      ),
+      rankedCandidates,
+      resolved: true,
+    } satisfies PublicBookingAssistantShadowSearchResult;
   } catch {
-    return [];
+    return {
+      candidateIds: [],
+      rankedCandidates: [],
+      resolved: false,
+    } satisfies PublicBookingAssistantShadowSearchResult;
   }
 }
 
@@ -245,6 +443,7 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
       query: params.query.trim(),
       location: params.locationHint?.trim() || null,
       preferences: buildSearchPreferences(params),
+      user_location: params.userLocation ?? null,
       channel_context: {
         channel: 'public_web',
         deployment_mode: 'standalone_app',
@@ -268,21 +467,19 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
       };
     }
 
-    if (!searchResponse.data.candidates.length) {
+    const normalizedCandidates = searchResponse.data.candidates.map((candidate) =>
+      normalizeMatchCandidate(candidate as CandidateLike),
+    );
+    const semanticAssistSummary = normalizeSemanticAssistSummaryFromSearchData(
+      searchResponse.data as SearchResponseDataLike,
+    );
+
+    if (!normalizedCandidates.length) {
       return {
         candidateIds: [],
         rankedCandidates: [],
         suggestedServiceId: null,
-        semanticAssistSummary: searchResponse.data.semantic_assist
-          ? {
-              provider: searchResponse.data.semantic_assist.provider ?? null,
-              providerChain: searchResponse.data.semantic_assist.providerChain ?? [],
-              fallbackApplied: Boolean(searchResponse.data.semantic_assist.fallbackApplied),
-              normalizedQuery: searchResponse.data.semantic_assist.normalizedQuery ?? null,
-              inferredLocation: searchResponse.data.semantic_assist.inferredLocation ?? null,
-              inferredCategory: searchResponse.data.semantic_assist.inferredCategory ?? null,
-            }
-          : null,
+        semanticAssistSummary,
         warnings: searchResponse.data.warnings ?? [],
         trustSummary: null,
         bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
@@ -293,30 +490,21 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
 
     const candidateIds = Array.from(
       new Set(
-        searchResponse.data.candidates
-          .map((candidate) => candidate.candidateId)
-          .filter((candidateId) => Boolean(candidateId)),
+        normalizedCandidates
+          .map((candidate) => normalizeCandidateId(candidate))
+          .filter((candidateId): candidateId is string => Boolean(candidateId)),
       ),
     );
     const topCandidateId =
-      searchResponse.data.recommendations[0]?.candidateId ??
-      searchResponse.data.candidates[0]?.candidateId ??
+      normalizeCandidateId(searchResponse.data.recommendations[0] as RecommendationLike | undefined) ??
+      normalizeCandidateId(normalizedCandidates[0]) ??
       null;
     if (!topCandidateId) {
       return {
         candidateIds,
-        rankedCandidates: searchResponse.data.candidates,
+        rankedCandidates: normalizedCandidates,
         suggestedServiceId: null,
-        semanticAssistSummary: searchResponse.data.semantic_assist
-          ? {
-              provider: searchResponse.data.semantic_assist.provider ?? null,
-              providerChain: searchResponse.data.semantic_assist.providerChain ?? [],
-              fallbackApplied: Boolean(searchResponse.data.semantic_assist.fallbackApplied),
-              normalizedQuery: searchResponse.data.semantic_assist.normalizedQuery ?? null,
-              inferredLocation: searchResponse.data.semantic_assist.inferredLocation ?? null,
-              inferredCategory: searchResponse.data.semantic_assist.inferredCategory ?? null,
-            }
-          : null,
+        semanticAssistSummary,
         warnings: searchResponse.data.warnings ?? [],
         trustSummary: null,
         bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
@@ -325,102 +513,112 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
       };
     }
 
-    const trustRequest: CheckAvailabilityRequest = {
-      candidate_id: topCandidateId,
-      desired_slot: null,
-      party_size: null,
-      channel: 'public_web',
-      actor_context: buildActorContext(),
-    };
-    const trustResponse = await apiV1.checkAvailability(trustRequest);
-    if (!('data' in trustResponse)) {
+    const topCandidate =
+      normalizedCandidates.find((candidate) => normalizeCandidateId(candidate) === topCandidateId) ??
+      normalizedCandidates[0];
+    const publicWebPathSummary = buildPublicWebBookingPathSummary(topCandidate);
+    if (topCandidate.sourceType === 'public_web_search') {
       return {
         candidateIds,
-        rankedCandidates: searchResponse.data.candidates,
-        suggestedServiceId: null,
-        semanticAssistSummary: searchResponse.data.semantic_assist
-          ? {
-              provider: searchResponse.data.semantic_assist.provider ?? null,
-              providerChain: searchResponse.data.semantic_assist.providerChain ?? [],
-              fallbackApplied: Boolean(searchResponse.data.semantic_assist.fallbackApplied),
-              normalizedQuery: searchResponse.data.semantic_assist.normalizedQuery ?? null,
-              inferredLocation: searchResponse.data.semantic_assist.inferredLocation ?? null,
-              inferredCategory: searchResponse.data.semantic_assist.inferredCategory ?? null,
-            }
-          : null,
+        rankedCandidates: normalizedCandidates,
+        suggestedServiceId: topCandidateId,
+        semanticAssistSummary,
         warnings: searchResponse.data.warnings ?? [],
         trustSummary: null,
         bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
-        bookingPathSummary: null,
+        bookingPathSummary: publicWebPathSummary,
         usedLiveRead: true,
       };
     }
 
-    const pathRequest: ResolveBookingPathRequest = {
-      candidate_id: topCandidateId,
-      availability_state: trustResponse.data.availability_state,
-      booking_confidence: trustResponse.data.booking_confidence,
-      payment_option: 'invoice_after_confirmation',
-      channel: 'public_web',
-      actor_context: buildActorContext(),
-      context: {
-        source_page: params.sourcePage,
-      },
-    };
-    const pathResponse = await apiV1.resolveBookingPath(pathRequest);
-    if (!('data' in pathResponse)) {
+    try {
+      const trustRequest: CheckAvailabilityRequest = {
+        candidate_id: topCandidateId,
+        desired_slot: null,
+        party_size: null,
+        channel: 'public_web',
+        actor_context: buildActorContext(),
+      };
+      const trustResponse = await apiV1.checkAvailability(trustRequest);
+      if (!('data' in trustResponse)) {
+        return {
+          candidateIds,
+          rankedCandidates: normalizedCandidates,
+          suggestedServiceId: topCandidateId,
+          semanticAssistSummary,
+          warnings: searchResponse.data.warnings ?? [],
+          trustSummary: null,
+          bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
+          bookingPathSummary: null,
+          usedLiveRead: true,
+        };
+      }
+
+      const pathRequest: ResolveBookingPathRequest = {
+        candidate_id: topCandidateId,
+        availability_state: trustResponse.data.availability_state,
+        booking_confidence: trustResponse.data.booking_confidence,
+        payment_option: 'invoice_after_confirmation',
+        channel: 'public_web',
+        actor_context: buildActorContext(),
+        context: {
+          source_page: params.sourcePage,
+        },
+      };
+      const pathResponse = await apiV1.resolveBookingPath(pathRequest);
+      if (!('data' in pathResponse)) {
+        return {
+          candidateIds,
+          rankedCandidates: normalizedCandidates,
+          suggestedServiceId: topCandidateId,
+          semanticAssistSummary,
+          warnings: searchResponse.data.warnings ?? [],
+          trustSummary: {
+            availabilityState: trustResponse.data.availability_state,
+            bookingConfidence: trustResponse.data.booking_confidence,
+            recommendedBookingPath: trustResponse.data.recommended_booking_path ?? null,
+            warnings: trustResponse.data.warnings,
+          },
+          bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
+          bookingPathSummary: null,
+          usedLiveRead: true,
+        };
+      }
+
       return {
         candidateIds,
-        rankedCandidates: searchResponse.data.candidates,
-        suggestedServiceId: null,
-        semanticAssistSummary: searchResponse.data.semantic_assist
-          ? {
-              provider: searchResponse.data.semantic_assist.provider ?? null,
-              providerChain: searchResponse.data.semantic_assist.providerChain ?? [],
-              fallbackApplied: Boolean(searchResponse.data.semantic_assist.fallbackApplied),
-              normalizedQuery: searchResponse.data.semantic_assist.normalizedQuery ?? null,
-              inferredLocation: searchResponse.data.semantic_assist.inferredLocation ?? null,
-              inferredCategory: searchResponse.data.semantic_assist.inferredCategory ?? null,
-            }
-          : null,
+        rankedCandidates: normalizedCandidates,
+        suggestedServiceId: topCandidateId,
+        semanticAssistSummary,
+        warnings: searchResponse.data.warnings ?? [],
+        bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
+        trustSummary: {
+          availabilityState: trustResponse.data.availability_state,
+          bookingConfidence: trustResponse.data.booking_confidence,
+          recommendedBookingPath: trustResponse.data.recommended_booking_path ?? null,
+          warnings: trustResponse.data.warnings,
+        },
+        bookingPathSummary: {
+          pathType: pathResponse.data.path_type,
+          nextStep: pathResponse.data.next_step,
+          paymentAllowedBeforeConfirmation: pathResponse.data.payment_allowed_before_confirmation,
+          warnings: pathResponse.data.warnings,
+        },
+        usedLiveRead: true,
+      };
+    } catch {
+      return {
+        candidateIds,
+        rankedCandidates: normalizedCandidates,
+        suggestedServiceId: topCandidateId,
+        semanticAssistSummary,
         warnings: searchResponse.data.warnings ?? [],
         trustSummary: null,
         bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
-        bookingPathSummary: null,
-        usedLiveRead: false,
+        bookingPathSummary: publicWebPathSummary,
+        usedLiveRead: true,
       };
     }
-
-    return {
-      candidateIds,
-      rankedCandidates: searchResponse.data.candidates,
-      suggestedServiceId: topCandidateId,
-      semanticAssistSummary: searchResponse.data.semantic_assist
-        ? {
-            provider: searchResponse.data.semantic_assist.provider ?? null,
-            providerChain: searchResponse.data.semantic_assist.providerChain ?? [],
-            fallbackApplied: Boolean(searchResponse.data.semantic_assist.fallbackApplied),
-            normalizedQuery: searchResponse.data.semantic_assist.normalizedQuery ?? null,
-            inferredLocation: searchResponse.data.semantic_assist.inferredLocation ?? null,
-            inferredCategory: searchResponse.data.semantic_assist.inferredCategory ?? null,
-          }
-        : null,
-      warnings: searchResponse.data.warnings ?? [],
-      bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
-      trustSummary: {
-        availabilityState: trustResponse.data.availability_state,
-        bookingConfidence: trustResponse.data.booking_confidence,
-        recommendedBookingPath: trustResponse.data.recommended_booking_path ?? null,
-        warnings: trustResponse.data.warnings,
-      },
-      bookingPathSummary: {
-        pathType: pathResponse.data.path_type,
-        nextStep: pathResponse.data.next_step,
-        paymentAllowedBeforeConfirmation: pathResponse.data.payment_allowed_before_confirmation,
-        warnings: pathResponse.data.warnings,
-      },
-      usedLiveRead: true,
-    };
   } catch {
     return {
       candidateIds: [],

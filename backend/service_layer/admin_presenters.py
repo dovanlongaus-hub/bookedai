@@ -170,8 +170,10 @@ def build_service_merchant_item(service: ServiceMerchantProfile) -> dict[str, ob
     return {
         "id": service.id,
         "service_id": service.service_id,
+        "tenant_id": getattr(service, "tenant_id", None),
         "business_name": service.business_name,
         "business_email": service.business_email,
+        "owner_email": getattr(service, "owner_email", None),
         "name": service.name,
         "category": service.category,
         "summary": service.summary,
@@ -186,7 +188,11 @@ def build_service_merchant_item(service: ServiceMerchantProfile) -> dict[str, ob
         "tags": service.tags_json or [],
         "featured": bool(service.featured),
         "is_active": bool(service.is_active),
-        "is_search_ready": bool(service.is_active) and not quality_warnings,
+        "publish_state": str(getattr(service, "publish_state", "draft") or "draft"),
+        "is_publish_ready": not quality_warnings,
+        "is_search_ready": bool(service.is_active)
+        and str(getattr(service, "publish_state", "draft") or "draft") == "published"
+        and not quality_warnings,
         "quality_warnings": quality_warnings,
         "updated_at": service.updated_at.astimezone(UTC).isoformat(),
     }
@@ -200,6 +206,8 @@ def build_service_catalog_quality_counts(
         "search_ready_records": sum(1 for item in items if bool(item.get("is_search_ready"))),
         "warning_records": sum(1 for item in items if bool(item.get("quality_warnings"))),
         "inactive_records": sum(1 for item in items if not bool(item.get("is_active"))),
+        "published_records": sum(1 for item in items if item.get("publish_state") == "published"),
+        "review_records": sum(1 for item in items if item.get("publish_state") in {"draft", "review"}),
     }
 
 

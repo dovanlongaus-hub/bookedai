@@ -1,3 +1,5 @@
+import { FadeIn } from "@/components/ui/motion";
+
 const trustItems = [
   "24/7 AI assistant",
   "Voice AI agents",
@@ -9,24 +11,24 @@ const trustItems = [
 
 export function TrustBar() {
   return (
-    <section className="px-4 py-6 sm:px-6 lg:px-8">
-      <div className="mx-auto max-w-container">
-        <div className="glass-card rounded-lg px-5 py-4">
+    <section className="pb-4">
+      <div className="container-brand">
+        <FadeIn className="glass rounded-brand p-4 sm:p-5">
           <div className="flex flex-wrap items-center gap-3">
-            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-textSecondary">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-muted">
               Built for commercial visibility
             </div>
-            <div className="h-4 w-px bg-border" />
+            <div className="hidden h-4 w-px bg-white/10 sm:block" />
             {trustItems.map((item) => (
               <span
                 key={item}
-                className="rounded-pill border border-border bg-surfaceAlt px-3 py-1.5 text-xs font-medium text-textSecondary"
+                className="rounded-full border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-medium text-brand-muted"
               >
                 {item}
               </span>
             ))}
           </div>
-        </div>
+        </FadeIn>
       </div>
     </section>
   );

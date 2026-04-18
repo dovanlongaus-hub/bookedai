@@ -13,7 +13,7 @@ from integrations.ai_models.semantic_search_adapter import SemanticSearchAdapter
 
 
 class SemanticSearchAdapterTestCase(IsolatedAsyncioTestCase):
-    async def test_provider_configs_include_openai_fallback_when_primary_is_not_openai(self):
+    async def test_provider_configs_prioritize_openai_before_gemini_when_both_are_configured(self):
         settings = SimpleNamespace(
             semantic_search_enabled=True,
             semantic_search_provider="gemini",
@@ -31,10 +31,10 @@ class SemanticSearchAdapterTestCase(IsolatedAsyncioTestCase):
         providers = adapter._provider_configs()
 
         self.assertEqual(len(providers), 2)
-        self.assertEqual(providers[0].provider_name, "gemini")
-        self.assertEqual(providers[1].provider_name, "openai")
+        self.assertEqual(providers[0].provider_name, "openai")
+        self.assertEqual(providers[1].provider_name, "gemini")
 
-    async def test_generate_structured_json_falls_back_to_openai_when_gemini_fails(self):
+    async def test_generate_structured_json_falls_back_to_gemini_when_openai_fails(self):
         settings = SimpleNamespace(
             semantic_search_enabled=True,
             semantic_search_provider="gemini",
@@ -50,14 +50,14 @@ class SemanticSearchAdapterTestCase(IsolatedAsyncioTestCase):
 
         adapter = SemanticSearchAdapter(settings)
 
-        async def _fake_gemini(self, *, provider, prompt, payload, schema, location_hint):
-            raise RuntimeError("gemini unavailable")
-
         async def _fake_openai(self, *, provider, prompt, payload, schema):
+            raise RuntimeError("openai unavailable")
+
+        async def _fake_gemini(self, *, provider, prompt, payload, schema, location_hint, **_kwargs):
             return '{"status":"ok"}'
 
-        adapter._generate_gemini_json = MethodType(_fake_gemini, adapter)
         adapter._generate_openai_compatible_json = MethodType(_fake_openai, adapter)
+        adapter._generate_gemini_json = MethodType(_fake_gemini, adapter)
 
         response_text, provider_label, provider_chain = await adapter._generate_structured_json(
             prompt="rerank",
@@ -67,8 +67,8 @@ class SemanticSearchAdapterTestCase(IsolatedAsyncioTestCase):
         )
 
         self.assertEqual(response_text, '{"status":"ok"}')
-        self.assertEqual(provider_label, "openai")
-        self.assertEqual(provider_chain, ("gemini", "openai"))
+        self.assertEqual(provider_label, "gemini")
+        self.assertEqual(provider_chain, ("openai", "gemini"))
 
     async def test_assess_catalog_candidates_includes_fallback_and_normalized_evidence(self):
         settings = SimpleNamespace(
@@ -88,8 +88,8 @@ class SemanticSearchAdapterTestCase(IsolatedAsyncioTestCase):
         async def _fake_generate_structured_json(self, **_kwargs):
             return (
                 '{"normalized_query":"gp clinic sydney","inferred_location":"Sydney","inferred_category":"Healthcare Service","budget_summary":null,"evidence":["Location Specific Intent","semantic-provider-openai"],"ranked_candidates":[{"candidate_id":"svc_gp","semantic_score":0.88,"reason":" Best fit for a GP clinic in Sydney. ","trust_signal":"partner_verified","is_preferred":true,"evidence":["Provider Preferred","Location Specific Intent"]}]}',
-                "openai",
-                ("gemini", "openai"),
+                "gemini",
+                ("openai", "gemini"),
             )
 
         adapter._generate_structured_json = MethodType(_fake_generate_structured_json, adapter)
@@ -119,11 +119,11 @@ class SemanticSearchAdapterTestCase(IsolatedAsyncioTestCase):
         )
 
         assert assessment is not None
-        self.assertEqual(assessment.provider_label, "openai")
-        self.assertEqual(assessment.provider_chain, ("gemini", "openai"))
+        self.assertEqual(assessment.provider_label, "gemini")
+        self.assertEqual(assessment.provider_chain, ("openai", "gemini"))
         self.assertTrue(assessment.fallback_applied)
-        self.assertIn("semantic_provider_openai", assessment.evidence)
-        self.assertIn("semantic_fallback_from_gemini", assessment.evidence)
+        self.assertIn("semantic_provider_gemini", assessment.evidence)
+        self.assertIn("semantic_fallback_from_openai", assessment.evidence)
         self.assertEqual(assessment.ranked_candidates[0].reason, "Best fit for a GP clinic in Sydney.")
         self.assertEqual(
             assessment.ranked_candidates[0].evidence,

@@ -2,7 +2,10 @@ import { useEffect, useMemo, useState } from 'react';
 
 import { fallbackPartners, type PartnersSectionContent } from '../data';
 import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../../shared/config/api';
+import { SectionCard } from '../ui/SectionCard';
 import { SectionHeading } from '../ui/SectionHeading';
+import { SectionShell } from '../ui/SectionShell';
+import { SignalPill } from '../ui/SignalPill';
 
 type PartnerProfileItem = {
   id: number;
@@ -160,15 +163,32 @@ export function PartnersSection({ content }: PartnersSectionProps) {
   const infrastructurePartners = visibleItems.filter(isInfrastructurePartner);
   const ecosystemPartners = visibleItems.filter((item) => !isInfrastructurePartner(item));
   const trustSignals = [
-    `${visibleItems.length || fallbackPartners.length} visible trust points`,
+    `${visibleItems.length || fallbackPartners.length} visible logos in the proof layer`,
     'Startup infrastructure plus real ecosystem presence',
-    'Curated to support buyer confidence, not just decorate the page',
+    'Partner proof supports credibility without becoming the headline',
+  ];
+  const trustMetrics = [
+    {
+      label: 'Infrastructure',
+      value: `${infrastructurePartners.length || 0}`,
+      detail: 'platform and startup-support logos',
+    },
+    {
+      label: 'Ecosystem',
+      value: `${ecosystemPartners.length || 0}`,
+      detail: 'customer and network visibility',
+    },
+    {
+      label: 'Trust role',
+      value: 'Support',
+      detail: 'backs the pitch without stealing focus',
+    },
   ];
 
   return (
-    <section id="partners" className="mx-auto w-full max-w-7xl px-6 py-24 lg:px-8">
+    <SectionShell id="partners" className="py-24">
       <div className="grid gap-8 lg:grid-cols-[0.78fr_1.22fr] lg:items-start">
-        <div className="template-card p-7 lg:p-8">
+        <SectionCard className="p-7 lg:p-8">
           <SectionHeading
             kicker={content.kicker}
             kickerClassName={content.kickerClassName}
@@ -178,51 +198,64 @@ export function PartnersSection({ content }: PartnersSectionProps) {
 
           <div className="mt-7 grid gap-3">
             {content.stats.map((item) => (
-              <div
+              <SectionCard
                 key={item}
-                className="rounded-[1.2rem] border border-slate-200 bg-white/80 px-4 py-3 text-sm font-medium text-slate-700 shadow-[0_14px_35px_rgba(15,23,42,0.04)]"
+                tone="subtle"
+                className="rounded-[1.2rem] px-4 py-3 text-sm font-medium text-slate-700"
               >
                 {item}
-              </div>
+              </SectionCard>
             ))}
           </div>
 
-          <div className="booked-note-surface mt-5 p-5">
-            <div className="template-kicker text-[11px]">
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {trustMetrics.map((item) => (
+              <SectionCard key={item.label} tone="subtle" className="rounded-[1.25rem] px-4 py-4">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  {item.label}
+                </div>
+                <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">{item.value}</div>
+                <div className="mt-1 text-sm leading-6 text-slate-600">{item.detail}</div>
+              </SectionCard>
+            ))}
+          </div>
+
+          <SectionCard tone="dark" className="mt-5 p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7dd3fc]">
               Trust frame
             </div>
             <div className="mt-3 grid gap-3">
               {trustSignals.map((item) => (
                 <div
                   key={item}
-                  className="rounded-[1.15rem] bg-white px-4 py-3 text-sm font-medium leading-6 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+                  className="rounded-[1.15rem] border border-white/10 bg-white/8 px-4 py-3 text-sm font-medium leading-6 text-white/82"
                 >
                   {item}
                 </div>
               ))}
             </div>
-          </div>
-        </div>
+          </SectionCard>
+        </SectionCard>
 
-        <div className="rounded-[1.9rem] border border-black/5 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5 shadow-[0_22px_60px_rgba(15,23,42,0.07)]">
+        <SectionCard className="rounded-[1.9rem] p-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Partner trust
               </div>
               <div className="mt-2 text-2xl font-bold text-slate-950">
-                Startup-backed infrastructure plus visible ecosystem momentum
+                Credibility support, kept in the background where it belongs
               </div>
             </div>
-            <div className="rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
+            <SignalPill className="border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
               {visibleItems.length} partners
-            </div>
+            </SignalPill>
           </div>
 
           {loading ? (
-            <div className="mt-6 rounded-[1.4rem] border border-slate-200 bg-slate-50 px-5 py-8 text-sm text-slate-500">
+            <SectionCard tone="subtle" className="mt-6 rounded-[1.4rem] px-5 py-8 text-sm text-slate-500">
               Loading partner profiles...
-            </div>
+            </SectionCard>
           ) : null}
 
           {error ? (
@@ -233,19 +266,19 @@ export function PartnersSection({ content }: PartnersSectionProps) {
 
           {!loading && visibleItems.length > 0 ? (
             <div className="mt-6 space-y-5">
-              <section className="rounded-[1.5rem] border border-sky-100 bg-sky-50/70 p-4">
+              <SectionCard as="section" tone="subtle" className="rounded-[1.5rem] border border-sky-100 bg-sky-50/70 p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
                       Infrastructure support
                     </div>
                     <div className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
-                      Startup programs and platforms helping BookedAI ship faster
+                      Startup programs and core platforms that help the product feel legitimate
                     </div>
                   </div>
-                  <div className="rounded-full bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700 ring-1 ring-sky-100">
+                  <SignalPill className="bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700 ring-1 ring-sky-100">
                     {infrastructurePartners.length} logos
-                  </div>
+                  </SignalPill>
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-3">
@@ -255,7 +288,7 @@ export function PartnersSection({ content }: PartnersSectionProps) {
                       href={item.website_url ?? '#partners'}
                       target={item.website_url ? '_blank' : undefined}
                       rel={item.website_url ? 'noreferrer' : undefined}
-                      className="min-h-[13rem] overflow-hidden rounded-[1.2rem] border border-sky-100 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(15,23,42,0.05)]"
+                      className="min-h-[13rem] overflow-hidden rounded-[1.2rem] border border-sky-100 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(15,23,42,0.05)]"
                     >
                       <div className="flex h-full min-w-0 flex-col">
                         <div
@@ -272,32 +305,34 @@ export function PartnersSection({ content }: PartnersSectionProps) {
                           <div className="line-clamp-2 break-words text-[15px] font-semibold leading-5 text-slate-950">
                             {item.name}
                           </div>
-                          <div className="mt-1 line-clamp-2 break-words text-[12px] font-medium leading-4 text-sky-700">
-                            {item.category ?? 'Infrastructure partner'}
-                          </div>
-                          <div className="mt-auto pt-3 text-[11px] leading-4 text-slate-500">
-                            Startup support
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <SignalPill className="bg-sky-50 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-sky-700">
+                              {item.category ?? 'Infrastructure'}
+                            </SignalPill>
+                            <SignalPill className="bg-slate-100 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-slate-600">
+                              Startup support
+                            </SignalPill>
                           </div>
                         </div>
                       </div>
                     </a>
                   ))}
                 </div>
-              </section>
+              </SectionCard>
 
-              <section className="rounded-[1.5rem] border border-slate-200 bg-white p-4">
+              <SectionCard as="section" className="rounded-[1.5rem] p-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
                       Ecosystem and client visibility
                     </div>
                     <div className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
-                      Customer and ecosystem logos sized to stay inside the landing layout
+                      Customer and ecosystem logos that add confidence without crowding the close
                     </div>
                   </div>
-                  <div className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                  <SignalPill className="bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
                     Responsive grid
-                  </div>
+                  </SignalPill>
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -307,7 +342,7 @@ export function PartnersSection({ content }: PartnersSectionProps) {
                       href={item.website_url ?? '#partners'}
                       target={item.website_url ? '_blank' : undefined}
                       rel={item.website_url ? 'noreferrer' : undefined}
-                      className="min-h-[13rem] overflow-hidden rounded-[1.25rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(15,23,42,0.05)]"
+                      className="min-h-[13rem] overflow-hidden rounded-[1.25rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-4 shadow-[0_10px_24px_rgba(15,23,42,0.03)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_16px_32px_rgba(15,23,42,0.05)]"
                     >
                       <div className="flex h-full min-w-0 flex-col">
                         <div
@@ -324,20 +359,25 @@ export function PartnersSection({ content }: PartnersSectionProps) {
                           <div className="line-clamp-2 break-words text-[15px] font-semibold leading-5 text-slate-950">
                             {item.name}
                           </div>
-                          <div className="mt-1 line-clamp-2 break-words text-[12px] font-medium leading-4 text-emerald-700">
-                            {item.category ?? 'Partner'}
+                          <div className="mt-2 flex flex-wrap gap-2">
+                            <SignalPill className="bg-emerald-50 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-emerald-700">
+                              {item.category ?? 'Partner'}
+                            </SignalPill>
+                            <SignalPill className="bg-slate-100 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-slate-600">
+                              Visible ecosystem
+                            </SignalPill>
                           </div>
                         </div>
                       </div>
                     </a>
                   ))}
                 </div>
-              </section>
+              </SectionCard>
             </div>
           ) : null}
-        </div>
+        </SectionCard>
       </div>
-    </section>
+    </SectionShell>
   );
 }
 

@@ -56,8 +56,8 @@ export function PricingPlanCard({
     ? 'booked-button-secondary bg-white text-slate-950 hover:bg-cyan-50'
     : 'booked-button';
   const featuredFacts = plan.featured
-    ? ['Best value', 'Higher automation', 'Cleaner conversion path']
-    : ['Lower entry price', 'Fast launch', 'Clear monthly decision'];
+    ? ['Best value', 'Higher automation', 'Commission-ready']
+    : ['Lower entry price', 'Fast launch', 'Low-friction close'];
 
   return (
     <SectionCard
@@ -163,8 +163,8 @@ export function PricingPlanCard({
           </div>
           <div className="mt-2 text-sm leading-6">
             {plan.featured
-              ? 'Best when you want the strongest blend of automation, booking flow, and value without jumping into custom scope.'
-              : 'Best when you want a lower-friction start and a cleaner first buying decision for a smaller team.'}
+              ? 'Best when you want the strongest blend of automation, monthly value, and performance-based upside without jumping into custom scope.'
+              : 'Best when you want the simplest paid entry with a clean path into setup and performance-based commission later.'}
           </div>
         </div>
 

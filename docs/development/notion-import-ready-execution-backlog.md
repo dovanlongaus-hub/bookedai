@@ -109,6 +109,7 @@ Optional fourth database:
 | Admin Commercial Operations | Phase 3-6 | Frontend + Backend | Ready | P1 | Reporting and recovery readiness | `phase-3-6-epic-story-task-breakdown.md` |
 | Optimization and Hardening | Phase 3-6 | QA + DevOps + Backend | Ready | P1 | Working commercial flows | `phase-3-6-epic-story-task-breakdown.md` |
 | Tenant Workspace Foundation | Phase 7-8 | Frontend + Product | Ready | P0 | Shared contracts and tenant strategy | `phase-7-8-epic-story-task-breakdown.md` |
+| Tenant Onboarding and Catalog Ingestion Foundation | Phase 7-8 | Backend + Product + Frontend | Ready | P0 | Auth strategy, tenant strategy, search-truth missing-catalog evidence | `sprint-8-tenant-catalog-onboarding-execution-package.md` |
 | Tenant Commercial Dashboard | Phase 7-8 | Frontend + Backend | Ready | P0 | Workspace foundation | `phase-7-8-epic-story-task-breakdown.md` |
 | Tenant Lifecycle and Integrations Visibility | Phase 7-8 | Frontend + Backend | Ready | P1 | Tenant dashboard | `phase-7-8-epic-story-task-breakdown.md` |
 | Internal Admin Commercial IA | Phase 7-8 | Frontend + Product Ops | Ready | P0 | Internal admin strategy | `phase-7-8-epic-story-task-breakdown.md` |
@@ -131,11 +132,11 @@ Optional fourth database:
 | Sprint 5 Execution | Sprint 5 | Phase 3-6 | Reporting read models and widget APIs | `sprint-5-owner-execution-checklist.md` | Ready | Sprint 4 contracts |
 | Sprint 6 Execution | Sprint 6 | Phase 3-6 | Attribution and conversion metrics | `sprint-6-owner-execution-checklist.md` | Ready | Sprint 4-5 baseline |
 | Sprint 7 Execution | Sprint 7 | Phase 3-6 | Recovery workflows and lifecycle execution | `sprint-7-owner-execution-checklist.md` | Ready | Attribution and lifecycle baseline |
-| Sprint 8 Execution | Sprint 8 | Phase 3-6 | Tenant revenue baseline | `sprint-8-owner-execution-checklist.md` | Ready | Reporting baseline |
+| Sprint 8 Execution | Sprint 8 | Phase 3-6 | Tenant onboarding, catalog ownership, and offline search corpus foundation | `sprint-8-owner-execution-checklist.md` | Ready | Reporting baseline plus tenant auth direction |
 | Sprint 9 Execution | Sprint 9 | Phase 3-6 | Admin commercial operations baseline | `sprint-9-owner-execution-checklist.md` | Ready | Reporting and recovery baseline |
 | Sprint 10 Execution | Sprint 10 | Phase 3-6 | Optimization and hardening baseline | `sprint-10-owner-execution-checklist.md` | Ready | Commercial flows baseline |
-| Sprint 11 Execution | Sprint 11 | Phase 7-8 | Tenant workspace IA and API preparation | `sprint-11-owner-execution-checklist.md` | Ready | Phase 3-6 outputs |
-| Sprint 12 Execution | Sprint 12 | Phase 7-8 | Tenant workspace implementation | `sprint-12-owner-execution-checklist.md` | Ready | Sprint 11 complete |
+| Sprint 11 Execution | Sprint 11 | Phase 7-8 | Tenant workspace IA, onboarding routes, and catalog review API preparation | `sprint-11-owner-execution-checklist.md` | Ready | Phase 3-6 outputs plus Sprint 8 tenant foundation |
+| Sprint 12 Execution | Sprint 12 | Phase 7-8 | Tenant workspace, onboarding flow, and publish-safe catalog implementation | `sprint-12-owner-execution-checklist.md` | Ready | Sprint 11 complete |
 | Sprint 13 Execution | Sprint 13 | Phase 7-8 | Internal admin commercial IA and drill-ins | `sprint-13-owner-execution-checklist.md` | Ready | Tenant/admin contract alignment |
 | Sprint 14 Execution | Sprint 14 | Phase 7-8 | Admin support tooling and rollout readiness | `sprint-14-owner-execution-checklist.md` | Ready | Sprint 13 baseline |
 | Sprint 15 Execution | Sprint 15 | Phase 9 | Telemetry, replay, and regression coverage | `sprint-15-owner-execution-checklist.md` | Ready | Phase 7-8 complete |

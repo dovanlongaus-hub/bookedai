@@ -261,7 +261,7 @@ export function AdminPage() {
   }
 
   return (
-    <main className="booked-admin-shell px-4 py-6 lg:px-8">
+    <main className="booked-admin-shell bookedai-brand-shell px-4 py-6 lg:px-8">
       <div className="mx-auto max-w-[1600px]">
         <AdminDashboardHeader
           username={username}

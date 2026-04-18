@@ -26,6 +26,54 @@ This document is the implementation bridge between:
 - AI must remain advisory and trust-gated
 - rollout-sensitive changes must use flags, shadow mode, or dual-write
 - documentation and code should move together
+- inherit the latest approved implementation baseline before starting new sprint work in an existing area
+- preserve the live runtime and repo shape unless migration is explicitly approved
+- keep one active implementation spine for each major surface instead of letting additive inventory become implicit mandatory scope
+- keep one content source, one composition root, one shared primitive layer, and one token ownership model for each active surface
+- treat cleanup of old-path drift as part of implementation rather than optional polish
+
+## Cross-sprint continuity rules
+
+These rules apply to every later coding phase unless a newer approved source document explicitly overrides them.
+
+### 1. Baseline inheritance rule
+
+When a sprint continues work in an already-defined area:
+
+- start from the latest approved requirement, execution, and code-ready handoff stack
+- do not reinterpret the area from scratch
+- do not reopen locked structure or scope without an explicit reason
+
+### 2. Live-runtime rule
+
+Unless a migration is explicitly approved:
+
+- the live runtime remains the implementation target
+- additive starters or translation outputs remain supportive references only
+
+### 3. Active-spine rule
+
+Every major surface should preserve:
+
+- one active implementation spine
+- one composition root
+- one structured content source
+- one shared primitive layer
+- one token ownership model
+
+### 4. Deferred-inventory rule
+
+Files, sections, or flows outside the active spine should be treated as:
+
+- deferred
+- additive
+- or separately approved inventory
+
+They should not silently become mandatory scope in a later sprint.
+
+### 5. Cleanup-with-delivery rule
+
+If an implementation area contains drift from the approved baseline, the sprint should clean that drift while delivering the new work.
 
 ## Phase structure used here
 
@@ -38,6 +86,27 @@ Each coding phase contains:
 - dependency rules
 - rollout posture
 - definition of done
+
+## Cross-phase test runner track
+
+Every later coding phase should now treat test runners as a real delivery track, not just a QA afterthought.
+
+The program should build test runners in this order:
+
+1. `contract runner`
+   - verifies route shapes, shared DTOs, and compatibility across legacy and `/api/v1/*` seams
+2. `integration runner`
+   - verifies repositories, dual-write, idempotency, callbacks, and reconciliation behavior
+3. `browser smoke runner`
+   - verifies public CTA shells, modal opens, admin shell access, and high-value route smoke paths
+4. `AI/search quality runner`
+   - verifies grounded matching, locality relevance, trust gating, degraded fallback, and anti-hallucination behavior
+
+Cross-phase implementation rule:
+
+- every phase should either introduce, expand, or adopt at least one runner type that matches the main risk of that phase
+- no later phase should rely only on manual checks for behavior that already has a stable runner seam
+- public conversion or recommendation work must carry at least one browser or API runner path before the phase is considered operationally mature
 
 ## Coding Phase 0 — Contract Lock and Refactor Map
 
@@ -77,11 +146,17 @@ Freeze understanding of the current production contract so coding work does not 
 2. Mark every handler path that writes to `conversation_events`, `partner_profiles`, or `service_merchant_profiles`.
 3. Mark every frontend component that depends on current response shapes.
 4. Add or verify health and smoke checks for public, admin, API, and webhook paths.
-5. Create a hotspot map for:
+5. Add or verify the routed subdomain matrix for public, admin, portal, product, and API hosts.
+6. Create a hotspot map for:
    - `backend/services.py`
    - `backend/api/route_handlers.py`
    - `frontend/src/components/AdminPage.tsx`
    - booking assistant UI flows
+7. Define the initial smoke-runner inventory for:
+   - public live route health
+   - admin shell reachability
+   - portal shell reachability
+   - API health and webhook sanity paths
 
 ### Dependency rules
 
@@ -94,6 +169,7 @@ Freeze understanding of the current production contract so coding work does not 
 ### Definition of done
 
 - the team knows exactly what must remain stable during the refactor
+- the initial smoke-runner inventory is named even if not fully automated yet
 
 ## Coding Phase 1 — Modular Seams in Backend and Frontend
 
@@ -154,6 +230,7 @@ Create code seams so new logic can be written in bounded modules instead of grow
    - Tawk
    - n8n
 6. Introduce feature-flag read helpers and rollout hooks for future phases.
+7. Define the first contract-runner entry points around shared DTOs and `/api/v1/*` response envelopes.
 
 ### Dependency rules
 
@@ -168,6 +245,7 @@ Create code seams so new logic can be written in bounded modules instead of grow
 
 - new code has a safe modular home
 - legacy concentration files are no longer the default place for new work
+- the codebase has a credible place to attach contract-runner coverage
 
 ## Coding Phase 2 — Persistence Foundation and Repository Layer
 
@@ -210,6 +288,7 @@ Introduce the first persistence and platform-safety code foundations required fo
 3. Introduce default tenant lookup in new repository code.
 4. Add DB-backed feature flag support.
 5. Add low-risk audit logging and webhook tracking entry points.
+6. Add repository and migration verification hooks that an integration runner can call repeatedly.
 
 ### Dependency rules
 
@@ -223,6 +302,7 @@ Introduce the first persistence and platform-safety code foundations required fo
 ### Definition of done
 
 - the codebase has a real persistence foundation for safe domain expansion
+- repository and persistence foundations are runner-friendly rather than manual-check only
 
 ## Coding Phase 3 — Dual-Write for Core Business Flows
 
@@ -268,6 +348,7 @@ Start writing normalized domain truth in parallel with the legacy event log.
    - demo request creation
 4. Continue writing unchanged `conversation_events`.
 5. Add reconciliation queries or scripts to compare new normalized rows with legacy metadata.
+6. Add an integration-runner path for dual-write parity and reconciliation checks.
 
 ### Dependency rules
 
@@ -282,6 +363,7 @@ Start writing normalized domain truth in parallel with the legacy event log.
 ### Definition of done
 
 - core booking-like flows write both legacy and normalized truth safely
+- dual-write behavior can be checked repeatedly by a runner instead of only by spot inspection
 
 ## Coding Phase 4 — API v1 and Domain Service Buildout
 
@@ -327,6 +409,7 @@ Shift implementation from legacy route-centric behavior into domain-oriented API
 3. Make new endpoints call domain services and repositories instead of metadata-heavy handler code.
 4. Add tenant and actor hooks to new API entry points.
 5. Update shared frontend contracts to consume the new domain-first DTOs.
+6. Promote the contract runner from DTO-level checks into API route-level compatibility checks.
 
 ### Dependency rules
 
@@ -340,6 +423,7 @@ Shift implementation from legacy route-centric behavior into domain-oriented API
 ### Definition of done
 
 - the repo has a credible domain-first API surface for future development
+- API v1 has an explicit contract-runner target surface
 
 ## Coding Phase 5 — Matching, AI Router, and Booking Trust
 
@@ -387,6 +471,10 @@ Implement the trust-first intelligence core that the architecture treats as the 
    - request callback
    - pay now
    - pay after confirmation
+7. Add AI/search quality runner scenarios for:
+   - locality-sensitive queries
+   - trust-gated no-result states
+   - deterministic fallback behavior
 
 ### Dependency rules
 
@@ -400,6 +488,7 @@ Implement the trust-first intelligence core that the architecture treats as the 
 ### Definition of done
 
 - the assistant behaves as a grounded, trust-first booking surface rather than a generic chatbot
+- assistant trust and relevance behavior is runner-verified, not only visually reviewed
 
 ## Coding Phase 6 — Public Growth and Attribution Coding
 
@@ -436,6 +525,7 @@ Extend the public app into a scalable acquisition surface while staying aligned 
 3. Add first industry and comparison page families.
 4. Add attribution propagation through public forms and assistant entry flows.
 5. Persist attribution into lead creation and CRM-ready payloads.
+6. Add browser smoke-runner coverage for the highest-value public CTA shells and public attribution entry paths.
 
 ### Dependency rules
 
@@ -448,6 +538,7 @@ Extend the public app into a scalable acquisition surface while staying aligned 
 ### Definition of done
 
 - public product growth coding can scale beyond a single landing page
+- public conversion flows have a reusable smoke-runner baseline
 
 ## Coding Phase 7 — Admin Refactor and Internal Ops Console
 
@@ -484,6 +575,7 @@ Turn the current admin implementation into extensible internal operations code r
 3. Add booking-trust visibility and integration health visibility.
 4. Add rollout and audit visibility for internal operators.
 5. Keep current admin login and critical ops workflow stable during refactor.
+6. Add admin-shell and ops-surface smoke-runner coverage for the most critical internal routes.
 
 ### Dependency rules
 
@@ -496,6 +588,7 @@ Turn the current admin implementation into extensible internal operations code r
 ### Definition of done
 
 - admin coding structure supports platform operations growth without becoming another mega file
+- the first admin operational smoke-runner paths exist
 
 ## Coding Phase 8 — Tenant Foundation and Permission-Aware Surfaces
 
@@ -537,6 +630,7 @@ Create the first code foundations for a tenant-safe product surface.
    - billing summary
    - integrations status
 5. Hide internal-only controls from tenant experiences.
+6. Add tenant permission and route-access runner checks before the tenant shell expands further.
 
 ### Dependency rules
 
@@ -550,6 +644,7 @@ Create the first code foundations for a tenant-safe product surface.
 ### Definition of done
 
 - the codebase can support a tenant-safe rollout without cloning the admin app
+- tenant-safe access rules are runner-verifiable
 
 ## Coding Phase 9 — CRM, Email, Billing, and Integration Lifecycles
 
@@ -590,6 +685,7 @@ Implement the lifecycle and integration code that turns the platform into a real
 4. Add invoice, reminder, thank-you, and monthly-report lifecycle hooks.
 5. Add idempotent payment callback handling.
 6. Add sync retries, failure tracking, and reconciliation visibility.
+7. Expand the integration runner to cover callback replay, retry safety, and reconciliation outcomes.
 
 ### Dependency rules
 
@@ -605,6 +701,7 @@ Implement the lifecycle and integration code that turns the platform into a real
 ### Definition of done
 
 - lifecycle and integration code becomes domain-managed rather than scattered operational logic
+- core lifecycle and callback risks are covered by repeatable integration-runner paths
 
 ## Coding Phase 10 — QA, Security, DevOps, and Read-Cutover Hardening
 
@@ -645,6 +742,7 @@ Harden the implementation so the platform can evolve safely after the MVP founda
 5. Harden admin auth and webhook replay protection.
 6. Formalize staging rehearsal, rollback, backup, and restore workflows.
 7. Prepare admin and tenant read cutover only after reconciliation quality is proven.
+8. Consolidate contract, integration, browser smoke, and AI/search quality runners into release-gate suites that CI can execute consistently.
 
 ### Dependency rules
 
@@ -658,6 +756,7 @@ Harden the implementation so the platform can evolve safely after the MVP founda
 ### Definition of done
 
 - the platform is safe enough for broader tenant rollout and deeper integration expansion
+- the main risk surfaces are guarded by named runner suites that can block release when they fail
 
 ## Recommended implementation order
 

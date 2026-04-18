@@ -917,6 +917,7 @@ async def booking_assistant_session(
                         "email": normalized_email or None,
                         "phone": payload.customer_phone,
                     },
+                    "portal_url": result.portal_url,
                     "booking": {
                         "requested_service": result.service.name,
                         "requested_date": result.requested_date,

@@ -10,7 +10,9 @@ run_case() {
   local grep_pattern="$2"
 
   echo "[live-read-smoke] ${grep_pattern}"
-  PLAYWRIGHT_SKIP_BUILD=0 bash scripts/run_playwright_suite.sh live-read "${file}" --grep "${grep_pattern}"
+  PLAYWRIGHT_SKIP_BUILD="${PLAYWRIGHT_SKIP_BUILD:-0}" \
+    bash scripts/run_playwright_suite.sh live-read "${file}" --grep "${grep_pattern}"
 }
 
 run_case "tests/public-booking-assistant-live-read.spec.ts" "booking submit still uses legacy session as the authoritative write when live-read is enabled"
+run_case "tests/public-booking-assistant-live-read.spec.ts" "near me asks for location just in time and clears stale shortlist state when location is unavailable"

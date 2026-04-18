@@ -35,11 +35,11 @@ export function PricingRecommendationPanel({
         <div>
           <div className="template-kicker text-sm">Need help choosing?</div>
           <h3 className="template-title mt-3 max-w-[10ch] text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-            Choose the plan that matches where your business is today
+            Choose the plan that fits your stage, then keep the buying path moving
           </h3>
           <p className="template-body mt-4 max-w-[26rem] text-base leading-7">
-            Starter is the lowest-risk entry and Growth is the best-value default for most SMEs.
-            If your rollout is more complex, we can scope Pro with you separately.
+            Starter is the easiest first yes, Growth is the default recommendation for most SMEs,
+            and Pro stays off the main lane until complexity is real.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             {[
@@ -56,7 +56,7 @@ export function PricingRecommendationPanel({
           <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
             {[
               ['Fast yes', 'Start without procurement-style friction'],
-              ['Best value', 'Growth is the default commercial path'],
+              ['Best value', 'Growth is the default commercial path for most teams'],
               ['Custom only when needed', 'Keep complex scope off the main buying lane'],
             ].map(([title, body]) => (
               <SectionCard key={title} tone="subtle" className="rounded-[1.15rem] px-4 py-4">
@@ -73,7 +73,7 @@ export function PricingRecommendationPanel({
               <div>
                 <div className="template-kicker text-[11px] tracking-[0.16em]">Decision board</div>
                 <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                  One visible recommendation rail, not a confusing matrix.
+                  One recommendation rail is easier to trust than a pricing maze.
                 </div>
               </div>
               <SignalPill className="bg-slate-950 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-white">
@@ -118,9 +118,10 @@ export function PricingRecommendationPanel({
           <button
             type="button"
             onClick={() => onOpenConsultation('standard', 'book_recommended_plan')}
+            aria-label="Book Recommended Plan"
             className="booked-button mt-3 inline-flex items-center justify-center gap-2 px-5 py-4 text-sm font-semibold"
           >
-            Book Recommended Plan
+            Book Recommended Growth Plan
             <ArrowIcon />
           </button>
         </div>

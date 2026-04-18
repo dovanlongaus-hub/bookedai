@@ -1,5 +1,7 @@
 import type { SectionContent, TeamMember } from '../data';
 import { SectionHeading } from '../ui/SectionHeading';
+import { SectionCard } from '../ui/SectionCard';
+import { SignalPill } from '../ui/SignalPill';
 
 type TeamSectionProps = {
   content: SectionContent;
@@ -10,7 +12,7 @@ export function TeamSection({ content, members }: TeamSectionProps) {
   return (
     <section id="team-members" className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-8 lg:py-16">
       <div className="grid gap-6 xl:grid-cols-[0.76fr_1.24fr] xl:items-start">
-        <div className="template-card p-7 lg:p-8">
+        <SectionCard className="p-7 lg:p-8">
           <SectionHeading {...content} />
 
           <div className="booked-note-surface mt-7 p-5">
@@ -32,13 +34,15 @@ export function TeamSection({ content, members }: TeamSectionProps) {
               ))}
             </div>
           </div>
-        </div>
+        </SectionCard>
 
         <div className="grid gap-5 md:grid-cols-2">
           {members.map((member) => (
-            <article
+            <SectionCard
               key={member.name}
-              className="template-card-subtle overflow-hidden p-0"
+              as="article"
+              tone="subtle"
+              className="overflow-hidden p-0"
             >
               <div className="flex h-full flex-col">
                 <div className="aspect-[4/4.6] w-full overflow-hidden bg-slate-100">
@@ -54,20 +58,21 @@ export function TeamSection({ content, members }: TeamSectionProps) {
                     <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                       {member.role}
                     </div>
-                    <div className="booked-pill bg-white px-3 py-1 text-[9px] text-slate-600">
+                    <SignalPill variant="brand" className="bg-white px-3 py-1 text-[9px] text-slate-600">
                       Core team
-                    </div>
+                    </SignalPill>
                   </div>
                   <h3 className="mt-3 text-lg font-semibold text-slate-950 lg:text-xl">{member.name}</h3>
                   {member.badges?.length ? (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {member.badges.slice(0, 4).map((badge) => (
-                        <span
+                        <SignalPill
                           key={badge}
-                          className="booked-pill booked-pill--brand max-w-full px-2 py-1 text-[8px] tracking-[0.08em] sm:px-2.5 sm:text-[9px]"
+                          variant="brand"
+                          className="max-w-full px-2 py-1 text-[8px] tracking-[0.08em] sm:px-2.5 sm:text-[9px]"
                         >
                           {badge}
-                        </span>
+                        </SignalPill>
                       ))}
                     </div>
                   ) : null}
@@ -76,7 +81,7 @@ export function TeamSection({ content, members }: TeamSectionProps) {
                   </p>
                 </div>
               </div>
-            </article>
+            </SectionCard>
           ))}
         </div>
       </div>

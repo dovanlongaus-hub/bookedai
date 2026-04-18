@@ -1,5 +1,6 @@
 import type { SectionContent } from '../data';
 import { SectionHeading } from '../ui/SectionHeading';
+import { SectionCard } from '../ui/SectionCard';
 
 type ImplementationSectionProps = {
   content: SectionContent;
@@ -40,38 +41,38 @@ export function ImplementationSection({ content }: ImplementationSectionProps) {
   return (
     <section id="implementation" className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-8 lg:py-16">
       <div className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr] lg:items-start">
-        <div className="template-card p-8 lg:p-10">
+        <SectionCard className="p-8 lg:p-10">
           <SectionHeading {...content} />
 
           <div className="mt-8 grid gap-3">
             {implementationSignals.map((signal, index) => (
-              <div
+              <SectionCard
                 key={signal}
-                className="flex items-start gap-4 rounded-[1.4rem] bg-[#f5f5f7] px-5 py-4"
+                className="flex items-start gap-4 rounded-[1.4rem] bg-[#f5f5f7] px-5 py-4 shadow-none"
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1d1d1f] text-sm font-semibold text-white">
                   {index + 1}
                 </div>
                 <div className="text-sm leading-6 text-black/70">{signal}</div>
-              </div>
+              </SectionCard>
             ))}
           </div>
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             {rolloutPhases.map((phase, index) => (
-              <article key={phase.title} className="rounded-[1.35rem] bg-[#f5f5f7] px-4 py-4">
+              <SectionCard key={phase.title} as="article" tone="subtle" className="rounded-[1.35rem] px-4 py-4">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Phase 0{index + 1}
                 </div>
                 <div className="mt-2 text-sm font-semibold text-[#1d1d1f]">{phase.title}</div>
                 <div className="mt-2 text-sm leading-6 text-black/62">{phase.body}</div>
-              </article>
+              </SectionCard>
             ))}
           </div>
-        </div>
+        </SectionCard>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <article className="template-card-dark p-6 md:col-span-2">
+          <SectionCard as="article" tone="dark" className="p-6 md:col-span-2">
             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7dd3fc]">
               Product direction
             </div>
@@ -81,13 +82,13 @@ export function ImplementationSection({ content }: ImplementationSectionProps) {
             <p className="mt-3 max-w-3xl text-sm leading-6 text-white/78">
               Start with the cleanest path to revenue, then extend distribution without rebuilding the core buying flow.
             </p>
-          </article>
+          </SectionCard>
 
           {deploymentModes.map((mode) => (
-            <article key={mode.title} className="template-card-subtle h-full p-6">
+            <SectionCard key={mode.title} as="article" tone="subtle" className="h-full p-6">
               <div className="template-kicker text-sm tracking-[0.12em]">{mode.title}</div>
               <p className="mt-3 text-sm leading-6 text-black/70">{mode.body}</p>
-            </article>
+            </SectionCard>
           ))}
         </div>
       </div>

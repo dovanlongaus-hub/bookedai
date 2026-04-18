@@ -1,6 +1,6 @@
 # BookedAI Phase 1-2 Detailed Implementation Package
 
-Date: `2026-04-17`
+Date: `2026-04-18`
 
 Document status: `active execution package`
 
@@ -90,6 +90,8 @@ Phase 1-2 should be considered successful when:
 - the public CTA flow captures source context for later reporting
 - the page is mobile-strong and desktop-premium
 - the mandatory revenue-engine widgets are represented in the UI
+- the standalone homepage search runtime reads as a professional search workspace rather than a retrofitted popup or landing widget
+- shortlist cards, action links, and booking rail behavior are visually coherent enough to serve as the inherited interaction model for later public-surface work
 
 ## 6. Program rules for Phase 1-2
 
@@ -258,6 +260,19 @@ Make the public experience measurable and ready for later attribution and revenu
 ### Deliverables
 
 - public growth attribution baseline
+
+## 8A. Current implemented public-shell evidence
+
+The inherited implemented baseline for later Phase 1-2 work now also includes:
+
+- `frontend/src/apps/public/PublicApp.tsx` acting as a lightweight search-first shell with compact top navigation, quick suggestions, and a direct handoff into the homepage search workspace
+- `frontend/src/apps/public/HomepageSearchExperience.tsx` acting as the standalone shortlist, booking, and confirmation runtime instead of a popup-derived assistant surface
+- shared shortlist presentation through `frontend/src/shared/components/PartnerMatchCard.tsx`, `PartnerMatchActionFooter.tsx`, and `PartnerMatchShortlist.tsx`
+- browser validation for responsive desktop and mobile behavior plus targeted live-read shortlist regression checks
+
+Interpretation rule:
+
+- later public-shell work should extend this implemented workspace baseline instead of reintroducing a section-heavy landing spine or a dialog-first assistant frame
 - source-aware CTA handling
 
 ### Owner

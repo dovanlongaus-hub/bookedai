@@ -9,29 +9,29 @@
 :root {
   color-scheme: light;
 
-  /* Fonts — SF Pro on Apple, Inter on other platforms */
-  --apple-font-display: "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --apple-font-text:    "SF Pro Text",    -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Fonts — reference-template inspired pairing adapted for BookedAI */
+  --apple-font-display: "Space Grotesk", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  --apple-font-text:    "DM Sans", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
   --apple-font-mono:    "SF Mono", SFMono-Regular, ui-monospace, Menlo, Monaco, "Courier New", monospace;
 
   /* Core palette */
-  --apple-blue:         #0071e3;   /* Primary CTA — only chromatic accent */
-  --apple-blue-hover:   #0077ed;
-  --apple-blue-active:  #006edb;
-  --apple-link-light:   #0066cc;   /* Inline links on light bg */
-  --apple-link-dark:    #2997ff;   /* Inline links on dark bg */
+  --apple-blue:         #4f8cff;
+  --apple-blue-hover:   #6aa0ff;
+  --apple-blue-active:  #3f79df;
+  --apple-link-light:   #2157d7;
+  --apple-link-dark:    #84b7ff;
 
-  --apple-black:        #000000;   /* Dark section background */
-  --apple-near-black:   #1d1d1f;   /* Primary text on light, dark button bg */
-  --apple-light:        #f5f5f7;   /* Light section background */
+  --apple-black:        #0b1020;
+  --apple-near-black:   #172033;
+  --apple-light:        #f6f8fc;
   --apple-white:        #ffffff;   /* Pure white surfaces */
 
   /* Dark surface scale (dark sections) */
-  --apple-dark-1:       #1c1c1e;   /* Elevated on black bg */
-  --apple-dark-2:       #272729;
-  --apple-dark-3:       #2a2a2c;
-  --apple-dark-4:       #2c2c2e;
-  --apple-dark-5:       #3a3a3c;   /* Subtle dividers on dark */
+  --apple-dark-1:       #111827;
+  --apple-dark-2:       #182235;
+  --apple-dark-3:       #1e2b44;
+  --apple-dark-4:       #24324f;
+  --apple-dark-5:       #334155;
 
   /* Text scale */
   --apple-text-primary:   #1d1d1f;
@@ -56,14 +56,22 @@
   --apple-shadow-sm: rgba(0, 0, 0, 0.12) 0px 2px 12px 0px;
 
   /* Navigation */
-  --apple-nav-bg:   rgba(0, 0, 0, 0.8);
-  --apple-nav-height: 48px;
+  --apple-nav-bg:   rgba(11, 16, 32, 0.76);
+  --apple-nav-height: 56px;
+  --apple-surface-glass: rgba(255, 255, 255, 0.82);
+  --apple-surface-glass-strong: rgba(255, 255, 255, 0.92);
+  --apple-surface-dark-glass: rgba(24, 34, 53, 0.82);
+  --apple-border-soft: rgba(15, 23, 42, 0.08);
+  --apple-border-strong: rgba(79, 140, 255, 0.22);
+  --apple-aurora-blue: rgba(79, 140, 255, 0.18);
+  --apple-aurora-green: rgba(34, 197, 94, 0.12);
+  --apple-aurora-amber: rgba(249, 115, 22, 0.08);
 
   /* Border radius scale */
   --apple-radius-micro:      5px;
   --apple-radius-standard:   8px;
-  --apple-radius-comfortable: 11px;
-  --apple-radius-large:      12px;
+  --apple-radius-comfortable: 14px;
+  --apple-radius-large:      24px;
   --apple-radius-pill:       980px;
 
   /* Focus */
@@ -72,16 +80,16 @@
   /* ── Legacy aliases so old CSS-var references keep working ── */
   --template-bg:             var(--apple-light);
   --template-bg-strong:      var(--apple-white);
-  --template-bg-soft:        rgba(245, 245, 247, 0.72);
-  --template-surface:        rgba(255, 255, 255, 0.92);
-  --template-surface-strong: rgba(255, 255, 255, 0.98);
+  --template-bg-soft:        rgba(246, 248, 252, 0.72);
+  --template-surface:        var(--apple-surface-glass);
+  --template-surface-strong: var(--apple-surface-glass-strong);
   --template-surface-dark:   var(--apple-dark-2);
-  --template-panel-dark:     rgba(28, 28, 30, 0.88);
+  --template-panel-dark:     var(--apple-surface-dark-glass);
   --template-text:           var(--apple-near-black);
   --template-text-soft:      var(--apple-text-secondary);
   --template-text-muted:     var(--apple-text-tertiary);
-  --template-border:         rgba(0, 0, 0, 0.08);
-  --template-border-strong:  rgba(0, 113, 227, 0.28);
+  --template-border:         var(--apple-border-soft);
+  --template-border-strong:  var(--apple-border-strong);
   --template-primary:        var(--apple-blue);
   --template-primary-strong: var(--apple-blue-hover);
   --template-accent:         var(--apple-blue);
@@ -90,10 +98,10 @@
   --template-danger:         var(--apple-danger);
   --template-shadow-soft:    var(--apple-shadow-sm);
   --template-shadow-card:    var(--apple-shadow);
-  --template-shadow-glow:    rgba(0, 113, 227, 0.18) 0px 8px 30px 0px;
+  --template-shadow-glow:    rgba(79, 140, 255, 0.18) 0px 18px 50px 0px;
   --template-radius-xl:      var(--apple-radius-large);
   --template-radius-lg:      var(--apple-radius-large);
-  --template-radius-md:      var(--apple-radius-standard);
+  --template-radius-md:      var(--apple-radius-comfortable);
   --template-font-body:      var(--apple-font-text);
   --template-font-display:   var(--apple-font-display);
 }
@@ -116,7 +124,11 @@ body {
   margin: 0;
   min-width: 320px;
   overflow-x: hidden;
-  background: var(--apple-light);
+  background:
+    radial-gradient(circle at top left, var(--apple-aurora-blue), transparent 28%),
+    radial-gradient(circle at top right, var(--apple-aurora-green), transparent 24%),
+    radial-gradient(circle at center top, var(--apple-aurora-amber), transparent 20%),
+    var(--apple-light);
   color: var(--apple-near-black);
   font-family: var(--apple-font-text);
   font-size: 17px;
@@ -182,7 +194,11 @@ pre {
 
 /* Public landing shell — light Apple gray */
 .booked-shell {
-  background: var(--apple-light);
+  background:
+    radial-gradient(circle at top left, rgba(79, 140, 255, 0.14), transparent 28%),
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.10), transparent 24%),
+    radial-gradient(circle at center top, rgba(249, 115, 22, 0.08), transparent 20%),
+    linear-gradient(180deg, #f8fbff 0%, var(--apple-light) 42%, #eef4fb 100%);
 }
 
 /* Product shell — pure black for immersive product experience */
@@ -195,15 +211,21 @@ pre {
 /* Admin shell — clean light gray (macOS-style) */
 .booked-admin-shell,
 .apple-admin-shell {
-  background: var(--apple-light);
+  background:
+    radial-gradient(circle at top left, rgba(79, 140, 255, 0.16), transparent 24%),
+    linear-gradient(180deg, #0b1020 0%, #121a2b 42%, #172033 100%);
+  color: var(--apple-white);
 }
 
 /* Runtime booking widget shell */
 .booked-runtime-shell {
   min-height: 100vh;
   padding: 2.5rem 1rem;
-  background: var(--apple-light);
-  color: var(--apple-near-black);
+  background:
+    radial-gradient(circle at top left, rgba(79, 140, 255, 0.16), transparent 24%),
+    radial-gradient(circle at top right, rgba(34, 197, 94, 0.10), transparent 20%),
+    linear-gradient(180deg, #0b1020 0%, #121a2b 48%, #172033 100%);
+  color: var(--apple-white);
 }
 
 
@@ -213,12 +235,14 @@ pre {
 .template-nav,
 .apple-glass-nav,
 .apple-product-band {
-  height: var(--apple-nav-height);
+  min-height: var(--apple-nav-height);
   background: var(--apple-nav-bg);
   color: var(--apple-white);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 1.5rem;
+  box-shadow: 0 18px 60px rgba(2, 6, 23, 0.24);
   backdrop-filter: saturate(180%) blur(20px);
   -webkit-backdrop-filter: saturate(180%) blur(20px);
-  /* No border — the blur effect provides visual separation */
 }
 
 .template-nav a,
@@ -243,17 +267,19 @@ pre {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.25rem 0.75rem;
-  color: rgba(255, 255, 255, 0.85);
+  padding: 0.5rem 0.95rem;
+  border-radius: var(--apple-radius-pill);
+  color: rgba(255, 255, 255, 0.76);
   font-family: var(--apple-font-text);
-  font-size: 12px;
-  font-weight: 400;
-  letter-spacing: 0;
-  transition: color 160ms ease;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  transition: color 160ms ease, background 160ms ease;
 }
 
 .booked-nav-link:hover {
   color: var(--apple-white);
+  background: rgba(255, 255, 255, 0.08);
   text-decoration: none;
 }
 
@@ -262,17 +288,19 @@ pre {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 32px;
-  height: 32px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(255, 255, 255, 0.18);
+  min-width: 44px;
+  min-height: 44px;
+  border-radius: var(--apple-radius-pill);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.08);
   color: var(--apple-white);
-  transition: background 160ms ease;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05);
+  transition: background 160ms ease, transform 160ms ease, border-color 160ms ease;
 }
 
 .booked-menu-button:hover {
-  background: rgba(255, 255, 255, 0.28);
+  background: rgba(255, 255, 255, 0.14);
+  border-color: rgba(255, 255, 255, 0.16);
 }
 
 
@@ -308,20 +336,20 @@ pre {
 .apple-kicker {
   font-family: var(--apple-font-text);
   font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
+  font-weight: 700;
+  letter-spacing: 0.16em;
   color: var(--apple-blue);
-  text-transform: none;
+  text-transform: uppercase;
 }
 
 /* Display headline */
 .template-title,
 .apple-title {
   font-family: var(--apple-font-display);
-  font-size: clamp(2.5rem, 5.5vw, 3.5rem);
-  font-weight: 600;
-  line-height: 1.07;
-  letter-spacing: -0.017em;
+  font-size: clamp(2.8rem, 5.8vw, 4.4rem);
+  font-weight: 700;
+  line-height: 0.98;
+  letter-spacing: -0.05em;
 }
 
 /* Body text */
@@ -329,8 +357,8 @@ pre {
 .apple-body {
   font-family: var(--apple-font-text);
   font-size: 17px;
-  line-height: 1.47;
-  letter-spacing: -0.022em;
+  line-height: 1.64;
+  letter-spacing: -0.01em;
   color: var(--apple-text-secondary);
 }
 
@@ -383,14 +411,15 @@ pre {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  border-radius: var(--apple-radius-micro);
-  background: rgba(0, 0, 0, 0.06);
+  border-radius: var(--apple-radius-pill);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: rgba(255, 255, 255, 0.72);
   color: var(--apple-near-black);
-  padding: 0.25rem 0.6rem;
+  padding: 0.32rem 0.72rem;
   font-family: var(--apple-font-text);
   font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 
 /* Pill label — used in status indicators, category tags */
@@ -399,14 +428,16 @@ pre {
   align-items: center;
   gap: 0.35rem;
   border-radius: var(--apple-radius-pill);
-  border: 1px solid rgba(0, 113, 227, 0.18);
-  background: rgba(0, 113, 227, 0.06);
+  border: 1px solid rgba(79, 140, 255, 0.18);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.86) 0%, rgba(244, 248, 255, 0.94) 100%);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.05);
   padding: 0.2rem 0.65rem;
   color: var(--apple-blue);
   font-family: var(--apple-font-text);
   font-size: 12px;
-  font-weight: 500;
-  letter-spacing: 0;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
 }
 
 .booked-pill--brand {
@@ -424,8 +455,11 @@ pre {
 .apple-product-card,
 .apple-product-frame {
   border-radius: var(--apple-radius-large);
-  background: var(--apple-white);
-  box-shadow: var(--apple-shadow);
+  border: 1px solid var(--template-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(247, 250, 255, 0.98) 100%);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.10);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 /* Subtle card — light gray on light bg, no heavy shadow */
@@ -433,16 +467,20 @@ pre {
 .apple-card-soft,
 .apple-product-flow-step {
   border-radius: var(--apple-radius-large);
-  background: var(--apple-light);
+  border: 1px solid rgba(15, 23, 42, 0.05);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.88) 0%, rgba(241, 245, 249, 0.96) 100%);
 }
 
 /* Dark card — elevated surface on black bg */
 .template-card-dark,
 .apple-card-dark {
   border-radius: var(--apple-radius-large);
-  background: var(--apple-dark-2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(24, 34, 53, 0.92) 0%, rgba(11, 16, 32, 0.94) 100%);
   color: var(--apple-white);
-  box-shadow: var(--apple-shadow);
+  box-shadow: 0 24px 70px rgba(2, 6, 23, 0.42);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
 /* Wide runtime card (booking widget) */
@@ -450,9 +488,11 @@ pre {
   margin-inline: auto;
   max-width: 1200px;
   border-radius: var(--apple-radius-large);
-  background: var(--apple-white);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(24, 34, 53, 0.88) 0%, rgba(11, 16, 32, 0.92) 100%);
   padding: 2rem;
-  box-shadow: var(--apple-shadow);
+  color: var(--apple-white);
+  box-shadow: 0 24px 70px rgba(2, 6, 23, 0.42);
 }
 
 .booked-runtime-card--narrow { max-width: 72rem; }
@@ -461,15 +501,16 @@ pre {
 /* Stat card */
 .booked-stat-card {
   border-radius: var(--apple-radius-large);
-  background: var(--apple-white);
-  box-shadow: var(--apple-shadow-sm);
+  border: 1px solid rgba(15, 23, 42, 0.06);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(248, 250, 252, 0.98) 100%);
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.08);
 }
 
 /* Note / info surface */
 .booked-note-surface {
   border-radius: var(--apple-radius-large);
-  background: rgba(0, 113, 227, 0.06);
-  border: 1px solid rgba(0, 113, 227, 0.12);
+  background: linear-gradient(180deg, rgba(79, 140, 255, 0.08) 0%, rgba(79, 140, 255, 0.05) 100%);
+  border: 1px solid rgba(79, 140, 255, 0.14);
 }
 
 /* Workspace selector card */
@@ -527,31 +568,34 @@ pre {
   align-items: center;
   justify-content: center;
   gap: 0.4rem;
-  border-radius: var(--apple-radius-standard);
-  border: 1px solid transparent;
-  background: var(--apple-blue);
+  border-radius: var(--apple-radius-pill);
+  border: 1px solid rgba(79, 140, 255, 0.22);
+  background: linear-gradient(135deg, #4f8cff 0%, #3f7cff 52%, #22c55e 100%);
   color: var(--apple-white);
   font-family: var(--apple-font-text);
-  font-size: 17px;
-  font-weight: 400;
+  font-size: 16px;
+  font-weight: 700;
   line-height: 1;
-  padding: 8px 15px;
+  padding: 0.9rem 1.35rem;
+  box-shadow: 0 14px 34px rgba(79, 140, 255, 0.22);
   cursor: pointer;
-  transition: background 160ms ease, transform 160ms ease;
+  transition: background 160ms ease, transform 160ms ease, box-shadow 160ms ease;
   outline: none;
 }
 
 .template-button:hover,
 .apple-button:hover,
 .booked-button:hover {
-  background: var(--apple-blue-hover);
+  background: linear-gradient(135deg, #6aa0ff 0%, #4f8cff 56%, #2dd36f 100%);
+  box-shadow: 0 20px 48px rgba(79, 140, 255, 0.28);
+  transform: translateY(-1px);
 }
 
 .template-button:active,
 .apple-button:active,
 .booked-button:active {
-  background: var(--apple-blue-active);
-  transform: scale(0.98);
+  background: linear-gradient(135deg, #3f79df 0%, #346ee0 56%, #1fab58 100%);
+  transform: translateY(0) scale(0.985);
 }
 
 .template-button:focus-visible,
@@ -594,16 +638,17 @@ pre {
   justify-content: center;
   gap: 0.35rem;
   border-radius: var(--apple-radius-pill);
-  border: 1px solid var(--apple-link-light);
-  background: transparent;
-  color: var(--apple-link-light);
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.72);
+  color: var(--apple-near-black);
   font-family: var(--apple-font-text);
-  font-size: 17px;
-  font-weight: 400;
+  font-size: 16px;
+  font-weight: 600;
   line-height: 1;
-  padding: 8px 18px;
+  padding: 0.9rem 1.15rem;
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.06);
   cursor: pointer;
-  transition: background 160ms ease, color 160ms ease;
+  transition: background 160ms ease, color 160ms ease, transform 160ms ease, border-color 160ms ease;
   outline: none;
   text-decoration: none;
 }
@@ -611,7 +656,10 @@ pre {
 .template-button-secondary:hover,
 .apple-button-secondary:hover,
 .booked-button-secondary:hover {
-  text-decoration: underline;
+  background: rgba(255, 255, 255, 0.92);
+  border-color: rgba(79, 140, 255, 0.16);
+  text-decoration: none;
+  transform: translateY(-1px);
 }
 
 .template-button-secondary:focus-visible,
@@ -758,16 +806,18 @@ pre {
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: 50%;
-  border: none;
-  background: rgba(0, 0, 0, 0.06);
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.76);
   color: var(--apple-near-black);
-  transition: background 160ms ease;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+  transition: background 160ms ease, transform 160ms ease;
   cursor: pointer;
 }
 
 .booked-social-button:hover {
-  background: rgba(0, 0, 0, 0.10);
+  background: rgba(255, 255, 255, 0.96);
+  transform: translateY(-1px);
 }
 
 
@@ -776,12 +826,12 @@ pre {
 .booked-field {
   width: 100%;
   border-radius: var(--apple-radius-comfortable);
-  border: 1px solid rgba(0, 0, 0, 0.16);
-  background: var(--apple-white);
+  border: 1px solid rgba(15, 23, 42, 0.10);
+  background: rgba(255, 255, 255, 0.92);
   color: var(--apple-near-black);
-  padding: 10px 14px;
+  padding: 0.95rem 1rem;
   font-family: var(--apple-font-text);
-  font-size: 17px;
+  font-size: 16px;
   outline: none;
   transition: border-color 160ms ease, box-shadow 160ms ease;
 }
@@ -876,17 +926,19 @@ pre {
 .booked-brand-image {
   display: block;
   width: auto;
-  height: 2rem;
+  height: 2.2rem;
   max-width: 100%;
   object-fit: contain;
+  object-position: left center;
 }
 
-.booked-brand-image--hero          { height: 2.25rem; }
-.booked-brand-image--landing-nav   { height: 2.55rem; }
+.booked-brand-image--hero          { height: 2.45rem; }
+.booked-brand-image--landing-nav   { height: 2.8rem; }
+.booked-brand-image--hero-banner   { width: min(100%, 18rem); height: auto; max-height: 4.75rem; }
 .booked-brand-image--frameless     { filter: none; }
 .booked-brand-image--soft          { filter: none; }
-.booked-brand-image--footer        { height: 2.35rem; }
-.booked-brand-image--landing-footer { height: 2.85rem; }
+.booked-brand-image--footer        { height: 2.6rem; }
+.booked-brand-image--landing-footer { height: 3.25rem; }
 .booked-brand-image--admin         { height: 2.4rem; }
 
 .booked-brand-lockup--sm .booked-brand-image { height: 1.5rem; }
@@ -895,10 +947,11 @@ pre {
 
 @media (min-width: 640px) {
   .booked-brand-lockup--sm .booked-brand-image { height: 1.75rem; }
-  .booked-brand-image--hero          { height: 2.6rem; }
-  .booked-brand-image--landing-nav   { height: 3rem; }
-  .booked-brand-image--footer        { height: 2.7rem; }
-  .booked-brand-image--landing-footer { height: 3.35rem; }
+  .booked-brand-image--hero          { height: 2.85rem; }
+  .booked-brand-image--landing-nav   { height: 4rem; }
+  .booked-brand-image--hero-banner   { width: min(100%, 22rem); max-height: 5.95rem; }
+  .booked-brand-image--footer        { height: 2.95rem; }
+  .booked-brand-image--landing-footer { height: 3.8rem; }
   .booked-brand-image--admin         { height: 2.8rem; }
 }
 
@@ -929,11 +982,55 @@ pre {
 
 /* Normalize any slate/white bg elements inside the admin shell */
 .booked-admin-shell :is(section, article)[class*="bg-white"] {
-  background: var(--apple-white);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(247, 250, 255, 0.98) 100%);
 }
 
 .booked-admin-shell :is(div)[class*="bg-slate-50"] {
-  background: var(--apple-light);
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.88) 0%, rgba(241, 245, 249, 0.96) 100%);
+}
+
+.booked-public-shell {
+  position: relative;
+  background: var(--bookedai-aurora-background, transparent);
+  color: var(--apple-white);
+}
+
+.booked-public-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    linear-gradient(180deg, rgba(7, 11, 22, 0.32) 0%, rgba(7, 11, 22, 0.08) 22%, rgba(7, 11, 22, 0) 100%);
+}
+
+.booked-public-shell > * {
+  position: relative;
+  z-index: 1;
+}
+
+.booked-roadmap-shell {
+  color: var(--apple-white);
+}
+
+.booked-roadmap-shell :is(.template-card, .template-card-subtle, .template-card-dark) {
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.booked-tenant-shell :is(section, article)[class*="bg-white"] {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.94) 0%, rgba(247, 250, 255, 0.98) 100%);
+  border-color: rgba(15, 23, 42, 0.08);
+  box-shadow: 0 18px 50px rgba(15, 23, 42, 0.10);
+}
+
+.booked-tenant-shell :is(div, span, button)[class*="bg-slate-50"] {
+  background: linear-gradient(180deg, rgba(248, 250, 252, 0.88) 0%, rgba(241, 245, 249, 0.96) 100%);
+}
+
+.booked-tenant-shell :is(button)[class*="bg-slate-950"] {
+  background: linear-gradient(135deg, #4f8cff 0%, #3f7cff 52%, #22c55e 100%);
+  box-shadow: 0 14px 34px rgba(79, 140, 255, 0.22);
 }
 
 

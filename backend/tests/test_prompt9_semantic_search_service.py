@@ -193,7 +193,7 @@ class Prompt9SemanticSearchServiceTestCase(IsolatedAsyncioTestCase):
                         ),
                     ),
                     provider_label="openai",
-                    provider_chain=("gemini", "openai"),
+                    provider_chain=("openai", "gemini"),
                     fallback_applied=True,
                 )
 
@@ -209,6 +209,6 @@ class Prompt9SemanticSearchServiceTestCase(IsolatedAsyncioTestCase):
 
         self.assertTrue(outcome.applied)
         self.assertEqual(outcome.provider, "openai")
-        self.assertEqual(outcome.provider_chain, ("gemini", "openai"))
+        self.assertEqual(outcome.provider_chain, ("openai", "gemini"))
         self.assertTrue(outcome.fallback_applied)
         self.assertEqual(outcome.ranked_matches[0].semantic_score, 0.93)

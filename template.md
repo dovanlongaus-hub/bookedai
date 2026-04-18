@@ -63,19 +63,24 @@
 
 ## Branding assets
 - Primary wordmark for light surfaces:
-  - [frontend/public/branding/bookedai-logo-cropped.png](/home/dovanlong/BookedAI/frontend/public/branding/bookedai-logo-cropped.png)
+  - [frontend/public/branding/bookedai-logo-light.png](/home/dovanlong/BookedAI/frontend/public/branding/bookedai-logo-light.png)
 - Dark/runtime-compatible wordmark:
-  - [frontend/public/branding/bookedai-logo-dark.png](/home/dovanlong/BookedAI/frontend/public/branding/bookedai-logo-dark.png)
+  - [frontend/public/branding/bookedai-logo-dark-badge.png](/home/dovanlong/BookedAI/frontend/public/branding/bookedai-logo-dark-badge.png)
+- Black/neutral document wordmark:
+  - [frontend/public/branding/bookedai-logo-black.png](/home/dovanlong/BookedAI/frontend/public/branding/bookedai-logo-black.png)
 - Square icon for compact UI, app icon, and favicon:
-  - [frontend/public/branding/bookedai-logo-square.png](/home/dovanlong/BookedAI/frontend/public/branding/bookedai-logo-square.png)
-- Browser favicon:
-  - [frontend/public/favicon.png](/home/dovanlong/BookedAI/frontend/public/favicon.png)
+  - [frontend/public/branding/bookedai-mark-gradient.png](/home/dovanlong/BookedAI/frontend/public/branding/bookedai-mark-gradient.png)
+  - [frontend/public/branding/bookedai-app-icon-1024.png](/home/dovanlong/BookedAI/frontend/public/branding/bookedai-app-icon-1024.png)
+- Browser favicon exports:
+  - [frontend/public/branding/bookedai-icon-32.png](/home/dovanlong/BookedAI/frontend/public/branding/bookedai-icon-32.png)
+  - [frontend/public/branding/bookedai-mobile-icon-192.png](/home/dovanlong/BookedAI/frontend/public/branding/bookedai-mobile-icon-192.png)
+  - [frontend/public/branding/bookedai-apple-touch-icon.png](/home/dovanlong/BookedAI/frontend/public/branding/bookedai-apple-touch-icon.png)
 
 Use rules:
-- `bookedai-logo-cropped.png`: default header/footer/product/admin wordmark.
-- `bookedai-logo-dark.png`: only when a darker or isolated wordmark treatment is needed.
-- `bookedai-logo-square.png`: favicon, app icon, tiny avatar/icon slots, compact admin shortcuts.
-- Do not use legacy `bookedai-mark*.png` for new work.
+- `bookedai-logo-light.png`: default header/footer/product/admin wordmark on light surfaces.
+- `bookedai-logo-dark-badge.png`: use on dark shells and inverse surfaces.
+- `bookedai-mark-gradient.png`: compact nav, avatars, chips, and button/icon source of truth.
+- legacy `bookedai-logo*.png` and `bookedai-mark*.png` are compatibility aliases only and should not be used for new work.
 
 ## Compatibility rule
 - Existing `apple-*` classes are temporarily mapped in the shared theme file so current components stay working during migration.

@@ -14,6 +14,5 @@ run_case() {
     bash scripts/run_playwright_suite.sh legacy "${file}" --grep "${grep_pattern}"
 }
 
-run_case "tests/pricing-demo-flows.spec.ts" "pricing consultation success flow surfaces payment, calendar, and return states"
-run_case "tests/pricing-demo-flows.spec.ts" "plan payment success banner renders after pricing return"
-run_case "tests/pricing-demo-flows.spec.ts" "plan payment cancelled banner keeps retry messaging visible"
+run_case "tests/public-homepage-responsive.spec.ts" "desktop keeps the opening screen clean and search-first"
+run_case "tests/public-homepage-responsive.spec.ts" "mobile keeps search and actions compact like a Google-style shell"

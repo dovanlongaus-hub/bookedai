@@ -8,11 +8,32 @@ Current synchronized release baseline: `1.0.1-stable`.
 
 Latest infrastructure update date: `2026-04-16`.
 
+Latest product-surface update date: `2026-04-18`.
+
 From this point onward, it serves three purposes:
 
 - act as the master index for all project documentation
 - define the change discipline for future upgrades
 - ensure every new request is synchronized across all affected modules
+
+## Latest Synced Delivery Note
+
+As of `2026-04-18`, the inherited public product-surface baseline is the implemented standalone homepage search workspace in:
+
+- `frontend/src/apps/public/PublicApp.tsx`
+- `frontend/src/apps/public/HomepageSearchExperience.tsx`
+- `frontend/src/shared/components/PartnerMatchCard.tsx`
+- `frontend/src/shared/components/PartnerMatchActionFooter.tsx`
+
+This baseline is now synchronized across requirement, progress, roadmap, phase, sprint, and handoff documentation.
+
+Current inherited truth:
+
+- the homepage is a professional search-first runtime, not a section-heavy landing page
+- the search surface now uses a clearer workspace model with compact navigation, dominant search input, quick suggestions, ranked results, and a dedicated booking rail
+- shortlist cards and action footers now present the professional shared booking-search treatment used by the public runtime
+- responsive verification and targeted live-read regression checks were re-run against this shell before documentation closeout
+- broader BookedAI tenant or admin UI alignment is still later work and should not be treated as completed scope
 
 ## Documentation Map
 
@@ -55,6 +76,7 @@ From this point onward, it serves three purposes:
 - [Go-To-Market Sales And Event Strategy](./docs/architecture/go-to-market-sales-event-strategy.md)
 - [Demo Script Storytelling And Video Strategy](./docs/architecture/demo-script-storytelling-video-strategy.md)
 - [Change Governance](./docs/governance/change-governance.md)
+- [Project-Wide Sprint Execution Checklist](./docs/development/project-wide-sprint-execution-checklist.md)
 
 ### Audience-specific documentation
 
@@ -153,6 +175,109 @@ When enhancing an existing feature:
 - record the upgraded state in the proper document
 - make sure the upgraded state is also reflected in implementation tracking and the relevant roadmap or sprint or phase plan
 
+### 5A. Route later-sprint logic issues into the correct later sprint
+
+If work in the current sprint exposes a bug, gap, or logic flaw that properly belongs to a later sprint or phase:
+
+- do not leave it as an informal note or memory-only carryover
+- add it to the correct sprint, phase, story, task, or checklist artifact where that work is supposed to happen
+- record it in the current sprint artifact as a carry-forward issue with enough detail that the next sprint can act on it immediately
+
+The current sprint must explicitly record:
+
+- what the issue is
+- why it was not fully solved in the current sprint
+- which later sprint or phase now owns the fix
+- what exact behavior, acceptance rule, or regression case the later sprint must handle
+
+The later sprint artifact must explicitly record:
+
+- the new or revised task that now owns the issue
+- the expected implementation scope
+- the acceptance or regression checks needed to close it
+
+Do not treat cross-sprint logic defects as resolved just because they were discovered and discussed.
+
+### 6. Apply the latest approved implementation baseline by default
+
+When a later sprint builds on an already-approved direction:
+
+- inherit the latest approved source-of-truth stack first
+- do not reopen solved structure, scope, or ownership questions unless a truth issue is discovered
+- treat the latest code-ready handoff for that area as the default execution baseline
+
+### 7. Preserve the live runtime and repo shape unless migration is explicitly approved
+
+Default project rule:
+
+- upgrade the live implementation in place
+- preserve the current repo shape where possible
+- avoid rewrite-first moves unless a rewrite has been explicitly approved as scope
+
+Do not assume that:
+
+- a forward-compatible starter replaces the live runtime
+- an additive architecture experiment is automatically the new production target
+
+### 8. Keep one active implementation spine and demote deferred inventory
+
+For any major user-facing flow:
+
+- there must be one explicit active implementation spine
+- files or sections outside that spine should be treated as additive, deferred, or separately approved inventory
+- later sprints must not silently promote deferred inventory into mandatory scope
+
+### 9. Keep one source of truth for content, composition, and tokens
+
+For every active product surface, later sprints should preserve:
+
+- one content source of truth
+- one page or flow composition root
+- one token ownership model
+- one shared primitive layer for reusable UI
+
+Do not allow later sprints to reintroduce:
+
+- copy drift across JSX files
+- competing page roots
+- competing token systems
+- parallel primitive layers for the same surface
+
+### 10. Cleanup and migration are part of implementation, not optional polish
+
+If an area contains old-path drift, later sprints should treat cleanup as part of delivery.
+
+Examples:
+
+- duplicate primitives
+- text-heavy legacy layouts that conflict with the approved visual system
+- stale assumptions about active scope
+- build wiring that depends on the wrong runtime or config chain
+
+### 10A. Carry-forward detail must be specific, not generic
+
+When the current sprint hands an issue forward:
+
+- do not write vague notes such as `follow up later` or `fix in next sprint`
+- write the exact query, scenario, payload shape, or UI behavior that failed
+- write the exact risk if it is left unresolved
+- write the exact sprint or phase that owns the next fix
+
+This rule is especially important for:
+
+- search or assistant truth failures
+- public conversion regressions
+- contract drift
+- release-gate gaps
+
+### 11. Visual-first approved surfaces should not regress to older presentation patterns
+
+When a surface has already been approved as visual-first:
+
+- future changes should preserve that presentation model
+- sections should not drift back into long-form text-first treatment
+- pricing, trust, and closing conversion surfaces should remain aligned with the same approved visual system as the upper narrative sections
+
 ## Synchronization Checklist
 
 ### If frontend changes
@@ -218,6 +343,11 @@ The current repository history still indicates this high-level creation sequence
 The latest structural refactor now establishes:
 
 - frontend runtime separation through `src/app`, `src/apps/public`, `src/apps/admin`, and `src/shared`
+- the public landing rebuild is now materially in its visual-first implementation stage, with the core hero, problem, solution, and product-proof sections redesigned toward infographic-led, graphic-heavy storytelling instead of text-heavy marketing blocks
+- the active public design direction now targets roughly `80%` graphic, flow, chart, proof-state, and status-image treatment with the remaining `20%` reserved for high-value positioning copy, commercial keywords, and action-driving statements
+- that visual-first treatment now also extends through pricing, trust, and final CTA surfaces, so the active landing path reads as one coherent premium narrative rather than mixing redesigned sections with older text-heavier sections
+- pricing plan cards and the partner trust wall are now also polished to the same premium scan-first system, so mid-page decision blocks and lower-page credibility blocks no longer feel visually behind the upper narrative sections
+- the booking assistant preview section now also uses the same visual-first framing with a proof-led intro panel and a stronger live-product shell, so the interactive demo block reads like core product storytelling rather than a standalone utility widget
 - backend startup separation through `main.py`, `app.py`, and `api/routes.py`
 - shared frontend API base URL logic in a single reusable utility
 - backend route separation through domain-specific router modules
@@ -253,6 +383,7 @@ The current beta rollout is now materially safer than the original single-route 
 - `beta.bookedai.au` now routes to dedicated `beta-web` and `beta-backend` containers
 - TLS and Cloudflare DNS are explicitly provisioned for the beta subdomain
 - beta traffic is isolated from the production web and backend runtime processes
+- production now also reserves `portal.bookedai.au` as a first-class routed subdomain for the customer booking portal path rather than leaving post-booking continuation on an implicit host
 
 The current beta tier still has important shared infrastructure constraints:
 
@@ -289,7 +420,8 @@ The current solution-wide progress should now be understood as:
   - richer handoff formats now exist entirely on the client side, so operators can choose a packaging style without changing backend contracts or rollout safety
 - platform architecture:
   - Cloudflare DNS, Nginx routing, Docker Compose deployment, and TLS provisioning now explicitly support production and beta tiers
-  - deploy automation is aware of beta domain issuance and rollout
+  - `portal.bookedai.au` is now part of the production subdomain matrix and routes through the shared frontend plus backend proxy path
+  - deploy automation is aware of beta domain issuance and rollout, and now also includes the customer portal host in DNS and certificate coverage
 - environment architecture:
   - `beta.bookedai.au` is now the required rehearsal surface before promotion to `bookedai.au`
   - `scripts/deploy_beta.sh` is now the default rebuild and redeploy path for staging previews on `beta.bookedai.au`
@@ -406,6 +538,15 @@ Future tenant-facing product work should inherit:
 - `docs/architecture/tenant-app-strategy.md`
 
 This is intended to help the team evolve from an internal admin console toward a true SME operational app without breaking the current production system.
+
+Latest confirmed tenant baseline on `2026-04-18`:
+
+- standalone `TenantApp` now exists as a real tenant route entry, not just a planning target
+- tenant workspace now includes `overview`, `catalog`, `bookings`, and `integrations` panels
+- tenant catalog panel now uses the same search-result card language as the public search workspace
+- tenant Google sign-in now exists as the first tenant-safe authenticated path for write-enabled catalog actions
+- tenant website import now supports AI-guided extraction tuned toward booking-critical fields such as service name, duration, location, price, description, imagery, booking URL, and related booking metadata
+- tenant catalog snapshot now exposes search-readiness counts and review warnings so catalog quality can be managed inside the tenant surface instead of only through admin flows
 
 ## Internal Admin Baseline
 

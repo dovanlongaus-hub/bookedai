@@ -1,6 +1,11 @@
 import { FormEvent, useEffect, useId, useState } from 'react';
 
-import { buildPublicCtaAttribution, dispatchPublicCtaAttribution, type PublicCtaAttribution } from './attribution';
+import {
+  buildPublicCtaAttribution,
+  dispatchPublicCtaAttribution,
+  resolvePublicCtaAttribution,
+  type PublicCtaAttribution,
+} from './attribution';
 import { brandDescriptor, brandName } from './data';
 import { ApiClientError, apiFetch } from '../../shared/api/client';
 import { SectionCard } from './ui/SectionCard';
@@ -107,6 +112,7 @@ export function DemoBookingDialog({
   onClose,
   entryAttribution = null,
 }: DemoBookingDialogProps) {
+  const resolvedEntryAttribution = resolvePublicCtaAttribution(entryAttribution);
   const inlineContainerId = useId().replace(/:/g, '');
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
@@ -272,7 +278,7 @@ export function DemoBookingDialog({
         buildPublicCtaAttribution({
           source_section: 'demo_dialog',
           source_cta: 'submit_demo_brief',
-          source_detail: entryAttribution?.source_cta ?? null,
+          source_detail: resolvedEntryAttribution?.source_cta ?? null,
         }),
       );
       const payload = await apiFetch<DemoBriefResponse>('/demo/brief', {
@@ -285,12 +291,12 @@ export function DemoBookingDialog({
           business_name: businessName.trim(),
           business_type: businessType.trim(),
           notes: notes.trim() || null,
-          source_page: entryAttribution?.source_page ?? null,
-          source_section: entryAttribution?.source_section ?? null,
-          source_cta: entryAttribution?.source_cta ?? null,
-          source_detail: entryAttribution?.source_detail ?? null,
-          source_path: entryAttribution?.source_path ?? null,
-          source_referrer: entryAttribution?.source_referrer ?? null,
+          source_page: resolvedEntryAttribution?.source_page ?? null,
+          source_section: resolvedEntryAttribution?.source_section ?? null,
+          source_cta: resolvedEntryAttribution?.source_cta ?? null,
+          source_detail: resolvedEntryAttribution?.source_detail ?? null,
+          source_path: resolvedEntryAttribution?.source_path ?? null,
+          source_referrer: resolvedEntryAttribution?.source_referrer ?? null,
         }),
       });
       setBriefResult(payload);
