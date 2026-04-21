@@ -6,36 +6,78 @@ Current application release baseline: `1.0.1-stable`.
 
 ## Repository structure
 
-- `frontend/`: React + TypeScript + Vite
+- `frontend/`: active React + TypeScript + Vite multi-surface frontend used by the current Docker/Nginx production runtime
+- `app/`, `components/`: parallel Next.js 16 + React 19 marketing/runtime experiment, not yet the sole deployed frontend
 - `backend/`: FastAPI
 - `supabase/`: self-hosted Supabase Docker stack and overrides
-- `n8n/`: automation workflows and provisioning assets
 - `deploy/`: production-only infrastructure for Nginx, Certbot, systemd, and Hermes
 - `scripts/`: VPS bootstrap, deployment, health checks, and DNS automation
 - `storage/`: persisted uploaded assets
 
-## Additive foundation scaffolding
+## Backend API layout
 
-This production repo now also includes a non-destructive foundation scaffold to support later phases without rewriting the system:
+Current FastAPI routing is split by surface and bounded context:
 
-- `backend/core/`: config grouping, logging, observability, feature flags, shared contracts, and error models
-- `backend/domain/`: starter service seams for growth, matching, booking trust, booking paths, payments, CRM, email, billing, deployment modes, AI routing, conversations, and integration hub
-- `backend/repositories/`: starter repository boundaries for future tenant-aware persistence
-- `backend/integrations/`: provider adapter seams for Stripe, Zoho CRM, email, WhatsApp, AI/search, n8n, and external systems
-- `backend/workers/`: outbox, job, and scheduler skeletons
-- `frontend/src/shared/contracts/`: shared domain DTOs for API and surface reuse
-- `frontend/src/shared/api/client.ts`: common API fetch helper
+Top-level `/api/*` routers:
 
-These files are intentionally foundations only. They do not replace the current production flows yet.
+- `backend/api/public_catalog_routes.py`: public catalog, booking assistant, pricing, and demo endpoints
+- `backend/api/upload_routes.py`: upload entrypoints under `/api/uploads/*`
+- `backend/api/webhook_routes.py`: Tawk, WhatsApp, and automation callbacks under `/api/webhooks/*` and `/api/automation/*`
+- `backend/api/admin_routes.py`: admin login, overview, bookings, catalog QA, and partner management
+- `backend/api/communication_routes.py`: email endpoints and Discord interactions
+
+Bounded-context `/api/v1/*` routers:
+
+- `backend/api/v1_booking_routes.py`: leads, conversation sessions, booking intent, payment intent, booking path resolution
+- `backend/api/v1_search_routes.py`: search and booking-trust endpoints
+- `backend/api/v1_tenant_routes.py`: tenant auth, tenant workspace, billing, team, catalog, and customer portal actions
+- `backend/api/v1_communication_routes.py`: lifecycle email, SMS, and WhatsApp outbound flows
+- `backend/api/v1_integration_routes.py`: provider status, reconciliation, outbox, and CRM retry operations
+- `backend/api/v1_router.py`: composition layer that mounts the v1 bounded-context routers
+
+Legacy implementation note:
+
+- `backend/api/v1_routes.py` still contains the concrete handler implementations, but the mounted router surface is now split by bounded context so future extractions can move handler code out module-by-module instead of continuing to grow one file.
+
+Supporting backend layers currently in active use:
+
+- `backend/core/`: config, logging, observability, feature flags, errors, and shared session token signing helpers
+- `backend/repositories/`: tenant-aware persistence access
+- `backend/service_layer/`: admin, tenant, communication, matching/search, upload, and integration orchestration
+
+## Refactor rules for future backend work
+
+To keep the codebase manageable as the product expands, use these boundaries for new work:
+
+- `booking`: conversation sessions, booking path resolution, booking intents, payment intents
+- `tenant`: tenant auth, overview, team, billing, catalog, portal actions
+- `admin`: admin authentication, oversight dashboards, QA workflows, partner management
+- `search/matching`: query understanding, matching, booking-trust checks, semantic reranking
+- `communications`: email, SMS, WhatsApp, Discord-facing communication flows
+- `integrations`: provider status, reconciliation, outbox, CRM sync, webhook handoff plumbing
+
+Implementation rules:
+
+- route modules should stay transport-focused and thin
+- shared auth/session token logic belongs in `backend/core/`
+- orchestration belongs in `backend/service_layer/`
+- provider-specific code belongs in `backend/integrations/`
+- new feature work should not add more long-lived cross-domain logic to `backend/api/v1_routes.py` or `backend/services.py`
+- if a change touches multiple bounded contexts, split the shared pieces into `core`, `service_layer`, or `integrations` first, then keep each route module narrow
+- `backend/integrations/`: provider adapters and external-system seams
+- `backend/workers/`: outbox and scheduler workers
 
 ## Production architecture
 
 Production traffic is expected to follow this path:
 
-- `https://bookedai.au/` -> frontend
+- `https://bookedai.au/` -> homepage sales deck frontend
 - `https://api.bookedai.au/*` -> FastAPI backend
 - `https://admin.bookedai.au/` -> admin-facing frontend routes behind the same proxy
+- `https://product.bookedai.au/` -> live product demo and booking-agent frontend
+- `https://demo.bookedai.au/` -> minimal conversational landing page for the AI revenue engine demo
 - `https://portal.bookedai.au/` -> customer booking portal routes on the shared frontend plus backend proxy
+- `https://tenant.bookedai.au/` -> tenant operator sign-in and catalog workspace on the shared frontend plus backend proxy
 - `https://supabase.bookedai.au/` -> Supabase Studio, Auth, REST, Storage via Kong
 - `https://n8n.bookedai.au/` -> n8n editor and webhooks
 - `https://hermes.bookedai.au/` -> Hermes knowledge/documentation service
@@ -86,6 +128,7 @@ AI provider:
 Additional developer references:
 
 - [Foundation Scaffold Notes](./docs/development/foundation-scaffold.md)
+- [Release Note - 2026-04-20 Homepage Product Live](./docs/development/release-note-2026-04-20-homepage-product-live.md)
 - [Target Platform Architecture](./docs/architecture/target-platform-architecture.md)
 - [Repo And Module Strategy](./docs/architecture/repo-module-strategy.md)
 - [Go-To-Market Sales And Event Strategy](./docs/architecture/go-to-market-sales-event-strategy.md)
@@ -98,7 +141,10 @@ Additional developer references:
 - `A` record for `bookedai.au` -> your server public IP
 - `A` record for `www.bookedai.au` -> same public IP
 - `A` record for `api.bookedai.au` -> same public IP
+- `A` record for `product.bookedai.au` -> same public IP
+- `A` record for `demo.bookedai.au` -> same public IP
 - `A` record for `portal.bookedai.au` -> same public IP
+- `A` record for `tenant.bookedai.au` -> same public IP
 - `A` record for `supabase.bookedai.au` -> same public IP
 - `A` record for `n8n.bookedai.au` -> same public IP
 - `A` record for `hermes.bookedai.au` -> same public IP
@@ -113,6 +159,9 @@ Additional developer references:
 
    Update at minimum in root `.env`:
 
+- `SESSION_SIGNING_SECRET`
+- `TENANT_SESSION_SIGNING_SECRET`
+- `ADMIN_SESSION_SIGNING_SECRET`
 - `N8N_BASIC_AUTH_PASSWORD`
 - `N8N_ENCRYPTION_KEY`
 - `OPENAI_API_KEY`
@@ -124,9 +173,17 @@ Additional developer references:
 - optional `DISCORD_GUILD_ID` if you want faster guild-scoped command registration during rollout
 - optional `DISCORD_ANNOUNCE_CHANNEL_ID` if you want delivery updates posted into a fixed Discord text channel
 - `ADMIN_API_TOKEN` for protected email admin routes
+- `ADMIN_PASSWORD` for admin login credentials
 - `TAWK_WEBHOOK_SECRET` if you enable signature verification
 - `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_SMTP_PASSWORD`, `EMAIL_SMTP_FROM`
 - `EMAIL_IMAP_HOST`, `EMAIL_IMAP_PORT`, `EMAIL_IMAP_USERNAME`, `EMAIL_IMAP_PASSWORD`
+
+Session secret notes:
+
+- `ADMIN_SESSION_SIGNING_SECRET` is the preferred signing key for admin sessions.
+- `TENANT_SESSION_SIGNING_SECRET` is the preferred signing key for tenant sessions.
+- `SESSION_SIGNING_SECRET` is a shared fallback for session signing when a more specific secret is not set.
+- Current code still falls back to legacy `ADMIN_API_TOKEN` and `ADMIN_PASSWORD` to avoid breaking older environments.
 
    Then prepare the Supabase env file:
 
@@ -164,8 +221,10 @@ Additional developer references:
 6. Access:
 
 - App: `https://bookedai.au`
+- Product: `https://product.bookedai.au`
 - Beta: `https://beta.bookedai.au`
 - Admin: `https://admin.bookedai.au`
+- Demo: `https://demo.bookedai.au`
 - Portal: `https://portal.bookedai.au`
 - API docs: `https://api.bookedai.au/api/docs`
 - Supabase: `https://supabase.bookedai.au`
@@ -262,6 +321,7 @@ Discord Developer Portal checklist:
 - `bookedai.au`
 - `www.bookedai.au`
 - `api.bookedai.au`
+- `product.bookedai.au`
 - `admin.bookedai.au`
 - `portal.bookedai.au`
 - `n8n.bookedai.au`
@@ -272,8 +332,8 @@ Discord Developer Portal checklist:
    You can customize the record list in root `.env`:
 
    ```env
-   CLOUDFLARE_AUTO_DNS_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,portal.bookedai.au,calendar.bookedai.au
-   CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,portal.bookedai.au,calendar.bookedai.au
+   CLOUDFLARE_AUTO_DNS_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,product.bookedai.au,portal.bookedai.au,calendar.bookedai.au
+   CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,product.bookedai.au,portal.bookedai.au,calendar.bookedai.au
    ```
 
    To run the sync manually at any time:

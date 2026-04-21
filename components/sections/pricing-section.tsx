@@ -38,52 +38,75 @@ export function PricingSection() {
       <div className="container-brand">
         <div className="mx-auto max-w-3xl text-center">
           <div className="text-xs uppercase tracking-[0.24em] text-brand-muted">
-            Aligned Pricing That Grows With You
+            Freemium Entry, Clear SME Growth Path
           </div>
           <h2 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">
-            Setup once. Pay based on performance.
+            Start freemium. Upgrade as your bookings grow.
           </h2>
           <p className="mt-5 text-lg leading-8 text-brand-muted">
-            BookedAI.au starts with a one-time setup fee to build your AI
-            revenue engine around your business. After launch, pricing is tied
-            to successful bookings or revenue generated.
+            BookedAI.au starts with a one-time setup fee, then scales on a
+            success-based commission model tied to bookings or revenue
+            generated. SMEs can begin with a freemium launch and move into
+            Pro or Pro Max as they need more channels, automation, and growth
+            support.
           </p>
         </div>
 
-        <div className="mt-12 grid gap-6 lg:grid-cols-2">
+        <div className="mt-8 rounded-brand border border-brand-green/30 bg-brand-green/10 px-6 py-5 text-center text-sm leading-7 text-brand-text">
+          Launch offer: the first <span className="font-semibold text-white">10 SMEs</span> get
+          <span className="font-semibold text-white"> 1 month free after go-live</span> before
+          commission begins.
+        </div>
+
+        <div className="mt-12 grid gap-6 xl:grid-cols-3">
           <PricingCard
-            title="Custom Setup"
-            price="One-time setup fee"
-            description="We design, configure, integrate, and launch your BookedAI.au system to match your workflows, channels, booking logic, and revenue goals."
+            title="Freemium"
+            price="Setup fee + commission"
+            description="Launch with the essentials for SME lead capture and booking conversion, then pay a tailored commission only when BookedAI.au helps generate results."
             items={[
-              "AI voice and chat setup",
-              "Search, website, email, and follow-up workflows",
-              "Booking automation configuration",
-              "Calendar / CRM / payment integration",
-              "Revenue dashboard configuration",
-              "Testing and launch support",
+              "One-time setup tailored to your business",
+              "Website chat and lead capture flows",
+              "Core booking automation and routing",
+              "Simple attribution and performance tracking",
+              "Designed for SMEs validating demand fast",
+              "Launch offer: first 10 SMEs get 1 month free",
             ]}
           />
 
           <PricingCard
-            title="Success-Based Commission"
-            price="Per booking or revenue generated"
-            description="After launch, BookedAI.au pricing is aligned to outcomes. You pay based on the commercial value created through the system."
+            title="Pro"
+            price="More automation for growing SMEs"
+            description="Upgrade when your team needs stronger conversion, less admin, and better visibility across customer touchpoints."
             items={[
-              "Lower risk to adopt",
-              "Pricing aligned to results",
-              "Clearer ROI visibility",
-              "Growth-partner positioning",
-              "Channel attribution and commission tracking",
-              "Built to scale as bookings grow",
+              "Everything in Freemium",
+              "Multi-channel follow-up across web, email, and SMS",
+              "Calendar, CRM, and payment integrations",
+              "Smarter lead qualification and reminder flows",
+              "Clearer ROI dashboards for owner-operators",
+              "Best for SMEs scaling bookings without extra headcount",
+            ]}
+          />
+
+          <PricingCard
+            title="Pro Max"
+            price="Maximum capability for ambitious SMEs"
+            description="Built for service businesses that want deeper automation, stronger conversion coverage, and a more hands-on growth engine."
+            items={[
+              "Everything in Pro",
+              "Advanced AI voice and high-intent enquiry handling",
+              "Reactivation, upsell, and repeat-booking journeys",
+              "More tailored workflows and revenue logic",
+              "Priority optimisation and launch support",
+              "Best for SMEs ready to scale with broader automation",
             ]}
           />
         </div>
 
         <div className="mt-8 flex flex-col items-center justify-center gap-4 rounded-brand border border-white/10 bg-white/5 px-6 py-8 text-center">
           <p className="max-w-2xl text-sm leading-7 text-brand-muted">
-            Commission structure can be tailored to your service model, average
-            booking value, and sales cycle. The goal is simple: <span className="font-semibold text-white">we win when you win.</span>
+            Commission structure is tailored to your service model, average
+            booking value, and sales cycle, so SMEs can start lean and upgrade
+            as capability increases. The goal is simple: <span className="font-semibold text-white">we win when you win.</span>
           </p>
           <Button href="#hero">Book a Strategy Demo</Button>
         </div>

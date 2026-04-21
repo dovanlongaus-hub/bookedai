@@ -212,6 +212,8 @@ Current BookedAI repo state:
 - `beta.bookedai.au` is now the concrete staging entrypoint
 - beta routes to `beta-web` and `beta-backend`, not to production `web` and `backend`
 - beta still needs future data and provider isolation to become a full staging-grade environment
+- release tooling can now also run a lightweight migration-state verification step through `scripts/verify_backend_migration_state.sh` when staging or shadow environments expose `DATABASE_URL` plus `psql`
+- the tenant publish lane now also has a dedicated production-shadow rehearsal checklist in `docs/development/tenant-publish-production-shadow-rehearsal.md`, so beta and shadow validation can follow one repeatable sequence instead of ad hoc operator memory
 
 ### Production
 

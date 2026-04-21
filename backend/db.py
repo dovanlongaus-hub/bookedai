@@ -67,6 +67,8 @@ class ServiceMerchantProfile(Base):
     category: Mapped[str | None] = mapped_column(String(100))
     summary: Mapped[str | None] = mapped_column(Text)
     amount_aud: Mapped[float | None] = mapped_column(Float)
+    currency_code: Mapped[str] = mapped_column(String(8), default="AUD", nullable=False)
+    display_price: Mapped[str | None] = mapped_column(String(255))
     duration_minutes: Mapped[int | None] = mapped_column(Integer)
     venue_name: Mapped[str | None] = mapped_column(String(255))
     location: Mapped[str | None] = mapped_column(String(500))
@@ -99,6 +101,29 @@ class TenantUserMembership(Base):
     full_name: Mapped[str | None] = mapped_column(String(255))
     auth_provider: Mapped[str] = mapped_column(String(64), nullable=False, default="google")
     provider_subject: Mapped[str | None] = mapped_column(String(255))
+    role: Mapped[str] = mapped_column(String(64), nullable=False, default="tenant_admin")
+    status: Mapped[str] = mapped_column(String(64), nullable=False, default="active")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
+    )
+
+
+class TenantUserCredential(Base):
+    __tablename__ = "tenant_user_credentials"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    tenant_slug: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    username: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+    password_salt: Mapped[str] = mapped_column(String(255), nullable=False)
+    password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     role: Mapped[str] = mapped_column(String(64), nullable=False, default="tenant_admin")
     status: Mapped[str] = mapped_column(String(64), nullable=False, default="active")
     created_at: Mapped[datetime] = mapped_column(
@@ -145,6 +170,18 @@ async def init_database(engine: AsyncEngine) -> None:
             text(
                 "ALTER TABLE service_merchant_profiles "
                 "ADD COLUMN IF NOT EXISTS publish_state VARCHAR(32) NOT NULL DEFAULT 'draft'"
+            )
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE service_merchant_profiles "
+                "ADD COLUMN IF NOT EXISTS currency_code VARCHAR(8) NOT NULL DEFAULT 'AUD'"
+            )
+        )
+        await connection.execute(
+            text(
+                "ALTER TABLE service_merchant_profiles "
+                "ADD COLUMN IF NOT EXISTS display_price VARCHAR(255)"
             )
         )
 

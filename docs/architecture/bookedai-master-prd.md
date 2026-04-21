@@ -21,9 +21,11 @@ This document should be read together with:
 - `docs/architecture/target-platform-architecture.md`
 - `docs/architecture/system-overview.md`
 - `docs/architecture/implementation-phase-roadmap.md`
+- `docs/architecture/current-phase-sprint-execution-plan.md`
 - `docs/architecture/mvp-sprint-execution-plan.md`
 - `docs/architecture/pricing-packaging-monetization-strategy.md`
 - `docs/architecture/public-growth-app-strategy.md`
+- `docs/architecture/user-surface-saas-upgrade-plan.md`
 - `docs/architecture/tenant-app-strategy.md`
 - `docs/architecture/internal-admin-app-strategy.md`
 - `docs/architecture/crm-email-revenue-lifecycle-strategy.md`
@@ -66,6 +68,30 @@ The current approved locale options for the public shell are:
 - Tiếng Việt
 
 The current homepage should therefore not be described in later planning as a popup-first public assistant unless the requirement-side source documents are explicitly revised.
+
+### Current product-surface baseline from code
+
+As of `2026-04-19`, requirement-side reading should also assume the checked-in repo already contains:
+
+- a public search-first application baseline
+- a tenant workspace baseline on `tenant.bookedai.au`
+- an internal admin operations baseline on `admin.bookedai.au`
+- additive `/api/v1/*` commercial seams
+- release-gate and replay tooling for at least the active search-quality lane
+
+Later requirement or sprint documents should therefore describe many next steps in tenant, admin, billing, reporting, and release-discipline work as:
+
+- completion
+- hardening
+- productization
+- or expansion
+
+instead of describing those areas as if they were still absent from the codebase.
+
+Cross-surface UX and productization rule now also locked from `2026-04-19`:
+
+- public frontend, customer portal, tenant workspace, admin entry, and billing flows must now be planned and reviewed as one coherent SaaS system
+- later sprint planning should not improve one surface in isolation while leaving adjacent surfaces obviously lower-trust, lower-clarity, or visually disconnected
 
 ### Product operating principles now locked
 
@@ -279,6 +305,8 @@ The following principles are mandatory:
 - AI is the operating mechanism, not the headline claim
 - revenue and bookings are the primary product outcomes
 - production stability matters more than architectural purity
+- `tenant.bookedai.au` must be treated as the single tenant product gateway rather than an optional side route
+- each tenant should have one primary BookedAI account system for sign-up, sign-in, billing ownership, and operator access rather than fragmented per-feature logins
 - Supabase Postgres remains the transaction and domain truth layer
 - integrations and callbacks must be idempotent
 - payment and revenue reporting must connect to booking state, not vanity events
@@ -312,6 +340,7 @@ Current runtime capabilities already include:
 - public marketing website
 - booking assistant experience
 - customer booking portal host on `portal.bookedai.au` for post-booking detail, edit, cancel, and save flows
+- tenant workspace host on `tenant.bookedai.au` for tenant-safe sign-in and operator access
 - demo request and pricing consultation flows
 - admin interface
 - Stripe checkout session creation
@@ -341,6 +370,33 @@ Portal requirement now locked for customer booking flows:
 - recovery workflows
 - pricing and packaging aligned to outcomes
 
+Tenant workspace requirement now locked for operator product flows:
+
+- `tenant.bookedai.au` must become the default and most professional tenant entry host
+- the tenant host must support one unified tenant identity flow for:
+  - account creation
+  - sign-in
+  - invite acceptance and first-password setup
+  - membership and access control
+  - billing ownership
+  - payment method management
+- the same tenant workspace must also act as the primary product surface for:
+  - business and catalog data input
+  - booking and operational visibility
+  - revenue reporting
+  - subscription and invoice visibility
+  - billing and payment actions
+- the tenant experience must be designed and implemented like a premium paid SaaS product rather than a lightweight internal dashboard
+- pricing, plan state, billing controls, and payment collection should appear as first-class tenant-app capabilities rather than later admin-only concepts
+- the first role matrix should be explicit in product and implementation scope:
+  - `tenant_admin`
+  - `finance_manager`
+  - `operator`
+- tenant actions should be role-aware by default:
+  - billing mutations for `tenant_admin` and `finance_manager`
+  - team and membership control for `tenant_admin`
+  - catalog write actions for `tenant_admin` and `operator`
+
 ## 12. Target product surfaces
 
 ### 12.1 Public growth surface
@@ -358,12 +414,17 @@ Responsibilities:
 
 Responsibilities:
 
+- single gateway on `tenant.bookedai.au` for tenant sign-up, sign-in, and account ownership
+- one tenant identity and membership model across data input, operations, reporting, and billing
+- business profile, service, and provider data entry
 - revenue dashboard
 - booking and conversion visibility
 - missed revenue tracker
 - source attribution
 - follow-up and recovery workflows
 - payment status and commission visibility
+- subscription plan visibility
+- invoices, payment methods, and billing actions
 - CRM and calendar integration status
 
 ### 12.3 Internal admin surface
@@ -417,6 +478,21 @@ BookedAI must:
 - support direct booking, callback, quote request, or request-booking paths
 
 ### 13.4 Revenue visibility
+
+BookedAI must:
+
+- show tenant-safe revenue generated, revenue pending, and revenue missed views
+- connect booking state, payment state, and billing state into one commercial summary
+- make monthly value legible inside the tenant workspace without requiring admin intervention
+
+### 13.5 Tenant identity and self-serve billing
+
+BookedAI must:
+
+- provide one professional tenant sign-up and sign-in experience on `tenant.bookedai.au`
+- keep tenant access unified across data input, reporting, billing, and workspace actions
+- support plan visibility, invoice history, billing contact management, and payment-method actions
+- treat subscription and billing UX as part of the core tenant product, not as a hidden back-office flow
 
 BookedAI must provide a revenue dashboard showing:
 

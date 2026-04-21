@@ -50,7 +50,8 @@ The current repository is a real production monolith-in-one-repo with partial st
 
 Confirmed current high-level shape:
 
-- frontend: React + TypeScript + Vite
+- primary deployed frontend: React + TypeScript + Vite under `frontend/`
+- parallel frontend experiment: Next.js under `app/` and `components/`
 - backend: FastAPI
 - persistence and infra support: self-hosted Supabase stack
 - automation: n8n
@@ -92,10 +93,11 @@ Together, these files define the current official architecture baseline for:
 
 Primary root folders currently present:
 
+- `app/`
+- `components/`
 - `frontend/`
 - `backend/`
 - `supabase/`
-- `n8n/`
 - `deploy/`
 - `scripts/`
 - `docs/`
@@ -106,11 +108,9 @@ These top-level folders are already useful and should remain in place in the nea
 
 Current app and surface reality:
 
-- public and admin currently live inside the same frontend project
-- runtime selection is performed by `frontend/src/app/AppRouter.tsx`
-- public surface composition lives under `frontend/src/apps/public/`
-- admin surface composition lives under `frontend/src/apps/admin/`
-- shared frontend runtime config lives under `frontend/src/shared/`
+- the current production-facing multi-surface web runtime still lives under `frontend/src/`
+- the root Next.js app under `app/` and `components/` is a parallel runtime lane, not yet the single production shell
+- the repo therefore has a dual frontend reality that later migrations must handle explicitly rather than ignoring
 
 Current public-facing clusters:
 
@@ -142,13 +142,28 @@ Current backend organization:
 Current backend file clusters:
 
 - app startup: `main.py`, `app.py`
-- route registration: `api/routes.py`, `api/public_routes.py`, `api/admin_routes.py`, `api/automation_routes.py`, `api/email_routes.py`
+- route registration:
+  - `api/public_catalog_routes.py`
+  - `api/upload_routes.py`
+  - `api/webhook_routes.py`
+  - `api/admin_routes.py`
+  - `api/communication_routes.py`
+  - `api/tenant_routes.py`
+  - compatibility shims:
+    - `api/routes.py`
+    - `api/public_routes.py`
+    - `api/automation_routes.py`
+    - `api/email_routes.py`
 - handler orchestration: `api/route_handlers.py`
 - business and provider logic concentration: `services.py`
 - partial service extraction: `service_layer/`
 - data and models: `db.py`
 - request and response contracts: `schemas.py`
 - config: `config.py`
+
+Current highest-priority backend module debt:
+
+- `backend/api/v1_routes.py` still mixes search, booking, tenant, portal, communication, and integration surfaces
 
 ### Integrations structure
 
@@ -222,6 +237,8 @@ Recommendation:
 
 - route handlers should become orchestration shells
 - domain services should take over business policy
+- top-level route ownership should stay split by context
+- the remaining `/api/v1/*` monolith should be extracted by bounded context, not only by file size
 
 ### Data and domain coupling
 

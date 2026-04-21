@@ -1,12 +1,44 @@
 # Roadmap Sprint Document Register
 
-Date: `2026-04-17`
+Date: `2026-04-21`
 
 ## Purpose
 
 This register maps each active roadmap sprint to the source documents that define the current BookedAI delivery plan.
 
 The current register has been updated to match the revenue-engine repositioning of BookedAI.
+
+Current synchronization baseline from `2026-04-20`:
+
+- `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/development/project-plan-code-audit-2026-04-19.md`
+- `docs/architecture/user-surface-saas-upgrade-plan.md`
+- `docs/development/sprint-13-16-user-surface-delivery-package.md`
+- `docs/development/tenant-implementation-requirements-framework.md`
+- `docs/development/future-swim-tenant-use-case.md`
+- `docs/development/tenant-onboarding-operations-checklist.md`
+- `docs/development/future-swim-launch-runbook.md`
+- `docs/development/future-swim-content-copy-approval-checklist.md`
+- `docs/development/future-swim-production-activation-pack.md`
+- `docs/architecture/zoho-crm-tenant-integration-blueprint.md`
+- `docs/development/future-swim-zoho-crm-rollout.md`
+
+Additional synchronization baseline from `2026-04-21`:
+
+- `docs/development/backend-boundaries.md`
+- `docs/development/env-strategy.md`
+- `docs/users/administrator-guide.md`
+- `backend/api/v1_router.py`
+- `backend/api/v1_tenant_handlers.py`
+
+These documents now record the current code-aligned state of the program and should be consulted whenever older sprint language still reads as if an already-implemented lane were still only a planned concept.
+
+Current backend modularization interpretation locked from `2026-04-21`:
+
+- `/api/v1/*` router separation already exists in code
+- `backend/api/v1_routes.py` should now be treated as a legacy handler concentration point under active extraction, not the sole router module
+- current extraction priority is `tenant -> portal -> integrations -> communications -> search_matching -> booking`
+- current deployed frontend source of truth remains `frontend/`, while the root Next.js tree should be treated as a parallel migration lane until deployment ownership changes explicitly
 
 ## Documentation synchronization rule
 
@@ -37,10 +69,11 @@ Runner sequence to inherit:
 - `browser smoke runner` for public and operator flow reachability
 - `AI/search quality runner` for trust, locality, relevance, and degraded fallback behavior
 
-Cross-document interpretation rule now locked from `2026-04-18`:
+Cross-document interpretation rule now locked from `2026-04-20`:
 
 - after Sprint 2, every sprint that touches the public shell, search, booking, trust, catalog supply, or reporting should assume the product is optimizing for revenue capture by service SMEs first
-- after Sprint 2, every sprint that touches the public shell must preserve the minimal homepage body and the mobile-first inline assistant path unless the requirement-side source docs are explicitly revised first
+- after Sprint 7, every sprint that touches the public shell must preserve the current compact homepage acquisition model: larger revenue-engine branding, reduced duplicate content, direct route menu, product-host trial CTA, tenant Google register/login entry, and shared package vocabulary `Freemium`, `Pro`, `Pro Max`
+- registration and custom-sales surfaces may expose `Advance Customize` as the custom path above `Pro Max`, but later sprint docs should not reintroduce public-facing `Upgrade 1-3` or `GPI Pro` wording
 
 ## Sprint register
 
@@ -94,7 +127,7 @@ Focus:
 - implementation slices for immediate lane-by-lane execution
 - live branding, favicon, CTA shell, and assistant locality closeout baseline
 - inherited `frontend/public/branding/` single-source logo/icon baseline for every app, web, site, single-page, favicon, touch-icon, and mobile-responsive shell
-- inherited `search-first homepage + inline assistant + English-default locale selector` public baseline for later sprint docs and implementation
+- inherited revenue-engine branding and route-safe public-shell baseline for later sprint docs and implementation
 - inherited Sprint 2 implemented baseline for Sprint 3 kickoff
 
 ### Sprint 3
@@ -122,7 +155,7 @@ Focus:
 
 - public landing implementation
 - shared primitives and page assembly
-- minimal homepage body and inline assistant-first conversion rollout
+- compact homepage acquisition flow and shared route-navigation rollout
 - mobile-first responsive validation for search, shortlist, booking, and confirmation
 - trust, pricing, and conversion rollout through compact supporting surfaces
 - kickoff control against the inherited Sprint 2 implemented baseline
@@ -261,6 +294,8 @@ Focus:
 - tenant shell and API preparation
 - mobile-priority tenant IA
 - queue and route boundaries for revenue, recovery, and integration actions
+- tenant login professionalization baseline
+- cross-surface UX inventory for public, portal, tenant, admin, and billing
 
 ### Sprint 12
 
@@ -278,27 +313,36 @@ Focus:
 - payment, recovery, and integration visibility
 - publish-safe searchable catalog rows
 - payment, recovery, and commission visibility
+- first user-friendly tenant workspace refinement pass
 
 ### Sprint 13
 
 - `docs/architecture/phase-7-8-detailed-implementation-package.md`
 - `docs/architecture/phase-7-8-epic-story-task-breakdown.md`
+- `docs/architecture/user-surface-saas-upgrade-plan.md`
 - `docs/architecture/internal-admin-app-strategy.md`
 - `docs/architecture/integration-hub-sync-architecture.md`
 - `docs/development/sprint-13-owner-execution-checklist.md`
 
 Focus:
 
+- unified tenant identity and onboarding completion
+- tenant login UX upgrade
+- admin login UX upgrade specification
 - internal admin commercial IA
 - tenant drill-ins
 - issue-first operational workflows
+- system-wide UX harmonization kickoff
 
 ### Sprint 14
 
 - `docs/architecture/phase-7-8-detailed-implementation-package.md`
 - `docs/architecture/phase-7-8-epic-story-task-breakdown.md`
+- `docs/architecture/user-surface-saas-upgrade-plan.md`
 - `docs/architecture/internal-admin-app-strategy.md`
 - `docs/development/implementation-progress.md`
+- `docs/development/backend-boundaries.md`
+- `docs/development/env-strategy.md`
 - `docs/development/sprint-14-owner-execution-checklist.md`
 
 Focus:
@@ -306,13 +350,22 @@ Focus:
 - admin support tooling
 - reconciliation polish
 - rollout readiness for tenant and admin surfaces
+- portal product architecture and booking-review UX definition
+- billing information architecture and SaaS plan-state refinement
+- tenant workspace shell refinement
+- explicit backend ownership cleanup for the user-surface wave:
+  - top-level router split now implemented
+  - remaining `/api/v1/*` bounded-context extraction still active
+- actor-specific session-secret separation and auth hardening across tenant and admin surfaces
 
 ### Sprint 15
 
 - `docs/architecture/phase-9-detailed-implementation-package.md`
 - `docs/architecture/phase-9-epic-story-task-breakdown.md`
 - `docs/architecture/qa-testing-reliability-ai-evaluation-strategy.md`
+- `docs/architecture/user-surface-saas-upgrade-plan.md`
 - `docs/development/release-gate-checklist.md`
+- `docs/development/backend-boundaries.md`
 - `docs/development/sprint-15-owner-execution-checklist.md`
 
 Focus:
@@ -321,13 +374,21 @@ Focus:
 - commercial regression coverage
 - cross-surface consistency validation
 - release-grade runner enforcement and failure triage workflow
+- customer portal implementation
+- billing UX implementation
+- tenant value and plan-posture experience
+- carry-forward search-core issue from the `2026-04-21` verification pass:
+  - public-web fallback tests in `backend/tests/test_api_v1_routes.py` must be brought back to passing without weakening tenant-first search policy
+- bounded-context extraction should continue only where it materially improves regression safety for tenant, portal, integrations, communications, search, or booking work
 
 ### Sprint 16
 
 - `docs/architecture/phase-9-detailed-implementation-package.md`
 - `docs/architecture/phase-9-epic-story-task-breakdown.md`
 - `docs/architecture/qa-testing-reliability-ai-evaluation-strategy.md`
+- `docs/architecture/user-surface-saas-upgrade-plan.md`
 - `docs/development/release-gate-checklist.md`
+- `docs/development/backend-boundaries.md`
 - `docs/development/sprint-16-owner-execution-checklist.md`
 
 Focus:
@@ -335,6 +396,11 @@ Focus:
 - release gates
 - rollback discipline
 - scale-readiness review
+- whole-system visual and interaction harmonization review across public, portal, tenant, and admin
+- release-grade UX regression gate for the highest-value user flows
+- release-readiness closeout for the backend router and auth split:
+  - no hidden dependency on shared admin secrets for tenant sessions
+  - no undocumented route ownership ambiguity for critical public, admin, webhook, upload, or communication surfaces
 
 ## Current follow-on execution note
 
@@ -345,3 +411,4 @@ The immediate next implementation wave should stay centered on:
 3. wiring the first reporting widgets to truthful read models
 4. expanding search quality, recovery workflows, tenant supply truth, and commercial admin support
 5. progressively turning contract, integration, browser, and AI quality runners into real sprint gates instead of manual-only checks
+6. upgrading public, portal, tenant, admin, and billing surfaces so they behave like one coherent SaaS product system

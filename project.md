@@ -8,7 +8,7 @@ Current synchronized release baseline: `1.0.1-stable`.
 
 Latest infrastructure update date: `2026-04-16`.
 
-Latest product-surface update date: `2026-04-18`.
+Latest product-surface update date: `2026-04-21`.
 
 From this point onward, it serves three purposes:
 
@@ -16,30 +16,308 @@ From this point onward, it serves three purposes:
 - define the change discipline for future upgrades
 - ensure every new request is synchronized across all affected modules
 
+## Source Of Truth Rule
+
+`project.md` is the single project-level source of truth for:
+
+- current project scope
+- active delivery baseline
+- documentation hierarchy
+- synchronization rules between product, architecture, and implementation docs
+
+All other documents should be treated as supporting or specialized documents.
+
+That means:
+
+- `README.md` explains setup, repo usage, and operator-facing entry points
+- `DESIGN.md` captures design-system or UX implementation intent
+- `docs/architecture/*` contains domain, platform, and execution deep-dives
+- `docs/development/*` contains working plans, rollout notes, and implementation packages
+- `docs/users/*` contains audience-specific guides
+
+If any supporting document conflicts with `project.md`, treat `project.md` as authoritative until the inconsistency is explicitly resolved.
+
+Every meaningful implementation change that affects direction, architecture, roadmap, or delivery state should update `project.md` first, then sync the downstream document set.
+
 ## Latest Synced Delivery Note
 
-As of `2026-04-18`, the inherited public product-surface baseline is the implemented standalone homepage search workspace in:
+As of `2026-04-21`, the synchronized repo baseline now includes both product-surface continuity work and a backend ownership cleanup pass.
 
-- `frontend/src/apps/public/PublicApp.tsx`
-- `frontend/src/apps/public/HomepageSearchExperience.tsx`
-- `frontend/src/shared/components/PartnerMatchCard.tsx`
-- `frontend/src/shared/components/PartnerMatchActionFooter.tsx`
+The current inherited truth is:
 
-This baseline is now synchronized across requirement, progress, roadmap, phase, sprint, and handoff documentation.
+- the production multi-surface frontend currently still runs from the React + TypeScript + Vite application under `frontend/`
+- the root `app/` and `components/` Next.js subtree now exists as a parallel marketing/runtime experiment, but it is not yet the sole production web source
+- the backend top-level router is now mounted in `backend/app.py` through explicit modules:
+  - `public_catalog_routes`
+  - `upload_routes`
+  - `webhook_routes`
+  - `admin_routes`
+  - `communication_routes`
+  - `tenant_routes`
+- compatibility router shims remain in place for older imports, so the cleanup improves ownership without forcing an immediate breaking import change
+- the main remaining backend monolith is now explicitly identified as `backend/api/v1_routes.py`
+- the approved backend bounded-context target is now:
+  - `booking`
+  - `tenant`
+  - `admin`
+  - `search_matching`
+  - `communications`
+  - `integrations`
+- session-signing is now split by actor boundary in code and docs through:
+  - `SESSION_SIGNING_SECRET`
+  - `TENANT_SESSION_SIGNING_SECRET`
+  - `ADMIN_SESSION_SIGNING_SECRET`
+- legacy `ADMIN_API_TOKEN` and `ADMIN_PASSWORD` fallback still exists for compatibility, but should now be treated as migration support rather than the desired end-state
+- route-related backend verification passed after the router split, and the previously failing `matching/search public-web fallback` and tenant session-signing regressions are now restored in the backend validation pass
 
-Current inherited truth:
+This baseline is now synchronized across:
 
-- the homepage is a professional search-first runtime, not a section-heavy landing page
-- the search surface now uses a clearer workspace model with compact navigation, dominant search input, quick suggestions, ranked results, and a dedicated booking rail
-- shortlist cards and action footers now present the professional shared booking-search treatment used by the public runtime
-- responsive verification and targeted live-read regression checks were re-run against this shell before documentation closeout
-- broader BookedAI tenant or admin UI alignment is still later work and should not be treated as completed scope
+- `README.md`
+- `docs/development/backend-boundaries.md`
+- `docs/development/env-strategy.md`
+- `docs/development/implementation-progress.md`
+- `docs/development/roadmap-sprint-document-register.md`
+- `docs/architecture/implementation-phase-roadmap.md`
+- `docs/development/sprint-13-16-user-surface-delivery-package.md`
+- `docs/users/administrator-guide.md`
+
+Broader tenant, portal, admin, billing, search-hardening, and bounded-context extraction work remains active and should still be treated as continuing delivery rather than closed scope.
+
+## Current Project Truth
+
+This section is the canonical project-level baseline for future upgrades.
+
+When later work needs one short authoritative read before touching code, use this section first.
+
+### Product definition
+
+BookedAI is currently defined as:
+
+- an AI revenue engine for service businesses
+- a multi-surface product spanning public acquisition, product proof, booking capture, tenant operations, admin support, communications, integrations, and deployment/runtime operations
+- a platform that must stay truthful about search quality, booking state, billing posture, support readiness, and rollout maturity
+
+The platform should not be framed as:
+
+- only a chatbot
+- only a landing page
+- only an internal admin console
+
+### Active runtime surfaces
+
+Current approved surface map:
+
+- `bookedai.au`
+  - homepage sales-deck and acquisition surface
+- `product.bookedai.au`
+  - deeper product demo and booking-agent proof surface
+- `demo.bookedai.au`
+  - lighter conversational or story-led demo surface
+- `tenant.bookedai.au`
+  - tenant sign-in, onboarding, catalog, billing, and team workspace gateway
+- `portal.bookedai.au`
+  - customer booking review and support-follow-up surface
+- `admin.bookedai.au`
+  - operator and internal support surface
+- `api.bookedai.au`
+  - FastAPI backend
+- `upload.bookedai.au`
+  - upload and hosted asset surface
+- `n8n.bookedai.au`
+  - automation editor and workflow runtime
+- `supabase.bookedai.au`
+  - data, auth, storage, and operator tooling through Supabase
+- `hermes.bookedai.au`
+  - knowledge or documentation service
+
+### Current repo shape
+
+Current checked-in repo truth:
+
+- primary deployed frontend:
+  - active React + TypeScript + Vite multi-surface app under `frontend/`
+- parallel frontend experiment:
+  - Next.js app under `app/` and `components/` for newer marketing/runtime exploration
+- backend:
+  - FastAPI app under `backend/`
+- data and infra:
+  - `supabase/`, `deploy/`, `scripts/`, `storage/`
+
+Future work must not assume the repo is greenfield or single-runtime.
+
+### Current backend architecture baseline
+
+Active backend entrypoint:
+
+- `backend/app.py`
+
+Current top-level router ownership:
+
+- `backend/api/public_catalog_routes.py`
+- `backend/api/upload_routes.py`
+- `backend/api/webhook_routes.py`
+- `backend/api/admin_routes.py`
+- `backend/api/communication_routes.py`
+- `backend/api/tenant_routes.py`
+
+Compatibility router shims still exist:
+
+- `backend/api/public_routes.py`
+- `backend/api/automation_routes.py`
+- `backend/api/email_routes.py`
+- `backend/api/routes.py`
+
+Current main backend debt item:
+
+- `backend/api/v1_routes.py` is still a large mixed-surface route module
+
+Approved bounded-context split target:
+
+- `booking`
+- `tenant`
+- `admin`
+- `search_matching`
+- `communications`
+- `integrations`
+- `portal`
+
+### Current auth and session baseline
+
+Approved session-signing baseline:
+
+- `SESSION_SIGNING_SECRET`
+- `TENANT_SESSION_SIGNING_SECRET`
+- `ADMIN_SESSION_SIGNING_SECRET`
+
+Current compatibility fallback still accepted by code:
+
+- `ADMIN_API_TOKEN`
+- `ADMIN_PASSWORD`
+
+Rule for future upgrades:
+
+- actor-specific session signing is the target baseline
+- legacy fallback is compatibility support only
+- later work must not silently collapse tenant and admin signing back into one shared secret model
+
+### Current implementation baseline by capability
+
+Implemented or materially active:
+
+- public homepage and product proof flow
+- booking assistant and booking session flow
+- matching and search infrastructure
+- public-web fallback lane and replay tooling
+- tenant auth foundations
+- tenant catalog import, review, publish, archive, and workspace reads
+- tenant billing and team foundations
+- portal booking detail and request-safe support actions
+- admin overview, bookings, support queue, partner management, and catalog quality flows
+- communication surfaces through email and Discord
+- provider and integration support seams
+- outbox, scheduler, and release-gate foundations
+
+Still active and incomplete:
+
+- full bounded-context extraction of `/api/v1/*`
+- tenant paid-SaaS completion
+- billing self-serve completeness
+- stronger value reporting
+- release-grade auth, portal, and billing hardening
+- remaining search fallback regression fixes
+
+### Current source-of-truth documents
+
+Project-wide master:
+
+- `project.md`
+
+Operator and repo entry:
+
+- `README.md`
+
+Primary active planning and execution docs:
+
+- `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/architecture/implementation-phase-roadmap.md`
+- `docs/development/implementation-progress.md`
+- `docs/development/backend-boundaries.md`
+- `docs/development/env-strategy.md`
+- `docs/development/roadmap-sprint-document-register.md`
+- `docs/development/sprint-13-16-user-surface-delivery-package.md`
+
+Operational and audience companion docs:
+
+- `docs/users/administrator-guide.md`
+- `docs/architecture/auth-rbac-multi-tenant-security-strategy.md`
+
+If any narrower doc conflicts with this baseline, update the narrower doc or update `project.md` explicitly. Do not let the inconsistency drift.
+
+## Active Upgrade Baseline
+
+The currently approved upgrade direction is:
+
+1. keep the live runtime stable
+2. continue upgrading the user-facing surfaces into one coherent SaaS product system
+3. continue reducing backend ownership ambiguity
+4. continue moving hidden operational assumptions into explicit code and documentation
+5. harden release discipline as real flows become tenant- and customer-facing
+
+### Current required upgrade tracks
+
+- public:
+  - preserve compact acquisition-first homepage posture
+  - preserve direct continuation into product and registration paths
+- tenant:
+  - continue hardening onboarding, billing, team, and role-safe operations
+- portal:
+  - continue productizing booking review and customer request flows
+- admin:
+  - continue support, billing-investigation, and operational trust workflows
+- backend:
+  - continue bounded-context router extraction and service ownership cleanup
+- auth:
+  - preserve actor-specific signing-secret separation
+- release discipline:
+  - extend search-grade rigor into auth, billing, portal, and support flows
+
+## Open Carry-Forward Items
+
+These items are explicitly open and should not be treated as resolved:
+
+- `backend/api/v1_routes.py` still needs bounded-context extraction
+- the repo still has a dual frontend reality:
+  - active Next.js root app
+  - legacy Vite subtree
+- two `backend/tests/test_api_v1_routes.py` public-web fallback cases are still failing and belong to the active search-hardening lane
+- tenant billing, invoice, payment-method, and value-reporting experience still need further productization
+- release gates for tenant auth, billing, and portal flows are not yet complete enough to be treated as fully closed
+
+## Decision Rules For Future Upgrades
+
+When future work changes scope, architecture, delivery sequence, or core implementation assumptions:
+
+- update `project.md` first
+- then update the active planning and execution docs
+- then update narrower requirement or audience docs
+
+When future work is only local or tactical, still check whether it changes:
+
+- active route ownership
+- active product surface ownership
+- auth or secret policy
+- sprint carry-forward scope
+- release criteria
+
+If yes, sync it back into `project.md`.
 
 ## Documentation Map
 
 ### Core documentation
 
 - [Project Documentation Root](./docs/README.md)
+- [Release Note - 2026-04-20 Homepage Product Live](./docs/development/release-note-2026-04-20-homepage-product-live.md)
+- [Investor Update - 2026-04-20](./docs/development/investor-update-2026-04-20.md)
 - [System Overview](./docs/architecture/system-overview.md)
 - [Module Hierarchy](./docs/architecture/module-hierarchy.md)
 - [Target Platform Architecture](./docs/architecture/target-platform-architecture.md)
@@ -524,6 +802,8 @@ This is intended to keep the current production site stable while evolving the p
 
 The synchronized documentation baseline now also includes a dedicated tenant app strategy covering:
 
+- tenant host and gateway role on `tenant.bookedai.au`
+- unified tenant sign-up, sign-in, and account ownership model
 - current tenant-facing reality versus internal admin reality
 - tenant app product role and operational goals
 - page families and information architecture
@@ -542,11 +822,36 @@ This is intended to help the team evolve from an internal admin console toward a
 Latest confirmed tenant baseline on `2026-04-18`:
 
 - standalone `TenantApp` now exists as a real tenant route entry, not just a planning target
+- `tenant.bookedai.au` is now the approved tenant-facing host and should be treated as the single tenant product gateway
 - tenant workspace now includes `overview`, `catalog`, `bookings`, and `integrations` panels
 - tenant catalog panel now uses the same search-result card language as the public search workspace
-- tenant Google sign-in now exists as the first tenant-safe authenticated path for write-enabled catalog actions
+- tenant sign-in now exists as the first tenant-safe authenticated path for write-enabled catalog actions
 - tenant website import now supports AI-guided extraction tuned toward booking-critical fields such as service name, duration, location, price, description, imagery, booking URL, and related booking metadata
 - tenant catalog snapshot now exposes search-readiness counts and review warnings so catalog quality can be managed inside the tenant surface instead of only through admin flows
+- the next required tenant upgrade is now locked in product scope: one canonical tenant account system should cover sign-up, sign-in, data input, reporting, subscription, invoice visibility, and billing actions rather than splitting those flows across multiple surfaces
+- migration-ready rollout for tenant membership and catalog publish-state now includes a repo-local apply helper plus an operator checklist for staging and shadow environments
+- migration-safe rollout now also includes a repo-local verification helper that can be used after apply or wired into the release gate when database access exists
+- tenant publish rollout now also has a dedicated production-shadow rehearsal checklist so beta or shadow validation can be run as a repeatable operational sequence
+- the first official sample tenant is now a chess-class onboarding sample derived from a real uploaded PDF source, giving the tenant-catalog lane one concrete non-website onboarding baseline to inherit from
+
+Latest confirmed tenant baseline on `2026-04-19`:
+
+- the tenant portal now behaves as one unified product gateway across `sign in`, `create account`, and `accept invite or claim workspace`
+- tenant password auth is live alongside Google continuation, and tenant sessions now survive reload and tenant switching safely
+- onboarding now includes business profile capture plus a visible progress model inside the tenant workspace
+- the tenant workspace now includes `billing` and `team` panels in addition to `overview`, `catalog`, `bookings`, and `integrations`
+- the billing workspace now includes self-serve billing setup, plan selection, trial-start or plan-switch actions, invoice-history seam, payment-method seam, billing settings, and billing audit trail
+- the tenant team workspace now includes membership roster, invite flow, and tenant role or status updates
+- the first tenant role model is now active:
+  - `tenant_admin`
+  - `finance_manager`
+  - `operator`
+- role-aware write rules are now part of the implemented product baseline:
+  - only `tenant_admin` and `finance_manager` can change billing setup or plans
+  - only `tenant_admin` can manage team membership and role changes
+  - only `tenant_admin` and `operator` can import, edit, publish, or archive catalog records
+- invite acceptance is now handled through the existing tenant claim path, so invited members can set their first password from the tenant portal
+- billing, profile, subscription, and team mutations now append tenant audit events so later support drill-ins have real evidence to inherit from
 
 ## Internal Admin Baseline
 

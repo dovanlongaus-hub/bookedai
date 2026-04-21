@@ -5,11 +5,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 FRONTEND_DIR="$ROOT_DIR/frontend"
 BACKEND_PYTHON="$ROOT_DIR/.venv-backend/bin/python"
+RUN_SEARCH_REPLAY_GATE="${RUN_SEARCH_REPLAY_GATE:-false}"
 
 echo "[release-gate] frontend build + smoke"
 (
   cd "$FRONTEND_DIR"
-  npm run test:release-gate
+  npm run test:playwright:smoke
 )
 
 if [[ ! -x "$BACKEND_PYTHON" ]]; then
@@ -23,5 +24,19 @@ echo "[release-gate] backend contract + lifecycle tests"
 
 echo "[release-gate] backend search eval pack"
 "$BACKEND_PYTHON" "$ROOT_DIR/scripts/run_search_eval_pack.py"
+
+if [[ "${RUN_SEARCH_REPLAY_GATE}" == "true" ]]; then
+  echo "[release-gate] production-shaped search replay gate"
+  python3 "$ROOT_DIR/scripts/run_search_replay_gate.py"
+else
+  echo "[release-gate] skipping production-shaped search replay gate (set RUN_SEARCH_REPLAY_GATE=true to enable)"
+fi
+
+if [[ -n "${DATABASE_URL:-}" ]] && command -v psql >/dev/null 2>&1; then
+  echo "[release-gate] backend migration state verification"
+  "$ROOT_DIR/scripts/verify_backend_migration_state.sh"
+else
+  echo "[release-gate] skipping backend migration state verification (DATABASE_URL or psql missing)"
+fi
 
 echo "[release-gate] all checks passed"

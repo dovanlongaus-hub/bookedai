@@ -4,6 +4,7 @@ from api import route_handlers as handlers
 from schemas import (
     AdminApiInventoryResponse,
     AdminBookingDetailResponse,
+    AdminPortalSupportActionResponse,
     AdminBookingsResponse,
     AdminConfigResponse,
     AdminDiscordHandoffResponse,
@@ -47,6 +48,12 @@ router.add_api_route(
     handlers.admin_booking_confirm_email,
     methods=["POST"],
     response_model=EmailSendResponse,
+)
+router.add_api_route(
+    "/admin/portal-support/{request_id}/{action}",
+    handlers.admin_portal_support_action,
+    methods=["POST"],
+    response_model=AdminPortalSupportActionResponse,
 )
 router.add_api_route(
     "/admin/reliability/handoff/discord",

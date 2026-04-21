@@ -1,15 +1,18 @@
 import type { ReactNode } from 'react';
 
 import {
+  adminHref,
   brandContactEmail,
   brandLinkedInHref,
   brandPositioning,
   brandWhatsAppHref,
   brandXHref,
   privacyHref,
+  productHref,
   roadmapHref,
+  tenantHref,
+  googleRegisterHref,
   termsHref,
-  videoDemoHref,
 } from './data';
 import { BrandLockup } from './ui/BrandLockup';
 import { SignalPill } from './ui/SignalPill';
@@ -21,9 +24,16 @@ import {
 type FooterProps = {
   onStartTrial: () => void;
   onBookDemo: () => void;
+  startTrialLabel?: string;
+  bookDemoLabel?: string;
 };
 
-export function Footer({ onStartTrial, onBookDemo }: FooterProps) {
+export function Footer({
+  onStartTrial,
+  onBookDemo,
+  startTrialLabel = 'Claim Free Setup',
+  bookDemoLabel = 'Open Product Demo',
+}: FooterProps) {
   const releaseBadgeLabel = getReleaseBadgeLabel();
   const releaseVersionLabel = getReleaseVersionLabel();
 
@@ -58,9 +68,9 @@ export function Footer({ onStartTrial, onBookDemo }: FooterProps) {
           <div className="grid gap-4">
             <div className="grid gap-3 sm:grid-cols-3">
               {[
-                ['Launch mode', 'Online first'],
-                ['Commercial model', 'Setup + subscription + commission'],
-                ['Operator view', 'Visible pipeline'],
+                ['Launch model', 'Starter to Pro to Pro Max'],
+                ['Commercial model', 'Setup fee + monthly + commission'],
+                ['Starting price', '49$+'],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-[1.25rem] bg-[#f5f5f7] px-4 py-4">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div>
@@ -75,14 +85,14 @@ export function Footer({ onStartTrial, onBookDemo }: FooterProps) {
                 onClick={onStartTrial}
                 className="booked-button px-4 py-2 font-semibold"
               >
-                Try Now
+                {startTrialLabel}
               </button>
               <button
                 type="button"
                 onClick={onBookDemo}
                 className="booked-button-secondary px-4 py-2 font-medium"
               >
-                Book a Demo
+                {bookDemoLabel}
               </button>
             </div>
           </div>
@@ -106,11 +116,20 @@ export function Footer({ onStartTrial, onBookDemo }: FooterProps) {
             </div>
           </div>
           <div className="flex flex-wrap gap-4">
-            <a href={videoDemoHref} className="template-link transition hover:underline">
-              Video Demo
+            <a href={productHref} className="template-link transition hover:underline">
+              Product Trial
             </a>
             <a href={roadmapHref} className="template-link transition hover:underline">
               Roadmap
+            </a>
+            <a href={tenantHref} className="template-link transition hover:underline">
+              Tenant
+            </a>
+            <a href={adminHref} className="template-link transition hover:underline">
+              Admin Login
+            </a>
+            <a href={googleRegisterHref} className="template-link transition hover:underline">
+              Google Register
             </a>
             <a href={privacyHref} className="template-link transition hover:underline">
               Privacy Policy

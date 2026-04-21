@@ -77,6 +77,8 @@ async function main() {
     });
   }
 
+  await killExistingPreviewServer(port);
+
   const preview = spawn(
     `npx vite preview --host 127.0.0.1 --port ${String(port)} --strictPort`,
     {

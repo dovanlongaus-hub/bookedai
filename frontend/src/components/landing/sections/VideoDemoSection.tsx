@@ -30,13 +30,13 @@ export function VideoDemoSection({ content }: VideoDemoSectionProps) {
           <div className="mt-8 flex flex-col gap-4 sm:flex-row">
             <a
               href={content.primaryHref}
-              className="rounded-full bg-slate-950 px-6 py-3 text-base font-semibold text-white transition hover:bg-slate-800"
+              className="booked-button"
             >
               {content.primaryCta}
             </a>
             <a
               href={content.secondaryHref}
-              className="rounded-full border border-black/10 bg-white px-6 py-3 text-base font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
+              className="booked-button-secondary"
             >
               {content.secondaryCta}
             </a>

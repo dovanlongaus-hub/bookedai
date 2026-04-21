@@ -1,6 +1,7 @@
 export type NavItem = {
   id: string;
   label: string;
+  href?: string;
 };
 
 export type LandingSpineItem = {
@@ -304,13 +305,22 @@ export type ImageUploadContent = SectionContent & {
 };
 
 export const primaryCtaHref =
-  '/?assistant=open';
+  '/register-interest?source_section=hero&source_cta=start_free_trial&source_detail=homepage_sales_deck&offer=launch10&deployment=standalone_website&setup=online';
 
-export const demoCtaHref =
-  '/?demo=open';
+export const productAppHref = 'https://product.bookedai.au/';
+
+export const demoAppHref = 'https://demo.bookedai.au/';
+
+export const demoCtaHref = demoAppHref;
+
+export const pitchDeckHref = '/pitch-deck';
 
 export const roadmapHref = '/roadmap';
-export const productHref = demoCtaHref;
+export const productHref = productAppHref;
+export const tenantHref = 'https://tenant.bookedai.au/';
+export const adminHref = 'https://admin.bookedai.au/';
+export const googleRegisterHref = `${tenantHref}?auth=create`;
+export const googleLoginHref = `${tenantHref}?auth=sign-in`;
 
 export const videoDemoHref = '/video-demo.html';
 
@@ -346,8 +356,8 @@ export const publicLandingSpine: LandingSpineItem[] = [
   { id: 'hero', label: 'Hero' },
   { id: 'problem', label: 'Problem', includeInNav: true },
   { id: 'solution', label: 'Solution', includeInNav: true },
-  { id: 'product-proof', label: 'Product Proof', includeInNav: true },
-  { id: 'booking-assistant', label: 'Live Assistant', includeInNav: true },
+  { id: 'product-proof', label: 'Product Demo', includeInNav: true },
+  { id: 'booking-assistant', label: 'Live Product', includeInNav: true },
   { id: 'trust', label: 'Trust', includeInNav: true },
   { id: 'partners', label: 'Partners', includeInNav: true },
   { id: 'team-members', label: 'Team Members', includeInNav: true },
@@ -361,16 +371,17 @@ export const navItems: NavItem[] = publicLandingSpine
   .map((item) => ({ id: item.id, label: item.label }));
 
 export const heroContent: HeroContent = {
-  eyebrow: 'The AI Revenue Engine That Turns Conversations Into Revenue',
-  title: 'Turn Any Kind of Conversations Into Your Revenue.',
-  bodyLead: 'BookedAI captures inbound demand across website chat, calls, email, and follow-up, then moves customers into the right booking path without adding admin overhead.',
+  eyebrow: 'Built for service-business growth',
+  title: 'Convert more enquiries into real bookings.',
+  bodyLead:
+    'BookedAI answers, qualifies, and moves customers to the next step without making your team chase every lead manually.',
   bodyRest:
-    'Built for service operators that want one premium system for qualification, booking, payment readiness, and revenue recovery workflows.',
-  note: 'More bookings generated, less manual follow-up, and clearer revenue visibility from first enquiry to confirmed outcome.',
-  primaryCta: 'Try Now',
-  secondaryCta: 'View Demo',
-  primaryHref: primaryCtaHref,
-  secondaryHref: productHref,
+    'One product handles website enquiries, calls, follow-up, and booking handoff in a cleaner revenue flow.',
+  note: 'Fast setup, clear buying path, and a launch-ready experience for modern service brands.',
+  primaryCta: 'See Live Demo',
+  secondaryCta: 'Get Early Access',
+  primaryHref: productHref,
+  secondaryHref: '/register-interest',
 };
 
 export const demoContent: DemoContent = {
@@ -435,15 +446,14 @@ export const proofContent: ProofContent = {
   channels: [
     'Web chat',
     'Phone calls',
-    'WhatsApp',
-    'Calendar',
-    'Automations',
+    'SMS follow-up',
+    'Booking handoff',
   ],
   section: {
     kicker: 'Solution',
     kickerClassName: 'text-sky-400',
-    title: 'A revenue engine built for service operators',
-    body: 'BookedAI gives service businesses one clear system to capture demand faster, qualify it better, and move real enquiries into booked revenue.',
+    title: 'A cleaner revenue flow for SMEs and investor conversations',
+    body: 'BookedAI makes the commercial story simple: capture demand, qualify intent, and move the right customer into a booking-ready next step.',
   },
 };
 
@@ -454,19 +464,14 @@ export const proofItems: ProofItem[] = [
     body: 'Every inbound message gets a fast first response before the lead chooses someone else.',
   },
   {
-    eyebrow: 'Operational value',
-    title: 'Cut repetitive admin',
-    body: 'Qualification happens up front, so the team spends less time repeating questions.',
-  },
-  {
-    eyebrow: 'Expansion logic',
-    title: 'Repeat across service verticals',
-    body: 'The same engine can work across clinics, salons, trades, events, and other service-led workflows.',
+    eyebrow: 'Conversion quality',
+    title: 'Guide the customer to the right next step',
+    body: 'BookedAI qualifies intent early so the buyer sees a clearer recommendation instead of a generic reply.',
   },
   {
     eyebrow: 'Workflow continuity',
-    title: 'Keep the workflow connected',
-    body: 'Booking, payment, reminders, escalation, and follow-up stay connected after the chat ends.',
+    title: 'Keep booking, payment, and follow-up connected',
+    body: 'The commercial path stays attached after the conversation ends, so teams can close more without losing context.',
   },
 ];
 
@@ -523,8 +528,8 @@ export const solutionContent: SectionContent = {
 export const implementationContent: SectionContent = {
   kicker: 'Implementation',
   kickerClassName: 'text-cyan-500',
-  title: 'Start standalone now, extend into widget, plugin, or mobile later',
-  body: 'Launch BookedAI as a hosted conversion surface first, then expand into an embedded assistant, plugin-integrated workflow, or future mobile experience without changing the core revenue engine.',
+  title: 'Launch fast on the website, then expand into tenant and operator workflows when ready',
+  body: 'Start with one clear customer-facing booking flow, then extend into the tenant workspace, admin oversight, Google sign-in, and deeper automation without rebuilding the core revenue path.',
 };
 
 export const solutionCards: InfoCard[] = [
@@ -558,32 +563,32 @@ export const metrics: Metric[] = [
 export const pricingContent: PricingContent = {
   kicker: 'Pricing',
   kickerClassName: 'text-indigo-400',
-  title: 'Simple entry pricing with a clear rollout path',
-  body: 'Start with a low-friction trial and onboarding path, then move into the commercial model that matches your rollout stage.',
-  planLabel: 'Starter plan',
-  planPrice: 'A$79/mo',
-  planCaption: 'after your 30-day free subscription period',
+  title: 'Freemium first. Pro when ready. Pro Max when revenue operations need more depth.',
+  body: 'Start light, move into a paid rollout when the conversion path is proven, and keep the commercial model easy for both SME buyers and investors to understand.',
+  planLabel: 'Starting plan',
+  planPrice: '49$+',
+  planCaption: 'entry pricing for SMEs launching BookedAI on a clean customer flow',
   planFeatures: [
-    'Instant AI replies',
-    'Smart lead qualification',
-    'Google Calendar booking',
-    'n8n automation for follow-up and reminders',
-    'Online setup review for your service workflow',
+    'Plans start from 49$+',
+    'Lightweight entry path for low-friction activation',
+    '1 month free on Pro and Pro Max',
+    'Setup fee quoted clearly when rollout scope needs it',
+    'Commission charged only on successful BookedAI-attributed bookings',
   ],
-  primaryCta: 'Try Now',
-  primaryHref: primaryCtaHref,
+  primaryCta: 'Open Product Trial',
+  primaryHref: productHref,
 };
 
 export const ctaContent: CallToActionContent = {
   kicker: 'Call to action',
-  title: 'Ready to turn conversations into revenue with BookedAI?',
-  body: 'If the conversational flow, proof, and booking path all make sense, this is the moment to start the next commercial step.',
-  primaryCta: 'Try Now',
-  secondaryCta: 'Book a Demo',
-  primaryHref: primaryCtaHref,
-  secondaryHref: demoCtaHref,
+  title: 'Ready to launch BookedAI into your revenue flow?',
+  body: 'Open the live product trial or talk to us about a rollout that fits your service business now and scales as operations get deeper.',
+  primaryCta: 'Open Product Trial',
+  secondaryCta: 'Talk to Sales',
+  primaryHref: productHref,
+  secondaryHref: '/register-interest',
   supportingText:
-    'Prefer email? Reach us at info@bookedai.au and we will help map your booking flow.',
+    'Prefer to start with access and account setup? Use the tenant gateway for Google register/login, or go straight to admin and roadmap from the homepage menu.',
 };
 
 export const trustItems: TrustItem[] = [
@@ -591,37 +596,37 @@ export const trustItems: TrustItem[] = [
     name: 'Ava',
     business: 'Clinic manager, Inner West',
     quote:
-      'BookedAI helped us respond after hours without making the experience feel robotic. The biggest win was fewer missed booking requests by the next morning.',
+      'BookedAI made after-hours enquiries feel covered instead of lost. We stopped waking up to a messy callback queue and started seeing clearer booking intent by morning.',
   },
   {
     name: 'Marcus',
     business: 'Salon owner, Surry Hills',
     quote:
-      'The handoff felt practical. Straightforward bookings stayed automated, and edge cases still came through to the team with the details we needed.',
+      'The value was not just the chat. It moved real customers toward the right service and left the team only the exceptions worth handling.',
   },
   {
     name: 'Priya',
     business: 'Operations lead, mobile trades team',
     quote:
-      'What mattered to us was speed and consistency. The workflow was clearer than a generic AI widget and closer to how a real commercial front desk would qualify jobs.',
+      'It felt closer to a revenue workflow than a generic AI widget. We could see what was qualified, what needed follow-up, and where the commercial handoff should happen.',
   },
 ];
 
 export const faqItems: FAQItem[] = [
   {
-    question: 'What counts as a qualified booking?',
+    question: 'How does the freemium model work?',
     answer:
-      'A qualified booking is an enquiry that matches your service criteria and reaches the agreed booking-ready stage in your workflow.',
+      'Freemium is the low-friction entry point for SMEs that want to test the BookedAI flow quickly. When you need stronger automation, guided booking, and deeper revenue operations, you move up to Pro or Pro Max.',
   },
   {
-    question: 'Can BookedAI hand conversations to my team?',
+    question: 'What do I pay after the launch offer?',
     answer:
-      'Yes. When an enquiry needs a person, BookedAI can route it to your team with the captured context so follow-up is faster.',
+      'After the first 10-SME free setup cohort, BookedAI charges a clear setup fee, then a monthly plan, and only adds commission when BookedAI is helping generate real booked outcomes through the installed flow.',
   },
   {
-    question: 'Do I need to change my calendar or tools?',
+    question: 'Can I use Google sign-in and a tenant workspace?',
     answer:
-      'No full stack change is required. BookedAI is designed to work with your existing calendar and workflow setup, including follow-up automations.',
+      'Yes. SMEs can use the tenant gateway for account creation and Google login, while operators and internal teams can continue into tenant and admin workflows as the rollout matures.',
   },
 ];
 
@@ -902,10 +907,10 @@ export const technicalArchitectureContent: TechnicalArchitectureContent = {
 export const roadmapContent: RoadmapContent = {
   kicker: 'Roadmap',
   kickerClassName: 'text-slate-500',
-  title: 'A delivery plan that connects product polish, architecture depth, and operational readiness',
-  body: 'The roadmap is organized around the architectures already defined, then expanded into phased execution so each release moves both the customer experience and the backend platform forward together.',
+  title: 'A delivery plan that keeps core journeys stable while turning the homepage into a sharper SME acquisition surface',
+  body: 'The roadmap now puts dependable user, tenant, admin, search, payment, email-confirmation, and portal-revisit flows first, while also keeping the public homepage clear enough to convert SMEs, reassure investors, and route traffic into the right runtime.',
   lead:
-    'The roadmap now reads as an operating view: compact phase timing first, agent clusters second, then expandable delivery detail only when you want to drill deeper.',
+    'The roadmap now reads in priority order: lock the core journey first, keep the homepage concise and commercially clear, route live product intent into product.bookedai.au, bring real SMEs in through standalone or full-portal paths, refine each module second, review advanced, legal, and role-shaped data third, then keep release hardening running underneath every step.',
   architectures: [
     {
       title: 'Customer experience architecture',
@@ -1307,63 +1312,65 @@ export const roadmapContent: RoadmapContent = {
   phases: [
     {
       name: 'Phase 1',
-      timing: 'Foundation',
-      windowLabel: 'Sprint S1-S3',
-      focusLabel: 'Landing story, roadmap shell, admin baseline, typed contracts',
-      milestoneLabel: 'Dedicated roadmap page and operator baseline are already live',
-      summary: 'Establish the baseline product story, core booking flow, and operator visibility.',
+      timing: 'Core Stability',
+      windowLabel: 'Priority 1',
+      focusLabel: 'Simple but stable public, tenant, admin, search, payment, email, portal revisit, and public brand pull',
+      milestoneLabel: 'The repo already has the main surfaces; the priority is making the end-to-end flow dependable while keeping the public layer attractive to investors, users, and real SME customers',
+      summary: 'Lock the simplest user-visible journeys first so public users, tenants, and admins can all complete the core flow reliably, while the public-facing brand still feels premium and commercially convincing.',
       tasks: [
-        { title: 'Redesign the homepage with premium whitespace, stronger typography, and investor-facing narrative', status: 'In Progress' },
-        { title: 'Ship mobile-style search previews for swim-school and restaurant discovery flows', status: 'In Progress' },
-        { title: 'Stabilize booking assistant entry points across the site', status: 'Completed' },
-        { title: 'Unify public and admin contracts for booking state visibility', status: 'In Progress' },
-        { title: 'Expose admin metrics, recent events, and route inventory', status: 'Completed' },
-        { title: 'Move architecture depth and delivery tracking into a dedicated roadmap page', status: 'Completed' },
+        { title: 'Turn homepage into the main public acquisition surface and route deeper app interaction into product and demo surfaces', status: 'Completed' },
+        { title: 'Add launch-offer CTA for free online setup for the first 10 SME customers', status: 'Completed' },
+        { title: 'Rename public package vocabulary to Freemium, Pro, and Pro Max with clearer SME benefits', status: 'Completed' },
+        { title: 'Expose direct public entry links for roadmap, tenant, admin login, and tenant Google register/login', status: 'Completed' },
+        { title: 'Add QR-led and email-led interested-registration flow that feeds the BookedAI setup and pricing path', status: 'Planned' },
+        { title: 'Keep public, tenant, and admin entry flows simple and stable before adding more surface area', status: 'In Progress' },
+        { title: 'Make search accurate enough to show the correct results and render them consistently', status: 'In Progress' },
+        { title: 'Protect the booking handoff, payment flow, and confirmation email as one dependable chain', status: 'In Progress' },
+        { title: 'Keep the customer portal revisit flow reachable through QR and resilient after confirmation', status: 'Planned' },
+        { title: 'Preserve premium branding and investor-facing clarity on the public surface while hardening the core flow', status: 'In Progress' },
+        { title: 'Bring real SME customers live first through standalone mode or linked full-portal paths for validation', status: 'Planned' },
+        { title: 'Stabilize shared contracts so public, tenant, and admin all read the same booking truth', status: 'In Progress' },
+        { title: 'Preserve operator visibility for recent events, route inventory, and reliability checks', status: 'Completed' },
       ],
     },
     {
       name: 'Phase 2',
-      timing: 'Booking Intelligence',
-      windowLabel: 'Sprint S3-S6',
-      focusLabel: 'Search quality, trust-first routing, booking context, and safer escalation',
-      milestoneLabel: 'Prompt 9 search quality is live, but feedback loops and industry-aware routing still need work',
-      summary: 'Deepen qualification, ranking, and trust so conversations become cleaner and safer booking outcomes.',
+      timing: 'Module Refinement',
+      windowLabel: 'Priority 2',
+      focusLabel: 'Refine each module in detail after the core journey is stable',
+      milestoneLabel: 'Search, portal, payment, tenant, and admin foundations exist; the next step is sharper module-level quality',
+      summary: 'Upgrade each module one by one so the product becomes clearer, deeper, and more operationally complete without destabilizing the core flow.',
       tasks: [
-        { title: 'Expand structured lead qualification fields per service type', status: 'In Progress' },
-        { title: 'Add richer search result ranking and trust diagnostics', status: 'In Progress' },
-        { title: 'Keep non-search-ready catalog rows out of live search and expose operator remediation', status: 'Completed' },
-        { title: 'Protect core search intents with a fixed-query eval pack and regression coverage', status: 'In Progress' },
-        { title: 'Improve human escalation paths for high-value enquiries', status: 'Planned' },
-        { title: 'Refine prompt routing by industry and booking intent', status: 'In Progress' },
-        { title: 'Normalize downstream booking payloads before workflow handoff', status: 'In Progress' },
-        { title: 'Introduce review feedback loops for quality tuning', status: 'Planned' },
+        { title: 'Deepen search ranking, trust diagnostics, and operator feedback loops without changing the stable core path', status: 'In Progress' },
+        { title: 'Refine tenant workspace details, onboarding templates, and catalog publishing workflows', status: 'Planned' },
+        { title: 'Refine admin workspaces, diagnostics, retry drill-ins, and issue-first tooling by module', status: 'In Progress' },
+        { title: 'Improve payment recovery, lifecycle messaging, and portal detail UX in focused slices', status: 'In Progress' },
+        { title: 'Broaden pricing, package, and CRM milestone modules only after the main flow stays dependable', status: 'Planned' },
+        { title: 'Expand reporting, attribution, and visibility cards where operators need clearer detail', status: 'Planned' },
       ],
     },
     {
       name: 'Phase 3',
-      timing: 'Commercial Expansion',
-      windowLabel: 'Sprint S5-S8',
-      focusLabel: 'Pricing conversion, payment resilience, packages, and CRM-linked milestones',
-      milestoneLabel: 'Shared pricing contracts are in place while revenue-path hardening continues',
-      summary: 'Connect more revenue-critical systems so BookedAI can support a broader go-to-market motion.',
+      timing: 'Advanced and Legal',
+      windowLabel: 'Priority 3',
+      focusLabel: 'Review advanced features, legal readiness, and per-user-group data detail after the platform is dependable',
+      milestoneLabel: 'Advanced orchestration should wait until the stable flow and module detail layers are already working well',
+      summary: 'Only after the product is stable and refined should advanced workflows, legal review, and detailed data shaping per user group become the main focus.',
       tasks: [
-        { title: 'Broaden pricing and plan conversion flows', status: 'In Progress' },
-        { title: 'Protect pricing consultation, plan-return, and demo sync flows with browser smoke coverage', status: 'Completed' },
-        { title: 'Cover pricing cancelled-state messaging and retry-ready public banner behavior', status: 'Completed' },
-        { title: 'Deepen payment state recovery for interrupted checkouts', status: 'In Progress' },
-        { title: 'Add category-specific packages for vertical onboarding', status: 'Planned' },
-        { title: 'Expand partner proof with tighter responsive cards and case-study depth', status: 'In Progress' },
-        { title: 'Link CRM and lifecycle automation into booking milestones', status: 'Planned' },
-        { title: 'Create onboarding templates for swim schools, restaurants, clinics, and salons', status: 'Planned' },
+        { title: 'Review advanced routing, recovery, and automation features only after simpler flows are stable', status: 'Planned' },
+        { title: 'Audit legal, consent, privacy, and policy requirements across booking, payment, email, and portal surfaces', status: 'Planned' },
+        { title: 'Define more detailed field sets and visibility rules for each user group', status: 'In Progress' },
+        { title: 'Refine role matrix, permission boundaries, and tenant-scoped data behavior', status: 'In Progress' },
+        { title: 'Harden auditability for advanced workflows before broadening automation power', status: 'Planned' },
       ],
     },
     {
       name: 'Phase 4',
-      timing: 'Scale and Reliability',
-      windowLabel: 'Sprint S7-S10',
-      focusLabel: 'Prompt 10/11 reliability, protected re-auth, release gate, and operational guardrails',
-      milestoneLabel: 'Admin reliability workspace and release-gate foundations are already active',
-      summary: 'Strengthen observability, operational safety, and production readiness for larger rollout volumes.',
+      timing: 'Release and Scale',
+      windowLabel: 'Cross-cutting support',
+      focusLabel: 'Release gates, retry truth, observability, and scale guardrails that support all three priority phases',
+      milestoneLabel: 'Admin reliability workspace and release-gate foundations are already active and should stay underneath every phase',
+      summary: 'Keep release discipline, operational safety, and production readiness running continuously while the phased priorities advance.',
       tasks: [
         { title: 'Add deployment health and release-readiness checklists', status: 'In Progress' },
         { title: 'Track conversion, fulfilment, and drift metrics end to end', status: 'In Progress' },
@@ -1405,7 +1412,7 @@ export const roadmapContent: RoadmapContent = {
       windowLabel: 'M0 • Sprint 1-2',
       focusLabel: 'Lock production contracts, inventory flows, and release discipline',
       milestoneLabel: 'Baseline architecture and release framing are already in repo',
-      summary: 'Production baseline and architectural inventory were locked first so later refactors could move faster with less ambiguity.',
+      summary: 'Production baseline and architectural inventory were locked first so the homepage can now be repositioned cleanly as a sales deck while deeper product behavior stays in dedicated runtimes.',
       evidence:
         'Architecture docs, roadmap page, deploy scripts, route inventory work, and release notes are already reflected in repo structure and documentation.',
       mainGap:
@@ -1443,7 +1450,7 @@ export const roadmapContent: RoadmapContent = {
       windowLabel: 'M0 • Sprint 2',
       focusLabel: 'Bound service seams, shared contracts, and adapter boundaries',
       milestoneLabel: 'Public/admin and backend modules are already split into safer seams',
-      summary: 'This sprint establishes modular foundations so new work lands in bounded modules instead of giant handlers or page shells.',
+      summary: 'This sprint establishes modular foundations so the homepage, product demo, registration path, and operational surfaces can evolve without collapsing back into one mixed shell.',
       evidence:
         '`frontend/src/features/admin/*`, `frontend/src/shared/contracts/*`, `backend/service_layer/*`, `backend/repositories/*`, and `backend/core/*` are already active.',
       mainGap:
@@ -1472,7 +1479,7 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Sprint 3',
-      phaseName: 'Phase 2',
+      phaseName: 'Phase 1',
       timing: 'Platform safety tables',
       status: 'In Progress',
       windowLabel: 'M1 • Sprint 3',
@@ -1509,7 +1516,7 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Sprint 4',
-      phaseName: 'Phase 2',
+      phaseName: 'Phase 1',
       timing: 'Dual-write mirrors',
       status: 'In Progress',
       windowLabel: 'M1 • Sprint 4',
@@ -1546,7 +1553,7 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Sprint 5',
-      phaseName: 'Phase 2',
+      phaseName: 'Phase 1',
       timing: 'Domain API v1 foundation',
       status: 'Completed',
       windowLabel: 'M2 • Sprint 5',
@@ -1583,7 +1590,7 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Sprint 6',
-      phaseName: 'Phase 2',
+      phaseName: 'Phase 1',
       timing: 'Matching and trust',
       status: 'In Progress',
       windowLabel: 'M2 • Sprint 6',
@@ -1629,23 +1636,28 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Sprint 7',
-      phaseName: 'Phase 3',
+      phaseName: 'Phase 2',
       timing: 'Public growth uplift',
       status: 'In Progress',
       windowLabel: 'M3 • Sprint 7',
-      focusLabel: 'Pricing conversion, attribution, public trust education, and GTM surfaces',
-      milestoneLabel: 'Public roadmap/demo/pricing surface is already much stronger than the original baseline',
-      summary: 'This sprint strengthens the acquisition and conversion layer without sacrificing the trust-first product story.',
+      focusLabel: 'Homepage sales-deck uplift, pricing clarity, and SME acquisition surfaces',
+      milestoneLabel: 'Public roadmap, demo, pricing, and proof surfaces are already stronger; now they need tighter module-level completion and clearer live SME onboarding paths',
+      summary: 'This sprint focuses on making the homepage sell more clearly: launch offer, product-demo separation, product-host trial routing, pricing clarity, Google-auth tenant entry, and clearer paths for SMEs to launch standalone first or connect into the wider BookedAI portal experience.',
       evidence:
-        'Public landing/demo work, partner-wall upgrades, standalone roadmap page, and pricing/demo smoke coverage are all present in repo.',
+        'Public landing/demo work, standalone roadmap page, direct product-host trial routing, tenant Google-auth entry links, and pricing/demo smoke coverage are all present in repo.',
       mainGap:
-        'Connect attribution, conversion instrumentation, package positioning, and cancelled-state loops into more measurable growth outcomes.',
+        'Connect attribution, conversion instrumentation, QR/email lead capture, and cancelled-state loops into more measurable growth outcomes.',
       nextPrompt: 'Prompt 6, Prompt 16, Prompt 17',
       ownerGroup: 'Frontend rollout',
       agents: ['Locke', 'Raman', 'Meitner', 'PM Integrator'],
       tasks: [
         { title: 'Strengthen pricing/demo conversion and banner states', status: 'Completed' },
         { title: 'Improve partner proof and public storytelling surfaces', status: 'In Progress' },
+        { title: 'Reframe homepage as the main public acquisition surface and move deeper runtime behavior into product/demo surfaces', status: 'Completed' },
+        { title: 'Add first-10-SME free-setup CTA and Freemium or Pro or Pro Max package framing', status: 'Completed' },
+        { title: 'Route primary homepage trial intent into product.bookedai.au and expose direct roadmap or tenant or admin entry links', status: 'Completed' },
+        { title: 'Clarify standalone SME launch path versus linked full-portal path on public-facing conversion surfaces', status: 'In Progress' },
+        { title: 'Add QR registration and interested-lead email flow', status: 'Planned' },
         { title: 'Connect attribution and GTM loops into measurable growth metrics', status: 'Planned' },
       ],
       references: [
@@ -1663,13 +1675,13 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Sprint 8',
-      phaseName: 'Phase 4',
+      phaseName: 'Phase 2',
       timing: 'Admin ops modularization',
       status: 'In Progress',
       windowLabel: 'M3 • Sprint 8',
-      focusLabel: 'Issue-first admin IA, reliability workspace, and deep-linkable operator lanes',
-      milestoneLabel: 'Admin is already a workspace shell instead of one giant ops page',
-      summary: 'Admin is being reshaped into issue-first operator lanes so reliability, ops, and catalog workflows scale without one mega dashboard.',
+      focusLabel: 'Admin module refinement, issue-first IA, and deeper operator tooling',
+      milestoneLabel: 'Admin is already a workspace shell; the next step is deeper module detail and better diagnostics',
+      summary: 'Admin continues to move from broad shell work into sharper module-level tooling so operators can work faster without adding clutter.',
       evidence:
         '`AdminPage` is now a composition shell, with feature-local modules, reliability workspace split, panel deep-links, and lazy drill-down modules.',
       mainGap:
@@ -1697,13 +1709,13 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Sprint 9',
-      phaseName: 'Phase 4',
+      phaseName: 'Phase 3',
       timing: 'Tenant foundation',
       status: 'In Progress',
       windowLabel: 'M4 • Sprint 9',
-      focusLabel: 'Tenant-safe APIs, role model, permission abstraction, and lifecycle-safe shell',
-      milestoneLabel: 'Tenant-aware data seams exist, but the first tenant product shell is still pending',
-      summary: 'The platform is structurally approaching tenant-safe rollout, but the tenant-facing product shell and scoped views are not finished yet.',
+      focusLabel: 'Role model, permission abstraction, and user-group-shaped tenant data',
+      milestoneLabel: 'Tenant-aware data seams exist; the next layer is cleaner role, permission, and per-user-group detail',
+      summary: 'This sprint shifts toward the more advanced layer where tenant permissions, scoped data, and group-specific behavior are made explicit.',
       evidence:
         'Tenant-aware repository context, `tenant_mode_enabled`, default tenant seed, and tenant-aware mirror writes are already present.',
       mainGap:
@@ -1834,9 +1846,9 @@ export const fallbackPartners: FeaturedPartner[] = [
     id: 'future-swim-caringbah',
     name: 'Future Swim Caringbah',
     category: 'Client Example',
-    websiteUrl: 'https://bookedai.au',
+    websiteUrl: 'https://futureswim.com.au/locations/caringbah/',
     description:
-      'Swim school example used on the landing page to demonstrate a real enquiry-to-booking flow for parents searching nearby lessons.',
+      'Official swim-school tenant example used to demonstrate nearby kids lesson discovery and enquiry-to-booking flows for parents.',
     logoUrl:
       'https://images.pexels.com/photos/1263348/pexels-photo-1263348.jpeg?auto=compress&cs=tinysrgb&w=1200',
     imageUrl:

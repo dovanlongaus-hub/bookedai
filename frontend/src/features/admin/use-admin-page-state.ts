@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from 'react';
 
 import {
+  applyAdminPortalSupportAction,
   deleteAdminPartner,
   deleteAdminService,
   downloadAdminServiceQualityExport,
@@ -73,6 +74,8 @@ export function useAdminPageState(apiBaseUrl: string) {
   const [confirmNote, setConfirmNote] = useState('');
   const [sendingConfirmation, setSendingConfirmation] = useState(false);
   const [confirmationMessage, setConfirmationMessage] = useState('');
+  const [portalSupportActionMessage, setPortalSupportActionMessage] = useState('');
+  const [portalSupportActionSubmittingId, setPortalSupportActionSubmittingId] = useState<number | null>(null);
   const [loggingIn, setLoggingIn] = useState(false);
   const [loadingDashboard, setLoadingDashboard] = useState(false);
   const [bookingsViewEnabled, setBookingsViewEnabled] = useState(false);
@@ -112,6 +115,7 @@ export function useAdminPageState(apiBaseUrl: string) {
     setPartnerMessage('');
     setServiceMessage('');
     setConfirmationMessage('');
+    setPortalSupportActionMessage('');
     setConfirmNote('');
     setBookingsViewEnabled(false);
     setBookingsShadowStatus('disabled');
@@ -284,6 +288,43 @@ export function useAdminPageState(apiBaseUrl: string) {
       setError(message);
     } finally {
       setLoadingDashboard(false);
+    }
+  }
+
+  async function applyPortalSupportAction(
+    requestId: number,
+    action: 'reviewed' | 'escalated',
+    note?: string | null,
+  ) {
+    if (!sessionToken) {
+      return;
+    }
+    setPortalSupportActionSubmittingId(requestId);
+    setPortalSupportActionMessage('');
+    setError('');
+
+    try {
+      const response = await applyAdminPortalSupportAction(
+        apiBaseUrl,
+        sessionToken,
+        requestId,
+        action,
+        note ?? null,
+      );
+      setPortalSupportActionMessage(response.message);
+      await loadDashboard();
+    } catch (requestError) {
+      const message = resolveErrorMessage(
+        requestError,
+        'Could not update the portal support request.',
+      );
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setError(message);
+    } finally {
+      setPortalSupportActionSubmittingId(null);
     }
   }
 
@@ -560,6 +601,8 @@ export function useAdminPageState(apiBaseUrl: string) {
     setConfirmNote,
     sendingConfirmation,
     confirmationMessage,
+    portalSupportActionMessage,
+    portalSupportActionSubmittingId,
     loggingIn,
     loadingDashboard,
     bookingsViewEnabled,
@@ -583,6 +626,7 @@ export function useAdminPageState(apiBaseUrl: string) {
     handleLogin,
     handleLogout,
     sendConfirmationEmail,
+    applyPortalSupportAction,
     editPartner,
     resetPartnerForm,
     uploadPartnerAsset,

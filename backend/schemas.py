@@ -160,11 +160,39 @@ class AdminTimelineEvent(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class AdminPortalSupportQueueItem(BaseModel):
+    queue_item_id: str
+    id: int
+    source_kind: str | None = None
+    request_type: str
+    booking_reference: str | None = None
+    booking_status: str | None = None
+    service_name: str | None = None
+    business_name: str | None = None
+    customer_name: str | None = None
+    customer_email: str | None = None
+    support_email: str | None = None
+    preferred_date: str | None = None
+    preferred_time: str | None = None
+    timezone: str | None = None
+    customer_note: str | None = None
+    created_at: str
+    outbox_event_id: int | None = None
+    outbox_status: str | None = None
+    outbox_available_at: str | None = None
+    resolution_status: str | None = None
+    resolution_note: str | None = None
+    resolved_at: str | None = None
+    resolved_by: str | None = None
+    action_request_id: int | None = None
+
+
 class AdminOverviewResponse(BaseModel):
     status: str
     metrics: list[AdminMetricCard]
     recent_bookings: list[AdminBookingRecord]
     recent_events: list[AdminTimelineEvent]
+    portal_support_queue: list[AdminPortalSupportQueueItem] = Field(default_factory=list)
 
 
 class AdminBookingsResponse(BaseModel):
@@ -181,6 +209,17 @@ class AdminBookingDetailResponse(BaseModel):
 
 class AdminBookingConfirmationRequest(BaseModel):
     note: str | None = Field(default=None, max_length=1000)
+
+
+class AdminPortalSupportActionRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class AdminPortalSupportActionResponse(BaseModel):
+    status: str
+    request_id: int
+    action: str
+    message: str
 
 
 class AdminDiscordHandoffRequest(BaseModel):
@@ -293,6 +332,8 @@ class ServiceCatalogItem(BaseModel):
     summary: str
     duration_minutes: int = Field(gt=0)
     amount_aud: float = Field(gt=0)
+    currency_code: str = Field(default="AUD", max_length=8)
+    display_price: str | None = Field(default=None, max_length=255)
     image_url: str | None = Field(default=None, max_length=500)
     map_snapshot_url: str | None = Field(default=None, max_length=500)
     venue_name: str | None = Field(default=None, max_length=200)
@@ -417,6 +458,7 @@ class PricingConsultationResponse(BaseModel):
     status: str
     consultation_reference: str
     plan_id: Literal["basic", "standard", "pro"]
+    package_name: str
     plan_name: str
     amount_aud: float = Field(gt=0)
     amount_label: str
@@ -505,3 +547,30 @@ class DemoBookingSyncResponse(BaseModel):
     meeting_event_url: str | None = None
     email_status: Literal["sent", "pending_manual_followup"] | None = None
     confirmation_message: str
+
+
+class PublicDemoImportRequest(BaseModel):
+    website_url: str = Field(min_length=4, max_length=500)
+    business_name: str | None = Field(default=None, max_length=255)
+    category: str | None = Field(default=None, max_length=100)
+
+
+class PublicDemoImportItem(BaseModel):
+    name: str
+    category: str | None = None
+    summary: str | None = None
+    amount_aud: float | None = None
+    duration_minutes: int | None = None
+    venue_name: str | None = None
+    location: str | None = None
+    booking_url: str | None = None
+    image_url: str | None = None
+    tags: list[str] = Field(default_factory=list)
+
+
+class PublicDemoImportResponse(BaseModel):
+    status: str
+    business_name: str
+    website_url: str
+    services: list[PublicDemoImportItem]
+    service_count: int

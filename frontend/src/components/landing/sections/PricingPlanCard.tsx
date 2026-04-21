@@ -171,7 +171,7 @@ export function PricingPlanCard({
         <button
           type="button"
           onClick={() => onOpenConsultation(plan.id, 'book_plan')}
-          className={`mt-8 flex w-full items-center justify-center gap-2 px-5 py-4 text-sm font-semibold ${ctaClassName}`}
+          className={`mt-8 flex w-full items-center justify-center gap-2 ${ctaClassName}`}
         >
           {plan.ctaLabel}
           <ArrowIcon />

@@ -14,6 +14,26 @@ It is intended for:
 
 Date of plan: `2026-04-17`
 
+This package should now also be read together with:
+
+- `docs/development/intelligent-search-core-review-and-upgrade-plan-2026-04-19.md`
+
+## 2026-04-18 Tenant-Positive Chess Verification Update
+
+The search-quality lane now also depends on `backend/migrations/sql/009_co_mai_hung_chess_published_pilot_row.sql`.
+
+That migration adds exactly one curated `published` chess row for `co-mai-hung-chess-class` in `Sydney`, so BookedAI can verify a real tenant-positive path for queries such as `chess classes in Sydney` without promoting the original brochure-derived PDF rows out of `review`.
+
+Live validation after applying that migration on `2026-04-18` confirmed:
+
+- `chess classes in Sydney` now returns `co-mai-hung-chess-sydney-pilot-group` from `service_catalog`
+- `chess near me` still returns a location warning and no stale shortlist, which keeps the `near me` fail-safe behavior intact even after tenant-positive chess coverage was introduced
+- the homepage runtime has now been tightened to mirror that backend truth more closely:
+  - recommendation-led live-read results are displayed before any UI-side locality sorting can distort them
+  - `near me` plus denied location permission suppresses the shortlist entirely
+  - a lightweight query-intent display filter blocks same-category but wrong-topic noise such as swim-school rows from outranking a chess query on the homepage surface
+  - homepage priority search now also scores customer-visible results by `intent/content match first`, then `location fit`, so same-category tenant rows are not allowed to surface unless their content actually matches what the customer typed
+
 ## Current baseline
 
 As of `2026-04-17`, the repo already has a real search-quality lane in production-shaped code:
@@ -51,6 +71,36 @@ Current upgrade focus as of `2026-04-18`:
 - treat this lane as the active intelligent search and booking upgrade slice because it directly improves search-to-booking trust
 - use OpenAI Responses API `web_search` as the official public internet-search fallback after tenant miss, rather than adding a second search engine integration in this sprint
 - verify the tenant-first/public-web-second behavior with targeted E2E coverage on the public homepage assistant surface
+
+Planning refinement recorded on `2026-04-19`:
+
+- the intelligent-search lane has now been re-reviewed against the active code-aligned execution baseline
+- the next upgrade wave is now explicitly framed as:
+  - canonical query understanding
+  - intent-first tenant retrieval and ranking
+  - richer booking-decision detail shaping
+  - homepage truth convergence
+  - replay and release-threshold expansion
+
+Implementation start recorded on `2026-04-19`:
+
+- Phase `S6-A` is now actively implemented, not just planned
+- `/api/v1/matching/search` now carries a canonical `query_understanding` payload so search meaning is shared across backend and homepage runtime
+- homepage intent-priority filtering now prefers backend-supplied intent terms before UI-local heuristics, which reduces drift between API truth and visible shortlist order
+- Phase `S6-C` has now also started in code:
+  - backend applies a deterministic post-gate ranking policy
+  - catalog recommendations now ship in backend-ranked top-3 order
+  - homepage recommendation-led ordering can therefore stay closer to API truth and rely less on UI-side rescue sorting
+- Phase `S6-E` has now started as well:
+  - candidate payloads now carry booking-decision detail fields such as `why_this_matches`, `source_label`, `price_posture`, `booking_path_type`, `next_step`, `availability_state`, and `booking_confidence`
+  - shared shortlist cards now surface more of that detail directly so customers can compare options without guessing what is tenant-backed, public-web sourced, booking-ready, or still review-first
+- the product-route booking dialog now follows a stricter interaction sequence:
+  - live search renders the shortlist first
+  - tapping a shortlist item opens a preview popup instead of immediately jumping into booking
+  - the preview popup now includes tenant or provider-facing detail such as provider identity, location, trust signal, and next-step context
+  - closing the preview returns the user to the shortlist unchanged
+  - pressing `Book this service` from preview is now the only action that commits the service into the booking form
+  - booking success now scrolls the user into the confirmed or thank-you state instead of leaving the UI in an editable form context
 
 ## Delivery goal
 
@@ -108,6 +158,21 @@ Targeted public assistant E2E coverage verified on `2026-04-18`:
 - tenant miss renders sourced public web results from the OpenAI fallback path
 - loading state shows `BookedAI is finding the best option for your request.`
 - stale shortlist rows are hidden while a new search is resolving
+- `near me` searches now also stay grounded to live-read truth on the homepage runtime:
+  - `restaurant near me` shows the location-permission warning and suppresses legacy hospitality noise
+  - `dentist near me`, `haircut near me`, and `childcare near me` keep the shortlist empty when location permission is missing instead of reviving legacy wrong-domain rows
+
+Popup assistant regression expansion recorded on `2026-04-19`:
+
+- the dedicated `BookingAssistantDialog` product-route surface now has targeted browser coverage instead of relying only on homepage-shell regressions
+- guarded popup paths now include:
+  - `tenant-first` dialog search truth for direct-intent tenant-backed results such as `chess classes in Sydney`
+  - `public-web` dialog fallback truth when tenant catalog strength is insufficient
+  - `near me` dialog fail-safe behavior when location permission is unavailable
+  - `wrong-domain suppression` dialog behavior when only weak city-only or stale legacy rows exist
+  - `preview-before-booking` dialog behavior so result inspection and booking commitment are separated
+  - `confirmed-state-after-submit` dialog behavior so successful bookings end on a clear confirmation surface
+- this closes the earlier gap where homepage live-read truth was better protected than the standalone popup/product dialog runtime
 
 Current guarded tests live in:
 
@@ -139,6 +204,28 @@ Follow-up remediation validated on `2026-04-18`:
 - residual live gap:
   - some hospitality queries such as `restaurant table for 6 in Sydney tonight` still return `results: []` from the OpenAI web-search step itself, even after technical fallback repair
   - this is now a prompt-policy / retrieval-coverage issue rather than an API-contract failure
+
+Final production validation snapshot recorded later on `2026-04-18`:
+
+- unsupported `temperature` was removed from the live OpenAI request after confirming the Responses API rejected it for the deployed model
+- stack health passed again at `2026-04-18T16:35:01Z`
+- direct live checks then confirmed visible `public_web_search` results for:
+  - `restaurant table for 6 in Sydney tonight`
+  - `dentist checkup in Sydney CBD this weekend`
+  - `childcare near Sydney for a 4 year old`
+  - `private dining in Melbourne for 8 this Friday night`
+- a point-in-time 7-case English replay snapshot then produced:
+- a point-in-time 7-case English replay snapshot then produced:
+  - `web_fallback = 4`
+  - `missing_catalog = 2`
+  - `blocked_by_gates = 1`
+  - `tenant_hit = 0`
+- the replay corpus has since been expanded with 5 production-validated tenant-positive cases, and a targeted run confirmed:
+  - `tenant_hit = 5`
+  - `expectation_mismatches = 0`
+- this means Sprint 6 search quality has now materially progressed from “wrong results shown” to “strict truth plus sourced fallback,” but the lane still needs:
+  - stronger hospitality stability across repeated runs
+  - better coverage for `support worker` and intermittent `physio` fallback misses
 
 ### Workstream A — Search telemetry foundation
 
@@ -353,6 +440,12 @@ Current recommendation, based on official OpenAI model documentation reviewed on
 - frontend type-check and build coverage for admin feedback UI
 - evaluation harness run against both fixed-query and replay datasets
 - release-gate document updated to state how Sprint 6 search changes are promoted or held
+- product-route browser checks should now also verify:
+  - shortlist visible before booking state
+  - preview popup opens on result tap
+  - preview dismiss returns to search
+  - `Book` from preview enters booking details and focuses the first customer field
+  - successful submit transitions to the confirmed or thank-you state
 
 ## Risks to watch
 
@@ -371,8 +464,20 @@ Current recommendation, based on official OpenAI model documentation reviewed on
 - admin operators can record structured search-quality feedback
 - search-to-booking context is clearer and more normalized than the current lightweight hint model
 - `missing_catalog` outcomes can be handed off cleanly into the Phase 4 tenant-catalog backlog, including cases like `swimming Sydney` where BookedAI needs real SME product data before search can succeed
+- the public product dialog keeps one explicit customer sequence:
+  - search shortlist
+  - preview with tenant info
+  - optional dismiss back to shortlist
+  - explicit book action into booking form
+  - confirmed or thank-you state after booking creation
 
 ## Related references
+
+- `2026-04-18` live validation after removing unsupported `temperature` from the OpenAI web-search request confirmed the production fallback path was healthy again:
+  - stack health check passed at `2026-04-18T16:35:01Z`
+  - `physio for shoulder pain near Parramatta tomorrow morning` returned `public_web_search` results with booking URLs and time-aware explanations
+  - `restaurant table for 6 in Sydney tonight` returned 3 hospitality web results (`Hinchcliff House`, `Viand Club`, `Park Hyatt Sydney Dining`) instead of an empty state or wrong-domain catalog rows
+  - production state after this rollout is now `tenant-first, public-web-second`, with hospitality rescue pass active and no unsupported OpenAI parameters in the live request payload
 
 - [Implementation Progress](./implementation-progress.md)
 - [Roadmap Sprint Document Register](./roadmap-sprint-document-register.md)

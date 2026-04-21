@@ -19,7 +19,7 @@ export function AdminBookingTableRow({
     <button
       type="button"
       onClick={() => onSelectBooking(booking.booking_reference)}
-      className={`grid w-full grid-cols-[160px_1fr_1.1fr_1fr_120px_150px] gap-3 border-t border-slate-200 px-4 py-4 text-left text-sm transition hover:bg-slate-50 ${
+      className={`booked-admin-bookings-table w-full gap-3 border-t border-slate-200 px-4 py-4 text-left text-sm transition hover:bg-slate-50 ${
         enhancedViewEnabled && isSelected ? 'bg-sky-50/70' : ''
       }`}
     >

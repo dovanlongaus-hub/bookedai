@@ -12,6 +12,18 @@ const ProductApp = lazy(async () => {
   const module = await import('../apps/public/ProductApp');
   return { default: module.ProductApp };
 });
+const RegisterInterestApp = lazy(async () => {
+  const module = await import('../apps/public/RegisterInterestApp');
+  return { default: module.RegisterInterestApp };
+});
+const DemoLandingApp = lazy(async () => {
+  const module = await import('../apps/public/DemoLandingApp');
+  return { default: module.DemoLandingApp };
+});
+const FutureSwimApp = lazy(async () => {
+  const module = await import('../apps/public/FutureSwimApp');
+  return { default: module.FutureSwimApp };
+});
 const PitchDeckApp = lazy(async () => {
   const module = await import('../apps/public/PitchDeckApp');
   return { default: module.PitchDeckApp };
@@ -23,6 +35,10 @@ const RoadmapApp = lazy(async () => {
 const TenantApp = lazy(async () => {
   const module = await import('../apps/tenant/TenantApp');
   return { default: module.TenantApp };
+});
+const PortalApp = lazy(async () => {
+  const module = await import('../apps/portal/PortalApp');
+  return { default: module.PortalApp };
 });
 
 function isAdminRuntime() {
@@ -70,6 +86,41 @@ function isProductRuntime() {
   );
 }
 
+function isRegisterInterestRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname, pathname } = window.location;
+  return (
+    hostname === 'register.bookedai.au' ||
+    pathname === '/register-interest' ||
+    pathname === '/register-interest/'
+  );
+}
+
+function isDemoRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname, pathname } = window.location;
+  return hostname === 'demo.bookedai.au' || pathname === '/demo' || pathname === '/demo/';
+}
+
+function isFutureSwimRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname, pathname } = window.location;
+  return (
+    hostname === 'futureswim.bookedai.au' ||
+    pathname === '/futureswim' ||
+    pathname === '/futureswim/'
+  );
+}
+
 function isTenantRuntime() {
   if (typeof window === 'undefined') {
     return false;
@@ -79,18 +130,29 @@ function isTenantRuntime() {
   return hostname === 'tenant.bookedai.au' || pathname === '/tenant' || pathname.startsWith('/tenant/');
 }
 
+function isPortalRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname, pathname } = window.location;
+  return hostname === 'portal.bookedai.au' || pathname === '/portal' || pathname.startsWith('/portal/');
+}
+
 export function AppRouter() {
   const fallback = (
-    <main className="booked-runtime-shell bookedai-brand-shell lg:px-8">
-      <div className="booked-runtime-card bookedai-stage-frame border-white/10 bg-[rgba(11,16,32,0.88)] text-white">
-        <div className="booked-runtime-eyebrow text-[var(--bookedai-primary-blue)]">BookedAI runtime</div>
-        <h1 className="booked-title mt-3 text-2xl font-bold text-white">
-          Loading application shell
-        </h1>
-        <p className="booked-body mt-3 max-w-2xl text-sm leading-6 text-white/70">
-          Route-level code splitting is enabled so public, product, roadmap, tenant, and admin
-          runtimes can load their own bundles more efficiently.
-        </p>
+    <main className="booked-runtime-shell booked-page-shell">
+      <div className="booked-page-frame">
+        <div className="booked-runtime-card">
+          <div className="booked-runtime-eyebrow text-[var(--apple-blue)]">BookedAI runtime</div>
+          <h1 className="booked-title mt-3 text-2xl font-bold text-[var(--apple-near-black)]">
+            Loading application shell
+          </h1>
+          <p className="booked-body mt-3 max-w-2xl text-sm leading-6 text-black/66">
+            Route-level code splitting is enabled so public, product, roadmap, tenant, and admin
+            runtimes can load their own bundles more efficiently.
+          </p>
+        </div>
       </div>
     </main>
   );
@@ -111,15 +173,40 @@ export function AppRouter() {
     );
   }
 
+  if (isRegisterInterestRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <RegisterInterestApp />
+      </Suspense>
+    );
+  }
+
+  if (isDemoRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <DemoLandingApp />
+      </Suspense>
+    );
+  }
+
+  if (isFutureSwimRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <FutureSwimApp />
+      </Suspense>
+    );
+  }
+
   if (isRoadmapRuntime()) {
     return (
       <Suspense fallback={fallback}>
         <RoadmapApp
           onStartTrial={() => {
-            window.location.href = '/?assistant=open';
+            window.location.href =
+              '/register-interest?source_section=call_to_action&source_cta=start_free_trial&source_detail=roadmap_runtime&offer=launch10&deployment=standalone_website&setup=online';
           }}
           onBookDemo={() => {
-            window.location.href = '/?demo=open';
+            window.location.href = 'https://product.bookedai.au/';
           }}
         />
       </Suspense>
@@ -138,6 +225,14 @@ export function AppRouter() {
     return (
       <Suspense fallback={fallback}>
         <TenantApp />
+      </Suspense>
+    );
+  }
+
+  if (isPortalRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <PortalApp />
       </Suspense>
     );
   }

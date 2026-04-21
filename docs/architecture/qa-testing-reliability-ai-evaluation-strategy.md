@@ -179,6 +179,29 @@ Each flow should have:
 
 Current repo already confirms service-ranking and location heuristics in [backend/services.py](../../backend/services.py), but does not yet confirm a dedicated automated matching test suite.
 
+### Production replay threshold policy
+
+For the active intelligent-search lane, matching quality should now also be evaluated through replay cohorts that mirror the live `tenant-first, public-web-second` design.
+
+Required cohorts:
+
+- `tenant-positive cohort`
+  - verifies that known good catalog rows win when they satisfy service, location, and category constraints
+- `public-web fallback cohort`
+  - verifies that tenant miss cases use sourced public web results when safe enough, without leaking wrong-domain tenant rows
+
+Current minimum thresholds for promote-or-hold review:
+
+- tenant-positive cohort:
+  - `100% tenant_hit`
+  - `0 expectation mismatches`
+- public-web fallback cohort:
+  - `>= 4/7` sourced fallback outcomes in the current baseline
+  - `0` wrong-domain tenant leaks
+  - safe no-result is acceptable only when no display-safe fallback survives the gates
+
+This threshold set is intentionally precision-first. It is acceptable for fallback recall to be incomplete while the engine is still being hardened, but it is not acceptable to reintroduce wrong-domain or wrong-location results just to raise the visible result count.
+
 ## Section 5 — Booking trust tests
 
 ### Critical behaviors to test

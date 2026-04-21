@@ -10,10 +10,12 @@ The roadmap now assumes:
 - the product must work across search, website, calls, email, follow-up, and payments
 - revenue visibility, missed revenue, attribution, and commission are first-class delivery targets
 - pricing is setup fee plus performance-based commission
+- `tenant.bookedai.au` should become the unified tenant product gateway for sign-up, sign-in, data input, reporting, subscription, and billing
 
 This roadmap aligns with:
 
 - `docs/architecture/bookedai-master-prd.md`
+- `docs/architecture/current-phase-sprint-execution-plan.md`
 - `docs/architecture/phase-0-detailed-implementation-plan.md`
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
 - `docs/architecture/target-platform-architecture.md`
@@ -25,6 +27,8 @@ This roadmap aligns with:
 ## Planning principles
 
 - keep current production continuity first
+- lock the simplest end-to-end user-visible journeys before widening scope
+- prioritize stable public, tenant, admin, search, payment, email-confirmation, and portal revisit flows ahead of feature breadth
 - prioritize direct revenue capture and booking conversion over brochure expansion
 - keep the public homepage lean so search, shortlist, booking, and confirmation have maximum practical space
 - treat mobile-first responsive execution as a hard requirement for any public conversion surface
@@ -33,7 +37,24 @@ This roadmap aligns with:
 - build the data model for revenue, missed revenue, attribution, and commission before overbuilding UI
 - keep rollout additive and feature-flagged
 - preserve one shared commercial truth across public, tenant, and admin surfaces
+- preserve one shared package vocabulary across public docs and UI:
+  `Freemium`, `Pro`, `Pro Max`, plus the explicit `First 10 SMEs` launch offer
 - build test runners as delivery infrastructure, not as end-of-program polish
+
+## Priority reset locked from `2026-04-19`
+
+All remaining roadmap sequencing should now be interpreted through these priority bands:
+
+1. `Priority 1 - Core journey stability first`
+   Public user, tenant, and admin flows must be simple, understandable, and stable before deeper expansion. The highest-priority paths are accurate search results, booking handoff, payment completion, confirmation email, and QR-enabled portal revisit.
+   This priority still includes keeping the public brand attractive to investors and end users so the stable journey is also commercially convincing, not merely operationally correct.
+   The homepage itself should now be treated as a `sales deck and acquisition surface first`, while deeper app runtime behavior should increasingly live under `product/demo`.
+2. `Priority 2 - Module-by-module refinement second`
+   After the core journeys are stable, each module should be upgraded in detail: tenant workspace, admin diagnostics, catalog workflows, portal UX, payment recovery, lifecycle communication, and reporting slices.
+3. `Priority 3 - Advanced, legal, and role-shaped data last`
+   Advanced orchestration, legal and compliance review, and detailed data shaping per user group should be reviewed only after the core and module layers are dependable.
+
+Release hardening, regression coverage, and promotion gates remain mandatory throughout, but they should support the three priorities above rather than pull focus away from them.
 
 ## Execution dependency rule
 
@@ -117,26 +138,37 @@ Owns:
 | Phase | Name | Primary outcome |
 |---|---|---|
 | 0 | Narrative and architecture reset | one aligned revenue-engine definition across docs and product surfaces |
-| 1 | Public growth and premium landing rebuild | premium public positioning, hero UI, multi-channel story, pricing explanation |
-| 2 | Commercial data foundation | revenue, attribution, missed revenue, payment, and commission domain models plus repository-ready verification seams |
-| 3 | Multi-channel capture and conversion engine | search, website, calls, email, and follow-up normalized into one conversion flow plus first trust-sensitive runner coverage |
-| 4 | Revenue workspace and reporting | tenant-facing revenue dashboard, funnel metrics, missed revenue, commission visibility, and reporting contract checks |
-| 5 | Recovery, payments, and commission operations | recovery workflows, payment-linked reporting, commission support, reconciliation, and integration-runner coverage |
-| 6 | Optimization, evaluation, and scale hardening | closed-loop tuning, release gating, reporting quality, SaaS hardening, and consolidated runner suites |
-| 7 | Tenant revenue workspace | tenant-facing operational revenue product with action queues and lifecycle visibility |
-| 8 | Internal admin optimization and support platform | issue-first commercial support, reconciliation, and audit-ready admin operations |
-| 9 | QA, release discipline, and scale hardening | regression protection, telemetry, release gates, rollback discipline, scale readiness, and release-grade runner enforcement |
+| 1 | Core user journey stability and public pull | stable public user, tenant, and admin journeys with accurate search, payment, confirmation email, QR portal revisit, and a public-facing brand strong enough to attract investors, users, and real SME demand |
+| 2 | Module-by-module refinement | deeper improvements across tenant, admin, portal, catalog, reporting, lifecycle, and payment-support modules |
+| 3 | Advanced controls, legal, and user-group data | advanced features reviewed after core stability, including legal readiness and more detailed data models per user group |
+| 4 | Release, regression, and scale hardening | release-gate discipline, observability, rollback readiness, and scale-safe promotion rules |
 
 ## Current implementation snapshot
 
-Date: `2026-04-18`
+Date: `2026-04-21`
 
 The current repo already has valuable production foundations:
 
 - public marketing and demo flows
+- root Next.js marketing surface under `app/` and `components/`
+- a legacy Vite-driven `frontend/` subtree still present for deeper product or fixture-oriented surfaces
 - admin interface
 - routed customer portal host for booking-detail continuation on `portal.bookedai.au`
 - additive `/api/v1/*` contract seams
+- a now-partially-split top-level backend router under:
+  - `public_catalog_routes`
+  - `upload_routes`
+  - `webhook_routes`
+  - `admin_routes`
+  - `communication_routes`
+  - bounded-context `v1_router`
+- bounded-context `/api/v1/*` route modules under:
+  - `v1_booking_routes`
+  - `v1_search_routes`
+  - `v1_tenant_routes`
+  - `v1_communication_routes`
+  - `v1_integration_routes`
+- first extracted tenant handler module at `backend/api/v1_tenant_handlers.py`
 - search and matching quality work
 - Stripe checkout initiation
 - calendar and email integrations
@@ -155,6 +187,41 @@ The next roadmap change is to organize it under the revenue-engine model and fil
 - recovery workflow reporting
 - tenant-facing commercial visibility
 - customer-facing booking portal continuity after confirmation through a dedicated routed production host
+
+Current execution interpretation now locked from `2026-04-20`:
+
+- the repo should be treated as having already completed substantial parts of Phase 1, Phase 3, Phase 7, and Phase 8 at implementation-foundation level
+- later roadmap or sprint planning should not describe public search, tenant workspace, admin workspace, or release tooling as not-yet-started where working code already exists
+- the active delivery emphasis after this date is stable completion of the core public, tenant, admin, payment, email-confirmation, and portal revisit journeys before broadening scope
+- the public-facing layer must still preserve premium branding, investor-facing credibility, and user attraction while those core flows are being hardened
+- the public homepage should now prioritize compact revenue-engine storytelling, launch-offer conversion, and clear runtime entrypoints instead of acting like the full live runtime
+- the current approved public pricing vocabulary is now locked as `Freemium`, `Pro`, and `Pro Max`, with the higher-touch registration-only lane allowed to expose `Advance Customize` as the custom commercial path
+- `bookedai.au` is now live on that tighter homepage posture, with primary trial CTA routing centered on `product.bookedai.au`, direct menu entry into `roadmap`, `tenant`, and `admin`, and Google register/login entry routed through `tenant.bookedai.au`
+- the whole product app experience should still be framed more clearly under `product/demo`, with homepage previews pointing into that deeper lane
+- real SME acquisition should be treated as a live validation lane, whether each SME runs first in standalone mode or through a linked full BookedAI portal path
+- module-level polish, advanced features, legal review, and user-group-specific data depth should be sequenced only after those core journeys are dependable
+
+Additional execution interpretation locked from `2026-04-21`:
+
+- the backend should now be treated as having started bounded-context router extraction, but not finished it
+- later planning should not describe backend routing as one untouched monolith only
+- the remaining major router debt is concentrated in `backend/api/v1_routes.py`
+- the active extraction order is now:
+  - `tenant`
+  - `portal`
+  - `integrations`
+  - `communications`
+  - `search_matching`
+  - `booking`
+- auth hardening should now inherit actor-specific session-signing secrets as the approved baseline:
+  - `SESSION_SIGNING_SECRET`
+  - `TENANT_SESSION_SIGNING_SECRET`
+  - `ADMIN_SESSION_SIGNING_SECRET`
+- legacy `ADMIN_API_TOKEN` and `ADMIN_PASSWORD` fallback should be treated as compatibility support during migration, not the target end-state architecture
+
+Operational companion for this roadmap:
+
+- `docs/development/project-plan-code-audit-2026-04-19.md`
 
 ## Phase 0 - Narrative and architecture reset
 
@@ -183,14 +250,11 @@ Ship a premium but lightweight public growth surface that clearly explains Booke
 ### Scope
 
 - new hero and brand system
-- multi-channel demand capture narrative
-- revenue loss problem section
-- how-it-works section
-- revenue engine feature section
-- industry use cases
-- revenue dashboard preview
-- pricing section with setup fee plus commission
-- comparison section
+- larger revenue-engine logo treatment and shorter homepage message stack
+- direct route menu for roadmap, tenant, admin login, and Google register/login
+- public proof section that points clearly into `product.bookedai.au`
+- pricing section with freemium, Pro, Pro Max, setup fee, and commission framing
+- first-10-SME launch offer plus one-month-free positioning
 - FAQ and final CTA
 
 ### Mandatory public UI blocks
@@ -219,8 +283,12 @@ Current implementation evidence:
 
 - the revenue-engine logo family and live icon assets were refreshed and deployed on `2026-04-18`
 - production and beta now serve the approved revenue-engine favicon path instead of the retired legacy favicon reference
-- the live homepage shell was further upgraded on `2026-04-18` into a more professional workspace-style search runtime with a clearer top navigation, stronger search command surface, clearer shortlist hierarchy, and a dedicated booking rail
-- responsive and live-read regression coverage has been re-run against that shell, so later roadmap work should inherit the current `workspace-style homepage search runtime` baseline instead of the older inline-dialog or long-spine interpretations
+- the live public baseline changed again on `2026-04-20`: `bookedai.au` now serves the tighter `PublicApp` homepage runtime instead of the interim pitch-deck apex-domain routing
+- homepage CTA structure now routes primary trial intent into `product.bookedai.au`, while sales-contact intent continues into `register-interest` and `product` or `demo` remain the deeper proof and runtime surfaces
+- the homepage now includes larger revenue-engine branding, a reduced section stack, a clearer route menu, explicit Google register/login utility links, renamed pricing tiers `Freemium`, `Pro`, and `Pro Max`, and shorter copy tuned to both SME buyers and investor review
+- the registration and offer surfaces now expose `Advance Customize` as the custom commercial path above `Pro Max`, while still preserving backward-compatible upgrade query aliases behind the scenes
+- the product runtime now also includes direct `Start Free Trial` continuation into the same registration funnel, which keeps live-product evaluation and homepage conversion on one commercial path
+- responsive/build verification and live production redeploy were re-run against that newer homepage baseline on `2026-04-20`
 
 ## Phase 2 - Commercial data foundation
 
@@ -536,25 +604,28 @@ Focus:
 
 Focus:
 
-- internal admin commercial IA
-- tenant drill-ins
-- issue-first operational workflows
+- canonical tenant host and unified auth
+- create account, claim, and invite-acceptance flows
+- onboarding progress and business profile capture
+- first tenant team and role baseline
 
 ### Sprint 14 - Pending
 
 Focus:
 
-- admin support tooling
-- audit-ready intervention model
-- rollout readiness for tenant and admin surfaces
+- tenant billing workspace
+- self-serve billing setup, plan and trial state
+- invoice and payment-method seams
+- team workspace and role-aware tenant actions
 
 ### Sprint 15 - Pending
 
 Focus:
 
+- tenant value and retention messaging
+- invite-delivery and first-login polish
+- remaining role-aware write gates
 - telemetry and replay readiness
-- commercial regression coverage
-- cross-surface consistency validation
 
 ### Sprint 16 - Pending
 
@@ -563,6 +634,7 @@ Focus:
 - release gates
 - rollback discipline
 - scale-readiness review
+- auth, invite, role, catalog, and billing rollout hardening
 
 ## Cross-phase dependencies
 

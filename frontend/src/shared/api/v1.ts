@@ -23,6 +23,9 @@ import type {
   IntegrationReconciliationSummaryResponse,
   IntegrationRuntimeActivityResponse,
   OutboxDispatchedAuditResponse,
+  PortalBookingActionRequest,
+  PortalBookingActionResponse,
+  PortalBookingDetailResponse,
   ReplayOutboxEventRequest,
   ReplayOutboxEventResponse,
   ResolveBookingPathRequest,
@@ -41,8 +44,25 @@ import type {
   TenantCatalogResponse,
   TenantGoogleAuthRequest,
   TenantAuthSessionResponse,
+  TenantBillingResponse,
+  TenantBillingAccountUpdateRequest,
+  TenantBillingWorkspaceResponse,
+  TenantBillingReceiptResponse,
+  TenantClaimAccountRequest,
+  TenantCreateAccountRequest,
+  TenantInviteMemberRequest,
+  TenantPasswordAuthRequest,
+  TenantProfileUpdateRequest,
+  TenantProfileUpdateResponse,
+  TenantSubscriptionUpdateRequest,
   TenantIntegrationsResponse,
+  TenantIntegrationProviderUpdateRequest,
+  TenantOnboardingResponse,
   TenantOverviewResponse,
+  TenantRevenueMetrics,
+  TenantTeamResponse,
+  TenantTeamInviteActionResponse,
+  TenantUpdateMemberAccessRequest,
 } from '../contracts';
 import type { MatchCandidate, MatchConfidence } from '../contracts';
 
@@ -169,6 +189,8 @@ function normalizeMatchCandidate(value: unknown): MatchCandidate {
     sourceUrl: readString(candidate, 'source_url', 'sourceUrl'),
     imageUrl: readString(candidate, 'image_url', 'imageUrl'),
     amountAud: readNumber(candidate, 'amount_aud', 'amountAud'),
+    currencyCode: readString(candidate, 'currency_code', 'currencyCode'),
+    displayPrice: readString(candidate, 'display_price', 'displayPrice'),
     durationMinutes: readNumber(candidate, 'duration_minutes', 'durationMinutes'),
     tags: readStringList(candidate, 'tags'),
     featured: readBoolean(candidate, 'featured'),
@@ -179,6 +201,13 @@ function normalizeMatchCandidate(value: unknown): MatchCandidate {
     isPreferred: readBoolean(candidate, 'is_preferred', 'isPreferred'),
     displaySummary: readString(candidate, 'display_summary', 'displaySummary'),
     explanation: readString(candidate, 'explanation'),
+    whyThisMatches: readString(candidate, 'why_this_matches', 'whyThisMatches'),
+    sourceLabel: readString(candidate, 'source_label', 'sourceLabel'),
+    pricePosture: readString(candidate, 'price_posture', 'pricePosture'),
+    bookingPathType: readString(candidate, 'booking_path_type', 'bookingPathType'),
+    nextStep: readString(candidate, 'next_step', 'nextStep'),
+    availabilityState: readString(candidate, 'availability_state', 'availabilityState'),
+    bookingConfidence: readString(candidate, 'booking_confidence', 'bookingConfidence'),
   };
 }
 
@@ -237,6 +266,82 @@ function normalizeSearchCandidatesEnvelope(
             scheduleHint: readString(data.booking_context, 'schedule_hint', 'scheduleHint'),
             intentLabel: readString(data.booking_context, 'intent_label', 'intentLabel'),
             summary: readString(data.booking_context, 'summary'),
+          }
+        : null,
+      query_understanding: isRecord(data.query_understanding)
+        ? {
+            normalizedQuery: readString(
+              data.query_understanding,
+              'normalized_query',
+              'normalizedQuery',
+            ),
+            inferredLocation: readString(
+              data.query_understanding,
+              'inferred_location',
+              'inferredLocation',
+            ),
+            locationTerms: readStringList(
+              data.query_understanding,
+              'location_terms',
+              'locationTerms',
+            ),
+            coreIntentTerms: readStringList(
+              data.query_understanding,
+              'core_intent_terms',
+              'coreIntentTerms',
+            ),
+            expandedIntentTerms: readStringList(
+              data.query_understanding,
+              'expanded_intent_terms',
+              'expandedIntentTerms',
+            ),
+            constraintTerms: readStringList(
+              data.query_understanding,
+              'constraint_terms',
+              'constraintTerms',
+            ),
+            requestedCategory: readString(
+              data.query_understanding,
+              'requested_category',
+              'requestedCategory',
+            ),
+            budgetLimit: readNumber(
+              data.query_understanding,
+              'budget_limit',
+              'budgetLimit',
+            ),
+            nearMeRequested: readBoolean(
+              data.query_understanding,
+              'near_me_requested',
+              'nearMeRequested',
+            ),
+            isChatStyle: readBoolean(
+              data.query_understanding,
+              'is_chat_style',
+              'isChatStyle',
+            ),
+            requestedDate: readString(
+              data.query_understanding,
+              'requested_date',
+              'requestedDate',
+            ),
+            requestedTime: readString(
+              data.query_understanding,
+              'requested_time',
+              'requestedTime',
+            ),
+            scheduleHint: readString(
+              data.query_understanding,
+              'schedule_hint',
+              'scheduleHint',
+            ),
+            partySize: readNumber(data.query_understanding, 'party_size', 'partySize'),
+            intentLabel: readString(
+              data.query_understanding,
+              'intent_label',
+              'intentLabel',
+            ),
+            summary: readString(data.query_understanding, 'summary'),
           }
         : null,
       semantic_assist: isRecord(data.semantic_assist)
@@ -479,20 +584,258 @@ export async function getTenantOverview(tenantRef?: string | null) {
   return requestV1Envelope<TenantOverviewResponse>(`/v1/tenant/overview${query}`);
 }
 
+export async function getTenantRevenueMetrics(
+  tenantRef?: string | null,
+  sessionToken?: string | null,
+) {
+  const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantRevenueMetrics>(`/v1/tenant/revenue-metrics${query}`, {
+    headers,
+  });
+}
+
 export async function getTenantBookings(tenantRef?: string | null) {
   const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
   return requestV1Envelope<TenantBookingsResponse>(`/v1/tenant/bookings${query}`);
 }
 
-export async function getTenantIntegrations(tenantRef?: string | null) {
+export async function getTenantIntegrations(tenantRef?: string | null, sessionToken?: string | null) {
   const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
-  return requestV1Envelope<TenantIntegrationsResponse>(`/v1/tenant/integrations${query}`);
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantIntegrationsResponse>(`/v1/tenant/integrations${query}`, { headers });
+}
+
+export async function updateTenantIntegrationProvider(
+  provider: string,
+  request: TenantIntegrationProviderUpdateRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantIntegrationsResponse>(
+    `/v1/tenant/integrations/providers/${encodeURIComponent(provider)}${query}`,
+    withJsonBody(request, { method: 'PATCH', headers }),
+  );
+}
+
+export async function getTenantBilling(tenantRef?: string | null, sessionToken?: string | null) {
+  const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantBillingResponse>(`/v1/tenant/billing${query}`, { headers });
+}
+
+export async function getTenantOnboarding(tenantRef?: string | null, sessionToken?: string | null) {
+  const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantOnboardingResponse>(`/v1/tenant/onboarding${query}`, { headers });
+}
+
+export async function getTenantTeam(tenantRef?: string | null, sessionToken?: string | null) {
+  const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantTeamResponse>(`/v1/tenant/team${query}`, { headers });
+}
+
+export async function getPortalBookingDetail(bookingReference: string) {
+  return requestV1Envelope<PortalBookingDetailResponse>(
+    `/v1/portal/bookings/${encodeURIComponent(bookingReference)}`,
+  );
+}
+
+export async function requestPortalBookingReschedule(
+  bookingReference: string,
+  request: PortalBookingActionRequest,
+) {
+  return requestV1Envelope<PortalBookingActionResponse>(
+    `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/reschedule-request`,
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+export async function requestPortalBookingCancellation(
+  bookingReference: string,
+  request: PortalBookingActionRequest,
+) {
+  return requestV1Envelope<PortalBookingActionResponse>(
+    `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/cancel-request`,
+    withJsonBody(request, { method: 'POST' }),
+  );
 }
 
 export async function tenantGoogleAuth(request: TenantGoogleAuthRequest) {
   return requestV1Envelope<TenantAuthSessionResponse>(
     '/v1/tenant/auth/google',
     withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+export async function tenantPasswordAuth(request: TenantPasswordAuthRequest) {
+  return requestV1Envelope<TenantAuthSessionResponse>(
+    '/v1/tenant/auth/password',
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+export async function tenantCreateAccount(request: TenantCreateAccountRequest) {
+  return requestV1Envelope<TenantAuthSessionResponse>(
+    '/v1/tenant/account/create',
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+export async function tenantClaimAccount(request: TenantClaimAccountRequest) {
+  return requestV1Envelope<TenantAuthSessionResponse>(
+    '/v1/tenant/account/claim',
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+export async function updateTenantProfile(
+  request: TenantProfileUpdateRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantProfileUpdateResponse>(
+    `/v1/tenant/profile${query}`,
+    withJsonBody(request, { method: 'PATCH', headers }),
+  );
+}
+
+export async function updateTenantBillingAccount(
+  request: TenantBillingAccountUpdateRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantBillingWorkspaceResponse>(
+    `/v1/tenant/billing/account${query}`,
+    withJsonBody(request, { method: 'PATCH', headers }),
+  );
+}
+
+export async function updateTenantSubscription(
+  request: TenantSubscriptionUpdateRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantBillingWorkspaceResponse>(
+    `/v1/tenant/billing/subscription${query}`,
+    withJsonBody(request, { method: 'POST', headers }),
+  );
+}
+
+export async function markTenantBillingInvoicePaid(
+  invoiceId: string,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantBillingWorkspaceResponse>(
+    `/v1/tenant/billing/invoices/${encodeURIComponent(invoiceId)}/mark-paid${query}`,
+    withJsonBody({}, { method: 'POST', headers }),
+  );
+}
+
+export async function getTenantBillingInvoiceReceipt(
+  invoiceId: string,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantBillingReceiptResponse>(
+    `/v1/tenant/billing/invoices/${encodeURIComponent(invoiceId)}/receipt${query}`,
+    { headers },
+  );
+}
+
+export async function inviteTenantTeamMember(
+  request: TenantInviteMemberRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantTeamResponse>(
+    `/v1/tenant/team/invite${query}`,
+    withJsonBody(request, { method: 'POST', headers }),
+  );
+}
+
+export async function updateTenantTeamMemberAccess(
+  memberEmail: string,
+  request: TenantUpdateMemberAccessRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantTeamResponse>(
+    `/v1/tenant/team/members/${encodeURIComponent(memberEmail)}${query}`,
+    withJsonBody(request, { method: 'PATCH', headers }),
+  );
+}
+
+export async function resendTenantTeamInvite(
+  memberEmail: string,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantTeamInviteActionResponse>(
+    `/v1/tenant/team/members/${encodeURIComponent(memberEmail)}/resend-invite${query}`,
+    withJsonBody({}, { method: 'POST', headers }),
   );
 }
 
@@ -593,13 +936,32 @@ export const apiV1 = {
   getOutboxDispatchedAudit,
   replayOutboxEvent,
   getTenantBookings,
+  getTenantBilling,
+  getTenantBillingInvoiceReceipt,
   getTenantCatalog,
   getTenantIntegrations,
+  updateTenantIntegrationProvider,
+  getTenantOnboarding,
+  getTenantTeam,
   getTenantOverview,
+  getPortalBookingDetail,
+  requestPortalBookingReschedule,
+  requestPortalBookingCancellation,
   archiveTenantCatalogService,
   importTenantCatalogFromWebsite,
   publishTenantCatalogService,
+  tenantClaimAccount,
+  tenantCreateAccount,
   tenantGoogleAuth,
+  tenantPasswordAuth,
+  updateTenantProfile,
+  updateTenantBillingAccount,
+  markTenantBillingInvoicePaid,
+  updateTenantSubscription,
+  inviteTenantTeamMember,
+  resendTenantTeamInvite,
+  updateTenantTeamMemberAccess,
   updateTenantCatalogService,
   retryCrmSync,
+  getTenantRevenueMetrics,
 };

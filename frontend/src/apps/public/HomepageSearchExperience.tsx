@@ -1,6 +1,6 @@
 import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
-import { brandPreferredLogoPath, brandShortIconPath, demoContent } from '../../components/landing/data';
+import { brandShortIconPath, demoContent } from '../../components/landing/data';
 import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../shared/config/api';
 import {
   buildPartnerMatchActionFooterModelFromServiceItem,
@@ -35,6 +35,15 @@ type ServiceCatalogItem = {
   tags: string[];
   featured: boolean;
   distance_km?: number | null;
+  source_type?: string | null;
+  source_label?: string | null;
+  why_this_matches?: string | null;
+  price_posture?: string | null;
+  booking_path_type?: string | null;
+  next_step?: string | null;
+  availability_state?: string | null;
+  booking_confidence?: string | null;
+  trust_signal?: string | null;
 };
 
 type BookingAssistantCatalogResponse = {
@@ -87,7 +96,6 @@ type HomepageSearchExperienceProps = {
   initialQuery: string | null;
   initialQueryRequestId: number;
 };
-const bookedAiLogoSrc = brandPreferredLogoPath;
 const bookedAiShortIconSrc = brandShortIconPath;
 
 type BrowserSpeechRecognitionResult = {
@@ -191,6 +199,15 @@ function MicIcon({ className = 'h-5 w-5' }: { className?: string }) {
     <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
       <rect x="9" y="4" width="6" height="10" rx="3" strokeWidth="1.8" />
       <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v3M9 20h6" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ChevronUpDownIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
+      <path d="m8 10 4-4 4 4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="m16 14-4 4-4-4" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
     </svg>
   );
 }
@@ -348,6 +365,15 @@ function toServiceCatalogItem(candidate: MatchCandidate): ServiceCatalogItem {
     tags: candidate.tags ?? [],
     featured: candidate.featured ?? false,
     distance_km: candidate.distanceKm ?? null,
+    source_type: candidate.sourceType ?? null,
+    source_label: candidate.sourceLabel ?? null,
+    why_this_matches: candidate.whyThisMatches ?? null,
+    price_posture: candidate.pricePosture ?? null,
+    booking_path_type: candidate.bookingPathType ?? null,
+    next_step: candidate.nextStep ?? null,
+    availability_state: candidate.availabilityState ?? null,
+    booking_confidence: candidate.bookingConfidence ?? null,
+    trust_signal: candidate.trustSignal ?? null,
   };
 }
 
@@ -402,19 +428,69 @@ function getLocationPriorityBucket(
   return 4;
 }
 
+function resolvePriorityIntentTerms(query: string, intentTermsOverride?: string[] | null) {
+  if (intentTermsOverride && intentTermsOverride.length > 0) {
+    return Array.from(new Set(intentTermsOverride.map((term) => term.trim().toLowerCase()).filter(Boolean)));
+  }
+
+  return extractQueryIntentTerms(query);
+}
+
+function computeIntentPriorityScore(
+  service: ServiceCatalogItem,
+  query: string,
+  intentTermsOverride?: string[] | null,
+) {
+  const intentTerms = resolvePriorityIntentTerms(query, intentTermsOverride);
+  if (!intentTerms.length) {
+    return 0;
+  }
+
+  const nameText = normalizeSearchText([service.name]);
+  const summaryText = normalizeSearchText([service.summary]);
+  const metadataText = normalizeSearchText([
+    service.category,
+    service.location,
+    service.venue_name,
+    ...service.tags,
+  ]);
+
+  let score = 0;
+  for (const term of intentTerms) {
+    if (nameText.includes(term)) {
+      score += 7;
+      continue;
+    }
+    if (metadataText.includes(term)) {
+      score += 4;
+      continue;
+    }
+    if (summaryText.includes(term)) {
+      score += 2;
+    }
+  }
+
+  return score;
+}
+
 function prioritizeSearchResults(
   services: ServiceCatalogItem[],
   locality: string | null,
   query: string,
+  intentTermsOverride?: string[] | null,
 ) {
   return [...services]
     .map((service, index) => ({
       service,
       index,
+      intentScore: computeIntentPriorityScore(service, query, intentTermsOverride),
       bucket: getLocationPriorityBucket(service, locality, query),
       distance: typeof service.distance_km === 'number' ? service.distance_km : Number.POSITIVE_INFINITY,
     }))
     .sort((left, right) => {
+      if (left.intentScore !== right.intentScore) {
+        return right.intentScore - left.intentScore;
+      }
       if (left.bucket !== right.bucket) {
         return left.bucket - right.bucket;
       }
@@ -452,6 +528,15 @@ function uniqueCandidateServices(
     tags: item.tags,
     featured: item.featured,
     distance_km: item.distance_km ?? null,
+    source_type: item.source_type ?? null,
+    source_label: item.source_label ?? null,
+    why_this_matches: item.why_this_matches ?? null,
+    price_posture: item.price_posture ?? null,
+    booking_path_type: item.booking_path_type ?? null,
+    next_step: item.next_step ?? null,
+    availability_state: item.availability_state ?? null,
+    booking_confidence: item.booking_confidence ?? null,
+    trust_signal: item.trust_signal ?? null,
   }));
 
   if (normalized.length > 0) {
@@ -459,6 +544,126 @@ function uniqueCandidateServices(
   }
 
   return [];
+}
+
+function extractQueryIntentTerms(query: string) {
+  const stopWords = new Set([
+    'a',
+    'an',
+    'and',
+    'around',
+    'at',
+    'book',
+    'booking',
+    'class',
+    'classes',
+    'find',
+    'for',
+    'get',
+    'i',
+    'in',
+    'is',
+    'looking',
+    'lesson',
+    'lessons',
+    'me',
+    'my',
+    'near',
+    'need',
+    'of',
+    'on',
+    'option',
+    'options',
+    'please',
+    'service',
+    'services',
+    'session',
+    'sessions',
+    'the',
+    'to',
+    'training',
+    'tutor',
+    'want',
+    'with',
+  ]);
+  const locationWords = new Set([
+    'sydney',
+    'melbourne',
+    'brisbane',
+    'perth',
+    'adelaide',
+    'canberra',
+    'wollongong',
+    'parramatta',
+    'nsw',
+    'vic',
+    'qld',
+    'cbd',
+  ]);
+
+  return Array.from(
+    new Set(
+      query
+        .toLowerCase()
+        .split(/[^a-z0-9]+/)
+        .map((term) => term.trim())
+        .filter((term) => term.length >= 4 && !stopWords.has(term) && !locationWords.has(term)),
+    ),
+  );
+}
+
+function filterResultsByIntentTerms(
+  services: ServiceCatalogItem[],
+  query: string,
+  intentTermsOverride?: string[] | null,
+) {
+  const intentTerms = resolvePriorityIntentTerms(query, intentTermsOverride);
+  if (!intentTerms.length) {
+    return services;
+  }
+
+  const strongMatches = services.filter((service) => {
+    const primaryServiceText = normalizeSearchText([
+      service.name,
+      service.category,
+      service.location,
+      service.venue_name,
+      ...service.tags,
+    ]);
+    return intentTerms.some((term) => primaryServiceText.includes(term));
+  });
+  if (strongMatches.length > 0) {
+    return strongMatches;
+  }
+
+  const filtered = services.filter((service) => {
+    const summaryText = normalizeSearchText([service.summary]);
+    return intentTerms.some((term) => summaryText.includes(term));
+  });
+
+  return filtered.length > 0 ? filtered : services;
+}
+
+function orderResultsByRecommendationIds(
+  services: ServiceCatalogItem[],
+  recommendedCandidateIds: string[],
+) {
+  if (!recommendedCandidateIds.length) {
+    return services;
+  }
+
+  const byId = new Map(services.map((service) => [service.id, service]));
+  const ordered = recommendedCandidateIds
+    .map((candidateId) => byId.get(candidateId) ?? null)
+    .filter((service): service is ServiceCatalogItem => Boolean(service));
+
+  if (!ordered.length) {
+    return services;
+  }
+
+  const orderedIds = new Set(ordered.map((service) => service.id));
+  const remainder = services.filter((service) => !orderedIds.has(service.id));
+  return [...ordered, ...remainder];
 }
 
 function buildLiveReadResultsSummary(params: {
@@ -489,6 +694,16 @@ function buildLiveReadResultsSummary(params: {
   return `I found ${params.rankedCount} relevant result${params.rankedCount === 1 ? '' : 's'}. Here are the top ${shownCount} to compare first.`;
 }
 
+function hasLocationPermissionWarning(warnings: string[]) {
+  return warnings.some((warning) =>
+    /location access is needed to (find services near you|rank nearby matches)/i.test(warning),
+  );
+}
+
+function hasNearMeIntent(query: string) {
+  return /\b(near me|nearby|close to me|around me|in my area)\b/i.test(query);
+}
+
 export function HomepageSearchExperience({
   content,
   sourcePath,
@@ -514,7 +729,10 @@ export function HomepageSearchExperience({
   const [submitLoading, setSubmitLoading] = useState(false);
   const [result, setResult] = useState<BookingAssistantSessionResponse | null>(null);
   const [bookingComposerOpen, setBookingComposerOpen] = useState(false);
+  const [composerCollapsed, setComposerCollapsed] = useState(false);
   const [isDesktopViewport, setIsDesktopViewport] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [isBottomBarVisible, setIsBottomBarVisible] = useState(true);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
   const [voiceError, setVoiceError] = useState('');
@@ -524,6 +742,7 @@ export function HomepageSearchExperience({
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const recognitionBaseQueryRef = useRef('');
   const bookingAssistantV1SessionIdRef = useRef<string | null>(null);
+  const lastScrollYRef = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -564,12 +783,36 @@ export function HomepageSearchExperience({
   }, [initialQuery, initialQueryRequestId]);
 
   useEffect(() => {
+    if (!currentQuery && !result) {
+      setComposerCollapsed(false);
+    }
+  }, [currentQuery, result]);
+
+  useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
       return;
     }
 
     const mediaQuery = window.matchMedia('(min-width: 1024px)');
     const syncViewport = () => setIsDesktopViewport(mediaQuery.matches);
+    syncViewport();
+
+    if (typeof mediaQuery.addEventListener === 'function') {
+      mediaQuery.addEventListener('change', syncViewport);
+      return () => mediaQuery.removeEventListener('change', syncViewport);
+    }
+
+    mediaQuery.addListener(syncViewport);
+    return () => mediaQuery.removeListener(syncViewport);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
+      return;
+    }
+
+    const mediaQuery = window.matchMedia('(max-width: 767px)');
+    const syncViewport = () => setIsMobileViewport(mediaQuery.matches);
     syncViewport();
 
     if (typeof mediaQuery.addEventListener === 'function') {
@@ -601,6 +844,38 @@ export function HomepageSearchExperience({
       recognitionRef.current = null;
     };
   }, []);
+
+  useEffect(() => {
+    if (!isMobileViewport || typeof window === 'undefined') {
+      setIsBottomBarVisible(true);
+      return;
+    }
+
+    lastScrollYRef.current = window.scrollY;
+    setIsBottomBarVisible(true);
+
+    const handleScroll = () => {
+      const nextScrollY = window.scrollY;
+      const delta = nextScrollY - lastScrollYRef.current;
+
+      if (nextScrollY <= 24 || delta < -8) {
+        setIsBottomBarVisible(true);
+      } else if (delta > 12 && nextScrollY > 140) {
+        setIsBottomBarVisible(false);
+      }
+
+      lastScrollYRef.current = nextScrollY;
+    };
+
+    window.addEventListener('scroll', handleScroll, { passive: true });
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [isMobileViewport]);
+
+  useEffect(() => {
+    if (isMobileViewport && (searchLoading || voiceListening || !composerCollapsed)) {
+      setIsBottomBarVisible(true);
+    }
+  }, [composerCollapsed, isMobileViewport, searchLoading, voiceListening]);
 
   const selectedService = useMemo(
     () => results.find((service) => service.id === selectedServiceId) ?? null,
@@ -674,6 +949,7 @@ export function HomepageSearchExperience({
     setResult(null);
     setSubmitError('');
     setBookingComposerOpen(false);
+    setComposerCollapsed(false);
 
     try {
       const activeGeoContext = geoContext ?? (await requestGeoContext());
@@ -688,43 +964,78 @@ export function HomepageSearchExperience({
           : null,
       });
 
-      let legacyPayload = await requestLegacySearch(trimmedQuery, activeGeoContext);
-      if (legacyPayload.should_request_location && !activeGeoContext) {
-        const requestedGeo = await requestGeoContext();
-        if (requestedGeo) {
-          legacyPayload = await requestLegacySearch(trimmedQuery, requestedGeo);
-        } else {
-          setGeoHint(content.ui.geoHint);
+      let legacyPayload: BookingAssistantChatResponse | null = null;
+      if (!liveRead.usedLiveRead) {
+        legacyPayload = await requestLegacySearch(trimmedQuery, activeGeoContext);
+        if (legacyPayload.should_request_location && !activeGeoContext) {
+          const requestedGeo = await requestGeoContext();
+          if (requestedGeo) {
+            legacyPayload = await requestLegacySearch(trimmedQuery, requestedGeo);
+          } else {
+            setGeoHint(content.ui.geoHint);
+          }
         }
       }
 
+      const isLiveReadAuthoritative = liveRead.usedLiveRead;
       const hasLiveReadSearchGrounding =
-        liveRead.rankedCandidates.length > 0 ||
-        liveRead.candidateIds.length > 0 ||
-        Boolean(liveRead.semanticAssistSummary) ||
-        liveRead.warnings.length > 0;
-      const mergedResults = hasLiveReadSearchGrounding
+        isLiveReadAuthoritative &&
+        (liveRead.rankedCandidates.length > 0 ||
+          liveRead.candidateIds.length > 0 ||
+          Boolean(liveRead.semanticAssistSummary) ||
+          liveRead.warnings.length > 0);
+      const mergedResults = isLiveReadAuthoritative
         ? uniqueCandidateServices(liveRead.rankedCandidates, [], catalog)
-        : uniqueCandidateServices([], legacyPayload.matched_services ?? [], catalog);
-      const prioritizedResults = prioritizeSearchResults(
-        mergedResults,
-        activeGeoContext?.locality ?? null,
-        trimmedQuery,
-      );
+        : uniqueCandidateServices([], legacyPayload?.matched_services ?? [], catalog);
+      const shouldHoldResultsForLocation =
+        !activeGeoContext &&
+        hasLiveReadSearchGrounding &&
+        (hasLocationPermissionWarning(liveRead.warnings) || hasNearMeIntent(trimmedQuery));
+      const recommendationOrderedResults = shouldHoldResultsForLocation
+        ? []
+        : orderResultsByRecommendationIds(
+            mergedResults,
+            liveRead.recommendedCandidateIds,
+          );
+      const priorityIntentTerms =
+        liveRead.queryUnderstandingSummary?.coreIntentTerms?.length
+          ? liveRead.queryUnderstandingSummary.coreIntentTerms
+          : liveRead.queryUnderstandingSummary?.expandedIntentTerms ?? [];
+      const intentFilteredResults = shouldHoldResultsForLocation
+        ? []
+        : filterResultsByIntentTerms(
+            recommendationOrderedResults,
+            trimmedQuery,
+            priorityIntentTerms,
+          );
+      const prioritizedResults =
+        liveRead.recommendedCandidateIds.length > 0
+          ? intentFilteredResults
+          : prioritizeSearchResults(
+              intentFilteredResults,
+              activeGeoContext?.locality ?? null,
+              trimmedQuery,
+              priorityIntentTerms,
+            );
 
       const nextSuggestedId = hasLiveReadSearchGrounding
         ? liveRead.suggestedServiceId ?? prioritizedResults[0]?.id ?? ''
-        : legacyPayload.suggested_service_id ?? prioritizedResults[0]?.id ?? '';
+        : legacyPayload?.suggested_service_id ?? prioritizedResults[0]?.id ?? '';
       const nextAssistantSummary = hasLiveReadSearchGrounding
         ? buildLiveReadResultsSummary({
             rankedCount: prioritizedResults.length,
             warnings: liveRead.warnings,
             normalizedQuery:
-              liveRead.semanticAssistSummary?.normalizedQuery ?? trimmedQuery.toLowerCase(),
-            inferredLocation: liveRead.semanticAssistSummary?.inferredLocation ?? null,
+              liveRead.queryUnderstandingSummary?.normalizedQuery ??
+              liveRead.semanticAssistSummary?.normalizedQuery ??
+              trimmedQuery.toLowerCase(),
+            inferredLocation:
+              liveRead.queryUnderstandingSummary?.inferredLocation ??
+              liveRead.semanticAssistSummary?.inferredLocation ??
+              null,
             inferredCategory: liveRead.semanticAssistSummary?.inferredCategory ?? null,
           })
-        : legacyPayload.reply;
+        : legacyPayload?.reply ?? content.ui.noMatchBody;
 
       setResults(prioritizedResults);
       setSelectedServiceId(nextSuggestedId);
@@ -738,8 +1049,17 @@ export function HomepageSearchExperience({
         ...(liveRead.bookingPathSummary?.warnings ?? []),
         ...(liveRead.trustSummary?.warnings ?? []),
       ]);
+      if (
+        !activeGeoContext &&
+        (hasLocationPermissionWarning(liveRead.warnings) || hasNearMeIntent(trimmedQuery))
+      ) {
+        setGeoHint(content.ui.geoHint);
+      }
       if (!prioritizedResults.length && !hasLiveReadSearchGrounding) {
         setAssistantSummary(content.ui.noMatchBody);
+      }
+      if (prioritizedResults.length > 0 || hasLiveReadSearchGrounding) {
+        setComposerCollapsed(true);
       }
 
       window.setTimeout(() => {
@@ -749,6 +1069,7 @@ export function HomepageSearchExperience({
       setSearchError(error instanceof Error ? error.message : 'Unable to search services right now.');
       setResults([]);
       setSelectedServiceId('');
+      setComposerCollapsed(false);
     } finally {
       setSearchLoading(false);
     }
@@ -851,6 +1172,7 @@ export function HomepageSearchExperience({
       }
 
       setResult(payload);
+      setComposerCollapsed(true);
     } catch (error) {
       setSubmitError(error instanceof Error ? error.message : 'Unable to create booking request.');
     } finally {
@@ -869,12 +1191,64 @@ export function HomepageSearchExperience({
     ? [selectedService.category, selectedService.location].filter(Boolean).join(' • ')
     : content.ui.bookingPanelHelper;
   const shortcutToneClasses = [
-    'border-[#cfe1ff] bg-[#eef4ff] text-[#1a73e8] hover:border-[#b7d0ff] hover:bg-[#e6efff]',
-    'border-[#d7f0d4] bg-[#eef9ee] text-[#188038] hover:border-[#c4e8c0] hover:bg-[#e8f6e8]',
-    'border-[#fde1c5] bg-[#fff3e6] text-[#b06000] hover:border-[#f8d3a4] hover:bg-[#ffedd9]',
-    'border-[#eadbff] bg-[#f6f0ff] text-[#7b61c9] hover:border-[#dcc8ff] hover:bg-[#f0e8ff]',
-    'border-[#ffd9e1] bg-[#fff0f4] text-[#c5225a] hover:border-[#ffc8d5] hover:bg-[#ffe8ef]',
+    'public-apple-shortcut-blue hover:bg-[#eef4ff]',
+    'public-apple-shortcut-green hover:bg-[#eef9ee]',
+    'public-apple-shortcut-amber hover:bg-[#fff3e6]',
+    'public-apple-shortcut-purple hover:bg-[#f6f0ff]',
+    'public-apple-shortcut-rose hover:bg-[#fff0f4]',
   ];
+  const workspaceStatus = searchLoading
+    ? {
+        label: 'Receiving your enquiry',
+        detail: currentQuery
+          ? `Searching live signals for "${currentQuery}" and preparing the best-fit shortlist.`
+          : 'Receiving the request and preparing live search.',
+        tone: 'public-apple-toolbar-pill--accent',
+      }
+    : searchError
+      ? {
+          label: 'Search needs attention',
+          detail: searchError,
+          tone: 'border-rose-200 bg-rose-50 text-rose-700',
+        }
+      : result
+        ? {
+            label: 'Booking path ready',
+            detail: `Booking reference ${result.booking_reference} is ready with follow-up and portal access.`,
+            tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
+          }
+        : hasActiveQuery
+          ? {
+              label: 'Shortlist ready',
+              detail:
+                results.length > 0
+                  ? `${results.length} ranked option${results.length === 1 ? '' : 's'} ready above. Review the shortlist, then continue to booking.`
+                  : 'No strong match yet. Refine the request and search again.',
+              tone: 'border-slate-900/8 bg-white/78 text-[#172033]/72',
+            }
+          : {
+              label: 'Ready to receive',
+              detail: 'Type a natural-language enquiry below. Results will appear above in the BookedAI booking flow.',
+              tone: 'border-slate-900/8 bg-white/78 text-[#172033]/72',
+            };
+  const mobileStatusLabel = searchLoading
+    ? 'Searching'
+    : result
+      ? 'Booked'
+      : 'Ready';
+
+  function handleServiceSelect(service: ServiceCatalogItem) {
+    setSelectedServiceId(service.id);
+    setResult(null);
+    setSubmitError('');
+    setBookingComposerOpen(true);
+    if (!isDesktopViewport) {
+      setComposerCollapsed(true);
+    }
+    window.setTimeout(() => {
+      bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 80);
+  }
 
   function handleVoiceSearch() {
     if (typeof window === 'undefined') {
@@ -941,65 +1315,31 @@ export function HomepageSearchExperience({
   }
 
   return (
-    <div id="bookedai-search-assistant" ref={bookingPanelRef} className="mx-auto max-w-[1320px]">
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.65fr)_minmax(320px,0.9fr)]">
-        <section className="min-w-0 overflow-hidden rounded-[1.85rem] border border-[#dbe4ee] bg-white shadow-[0_28px_90px_rgba(15,23,42,0.08)]">
-          <div className="border-b border-[#edf2f7] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4 sm:px-6 sm:py-5">
-            <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="rounded-full bg-[#e8f0fe] px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                    {content.ui.statusLive}
-                  </span>
-                  <span className="rounded-full border border-[#e2e8f0] bg-white px-3 py-1 text-[11px] font-medium text-[#475569]">
-                    {content.ui.shortlistLabel}
-                  </span>
-                  <span className="rounded-full border border-[#e2e8f0] bg-white px-3 py-1 text-[11px] font-medium text-[#475569]">
-                    {content.ui.bookingPanelTitle}
-                  </span>
-                  {currentQuery ? (
-                    <span className="rounded-full border border-[#d6e4fb] bg-[#f6faff] px-3 py-1 text-[11px] font-medium text-[#1f3b68]">
-                      {content.ui.resultsQueryLabel}: "{currentQuery}"
-                    </span>
-                  ) : null}
-                </div>
-
-                <h2 className="mt-4 text-[1.2rem] font-semibold tracking-[-0.03em] text-[#202124] sm:text-[1.45rem]">
-                  {content.ui.resultsTitle}
-                </h2>
-                <p className="mt-2 max-w-3xl text-sm leading-6 text-[#5f6368] sm:text-[15px]">
-                  {workspaceSummary}
-                </p>
+    <div
+      id="bookedai-search-assistant"
+      ref={bookingPanelRef}
+      className={`mx-auto max-w-[1280px] ${isMobileViewport ? 'pb-28' : ''}`}
+    >
+      <div className="public-search-results-shell grid gap-4 xl:items-start">
+        <section className="public-apple-workspace-shell min-w-0 overflow-hidden rounded-[1.5rem]">
+          <div className="px-3 py-3 sm:px-4 sm:py-4">
+            {currentQuery ? (
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <span className="public-apple-toolbar-pill public-apple-toolbar-pill--accent px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]">
+                  {content.ui.resultsQueryLabel}: "{currentQuery}"
+                </span>
+                <span className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-medium">
+                  {resultCountLabel}
+                </span>
               </div>
-
-              <div className="grid gap-2 sm:grid-cols-2 xl:w-[24rem] xl:min-w-[24rem]">
-                <div className="rounded-[1.15rem] border border-[#e6edf5] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5f6368]">
-                    {content.ui.shortlistLabel}
-                  </div>
-                  <div className="mt-1 text-sm font-semibold text-[#202124]">{resultCountLabel}</div>
-                  <p className="mt-1 text-xs leading-5 text-[#64748b]">
-                    {hasActiveQuery ? content.ui.summaryTitle : content.ui.resultsEmptyTitle}
-                  </p>
-                </div>
-                <div className="rounded-[1.15rem] border border-[#e6edf5] bg-[#f8fbff] px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5f6368]">
-                    {content.ui.bookingPanelTitle}
-                  </div>
-                  <div className="mt-1 line-clamp-2 text-sm font-semibold text-[#202124]">
-                    {selectedService ? selectedService.name : content.ui.bookingPanelEmpty}
-                  </div>
-                  <p className="mt-1 text-xs leading-5 text-[#64748b]">{selectedServiceMeta}</p>
-                </div>
-              </div>
-            </div>
+            ) : null}
 
             {uniqueWarnings.length > 0 ? (
-              <div className="mt-4 flex flex-wrap gap-2">
+              <div className="mb-3 flex flex-wrap gap-2">
                 {uniqueWarnings.map((warning) => (
                   <span
                     key={warning}
-                    className="rounded-full border border-[#fce8b2] bg-[#fff7e0] px-3 py-1 text-[11px] font-medium text-[#8d6b00]"
+                    className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-medium text-amber-700"
                   >
                     {warning}
                   </span>
@@ -1008,96 +1348,21 @@ export function HomepageSearchExperience({
             ) : null}
 
             {geoHint ? (
-              <div className="mt-4 rounded-[1rem] border border-[#d2e3fc] bg-[#f8fbff] px-3 py-3 text-sm leading-6 text-[#1f3b68]">
+              <div className="public-apple-workspace-panel-soft mb-3 rounded-[0.95rem] px-3 py-2.5 text-sm leading-6 text-[#31507b]">
                 {geoHint}
               </div>
             ) : null}
-          </div>
 
-          <div className="border-b border-[#edf2f7] bg-[#fbfdff] px-4 py-4 sm:px-6 sm:py-5">
-            <form onSubmit={handleSearchSubmit}>
-              <div className="rounded-[1.5rem] border border-[#dbe4ee] bg-white p-3 shadow-[0_16px_42px_rgba(15,23,42,0.07)]">
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
-                  <div className="relative min-w-0 flex-1">
-                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#64748b]">
-                      <SearchIcon className="h-4.5 w-4.5" />
-                    </span>
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                      placeholder={content.ui.searchPlaceholder}
-                      className="h-13 w-full rounded-[1.15rem] border border-[#dde3ea] bg-white pl-12 pr-4 text-[15px] text-[#202124] outline-none transition focus:border-[#c9dafd] focus:shadow-[0_14px_30px_rgba(26,115,232,0.12)] sm:h-14"
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 lg:shrink-0">
-                    <button
-                      type="button"
-                      aria-label={voiceListening ? 'Stop voice input' : 'Start voice input'}
-                      title={voiceListening ? 'Stop voice input' : 'Start voice input'}
-                      onClick={handleVoiceSearch}
-                      disabled={!voiceSupported}
-                      className={`inline-flex h-12 w-12 items-center justify-center rounded-[1.1rem] border transition sm:h-14 sm:w-14 ${
-                        voiceSupported
-                          ? voiceListening
-                            ? 'border-[#d2e3fc] bg-[#e8f0fe] text-[#1a73e8]'
-                            : 'border-[#dde3ea] bg-[#f8fbff] text-[#1a73e8] hover:bg-[#eef4ff]'
-                          : 'cursor-not-allowed border-[#eceff3] bg-[#f5f6f7] text-[#9aa0a6]'
-                      }`}
-                    >
-                      <MicIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={searchLoading}
-                      aria-label="Send search"
-                      className="inline-flex h-12 flex-1 items-center justify-center gap-2 rounded-[1.1rem] bg-[#1a73e8] px-4 text-sm font-semibold text-white shadow-[0_14px_30px_rgba(26,115,232,0.22)] transition hover:bg-[#1765cc] disabled:cursor-not-allowed disabled:opacity-60 sm:h-14 lg:min-w-[9.25rem]"
-                    >
-                      <ArrowRightIcon className="h-4 w-4" />
-                      <span>{content.ui.searchButton}</span>
-                    </button>
-                  </div>
-                </div>
-
-                {voiceError ? (
-                  <p className="mt-2 text-xs text-[#b3261e]">{voiceError}</p>
-                ) : voiceListening ? (
-                  <p className="mt-2 text-xs text-[#1a73e8]">Listening for voice input...</p>
-                ) : null}
+            {hasActiveQuery && assistantSummary ? (
+              <div className="public-apple-workspace-panel-soft mb-3 rounded-[1rem] px-3.5 py-2.5 text-sm leading-6 text-[#172033]/72">
+                {assistantSummary}
               </div>
-            </form>
+            ) : null}
 
-            <div className="mt-4 -mx-1 overflow-x-auto pb-1">
-              <div className="flex min-w-max gap-2 px-1 sm:min-w-0 sm:flex-wrap">
-                {content.searchSuggestions.map((suggestion) => (
-                  <button
-                    key={suggestion.label}
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery(suggestion.query);
-                      void runSearch(suggestion.query);
-                    }}
-                    className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3.5 py-2 text-[13px] font-semibold transition ${
-                      shortcutToneClasses[
-                        content.searchSuggestions.findIndex((item) => item.label === suggestion.label) %
-                          shortcutToneClasses.length
-                      ]
-                    }`}
-                  >
-                    <SearchIcon className="h-3.5 w-3.5" />
-                    {suggestion.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="px-4 py-4 sm:px-6 sm:py-5">
-            <div className="space-y-4">
+            <div className="space-y-3">
               {searchLoading ? (
-                <div className="rounded-[1.35rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-5">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                <div className="rounded-[1.15rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
                     {content.ui.resultsLoadingTitle}
                   </div>
                   <p className="mt-2 text-sm leading-6 text-[#5f6368]">
@@ -1107,10 +1372,7 @@ export function HomepageSearchExperience({
                   </p>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {['Checking locality', 'Verifying best fit', 'Preparing shortlist'].map((label) => (
-                      <div
-                        key={label}
-                        className="rounded-full border border-[#d2e3fc] bg-white px-3 py-1.5 text-[11px] font-medium text-[#1a73e8]"
-                      >
+                      <div key={label} className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-medium text-[#6d28d9]">
                         {label}
                       </div>
                     ))}
@@ -1130,30 +1392,30 @@ export function HomepageSearchExperience({
                   batchSize={3}
                   className="space-y-4"
                   listClassName="space-y-3"
-                  buttonClassName="rounded-[1.15rem] border border-[#dbe4ee] bg-[#fbfdff] px-4 py-3 text-sm font-semibold text-[#1f2937] transition hover:border-[#c9dafd] hover:bg-white"
+                  buttonClassName="public-apple-workspace-panel-soft rounded-[1.15rem] px-4 py-3 text-sm font-semibold text-[#111827] transition hover:bg-white"
                   resetKey={`${currentQuery}-${results.length}`}
                   buttonLabel="See more results"
                   emptyState={
-                    <div className="rounded-[1.45rem] border border-dashed border-[#d7dee8] bg-[linear-gradient(180deg,#fbfcfe_0%,#f7fafc_100%)] px-4 py-12 text-center sm:px-8">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5f6368]">
+                    <div className="public-apple-empty-state rounded-[1.2rem] px-4 py-10 text-center sm:px-8">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
                         {currentQuery ? content.ui.noMatchTitle : content.ui.resultsEmptyTitle}
                       </div>
-                      <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-[#5f6368]">
+                      <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-[#172033]/58">
                         {currentQuery ? content.ui.noMatchBody : content.ui.resultsEmptyBody}
                       </p>
                     </div>
                   }
                   renderMeta={({ visibleCount, totalCount }) => (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.15rem] border border-[#edf1f5] bg-[#fbfcfe] px-4 py-3">
+                    <div className="public-apple-workspace-panel-soft flex flex-wrap items-center justify-between gap-3 rounded-[1rem] px-3.5 py-2.5">
                       <div className="min-w-0">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#5f6368]">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
                           {content.ui.shortlistLabel}
                         </div>
-                        <div className="mt-1 text-sm font-semibold text-[#202124]">
+                        <div className="mt-1 text-sm font-semibold text-[#111827]">
                           {currentQuery ? `"${currentQuery}"` : content.ui.resultsTitle}
                         </div>
                       </div>
-                      <div className="rounded-full border border-[#e2e8f0] bg-white px-3 py-1 text-xs text-[#5f6368]">
+                      <div className="public-apple-toolbar-pill px-2.5 py-1 text-[11px]">
                         {visibleCount} / {totalCount}
                       </div>
                     </div>
@@ -1170,9 +1432,9 @@ export function HomepageSearchExperience({
                     return (
                       <div
                         key={service.id}
-                        className={`rounded-[1.45rem] border p-3 shadow-[0_12px_34px_rgba(15,23,42,0.05)] ${
+                        className={`rounded-[1.2rem] border p-2.5 shadow-[0_10px_28px_rgba(15,23,42,0.045)] ${
                           isSelected
-                            ? 'border-[#bfd7ff] bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)]'
+                            ? 'border-[rgba(139,92,246,0.16)] bg-[linear-gradient(180deg,#ffffff_0%,#faf7ff_100%)]'
                             : 'border-[#e8edf3] bg-white'
                         }`}
                       >
@@ -1181,15 +1443,7 @@ export function HomepageSearchExperience({
                           tone={isSelected ? 'selected' : 'default'}
                           badge={service.featured ? 'Top match' : null}
                           trailingLabel={service.category}
-                          onClick={() => {
-                            setSelectedServiceId(service.id);
-                            setResult(null);
-                            setSubmitError('');
-                            setBookingComposerOpen(false);
-                            window.setTimeout(() => {
-                              bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                            }, 80);
-                          }}
+                          onClick={() => handleServiceSelect(service)}
                         />
                         <PartnerMatchActionFooter model={footer} tone={isSelected ? 'selected' : 'default'} />
                       </div>
@@ -1201,28 +1455,28 @@ export function HomepageSearchExperience({
           </div>
         </section>
 
-        <aside className="min-w-0 rounded-[1.85rem] border border-[#dbe4ee] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4 shadow-[0_28px_90px_rgba(15,23,42,0.08)] sm:p-5 xl:sticky xl:top-[4.8rem] xl:self-start">
-          <div className="rounded-[1.35rem] bg-[linear-gradient(180deg,#0f172a_0%,#172554_100%)] px-4 py-4 text-white shadow-[0_20px_50px_rgba(15,23,42,0.24)]">
+        <aside className="public-apple-workspace-shell public-booking-sidebar min-w-0 rounded-[1.5rem] p-3 sm:p-4 xl:sticky xl:self-start">
+          <div className="public-apple-workspace-panel rounded-[1.15rem] px-3.5 py-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-white/68">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
                   {content.ui.bookingPanelTitle}
                 </div>
-                <div className="mt-2 text-[1.05rem] font-semibold tracking-[-0.02em] text-white">
+                <div className="mt-2 text-[1rem] font-semibold tracking-[-0.02em] text-[#111827]">
                   {selectedService ? selectedService.name : content.ui.bookingPanelEmpty}
                 </div>
-                <p className="mt-2 text-sm leading-6 text-white/78">
-                  {selectedService ? content.ui.bookingSuccessBody : content.ui.resultsEmptyBody}
+                <p className="mt-2 text-sm leading-6 text-[#172033]/58">
+                  {selectedService ? selectedServiceMeta : content.ui.resultsEmptyBody}
                 </p>
               </div>
-              <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] bg-white/10 text-white ring-1 ring-white/10">
+              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[0.9rem] bg-[#f5f7fb] text-[#6d28d9] ring-1 ring-slate-900/6 sm:inline-flex">
                 <BrandButtonMark className="h-6 w-6" />
               </div>
             </div>
           </div>
 
           {selectedService ? (
-            <div className="mt-4 rounded-[1.25rem] border border-[#d2e3fc] bg-white px-4 py-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+            <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
@@ -1236,7 +1490,7 @@ export function HomepageSearchExperience({
                     <div className="mt-1 text-xs text-[#5f6368]">{selectedService.location}</div>
                   ) : null}
                 </div>
-                <div className="inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#e8f0fe] text-[#1a73e8]">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#e8f0fe] text-[#1a73e8]">
                   <CheckIcon className="h-4 w-4" />
                 </div>
               </div>
@@ -1245,7 +1499,7 @@ export function HomepageSearchExperience({
                 <button
                   type="button"
                   onClick={() => setBookingComposerOpen((current) => !current)}
-                  className="mt-4 inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#1a73e8] px-4 py-3 text-sm font-semibold text-white shadow-[0_12px_28px_rgba(26,115,232,0.22)] lg:hidden"
+                  className="public-apple-primary-button mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold lg:hidden"
                 >
                   <SparkIcon className="h-4 w-4" />
                   {bookingComposerOpen ? 'Hide booking form' : content.ui.bookingButton}
@@ -1256,73 +1510,73 @@ export function HomepageSearchExperience({
 
           {!result ? (
             <div
-              className={`mt-4 rounded-[1.25rem] border border-[#e5ebf2] bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)] ${
+              className={`public-apple-workspace-panel mt-3 rounded-[1.1rem] p-3.5 ${
                 selectedService && !bookingComposerOpen && !isDesktopViewport ? 'hidden' : ''
               }`}
             >
-              <div className="mb-4">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5f6368]">
+              <div className="mb-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
                   {content.ui.bookingPanelTitle}
                 </div>
-                <div className="mt-1 text-sm font-semibold text-[#202124]">
+                <div className="mt-1 text-sm font-semibold text-[#111827]">
                   {selectedService ? content.ui.bookingButton : content.ui.bookingPanelEmpty}
                 </div>
               </div>
 
-              <form onSubmit={handleBookingSubmit} className="space-y-4">
+              <form onSubmit={handleBookingSubmit} className="space-y-3">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#3c4043]">{content.ui.nameLabel}</span>
+                  <span className="mb-2 block text-sm font-medium text-[#172033]/76">{content.ui.nameLabel}</span>
                   <input
                     type="text"
                     value={customerName}
                     onChange={(event) => setCustomerName(event.target.value)}
-                    className="h-12 w-full rounded-[1rem] border border-[#dadce0] bg-white px-4 text-sm outline-none transition focus:border-[#1a73e8] focus:shadow-[0_0_0_4px_rgba(26,115,232,0.08)]"
+                    className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#3c4043]">{content.ui.emailLabel}</span>
+                  <span className="mb-2 block text-sm font-medium text-[#172033]/76">{content.ui.emailLabel}</span>
                   <input
                     type="email"
                     value={customerEmail}
                     onChange={(event) => setCustomerEmail(event.target.value)}
-                    className="h-12 w-full rounded-[1rem] border border-[#dadce0] bg-white px-4 text-sm outline-none transition focus:border-[#1a73e8] focus:shadow-[0_0_0_4px_rgba(26,115,232,0.08)]"
+                    className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#3c4043]">{content.ui.phoneLabel}</span>
+                  <span className="mb-2 block text-sm font-medium text-[#172033]/76">{content.ui.phoneLabel}</span>
                   <input
                     type="tel"
                     value={customerPhone}
                     onChange={(event) => setCustomerPhone(event.target.value)}
-                    className="h-12 w-full rounded-[1rem] border border-[#dadce0] bg-white px-4 text-sm outline-none transition focus:border-[#1a73e8] focus:shadow-[0_0_0_4px_rgba(26,115,232,0.08)]"
+                    className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#3c4043]">{content.ui.dateTimeLabel}</span>
+                  <span className="mb-2 block text-sm font-medium text-[#172033]/76">{content.ui.dateTimeLabel}</span>
                   <input
                     type="datetime-local"
                     value={preferredSlot}
                     onChange={(event) => setPreferredSlot(event.target.value)}
-                    className="h-12 w-full rounded-[1rem] border border-[#dadce0] bg-white px-4 text-sm outline-none transition focus:border-[#1a73e8] focus:shadow-[0_0_0_4px_rgba(26,115,232,0.08)]"
+                    className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#3c4043]">{content.ui.notesLabel}</span>
+                  <span className="mb-2 block text-sm font-medium text-[#172033]/76">{content.ui.notesLabel}</span>
                   <textarea
                     rows={4}
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                     placeholder={content.ui.notesPlaceholder}
-                    className="w-full rounded-[1rem] border border-[#dadce0] bg-white px-4 py-3 text-sm outline-none transition focus:border-[#1a73e8] focus:shadow-[0_0_0_4px_rgba(26,115,232,0.08)]"
+                    className="public-apple-field w-full rounded-[0.95rem] px-4 py-3 text-sm outline-none transition"
                   />
                 </label>
 
                 {submitError ? (
-                  <div className="rounded-[1rem] border border-[#f2b8b5] bg-[#fce8e6] px-4 py-3 text-sm text-[#b3261e]">
+                  <div className="rounded-[0.95rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                     {submitError}
                   </div>
                 ) : null}
@@ -1330,7 +1584,7 @@ export function HomepageSearchExperience({
                 <button
                   type="submit"
                   disabled={submitLoading || !selectedService}
-                  className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-[1rem] bg-[#1a73e8] px-5 text-sm font-semibold text-white transition hover:bg-[#1765cc] disabled:cursor-not-allowed disabled:opacity-60"
+                  className="public-apple-primary-button inline-flex h-10 w-full items-center justify-center gap-2 rounded-[0.95rem] px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   <SparkIcon className="h-4 w-4" />
                   {submitLoading ? content.ui.bookingSubmitting : content.ui.bookingButton}
@@ -1338,8 +1592,8 @@ export function HomepageSearchExperience({
               </form>
             </div>
           ) : (
-            <div className="mt-4 space-y-4 rounded-[1.2rem] border border-[#d2e3fc] bg-white px-4 py-4">
-              <div className="rounded-[1.3rem] bg-[linear-gradient(180deg,#1a73e8_0%,#1557b0_100%)] px-4 py-4 text-white shadow-[0_18px_42px_rgba(26,115,232,0.24)]">
+            <div className="public-apple-workspace-panel mt-3 space-y-3 rounded-[1.1rem] px-3.5 py-3.5">
+              <div className="rounded-[1.1rem] bg-[linear-gradient(180deg,#8B5CF6_0%,#4F8CFF_100%)] px-4 py-4 text-white shadow-[0_14px_34px_rgba(139,92,246,0.2)]">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="inline-flex rounded-full bg-white/18 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/92">
@@ -1397,15 +1651,15 @@ export function HomepageSearchExperience({
               </div>
 
               <div className="grid gap-3 sm:grid-cols-3">
-                <div className="rounded-[1rem] bg-[#f8fafd] px-3 py-3">
+                <div className="public-apple-workspace-panel-soft rounded-[0.95rem] px-3 py-2.5">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5f6368]">Service</div>
                   <div className="mt-1 text-sm font-semibold text-[#202124]">{result.service.name}</div>
                 </div>
-                <div className="rounded-[1rem] bg-[#f8fafd] px-3 py-3">
+                <div className="public-apple-workspace-panel-soft rounded-[1rem] px-3 py-3">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5f6368]">Price</div>
                   <div className="mt-1 text-sm font-semibold text-[#202124]">{result.amount_label}</div>
                 </div>
-                <div className="rounded-[1rem] bg-[#f8fafd] px-3 py-3">
+                <div className="public-apple-workspace-panel-soft rounded-[1rem] px-3 py-3">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5f6368]">
                     {content.ui.requestedSlotLabel}
                   </div>
@@ -1414,7 +1668,7 @@ export function HomepageSearchExperience({
                 </div>
               </div>
 
-              <div className="rounded-[1rem] border border-[#e6ebf1] bg-[#fbfcfe] px-4 py-3">
+              <div className="public-apple-workspace-panel-soft rounded-[0.95rem] px-4 py-3">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5f6368]">
                   {content.ui.followUpLabel}
                 </div>
@@ -1426,7 +1680,7 @@ export function HomepageSearchExperience({
 
               <div className="grid gap-2 sm:grid-cols-3">
                 {bookingOutcomeSteps.map((step) => (
-                  <div key={step.label} className="rounded-[1rem] border border-[#e6ebf1] bg-white px-3 py-3">
+                  <div key={step.label} className="public-apple-workspace-panel rounded-[0.95rem] px-3 py-3">
                     <div className="text-[11px] font-semibold text-[#202124]">{step.label}</div>
                     <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${step.tone}`}>
                       {step.value}
@@ -1442,7 +1696,7 @@ export function HomepageSearchExperience({
                     target="_blank"
                     rel="noreferrer"
                     aria-label="Open payment"
-                    className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] bg-[#1a73e8] px-3 py-2.5 text-[10px] font-semibold text-white transition hover:bg-[#1765cc]"
+                    className="public-apple-primary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
                   >
                     <SparkIcon className="h-4 w-4" />
                     <span>Payment</span>
@@ -1454,7 +1708,7 @@ export function HomepageSearchExperience({
                     target="_blank"
                     rel="noreferrer"
                     aria-label="Add to calendar"
-                    className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] border border-[#dadce0] bg-white px-3 py-2.5 text-[10px] font-semibold text-[#202124] transition hover:bg-[#f8f9fa]"
+                    className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
                   >
                     <CalendarIcon className="h-4 w-4" />
                     <span>Calendar</span>
@@ -1467,7 +1721,7 @@ export function HomepageSearchExperience({
                     window.history.replaceState({}, '', '/');
                     window.scrollTo({ top: 0, behavior: 'smooth' });
                   }}
-                  className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] border border-[#dadce0] bg-white px-3 py-2.5 text-[10px] font-semibold text-[#202124] transition hover:bg-[#f8f9fa]"
+                  className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
                 >
                   <HomeIcon className="h-4 w-4" />
                   <span>Home</span>
@@ -1484,6 +1738,181 @@ export function HomepageSearchExperience({
             </div>
           )}
         </aside>
+      </div>
+
+      <div
+        className={`z-20 mt-4 px-0 transition-all duration-300 ${
+          isMobileViewport
+            ? `fixed inset-x-0 bottom-0 mt-0 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] ${
+                isBottomBarVisible
+                  ? 'translate-y-0 opacity-100'
+                  : 'pointer-events-none translate-y-[calc(100%+1rem)] opacity-0'
+              }`
+            : 'sticky bottom-2 sm:bottom-3'
+        }`}
+      >
+        <form onSubmit={handleSearchSubmit} className="public-apple-workspace-shell rounded-[1.3rem] p-2.5 sm:p-3">
+          <div className={`flex flex-col ${isMobileViewport ? 'gap-2' : 'gap-2.5'}`}>
+            <div className={`flex items-center justify-between gap-2 ${isMobileViewport ? 'flex-nowrap' : 'flex-wrap'}`}>
+              <div
+                className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                  isMobileViewport ? 'max-w-[6.5rem] shrink-0' : 'w-fit'
+                } ${workspaceStatus.tone}`}
+                title={workspaceStatus.label}
+              >
+                <span className={`inline-flex h-2 w-2 rounded-full ${searchLoading ? 'animate-pulse bg-current' : 'bg-current/70'}`} />
+                <span className="truncate">{isMobileViewport ? mobileStatusLabel : workspaceStatus.label}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setComposerCollapsed((current) => !current)}
+                aria-label={composerCollapsed ? 'Expand search' : 'Minimise search'}
+                title={composerCollapsed ? 'Expand search' : 'Minimise search'}
+                className={`public-search-topbar-button inline-flex shrink-0 items-center rounded-full ${
+                  isMobileViewport ? 'h-9 w-9 justify-center px-0 py-0' : 'px-3 py-1 text-[11px] font-medium'
+                }`}
+              >
+                {isMobileViewport ? (
+                  <ChevronUpDownIcon className="h-4 w-4" />
+                ) : (
+                  composerCollapsed ? 'Expand search' : 'Minimise search'
+                )}
+              </button>
+            </div>
+
+            {(!composerCollapsed || isMobileViewport) ? (
+              <>
+                {!isMobileViewport ? (
+                  <p className="text-sm leading-6 text-[#172033]/62">{workspaceStatus.detail}</p>
+                ) : null}
+
+                <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
+                  <div className="relative min-w-0 flex-1">
+                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#172033]/34">
+                      <SearchIcon className="h-4.5 w-4.5" />
+                    </span>
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      onFocus={() => {
+                        setIsBottomBarVisible(true);
+                        if (!searchQuery.trim()) {
+                          setComposerCollapsed(false);
+                        }
+                      }}
+                      placeholder={content.ui.searchPlaceholder}
+                      className="public-apple-field h-11 w-full rounded-[1rem] pl-12 pr-4 text-[15px] outline-none transition"
+                    />
+                  </div>
+
+                  <div className={`flex items-center gap-2 ${isMobileViewport ? 'shrink-0' : 'lg:shrink-0'}`}>
+                    <button
+                      type="button"
+                      aria-label={voiceListening ? 'Stop voice input' : 'Start voice input'}
+                      title={voiceListening ? 'Stop voice input' : 'Start voice input'}
+                      onClick={handleVoiceSearch}
+                      disabled={!voiceSupported}
+                      className={`inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border transition ${
+                        voiceSupported
+                          ? voiceListening
+                            ? 'border-[#d2e3fc] bg-[#e8f0fe] text-[#1a73e8]'
+                            : 'border-slate-900/8 bg-white/78 text-[#6d28d9] hover:bg-white'
+                          : 'cursor-not-allowed border-[#eceff3] bg-[#f5f6f7] text-[#9aa0a6]'
+                      }`}
+                    >
+                      <MicIcon className="h-4 w-4" />
+                    </button>
+                    <button
+                      type="submit"
+                      disabled={searchLoading}
+                      aria-label="Send search"
+                      className={`public-apple-primary-button inline-flex h-11 items-center justify-center gap-2 rounded-[1rem] text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isMobileViewport ? 'w-11 px-0' : 'flex-1 px-4 lg:min-w-[9rem]'
+                      }`}
+                    >
+                      <ArrowRightIcon className="h-4 w-4" />
+                      <span className={isMobileViewport ? 'sr-only' : ''}>{content.ui.searchButton}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {!composerCollapsed ? (
+                  <>
+                    {isMobileViewport ? (
+                      <p className="text-[12px] leading-5 text-[#172033]/62">{workspaceStatus.detail}</p>
+                    ) : null}
+
+                    <div className="-mx-1 overflow-x-auto pb-1">
+                      <div className="flex min-w-max gap-2 px-1 sm:min-w-0 sm:flex-wrap">
+                        {content.searchSuggestions.map((suggestion) => (
+                          <button
+                            key={suggestion.label}
+                            type="button"
+                            onClick={() => {
+                              setSearchQuery(suggestion.query);
+                              void runSearch(suggestion.query);
+                            }}
+                            className={`inline-flex shrink-0 items-center gap-2 rounded-full border px-3 py-1.5 text-[12px] font-semibold transition ${
+                              shortcutToneClasses[
+                                content.searchSuggestions.findIndex((item) => item.label === suggestion.label) %
+                                  shortcutToneClasses.length
+                              ]
+                            }`}
+                          >
+                            <SearchIcon className="h-3.5 w-3.5" />
+                            {suggestion.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  </>
+                ) : null}
+
+                {voiceError ? (
+                  <p className="text-xs text-rose-700">{voiceError}</p>
+                ) : voiceListening ? (
+                  <p className="text-xs text-[#6d28d9]">Listening for voice input...</p>
+                ) : null}
+              </>
+            ) : (
+              <div className="public-search-collapsed-trigger flex items-center gap-2 rounded-[1rem] px-3 py-2 transition hover:bg-[#f8fafc]">
+                <span className="pointer-events-none shrink-0 text-[#172033]/34">
+                  <SearchIcon className="h-4 w-4" />
+                </span>
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(event) => setSearchQuery(event.target.value)}
+                  onFocus={() => {
+                    setIsBottomBarVisible(true);
+                    if (!searchQuery.trim()) {
+                      setComposerCollapsed(false);
+                    }
+                  }}
+                  placeholder={content.ui.searchPlaceholder}
+                  className="min-w-0 flex-1 bg-transparent text-sm font-medium text-[#172033]/78 outline-none placeholder:text-[#172033]/42"
+                />
+                <button
+                  type="submit"
+                  disabled={searchLoading}
+                  aria-label="Send search"
+                  className="public-apple-primary-button inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-[0.95rem] px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <ArrowRightIcon className="h-4 w-4" />
+                  <span className="hidden sm:inline">Search</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setComposerCollapsed(false)}
+                  className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6d28d9] transition hover:bg-white"
+                >
+                  Expand
+                </button>
+              </div>
+            )}
+          </div>
+        </form>
       </div>
     </div>
   );

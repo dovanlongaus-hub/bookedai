@@ -1,0 +1,255 @@
+{
+  "version": 1,
+  "updatedAt": "2026-04-21T03:35:02.013Z",
+  "entries": {
+    "memory:memory/2026-04-21.md:85:86": {
+      "key": "memory:memory/2026-04-21.md:85:86",
+      "path": "memory/2026-04-21.md",
+      "startLine": 85,
+      "endLine": 86,
+      "source": "memory",
+      "snippet": "- Started the `backend/services.py` decomposition with a low-risk geo slice: added `backend/service_layer/geo_utils.py`, moved Google Maps URL, map snapshot, geocode query, Nominatim geocoding, and haversine helpers there with backward-compatible aliases, updated `backend/services.py` to import those helpers instead of defining them inline, exported the new helpers from `backend/service_layer/__init__.py`, and verified compile health for the affected backend modules with `python3 -m py_compile` - Continued the `backend/services.py` decomposition with a catalog asset slice: added `backend/service_layer/catalog_assets.py`, moved category or service image maps plus `resolve_service_image_url` t",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 2,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T03:30:39.845Z",
+      "lastRecalledAt": "2026-04-21T03:35:02.013Z",
+      "queryHashes": [
+        "f9753c289ac4",
+        "f45c5832ed3b"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "backend/services.py",
+        "low-risk",
+        "backward-compatible",
+        "backend/service-layer",
+        "py-compile",
+        "resolve-service-image-url",
+        "started",
+        "the"
+      ]
+    },
+    "memory:memory/2026-04-21.md:73:79": {
+      "key": "memory:memory/2026-04-21.md:73:79",
+      "path": "memory/2026-04-21.md",
+      "startLine": 73,
+      "endLine": 79,
+      "source": "memory",
+      "snippet": "- Started the dependency cleanup pass for extracted v1 handlers: replaced `from api.v1_routes import *` with explicit `from api.v1_routes import (...)` imports in `backend/api/v1_booking_handlers.py`, `backend/api/v1_search_handlers.py`, `backend/api/v1_communication_handlers.py`, and `backend/api/v1_integration_handlers.py`, then re-ran `python3 -m py_compile` across the v1 route stack; `backend/api/v1_tenant_handlers.py` remains on the wildcard import temporarily because it is still the largest extracted module and should be narrowed in a follow-up pass - Completed the tenant handler cleanup follow-up: removed the wildcard import from `backend/api/v1_tenant_handlers.py`, replaced it with e",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T03:30:39.845Z",
+      "lastRecalledAt": "2026-04-21T03:30:39.845Z",
+      "queryHashes": [
+        "f9753c289ac4"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "api.v1-routes",
+        "re-ran",
+        "py-compile",
+        "follow-up",
+        "started",
+        "the",
+        "dependency",
+        "cleanup"
+      ]
+    },
+    "memory:memory/2026-04-21.md:67:70": {
+      "key": "memory:memory/2026-04-21.md:67:70",
+      "path": "memory/2026-04-21.md",
+      "startLine": 67,
+      "endLine": 70,
+      "source": "memory",
+      "snippet": "- Split search-heavy route coverage out of `backend/tests/test_api_v1_routes.py` into `backend/tests/test_api_v1_search_routes.py` so the matching and fallback lane can be verified independently from communications and admin coverage - Verified compile health for `backend/api/v1_routes.py`, `backend/tests/test_api_v1_routes.py`, and `backend/tests/test_api_v1_search_routes.py` with `python3 -m py_compile`; runtime test execution is still blocked in the available shell environments because FastAPI and pytest are not installed there - Started the next bounded-context extraction pass for integrations: added `backend/api/v1_integration_handlers.py`, moved the current integration and outbox handl",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T03:30:39.845Z",
+      "lastRecalledAt": "2026-04-21T03:30:39.845Z",
+      "queryHashes": [
+        "f9753c289ac4"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "search-heavy",
+        "backend/api/v1-routes.py",
+        "py-compile",
+        "bounded-context",
+        "split",
+        "heavy",
+        "route",
+        "coverage"
+      ]
+    },
+    "memory:memory/2026-04-21.md:86:91": {
+      "key": "memory:memory/2026-04-21.md:86:91",
+      "path": "memory/2026-04-21.md",
+      "startLine": 86,
+      "endLine": 91,
+      "source": "memory",
+      "snippet": "- Continued the `backend/services.py` decomposition with a catalog asset slice: added `backend/service_layer/catalog_assets.py`, moved category or service image maps plus `resolve_service_image_url` there, updated `backend/services.py` to import the resolver instead of owning the asset tables inline, exported the resolver from `backend/service_layer/__init__.py`, and verified compile health for the affected backend modules with `python3 -m py_compile` - Reoriented the next `backend/services.py` decomposition slices around the user-prioritized WEBSITE, CALLS, and FOLLOW-UP lanes, then completed the WEBSITE helper extraction first: added `backend/service_layer/website_import_utils.py`, moved H",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T03:30:39.845Z",
+      "lastRecalledAt": "2026-04-21T03:30:39.845Z",
+      "queryHashes": [
+        "f9753c289ac4"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "backend/services.py",
+        "resolve-service-image-url",
+        "backend/service-layer",
+        "py-compile",
+        "user-prioritized",
+        "follow-up",
+        "continued",
+        "the"
+      ]
+    },
+    "memory:memory/2026-04-21.md:86:87": {
+      "key": "memory:memory/2026-04-21.md:86:87",
+      "path": "memory/2026-04-21.md",
+      "startLine": 86,
+      "endLine": 87,
+      "source": "memory",
+      "snippet": "- Continued the `backend/services.py` decomposition with a catalog asset slice: added `backend/service_layer/catalog_assets.py`, moved category or service image maps plus `resolve_service_image_url` there, updated `backend/services.py` to import the resolver instead of owning the asset tables inline, exported the resolver from `backend/service_layer/__init__.py`, and verified compile health for the affected backend modules with `python3 -m py_compile` - Reoriented the next `backend/services.py` decomposition slices around the user-prioritized WEBSITE, CALLS, and FOLLOW-UP lanes, then completed the WEBSITE helper extraction first: added `backend/service_layer/website_import_utils.py`, moved H",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T03:35:02.013Z",
+      "lastRecalledAt": "2026-04-21T03:35:02.013Z",
+      "queryHashes": [
+        "f45c5832ed3b"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "backend/services.py",
+        "resolve-service-image-url",
+        "backend/service-layer",
+        "py-compile",
+        "user-prioritized",
+        "follow-up",
+        "continued",
+        "the"
+      ]
+    },
+    "memory:memory/2026-04-21.md:87:92": {
+      "key": "memory:memory/2026-04-21.md:87:92",
+      "path": "memory/2026-04-21.md",
+      "startLine": 87,
+      "endLine": 92,
+      "source": "memory",
+      "snippet": "- Reoriented the next `backend/services.py` decomposition slices around the user-prioritized WEBSITE, CALLS, and FOLLOW-UP lanes, then completed the WEBSITE helper extraction first: added `backend/service_layer/website_import_utils.py`, moved HTML text extraction, related-page discovery, product-page discovery, URL detection, search-result URL parsing, JSON-LD flattening and extraction, price extraction, business-context extraction, structured-service extraction, and imported-image resolution helpers there with backward-compatible aliases, updated `backend/services.py` to import those helpers instead of defining them inline, exported the public website parsing helpers from `backend/service_l",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T03:35:02.013Z",
+      "lastRecalledAt": "2026-04-21T03:35:02.013Z",
+      "queryHashes": [
+        "f45c5832ed3b"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "backend/services.py",
+        "user-prioritized",
+        "follow-up",
+        "related-page",
+        "product-page",
+        "search-result",
+        "json-ld",
+        "business-context"
+      ]
+    },
+    "memory:memory/2026-04-21.md:82:85": {
+      "key": "memory:memory/2026-04-21.md:82:85",
+      "path": "memory/2026-04-21.md",
+      "startLine": 82,
+      "endLine": 85,
+      "source": "memory",
+      "snippet": "- Verified the frontend build passes after the homepage changes with `npm run build` from `frontend/` - Polished the same homepage pass again by making the logo-first section feel more premium with a cleaner framed surface, larger logo scale, and tighter supporting signals, while also upgrading the compact homepage menu icon to a more polished glass-button treatment - Refined the hero again so the live preview now shows the full BookedAI logo lockup with slogan instead of a square-only mark, removed the extra `Website enquiries / Call capture / Booking handoff` chips, and replaced them with cleaner, lighter summary cards that are easier to scan on first glance - Started the `backend/services",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T03:35:02.013Z",
+      "lastRecalledAt": "2026-04-21T03:35:02.013Z",
+      "queryHashes": [
+        "f45c5832ed3b"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "logo-first",
+        "glass-button",
+        "square-only",
+        "backend/services",
+        "verified",
+        "the",
+        "frontend",
+        "passes"
+      ]
+    },
+    "memory:memory/2026-04-21.md:88:100": {
+      "key": "memory:memory/2026-04-21.md:88:100",
+      "path": "memory/2026-04-21.md",
+      "startLine": 88,
+      "endLine": 100,
+      "source": "memory",
+      "snippet": "- Continued the earlier improvements with a FOLLOW-UP slice from `backend/services.py`: added `backend/service_layer/followup_copy.py`, moved booking manual follow-up URL generation plus booking, consultation, and demo confirmation or internal notification copy builders there, rewired `backend/services.py` methods to delegate to the new helper module, exported the new helpers from `backend/service_layer/__init__.py`, and verified compile health with `python3 -m py_compile` ## Frontend Hardening Follow-Up - Added broader frontend scan-path blocking for php, backup, temp, and config-like filenames so config.php, phpinfo.php, config.js, aws-config.js, and config.php.bak now return 404 instead",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T03:35:02.013Z",
+      "lastRecalledAt": "2026-04-21T03:35:02.013Z",
+      "queryHashes": [
+        "f45c5832ed3b"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "backup",
+        "follow-up",
+        "backend/services.py",
+        "backend/service-layer",
+        "py-compile",
+        "scan-path",
+        "config-like",
+        "config.php"
+      ]
+    }
+  }
+}

@@ -53,14 +53,14 @@ export function AdminDashboardHeader({
             type="button"
             onClick={onRefresh}
             disabled={loadingDashboard}
-            className="booked-button-secondary px-4 py-2 text-sm font-semibold disabled:opacity-60"
+            className="booked-button-secondary disabled:opacity-60"
           >
             {loadingDashboard ? 'Refreshing...' : 'Refresh'}
           </button>
           <button
             type="button"
             onClick={onLogout}
-            className="booked-button px-4 py-2 text-sm font-semibold"
+            className="booked-button"
           >
             Log out
           </button>

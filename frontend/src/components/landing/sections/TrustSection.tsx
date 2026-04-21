@@ -13,14 +13,14 @@ type TrustSectionProps = {
 const headingContent = {
   kicker: 'Trust',
   kickerClassName: 'text-emerald-600',
-  title: `Give buyers enough proof to trust ${brandName} quickly`,
-  body: 'Keep the proof realistic, compact, and easy to scan so service businesses can judge fit without wading through inflated claims.',
+  title: `Give buyers and investors enough proof to trust ${brandName} quickly`,
+  body: 'Keep the proof realistic, compact, and easy to scan so service businesses can judge fit while investors can understand the commercial logic fast.',
 };
 
 const trustSignals = [
-  { label: 'Response path', value: 'Clear' },
+  { label: 'Commercial model', value: 'Clear' },
   { label: 'Proof style', value: 'Grounded' },
-  { label: 'Buyer effort', value: 'Low' },
+  { label: 'Decision effort', value: 'Low' },
 ];
 
 export function TrustSection({ items, faqItems }: TrustSectionProps) {
@@ -36,18 +36,18 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
                 <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   {item.label}
                 </div>
-                <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">
+                <div className="mt-2 text-xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">
                   {item.value}
                 </div>
               </SectionCard>
             ))}
           </div>
 
-          <SectionCard tone="dark" className="mt-5 rounded-[1.8rem] p-5">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7dd3fc]">
+          <SectionCard className="mt-5 rounded-[1.8rem] p-5">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
               Trust frame
             </div>
-            <div className="mt-3 text-xl font-semibold tracking-[-0.03em] text-white">
+            <div className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">
               Confidence is the goal, not overclaiming.
             </div>
             <div className="mt-4 grid gap-3">
@@ -56,7 +56,7 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
                 'Use short proof blocks instead of dense marketing copy.',
                 'Answer risk questions before the buyer needs to ask.',
               ].map((item) => (
-                <div key={item} className="rounded-[1.05rem] border border-white/10 bg-white/8 px-4 py-3 text-sm leading-6 text-white/82">
+                <div key={item} className="rounded-[1.05rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-3 text-sm leading-6 text-black/72">
                   {item}
                 </div>
               ))}
@@ -84,7 +84,7 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
                   key={item.name + item.business}
                   as="article"
                   tone="subtle"
-                  className="flex h-full flex-col rounded-[1.6rem] p-6"
+                  className="flex h-full flex-col rounded-[1.45rem] p-5"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1d1d1f] text-[11px] font-semibold text-white">
@@ -94,7 +94,7 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
                       Customer cue
                     </SignalPill>
                   </div>
-                  <p className="mt-5 text-sm leading-7 text-slate-600">“{item.quote}”</p>
+                  <p className="mt-4 text-sm leading-6 text-slate-600">“{item.quote}”</p>
                   <div className="mt-auto pt-6">
                     <div className="text-sm font-semibold text-slate-950">{item.name}</div>
                     <div className="mt-1 text-sm text-slate-500">{item.business}</div>

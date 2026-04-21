@@ -519,7 +519,7 @@ export function DemoBookingDialog({
                 <button
                   type="submit"
                   disabled={isSubmittingBrief}
-                  className="booked-button inline-flex items-center justify-center px-5 py-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+                  className="booked-button inline-flex items-center justify-center disabled:cursor-not-allowed disabled:opacity-70"
                 >
                   {isSubmittingBrief ? 'Saving demo brief...' : 'Save demo brief'}
                 </button>
@@ -585,7 +585,7 @@ export function DemoBookingDialog({
                 href={EMBED_URL}
                 target="_blank"
                 rel="noreferrer"
-                className="booked-button-secondary inline-flex items-center justify-center border-cyan-300/30 bg-cyan-300/10 px-5 py-3 text-sm font-semibold text-cyan-100 hover:border-cyan-200/50 hover:bg-cyan-300/15 hover:text-white"
+                className="booked-button-secondary inline-flex items-center justify-center border-cyan-300/30 bg-cyan-300/10 text-cyan-100 hover:border-cyan-200/50 hover:bg-cyan-300/15 hover:text-white"
               >
                 Open full booking page
               </a>

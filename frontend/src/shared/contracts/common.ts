@@ -15,6 +15,7 @@ export type ApiChannel =
 export interface ApiActorContext {
   channel: ApiChannel;
   tenant_id?: string | null;
+  tenant_ref?: string | null;
   actor_id?: string | null;
   role?: string | null;
   deployment_mode?: DeploymentMode | null;

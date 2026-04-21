@@ -1,10 +1,14 @@
 from __future__ import annotations
 
-from sqlalchemy import desc, select
+from datetime import UTC, datetime
+
+from sqlalchemy import desc, select, text
 
 from db import ServiceMerchantProfile
+from repositories.audit_repository import AuditLogRepository
 from repositories.base import RepositoryContext
 from repositories.feature_flag_repository import FeatureFlagRepository
+from repositories.outbox_repository import OutboxRepository
 from repositories.reporting_repository import ReportingRepository
 from repositories.tenant_repository import TenantRepository
 from service_layer.admin_presenters import (
@@ -17,6 +21,51 @@ from service_layer.prompt11_integration_service import (
     build_integration_provider_statuses,
     build_reconciliation_details,
 )
+
+TENANT_BILLING_PLAN_CATALOG = [
+    {
+        "code": "starter",
+        "label": "Upgrade 1",
+        "price_label": "A$79/mo",
+        "monthly_amount_aud": 79,
+        "billing_interval": "monthly",
+        "description": "For early tenant teams moving beyond freemium into their first paid BookedAI package.",
+        "features": [
+            "Unified tenant sign-in and workspace",
+            "Catalog import, review, and publish controls",
+            "Core bookings, integrations, and billing visibility",
+        ],
+        "recommended": False,
+    },
+    {
+        "code": "growth",
+        "label": "Upgrade 2",
+        "price_label": "A$149/mo",
+        "monthly_amount_aud": 149,
+        "billing_interval": "monthly",
+        "description": "For tenants running recurring operations with the default paid BookedAI package and stronger reporting, billing posture, and team workflows.",
+        "features": [
+            "Everything in Upgrade 1",
+            "Revenue and billing health reporting",
+            "Priority support and production rollout posture",
+        ],
+        "recommended": True,
+    },
+    {
+        "code": "scale",
+        "label": "Upgrade 3",
+        "price_label": "A$299/mo",
+        "monthly_amount_aud": 299,
+        "billing_interval": "monthly",
+        "description": "For multi-location operators who need the most advanced BookedAI package, stronger controls, higher service volume, and paid SaaS governance.",
+        "features": [
+            "Everything in Upgrade 2",
+            "Expanded operational support lanes",
+            "Higher-touch rollout and billing governance",
+        ],
+        "recommended": False,
+    },
+]
 
 
 async def _load_tenant_context(session, *, tenant_ref: str | None = None) -> tuple[dict, str] | tuple[None, None]:
@@ -147,6 +196,968 @@ async def build_tenant_integrations_snapshot(session, *, tenant_ref: str | None 
         "attention": attention_items,
         "reconciliation": reconciliation,
         "crm_retry_backlog": crm_backlog,
+        "controls": {
+            "available_statuses": ["connected", "paused"],
+            "available_sync_modes": ["read_only", "write_back", "bidirectional"],
+            "operator_note": "Tenant portal integration writes currently focus on provider posture only; credential-level configuration remains admin-managed.",
+        },
+    }
+
+
+async def build_tenant_billing_snapshot(session, *, tenant_ref: str | None = None) -> dict:
+    tenant_profile, tenant_id = await _load_tenant_context(session, tenant_ref=tenant_ref)
+    if not tenant_profile or not tenant_id:
+        return {}
+
+    billing_account_result = await session.execute(
+        text(
+            """
+            select
+              id::text as id,
+              billing_email,
+              merchant_mode,
+              created_at,
+              updated_at
+            from billing_accounts
+            where tenant_id = cast(:tenant_id as uuid)
+            limit 1
+            """
+        ),
+        {"tenant_id": tenant_id},
+    )
+    billing_account = billing_account_result.mappings().first()
+
+    subscription_result = await session.execute(
+        text(
+            """
+            select
+              id::text as id,
+              billing_account_id::text as billing_account_id,
+              status,
+              plan_code,
+              started_at,
+              ended_at,
+              created_at,
+              updated_at
+            from subscriptions
+            where tenant_id = cast(:tenant_id as uuid)
+            order by updated_at desc nulls last, created_at desc nulls last
+            limit 1
+            """
+        ),
+        {"tenant_id": tenant_id},
+    )
+    subscription = subscription_result.mappings().first()
+
+    period_rows: list[dict] = []
+    if subscription and subscription.get("id"):
+        periods_result = await session.execute(
+            text(
+                """
+                select
+                  id::text as id,
+                  period_start,
+                  period_end,
+                  status,
+                  created_at
+                from subscription_periods
+                where subscription_id = cast(:subscription_id as uuid)
+                order by period_start desc, created_at desc
+                limit 6
+                """
+            ),
+            {"subscription_id": subscription["id"]},
+        )
+        period_rows = list(periods_result.mappings().all())
+
+    latest_period = period_rows[0] if period_rows else None
+    open_periods = sum(1 for item in period_rows if str(item.get("status") or "").lower() == "open")
+    closed_periods = sum(
+        1 for item in period_rows if str(item.get("status") or "").lower() in {"closed", "paid"}
+    )
+
+    has_billing_account = bool(billing_account)
+    has_active_subscription = str(subscription.get("status") if subscription else "").lower() in {
+        "active",
+        "trialing",
+    }
+    merchant_mode = str(billing_account.get("merchant_mode") or "").strip().lower() if billing_account else ""
+    can_charge = has_active_subscription and merchant_mode in {"live", "production"}
+
+    if not has_billing_account:
+        recommended_action = "Create a billing account before enabling package-based tenant charging."
+        operator_note = "Billing identity has not been configured for this tenant yet."
+    elif not subscription:
+        recommended_action = "Attach a subscription package so this tenant can move into paid SaaS operations."
+        operator_note = "Billing account exists, but no subscription contract is attached yet."
+    elif not has_active_subscription:
+        recommended_action = "Review subscription status before relying on this tenant for recurring billing."
+        operator_note = "A subscription record exists, but it is not currently in an active or trialing state."
+    elif not can_charge:
+        recommended_action = "Switch merchant mode to live when payment collection is ready for production."
+        operator_note = "Subscription is active, but payment collection is still not in live merchant mode."
+    else:
+        recommended_action = "Monitor renewal periods, invoices, and payment method health from this tenant workspace."
+        operator_note = "Tenant billing is structurally ready for paid SaaS operations."
+
+    trial_days = 14
+    plan_catalog = []
+    current_plan_code = str(subscription.get("plan_code") or "").strip().lower() if subscription else ""
+    for plan in TENANT_BILLING_PLAN_CATALOG:
+        is_current = current_plan_code == plan["code"]
+        if is_current and has_active_subscription:
+            cta_label = "Current package"
+        elif has_active_subscription:
+            cta_label = "Switch to this package"
+        else:
+            cta_label = f"Start {trial_days}-day package trial"
+        plan_catalog.append(
+            {
+                **plan,
+                "is_current": is_current,
+                "cta_label": cta_label,
+            }
+        )
+
+    trial_end_at = (
+        latest_period.get("period_end")
+        if latest_period and str(subscription.get("status") or "").lower() == "trialing"
+        else None
+    )
+    current_plan = next((item for item in TENANT_BILLING_PLAN_CATALOG if item["code"] == current_plan_code), None)
+    plan_amount_aud = int(current_plan["monthly_amount_aud"]) if current_plan else 0
+
+    invoice_items = []
+    for index, item in enumerate(period_rows, start=1):
+        raw_status = str(item.get("status") or "").strip().lower()
+        if raw_status in {"paid", "closed"}:
+            invoice_status = "paid"
+        elif raw_status in {"trial_open", "open"}:
+            invoice_status = "open"
+        else:
+            invoice_status = raw_status or "pending"
+        invoice_items.append(
+            {
+                "id": f"inv-{item.get('id') or index}",
+                "invoice_number": f"INV-{str(tenant_profile.get('slug') or 'tenant').upper()[:8]}-{index:03d}",
+                "status": invoice_status,
+                "amount_aud": 0 if raw_status == "trial_open" else plan_amount_aud,
+                "currency": "AUD",
+                "issued_at": item.get("created_at") or item.get("period_start"),
+                "due_at": item.get("period_end"),
+                "period_start": item.get("period_start"),
+                "period_end": item.get("period_end"),
+                "receipt_available": raw_status in {"paid", "closed"},
+                "source": "subscription_period",
+            }
+        )
+
+    payment_method_status = "configured" if can_charge else "not_collected"
+    if has_billing_account and not has_active_subscription:
+        payment_method_status = "setup_pending"
+    elif has_active_subscription and not can_charge:
+        payment_method_status = "needs_collection"
+
+    audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    recent_audit_entries = await audit_repository.list_recent_entries(tenant_id=tenant_id, limit=12)
+    billing_audit_events = []
+    for item in recent_audit_entries:
+        event_type = str(item.get("event_type") or "").strip()
+        entity_type = str(item.get("entity_type") or "").strip()
+        if not (
+            event_type.startswith("tenant.")
+            or entity_type in {"billing_account", "subscription", "tenant_profile"}
+        ):
+            continue
+        payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+        billing_audit_events.append(
+            {
+                "id": f"audit-{item.get('id')}",
+                "event_type": event_type,
+                "entity_type": entity_type or None,
+                "entity_id": item.get("entity_id"),
+                "actor_type": item.get("actor_type"),
+                "actor_id": item.get("actor_id"),
+                "created_at": item.get("created_at"),
+                "summary": str(payload.get("summary") or event_type.replace(".", " ")).strip(),
+            }
+        )
+        if len(billing_audit_events) >= 6:
+            break
+
+    return {
+        "tenant": tenant_profile,
+        "account": {
+            "id": billing_account.get("id") if billing_account else None,
+            "billing_email": billing_account.get("billing_email") if billing_account else None,
+            "merchant_mode": billing_account.get("merchant_mode") if billing_account else None,
+            "created_at": billing_account.get("created_at") if billing_account else None,
+            "updated_at": billing_account.get("updated_at") if billing_account else None,
+        },
+        "subscription": {
+            "id": subscription.get("id") if subscription else None,
+            "billing_account_id": subscription.get("billing_account_id") if subscription else None,
+            "status": subscription.get("status") if subscription else "not_started",
+            "package_code": subscription.get("plan_code") if subscription else None,
+            "plan_code": subscription.get("plan_code") if subscription else None,
+            "started_at": subscription.get("started_at") if subscription else None,
+            "ended_at": subscription.get("ended_at") if subscription else None,
+            "created_at": subscription.get("created_at") if subscription else None,
+            "updated_at": subscription.get("updated_at") if subscription else None,
+            "current_period_start": latest_period.get("period_start") if latest_period else None,
+            "current_period_end": latest_period.get("period_end") if latest_period else None,
+            "current_period_status": latest_period.get("status") if latest_period else None,
+        },
+        "period_summary": {
+            "total_periods": len(period_rows),
+            "open_periods": open_periods,
+            "closed_periods": closed_periods,
+            "latest_status": latest_period.get("status") if latest_period else None,
+        },
+        "periods": [
+            {
+                "id": item.get("id"),
+                "period_start": item.get("period_start"),
+                "period_end": item.get("period_end"),
+                "status": item.get("status"),
+                "created_at": item.get("created_at"),
+            }
+            for item in period_rows
+        ],
+        "collection": {
+            "has_billing_account": has_billing_account,
+            "has_active_subscription": has_active_subscription,
+            "can_charge": can_charge,
+            "operator_note": operator_note,
+            "recommended_action": recommended_action,
+        },
+        "self_serve": {
+            "billing_setup_complete": has_billing_account,
+            "payment_method_status": payment_method_status,
+            "trial_days": trial_days,
+            "trial_end_at": trial_end_at,
+            "can_start_trial": has_billing_account and not has_active_subscription,
+            "can_change_plan": has_billing_account,
+            "can_manage_billing": True,
+        },
+        "payment_method": {
+            "status": payment_method_status,
+            "provider_label": "BookedAI billing",
+            "brand": "Card on file" if can_charge else None,
+            "last4": "4242" if can_charge else None,
+            "expires_label": "Placeholder until gateway tokenization is connected" if can_charge else None,
+            "note": (
+                "Payment collection is enabled in live mode."
+                if can_charge
+                else "Payment method capture is not connected yet; this portal is exposing truthful readiness state only."
+            ),
+        },
+        "settings": {
+            "billing_email": billing_account.get("billing_email") if billing_account else None,
+            "merchant_mode": billing_account.get("merchant_mode") if billing_account else None,
+            "invoice_delivery": "email",
+            "auto_renew": bool(subscription and str(subscription.get("status") or "").lower() in {"active", "trialing"}),
+            "support_tier": current_plan["label"] if current_plan else "Not assigned",
+        },
+        "invoices": invoice_items,
+        "invoice_summary": {
+            "total_invoices": len(invoice_items),
+            "open_invoices": sum(1 for item in invoice_items if item["status"] == "open"),
+            "paid_invoices": sum(1 for item in invoice_items if item["status"] == "paid"),
+            "currency": "AUD",
+        },
+        "audit_trail": billing_audit_events,
+        "plans": plan_catalog,
+        "upcoming_capabilities": [
+            "Self-serve payment method management",
+            "Invoice history and downloadable receipts",
+            "Plan changes, upgrade prompts, and billing alerts",
+        ],
+    }
+
+
+def build_tenant_invoice_receipt(invoice: dict, *, tenant: dict, billing: dict) -> dict:
+    invoice_number = str(invoice.get("invoice_number") or "INV-TENANT").strip()
+    currency = str(invoice.get("currency") or "AUD").strip().upper()
+    amount_aud = float(invoice.get("amount_aud") or 0)
+    issued_at = invoice.get("issued_at")
+    due_at = invoice.get("due_at")
+    status = str(invoice.get("status") or "open").strip().lower()
+    tenant_name = str(tenant.get("name") or tenant.get("slug") or "BookedAI Tenant").strip()
+    plan_code = str(billing.get("subscription", {}).get("plan_code") or billing.get("subscription", {}).get("package_code") or "package").strip()
+    receipt_number = invoice_number.replace("INV-", "RCT-")
+    paid_at = datetime.now(UTC).isoformat() if status == "paid" else None
+    line_items = [
+        {
+            "description": f"BookedAI {plan_code.title()} subscription",
+            "amount_aud": amount_aud,
+        }
+    ]
+    text = "\n".join(
+        [
+            f"Receipt {receipt_number}",
+            f"Invoice {invoice_number}",
+            f"Tenant {tenant_name}",
+            f"Status {status}",
+            f"Issued {issued_at or 'not scheduled'}",
+            f"Due {due_at or 'not scheduled'}",
+            f"Amount {currency} {amount_aud:.2f}",
+            *(f"Line item: {item['description']} - {currency} {float(item['amount_aud']):.2f}" for item in line_items),
+        ]
+    )
+    return {
+        "receipt_number": receipt_number,
+        "invoice_id": invoice.get("id"),
+        "invoice_number": invoice_number,
+        "tenant_name": tenant_name,
+        "status": status,
+        "currency": currency,
+        "amount_aud": amount_aud,
+        "issued_at": issued_at,
+        "due_at": due_at,
+        "paid_at": paid_at,
+        "billing_email": billing.get("account", {}).get("billing_email"),
+        "merchant_mode": billing.get("account", {}).get("merchant_mode"),
+        "line_items": line_items,
+        "download_filename": f"{receipt_number.lower()}.txt",
+        "text": text,
+    }
+
+
+async def build_tenant_onboarding_snapshot(session, *, tenant_ref: str | None = None) -> dict:
+    tenant_profile, tenant_id = await _load_tenant_context(session, tenant_ref=tenant_ref)
+    if not tenant_profile or not tenant_id:
+        return {}
+
+    catalog_result = await session.execute(
+        text(
+            """
+            select
+              count(*) as total_records,
+              count(*) filter (where coalesce(publish_state, 'draft') = 'published') as published_records
+            from service_merchant_profiles
+            where tenant_id = :tenant_id
+            """
+        ),
+        {"tenant_id": tenant_id},
+    )
+    catalog_row = catalog_result.mappings().first() or {}
+
+    billing_result = await session.execute(
+        text(
+            """
+            select
+              exists(
+                select 1
+                from billing_accounts
+                where tenant_id = cast(:tenant_id as uuid)
+              ) as has_billing_account,
+              exists(
+                select 1
+                from subscriptions
+                where tenant_id = cast(:tenant_id as uuid)
+                  and status in ('active', 'trialing')
+              ) as has_active_subscription
+            """
+        ),
+        {"tenant_id": tenant_id},
+    )
+    billing_row = billing_result.mappings().first() or {}
+
+    business_profile_ready = bool(str(tenant_profile.get("name") or "").strip())
+    catalog_ready = int(catalog_row.get("total_records") or 0) > 0
+    publish_ready = int(catalog_row.get("published_records") or 0) > 0
+    billing_ready = bool(billing_row.get("has_billing_account"))
+    subscription_ready = bool(billing_row.get("has_active_subscription"))
+
+    steps = [
+        {
+            "id": "account",
+            "label": "Account created",
+            "status": "complete",
+            "description": "Tenant identity exists and can access the portal.",
+        },
+        {
+            "id": "business_profile",
+            "label": "Business profile",
+            "status": "complete" if business_profile_ready else "incomplete",
+            "description": "Add business name, industry, and workspace basics.",
+        },
+        {
+            "id": "catalog",
+            "label": "Catalog input",
+            "status": "complete" if catalog_ready else "incomplete",
+            "description": "Import or enter at least one tenant-owned service row.",
+        },
+        {
+            "id": "publish",
+            "label": "Public publish",
+            "status": "complete" if publish_ready else "incomplete",
+            "description": "Publish at least one search-ready record for public discovery.",
+        },
+        {
+            "id": "billing",
+            "label": "Billing setup",
+            "status": "complete" if billing_ready else "incomplete",
+            "description": "Attach billing identity and merchant posture.",
+        },
+        {
+            "id": "subscription",
+            "label": "Subscription live",
+            "status": "complete" if subscription_ready else "incomplete",
+            "description": "Move the tenant into an active or trialing paid state.",
+        },
+    ]
+
+    completed_steps = len([step for step in steps if step["status"] == "complete"])
+    progress_percent = int((completed_steps / len(steps)) * 100) if steps else 0
+
+    if completed_steps == len(steps):
+        recommended_next_action = "Tenant setup baseline is complete. Focus on monthly value visibility and retention loops."
+    elif not catalog_ready:
+        recommended_next_action = "Import or enter the first service so the workspace can move beyond account setup."
+    elif not publish_ready:
+        recommended_next_action = "Review and publish a search-ready service to activate tenant-owned discovery."
+    elif not billing_ready:
+        recommended_next_action = "Configure billing identity so the tenant can move toward paid SaaS operations."
+    else:
+        recommended_next_action = "Attach an active subscription or trial before paid rollout."
+
+    return {
+        "tenant": tenant_profile,
+        "progress": {
+            "completed_steps": completed_steps,
+            "total_steps": len(steps),
+            "percent": progress_percent,
+        },
+        "steps": steps,
+        "checkpoints": {
+            "catalog_records": int(catalog_row.get("total_records") or 0),
+            "published_records": int(catalog_row.get("published_records") or 0),
+            "has_billing_account": billing_ready,
+            "has_active_subscription": subscription_ready,
+        },
+        "recommended_next_action": recommended_next_action,
+    }
+
+
+async def build_tenant_team_snapshot(session, *, tenant_ref: str | None = None) -> dict:
+    tenant_profile, tenant_id = await _load_tenant_context(session, tenant_ref=tenant_ref)
+    if not tenant_profile or not tenant_id:
+        return {}
+
+    tenant_repository = TenantRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    members = await tenant_repository.list_tenant_members(tenant_id)
+    invite_audit_rows = await audit_repository.list_recent_entries(
+        tenant_id=tenant_id,
+        limit=12,
+    )
+
+    role_counts = {
+        "tenant_admin": 0,
+        "finance_manager": 0,
+        "operator": 0,
+        "other": 0,
+    }
+    status_counts = {
+        "active": 0,
+        "invited": 0,
+        "disabled": 0,
+        "other": 0,
+    }
+    normalized_members = []
+    for item in members:
+        role = str(item.get("role") or "operator").strip().lower()
+        status = str(item.get("status") or "active").strip().lower()
+        if role in role_counts:
+            role_counts[role] += 1
+        else:
+            role_counts["other"] += 1
+        if status in status_counts:
+            status_counts[status] += 1
+        else:
+            status_counts["other"] += 1
+        normalized_members.append(
+            {
+                "email": item.get("email"),
+                "full_name": item.get("full_name"),
+                "role": role,
+                "status": status,
+                "auth_provider": item.get("auth_provider"),
+                "created_at": item.get("created_at"),
+                "updated_at": item.get("updated_at"),
+            }
+        )
+
+    invite_activity = []
+    for item in invite_audit_rows:
+        event_type = str(item.get("event_type") or "").strip()
+        if event_type not in {
+            "tenant.team.member_invited",
+            "tenant.team.member_invite_resent",
+            "tenant.team.member_invite_accepted",
+        }:
+            continue
+        payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+        invite_activity.append(
+            {
+                "id": f"invite-audit-{item.get('id')}",
+                "event_type": event_type,
+                "created_at": item.get("created_at"),
+                "actor_id": item.get("actor_id"),
+                "recipient_email": payload.get("email"),
+                "role": payload.get("role"),
+                "delivery_status": payload.get("invite_delivery_status"),
+                "invite_url": payload.get("invite_url"),
+                "summary": str(payload.get("summary") or "Tenant invite recorded.").strip(),
+            }
+        )
+        if len(invite_activity) >= 6:
+            break
+
+    return {
+        "tenant": tenant_profile,
+        "summary": {
+            "total_members": len(normalized_members),
+            "active_members": status_counts["active"],
+            "invited_members": status_counts["invited"],
+            "admin_members": role_counts["tenant_admin"],
+            "finance_members": role_counts["finance_manager"],
+        },
+        "role_counts": role_counts,
+        "status_counts": status_counts,
+        "available_roles": [
+            {
+                "code": "tenant_admin",
+                "label": "Tenant Admin",
+                "description": "Full tenant control across billing, catalog, reporting, and team access.",
+            },
+            {
+                "code": "finance_manager",
+                "label": "Finance Manager",
+                "description": "Can review billing and manage plans without full tenant administration.",
+            },
+            {
+                "code": "operator",
+                "label": "Operator",
+                "description": "Read and operate day-to-day workspace areas without billing control.",
+            },
+        ],
+        "invite_activity": invite_activity,
+        "members": normalized_members,
+    }
+
+
+def _normalize_portal_action_style(action_id: str) -> str:
+    if action_id == "pay_now":
+        return "primary"
+    if action_id == "request_cancel":
+        return "danger"
+    return "secondary"
+
+
+def _normalize_portal_status_tone(value: str) -> str:
+    normalized = str(value or "").strip().lower()
+    if normalized in {"cancelled", "failed", "error"}:
+        return "attention"
+    if normalized in {"completed", "paid", "succeeded"}:
+        return "healthy"
+    return "monitor"
+
+
+async def _load_portal_booking_row(session, *, booking_reference: str):
+    normalized_reference = str(booking_reference or "").strip()
+    if not normalized_reference:
+        return None
+
+    booking_result = await session.execute(
+        text(
+            """
+            select
+              bi.id::text as booking_intent_id,
+              bi.tenant_id::text as tenant_id,
+              bi.booking_reference,
+              bi.service_name,
+              bi.service_id,
+              bi.requested_date,
+              bi.requested_time,
+              bi.timezone,
+              bi.booking_path,
+              bi.confidence_level,
+              bi.status,
+              bi.payment_dependency_state,
+              bi.metadata_json,
+              bi.created_at::text as created_at,
+              c.full_name as customer_name,
+              c.email as customer_email,
+              c.phone as customer_phone,
+              sm.business_name,
+              sm.business_email,
+              sm.owner_email,
+              sm.category,
+              sm.summary,
+              sm.amount_aud as service_amount_aud,
+              sm.currency_code,
+              sm.display_price,
+              sm.duration_minutes,
+              sm.venue_name,
+              sm.location,
+              sm.map_url,
+              sm.booking_url,
+              sm.image_url
+            from booking_intents bi
+            left join contacts c
+              on c.id = bi.contact_id
+            left join service_merchant_profiles sm
+              on sm.service_id = bi.service_id
+            where bi.booking_reference = :booking_reference
+            limit 1
+            """
+        ),
+        {"booking_reference": normalized_reference},
+    )
+    return booking_result.mappings().first()
+
+
+async def build_portal_booking_snapshot(session, *, booking_reference: str) -> dict:
+    normalized_reference = str(booking_reference or "").strip()
+    if not normalized_reference:
+        return {}
+
+    booking_row = await _load_portal_booking_row(
+        session,
+        booking_reference=normalized_reference,
+    )
+    if not booking_row:
+        return {}
+
+    payment_result = await session.execute(
+        text(
+            """
+            select
+              pi.id::text as payment_intent_id,
+              pi.payment_option,
+              pi.status,
+              pi.amount_aud,
+              pi.currency,
+              pi.payment_url,
+              pi.external_session_id,
+              pi.metadata_json,
+              pi.created_at::text as created_at
+            from payment_intents pi
+            join booking_intents bi
+              on bi.id = pi.booking_intent_id
+            where bi.booking_reference = :booking_reference
+            order by pi.created_at desc
+            limit 1
+            """
+        ),
+        {"booking_reference": normalized_reference},
+    )
+    payment_row = payment_result.mappings().first()
+
+    booking_metadata = dict(booking_row.get("metadata_json") or {})
+    notes = str(booking_metadata.get("notes") or "").strip() or None
+
+    payment_status = (
+        str(payment_row.get("status") or booking_row.get("payment_dependency_state") or "pending").strip()
+        or "pending"
+    )
+    payment_url = str(payment_row.get("payment_url") or "").strip() or None
+    booking_status = str(booking_row.get("status") or "captured").strip() or "captured"
+
+    can_pay_now = bool(payment_url) and payment_status.lower() not in {
+        "paid",
+        "succeeded",
+        "completed",
+        "cancelled",
+    }
+    can_request_reschedule = booking_status.lower() not in {"cancelled", "completed"}
+    can_request_cancel = booking_status.lower() not in {"cancelled", "completed"}
+
+    support_email = (
+        str(booking_row.get("business_email") or "").strip().lower()
+        or str(booking_row.get("owner_email") or "").strip().lower()
+        or "support@bookedai.au"
+    )
+    booking_closed = booking_status.lower() in {"cancelled", "completed"}
+    payment_failed = payment_status.lower() in {"failed", "requires_action", "payment_follow_up_required"}
+    payment_complete = payment_status.lower() in {"paid", "succeeded", "completed"}
+
+    action_rows = [
+        {
+            "id": "pay_now",
+            "label": "Complete payment",
+            "description": "Finish payment using the current secure payment link.",
+            "enabled": can_pay_now,
+            "href": payment_url,
+            "note": None if can_pay_now else "Payment is already settled or no active payment link is available.",
+        },
+        {
+            "id": "request_reschedule",
+            "label": "Request reschedule",
+            "description": "Ask the team to review and move this booking to a different time.",
+            "enabled": can_request_reschedule,
+            "href": None,
+            "note": None if can_request_reschedule else "This booking can no longer be rescheduled from the portal.",
+        },
+        {
+            "id": "request_cancel",
+            "label": "Request cancellation",
+            "description": "Send a cancellation request for manual confirmation.",
+            "enabled": can_request_cancel,
+            "href": None,
+            "note": None if can_request_cancel else "This booking can no longer be cancelled from the portal.",
+        },
+        {
+            "id": "contact_support",
+            "label": "Contact support",
+            "description": "Get help from the business or BookedAI support team.",
+            "enabled": True,
+            "href": f"mailto:{support_email}?subject=Booking%20support%20{normalized_reference}",
+            "note": None,
+        },
+    ]
+
+    status_summary = {
+        "tone": "monitor",
+        "title": "Booking under review",
+        "body": "This booking is active in the portal and may still require follow-up from the provider.",
+    }
+    if booking_closed and booking_status.lower() == "cancelled":
+        status_summary = {
+            "tone": "attention",
+            "title": "Booking cancelled",
+            "body": "This booking is already marked as cancelled, so no further scheduling actions are available in the portal.",
+        }
+    elif booking_closed:
+        status_summary = {
+            "tone": "healthy",
+            "title": "Booking completed",
+            "body": "This booking is already marked complete. The portal remains available for review and support follow-up.",
+        }
+    elif payment_failed:
+        status_summary = {
+            "tone": "attention",
+            "title": "Payment needs attention",
+            "body": "A payment issue or follow-up requirement is recorded for this booking. Use the portal actions or contact support to resolve it.",
+        }
+    elif payment_complete:
+        status_summary = {
+            "tone": "healthy",
+            "title": "Payment received",
+            "body": "Payment is already recorded for this booking. You can still review the booking and contact support if anything changes.",
+        }
+
+    timeline = [
+        {
+            "id": "booking_created",
+            "label": "Booking captured",
+            "detail": f"Reference {normalized_reference} was created and is now visible in the portal.",
+            "tone": "complete",
+        },
+        {
+            "id": "schedule_state",
+            "label": "Schedule requested",
+            "detail": "The requested date and time are recorded below for review and follow-up.",
+            "tone": "complete"
+            if booking_row.get("requested_date") or booking_row.get("requested_time")
+            else "current",
+        },
+        {
+            "id": "payment_state",
+            "label": "Payment status",
+            "detail": f"Current payment state: {payment_status.replace('_', ' ')}.",
+            "tone": "complete" if payment_status.lower() in {"paid", "succeeded", "completed"} else "current",
+        },
+    ]
+
+    if booking_row.get("booking_path"):
+        timeline.append(
+            {
+                "id": "booking_path",
+                "label": "Booking path selected",
+                "detail": f"The current booking path is {(str(booking_row.get('booking_path') or '').replace('_', ' '))}.",
+                "tone": "upcoming" if booking_closed else "current",
+            }
+        )
+
+    booking_intent_id = str(booking_row.get("booking_intent_id") or "").strip()
+    if booking_intent_id:
+        audit_result = await session.execute(
+            text(
+                """
+                select
+                  id,
+                  event_type,
+                  payload,
+                  created_at::text as created_at
+                from audit_logs
+                where entity_id = :entity_id
+                  and event_type like 'portal.%'
+                order by created_at desc, id desc
+                limit 5
+                """
+            ),
+            {"entity_id": booking_intent_id},
+        )
+        audit_rows = list(audit_result.mappings().all())
+        for item in reversed(audit_rows):
+            event_type = str(item.get("event_type") or "").strip()
+            created_at = str(item.get("created_at") or "").strip()
+            payload = dict(item.get("payload") or {})
+            event_label = (
+                "Reschedule request submitted"
+                if event_type == "portal.reschedule_request.requested"
+                else "Cancellation request submitted"
+                if event_type == "portal.cancel_request.requested"
+                else "Portal request submitted"
+            )
+            detail_parts = [f"Recorded at {created_at}."] if created_at else []
+            if payload.get("customer_note"):
+                detail_parts.append(f"Customer note: {payload.get('customer_note')}")
+            if payload.get("preferred_date") or payload.get("preferred_time"):
+                detail_parts.append(
+                    "Requested schedule: "
+                    f"{payload.get('preferred_date') or 'date pending'}"
+                    f" {payload.get('preferred_time') or ''}".strip()
+                )
+            timeline.append(
+                {
+                    "id": f"audit_{item.get('id')}",
+                    "label": event_label,
+                    "detail": " ".join(detail_parts).strip() or "A customer portal request was recorded.",
+                    "tone": "current",
+                }
+            )
+
+    return {
+        "booking": {
+            "booking_reference": normalized_reference,
+            "status": booking_status,
+            "created_at": booking_row.get("created_at"),
+            "requested_date": booking_row.get("requested_date"),
+            "requested_time": booking_row.get("requested_time"),
+            "timezone": booking_row.get("timezone"),
+            "booking_path": booking_row.get("booking_path"),
+            "confidence_level": booking_row.get("confidence_level"),
+            "payment_dependency_state": booking_row.get("payment_dependency_state"),
+            "notes": notes,
+        },
+        "customer": {
+            "full_name": booking_row.get("customer_name"),
+            "email": booking_row.get("customer_email"),
+            "phone": booking_row.get("customer_phone"),
+        },
+        "service": {
+            "service_name": booking_row.get("service_name"),
+            "service_id": booking_row.get("service_id"),
+            "business_name": booking_row.get("business_name"),
+            "category": booking_row.get("category"),
+            "summary": booking_row.get("summary"),
+            "duration_minutes": booking_row.get("duration_minutes"),
+            "amount_aud": booking_row.get("service_amount_aud"),
+            "currency_code": booking_row.get("currency_code"),
+            "display_price": booking_row.get("display_price"),
+            "venue_name": booking_row.get("venue_name"),
+            "location": booking_row.get("location"),
+            "map_url": booking_row.get("map_url"),
+            "booking_url": booking_row.get("booking_url"),
+            "image_url": booking_row.get("image_url"),
+        },
+        "payment": {
+            "status": payment_status,
+            "amount_aud": payment_row.get("amount_aud") if payment_row else booking_row.get("service_amount_aud"),
+            "currency": payment_row.get("currency") if payment_row else booking_row.get("currency_code"),
+            "payment_url": payment_url,
+        },
+        "status_summary": status_summary,
+        "allowed_actions": [
+            {**item, "style": _normalize_portal_action_style(str(item["id"]))} for item in action_rows
+        ],
+        "support": {
+            "contact_email": support_email,
+            "contact_phone": None,
+            "contact_label": booking_row.get("business_name") or "BookedAI support",
+        },
+        "status_timeline": timeline,
+    }
+
+
+async def queue_portal_booking_request(
+    session,
+    *,
+    booking_reference: str,
+    request_type: str,
+    customer_note: str | None = None,
+    preferred_date: str | None = None,
+    preferred_time: str | None = None,
+    timezone: str | None = None,
+) -> dict:
+    booking_row = await _load_portal_booking_row(session, booking_reference=booking_reference)
+    if not booking_row:
+        return {}
+
+    normalized_reference = str(booking_row.get("booking_reference") or booking_reference).strip()
+    tenant_id = str(booking_row.get("tenant_id") or "").strip() or None
+    booking_intent_id = str(booking_row.get("booking_intent_id") or "").strip() or None
+    support_email = (
+        str(booking_row.get("business_email") or "").strip().lower()
+        or str(booking_row.get("owner_email") or "").strip().lower()
+        or "support@bookedai.au"
+    )
+
+    safe_request_type = request_type.strip().lower()
+    request_payload = {
+        "booking_reference": normalized_reference,
+        "request_type": safe_request_type,
+        "customer_note": (customer_note or "").strip() or None,
+        "preferred_date": (preferred_date or "").strip() or None,
+        "preferred_time": (preferred_time or "").strip() or None,
+        "timezone": (timezone or "").strip() or None,
+        "customer_name": booking_row.get("customer_name"),
+        "customer_email": booking_row.get("customer_email"),
+        "customer_phone": booking_row.get("customer_phone"),
+        "service_name": booking_row.get("service_name"),
+        "business_name": booking_row.get("business_name"),
+        "support_email": support_email,
+    }
+
+    audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    outbox_repository = OutboxRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+
+    await audit_repository.append_entry(
+        tenant_id=tenant_id,
+        event_type=f"portal.{safe_request_type}.requested",
+        entity_type="booking_intent",
+        entity_id=booking_intent_id,
+        actor_type="portal_customer",
+        actor_id=normalized_reference,
+        payload=request_payload,
+    )
+    outbox_id = await outbox_repository.enqueue_event(
+        tenant_id=tenant_id,
+        event_type=f"portal.{safe_request_type}.requested",
+        aggregate_type="booking_intent",
+        aggregate_id=booking_intent_id,
+        payload=request_payload,
+        idempotency_key=f"portal:{safe_request_type}:{normalized_reference}:{preferred_date or ''}:{preferred_time or ''}:{(customer_note or '').strip()}",
+    )
+
+    message = (
+        "Your reschedule request has been recorded for manual review."
+        if safe_request_type == "reschedule_request"
+        else "Your cancellation request has been recorded for manual review."
+    )
+
+    return {
+        "request_status": "queued",
+        "request_type": safe_request_type,
+        "booking_reference": normalized_reference,
+        "message": message,
+        "support_email": support_email,
+        "outbox_event_id": outbox_id,
     }
 
 
@@ -220,6 +1231,8 @@ async def build_tenant_catalog_snapshot(
                 "duration_minutes",
                 "location",
                 "amount_aud",
+                "currency_code",
+                "display_price",
                 "summary",
                 "image_url",
                 "booking_url",

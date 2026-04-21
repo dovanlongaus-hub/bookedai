@@ -31,6 +31,7 @@ export interface PricingConsultationResponse {
   status: string;
   consultation_reference: string;
   plan_id: PricingPlanId;
+  package_name?: string;
   plan_name: string;
   amount_aud: number;
   amount_label: string;

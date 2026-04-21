@@ -255,11 +255,11 @@ Align every core planning artifact to the new revenue-engine model before major 
 - no core document still frames BookedAI as a chat-first product
 - Phase 0 execution package is approved and used as the handoff into Phase 1
 
-## Phase 1 - Premium public narrative and brand system
+## Phase 1 - Homepage sales deck, premium public narrative, and brand system
 
 ### Objective
 
-Make the public story immediately clear and commercially credible.
+Make the homepage the primary sales deck so the public story is immediately clear, commercially credible, and ready to convert real SME interest.
 
 ### In scope
 
@@ -268,24 +268,29 @@ Make the public story immediately clear and commercially credible.
 - header, hero, section hierarchy, CTA system
 - premium dark-mode visual language
 - pricing explanation with setup fee plus commission
+- launch offer for first 10 SME customers
+- QR and registration-led conversion path
+- clear separation between homepage selling layer and deeper `product/demo` runtime
 
 ### Key deliverables
 
 - production-ready landing-page copy
 - component tree
 - premium hero and widget design spec
+- homepage CTA architecture for free setup, trial, and product demo
 
 ### Exit criteria
 
 - public narrative explains BookedAI in under five seconds
 - pricing feels aligned and lower-risk
+- the homepage can sell the launch offer without requiring the full live runtime to explain itself
 - Phase 1-2 execution package is approved and used as the implementation baseline
 
-## Phase 2 - Landing implementation and growth instrumentation
+## Phase 2 - Landing implementation, registration conversion, and growth instrumentation
 
 ### Objective
 
-Ship the new landing page and connect it to measurable growth inputs.
+Ship the homepage sales deck and connect it to measurable registration and growth inputs.
 
 ### In scope
 
@@ -294,15 +299,20 @@ Ship the new landing page and connect it to measurable growth inputs.
 - browser-framed hero dashboard
 - integration strip and activity feed
 - attribution capture for public CTA flows
+- interested-registration flow
+- launch-offer email confirmation path
+- standalone versus full-portal deployment-mode selling
 
 ### Key deliverables
 
 - deployed premium landing page
 - conversion tracking for demo and strategy flows
+- SME registration path for setup, trial, and onboarding intent
 
 ### Exit criteria
 
 - public experience is live and aligned to the new positioning
+- homepage can convert real SME interest into a BookedAI-owned registration flow
 
 ## Phase 3 - Commercial data foundation
 
@@ -624,25 +634,33 @@ Outputs:
 
 Focus:
 
+- `tenant.bookedai.au` as the canonical tenant host
+- unified tenant sign-up and sign-in
 - tenant dashboard shell
 - revenue summary
 - conversion and recovery modules
+- business and catalog data input foundation
+- create account, claim, and invite-acceptance auth flow
+- onboarding progress and business-profile capture
+- first team and role model
 
 Outputs:
 
-- first tenant revenue workspace
+- first unified tenant workspace with one account system, one operator gateway, onboarding status, and first-pass team access model
 
-## Sprint 14 - Internal admin commercial workspace
+## Sprint 14 - Tenant billing and role-safe operations
 
 Focus:
 
-- tenant support IA
-- payment and commission ops
-- attribution diagnostics
+- tenant billing workspace
+- self-serve billing setup, plan selection, and trial posture
+- invoice and payment-method seams
+- tenant team workspace and role-safe actions
+- role-aware billing and catalog write enforcement
 
 Outputs:
 
-- internal admin commercial operations surface
+- tenant billing and access-control surface that behaves more like a paid SaaS workspace than a read-only dashboard
 
 ## Sprint 15 - Optimization loop and feedback capture
 
@@ -650,10 +668,14 @@ Focus:
 
 - operator feedback on bad attribution, missed-revenue rules, and recovery outcomes
 - optimization queues
+- paid-tenant retention inputs and monthly value reporting refinements
+- invite email and first-login onboarding polish
+- role-aware integrations and remaining tenant write gates
+- tenant-facing renewal, trial-expiry, and payment-attention messaging
 
 Outputs:
 
-- closed-loop optimization baseline
+- closed-loop optimization baseline plus stronger tenant retention and role-aware workspace behavior
 
 ## Sprint 16 - Hardening and release gate
 
@@ -662,6 +684,9 @@ Focus:
 - regression coverage
 - release and rollback gates
 - telemetry and reporting quality controls
+- billing, auth, and tenant-host hardening for a paid SaaS rollout
+- tenant invite, auth, team, billing, and catalog release discipline
+- rollback-safe rollout for role and permission changes
 
 Outputs:
 

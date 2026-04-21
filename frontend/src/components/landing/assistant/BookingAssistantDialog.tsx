@@ -45,6 +45,15 @@ type ServiceCatalogItem = {
   booking_url: string | null;
   tags: string[];
   featured: boolean;
+  source_type?: string | null;
+  source_label?: string | null;
+  why_this_matches?: string | null;
+  price_posture?: string | null;
+  booking_path_type?: string | null;
+  next_step?: string | null;
+  availability_state?: string | null;
+  booking_confidence?: string | null;
+  trust_signal?: string | null;
 };
 
 type BookingAssistantCatalogResponse = {
@@ -943,6 +952,8 @@ export function BookingAssistantDialog({
   const [selectionAnimationKey, setSelectionAnimationKey] = useState(0);
   const [workflowHandoffKey, setWorkflowHandoffKey] = useState(0);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
+  const [isCompactProductBottomBarVisible, setIsCompactProductBottomBarVisible] = useState(true);
+  const [previewService, setPreviewService] = useState<ServiceCatalogItem | null>(null);
   const [liveReadSummary, setLiveReadSummary] = useState<{
     serviceId: string;
     semanticProvider: string | null;
@@ -974,6 +985,8 @@ export function BookingAssistantDialog({
     velocityY: 0,
   });
   const dialogBodyRef = useRef<HTMLDivElement | null>(null);
+  const chatInputRef = useRef<HTMLInputElement | null>(null);
+  const compactProductScrollTopRef = useRef(0);
   const bookingPanelRef = useRef<HTMLDivElement | null>(null);
   const bookingScrollRef = useRef<HTMLDivElement | null>(null);
   const bookingWorkflowSectionRef = useRef<HTMLDivElement | null>(null);
@@ -1093,6 +1106,86 @@ export function BookingAssistantDialog({
     }
 
     return payload;
+  }
+
+  async function requestChatReplyStreaming(
+    nextMessages: ChatMessage[],
+    geoContext?: UserGeoContext | null,
+    onToken?: (partialText: string) => void,
+  ): Promise<BookingAssistantChatResponse> {
+    const body = JSON.stringify({
+      message: nextMessages[nextMessages.length - 1]?.content ?? '',
+      conversation: nextMessages.map<ChatApiMessage>((item) => ({
+        role: item.role,
+        content: item.content,
+      })),
+      user_latitude: geoContext?.latitude ?? userGeoContext?.latitude ?? null,
+      user_longitude: geoContext?.longitude ?? userGeoContext?.longitude ?? null,
+      user_locality: geoContext?.locality ?? userGeoContext?.locality ?? null,
+    });
+
+    const response = await fetch(`${getApiBaseUrl()}/booking-assistant/chat/stream`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body,
+    });
+
+    if (!response.ok || !response.body) {
+      return requestChatReply(nextMessages, geoContext);
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let accumulated = '';
+    let buffer = '';
+    let donePayload: BookingAssistantChatResponse | null = null;
+
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() ?? '';
+      for (const line of lines) {
+        if (!line.startsWith('data: ')) continue;
+        const raw = line.slice(6).trim();
+        try {
+          const event = JSON.parse(raw) as {
+            type: string;
+            text?: string;
+            matched_services?: ServiceCatalogItem[];
+            suggested_service_id?: string | null;
+            should_request_location?: boolean;
+          };
+          if (event.type === 'token' && event.text) {
+            accumulated += event.text;
+            onToken?.(accumulated);
+          } else if (event.type === 'done') {
+            donePayload = {
+              status: 'ok',
+              reply: accumulated,
+              matched_services: event.matched_services ?? [],
+              matched_events: [],
+              suggested_service_id: event.suggested_service_id ?? null,
+              should_request_location: event.should_request_location ?? false,
+            };
+          }
+        } catch {
+          // ignore malformed SSE
+        }
+      }
+    }
+
+    return (
+      donePayload ?? {
+        status: 'ok',
+        reply: accumulated || 'I can help you find and book a service. What are you looking for?',
+        matched_services: [],
+        matched_events: [],
+        suggested_service_id: null,
+        should_request_location: false,
+      }
+    );
   }
 
   useEffect(() => {
@@ -1229,17 +1322,18 @@ export function BookingAssistantDialog({
 
     const timeoutId = window.setTimeout(() => {
       if (isProductAppLayout) {
-        bookingScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        setActiveMobilePanel('booking');
+        setProductSheetSnap('full');
+        setProductModuleTab('details');
+        bookingDetailsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } else {
         bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
-      if (activeMobilePanel === 'booking') {
-        customerNameInputRef.current?.focus();
-      }
+      customerNameInputRef.current?.focus();
     }, 120);
 
     return () => window.clearTimeout(timeoutId);
-  }, [selectedServiceId, activeMobilePanel, isProductAppLayout, isDefaultPopupLayout, viewportSize.width]);
+  }, [selectedServiceId, isProductAppLayout, isDefaultPopupLayout, viewportSize.width]);
 
   useEffect(() => {
     if (!isProductAppLayout) {
@@ -1369,6 +1463,44 @@ export function BookingAssistantDialog({
     isProductAppLayout,
   ]);
 
+  useEffect(() => {
+    if (!isProductAppLayout || !isCompactMobileViewport) {
+      setIsCompactProductBottomBarVisible(true);
+      compactProductScrollTopRef.current = 0;
+      return;
+    }
+
+    const scrollNode = dialogBodyRef.current;
+    if (!scrollNode) {
+      return;
+    }
+
+    compactProductScrollTopRef.current = scrollNode.scrollTop;
+    setIsCompactProductBottomBarVisible(true);
+
+    const handleScroll = () => {
+      const nextTop = scrollNode.scrollTop;
+      const delta = nextTop - compactProductScrollTopRef.current;
+
+      if (nextTop <= 24 || delta < -8) {
+        setIsCompactProductBottomBarVisible(true);
+      } else if (delta > 12 && nextTop > 120) {
+        setIsCompactProductBottomBarVisible(false);
+      }
+
+      compactProductScrollTopRef.current = nextTop;
+    };
+
+    scrollNode.addEventListener('scroll', handleScroll, { passive: true });
+    return () => scrollNode.removeEventListener('scroll', handleScroll);
+  }, [isCompactMobileViewport, isProductAppLayout]);
+
+  useEffect(() => {
+    if (isProductAppLayout && isCompactMobileViewport && (chatLoading || isListening || !hasConversationStarted)) {
+      setIsCompactProductBottomBarVisible(true);
+    }
+  }, [chatLoading, hasConversationStarted, isCompactMobileViewport, isListening, isProductAppLayout]);
+
   const processSteps = useMemo(
     () =>
       buildProcessSteps({
@@ -1489,6 +1621,22 @@ export function BookingAssistantDialog({
     setProductModuleTab(currentFlowTab);
   }, [currentFlowTab, isProductAppLayout]);
 
+  useEffect(() => {
+    if (!result) {
+      return;
+    }
+
+    setActiveMobilePanel('booking');
+    if (isProductAppLayout) {
+      setProductSheetSnap('full');
+      setProductModuleTab('confirmed');
+    }
+
+    window.setTimeout(() => {
+      bookingConfirmedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 140);
+  }, [isProductAppLayout, result]);
+
   function scrollToProductSection(tab: ProductModuleTab) {
     const sectionMap = {
       overview: bookingWorkflowSectionRef,
@@ -1511,7 +1659,7 @@ export function BookingAssistantDialog({
     }
     window.setTimeout(() => {
       if (isProductAppLayout) {
-        bookingScrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+        bookingDetailsSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       } else {
         bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
@@ -1525,6 +1673,30 @@ export function BookingAssistantDialog({
       bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       customerNameInputRef.current?.focus();
     }, 120);
+  }
+
+  function focusCompactSearchComposer() {
+    setActiveMobilePanel('chat');
+    if (isProductAppLayout) {
+      setProductSheetSnap('peek');
+    }
+    setIsCompactProductBottomBarVisible(true);
+    window.setTimeout(() => {
+      dialogBodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      chatInputRef.current?.focus();
+    }, 120);
+  }
+
+  function openServicePreview(service: ServiceCatalogItem) {
+    setPreviewService(service);
+  }
+
+  function confirmServicePreview(service: ServiceCatalogItem) {
+    setPreviewService(null);
+    handleSelectService(service.id);
+    if (isProductAppLayout || shouldUseCompactPopupMobileUI) {
+      focusBookingDetails();
+    }
   }
 
   function renderSearchResolvingPanel(className = '') {
@@ -1678,33 +1850,22 @@ export function BookingAssistantDialog({
     setChatLoading(true);
     setSelectedServiceId('');
     setSelectedEvent(null);
+    setPreviewService(null);
     setLiveReadSummary(null);
     try {
-      const liveReadPromise = bookingAssistantV1LiveReadEnabled
-        ? getPublicBookingAssistantLiveReadRecommendation({
-            query: trimmedMessage,
-            sourcePage: assistantSourcePath,
-            locationHint: userGeoContext?.locality ?? null,
-            serviceCategory: previousSelectedService?.category ?? null,
-            selectedServiceId: selectedServiceId || null,
-            userLocation: userGeoContext
-              ? {
-                  latitude: userGeoContext.latitude,
-                  longitude: userGeoContext.longitude,
-                }
-              : null,
-          })
-        : Promise.resolve({
-            candidateIds: [] as string[],
-            rankedCandidates: [] as MatchCandidate[],
-            suggestedServiceId: null,
-            semanticAssistSummary: null,
-            warnings: [] as string[],
-            trustSummary: null,
-            bookingRequestSummary: null,
-            bookingPathSummary: null,
-            usedLiveRead: false,
-          });
+      const liveReadPromise = getPublicBookingAssistantLiveReadRecommendation({
+        query: trimmedMessage,
+        sourcePage: assistantSourcePath,
+        locationHint: userGeoContext?.locality ?? null,
+        serviceCategory: previousSelectedService?.category ?? null,
+        selectedServiceId: selectedServiceId || null,
+        userLocation: userGeoContext
+          ? {
+              latitude: userGeoContext.latitude,
+              longitude: userGeoContext.longitude,
+            }
+          : null,
+      });
       const shadowSearchPromise = bookingAssistantV1Enabled
         ? shadowPublicBookingAssistantSearch({
             query: trimmedMessage,
@@ -1725,7 +1886,20 @@ export function BookingAssistantDialog({
             resolved: false,
           });
 
-      let payload = await requestChatReply(nextMessages);
+      const streamingPlaceholderMsg: ChatMessage = { role: 'assistant', content: '' };
+      setMessages((current) => [...current, streamingPlaceholderMsg]);
+
+      let payload = await requestChatReplyStreaming(nextMessages, null, (partial) => {
+        setMessages((current) => {
+          const updated = [...current];
+          const lastIdx = updated.length - 1;
+          if (updated[lastIdx]?.role === 'assistant') {
+            updated[lastIdx] = { ...updated[lastIdx], content: partial };
+          }
+          return updated;
+        });
+      });
+
       if (
         payload.should_request_location &&
         !userGeoContext &&
@@ -1733,7 +1907,7 @@ export function BookingAssistantDialog({
       ) {
         const geoContext = await requestGeoContext();
         if (geoContext) {
-          payload = await requestChatReply(nextMessages, geoContext);
+          payload = await requestChatReplyStreaming(nextMessages, geoContext);
         } else {
           setMessages((current) => [
             ...current,
@@ -1802,27 +1976,28 @@ export function BookingAssistantDialog({
         mergedMatchedServices.length === 0 &&
         payload.matched_events.length === 0;
 
-      setMessages((current) => [
-        ...(shouldClearHistoricalMatches
+      const finalAssistantMessage: ChatMessage = {
+        role: 'assistant',
+        content: assistantReply,
+        matchedServices: mergedMatchedServices,
+        matchedEvents: curateEventMatches(payload.matched_events),
+      };
+      setMessages((current) => {
+        const base = shouldClearHistoricalMatches
           ? current.map((message) =>
               message.role === 'assistant' &&
               ((message.matchedServices?.length ?? 0) > 0 ||
                 (message.matchedEvents?.length ?? 0) > 0)
-                ? {
-                    ...message,
-                    matchedServices: [],
-                    matchedEvents: [],
-                  }
+                ? { ...message, matchedServices: [], matchedEvents: [] }
                 : message,
             )
-          : current),
-        {
-          role: 'assistant',
-          content: assistantReply,
-          matchedServices: mergedMatchedServices,
-          matchedEvents: curateEventMatches(payload.matched_events),
-        },
-      ]);
+          : current;
+        const lastIdx = base.length - 1;
+        if (lastIdx >= 0 && base[lastIdx].role === 'assistant') {
+          return [...base.slice(0, lastIdx), finalAssistantMessage];
+        }
+        return [...base, finalAssistantMessage];
+      });
       if (!payload.matched_events.length) {
         setSelectedEvent(null);
       }
@@ -1873,6 +2048,13 @@ export function BookingAssistantDialog({
       const messageText =
         error instanceof Error ? error.message : 'Unable to send message';
       setChatError(messageText);
+      setMessages((current) => {
+        const last = current[current.length - 1];
+        if (last?.role === 'assistant' && !last.content) {
+          return current.slice(0, -1);
+        }
+        return current;
+      });
     } finally {
       setChatLoading(false);
       setPendingSearchQuery('');
@@ -1902,6 +2084,7 @@ export function BookingAssistantDialog({
   }, [catalog, chatLoading, initialQuery, initialQueryRequestId, isOpen, messages.length]);
 
   function handleSelectService(serviceId: string) {
+    setPreviewService(null);
     setSelectedServiceId(serviceId);
     setSelectedEvent(null);
     if (liveReadSummary?.serviceId !== serviceId) {
@@ -1923,6 +2106,7 @@ export function BookingAssistantDialog({
   }
 
   function handleSelectEvent(event: AIEventItem) {
+    setPreviewService(null);
     setSelectedEvent(event);
     setPreferredSlot(toDatetimeLocalValue(event.start_at));
     setNotes(buildEventBookingContext(event, latestCustomerRequirement));
@@ -2292,61 +2476,7 @@ export function BookingAssistantDialog({
               </div>
             </div>
 
-            {isProductAppLayout && isCompactMobileViewport ? (
-              <div className="mt-2 grid grid-cols-3 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setVoiceRepliesEnabled((current) => !current)}
-                  className={`flex min-h-9 items-center justify-center gap-1.5 rounded-[1rem] border px-2 py-2 text-[10px] font-semibold transition ${
-                    voiceRepliesEnabled
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : 'border-slate-200 bg-white text-slate-600'
-                  }`}
-                >
-                  <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current">
-                    <path d="M8 2.75a2 2 0 0 1 2 2v2.5a2 2 0 1 1-4 0v-2.5a2 2 0 0 1 2-2Z" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                    <path d="M4.75 7.5a3.25 3.25 0 1 0 6.5 0" strokeWidth="1.4" strokeLinecap="round" />
-                    <path d="M8 10.75v2.5" strokeWidth="1.4" strokeLinecap="round" />
-                    <path d="M6 13.25h4" strokeWidth="1.4" strokeLinecap="round" />
-                  </svg>
-                  <span>Voice</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProductSheetSnap('peek');
-                    setActiveMobilePanel('chat');
-                  }}
-                  className="flex min-h-9 items-center justify-center gap-1.5 rounded-[1rem] border border-slate-200 bg-white px-2 py-2 text-[10px] font-semibold text-slate-700"
-                >
-                  <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-950 text-[9px] font-bold text-white">
-                    B
-                  </span>
-                  <span className="truncate">BookedAI</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setProductSheetSnap(hasSelectionReadyForBooking ? 'full' : 'half');
-                    setProductModuleTab(hasSelectionReadyForBooking ? 'details' : 'overview');
-                    setActiveMobilePanel('booking');
-                  }}
-                  className={`flex min-h-9 items-center justify-center gap-1.5 rounded-[1rem] border px-2 py-2 text-[10px] font-semibold transition ${
-                    hasSelectionReadyForBooking
-                      ? 'border-slate-950 bg-slate-950 text-white'
-                      : 'border-slate-200 bg-white text-slate-600'
-                  }`}
-                >
-                  <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current">
-                    <path d="M3.25 4.25h9.5" strokeWidth="1.4" strokeLinecap="round" />
-                    <path d="M4.5 2.75v3" strokeWidth="1.4" strokeLinecap="round" />
-                    <path d="M11.5 2.75v3" strokeWidth="1.4" strokeLinecap="round" />
-                    <rect x="3" y="4.75" width="10" height="8" rx="2" strokeWidth="1.4" />
-                  </svg>
-                  <span>Booking</span>
-                </button>
-              </div>
-            ) : null}
+            {isProductAppLayout && isCompactMobileViewport ? null : null}
 
             {shouldShowCompactPopupTopStrip && !isHomepageSearchSurface ? (
               <div className="-mx-1 mt-1 overflow-x-auto pb-0.5 sm:hidden">
@@ -2821,12 +2951,12 @@ export function BookingAssistantDialog({
                               key={service.id}
                               type="button"
                               onClick={() => {
-                                handleSelectService(service.id);
+                                openServicePreview(service);
                               }}
-                              className={`overflow-hidden rounded-[1.35rem] border text-left transition ${
+                              className={`overflow-hidden rounded-[1.35rem] border text-left transition-all duration-200 ${
                                 isSelected
                                   ? 'booking-card-picked border-slate-950 bg-slate-950 text-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]'
-                                  : 'border-slate-200 bg-white text-slate-800 hover:border-slate-300 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)]'
+                                  : 'border-slate-200 bg-white text-slate-800 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_16px_36px_rgba(15,23,42,0.08)]'
                               }`}
                             >
                               <div className={`${isProductAppLayout ? 'p-3.5' : isDefaultPopupMobileViewport ? 'p-3' : 'p-4'}`}>
@@ -2991,14 +3121,66 @@ export function BookingAssistantDialog({
               </div>
 
               <div
-                className={`border-t border-slate-200 bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-6 sm:py-4 ${
+                className={`border-t border-slate-200 bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] transition-transform duration-300 sm:px-6 sm:py-4 ${
                   isProductAppLayout
                     ? activeMobilePanel === 'booking'
                       ? 'sticky bottom-0 z-10 px-4 py-2.5 sm:px-5 sm:py-3'
                       : 'sticky bottom-0 z-10 px-4 py-2.5 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-5 sm:py-3'
                     : ''
+                } ${
+                  isProductAppLayout && isCompactMobileViewport && !isCompactProductBottomBarVisible
+                    ? 'translate-y-[calc(100%+1rem)]'
+                    : 'translate-y-0'
                 }`}
               >
+                {isProductAppLayout && isCompactMobileViewport ? (
+                  <div className="mb-2 flex items-center gap-2">
+                    <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                      chatLoading
+                        ? 'bg-sky-50 text-sky-700'
+                        : hasConversationStarted
+                          ? 'bg-emerald-50 text-emerald-700'
+                          : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      <span className={`h-1.5 w-1.5 rounded-full ${chatLoading ? 'animate-pulse bg-current' : 'bg-current/80'}`} />
+                      {chatLoading ? 'Searching' : hasConversationStarted ? 'Ready' : 'Receive'}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={focusCompactSearchComposer}
+                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-950"
+                      aria-label="Expand search"
+                      title="Expand search"
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current">
+                        <circle cx="7" cy="7" r="3.25" strokeWidth="1.3" />
+                        <path d="m10.5 10.5 2.75 2.75" strokeWidth="1.3" strokeLinecap="round" />
+                      </svg>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setProductSheetSnap(hasSelectionReadyForBooking ? 'full' : 'half');
+                        setProductModuleTab(hasSelectionReadyForBooking ? 'details' : 'overview');
+                        setActiveMobilePanel('booking');
+                        setIsCompactProductBottomBarVisible(true);
+                      }}
+                      className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${
+                        hasSelectionReadyForBooking
+                          ? 'border-slate-950 bg-slate-950 text-white'
+                          : 'border-slate-200 bg-white text-slate-600'
+                      }`}
+                    >
+                      <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current">
+                        <path d="M3.25 4.25h9.5" strokeWidth="1.4" strokeLinecap="round" />
+                        <path d="M4.5 2.75v3" strokeWidth="1.4" strokeLinecap="round" />
+                        <path d="M11.5 2.75v3" strokeWidth="1.4" strokeLinecap="round" />
+                        <rect x="3" y="4.75" width="10" height="8" rx="2" strokeWidth="1.4" />
+                      </svg>
+                      <span>Booking</span>
+                    </button>
+                  </div>
+                ) : null}
                 {isProductAppLayout && isCompactMobileViewport && hasSelectionReadyForBooking && selectedService ? (
                   <button
                     type="button"
@@ -3084,10 +3266,12 @@ export function BookingAssistantDialog({
                         </svg>
                       </span>
                       <input
+                        ref={chatInputRef}
                         id="assistant-chat-input"
                         type="text"
                         value={chatInput}
                         onChange={(event) => setChatInput(event.target.value)}
+                        onFocus={() => setIsCompactProductBottomBarVisible(true)}
                         placeholder={
                           showProductWelcomeState
                             ? 'Try: best swim lesson near Caringbah this weekend'
@@ -3554,13 +3738,12 @@ export function BookingAssistantDialog({
                           key={service.id}
                           type="button"
                           onClick={() => {
-                            handleSelectService(service.id);
-                            setActiveMobilePanel('booking');
+                            openServicePreview(service);
                           }}
-                          className={`rounded-[1.25rem] border p-4 text-left transition ${
+                          className={`rounded-[1.25rem] border p-4 text-left transition-all duration-200 ${
                             isSelected
                               ? 'border-slate-950 bg-slate-950 text-white shadow-[0_16px_36px_rgba(15,23,42,0.18)]'
-                              : 'border-slate-200 bg-[#fbfbfd] text-slate-800 hover:border-slate-300'
+                              : 'border-slate-200 bg-[#fbfbfd] text-slate-800 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-[0_12px_28px_rgba(15,23,42,0.08)]'
                           }`}
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -3628,7 +3811,7 @@ export function BookingAssistantDialog({
                                 {formatPrice(service.amount_aud)}
                               </div>
                               <div className={`mt-1 text-[11px] ${isSelected ? 'text-white/60' : 'text-slate-500'}`}>
-                                {isSelected ? 'Selected' : 'Tap to choose'}
+                                {isSelected ? 'Selected' : 'Tap to preview'}
                               </div>
                             </div>
                           </div>
@@ -4262,6 +4445,147 @@ export function BookingAssistantDialog({
                         ? 'A Google Calendar action is ready immediately and is also included in the confirmation email. After payment, Stripe returns the customer to the homepage while the booking stays logged for follow-up.'
                       : 'Stripe returns the customer to the homepage after payment. Email confirmation is handled here, and the booking is already passed into the workflow for calendar or team follow-up.'}
                   </p>
+                </div>
+              ) : null}
+
+              {previewService ? (
+                <div className="absolute inset-0 z-40 flex items-end justify-center bg-slate-950/40 p-3 backdrop-blur-sm sm:items-center sm:p-6">
+                  <button
+                    type="button"
+                    aria-label="Close preview"
+                    onClick={() => setPreviewService(null)}
+                    className="absolute inset-0"
+                  />
+                  <div className="relative z-10 w-full max-w-md overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
+                    <div className="bg-[linear-gradient(135deg,#f8fafc_0%,#eef6ff_52%,#f0fdf4_100%)] px-4 py-4 sm:px-5">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                            Quick preview
+                          </div>
+                          <div className="mt-1 text-[1.05rem] font-semibold leading-6 text-slate-950">
+                            {previewService.name}
+                          </div>
+                          <div className="mt-1 flex flex-wrap gap-1.5">
+                            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                              {previewService.category}
+                            </span>
+                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                              {buildBookabilityLabel(previewService)}
+                            </span>
+                          </div>
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => setPreviewService(null)}
+                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-950"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4 px-4 py-4 sm:px-5 sm:py-5">
+                      <p className="text-sm leading-6 text-slate-600">
+                        {previewService.summary}
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="rounded-[1rem] bg-slate-50 px-3 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Price
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-slate-950">
+                            {formatPrice(previewService.amount_aud)}
+                          </div>
+                        </div>
+                        <div className="rounded-[1rem] bg-slate-50 px-3 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Duration
+                          </div>
+                          <div className="mt-1 text-sm font-semibold text-slate-950">
+                            {previewService.duration_minutes} min
+                          </div>
+                        </div>
+                        <div className="col-span-2 rounded-[1rem] bg-slate-50 px-3 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Location
+                          </div>
+                          <div className="mt-1 text-sm font-medium text-slate-700">
+                            {buildServiceLocationLabel(previewService)}
+                          </div>
+                        </div>
+                        <div className="col-span-2 rounded-[1rem] bg-emerald-50 px-3 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                            Why it matches
+                          </div>
+                          <div className="mt-1 text-sm font-medium text-emerald-950">
+                            {buildBestForLabel(previewService, latestCustomerRequirement)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="rounded-[1rem] border border-slate-200 bg-white px-3 py-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Tenant info
+                        </div>
+                        <div className="mt-2 space-y-1.5 text-sm text-slate-600">
+                          <div>
+                            <span className="font-semibold text-slate-900">Tenant:</span>{' '}
+                            {previewService.venue_name ?? previewService.source_label ?? 'BookedAI partner'}
+                          </div>
+                          {previewService.location ? (
+                            <div>
+                              <span className="font-semibold text-slate-900">Location:</span>{' '}
+                              {previewService.location}
+                            </div>
+                          ) : null}
+                          {previewService.trust_signal ? (
+                            <div>
+                              <span className="font-semibold text-slate-900">Trust:</span>{' '}
+                              {previewService.trust_signal}
+                            </div>
+                          ) : null}
+                          {previewService.next_step ? (
+                            <div>
+                              <span className="font-semibold text-slate-900">Next step:</span>{' '}
+                              {previewService.next_step}
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+
+                      {buildServiceConfidenceNotes(previewService).length ? (
+                        <div className="flex flex-wrap gap-2">
+                          {buildServiceConfidenceNotes(previewService).slice(0, 3).map((note) => (
+                            <span
+                              key={`${previewService.id}-preview-${note}`}
+                              className="rounded-full bg-sky-50 px-2.5 py-1 text-[11px] font-medium text-sky-700"
+                            >
+                              {note}
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setPreviewService(null)}
+                          className="inline-flex h-11 flex-1 items-center justify-center rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                        >
+                          Keep browsing
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => confirmServicePreview(previewService)}
+                          className="inline-flex h-11 flex-1 items-center justify-center rounded-full bg-slate-950 px-4 text-sm font-semibold text-white transition hover:bg-slate-800"
+                        >
+                          Book this service
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               ) : null}
             </div>

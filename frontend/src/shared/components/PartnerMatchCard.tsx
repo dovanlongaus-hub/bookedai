@@ -90,14 +90,19 @@ export function PartnerMatchCard({
               >
                 {card.providerLabel}
               </div>
+              {card.sourceLabel ? (
+                <div className="mt-1 text-[11px] font-medium text-slate-500">
+                  {card.sourceLabel}
+                </div>
+              ) : null}
             </div>
-            {card.bookingUrl ? (
+            {card.bookingStatusLabel ? (
               <span
                 className={`ml-1 shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold ${
                   selected ? 'bg-emerald-100 text-emerald-800' : 'bg-emerald-50 text-emerald-700'
                 }`}
               >
-                Book online
+                {card.bookingStatusLabel}
               </span>
             ) : null}
           </div>

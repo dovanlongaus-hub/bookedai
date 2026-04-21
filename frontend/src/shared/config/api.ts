@@ -16,7 +16,8 @@ export function getApiBaseUrl() {
     typeof window !== 'undefined' &&
     (window.location.hostname === 'product.bookedai.au' ||
       window.location.hostname === 'admin.bookedai.au' ||
-      window.location.hostname === 'tenant.bookedai.au')
+      window.location.hostname === 'tenant.bookedai.au' ||
+      window.location.hostname === 'futureswim.bookedai.au')
   ) {
     return '/api';
   }

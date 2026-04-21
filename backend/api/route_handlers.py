@@ -17,11 +17,17 @@ from uuid import uuid4
 
 import httpx
 from fastapi import APIRouter, FastAPI, File, Header, HTTPException, Request, Response, UploadFile, status
+from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, func, select
 
 from config import Settings, get_settings
 from core.feature_flags import is_flag_enabled
 from core.logging import get_logger
+from core.session_tokens import (
+    SessionTokenError,
+    create_admin_session_token,
+    verify_admin_session_token,
+)
 from db import (
     ConversationEvent,
     PartnerProfile,
@@ -40,6 +46,8 @@ from repositories.webhook_repository import WebhookEventRepository
 from schemas import BookingWorkflowPayload, TawkMessage, TawkWebhookResponse
 from schemas import (
     AdminConfigResponse,
+    AdminPortalSupportActionRequest,
+    AdminPortalSupportActionResponse,
     AdminBookingDetailResponse,
     AdminBookingConfirmationRequest,
     AdminDiscordHandoffRequest,
@@ -70,6 +78,9 @@ from schemas import (
     DemoBookingResponse,
     PricingConsultationRequest,
     PricingConsultationResponse,
+    PublicDemoImportRequest,
+    PublicDemoImportResponse,
+    PublicDemoImportItem,
     ServiceCatalogItem,
 )
 from service_layer.admin_presenters import (
@@ -84,6 +95,7 @@ from service_layer.admin_presenters import (
 )
 from service_layer.catalog_quality_service import apply_catalog_quality_gate
 from service_layer.admin_dashboard_service import (
+    apply_admin_portal_support_action,
     build_admin_booking_detail_payload,
     build_admin_bookings_payload,
     build_admin_bookings_shadow_summary,
@@ -176,8 +188,8 @@ DEFAULT_PARTNER_PROFILES = [
     {
         "name": "Future Swim Caringbah",
         "category": "Client Example",
-        "website_url": "https://bookedai.au",
-        "description": "Swim school example used on the landing page to demonstrate a real enquiry-to-booking flow for parents searching nearby lessons.",
+        "website_url": "https://futureswim.com.au/locations/caringbah/",
+        "description": "Official swim-school tenant example used to demonstrate nearby kids lesson discovery and enquiry-to-booking flow for parents.",
         "logo_url": "https://images.pexels.com/photos/1263348/pexels-photo-1263348.jpeg?auto=compress&cs=tinysrgb&w=1200",
         "image_url": "https://images.pexels.com/photos/1263348/pexels-photo-1263348.jpeg?auto=compress&cs=tinysrgb&w=1200",
         "featured": 1,
@@ -471,46 +483,6 @@ def _iter_meta_whatsapp_payload(
     return normalized_messages
 
 
-def get_admin_session_secret(cfg: Settings) -> str:
-    return cfg.admin_api_token or cfg.admin_password
-
-
-def create_admin_session_token(cfg: Settings, username: str) -> tuple[str, datetime]:
-    expires_at = datetime.now(UTC) + timedelta(hours=max(cfg.admin_session_ttl_hours, 1))
-    payload = {"sub": username, "exp": int(expires_at.timestamp())}
-    encoded = base64.urlsafe_b64encode(
-        json.dumps(payload, separators=(",", ":")).encode()
-    ).decode()
-    signature = hmac.new(
-        get_admin_session_secret(cfg).encode(),
-        encoded.encode(),
-        hashlib.sha256,
-    ).hexdigest()
-    return f"{encoded}.{signature}", expires_at
-
-
-def verify_admin_session_token(cfg: Settings, token: str) -> str:
-    if not token or "." not in token:
-        raise ValueError("Invalid admin session")
-
-    encoded, provided_signature = token.rsplit(".", 1)
-    expected_signature = hmac.new(
-        get_admin_session_secret(cfg).encode(),
-        encoded.encode(),
-        hashlib.sha256,
-    ).hexdigest()
-    if not hmac.compare_digest(provided_signature, expected_signature):
-        raise ValueError("Invalid admin session")
-
-    padded = encoded + "=" * (-len(encoded) % 4)
-    payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
-    expires_at = int(payload.get("exp", 0))
-    username = str(payload.get("sub", "")).strip()
-    if not username or expires_at <= int(datetime.now(UTC).timestamp()):
-        raise ValueError("Admin session expired")
-    return username
-
-
 async def _register_whatsapp_webhook_event(
     session,
     *,
@@ -622,7 +594,7 @@ def require_admin_access(
         if scheme.lower() == "bearer" and token.strip():
             try:
                 return verify_admin_session_token(cfg, token.strip())
-            except ValueError:
+            except SessionTokenError:
                 pass
 
     if x_admin_token:
@@ -867,6 +839,65 @@ async def booking_assistant_chat(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@api.post("/booking-assistant/chat/stream")
+async def booking_assistant_chat_stream(
+    request: Request,
+    payload: BookingAssistantChatRequest,
+) -> StreamingResponse:
+    """SSE streaming endpoint for chat. Yields tokens then a final 'done' event
+    with matched_services so the frontend can show typing animation."""
+    await enforce_rate_limit(
+        request,
+        scope="booking-assistant-chat",
+        limit=request.app.state.settings.booking_chat_rate_limit_requests,
+        window_seconds=request.app.state.settings.booking_chat_rate_limit_window_seconds,
+    )
+    booking_service: BookingAssistantService = request.app.state.booking_assistant_service
+    openai_service: OpenAIService = request.app.state.openai_service
+    catalog = await load_active_service_catalog(request)
+
+    ranked = booking_service._rank_services(
+        payload.message,
+        services=catalog,
+        user_latitude=payload.user_latitude,
+        user_longitude=payload.user_longitude,
+        user_locality=payload.user_locality,
+        precomputed_signals=None,
+    )
+    shortlist = booking_service._curate_service_matches(
+        [item.service for item in ranked[:12]]
+    )
+    import json as _json
+
+    async def event_stream():
+        matched_services_payload = [s.model_dump() for s in shortlist]
+        suggested_id = shortlist[0].id if shortlist else None
+        async for chunk in openai_service.booking_assistant_streaming_reply(
+            message=payload.message,
+            conversation=payload.conversation,
+            services=shortlist,
+        ):
+            if chunk.startswith("data: ") and '"type":"done"' in chunk:
+                done_payload = _json.dumps({
+                    "type": "done",
+                    "matched_services": matched_services_payload,
+                    "suggested_service_id": suggested_id,
+                    "should_request_location": False,
+                })
+                yield f"data: {done_payload}\n\n"
+            else:
+                yield chunk
+
+    return StreamingResponse(
+        event_stream(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "X-Accel-Buffering": "no",
+        },
+    )
+
+
 @api.post(
     "/booking-assistant/session",
     response_model=BookingAssistantSessionResponse,
@@ -953,6 +984,64 @@ async def booking_assistant_session(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@api.post("/demo/scan-website", response_model=PublicDemoImportResponse)
+async def public_demo_scan_website(
+    request: Request,
+    payload: PublicDemoImportRequest,
+) -> PublicDemoImportResponse:
+    """Public endpoint: given a business website URL, AI extracts services and returns
+    them as a preview catalog — no auth required, rate-limited, read-only (no DB writes)."""
+    await enforce_rate_limit(request, scope="demo-scan-website", limit=5, window_seconds=60)
+
+    openai_service: OpenAIService = request.app.state.openai_service
+    website_input = payload.website_url.strip()
+    website_url = await openai_service.resolve_business_website(
+        website_or_query=website_input,
+        business_name=payload.business_name,
+    )
+    if not website_url:
+        raise HTTPException(
+            status_code=422,
+            detail="Could not resolve a valid website from that URL or business name.",
+        )
+
+    extracted = await openai_service.extract_services_from_website(
+        website_url=website_url,
+        business_name=payload.business_name,
+        category_hint=payload.category,
+    )
+
+    business_name = (
+        (payload.business_name or "").strip()
+        or website_url.replace("https://", "").replace("http://", "").split("/")[0]
+    )
+
+    services = [
+        PublicDemoImportItem(
+            name=str(item.get("name") or "").strip(),
+            category=str(item.get("category") or payload.category or "").strip() or None,
+            summary=str(item.get("summary") or "").strip() or None,
+            amount_aud=float(item["amount_aud"]) if item.get("amount_aud") is not None else None,
+            duration_minutes=int(item["duration_minutes"]) if item.get("duration_minutes") is not None else None,
+            venue_name=str(item.get("venue_name") or "").strip() or None,
+            location=str(item.get("location") or "").strip() or None,
+            booking_url=str(item.get("booking_url") or website_url).strip() or None,
+            image_url=str(item.get("image_url") or "").strip() or None,
+            tags=[str(t) for t in (item.get("tags") or []) if t],
+        )
+        for item in extracted
+        if str(item.get("name") or "").strip()
+    ]
+
+    return PublicDemoImportResponse(
+        status="ok",
+        business_name=business_name,
+        website_url=website_url,
+        services=services,
+        service_count=len(services),
+    )
+
+
 @api.post(
     "/pricing/consultation",
     response_model=PricingConsultationResponse,
@@ -982,20 +1071,21 @@ async def pricing_consultation(
                 message=TawkMessage(
                     conversation_id=result.consultation_reference,
                     message_id=result.consultation_reference,
-                    text=payload.notes or f"{result.plan_name} pricing consultation",
+                    text=payload.notes or f"{result.plan_name} package consultation",
                     sender_name=payload.customer_name,
                     sender_email=payload.customer_email.strip().lower(),
                     sender_phone=payload.customer_phone,
                 ),
                 ai_intent="pricing_consultation",
                 ai_reply=(
-                    "Plan booking created with onboarding scheduling, trial offer, and Stripe checkout."
+                    "Package booking created with onboarding scheduling, trial offer, and Stripe checkout."
                 ),
                 workflow_status=result.payment_status,
                 metadata={
                     "consultation_reference": result.consultation_reference,
                     "plan_id": result.plan_id,
                     "plan_name": result.plan_name,
+                    "package_name": result.plan_name,
                     "business_name": payload.business_name,
                     "business_type": payload.business_type,
                     "onboarding_mode": result.onboarding_mode,
@@ -1514,6 +1604,38 @@ async def admin_booking_confirm_email(
             raise HTTPException(status_code=400, detail=str(exc)) from exc
 
     return EmailSendResponse(**payload_data)
+
+
+@api.post(
+    "/admin/portal-support/{request_id}/{action}",
+    response_model=AdminPortalSupportActionResponse,
+)
+async def admin_portal_support_action(
+    request_id: int,
+    action: str,
+    request: Request,
+    payload: AdminPortalSupportActionRequest,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+) -> AdminPortalSupportActionResponse:
+    admin_actor = require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        try:
+            payload_data = await apply_admin_portal_support_action(
+                session,
+                request_id=request_id,
+                action=action,
+                actor_id=admin_actor,
+                note=payload.note,
+            )
+            await session.commit()
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return AdminPortalSupportActionResponse(**payload_data)
 
 
 @api.post("/admin/reliability/handoff/discord", response_model=AdminDiscordHandoffResponse)

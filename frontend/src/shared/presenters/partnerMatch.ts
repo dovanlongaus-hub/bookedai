@@ -7,6 +7,8 @@ export type BookingReadyServiceItem = {
   summary: string;
   duration_minutes: number;
   amount_aud: number;
+  currency_code?: string | null;
+  display_price?: string | null;
   image_url: string | null;
   map_snapshot_url: string | null;
   venue_name: string | null;
@@ -15,6 +17,15 @@ export type BookingReadyServiceItem = {
   booking_url: string | null;
   tags: string[];
   featured: boolean;
+  source_type?: string | null;
+  source_label?: string | null;
+  why_this_matches?: string | null;
+  price_posture?: string | null;
+  booking_path_type?: string | null;
+  next_step?: string | null;
+  availability_state?: string | null;
+  booking_confidence?: string | null;
+  trust_signal?: string | null;
 };
 
 export type PartnerMatchCardModel = {
@@ -22,6 +33,9 @@ export type PartnerMatchCardModel = {
   providerLabel: string;
   locationLabel: string;
   nextStepLabel: string;
+  sourceLabel: string | null;
+  bookingStatusLabel: string | null;
+  matchReasonLabel: string | null;
   confidenceNotes: string[];
   metricLine: string;
   explanation: string | null;
@@ -105,6 +119,8 @@ export function toBookingReadyServiceItem(candidate: MatchCandidate): BookingRea
     summary: candidate.summary ?? candidate.explanation ?? '',
     duration_minutes: candidate.durationMinutes ?? 30,
     amount_aud: candidate.amountAud ?? 0,
+    currency_code: candidate.currencyCode ?? null,
+    display_price: candidate.displayPrice ?? null,
     image_url: candidate.imageUrl ?? null,
     map_snapshot_url: null,
     venue_name: candidate.venueName ?? candidate.providerName ?? null,
@@ -113,6 +129,15 @@ export function toBookingReadyServiceItem(candidate: MatchCandidate): BookingRea
     booking_url: candidate.bookingUrl ?? null,
     tags: candidate.tags ?? [],
     featured: candidate.featured ?? false,
+    source_type: candidate.sourceType ?? null,
+    source_label: candidate.sourceLabel ?? null,
+    why_this_matches: candidate.whyThisMatches ?? null,
+    price_posture: candidate.pricePosture ?? null,
+    booking_path_type: candidate.bookingPathType ?? null,
+    next_step: candidate.nextStep ?? null,
+    availability_state: candidate.availabilityState ?? null,
+    booking_confidence: candidate.bookingConfidence ?? null,
+    trust_signal: candidate.trustSignal ?? null,
   };
 }
 
@@ -121,6 +146,9 @@ export function buildPartnerMatchLocationLabel(candidate: MatchCandidate) {
 }
 
 export function buildPartnerMatchNextStepLabel(candidate: MatchCandidate) {
+  if (candidate.nextStep?.trim()) {
+    return candidate.nextStep.trim();
+  }
   if (isHousingCategory(candidate.category)) {
     return 'Book a consultation';
   }
@@ -131,7 +159,13 @@ export function buildPartnerMatchNextStepLabel(candidate: MatchCandidate) {
 }
 
 export function buildPartnerMatchConfidenceNotes(candidate: MatchCandidate) {
-  const notes = [
+  const notes = [];
+
+  if (candidate.sourceLabel) {
+    notes.push(candidate.sourceLabel);
+  }
+
+  notes.push(
     candidate.bookingUrl
       ? isHousingCategory(candidate.category)
         ? 'Partner consultation link'
@@ -139,10 +173,13 @@ export function buildPartnerMatchConfidenceNotes(candidate: MatchCandidate) {
       : isHousingCategory(candidate.category)
         ? 'Project consult flow ready'
         : 'Chat booking flow ready',
-  ];
+  );
 
   if (candidate.location || candidate.venueName || candidate.mapUrl) {
     notes.push('Location details ready');
+  }
+  if (candidate.bookingConfidence) {
+    notes.push(`${candidate.bookingConfidence} confidence`);
   }
   if (candidate.trustSignal) {
     notes.push(candidate.trustSignal.replace(/_/g, ' '));
@@ -154,19 +191,51 @@ export function buildPartnerMatchConfidenceNotes(candidate: MatchCandidate) {
 }
 
 export function buildPartnerMatchMetricLine(candidate: MatchCandidate) {
+  let numericPriceLabel: string | null = null;
+  if (typeof candidate.amountAud === 'number' && candidate.amountAud > 0) {
+    const currencyCode = candidate.currencyCode?.trim() || 'AUD';
+    try {
+      numericPriceLabel = new Intl.NumberFormat('en-AU', {
+        style: 'currency',
+        currency: currencyCode,
+        maximumFractionDigits: 0,
+      }).format(candidate.amountAud);
+    } catch {
+      numericPriceLabel = `${currencyCode} ${candidate.amountAud}`;
+    }
+  }
+
   const parts = [
-    typeof candidate.amountAud === 'number' && candidate.amountAud > 0
-      ? new Intl.NumberFormat('en-AU', {
-          style: 'currency',
-          currency: 'AUD',
-          maximumFractionDigits: 0,
-        }).format(candidate.amountAud)
-      : null,
+    candidate.pricePosture?.trim()
+      ? candidate.pricePosture.trim()
+      : candidate.displayPrice?.trim()
+      ? candidate.displayPrice.trim()
+      : numericPriceLabel,
     typeof candidate.durationMinutes === 'number' && candidate.durationMinutes > 0
       ? `${candidate.durationMinutes} min`
       : null,
   ];
   return parts.filter(Boolean).join(' • ') || 'Top ranked match';
+}
+
+function buildBookingStatusLabel(candidate: MatchCandidate) {
+  if (candidate.bookingPathType === 'book_on_partner_site') {
+    return 'Book online';
+  }
+  if (candidate.bookingPathType === 'request_callback') {
+    return 'Review first';
+  }
+  if (candidate.availabilityState === 'partner_booking_only') {
+    return 'Partner booking';
+  }
+  if (candidate.availabilityState === 'needs_manual_confirmation') {
+    return 'Needs confirmation';
+  }
+  return candidate.bookingUrl ? 'Booking ready' : null;
+}
+
+function buildMatchReasonLabel(candidate: MatchCandidate) {
+  return candidate.whyThisMatches?.trim() || candidate.displaySummary?.trim() || candidate.explanation?.trim() || null;
 }
 
 export function buildPartnerMatchCardModel(candidate: MatchCandidate): PartnerMatchCardModel {
@@ -177,9 +246,12 @@ export function buildPartnerMatchCardModel(candidate: MatchCandidate): PartnerMa
     providerLabel: candidate.providerName,
     locationLabel: buildPartnerMatchLocationLabel(candidate),
     nextStepLabel: buildPartnerMatchNextStepLabel(candidate),
+    sourceLabel: candidate.sourceLabel ?? null,
+    bookingStatusLabel: buildBookingStatusLabel(candidate),
+    matchReasonLabel: buildMatchReasonLabel(candidate),
     confidenceNotes: buildPartnerMatchConfidenceNotes(candidate),
     metricLine: buildPartnerMatchMetricLine(candidate),
-    explanation: candidate.displaySummary ?? candidate.explanation ?? candidate.summary ?? null,
+    explanation: buildMatchReasonLabel(candidate) ?? candidate.summary ?? null,
     bookingUrl: candidate.bookingUrl ?? null,
     sourceUrl: candidate.sourceUrl ?? null,
     imageUrl,
@@ -249,7 +321,7 @@ export function buildPartnerMatchCardModelFromServiceItem(
     candidateId: service.id,
     providerName: providerNameOverride ?? service.venue_name ?? service.name,
     serviceName: service.name,
-    sourceType: 'service_catalog',
+    sourceType: service.source_type ?? 'service_catalog',
     category: service.category,
     summary: service.summary,
     venueName: service.venue_name,
@@ -259,14 +331,23 @@ export function buildPartnerMatchCardModelFromServiceItem(
     sourceUrl: null,
     imageUrl: service.image_url,
     amountAud: service.amount_aud,
+    currencyCode: service.currency_code ?? null,
+    displayPrice: service.display_price ?? null,
     durationMinutes: service.duration_minutes,
     tags: service.tags,
     featured: service.featured,
     distanceKm: null,
     matchScore: null,
     semanticScore: null,
-    trustSignal: null,
+    trustSignal: service.trust_signal ?? null,
     isPreferred: false,
+    sourceLabel: service.source_label ?? null,
+    whyThisMatches: service.why_this_matches ?? null,
+    pricePosture: service.price_posture ?? null,
+    bookingPathType: service.booking_path_type ?? null,
+    nextStep: service.next_step ?? null,
+    availabilityState: service.availability_state ?? null,
+    bookingConfidence: service.booking_confidence ?? null,
     explanation,
   });
 }
@@ -285,7 +366,7 @@ export function buildPartnerMatchActionFooterModelFromServiceItem(
       candidateId: service.id,
       providerName: providerNameOverride ?? service.venue_name ?? service.name,
       serviceName: service.name,
-      sourceType: 'service_catalog',
+      sourceType: service.source_type ?? 'service_catalog',
       category: service.category,
       summary: service.summary,
       venueName: service.venue_name,
@@ -295,14 +376,23 @@ export function buildPartnerMatchActionFooterModelFromServiceItem(
       sourceUrl: null,
       imageUrl: service.image_url,
       amountAud: service.amount_aud,
+      currencyCode: service.currency_code ?? null,
+      displayPrice: service.display_price ?? null,
       durationMinutes: service.duration_minutes,
       tags: service.tags,
       featured: service.featured,
       distanceKm: null,
       matchScore: null,
       semanticScore: null,
-      trustSignal: null,
+      trustSignal: service.trust_signal ?? null,
       isPreferred: false,
+      sourceLabel: service.source_label ?? null,
+      whyThisMatches: service.why_this_matches ?? null,
+      pricePosture: service.price_posture ?? null,
+      bookingPathType: service.booking_path_type ?? null,
+      nextStep: service.next_step ?? null,
+      availabilityState: service.availability_state ?? null,
+      bookingConfidence: service.booking_confidence ?? null,
       explanation: null,
     },
     {

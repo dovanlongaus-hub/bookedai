@@ -11,6 +11,8 @@ This document defines how BookedAI must be changed going forward so that upgrade
 Before making a change, review:
 
 - `project.md`
+- `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/development/implementation-progress.md`
 - the relevant file in `docs/architecture/`
 - the relevant file in `docs/users/`
 
@@ -113,16 +115,24 @@ If a prompt introduces substantial new architecture, module, migration, workflow
 
 For any substantive module or behavior update, record the result in all three documentation layers below unless the user explicitly asks not to:
 
+- `project.md`
 - the request-facing source document that was revised for that area
 - the implementation-tracking document in `docs/development/`
 - the matching roadmap, sprint, plan, or phase document that carries delivery sequencing
 
 When the change is fully implemented through the last mile and promoted to the live environment, this documentation write-back is not optional or deferred:
 
+- update `project.md` first when the change affects project-wide scope, architecture baseline, route ownership, auth policy, or delivery sequence
 - update the implementation result immediately in `docs/development/implementation-progress.md`
 - update the requirement or description document for the affected sprint, module, or workflow
 - update the matching roadmap, sprint, plan, or phase artifact that carries delivery sequencing
 - treat live deployment and documentation synchronization as one closure action, not two separate tasks
+
+When the change also introduces or extends backend SQL migration inventory:
+
+- add or update a repo-local apply helper when feasible
+- add or update a migration apply checklist in `docs/development/`
+- record shadow, staging, or production apply status in `docs/development/implementation-progress.md`
 
 For sprint-to-sprint continuity, also update the next active sprint artifacts with explicit inheritance notes whenever the completed sprint introduced a new approved baseline that later teams must follow.
 
@@ -249,7 +259,7 @@ When the search stack is changed, the documentation update must say:
 A request should only be considered fully handled when:
 
 1. the code change is aligned across affected modules
-2. the related documentation is aligned
+2. `project.md`, implementation tracking, and the relevant execution artifact are aligned
 3. previous behavior descriptions were reviewed before upgrading them
 4. the final state is internally consistent for all affected audiences
 5. substantial prompt-level descriptions have been recorded into the relevant documentation files and `project.md` unless the user explicitly chooses otherwise

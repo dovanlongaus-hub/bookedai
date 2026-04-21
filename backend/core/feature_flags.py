@@ -29,14 +29,17 @@ FEATURE_FLAGS: tuple[FeatureFlag, ...] = (
     FeatureFlag(
         key="email_template_engine_v1",
         description="Enable modular email composition templates.",
+        default_enabled=True,
     ),
     FeatureFlag(
         key="tenant_mode_enabled",
         description="Expose tenant-aware runtime seams while staying single-tenant by default.",
+        default_enabled=True,
     ),
     FeatureFlag(
         key="new_admin_bookings_view",
         description="Gate future admin bookings refactors behind a safe rollout switch.",
+        default_enabled=True,
     ),
     FeatureFlag(
         key="admin_booking_read_shadow_compare",
@@ -45,6 +48,7 @@ FEATURE_FLAGS: tuple[FeatureFlag, ...] = (
     FeatureFlag(
         key="semantic_matching_model_assist_v1",
         description="Enable model-assisted semantic reranking for Prompt 9 catalog search while preserving heuristic fallback.",
+        default_enabled=True,
     ),
 )
 

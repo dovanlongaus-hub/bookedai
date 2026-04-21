@@ -37,8 +37,8 @@ import { SignalPill } from '../ui/SignalPill';
 
 const pricingFlow = [
   {
-    title: 'Pick the plan',
-    body: 'Choose the smallest confident yes for your current stage.',
+    title: 'Pick the package',
+    body: 'Start with Freemium, claim the Top 10 SME launch offer, or choose the paid plan that matches your current revenue stage.',
   },
   {
     title: 'Confirm setup',
@@ -333,19 +333,17 @@ export function PricingSection() {
 
         <div className="mx-auto max-w-4xl text-center">
           <SignalPill className="inline-flex items-center justify-center px-4 py-2 text-[11px] uppercase tracking-[0.24em]">
-            30-day free trial • setup + monthly plan + performance-based commission
+            Starter from 49$+ • Pro and Pro Max • commission on real booked revenue
           </SignalPill>
           <h2 className="template-title mt-6 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-            Pricing that stays easy to understand at the moment of decision
+            Package pricing that helps SMEs say yes quickly without losing commercial clarity
           </h2>
           <p className="template-body mx-auto mt-5 max-w-2xl text-lg leading-8">
-            Start free for 30 days, then move into a clear monthly plan that fits your stage.
-            Setup stays separate, and performance-based commission only appears when the commercial context is real.
+            Start from 49$+, move into Pro when you need more guided booking power, then scale through a setup, plan, and commission model that stays easy to understand.
           </p>
           <p className="template-body mx-auto mt-4 max-w-3xl text-sm leading-6 sm:text-base">
             Built for salons, clinics, swim schools, tutors, trades, hospitality, and other
-            local businesses across Australia. Online rollout covers most teams, and we only
-            quote extra when you need onsite support or a more custom implementation.
+            local businesses across Australia. You can launch standalone on your website, as a dedicated booking app, or as a path linked into the broader BookedAI portal.
           </p>
 
           <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
@@ -372,7 +370,7 @@ export function PricingSection() {
               <div>
                 <div className="template-kicker text-[11px]">Pricing flow graphic</div>
                 <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                  Pricing should read like a buying path, not a pricing maze.
+                  The homepage should explain the offer clearly before the buyer ever opens the deeper product runtime.
                 </div>
               </div>
               <div className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
@@ -406,26 +404,16 @@ export function PricingSection() {
 
         <div className="mt-12 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <SectionCard className="p-7 sm:p-8">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div>
-                <p className="template-kicker text-sm">
-                  Special offers first
-                </p>
-                <h3 className="template-title mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-                  Three clear plans, one easy buying decision
-                </h3>
-              </div>
-              <div className="booked-note-surface px-5 py-4 text-right">
-                <div className="text-xs uppercase tracking-[0.18em] text-slate-500">
-                  Starts from
-                </div>
-                <div className="mt-1 text-3xl font-semibold text-slate-950">A$79/mo</div>
-              </div>
+            <div>
+              <p className="template-kicker text-sm">
+                Special offers first
+              </p>
+              <h3 className="template-title mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+                Freemium first, then Pro, then Pro Max as the revenue engine gets deeper
+              </h3>
             </div>
             <p className="template-body mt-5 max-w-2xl text-base leading-7">
-              Pick the plan that matches your current volume and workflow. Every booking action
-              takes you into the same onboarding flow, timing selection, confirmation path, and
-              commercial handoff without hiding the setup or commission model.
+              Pick the package that matches your current volume and workflow. Every registration and booking action should take the buyer into the same onboarding flow, timing selection, confirmation path, and commercial handoff without hiding the setup or commission model.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {topOffers.map((offer) => (
@@ -450,7 +438,7 @@ export function PricingSection() {
                     Buying story
                   </div>
                   <div className="mt-2 text-lg font-semibold text-slate-950">
-                    Start with the smallest confident yes, then expand once the conversion layer is proven.
+                    Start with Freemium or the Top 10 SME launch cohort, then expand into Pro or Pro Max once the conversion layer is proven.
                   </div>
                 </div>
                 <SignalPill className="bg-white px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-600">
@@ -458,30 +446,29 @@ export function PricingSection() {
                 </SignalPill>
               </div>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                The packaging is designed to reduce decision fatigue for SMEs while still leaving room for setup scope and performance-based commission once results are in view.
+                Buyers should be able to see the launch offer, the setup path, the monthly plan, and the commission logic in one pass.
               </p>
             </SectionCard>
           </SectionCard>
 
-          <SectionCard tone="dark" className="p-7 sm:p-8">
-            <div className="text-sm font-medium uppercase tracking-[0.18em] text-cyan-200">
+          <SectionCard className="p-7 sm:p-8">
+            <div className="text-sm font-medium uppercase tracking-[0.18em] text-[#1459c7]">
               How setup works
             </div>
-            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-white">
+            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-[#1d1d1f]">
               Keep launch simple, add complexity only if needed
             </h3>
-            <p className="mt-4 text-base leading-7 text-slate-300">
-              Most SMEs can launch online first. If your team needs onsite support, training,
-              or a more hands-on rollout, we quote that separately so the base subscription stays clean and the performance model stays credible.
+            <p className="mt-4 text-base leading-7 text-slate-600">
+              Most SMEs can launch online first, either as a standalone website flow or a dedicated booking app. If your team needs onsite support, training, or a more hands-on rollout, we quote that separately so the monthly plan stays clean and the performance model stays credible.
             </p>
             <div className="mt-6 grid gap-3">
               {setupOptions.map((item) => (
                 <SectionCard
                   key={item.label}
-                  className="rounded-[1.5rem] border border-cyan-300/18 bg-slate-950/45 px-4 py-4 text-white shadow-none"
+                  className="rounded-[1.5rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4 text-[#1d1d1f] shadow-none"
                 >
-                  <div className="text-sm font-semibold text-white">{item.label}</div>
-                  <div className="mt-1 text-sm leading-6 text-slate-300">{item.detail}</div>
+                  <div className="text-sm font-semibold text-[#1d1d1f]">{item.label}</div>
+                  <div className="mt-1 text-sm leading-6 text-slate-600">{item.detail}</div>
                 </SectionCard>
               ))}
             </div>
@@ -489,7 +476,7 @@ export function PricingSection() {
               {highlightPoints.map((point) => (
                 <SignalPill
                   key={point}
-                  className="border-cyan-300/18 bg-slate-950/45 px-3 py-2 text-xs text-cyan-100"
+                  className="border-black/6 bg-white/72 px-3 py-2 text-xs text-[#1459c7]"
                 >
                   {point}
                 </SignalPill>
@@ -508,7 +495,7 @@ export function PricingSection() {
               }
             />
           ))}
-          <SectionCard as="article" tone="dark" className="relative overflow-hidden p-7 sm:p-8">
+          <SectionCard as="article" className="relative overflow-hidden p-7 sm:p-8">
             <div
               aria-hidden="true"
               className="pointer-events-none absolute inset-x-6 top-0 h-24 rounded-full bg-cyan-300/10 blur-3xl"
@@ -516,36 +503,36 @@ export function PricingSection() {
             <div className="relative">
               <div className="flex items-start justify-between gap-4">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-cyan-200">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1459c7]">
                     For complex teams
                   </div>
-                  <div className="text-xl font-semibold tracking-tight text-white">
+                  <div className="text-xl font-semibold tracking-tight text-[#1d1d1f]">
                     {advancedPlan.name}
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-300">
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
                     Multi-location, deeper automation, or broader operational rollout that needs custom setup and commercial shaping.
                   </p>
                 </div>
-                <SignalPill variant="inverse" className="px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-200 ring-1 ring-white/10">
+                <SignalPill className="px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1459c7] ring-1 ring-black/6">
                   Talk to us
                 </SignalPill>
               </div>
 
-              <div className="mt-8 text-4xl font-semibold tracking-tight text-white">
+              <div className="mt-8 text-4xl font-semibold tracking-tight text-[#1d1d1f]">
                 Custom scope
               </div>
-              <p className="mt-2 text-sm font-medium text-cyan-100">
-                Usually starts from {advancedPlan.price}/mo after your 30-day free period
+              <p className="mt-2 text-sm font-medium text-[#1459c7]">
+                Usually starts from {advancedPlan.price}/mo after your 1 month free period
               </p>
-              <p className="mt-3 text-sm leading-6 text-slate-300">
+              <p className="mt-3 text-sm leading-6 text-slate-600">
                 We keep advanced rollout off the main buying path so smaller SMEs can decide
                 quickly, while larger operators can still get the right package and performance model.
               </p>
 
               <ul className="mt-8 space-y-3">
                 {advancedPlan.features.slice(1).map((feature) => (
-                  <li key={feature} className="flex items-start gap-3 text-sm leading-6 text-slate-200">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-300/12">
+                  <li key={feature} className="flex items-start gap-3 text-sm leading-6 text-slate-700">
+                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-50">
                       <CheckIcon />
                     </span>
                     <span>{feature}</span>
@@ -562,9 +549,9 @@ export function PricingSection() {
                     'book_advanced_plan',
                     'advanced_plan_card',
                   )}
-                className="booked-button-secondary mt-8 flex w-full items-center justify-center gap-2 border-cyan-300/30 bg-transparent px-5 py-4 text-sm font-semibold text-white hover:border-cyan-200/60 hover:text-cyan-100"
+                className="booked-button-secondary mt-8 flex w-full items-center justify-center gap-2"
               >
-                Talk To Us About Pro
+                Talk To Us About Pro Max
                 <ArrowIcon />
               </button>
             </div>

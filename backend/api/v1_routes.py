@@ -1,12 +1,15 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import hashlib
+from html import escape
 import hmac
 import json
 import re
 from datetime import UTC, datetime, timedelta
 from typing import Any
+from urllib.parse import quote, urlencode
 from uuid import uuid4
 
 import httpx
@@ -20,11 +23,17 @@ from config import Settings
 from core.feature_flags import is_flag_enabled
 from core.errors import AppError, IntegrationAppError, PaymentAppError, ValidationAppError
 from core.logging import get_logger
-from db import ServiceMerchantProfile, TenantUserMembership, get_session
+from core.session_tokens import (
+    SessionTokenError,
+    create_tenant_session_token as _create_tenant_session_token,
+    verify_tenant_session_token as _verify_tenant_session_token,
+)
+from db import ServiceMerchantProfile, TenantUserCredential, TenantUserMembership, get_session
 from repositories.audit_repository import AuditLogRepository
 from repositories.base import RepositoryContext
 from repositories.booking_intent_repository import BookingIntentRepository
 from repositories.contact_repository import ContactRepository
+from repositories.integration_repository import IntegrationRepository
 from repositories.lead_repository import LeadRepository
 from repositories.outbox_repository import OutboxRepository
 from repositories.payment_intent_repository import PaymentIntentRepository
@@ -41,6 +50,9 @@ from service_layer.lifecycle_ops_service import (
 from service_layer.communication_service import CommunicationService, render_bookedai_confirmation_email
 from service_layer.prompt9_matching_service import (
     GENERIC_QUERY_STOPWORDS,
+    RankedServiceMatch,
+    apply_deterministic_ranking_policy,
+    build_canonical_query_understanding,
     build_booking_trust_payload,
     extract_core_intent_terms,
     extract_booking_request_context,
@@ -66,9 +78,15 @@ from service_layer.prompt11_integration_service import (
     build_reconciliation_summary,
 )
 from service_layer.tenant_app_service import (
+    build_tenant_invoice_receipt,
+    build_portal_booking_snapshot,
+    queue_portal_booking_request,
+    build_tenant_billing_snapshot,
     build_tenant_catalog_snapshot,
     build_tenant_bookings_snapshot,
     build_tenant_integrations_snapshot,
+    build_tenant_onboarding_snapshot,
+    build_tenant_team_snapshot,
     build_tenant_overview,
 )
 from services import _build_google_maps_url
@@ -94,6 +112,7 @@ SEMANTIC_DOMAIN_STOP_WORDS = {
 class ActorContextPayload(BaseModel):
     channel: str
     tenant_id: str | None = None
+    tenant_ref: str | None = None
     actor_id: str | None = None
     role: str | None = None
     deployment_mode: str | None = None
@@ -151,6 +170,7 @@ class StartChatSessionRequestPayload(BaseModel):
 class BookingChannelContextPayload(BaseModel):
     channel: str
     tenant_id: str | None = None
+    tenant_ref: str | None = None
     deployment_mode: str | None = None
     widget_id: str | None = None
 
@@ -249,6 +269,71 @@ class IntegrationStatusQueryPayload(BaseModel):
 class TenantGoogleAuthRequestPayload(BaseModel):
     id_token: str
     tenant_ref: str | None = None
+    auth_intent: str | None = None
+    business_name: str | None = None
+    industry: str | None = None
+    tenant_slug: str | None = None
+
+
+class TenantPasswordAuthRequestPayload(BaseModel):
+    username: str
+    password: str
+    tenant_ref: str | None = None
+
+
+class TenantCreateAccountRequestPayload(BaseModel):
+    business_name: str
+    email: str
+    username: str
+    password: str
+    full_name: str | None = None
+    industry: str | None = None
+    timezone: str | None = None
+    locale: str | None = None
+    tenant_slug: str | None = None
+
+
+class TenantClaimAccountRequestPayload(BaseModel):
+    tenant_ref: str
+    email: str
+    username: str
+    password: str
+    full_name: str | None = None
+
+
+class TenantProfileUpdateRequestPayload(BaseModel):
+    business_name: str | None = None
+    industry: str | None = None
+    timezone: str | None = None
+    locale: str | None = None
+    operator_full_name: str | None = None
+
+
+class TenantBillingAccountUpdateRequestPayload(BaseModel):
+    billing_email: str | None = None
+    merchant_mode: str | None = None
+
+
+class TenantSubscriptionUpdateRequestPayload(BaseModel):
+    package_code: str | None = None
+    plan_code: str | None = None
+    mode: str | None = Field(default="trial")
+
+
+class TenantInviteMemberRequestPayload(BaseModel):
+    email: str
+    full_name: str | None = None
+    role: str = "operator"
+
+
+class TenantMemberAccessUpdateRequestPayload(BaseModel):
+    role: str | None = None
+    status: str | None = None
+
+
+class TenantIntegrationProviderUpdateRequestPayload(BaseModel):
+    status: str | None = None
+    sync_mode: str | None = None
 
 
 class TenantCatalogImportRequestPayload(BaseModel):
@@ -267,6 +352,8 @@ class TenantCatalogUpdateRequestPayload(BaseModel):
     category: str | None = None
     summary: str | None = None
     amount_aud: float | None = None
+    currency_code: str | None = None
+    display_price: str | None = None
     duration_minutes: int | None = None
     venue_name: str | None = None
     location: str | None = None
@@ -277,72 +364,45 @@ class TenantCatalogUpdateRequestPayload(BaseModel):
     featured: bool | None = None
 
 
+class PortalBookingActionRequestPayload(BaseModel):
+    customer_note: str | None = None
+    preferred_date: str | None = None
+    preferred_time: str | None = None
+    timezone: str | None = None
+
+
 def _slugify_value(value: str) -> str:
     normalized = re.sub(r"[^a-z0-9]+", "-", value.strip().lower())
     return normalized.strip("-") or "service"
 
 
-def _get_tenant_session_secret(cfg: Settings) -> str:
-    return cfg.admin_api_token or cfg.admin_password
+TENANT_SUBSCRIPTION_PLAN_CODES = {"starter", "growth", "scale"}
+TENANT_TEAM_ROLE_CODES = {"tenant_admin", "finance_manager", "operator"}
+TENANT_BILLING_WRITE_ROLES = {"tenant_admin", "finance_manager"}
+TENANT_TEAM_MANAGE_ROLES = {"tenant_admin"}
+TENANT_CATALOG_WRITE_ROLES = {"tenant_admin", "operator"}
+TENANT_INTEGRATION_WRITE_ROLES = {"tenant_admin", "operator"}
 
 
-def _create_tenant_session_token(
-    cfg: Settings,
+def _membership_role(membership: dict[str, str | None] | None) -> str:
+    return str((membership or {}).get("role") or "tenant_admin").strip().lower()
+
+
+def _require_tenant_membership_role(
+    membership: dict[str, str | None] | None,
     *,
-    email: str,
-    tenant_ref: str,
-    name: str | None,
-    picture_url: str | None,
-    google_sub: str | None,
-) -> tuple[str, datetime]:
-    expires_at = datetime.now(UTC) + timedelta(hours=max(cfg.admin_session_ttl_hours, 1))
-    payload = {
-        "sub": email,
-        "tenant_ref": tenant_ref,
-        "name": name,
-        "picture_url": picture_url,
-        "google_sub": google_sub,
-        "exp": int(expires_at.timestamp()),
-    }
-    encoded = base64.urlsafe_b64encode(
-        json.dumps(payload, separators=(",", ":")).encode()
-    ).decode()
-    signature = hmac.new(
-        _get_tenant_session_secret(cfg).encode(),
-        encoded.encode(),
-        hashlib.sha256,
-    ).hexdigest()
-    return f"{encoded}.{signature}", expires_at
-
-
-def _verify_tenant_session_token(cfg: Settings, token: str) -> dict[str, str | None]:
-    if not token or "." not in token:
-        raise ValueError("Invalid tenant session")
-
-    encoded, provided_signature = token.rsplit(".", 1)
-    expected_signature = hmac.new(
-        _get_tenant_session_secret(cfg).encode(),
-        encoded.encode(),
-        hashlib.sha256,
-    ).hexdigest()
-    if not hmac.compare_digest(provided_signature, expected_signature):
-        raise ValueError("Invalid tenant session")
-
-    padded = encoded + "=" * (-len(encoded) % 4)
-    payload = json.loads(base64.urlsafe_b64decode(padded.encode()).decode())
-    expires_at = int(payload.get("exp", 0))
-    email = str(payload.get("sub", "")).strip().lower()
-    tenant_ref = str(payload.get("tenant_ref", "")).strip()
-    if not email or not tenant_ref or expires_at <= int(datetime.now(UTC).timestamp()):
-        raise ValueError("Tenant session expired")
-
-    return {
-        "email": email,
-        "tenant_ref": tenant_ref,
-        "name": str(payload.get("name") or "").strip() or None,
-        "picture_url": str(payload.get("picture_url") or "").strip() or None,
-        "google_sub": str(payload.get("google_sub") or "").strip() or None,
-    }
+    allowed_roles: set[str],
+    message: str,
+) -> AppError | None:
+    role = _membership_role(membership)
+    if role in allowed_roles:
+        return None
+    return AppError(
+        code="tenant_role_forbidden",
+        message=message,
+        status_code=403,
+        details={"required_roles": sorted(allowed_roles), "current_role": role},
+    )
 
 
 def _extract_bearer_token(authorization: str | None) -> str | None:
@@ -365,8 +425,23 @@ async def _resolve_tenant_session(
     cfg: Settings = request.app.state.settings
     try:
         return _verify_tenant_session_token(cfg, token)
-    except ValueError:
+    except SessionTokenError:
         return None
+
+
+def _hash_tenant_password(*, password: str, salt: str) -> str:
+    derived = hashlib.pbkdf2_hmac(
+        "sha256",
+        password.encode(),
+        salt.encode(),
+        200_000,
+    )
+    return binascii.hexlify(derived).decode()
+
+
+def _verify_tenant_password(*, password: str, salt: str, expected_hash: str) -> bool:
+    candidate_hash = _hash_tenant_password(password=password, salt=salt)
+    return hmac.compare_digest(candidate_hash, expected_hash)
 
 
 async def _verify_google_identity_token(
@@ -418,6 +493,7 @@ async def _upsert_tenant_membership(
     email: str,
     full_name: str | None,
     google_sub: str | None,
+    auth_provider: str = "google",
 ) -> dict[str, str | None]:
     normalized_email = email.strip().lower()
     tenant_id = str(tenant_profile.get("id") or "").strip()
@@ -434,6 +510,7 @@ async def _upsert_tenant_membership(
     if existing:
         existing.full_name = full_name or existing.full_name
         existing.provider_subject = google_sub or existing.provider_subject
+        existing.auth_provider = auth_provider or existing.auth_provider
         existing.status = "active"
         existing.role = existing.role or "tenant_admin"
         membership = existing
@@ -443,7 +520,7 @@ async def _upsert_tenant_membership(
             tenant_slug=tenant_slug,
             email=normalized_email,
             full_name=full_name,
-            auth_provider="google",
+            auth_provider=auth_provider,
             provider_subject=google_sub,
             role="tenant_admin",
             status="active",
@@ -465,13 +542,14 @@ async def _load_tenant_membership(
     *,
     tenant_id: str,
     email: str,
+    statuses: tuple[str, ...] = ("active",),
 ) -> dict[str, str | None] | None:
     membership = (
         await session.execute(
             select(TenantUserMembership).where(
                 TenantUserMembership.tenant_id == tenant_id,
                 TenantUserMembership.email == email.strip().lower(),
-                TenantUserMembership.status == "active",
+                TenantUserMembership.status.in_(statuses),
             )
         )
     ).scalar_one_or_none()
@@ -485,6 +563,221 @@ async def _load_tenant_membership(
         "role": membership.role,
         "status": membership.status,
     }
+
+
+async def _load_tenant_memberships_for_google_identity(
+    session,
+    *,
+    email: str,
+    google_sub: str | None,
+) -> list[dict[str, str | None]]:
+    normalized_email = email.strip().lower()
+    matches: list[TenantUserMembership] = []
+
+    if google_sub:
+        matches = list(
+            (
+                await session.execute(
+                    select(TenantUserMembership).where(
+                        TenantUserMembership.provider_subject == google_sub,
+                        TenantUserMembership.status == "active",
+                    )
+                )
+            ).scalars()
+        )
+
+    if not matches and normalized_email:
+        matches = list(
+            (
+                await session.execute(
+                    select(TenantUserMembership).where(
+                        TenantUserMembership.email == normalized_email,
+                        TenantUserMembership.status == "active",
+                    )
+                )
+            ).scalars()
+        )
+
+    deduped: dict[str, dict[str, str | None]] = {}
+    for membership in matches:
+        tenant_id = str(membership.tenant_id or "").strip()
+        if not tenant_id or tenant_id in deduped:
+            continue
+        deduped[tenant_id] = {
+            "tenant_id": tenant_id,
+            "tenant_slug": membership.tenant_slug,
+            "email": membership.email,
+            "role": membership.role,
+            "status": membership.status,
+        }
+
+    return list(deduped.values())
+
+
+async def _load_tenant_credential(
+    session,
+    *,
+    username: str,
+) -> TenantUserCredential | None:
+    return (
+        await session.execute(
+            select(TenantUserCredential).where(
+                TenantUserCredential.username == username.strip().lower(),
+                TenantUserCredential.status == "active",
+            )
+        )
+    ).scalar_one_or_none()
+
+
+async def _load_tenant_credential_by_email(
+    session,
+    *,
+    tenant_id: str,
+    email: str,
+) -> TenantUserCredential | None:
+    return (
+        await session.execute(
+            select(TenantUserCredential).where(
+                TenantUserCredential.tenant_id == tenant_id,
+                TenantUserCredential.email == email.strip().lower(),
+                TenantUserCredential.status == "active",
+            )
+        )
+    ).scalar_one_or_none()
+
+
+def _normalize_tenant_slug_candidate(value: str) -> str:
+    return _slugify_value(value)[:80]
+
+
+def _tenant_auth_capabilities() -> list[str]:
+    return [
+        "tenant_overview",
+        "tenant_catalog_import",
+        "tenant_catalog_review",
+        "tenant_catalog_publish",
+        "tenant_billing_read",
+        "tenant_onboarding_read",
+    ]
+
+
+async def _create_or_update_tenant_credential(
+    session,
+    *,
+    tenant_profile: dict[str, str | None],
+    email: str,
+    username: str,
+    password: str,
+    role: str = "tenant_admin",
+) -> TenantUserCredential:
+    normalized_email = email.strip().lower()
+    normalized_username = username.strip().lower()
+    existing = await _load_tenant_credential(session, username=normalized_username)
+    if existing and str(existing.tenant_id or "").strip() != str(tenant_profile.get("id") or "").strip():
+        raise ValidationAppError(
+            "tenant_auth_username_taken",
+            "That username is already assigned to another tenant account.",
+        )
+
+    credential = existing or await _load_tenant_credential_by_email(
+        session,
+        tenant_id=str(tenant_profile.get("id") or ""),
+        email=normalized_email,
+    )
+    salt = f"{normalized_username}-static-salt"
+    password_hash = _hash_tenant_password(password=password, salt=salt)
+
+    if credential:
+        credential.tenant_slug = str(tenant_profile.get("slug") or credential.tenant_slug or "")
+        credential.email = normalized_email
+        credential.username = normalized_username
+        credential.password_salt = salt
+        credential.password_hash = password_hash
+        credential.role = role or credential.role or "tenant_admin"
+        credential.status = "active"
+    else:
+        credential = TenantUserCredential(
+            tenant_id=str(tenant_profile.get("id") or ""),
+            tenant_slug=str(tenant_profile.get("slug") or ""),
+            email=normalized_email,
+            username=normalized_username,
+            password_salt=salt,
+            password_hash=password_hash,
+            role=role,
+            status="active",
+        )
+        session.add(credential)
+
+    await session.flush()
+    return credential
+
+
+async def _count_claimable_services(
+    session,
+    *,
+    tenant_profile: dict[str, str | None],
+    email: str,
+) -> int:
+    normalized_email = email.strip().lower()
+    tenant_id = str(tenant_profile.get("id") or "").strip()
+    tenant_slug = str(tenant_profile.get("slug") or "").strip().lower()
+    tenant_name = str(tenant_profile.get("name") or "").strip().lower()
+    claim_filters = [
+        ServiceMerchantProfile.tenant_id == tenant_id,
+        ServiceMerchantProfile.owner_email == normalized_email,
+        ServiceMerchantProfile.business_email == normalized_email,
+    ]
+    if tenant_name:
+        claim_filters.append(ServiceMerchantProfile.business_name.ilike(f"%{tenant_name}%"))
+    if tenant_slug:
+        claim_filters.append(ServiceMerchantProfile.source_url.ilike(f"%{tenant_slug}%"))
+    result = await session.execute(
+        select(ServiceMerchantProfile).where(or_(*claim_filters))
+    )
+    return len(result.scalars().all())
+
+
+async def _build_tenant_auth_response(
+    cfg: Settings,
+    *,
+    tenant_id: str,
+    tenant_profile: dict[str, str | None],
+    email: str,
+    name: str | None,
+    picture_url: str | None,
+    provider: str,
+    role: str,
+    membership: dict[str, str | None] | None,
+    google_sub: str | None = None,
+) -> tuple[dict[str, Any], ActorContextPayload]:
+    session_token, expires_at = _create_tenant_session_token(
+        cfg,
+        email=email,
+        tenant_ref=str(tenant_profile.get("slug") or tenant_id),
+        name=name,
+        picture_url=picture_url,
+        google_sub=google_sub,
+    )
+    actor_context = ActorContextPayload(
+        channel="tenant_app",
+        tenant_id=tenant_id,
+        role=role or "tenant_admin",
+        deployment_mode="standalone_app",
+    )
+    response = {
+        "session_token": session_token,
+        "expires_at": expires_at.isoformat(),
+        "provider": provider,
+        "user": {
+            "email": email,
+            "full_name": name,
+            "picture_url": picture_url,
+        },
+        "tenant": tenant_profile,
+        "capabilities": _tenant_auth_capabilities(),
+        "membership": membership,
+    }
+    return response, actor_context
 
 
 def _can_claim_tenant_service(
@@ -570,6 +863,13 @@ async def _resolve_tenant_catalog_service(
 async def _resolve_tenant_id(request: Request, actor_context: ActorContextPayload | None) -> str | None:
     if actor_context and actor_context.tenant_id:
         return actor_context.tenant_id
+
+    tenant_ref = str(actor_context.tenant_ref or "").strip() if actor_context else ""
+    if tenant_ref:
+        async with get_session(request.app.state.session_factory) as session:
+            tenant_id = await TenantRepository(RepositoryContext(session=session)).resolve_tenant_id(tenant_ref)
+            if tenant_id:
+                return tenant_id
 
     async with get_session(request.app.state.session_factory) as session:
         return await TenantRepository(RepositoryContext(session=session)).get_default_tenant_id()
@@ -671,6 +971,141 @@ def _build_capabilities(channel: str, deployment_mode: str | None) -> list[str]:
     return capabilities
 
 
+def _tenant_portal_workspace_url(
+    request: Request,
+    *,
+    tenant_slug: str,
+    auth_mode: str | None = None,
+    invite_email: str | None = None,
+    invite_role: str | None = None,
+    invite_name: str | None = None,
+) -> str:
+    settings = getattr(request.app.state, "settings", None)
+    public_app_url = str(getattr(settings, "public_app_url", "") or "").strip().rstrip("/")
+    use_local_path = "localhost" in public_app_url or "127.0.0.1" in public_app_url
+    if use_local_path:
+        base = f"{public_app_url}/tenant/{quote(tenant_slug.strip())}"
+    else:
+        base = f"https://tenant.bookedai.au/{quote(tenant_slug.strip())}"
+
+    params: dict[str, str] = {}
+    if auth_mode:
+        params["auth"] = auth_mode.strip().lower()
+    if invite_email:
+        params["invite_email"] = invite_email.strip().lower()
+    if invite_role:
+        params["invite_role"] = invite_role.strip().lower()
+    if invite_name:
+        normalized_name = invite_name.strip()
+        if normalized_name:
+            params["invite_name"] = normalized_name
+
+    if not params:
+        return base
+    return f"{base}?{urlencode(params)}"
+
+
+def _build_tenant_invite_email_payload(
+    request: Request,
+    *,
+    tenant_name: str,
+    tenant_slug: str,
+    invitee_email: str,
+    invitee_full_name: str | None,
+    role: str,
+    invited_by_name: str | None,
+    invited_by_email: str,
+) -> dict[str, str]:
+    invite_url = _tenant_portal_workspace_url(
+        request,
+        tenant_slug=tenant_slug,
+        auth_mode="claim",
+        invite_email=invitee_email,
+        invite_role=role,
+        invite_name=invitee_full_name,
+    )
+    role_label = role.replace("_", " ").title()
+    inviter_label = invited_by_name.strip() if invited_by_name and invited_by_name.strip() else invited_by_email
+    invitee_label = invitee_full_name.strip() if invitee_full_name and invitee_full_name.strip() else invitee_email
+    subject = f"You have been invited to {tenant_name} on BookedAI"
+    text = (
+        f"Hello {invitee_label},\n\n"
+        f"{inviter_label} invited you to join {tenant_name} on BookedAI as {role_label}.\n\n"
+        "Use the tenant portal link below to accept the invite, set your tenant password, and open your workspace:\n"
+        f"{invite_url}\n\n"
+        "This tenant portal is the single place for sign-in, data input, reporting, and billing operations.\n"
+    )
+    html = (
+        "<div style=\"font-family:Arial,sans-serif;color:#0f172a;line-height:1.6\">"
+        f"<p>Hello {escape(invitee_label)},</p>"
+        f"<p><strong>{escape(inviter_label)}</strong> invited you to join "
+        f"<strong>{escape(tenant_name)}</strong> on BookedAI as <strong>{escape(role_label)}</strong>.</p>"
+        "<p>Use the tenant portal link below to accept the invite, set your tenant password, "
+        "and open your workspace.</p>"
+        f"<p><a href=\"{escape(invite_url)}\" "
+        "style=\"display:inline-block;padding:10px 18px;border-radius:999px;background:#0f172a;color:#ffffff;text-decoration:none;font-weight:600\">"
+        "Open tenant portal</a></p>"
+        f"<p style=\"font-size:13px;color:#475569\">If the button does not open, use this link:<br>{escape(invite_url)}</p>"
+        "</div>"
+    )
+    return {
+        "subject": subject,
+        "text": text,
+        "html": html,
+        "invite_url": invite_url,
+    }
+
+
+def _tenant_period_id_from_invoice_id(invoice_id: str) -> str | None:
+    normalized = str(invoice_id or "").strip()
+    if not normalized.startswith("inv-"):
+        return None
+    period_id = normalized.removeprefix("inv-").strip()
+    return period_id or None
+
+
+async def _deliver_tenant_invite_email(
+    request: Request,
+    *,
+    tenant_name: str,
+    tenant_slug: str,
+    invitee_email: str,
+    invitee_full_name: str | None,
+    role: str,
+    invited_by_name: str | None,
+    invited_by_email: str,
+) -> dict[str, str | bool]:
+    invite_email_payload = _build_tenant_invite_email_payload(
+        request,
+        tenant_name=tenant_name,
+        tenant_slug=tenant_slug,
+        invitee_email=invitee_email,
+        invitee_full_name=invitee_full_name,
+        role=role,
+        invited_by_name=invited_by_name,
+        invited_by_email=invited_by_email,
+    )
+    email_service: EmailService = request.app.state.email_service
+    smtp_configured = email_service.smtp_configured()
+    invite_delivery_status = "queued"
+    invite_delivery_note = "SMTP is not fully configured; share the tenant portal invite link manually."
+    if smtp_configured:
+        await email_service.send_email(
+            to=[invitee_email],
+            subject=invite_email_payload["subject"],
+            text=invite_email_payload["text"],
+            html=invite_email_payload["html"],
+        )
+        invite_delivery_status = "sent"
+        invite_delivery_note = "Invite email sent from the tenant portal."
+    return {
+        "status": invite_delivery_status,
+        "operator_note": invite_delivery_note,
+        "smtp_configured": smtp_configured,
+        "invite_url": invite_email_payload["invite_url"],
+    }
+
+
 def _normalize_booking_path(service: ServiceMerchantProfile | None) -> str:
     if service and service.booking_url:
         return "book_on_partner_site"
@@ -764,7 +1199,12 @@ def _raw_query_intent_terms(
     *,
     location_hint: str | None = None,
 ) -> list[str]:
-    terms = list(extract_core_intent_terms(query, location_hint=location_hint, limit=6))
+    terms = list(
+        build_canonical_query_understanding(
+            query,
+            location_hint=location_hint,
+        ).core_intent_terms
+    )
     if {"support", "worker"} <= set(terms):
         terms = [term for term in terms if term not in {"home", "community"}]
     return terms
@@ -987,6 +1427,76 @@ def _build_match_confidence_payload(ranked_matches: list[Any]) -> dict[str, Any]
     }
 
 
+def _build_candidate_source_label(*, source_type: str, trust_signal: str | None = None) -> str:
+    if source_type == "public_web_search":
+        return "Sourced from the public web"
+    if trust_signal == "partner_verified":
+        return "Verified tenant partner"
+    if trust_signal == "partner_routed":
+        return "Tenant partner booking path"
+    if trust_signal == "featured_catalog":
+        return "Featured tenant catalog"
+    return "Tenant catalog match"
+
+
+def _build_price_posture(
+    *,
+    display_price: str | None,
+    amount_aud: float | None,
+) -> str | None:
+    normalized_display_price = str(display_price or "").strip() or None
+    if normalized_display_price:
+        return normalized_display_price
+    if amount_aud is not None:
+        return f"From AUD {int(amount_aud) if float(amount_aud).is_integer() else amount_aud}"
+    return "Price to confirm during booking"
+
+
+def _build_catalog_recommendations(
+    ranked_matches: list[RankedServiceMatch],
+    *,
+    limit: int,
+    booking_request_context: Any,
+) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    recommendations: list[dict[str, Any]] = []
+    detail_by_candidate_id: dict[str, dict[str, Any]] = {}
+    for match in ranked_matches[:limit]:
+        availability_state, _verified, recommended_path, trust_warnings, _payment_allowed_now, booking_confidence = (
+            build_booking_trust_payload(
+                match.service,
+                party_size=booking_request_context.party_size,
+                desired_date=booking_request_context.requested_date,
+                desired_time=booking_request_context.requested_time or booking_request_context.schedule_hint,
+            )
+        )
+        top_path, next_step, path_warnings, _payment_allowed = resolve_booking_path_policy(
+            availability_state=availability_state,
+            booking_confidence=booking_confidence,
+            payment_option=None,
+            context={
+                "party_size": booking_request_context.party_size,
+            },
+        )
+        recommendations.append(
+            {
+                "candidate_id": str(getattr(match.service, "service_id", "") or ""),
+                "reason": match.explanation,
+                "path_type": recommended_path or top_path,
+                "next_step": next_step,
+                "warnings": list(dict.fromkeys([*trust_warnings, *path_warnings])),
+            }
+        )
+        candidate_id = str(getattr(match.service, "service_id", "") or "")
+        detail_by_candidate_id[candidate_id] = {
+            "availability_state": availability_state,
+            "booking_confidence": booking_confidence,
+            "booking_path_type": recommended_path or top_path,
+            "next_step": next_step,
+            "why_this_matches": match.explanation,
+        }
+    return recommendations, detail_by_candidate_id
+
+
 def _candidate_ids_from_payload(candidates: list[dict[str, Any]], *, limit: int = 8) -> list[str]:
     candidate_ids: list[str] = []
     for candidate in candidates[:limit]:
@@ -994,6 +1504,76 @@ def _candidate_ids_from_payload(candidates: list[dict[str, Any]], *, limit: int 
         if candidate_id:
             candidate_ids.append(candidate_id)
     return candidate_ids
+
+
+def _build_public_web_fallback_candidates(web_results: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    normalized_candidates: list[dict[str, Any]] = []
+    seen_keys: set[str] = set()
+    for item in web_results:
+        candidate_id = str(item.get("candidate_id") or "").strip()
+        provider_name = str(item.get("provider_name") or "").strip()
+        service_name = str(item.get("service_name") or "").strip()
+        source_url = str(item.get("source_url") or "").strip()
+        booking_url = str(item.get("booking_url") or "").strip() or None
+        if not candidate_id or not provider_name or not service_name or not source_url:
+            continue
+
+        dedupe_key = f"{candidate_id}|{source_url}"
+        if dedupe_key in seen_keys:
+            continue
+        seen_keys.add(dedupe_key)
+
+        explanation = (
+            str(item.get("why_this_matches") or "").strip()
+            or "Public web search fallback matched the request when tenant catalog did not have a strong result."
+        )
+        normalized_candidates.append(
+            {
+                "candidate_id": candidate_id,
+                "provider_name": provider_name,
+                "service_name": service_name,
+                "source_type": "public_web_search",
+                "category": None,
+                "summary": item.get("summary"),
+                "venue_name": provider_name,
+                "location": item.get("location"),
+                "booking_url": booking_url,
+                "map_url": None,
+                "source_url": source_url,
+                "image_url": None,
+                "amount_aud": None,
+                "currency_code": None,
+                "display_price": None,
+                "duration_minutes": None,
+                "tags": ["public_web_search"],
+                "featured": False,
+                "distance_km": None,
+                "match_score": item.get("match_score"),
+                "semantic_score": None,
+                "trust_signal": "public_web_search",
+                "is_preferred": False,
+                "display_summary": item.get("summary"),
+                "explanation": explanation,
+                "why_this_matches": explanation,
+                "source_label": _build_candidate_source_label(source_type="public_web_search"),
+                "price_posture": "Check provider site for final pricing",
+                "booking_path_type": (
+                    "book_on_partner_site"
+                    if booking_url
+                    else "request_callback"
+                ),
+                "next_step": (
+                    "Open the provider booking page to confirm details."
+                    if booking_url
+                    else "Open the provider website and review the service details."
+                ),
+                "availability_state": "availability_unknown",
+                "booking_confidence": "medium",
+            }
+        )
+        if len(normalized_candidates) >= 3:
+            break
+    return normalized_candidates
 
 
 @router.post("/leads")
@@ -1097,11 +1677,22 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
     actor_context = ActorContextPayload(
         channel=payload.channel_context.channel,
         tenant_id=payload.channel_context.tenant_id,
+        tenant_ref=payload.channel_context.tenant_ref,
         deployment_mode=payload.channel_context.deployment_mode,
     )
     tenant_id = await _resolve_tenant_id(request, actor_context)
+    strict_catalog_only = bool(actor_context.tenant_id or actor_context.tenant_ref) and (
+        actor_context.channel not in {"public_web", "embedded_widget"}
+    )
     semantic_rollout_enabled = False
-    effective_location_hint = extract_query_location_hint(payload.query, payload.location)
+    query_understanding = build_canonical_query_understanding(
+        payload.query,
+        location_hint=payload.location,
+        requested_category=str((payload.preferences or {}).get("service_category") or ""),
+        budget=payload.budget,
+        time_window=payload.time_window,
+    )
+    effective_location_hint = query_understanding.inferred_location
     booking_request_context = extract_booking_request_context(payload.query, payload.time_window)
     near_me = booking_request_context.near_me_requested or is_near_me_requested(payload.query)
     chat_style = booking_request_context.is_chat_style or is_chat_style_query(payload.query)
@@ -1119,6 +1710,8 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
             .order_by(desc(ServiceMerchantProfile.featured), ServiceMerchantProfile.name)
             .limit(24)
         )
+        if tenant_id:
+            statement = statement.where(ServiceMerchantProfile.tenant_id == tenant_id)
         if search_filters:
             statement = statement.where(and_(*search_filters))
         services = (await session.execute(statement)).scalars().all()
@@ -1218,6 +1811,10 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
         semantic_applied=semantic_applied,
     )
     display_ranked_matches = list(ranked_matches)
+    ranked_matches = apply_deterministic_ranking_policy(
+        ranked_matches,
+        query_understanding=query_understanding,
+    )
     if near_me and not user_location and location_permission_needed and not effective_location_hint:
         ranked_matches = []
     final_ranked_matches = list(ranked_matches)
@@ -1241,6 +1838,8 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
             "source_url": getattr(match.service, "source_url", None),
             "image_url": getattr(match.service, "image_url", None),
             "amount_aud": getattr(match.service, "amount_aud", None),
+            "currency_code": getattr(match.service, "currency_code", None),
+            "display_price": getattr(match.service, "display_price", None),
             "duration_minutes": getattr(match.service, "duration_minutes", None),
             "tags": list(getattr(match.service, "tags_json", None) or []),
             "featured": bool(getattr(match.service, "featured", 0)),
@@ -1255,6 +1854,19 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
                 or match.explanation
             ),
             "explanation": match.explanation,
+            "why_this_matches": match.explanation,
+            "source_label": _build_candidate_source_label(
+                source_type="service_catalog",
+                trust_signal=match.trust_signal,
+            ),
+            "price_posture": _build_price_posture(
+                display_price=getattr(match.service, "display_price", None),
+                amount_aud=getattr(match.service, "amount_aud", None),
+            ),
+            "booking_path_type": None,
+            "next_step": None,
+            "availability_state": None,
+            "booking_confidence": None,
         }
         for match in ranked_matches[:8]
     ]
@@ -1262,6 +1874,7 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
     public_web_fallback_candidates: list[dict[str, Any]] = []
     if (
         not candidates
+        and not strict_catalog_only
         and openai_service is not None
         and not (near_me and not user_location and location_permission_needed and not effective_location_hint)
         and hasattr(openai_service, "search_public_service_candidates")
@@ -1285,69 +1898,25 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
         except Exception:
             web_results = []
 
-        for item in web_results[:3]:
-            public_web_fallback_candidates.append(
-                {
-                    "candidate_id": item.get("candidate_id", ""),
-                    "provider_name": item.get("provider_name", ""),
-                    "service_name": item.get("service_name", ""),
-                    "source_type": "public_web_search",
-                    "category": None,
-                    "summary": item.get("summary"),
-                    "venue_name": item.get("provider_name", ""),
-                    "location": item.get("location"),
-                    "booking_url": item.get("booking_url"),
-                    "map_url": None,
-                    "source_url": item.get("source_url"),
-                    "image_url": None,
-                    "amount_aud": None,
-                    "duration_minutes": None,
-                    "tags": ["public_web_search"],
-                    "featured": False,
-                    "distance_km": None,
-                    "match_score": item.get("match_score"),
-                    "semantic_score": None,
-                    "trust_signal": "public_web_search",
-                    "is_preferred": False,
-                    "display_summary": item.get("summary"),
-                    "explanation": (
-                        item.get("why_this_matches")
-                        or "Public web search fallback matched the request when tenant catalog did not have a strong result."
-                    ),
-                }
-            )
+        public_web_fallback_candidates = _build_public_web_fallback_candidates(web_results)
 
         if public_web_fallback_candidates:
             candidates = public_web_fallback_candidates
     recommendations = []
     if candidates:
         if ranked_matches:
-            top_match = ranked_matches[0]
-            availability_state, _verified, recommended_path, trust_warnings, _payment_allowed_now, booking_confidence = (
-                build_booking_trust_payload(
-                    top_match.service,
-                    party_size=booking_request_context.party_size,
-                    desired_date=booking_request_context.requested_date,
-                    desired_time=booking_request_context.requested_time or booking_request_context.schedule_hint,
-                )
+            recommendations, recommendation_detail_by_candidate_id = _build_catalog_recommendations(
+                ranked_matches,
+                limit=3,
+                booking_request_context=booking_request_context,
             )
-            top_path, next_step, path_warnings, _payment_allowed = resolve_booking_path_policy(
-                availability_state=availability_state,
-                booking_confidence=booking_confidence,
-                payment_option=None,
-                context={
-                    "party_size": booking_request_context.party_size,
-                },
-            )
-            recommendations.append(
+            candidates = [
                 {
-                    "candidate_id": candidates[0]["candidate_id"],
-                    "reason": top_match.explanation,
-                    "path_type": recommended_path or top_path,
-                    "next_step": next_step,
-                    "warnings": list(dict.fromkeys([*trust_warnings, *path_warnings])),
+                    **candidate,
+                    **recommendation_detail_by_candidate_id.get(str(candidate.get("candidate_id") or ""), {}),
                 }
-            )
+                for candidate in candidates
+            ]
 
     warnings: list[str] = []
     if not candidates:
@@ -1461,6 +2030,24 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
                 "intent_label": booking_request_context.intent_label,
                 "summary": booking_request_context.summary,
             },
+            "query_understanding": {
+                "normalized_query": query_understanding.normalized_query,
+                "inferred_location": query_understanding.inferred_location,
+                "location_terms": list(query_understanding.location_terms),
+                "core_intent_terms": list(query_understanding.core_intent_terms),
+                "expanded_intent_terms": list(query_understanding.expanded_intent_terms),
+                "constraint_terms": list(query_understanding.constraint_terms),
+                "requested_category": query_understanding.requested_category,
+                "budget_limit": query_understanding.budget_limit,
+                "near_me_requested": query_understanding.near_me_requested,
+                "is_chat_style": query_understanding.is_chat_style,
+                "requested_date": query_understanding.requested_date,
+                "requested_time": query_understanding.requested_time,
+                "schedule_hint": query_understanding.schedule_hint,
+                "party_size": query_understanding.party_size,
+                "intent_label": query_understanding.intent_label,
+                "summary": query_understanding.summary,
+            },
             "semantic_assist": semantic_assist
             or {
                 "applied": False,
@@ -1484,13 +2071,12 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
 async def check_availability(request: Request, payload: CheckAvailabilityRequestPayload):
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     async with get_session(request.app.state.session_factory) as session:
-        service = (
-            await session.execute(
-                select(ServiceMerchantProfile).where(
-                    ServiceMerchantProfile.service_id == payload.candidate_id
-                )
-            )
-        ).scalar_one_or_none()
+        statement = select(ServiceMerchantProfile).where(
+            ServiceMerchantProfile.service_id == payload.candidate_id
+        )
+        if tenant_id:
+            statement = statement.where(ServiceMerchantProfile.tenant_id == tenant_id)
+        service = (await session.execute(statement)).scalar_one_or_none()
 
     availability_state, verified, recommended_path, warnings, payment_allowed_now, booking_confidence = (
         build_booking_trust_payload(
@@ -1562,11 +2148,12 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
             service = None
             service_id = payload.service_id or payload.candidate_id
             if service_id:
-                service = (
-                    await session.execute(
-                        select(ServiceMerchantProfile).where(ServiceMerchantProfile.service_id == service_id)
-                    )
-                ).scalar_one_or_none()
+                statement = select(ServiceMerchantProfile).where(
+                    ServiceMerchantProfile.service_id == service_id
+                )
+                if tenant_id:
+                    statement = statement.where(ServiceMerchantProfile.tenant_id == tenant_id)
+                service = (await session.execute(statement)).scalar_one_or_none()
 
             contact_repository = ContactRepository(RepositoryContext(session=session, tenant_id=tenant_id))
             lead_repository = LeadRepository(RepositoryContext(session=session, tenant_id=tenant_id))
@@ -2159,6 +2746,405 @@ async def integration_outbox_backlog(request: Request):
 async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestPayload):
     cfg: Settings = request.app.state.settings
     google_identity = await _verify_google_identity_token(cfg, id_token=payload.id_token)
+    auth_intent = str(payload.auth_intent or "sign-in").strip().lower()
+    if auth_intent not in {"sign-in", "create"}:
+        return _error_response(
+            ValidationAppError(
+                "tenant_google_auth_invalid_intent",
+                "Google tenant auth intent must be either sign-in or create.",
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_id: str | None = None
+        tenant_profile: dict[str, str | None] | None = None
+        membership: dict[str, str | None] | None = None
+        role = "tenant_admin"
+
+        if payload.tenant_ref:
+            tenant_id = await tenant_repository.resolve_tenant_id(payload.tenant_ref)
+            if not tenant_id:
+                return _error_response(
+                    AppError(
+                        code="tenant_not_found",
+                        message="The requested tenant could not be resolved for Google sign-in.",
+                        status_code=404,
+                        details={"tenant_ref": payload.tenant_ref},
+                    ),
+                    tenant_id=None,
+                    actor_context=None,
+                )
+
+            tenant_profile = await tenant_repository.get_tenant_profile(payload.tenant_ref or tenant_id)
+            if not tenant_profile:
+                return _error_response(
+                    AppError(
+                        code="tenant_not_found",
+                        message="The tenant profile could not be loaded.",
+                        status_code=404,
+                    ),
+                    tenant_id=None,
+                    actor_context=None,
+                )
+
+            membership = await _upsert_tenant_membership(
+                session,
+                tenant_profile=tenant_profile,
+                email=google_identity["email"] or "",
+                full_name=google_identity["name"],
+                google_sub=google_identity["google_sub"],
+                auth_provider="google",
+            )
+        else:
+            memberships = await _load_tenant_memberships_for_google_identity(
+                session,
+                email=google_identity["email"] or "",
+                google_sub=google_identity["google_sub"],
+            )
+
+            if len(memberships) > 1:
+                return _error_response(
+                    AppError(
+                        code="tenant_google_auth_multiple_memberships",
+                        message="This Google account is linked to multiple tenant workspaces. Open the exact workspace URL or sign in with the tenant username instead.",
+                        status_code=409,
+                        details={"tenant_slugs": [item["tenant_slug"] for item in memberships if item.get("tenant_slug")]},
+                    ),
+                    tenant_id=None,
+                    actor_context=None,
+                )
+
+            if len(memberships) == 1:
+                membership = memberships[0]
+                tenant_id = str(membership.get("tenant_id") or "").strip()
+                role = str(membership.get("role") or "tenant_admin")
+                tenant_profile = await tenant_repository.get_tenant_profile(tenant_id)
+                if tenant_profile:
+                    membership = await _upsert_tenant_membership(
+                        session,
+                        tenant_profile=tenant_profile,
+                        email=google_identity["email"] or "",
+                        full_name=google_identity["name"],
+                        google_sub=google_identity["google_sub"],
+                        auth_provider="google",
+                    )
+            else:
+                if auth_intent != "create":
+                    return _error_response(
+                        AppError(
+                            code="tenant_google_auth_not_found",
+                            message="No tenant workspace is linked to this Google account yet. Create a new tenant account first.",
+                            status_code=404,
+                        ),
+                        tenant_id=None,
+                        actor_context=None,
+                    )
+
+                normalized_business_name = str(payload.business_name or "").strip()
+                if not normalized_business_name:
+                    return _error_response(
+                        ValidationAppError(
+                            "tenant_google_create_business_name_required",
+                            "Business name is required before creating a tenant account with Google.",
+                        ),
+                        tenant_id=None,
+                        actor_context=None,
+                    )
+
+                normalized_slug = _normalize_tenant_slug_candidate(
+                    str(payload.tenant_slug or normalized_business_name)
+                )
+                existing_tenant = await tenant_repository.get_tenant_profile(normalized_slug)
+                if existing_tenant:
+                    return _error_response(
+                        AppError(
+                            code="tenant_account_slug_taken",
+                            message="That tenant workspace slug already exists. Sign in instead or choose a different business name.",
+                            status_code=409,
+                            details={"tenant_slug": normalized_slug},
+                        ),
+                        tenant_id=str(existing_tenant.get("id") or ""),
+                        actor_context=None,
+                    )
+
+                tenant_profile = await tenant_repository.create_tenant(
+                    slug=normalized_slug,
+                    name=normalized_business_name,
+                    timezone="Australia/Sydney",
+                    locale="en-AU",
+                    industry=str(payload.industry or "").strip() or None,
+                )
+                tenant_id = str(tenant_profile.get("id") or "").strip()
+                membership = await _upsert_tenant_membership(
+                    session,
+                    tenant_profile=tenant_profile,
+                    email=google_identity["email"] or "",
+                    full_name=google_identity["name"] or normalized_business_name,
+                    google_sub=google_identity["google_sub"],
+                    auth_provider="google",
+                )
+
+        await session.commit()
+
+    if not tenant_profile or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_google_auth_failed",
+                message="Tenant Google authentication could not be completed.",
+                status_code=500,
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    response, actor_context = await _build_tenant_auth_response(
+        cfg,
+        tenant_id=tenant_id,
+        tenant_profile=tenant_profile,
+        email=google_identity["email"] or "",
+        name=google_identity["name"],
+        picture_url=google_identity["picture_url"],
+        provider="google",
+        role=role,
+        membership=membership,
+        google_sub=google_identity["google_sub"],
+    )
+    return _success_response(
+        response,
+        tenant_id=tenant_id,
+        actor_context=actor_context,
+    )
+
+
+@router.post("/tenant/auth/password")
+async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequestPayload):
+    cfg: Settings = request.app.state.settings
+    normalized_username = payload.username.strip().lower()
+    normalized_password = payload.password.strip()
+    if not normalized_username or not normalized_password:
+        return _error_response(
+            ValidationAppError(
+                "tenant_auth_invalid_credentials",
+                "Username and password are required for tenant sign-in.",
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        credential = await _load_tenant_credential(session, username=normalized_username)
+        if not credential or not _verify_tenant_password(
+            password=normalized_password,
+            salt=credential.password_salt,
+            expected_hash=credential.password_hash,
+        ):
+            return _error_response(
+                AppError(
+                    code="tenant_auth_invalid_credentials",
+                    message="The tenant username or password is incorrect.",
+                    status_code=401,
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_id = str(credential.tenant_id or "").strip()
+        tenant_profile = await tenant_repository.get_tenant_profile(payload.tenant_ref or tenant_id)
+        if not tenant_profile:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The tenant profile could not be loaded for username-based sign-in.",
+                    status_code=404,
+                    details={"tenant_ref": payload.tenant_ref, "username": normalized_username},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        if payload.tenant_ref:
+            requested_tenant_id = await tenant_repository.resolve_tenant_id(payload.tenant_ref)
+            if requested_tenant_id and requested_tenant_id != tenant_id:
+                return _error_response(
+                    AppError(
+                        code="tenant_auth_tenant_mismatch",
+                        message="This tenant account does not belong to the requested tenant.",
+                        status_code=403,
+                    ),
+                    tenant_id=requested_tenant_id,
+                    actor_context=None,
+                )
+
+        membership = await _load_tenant_membership(
+            session,
+            tenant_id=tenant_id,
+            email=str(credential.email or "").strip().lower(),
+        )
+        if not membership:
+            tenant_profile = {
+                **tenant_profile,
+                "id": tenant_id,
+                "slug": str(credential.tenant_slug or tenant_profile.get("slug") or ""),
+            }
+            membership = await _upsert_tenant_membership(
+                session,
+                tenant_profile=tenant_profile,
+                email=str(credential.email or "").strip().lower(),
+                full_name=normalized_username,
+                google_sub=None,
+                auth_provider="password",
+            )
+            await session.commit()
+
+    session_token, expires_at = _create_tenant_session_token(
+        cfg,
+        email=str(credential.email or "").strip().lower(),
+        tenant_ref=str(credential.tenant_slug or tenant_profile["slug"] or tenant_id),
+        name=normalized_username,
+        picture_url=None,
+        google_sub=None,
+    )
+    actor_context = ActorContextPayload(
+        channel="tenant_app",
+        tenant_id=tenant_id,
+        role=str(credential.role or "tenant_admin"),
+        deployment_mode="standalone_app",
+    )
+    return _success_response(
+        {
+            "session_token": session_token,
+            "expires_at": expires_at.isoformat(),
+            "provider": "password",
+            "user": {
+                "email": str(credential.email or "").strip().lower(),
+                "full_name": normalized_username,
+                "picture_url": None,
+            },
+            "tenant": tenant_profile,
+            "capabilities": [
+                "tenant_overview",
+                "tenant_catalog_import",
+                "tenant_catalog_review",
+                "tenant_catalog_publish",
+            ],
+            "membership": membership,
+        },
+        tenant_id=tenant_id,
+        actor_context=actor_context,
+    )
+
+
+@router.post("/tenant/account/create")
+async def tenant_create_account(request: Request, payload: TenantCreateAccountRequestPayload):
+    cfg: Settings = request.app.state.settings
+    normalized_email = payload.email.strip().lower()
+    normalized_username = payload.username.strip().lower()
+    normalized_password = payload.password.strip()
+    normalized_business_name = payload.business_name.strip()
+    normalized_slug = _normalize_tenant_slug_candidate(payload.tenant_slug or normalized_business_name)
+    if (
+        not normalized_email
+        or not normalized_username
+        or not normalized_password
+        or not normalized_business_name
+    ):
+        return _error_response(
+            ValidationAppError(
+                "tenant_account_create_invalid",
+                "Business name, email, username, and password are required to create a tenant account.",
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        existing_tenant = await tenant_repository.get_tenant_profile(normalized_slug)
+        if existing_tenant:
+            return _error_response(
+                AppError(
+                    code="tenant_account_slug_taken",
+                    message="That tenant workspace slug already exists. Use claim workspace instead.",
+                    status_code=409,
+                    details={"tenant_slug": normalized_slug},
+                ),
+                tenant_id=str(existing_tenant.get("id") or ""),
+                actor_context=None,
+            )
+
+        existing_credential = await _load_tenant_credential(session, username=normalized_username)
+        if existing_credential:
+            return _error_response(
+                AppError(
+                    code="tenant_auth_username_taken",
+                    message="That username is already in use.",
+                    status_code=409,
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        tenant_profile = await tenant_repository.create_tenant(
+            slug=normalized_slug,
+            name=normalized_business_name,
+            timezone=payload.timezone or "Australia/Sydney",
+            locale=payload.locale or "en-AU",
+            industry=payload.industry.strip() if payload.industry else None,
+        )
+        membership = await _upsert_tenant_membership(
+            session,
+            tenant_profile=tenant_profile,
+            email=normalized_email,
+            full_name=payload.full_name or normalized_business_name,
+            google_sub=None,
+            auth_provider="password",
+        )
+        await _create_or_update_tenant_credential(
+            session,
+            tenant_profile=tenant_profile,
+            email=normalized_email,
+            username=normalized_username,
+            password=normalized_password,
+        )
+        await session.commit()
+
+    response, actor_context = await _build_tenant_auth_response(
+        cfg,
+        tenant_id=str(tenant_profile.get("id") or ""),
+        tenant_profile=tenant_profile,
+        email=normalized_email,
+        name=payload.full_name or normalized_business_name,
+        picture_url=None,
+        provider="password",
+        role=str(membership.get("role") or "tenant_admin"),
+        membership=membership,
+    )
+    return _success_response(
+        response,
+        tenant_id=str(tenant_profile.get("id") or ""),
+        actor_context=actor_context,
+    )
+
+
+@router.post("/tenant/account/claim")
+async def tenant_claim_account(request: Request, payload: TenantClaimAccountRequestPayload):
+    cfg: Settings = request.app.state.settings
+    normalized_email = payload.email.strip().lower()
+    normalized_username = payload.username.strip().lower()
+    normalized_password = payload.password.strip()
+    if not payload.tenant_ref.strip() or not normalized_email or not normalized_username or not normalized_password:
+        return _error_response(
+            ValidationAppError(
+                "tenant_claim_invalid",
+                "Tenant reference, email, username, and password are required to claim a tenant workspace.",
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
 
     async with get_session(request.app.state.session_factory) as session:
         tenant_repository = TenantRepository(RepositoryContext(session=session))
@@ -2167,7 +3153,7 @@ async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestP
             return _error_response(
                 AppError(
                     code="tenant_not_found",
-                    message="The requested tenant could not be resolved for Google sign-in.",
+                    message="The requested tenant could not be resolved for account claim.",
                     status_code=404,
                     details={"tenant_ref": payload.tenant_ref},
                 ),
@@ -2180,54 +3166,101 @@ async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestP
             return _error_response(
                 AppError(
                     code="tenant_not_found",
-                    message="The tenant profile could not be loaded.",
+                    message="The tenant profile could not be loaded for account claim.",
                     status_code=404,
                 ),
                 tenant_id=None,
                 actor_context=None,
             )
-        membership = await _upsert_tenant_membership(
+
+        membership_record = (
+            await session.execute(
+                select(TenantUserMembership).where(
+                    TenantUserMembership.tenant_id == tenant_id,
+                    TenantUserMembership.email == normalized_email,
+                    TenantUserMembership.status.in_(("active", "invited")),
+                )
+            )
+        ).scalar_one_or_none()
+        membership = None
+        accepted_existing_invite = False
+        if membership_record:
+            accepted_existing_invite = str(membership_record.status or "").strip().lower() == "invited"
+            membership_record.status = "active"
+            membership = {
+                "tenant_id": membership_record.tenant_id,
+                "tenant_slug": membership_record.tenant_slug,
+                "email": membership_record.email,
+                "role": membership_record.role,
+                "status": membership_record.status,
+            }
+
+        if not membership:
+            membership_count = await tenant_repository.count_active_memberships(tenant_id)
+            claimable_service_count = await _count_claimable_services(
+                session,
+                tenant_profile=tenant_profile,
+                email=normalized_email,
+            )
+            if membership_count > 0 and claimable_service_count == 0:
+                return _error_response(
+                    AppError(
+                        code="tenant_claim_not_allowed",
+                        message="This tenant workspace cannot be claimed or accepted with the supplied email yet.",
+                        status_code=403,
+                    ),
+                    tenant_id=tenant_id,
+                    actor_context=None,
+                )
+
+            membership = await _upsert_tenant_membership(
+                session,
+                tenant_profile=tenant_profile,
+                email=normalized_email,
+                full_name=payload.full_name or normalized_username,
+                google_sub=None,
+                auth_provider="password",
+            )
+
+        await _create_or_update_tenant_credential(
             session,
             tenant_profile=tenant_profile,
-            email=google_identity["email"] or "",
-            full_name=google_identity["name"],
-            google_sub=google_identity["google_sub"],
+            email=normalized_email,
+            username=normalized_username,
+            password=normalized_password,
+            role=str(membership.get("role") or "tenant_admin"),
         )
+        if accepted_existing_invite:
+            audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+            await audit_repository.append_entry(
+                tenant_id=tenant_id,
+                event_type="tenant.team.member_invite_accepted",
+                entity_type="tenant_member",
+                entity_id=normalized_email,
+                actor_type="tenant_app",
+                actor_id=normalized_email,
+                payload={
+                    "summary": "Tenant invite accepted from the tenant portal.",
+                    "email": normalized_email,
+                    "role": membership.get("role"),
+                    "tenant_slug": membership.get("tenant_slug"),
+                },
+            )
         await session.commit()
 
-    session_token, expires_at = _create_tenant_session_token(
+    response, actor_context = await _build_tenant_auth_response(
         cfg,
-        email=google_identity["email"] or "",
-        tenant_ref=tenant_profile["slug"] or tenant_id,
-        name=google_identity["name"],
-        picture_url=google_identity["picture_url"],
-        google_sub=google_identity["google_sub"],
-    )
-    actor_context = ActorContextPayload(
-        channel="tenant_app",
         tenant_id=tenant_id,
-        role="tenant_admin",
-        deployment_mode="standalone_app",
+        tenant_profile=tenant_profile,
+        email=normalized_email,
+        name=payload.full_name or normalized_username,
+        picture_url=None,
+        provider="password",
+        role=str(membership.get("role") or "tenant_admin"),
+        membership=membership,
     )
     return _success_response(
-        {
-            "session_token": session_token,
-            "expires_at": expires_at.isoformat(),
-            "provider": "google",
-            "user": {
-                "email": google_identity["email"],
-                "full_name": google_identity["name"],
-                "picture_url": google_identity["picture_url"],
-            },
-            "tenant": tenant_profile,
-            "capabilities": [
-                "tenant_overview",
-                "tenant_catalog_import",
-                "tenant_catalog_review",
-                "tenant_catalog_publish",
-            ],
-            "membership": membership,
-        },
+        response,
         tenant_id=tenant_id,
         actor_context=actor_context,
     )
@@ -2271,6 +3304,10 @@ def _apply_tenant_catalog_update(
         service.summary = payload.summary.strip() or None
     if payload.amount_aud is not None:
         service.amount_aud = payload.amount_aud
+    if payload.currency_code is not None:
+        service.currency_code = payload.currency_code.strip().upper() or "AUD"
+    if payload.display_price is not None:
+        service.display_price = payload.display_price.strip() or None
     if payload.duration_minutes is not None:
         service.duration_minutes = payload.duration_minutes
     if payload.venue_name is not None:
@@ -2296,6 +3333,8 @@ def _apply_catalog_quality_to_service(service: ServiceMerchantProfile) -> list[s
             "category": service.category,
             "summary": service.summary,
             "amount_aud": service.amount_aud,
+            "currency_code": getattr(service, "currency_code", "AUD"),
+            "display_price": getattr(service, "display_price", None),
             "duration_minutes": service.duration_minutes,
             "venue_name": service.venue_name,
             "location": service.location,
@@ -2470,7 +3509,7 @@ async def tenant_bookings(request: Request, authorization: str | None = Header(d
 
 @router.get("/tenant/integrations")
 async def tenant_integrations(request: Request, authorization: str | None = Header(default=None)):
-    tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
         request,
         authorization=authorization,
     )
@@ -2488,6 +3527,511 @@ async def tenant_integrations(request: Request, authorization: str | None = Head
             )
 
         snapshot = await build_tenant_integrations_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        snapshot["access"] = {
+            "current_role": _membership_role(membership) if tenant_session else "tenant_preview",
+            "can_manage_integrations": bool(
+                tenant_session and _membership_role(membership) in TENANT_INTEGRATION_WRITE_ROLES
+            ),
+            "write_mode": (
+                "provider_controls"
+                if tenant_session and _membership_role(membership) in TENANT_INTEGRATION_WRITE_ROLES
+                else "read_only"
+            ),
+            "operator_note": (
+                "Provider posture controls are available here for tenant admins and operators, while credential-level integration configuration changes remain admin-managed release controls."
+            ),
+        }
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership) if tenant_session else "tenant_preview",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.patch("/tenant/integrations/providers/{provider}")
+async def tenant_integration_provider_update(
+    request: Request,
+    provider: str,
+    payload: TenantIntegrationProviderUpdateRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before updating integration provider posture.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_INTEGRATION_WRITE_ROLES,
+        message="Only tenant admins and operators can update integration provider posture in the tenant portal.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    normalized_provider = provider.strip().lower()
+    if not normalized_provider:
+        return _error_response(
+            AppError(
+                code="invalid_provider",
+                message="Select a valid provider before updating integration posture.",
+                status_code=422,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    requested_status = payload.status.strip().lower() if payload.status else None
+    requested_sync_mode = payload.sync_mode.strip().lower() if payload.sync_mode else None
+    allowed_statuses = {"connected", "paused"}
+    allowed_sync_modes = {"read_only", "write_back", "bidirectional"}
+    if requested_status and requested_status not in allowed_statuses:
+        return _error_response(
+            AppError(
+                code="invalid_integration_status",
+                message="Select a valid integration provider status before saving.",
+                status_code=422,
+                details={"allowed_statuses": sorted(allowed_statuses)},
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    if requested_sync_mode and requested_sync_mode not in allowed_sync_modes:
+        return _error_response(
+            AppError(
+                code="invalid_integration_sync_mode",
+                message="Select a valid integration sync mode before saving.",
+                status_code=422,
+                details={"allowed_sync_modes": sorted(allowed_sync_modes)},
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        integration_repository = IntegrationRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        updated_connection = await integration_repository.upsert_connection(
+            tenant_id=tenant_id,
+            provider=normalized_provider,
+            status=requested_status or "paused",
+            sync_mode=requested_sync_mode or "read_only",
+        )
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.integrations.provider_updated",
+            entity_type="integration_connection",
+            entity_id=normalized_provider,
+            actor_type="tenant_app",
+            actor_id=str(tenant_session.get("email") or ""),
+            payload={
+                "summary": "Integration provider posture updated from the tenant portal.",
+                "provider": normalized_provider,
+                "status": updated_connection.get("status"),
+                "sync_mode": updated_connection.get("sync_mode"),
+            },
+        )
+        await session.commit()
+        snapshot = await build_tenant_integrations_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        snapshot["access"] = {
+            "current_role": _membership_role(membership),
+            "can_manage_integrations": True,
+            "write_mode": "provider_controls",
+            "operator_note": "Provider posture controls are active for this tenant session.",
+        }
+
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership),
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.get("/tenant/billing")
+async def tenant_billing(request: Request, authorization: str | None = Header(default=None)):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    async with get_session(request.app.state.session_factory) as session:
+        if not tenant_id:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved.",
+                    status_code=404,
+                    details={"tenant_ref": tenant_ref},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        snapshot = await build_tenant_billing_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        self_serve = snapshot.setdefault("self_serve", {})
+        self_serve["can_manage_billing"] = bool(
+            tenant_session and _membership_role(membership) in TENANT_BILLING_WRITE_ROLES
+        )
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership) if tenant_session else "tenant_preview",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.patch("/tenant/billing/account")
+async def tenant_billing_account_update(
+    request: Request,
+    payload: TenantBillingAccountUpdateRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before updating billing setup.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_BILLING_WRITE_ROLES,
+        message="Only tenant admins and finance managers can change billing setup or plans.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        billing_account = await tenant_repository.upsert_billing_account(
+            tenant_id=tenant_id,
+            billing_email=payload.billing_email.strip() if payload.billing_email else None,
+            merchant_mode=payload.merchant_mode.strip().lower() if payload.merchant_mode else "test",
+        )
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.billing.account_updated",
+            entity_type="billing_account",
+            entity_id=str(billing_account.get("id") or ""),
+            actor_type="tenant_app",
+            actor_id=str(tenant_session.get("email") or ""),
+            payload={
+                "summary": "Tenant billing account settings updated from the tenant portal.",
+                "billing_email": billing_account.get("billing_email"),
+                "merchant_mode": billing_account.get("merchant_mode"),
+            },
+        )
+        await session.commit()
+        billing = await build_tenant_billing_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        onboarding = await build_tenant_onboarding_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+
+    actor_context = ActorContextPayload(
+        channel="tenant_app",
+        tenant_id=tenant_id,
+        role=str(membership.get("role") or "tenant_admin"),
+        deployment_mode="standalone_app",
+    )
+    return _success_response(
+        {
+            "billing": billing,
+            "onboarding": onboarding,
+        },
+        tenant_id=tenant_id,
+        actor_context=actor_context,
+    )
+
+
+@router.post("/tenant/billing/subscription")
+async def tenant_billing_subscription_update(
+    request: Request,
+    payload: TenantSubscriptionUpdateRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before changing tenant billing packages.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_BILLING_WRITE_ROLES,
+        message="Only tenant admins and finance managers can change billing setup or packages.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    plan_code = str(payload.package_code or payload.plan_code or "").strip().lower()
+    if plan_code not in TENANT_SUBSCRIPTION_PLAN_CODES:
+        return _error_response(
+            AppError(
+                code="invalid_plan_code",
+                message="Select a valid tenant subscription package before continuing.",
+                status_code=422,
+                details={"allowed_plan_codes": sorted(TENANT_SUBSCRIPTION_PLAN_CODES)},
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    mode = str(payload.mode or "trial").strip().lower()
+    subscription_status = "trialing" if mode == "trial" else "active"
+    now = datetime.now(UTC)
+    period_days = 14 if subscription_status == "trialing" else 30
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        billing_account = await tenant_repository.upsert_billing_account(
+            tenant_id=tenant_id,
+            billing_email=str(tenant_session.get("email") or "").strip().lower() or None,
+            merchant_mode="test",
+        )
+        subscription = await tenant_repository.upsert_subscription(
+            tenant_id=tenant_id,
+            billing_account_id=billing_account.get("id"),
+            plan_code=plan_code,
+            status=subscription_status,
+            started_at=now,
+            ended_at=None if subscription_status == "active" else now + timedelta(days=period_days),
+        )
+        await tenant_repository.replace_subscription_period(
+            subscription_id=str(subscription.get("id")),
+            period_days=period_days,
+            status="trial_open" if subscription_status == "trialing" else "open",
+        )
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.billing.subscription_updated",
+            entity_type="subscription",
+            entity_id=str(subscription.get("id") or ""),
+            actor_type="tenant_app",
+            actor_id=str(tenant_session.get("email") or ""),
+            payload={
+                "summary": "Tenant subscription package changed from the tenant portal.",
+                "package_code": plan_code,
+                "plan_code": plan_code,
+                "status": subscription_status,
+                "mode": mode,
+            },
+        )
+        await session.commit()
+        billing = await build_tenant_billing_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        onboarding = await build_tenant_onboarding_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+
+    actor_context = ActorContextPayload(
+        channel="tenant_app",
+        tenant_id=tenant_id,
+        role=str(membership.get("role") or "tenant_admin"),
+        deployment_mode="standalone_app",
+    )
+    return _success_response(
+        {
+            "billing": billing,
+            "onboarding": onboarding,
+        },
+        tenant_id=tenant_id,
+        actor_context=actor_context,
+    )
+
+
+@router.post("/tenant/billing/invoices/{invoice_id}/mark-paid")
+async def tenant_billing_invoice_mark_paid(
+    request: Request,
+    invoice_id: str,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before updating invoice state.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_BILLING_WRITE_ROLES,
+        message="Only tenant admins and finance managers can update invoice state.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    period_id = _tenant_period_id_from_invoice_id(invoice_id)
+    if not period_id:
+        return _error_response(
+            AppError(
+                code="invalid_invoice_id",
+                message="The supplied invoice id is not valid for tenant billing actions.",
+                status_code=422,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        period = await tenant_repository.get_subscription_period(period_id=period_id)
+        if not period or str(period.get("tenant_id") or "") != tenant_id:
+            return _error_response(
+                AppError(
+                    code="invoice_not_found",
+                    message="The requested tenant invoice could not be found.",
+                    status_code=404,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        updated_period = await tenant_repository.update_subscription_period_status(
+            period_id=period_id,
+            status="paid",
+        )
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.billing.invoice_marked_paid",
+            entity_type="invoice",
+            entity_id=invoice_id,
+            actor_type="tenant_app",
+            actor_id=str(tenant_session.get("email") or ""),
+            payload={
+                "summary": "Tenant invoice was marked paid from the tenant portal.",
+                "invoice_id": invoice_id,
+                "period_id": period_id,
+                "status": updated_period.get("status") if updated_period else "paid",
+            },
+        )
+        await session.commit()
+        billing = await build_tenant_billing_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        onboarding = await build_tenant_onboarding_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+
+    return _success_response(
+        {
+            "billing": billing,
+            "onboarding": onboarding,
+        },
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=str(membership.get("role") or "tenant_admin"),
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.get("/tenant/billing/invoices/{invoice_id}/receipt")
+async def tenant_billing_invoice_receipt(
+    request: Request,
+    invoice_id: str,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before downloading receipt seams.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        billing = await build_tenant_billing_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        invoice = next((item for item in billing.get("invoices", []) if str(item.get("id")) == invoice_id), None)
+        if not invoice:
+            return _error_response(
+                AppError(
+                    code="invoice_not_found",
+                    message="The requested tenant invoice could not be found.",
+                    status_code=404,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+        receipt = build_tenant_invoice_receipt(invoice, tenant=billing.get("tenant", {}), billing=billing)
+
+    return _success_response(
+        receipt,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership),
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.get("/tenant/onboarding")
+async def tenant_onboarding(request: Request, authorization: str | None = Header(default=None)):
+    tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    async with get_session(request.app.state.session_factory) as session:
+        if not tenant_id:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved.",
+                    status_code=404,
+                    details={"tenant_ref": tenant_ref},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        snapshot = await build_tenant_onboarding_snapshot(session, tenant_ref=tenant_ref or tenant_id)
     return _success_response(
         snapshot,
         tenant_id=tenant_id,
@@ -2495,6 +4039,459 @@ async def tenant_integrations(request: Request, authorization: str | None = Head
             channel="tenant_app",
             tenant_id=tenant_id,
             role="tenant_admin" if tenant_session else "tenant_preview",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.get("/tenant/team")
+async def tenant_team(request: Request, authorization: str | None = Header(default=None)):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    async with get_session(request.app.state.session_factory) as session:
+        if not tenant_id:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved.",
+                    status_code=404,
+                    details={"tenant_ref": tenant_ref},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        snapshot = await build_tenant_team_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        snapshot["access"] = {
+            "current_role": _membership_role(membership) if tenant_session else "tenant_preview",
+            "can_manage_team": bool(tenant_session and _membership_role(membership) in TENANT_TEAM_MANAGE_ROLES),
+            "can_manage_billing": bool(tenant_session and _membership_role(membership) in TENANT_BILLING_WRITE_ROLES),
+        }
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership) if tenant_session else "tenant_preview",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.patch("/tenant/profile")
+async def tenant_profile_update(
+    request: Request,
+    payload: TenantProfileUpdateRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before updating tenant profile details.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.update_tenant_profile(
+            tenant_id=tenant_id,
+            name=payload.business_name.strip() if payload.business_name else None,
+            industry=payload.industry.strip() if payload.industry is not None else None,
+            timezone=payload.timezone.strip() if payload.timezone else None,
+            locale=payload.locale.strip() if payload.locale else None,
+        )
+        if not tenant_profile:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The tenant profile could not be updated because the tenant was not found.",
+                    status_code=404,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        membership_record = (
+            await session.execute(
+                select(TenantUserMembership).where(
+                    TenantUserMembership.tenant_id == tenant_id,
+                    TenantUserMembership.email == str(tenant_session.get("email") or "").strip().lower(),
+                    TenantUserMembership.status == "active",
+                )
+            )
+        ).scalar_one_or_none()
+        if membership_record and payload.operator_full_name is not None:
+            membership_record.full_name = payload.operator_full_name.strip() or membership_record.full_name
+
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.profile.updated",
+            entity_type="tenant_profile",
+            entity_id=tenant_id,
+            actor_type="tenant_app",
+            actor_id=str(tenant_session.get("email") or ""),
+            payload={
+                "summary": "Tenant business profile updated from the tenant portal.",
+                "business_name": tenant_profile.get("name"),
+                "industry": tenant_profile.get("industry"),
+                "timezone": tenant_profile.get("timezone"),
+                "locale": tenant_profile.get("locale"),
+            },
+        )
+
+        await session.commit()
+        onboarding = await build_tenant_onboarding_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+
+    actor_context = ActorContextPayload(
+        channel="tenant_app",
+        tenant_id=tenant_id,
+        role=str(membership.get("role") or "tenant_admin"),
+        deployment_mode="standalone_app",
+    )
+    return _success_response(
+        {
+            "tenant": tenant_profile,
+            "onboarding": onboarding,
+        },
+        tenant_id=tenant_id,
+        actor_context=actor_context,
+    )
+
+
+@router.post("/tenant/team/invite")
+async def tenant_team_invite(
+    request: Request,
+    payload: TenantInviteMemberRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before inviting team members.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_TEAM_MANAGE_ROLES,
+        message="Only tenant admins can invite team members or change tenant access roles.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    requested_role = payload.role.strip().lower()
+    if requested_role not in TENANT_TEAM_ROLE_CODES:
+        return _error_response(
+            AppError(
+                code="invalid_tenant_role",
+                message="Select a valid tenant role before inviting a team member.",
+                status_code=422,
+                details={"allowed_roles": sorted(TENANT_TEAM_ROLE_CODES)},
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref or tenant_id)
+        member = await tenant_repository.upsert_tenant_member(
+            tenant_id=tenant_id,
+            tenant_slug=str((tenant_profile or {}).get("slug") or tenant_ref or ""),
+            email=payload.email,
+            full_name=payload.full_name,
+            role=requested_role,
+            status="invited",
+        )
+        tenant_slug = str((tenant_profile or {}).get("slug") or tenant_ref or "").strip()
+        tenant_name = str((tenant_profile or {}).get("name") or tenant_slug or "BookedAI tenant").strip()
+        invited_by_name = str(tenant_session.get("full_name") or "").strip() or str(
+            tenant_session.get("email") or ""
+        ).strip()
+        invitee_email = str(member.get("email") or payload.email).strip().lower()
+        invite_delivery = await _deliver_tenant_invite_email(
+            request,
+            tenant_name=tenant_name,
+            tenant_slug=tenant_slug,
+            invitee_email=invitee_email,
+            invitee_full_name=str(member.get("full_name") or payload.full_name or "").strip() or None,
+            role=requested_role,
+            invited_by_name=invited_by_name,
+            invited_by_email=str(tenant_session.get("email") or "").strip().lower(),
+        )
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.team.member_invited",
+            entity_type="tenant_member",
+            entity_id=str(member.get("email") or ""),
+            actor_type="tenant_app",
+            actor_id=str(tenant_session.get("email") or ""),
+            payload={
+                "summary": "Tenant team member invited from the tenant portal.",
+                "email": member.get("email"),
+                "role": member.get("role"),
+                "invite_delivery_status": invite_delivery["status"],
+                "invite_url": invite_delivery["invite_url"],
+            },
+        )
+        await session.commit()
+        snapshot = await build_tenant_team_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        snapshot["access"] = {
+            "current_role": _membership_role(membership),
+            "can_manage_team": True,
+            "can_manage_billing": _membership_role(membership) in TENANT_BILLING_WRITE_ROLES,
+        }
+        snapshot["invite_delivery"] = {
+            "status": invite_delivery["status"],
+            "smtp_configured": bool(invite_delivery["smtp_configured"]),
+            "recipient_email": invitee_email,
+            "role": requested_role,
+            "invite_url": str(invite_delivery["invite_url"]),
+            "operator_note": str(invite_delivery["operator_note"]),
+        }
+
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership),
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.patch("/tenant/team/members/{member_email}")
+async def tenant_team_member_update(
+    request: Request,
+    member_email: str,
+    payload: TenantMemberAccessUpdateRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before updating team member access.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_TEAM_MANAGE_ROLES,
+        message="Only tenant admins can invite team members or change tenant access roles.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    requested_role = payload.role.strip().lower() if payload.role else None
+    if requested_role and requested_role not in TENANT_TEAM_ROLE_CODES:
+        return _error_response(
+            AppError(
+                code="invalid_tenant_role",
+                message="Select a valid tenant role before updating member access.",
+                status_code=422,
+                details={"allowed_roles": sorted(TENANT_TEAM_ROLE_CODES)},
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        updated_member = await tenant_repository.update_tenant_member_access(
+            tenant_id=tenant_id,
+            email=member_email,
+            role=requested_role,
+            status=payload.status.strip().lower() if payload.status else None,
+        )
+        if not updated_member:
+            return _error_response(
+                AppError(
+                    code="tenant_member_not_found",
+                    message="The requested tenant member could not be found.",
+                    status_code=404,
+                    details={"email": member_email},
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.team.member_access_updated",
+            entity_type="tenant_member",
+            entity_id=str(updated_member.get("email") or ""),
+            actor_type="tenant_app",
+            actor_id=str(tenant_session.get("email") or ""),
+            payload={
+                "summary": "Tenant team member access updated from the tenant portal.",
+                "email": updated_member.get("email"),
+                "role": updated_member.get("role"),
+                "status": updated_member.get("status"),
+            },
+        )
+        await session.commit()
+        snapshot = await build_tenant_team_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        snapshot["access"] = {
+            "current_role": _membership_role(membership),
+            "can_manage_team": True,
+            "can_manage_billing": _membership_role(membership) in TENANT_BILLING_WRITE_ROLES,
+        }
+
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership),
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.post("/tenant/team/members/{member_email}/resend-invite")
+async def tenant_team_member_resend_invite(
+    request: Request,
+    member_email: str,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before resending tenant invites.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_TEAM_MANAGE_ROLES,
+        message="Only tenant admins can resend tenant invites.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    normalized_email = member_email.strip().lower()
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref or tenant_id)
+        team_snapshot = await build_tenant_team_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        member = next(
+            (item for item in team_snapshot.get("members", []) if str(item.get("email") or "").strip().lower() == normalized_email),
+            None,
+        )
+        if not member:
+            return _error_response(
+                AppError(
+                    code="tenant_member_not_found",
+                    message="The requested tenant member could not be found.",
+                    status_code=404,
+                    details={"email": normalized_email},
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+        if str(member.get("status") or "").strip().lower() != "invited":
+            return _error_response(
+                AppError(
+                    code="tenant_member_not_invited",
+                    message="Only members still in invited status can receive a resent invite.",
+                    status_code=409,
+                    details={"email": normalized_email},
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        tenant_slug = str((tenant_profile or {}).get("slug") or tenant_ref or "").strip()
+        tenant_name = str((tenant_profile or {}).get("name") or tenant_slug or "BookedAI tenant").strip()
+        invited_by_name = str(tenant_session.get("full_name") or "").strip() or str(
+            tenant_session.get("email") or ""
+        ).strip()
+        invite_delivery = await _deliver_tenant_invite_email(
+            request,
+            tenant_name=tenant_name,
+            tenant_slug=tenant_slug,
+            invitee_email=normalized_email,
+            invitee_full_name=str(member.get("full_name") or "").strip() or None,
+            role=str(member.get("role") or "operator"),
+            invited_by_name=invited_by_name,
+            invited_by_email=str(tenant_session.get("email") or "").strip().lower(),
+        )
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.team.member_invite_resent",
+            entity_type="tenant_member",
+            entity_id=normalized_email,
+            actor_type="tenant_app",
+            actor_id=str(tenant_session.get("email") or ""),
+            payload={
+                "summary": "Tenant invite resent from the tenant portal.",
+                "email": normalized_email,
+                "role": member.get("role"),
+                "invite_delivery_status": invite_delivery["status"],
+                "invite_url": invite_delivery["invite_url"],
+            },
+        )
+        await session.commit()
+        snapshot = await build_tenant_team_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        snapshot["access"] = {
+            "current_role": _membership_role(membership),
+            "can_manage_team": True,
+            "can_manage_billing": _membership_role(membership) in TENANT_BILLING_WRITE_ROLES,
+        }
+        snapshot["invite_delivery"] = {
+            "status": invite_delivery["status"],
+            "smtp_configured": bool(invite_delivery["smtp_configured"]),
+            "recipient_email": normalized_email,
+            "role": str(member.get("role") or "operator"),
+            "invite_url": str(invite_delivery["invite_url"]),
+            "operator_note": str(invite_delivery["operator_note"]),
+        }
+
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership),
             deployment_mode="standalone_app",
         ),
     )
@@ -2536,6 +4533,113 @@ async def tenant_catalog(request: Request, authorization: str | None = Header(de
     )
 
 
+@router.get("/portal/bookings/{booking_reference}")
+async def portal_booking_detail(booking_reference: str, request: Request):
+    async with get_session(request.app.state.session_factory) as session:
+        snapshot = await build_portal_booking_snapshot(
+            session,
+            booking_reference=booking_reference,
+        )
+
+    if not snapshot:
+        return _error_response(
+            AppError(
+                code="portal_booking_not_found",
+                message="The requested booking reference could not be found for the customer portal.",
+                status_code=404,
+                details={"booking_reference": booking_reference},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    return _success_response(snapshot, tenant_id=None, actor_context=None)
+
+
+@router.post("/portal/bookings/{booking_reference}/reschedule-request")
+async def portal_booking_reschedule_request(
+    booking_reference: str,
+    request: Request,
+    payload: PortalBookingActionRequestPayload,
+):
+    if not (payload.customer_note or payload.preferred_date or payload.preferred_time):
+        return _error_response(
+            ValidationAppError(
+                "Please provide a note or a preferred new schedule before submitting a reschedule request.",
+                details={"customer_note": ["note or preferred schedule is required"]},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        result = await queue_portal_booking_request(
+            session,
+            booking_reference=booking_reference,
+            request_type="reschedule_request",
+            customer_note=payload.customer_note,
+            preferred_date=payload.preferred_date,
+            preferred_time=payload.preferred_time,
+            timezone=payload.timezone,
+        )
+        if not result:
+            return _error_response(
+                AppError(
+                    code="portal_booking_not_found",
+                    message="The requested booking reference could not be found for the customer portal.",
+                    status_code=404,
+                    details={"booking_reference": booking_reference},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+        await session.commit()
+
+    return _success_response(result, tenant_id=None, actor_context=None)
+
+
+@router.post("/portal/bookings/{booking_reference}/cancel-request")
+async def portal_booking_cancel_request(
+    booking_reference: str,
+    request: Request,
+    payload: PortalBookingActionRequestPayload,
+):
+    if not payload.customer_note:
+        return _error_response(
+            ValidationAppError(
+                "Please provide a brief note before submitting a cancellation request.",
+                details={"customer_note": ["cancellation note is required"]},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        result = await queue_portal_booking_request(
+            session,
+            booking_reference=booking_reference,
+            request_type="cancel_request",
+            customer_note=payload.customer_note,
+            preferred_date=None,
+            preferred_time=None,
+            timezone=payload.timezone,
+        )
+        if not result:
+            return _error_response(
+                AppError(
+                    code="portal_booking_not_found",
+                    message="The requested booking reference could not be found for the customer portal.",
+                    status_code=404,
+                    details={"booking_reference": booking_reference},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+        await session.commit()
+
+    return _success_response(result, tenant_id=None, actor_context=None)
+
+
 @router.post("/tenant/catalog/import-website")
 async def tenant_catalog_import_website(
     request: Request,
@@ -2556,6 +4660,13 @@ async def tenant_catalog_import_website(
             tenant_id=tenant_id,
             actor_context=None,
         )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_CATALOG_WRITE_ROLES,
+        message="Only tenant admins and operators can import or edit tenant catalog records.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
 
     if not tenant_id:
         return _error_response(
@@ -2598,6 +4709,8 @@ async def tenant_catalog_import_website(
             "duration_minutes",
             "location",
             "amount_aud",
+            "currency_code",
+            "display_price",
             "summary",
             "image_url",
             "booking_url",
@@ -2639,6 +4752,8 @@ async def tenant_catalog_import_website(
                 "category": str(item.get("category") or payload.category or "").strip() or None,
                 "summary": str(item.get("summary") or "").strip() or None,
                 "amount_aud": float(item["amount_aud"]) if item.get("amount_aud") is not None else None,
+                "currency_code": str(item.get("currency_code") or "AUD").strip().upper() or "AUD",
+                "display_price": str(item.get("display_price") or "").strip() or None,
                 "duration_minutes": int(item["duration_minutes"]) if item.get("duration_minutes") is not None else None,
                 "venue_name": str(item.get("venue_name") or business_name).strip() or None,
                 "location": str(item.get("location") or payload.location_hint or "").strip() or None,
@@ -2707,6 +4822,13 @@ async def tenant_catalog_update_service(
             tenant_id=tenant_id,
             actor_context=None,
         )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_CATALOG_WRITE_ROLES,
+        message="Only tenant admins and operators can import or edit tenant catalog records.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
 
     async with get_session(request.app.state.session_factory) as session:
         tenant_repository = TenantRepository(RepositoryContext(session=session))
@@ -2776,6 +4898,13 @@ async def tenant_catalog_publish_service(
             tenant_id=tenant_id,
             actor_context=None,
         )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_CATALOG_WRITE_ROLES,
+        message="Only tenant admins and operators can import or edit tenant catalog records.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
 
     async with get_session(request.app.state.session_factory) as session:
         tenant_repository = TenantRepository(RepositoryContext(session=session))
@@ -2854,6 +4983,13 @@ async def tenant_catalog_archive_service(
             tenant_id=tenant_id,
             actor_context=None,
         )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_CATALOG_WRITE_ROLES,
+        message="Only tenant admins and operators can import or edit tenant catalog records.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
 
     async with get_session(request.app.state.session_factory) as session:
         tenant_repository = TenantRepository(RepositoryContext(session=session))

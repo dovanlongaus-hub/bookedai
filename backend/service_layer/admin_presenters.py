@@ -13,8 +13,10 @@ def build_booking_record(event: ConversationEvent) -> dict[str, object | None]:
     service = metadata.get("service") if isinstance(metadata.get("service"), dict) else {}
     contact = metadata.get("contact") if isinstance(metadata.get("contact"), dict) else {}
     booking = metadata.get("booking") if isinstance(metadata.get("booking"), dict) else {}
-    service_name = service.get("name") or (
-        metadata.get("service") if isinstance(metadata.get("service"), str) else None
+    service_name = (
+        metadata.get("package_name")
+        or service.get("name")
+        or (metadata.get("service") if isinstance(metadata.get("service"), str) else None)
     )
 
     return {
@@ -157,12 +159,15 @@ def build_partner_item(partner: PartnerProfile) -> dict[str, object]:
 
 
 def build_service_merchant_item(service: ServiceMerchantProfile) -> dict[str, object | None]:
+    currency_code = str(getattr(service, "currency_code", "AUD") or "AUD").upper()
+    display_price = getattr(service, "display_price", None)
     quality_warnings = catalog_quality_warnings(
         {
             "name": service.name,
             "category": service.category,
             "summary": service.summary,
             "amount_aud": service.amount_aud,
+            "display_price": display_price,
             "location": service.location,
             "tags_json": list(service.tags_json or []),
         }
@@ -178,6 +183,8 @@ def build_service_merchant_item(service: ServiceMerchantProfile) -> dict[str, ob
         "category": service.category,
         "summary": service.summary,
         "amount_aud": service.amount_aud,
+        "currency_code": currency_code,
+        "display_price": display_price,
         "duration_minutes": service.duration_minutes,
         "venue_name": service.venue_name,
         "location": service.location,
@@ -212,6 +219,8 @@ def build_service_catalog_quality_counts(
 
 
 def build_service_catalog_item(service: ServiceMerchantProfile) -> ServiceCatalogItem:
+    currency_code = str(getattr(service, "currency_code", "AUD") or "AUD").upper()
+    display_price = getattr(service, "display_price", None)
     resolved_image_url = resolve_service_image_url(
         service_id=service.service_id,
         category=service.category or "General Service",
@@ -226,6 +235,8 @@ def build_service_catalog_item(service: ServiceMerchantProfile) -> ServiceCatalo
         summary=service.summary or "Service imported from merchant website.",
         duration_minutes=service.duration_minutes or 30,
         amount_aud=service.amount_aud or 0.01,
+        currency_code=currency_code,
+        display_price=display_price,
         image_url=resolved_image_url,
         map_snapshot_url=None,
         venue_name=service.venue_name,

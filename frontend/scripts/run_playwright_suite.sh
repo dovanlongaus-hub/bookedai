@@ -29,6 +29,8 @@ if [[ "${PLAYWRIGHT_SKIP_BUILD:-0}" != "1" ]]; then
   npm run build
 fi
 
+bash scripts/kill_playwright_preview.sh 3100 3101
+
 npx vite preview --host 127.0.0.1 --port "${PORT}" --strictPort &
 PREVIEW_PID=$!
 

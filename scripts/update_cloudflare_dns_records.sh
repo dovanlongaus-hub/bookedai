@@ -18,8 +18,8 @@ if [[ ! -x "${CONFIGURE_SCRIPT}" ]]; then
   exit 1
 fi
 
-AUTO_DNS_RECORDS="${CLOUDFLARE_AUTO_DNS_RECORDS:-bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,portal.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,upload.bookedai.au,calendar.bookedai.au}"
-PROXIED_DNS_RECORDS="${CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS:-bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,portal.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,calendar.bookedai.au}"
+AUTO_DNS_RECORDS="${CLOUDFLARE_AUTO_DNS_RECORDS:-bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,futureswim.bookedai.au,portal.bookedai.au,tenant.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,upload.bookedai.au,calendar.bookedai.au}"
+PROXIED_DNS_RECORDS="${CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS:-bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,futureswim.bookedai.au,portal.bookedai.au,tenant.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,calendar.bookedai.au}"
 
 IFS=',' read -r -a records <<<"${AUTO_DNS_RECORDS}"
 IFS=',' read -r -a proxied_records <<<"${PROXIED_DNS_RECORDS}"

@@ -17,6 +17,7 @@ This strategy inherits and aligns with:
 - Prompt 5 API and contract direction
 - Prompt 6 public growth strategy
 - Prompt 7 tenant app strategy
+- `docs/architecture/user-surface-saas-upgrade-plan.md`
 
 ## Section 1 — Executive summary
 
@@ -49,6 +50,12 @@ This strategy inherits and aligns with:
   - conflating tenant-facing product UX with internal ops UX
   - lacking system-wide incident visibility as tenant count and integration count grow
 
+Implementation synchronization note from `2026-04-19`:
+
+- the current code-aligned planning baseline for this lane is `docs/architecture/current-phase-sprint-execution-plan.md`
+- admin planning should now treat the existing admin console, workspace split, diagnostics, reliability drill-ins, and support-safe preview tooling as already implemented foundations
+- the next admin strategy emphasis is completion of commercial support loops, billing and tenant investigation tooling, and release-safe operator workflows rather than creation of the first admin surface
+
 ## Section 2 — Current admin assessment
 
 ### What exists
@@ -68,6 +75,9 @@ Confirmed from the repo:
   - partner profile CRUD
   - live configuration inspection
   - API inventory inspection
+  - reliability workspace lazy loading
+  - drift review examples and queue-style investigation support
+  - operator-facing retry and preview-oriented reliability flows
 
 ### What can be reused
 
@@ -99,6 +109,7 @@ Missing internal admin capabilities for a multi-tenant platform:
 - feature flag and rollout area
 - audit and support note area
 - role-aware internal UX
+- deeper tenant-auth and billing investigation tools that line up with the current tenant workspace rollout
 
 ### Current ops pain points
 
@@ -123,6 +134,7 @@ Based on current code reality:
 Current maturity should be described as:
 
 - useful internal ops console
+- issue-first support foundation now exists
 - not yet a full platform control and recovery console
 
 ## Section 3 — Internal admin strategy

@@ -8,6 +8,7 @@ import { RecentEventsSection } from '../features/admin/recent-events-section';
 import { ServiceCatalogSection } from '../features/admin/service-catalog-section';
 import { SelectedBookingPanel } from '../features/admin/selected-booking-panel';
 import { PartnersSection } from '../features/admin/partners-section';
+import { PortalSupportQueueSection } from '../features/admin/portal-support-queue-section';
 import { AdminWorkspaceNav } from '../features/admin/workspace-nav';
 import { AdminWorkspaceInsights } from '../features/admin/workspace-insights';
 import { useAdminPageState } from '../features/admin/use-admin-page-state';
@@ -25,7 +26,7 @@ type ParsedAdminHash = {
 };
 
 const workspacePanels: Record<AdminWorkspaceId, AdminWorkspacePanelId[]> = {
-  operations: ['bookings', 'recent-events', 'selected-booking'],
+  operations: ['bookings', 'recent-events', 'selected-booking', 'portal-support'],
   catalog: ['service-catalog', 'partners'],
   reliability: ['prompt5-preview', 'live-configuration', 'api-inventory'],
 };
@@ -117,6 +118,8 @@ export function AdminPage() {
     setConfirmNote,
     sendingConfirmation,
     confirmationMessage,
+    portalSupportActionMessage,
+    portalSupportActionSubmittingId,
     loggingIn,
     loadingDashboard,
     bookingsViewEnabled,
@@ -140,6 +143,7 @@ export function AdminPage() {
     handleLogin,
     handleLogout,
     sendConfirmationEmail,
+    applyPortalSupportAction,
     editPartner,
     resetPartnerForm,
     uploadPartnerAsset,
@@ -261,8 +265,8 @@ export function AdminPage() {
   }
 
   return (
-    <main className="booked-admin-shell bookedai-brand-shell px-4 py-6 lg:px-8">
-      <div className="mx-auto max-w-[1600px]">
+    <main className="booked-admin-shell booked-page-shell">
+      <div className="booked-page-frame booked-page-frame--wide booked-page-stack">
         <AdminDashboardHeader
           username={username}
           sessionExpiry={sessionExpiry}
@@ -285,6 +289,7 @@ export function AdminPage() {
           activePanel={activePanel}
           bookingsTotal={bookingsTotal}
           shadowStatus={bookingsShadowStatus}
+          portalSupportQueueCount={overview?.portal_support_queue?.length ?? 0}
           importedServicesCount={importedServices.length}
           partnersCount={partners.length}
           configItemsCount={configItems.length}
@@ -295,7 +300,7 @@ export function AdminPage() {
         />
 
         {activeWorkspace === 'operations' ? (
-          <section className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_0.9fr]">
+          <section className="booked-page-grid xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
             <div className="space-y-6">
               <div id="bookings">
                 <AdminBookingsSection
@@ -346,6 +351,20 @@ export function AdminPage() {
               <div id="recent-events">
                 <RecentEventsSection recentEvents={overview?.recent_events ?? []} />
               </div>
+
+              <div id="portal-support">
+                <PortalSupportQueueSection
+                  items={overview?.portal_support_queue ?? []}
+                  actionMessage={portalSupportActionMessage}
+                  actionSubmittingId={portalSupportActionSubmittingId}
+                  onSelectBooking={(bookingReference, source) => {
+                    void openBookingDetailFromReview(bookingReference, source);
+                  }}
+                  onApplyAction={(requestId, action, note) => {
+                    void applyPortalSupportAction(requestId, action, note);
+                  }}
+                />
+              </div>
             </div>
 
             <div className="space-y-6">
@@ -370,7 +389,7 @@ export function AdminPage() {
         ) : null}
 
         {activeWorkspace === 'catalog' ? (
-          <section className="mt-6 grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <section className="booked-page-grid xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
             <div className="space-y-6">
               <div id="service-catalog">
                 <ServiceCatalogSection

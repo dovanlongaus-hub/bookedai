@@ -55,12 +55,11 @@ async function stubHomepageApis(page: Parameters<typeof test>[0]['page']) {
 async function openHomepage(page: Parameters<typeof test>[0]['page']) {
   await stubHomepageApis(page);
   await page.goto('/');
-  const heroSearch = page.locator('section form').first();
-  await expect(heroSearch.locator('input[type="text"]').first()).toBeVisible();
+  await expect(page.locator('header img').first()).toBeVisible();
+  await expect(page.locator('#bookedai-search-assistant').getByRole('textbox').first()).toBeVisible();
   await expect(
-    heroSearch.getByRole('button', { name: /Try Now/i }),
+    page.locator('#bookedai-search-assistant').getByText(/Ready to receive|Receiving your enquiry/i).first(),
   ).toBeVisible();
-  await expect(page.getByRole('heading', { name: /The AI Revenue Engine/i }).first()).toBeVisible();
 }
 
 test.describe('public homepage responsive qa', () => {
@@ -68,19 +67,10 @@ test.describe('public homepage responsive qa', () => {
     await page.setViewportSize({ width: 1440, height: 1100 });
     await openHomepage(page);
 
-    const heroSearchForm = page.locator('section form').first();
-    const heroSearch = heroSearchForm.locator('input[type="text"]').first();
-    const heroSearchButton = heroSearchForm.getByRole('button', {
-      name: /Try Now/i,
-    });
-    const menuButton = page.getByRole('button', { name: /Open menu/i });
-    await expect(heroSearch).toBeVisible();
-    await expect(heroSearchButton).toBeVisible();
-    await expect(menuButton).toBeVisible();
-    await expect(page.locator('#bookedai-search-assistant')).toBeVisible();
-    await expect(
-      page.locator('#bookedai-search-assistant').getByText(/search results/i).first(),
-    ).toBeVisible();
+    const bottomDock = page.locator('#bookedai-search-assistant');
+    await expect(bottomDock.getByRole('textbox').first()).toBeVisible();
+    await expect(bottomDock.getByRole('button', { name: /Send search/i })).toBeVisible();
+    await expect(bottomDock.getByText(/Ready to receive|Receiving your enquiry/i).first()).toBeVisible();
 
     await page.screenshot({
       path: testInfo.outputPath('homepage-desktop.png'),
@@ -92,26 +82,14 @@ test.describe('public homepage responsive qa', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openHomepage(page);
 
-    const heroSearchForm = page.locator('section form').first();
-    const heroSearch = heroSearchForm.locator('input[type="text"]').first();
-    const heroSearchButton = heroSearchForm.getByRole('button', {
-      name: /Try Now/i,
-    });
-    const menuButton = page.getByRole('button', { name: /Open menu/i });
-    await expect(heroSearch).toBeVisible();
-    await expect(heroSearchButton).toBeVisible();
-    await expect(menuButton).toBeVisible();
-
-    await menuButton.click();
-    await expect(page.locator('#bookedai-home-menu')).toBeVisible();
+    await expect(page.locator('#bookedai-search-assistant').getByRole('textbox').first()).toBeVisible();
     await expect(
-      page.getByText(
-        /Use this menu to move between live search, roadmap, demo, and deeper BookedAI\.au context/i,
-      ),
+      page.locator('#bookedai-search-assistant').getByRole('button', { name: /Send search/i }),
     ).toBeVisible();
+    await expect(page.locator('header img').first()).toBeVisible();
 
     await page.screenshot({
-      path: testInfo.outputPath('homepage-mobile-menu.png'),
+      path: testInfo.outputPath('homepage-mobile-search.png'),
       fullPage: true,
     });
   });

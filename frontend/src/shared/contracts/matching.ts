@@ -19,6 +19,8 @@ export interface MatchCandidate {
   sourceUrl?: string | null;
   imageUrl?: string | null;
   amountAud?: number | null;
+  currencyCode?: string | null;
+  displayPrice?: string | null;
   durationMinutes?: number | null;
   tags?: string[];
   featured?: boolean;
@@ -29,6 +31,13 @@ export interface MatchCandidate {
   isPreferred?: boolean;
   displaySummary?: string | null;
   explanation?: string | null;
+  whyThisMatches?: string | null;
+  sourceLabel?: string | null;
+  pricePosture?: string | null;
+  bookingPathType?: string | null;
+  nextStep?: string | null;
+  availabilityState?: string | null;
+  bookingConfidence?: string | null;
 }
 
 export interface MatchConfidence {

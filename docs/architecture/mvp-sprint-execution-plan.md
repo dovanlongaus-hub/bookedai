@@ -4,6 +4,12 @@
 
 This plan turns the upgraded BookedAI roadmap into a sprint-by-sprint execution package.
 
+Implementation synchronization note as of `2026-04-19`:
+
+- this document should now be read together with `docs/architecture/current-phase-sprint-execution-plan.md`
+- the new execution baseline reflects the actual checked-in code and should be used whenever this MVP plan still reads as if a completed foundation lane were only planned
+- in any conflict about present implementation status, the current execution baseline plus the checked-in code should win
+
 The MVP is no longer "landing page plus chatbot."
 
 The MVP is:
@@ -306,6 +312,22 @@ The current repo already gives us a strong base:
 - rollout and QA scaffolding exists
 
 The upgraded MVP reframes those assets around a commercial outcome model instead of starting over.
+
+Execution update from `2026-04-19`:
+
+- the public search-first homepage, tenant workspace foundation, admin workspace foundation, `/api/v1/*` commercial seams, tenant catalog publish workflow, release-gate scripts, and replay tooling are now all present in code
+- because of that, Sprint 8 through Sprint 10 should no longer be read as untouched future concepts; they are better interpreted as partly implemented lanes that still need completion and hardening
+- the most practical near-term sprint focus has shifted toward Sprint 13 through Sprint 16 completion work:
+  - tenant create or claim account flow
+  - onboarding state completion
+  - billing and invoice seams
+  - payment-method and subscription posture
+  - tenant value reporting
+  - broader release-grade regression gates
+  - public frontend product-grade UX refinement
+  - customer portal productization
+  - tenant login and admin login professionalization
+  - cross-surface SaaS UX harmonization
 
 ## Immediate execution order
 

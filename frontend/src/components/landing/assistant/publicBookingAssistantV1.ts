@@ -48,7 +48,26 @@ type PublicBookingAssistantShadowSearchResult = {
 type PublicBookingAssistantLiveReadResult = {
   candidateIds: string[];
   rankedCandidates: MatchCandidate[];
+  recommendedCandidateIds: string[];
   suggestedServiceId: string | null;
+  queryUnderstandingSummary: {
+    normalizedQuery: string | null;
+    inferredLocation: string | null;
+    locationTerms: string[];
+    coreIntentTerms: string[];
+    expandedIntentTerms: string[];
+    constraintTerms: string[];
+    requestedCategory: string | null;
+    budgetLimit: number | null;
+    nearMeRequested: boolean;
+    isChatStyle: boolean;
+    requestedDate: string | null;
+    requestedTime: string | null;
+    scheduleHint: string | null;
+    partySize: number | null;
+    intentLabel: string | null;
+    summary: string | null;
+  } | null;
   semanticAssistSummary: {
     provider: string | null;
     providerChain: string[];
@@ -94,6 +113,13 @@ type CandidateLike = MatchCandidate & {
   source_url?: string | null;
   display_summary?: string | null;
   trust_signal?: string | null;
+  why_this_matches?: string | null;
+  source_label?: string | null;
+  price_posture?: string | null;
+  booking_path_type?: string | null;
+  next_step?: string | null;
+  availability_state?: string | null;
+  booking_confidence?: string | null;
 };
 
 type SemanticAssistLike = {
@@ -117,6 +143,33 @@ type SearchQueryUnderstandingLike = {
   inferred_location?: string | null;
   inferredCategory?: string | null;
   inferred_category?: string | null;
+  locationTerms?: string[] | null;
+  location_terms?: string[] | null;
+  coreIntentTerms?: string[] | null;
+  core_intent_terms?: string[] | null;
+  expandedIntentTerms?: string[] | null;
+  expanded_intent_terms?: string[] | null;
+  constraintTerms?: string[] | null;
+  constraint_terms?: string[] | null;
+  requestedCategory?: string | null;
+  requested_category?: string | null;
+  budgetLimit?: number | null;
+  budget_limit?: number | null;
+  nearMeRequested?: boolean | null;
+  near_me_requested?: boolean | null;
+  isChatStyle?: boolean | null;
+  is_chat_style?: boolean | null;
+  requestedDate?: string | null;
+  requested_date?: string | null;
+  requestedTime?: string | null;
+  requested_time?: string | null;
+  scheduleHint?: string | null;
+  schedule_hint?: string | null;
+  partySize?: number | null;
+  party_size?: number | null;
+  intentLabel?: string | null;
+  intent_label?: string | null;
+  summary?: string | null;
 };
 
 type SearchResponseDataLike = {
@@ -238,6 +291,13 @@ function normalizeMatchCandidate(candidate: CandidateLike): MatchCandidate {
     sourceUrl: candidate.sourceUrl ?? candidate.source_url ?? null,
     displaySummary: candidate.displaySummary ?? candidate.display_summary ?? null,
     trustSignal: candidate.trustSignal ?? candidate.trust_signal ?? null,
+    whyThisMatches: candidate.whyThisMatches ?? candidate.why_this_matches ?? null,
+    sourceLabel: candidate.sourceLabel ?? candidate.source_label ?? null,
+    pricePosture: candidate.pricePosture ?? candidate.price_posture ?? null,
+    bookingPathType: candidate.bookingPathType ?? candidate.booking_path_type ?? null,
+    nextStep: candidate.nextStep ?? candidate.next_step ?? null,
+    availabilityState: candidate.availabilityState ?? candidate.availability_state ?? null,
+    bookingConfidence: candidate.bookingConfidence ?? candidate.booking_confidence ?? null,
   };
 }
 
@@ -309,6 +369,56 @@ function normalizeSemanticAssistSummaryFromSearchData(
     normalizedQuery,
     inferredLocation,
     inferredCategory,
+  };
+}
+
+function normalizeQueryUnderstandingSummaryFromSearchData(
+  searchData: (SearchResponseDataLike & Record<string, unknown>) | null | undefined,
+) {
+  if (!searchData) {
+    return null;
+  }
+
+  const queryUnderstanding = searchData.queryUnderstanding ?? searchData.query_understanding;
+  if (!queryUnderstanding) {
+    return null;
+  }
+
+  return {
+    normalizedQuery:
+      queryUnderstanding.normalizedQuery ??
+      queryUnderstanding.normalized_query ??
+      searchData.normalizedQuery ??
+      searchData.normalized_query ??
+      null,
+    inferredLocation:
+      queryUnderstanding.inferredLocation ?? queryUnderstanding.inferred_location ?? null,
+    locationTerms:
+      queryUnderstanding.locationTerms ?? queryUnderstanding.location_terms ?? [],
+    coreIntentTerms:
+      queryUnderstanding.coreIntentTerms ?? queryUnderstanding.core_intent_terms ?? [],
+    expandedIntentTerms:
+      queryUnderstanding.expandedIntentTerms ?? queryUnderstanding.expanded_intent_terms ?? [],
+    constraintTerms:
+      queryUnderstanding.constraintTerms ?? queryUnderstanding.constraint_terms ?? [],
+    requestedCategory:
+      queryUnderstanding.requestedCategory ?? queryUnderstanding.requested_category ?? null,
+    budgetLimit:
+      queryUnderstanding.budgetLimit ?? queryUnderstanding.budget_limit ?? null,
+    nearMeRequested:
+      Boolean(queryUnderstanding.nearMeRequested ?? queryUnderstanding.near_me_requested),
+    isChatStyle:
+      Boolean(queryUnderstanding.isChatStyle ?? queryUnderstanding.is_chat_style),
+    requestedDate:
+      queryUnderstanding.requestedDate ?? queryUnderstanding.requested_date ?? null,
+    requestedTime:
+      queryUnderstanding.requestedTime ?? queryUnderstanding.requested_time ?? null,
+    scheduleHint:
+      queryUnderstanding.scheduleHint ?? queryUnderstanding.schedule_hint ?? null,
+    partySize: queryUnderstanding.partySize ?? queryUnderstanding.party_size ?? null,
+    intentLabel:
+      queryUnderstanding.intentLabel ?? queryUnderstanding.intent_label ?? null,
+    summary: queryUnderstanding.summary ?? null,
   };
 }
 
@@ -428,7 +538,9 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
     return {
       candidateIds: [],
       rankedCandidates: [],
+      recommendedCandidateIds: [],
       suggestedServiceId: null,
+      queryUnderstandingSummary: null,
       semanticAssistSummary: null,
       warnings: [],
       trustSummary: null,
@@ -457,7 +569,9 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
       return {
         candidateIds: [],
         rankedCandidates: [],
+        recommendedCandidateIds: [],
         suggestedServiceId: null,
+        queryUnderstandingSummary: null,
         semanticAssistSummary: null,
         warnings: [],
         trustSummary: null,
@@ -470,6 +584,9 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
     const normalizedCandidates = searchResponse.data.candidates.map((candidate) =>
       normalizeMatchCandidate(candidate as CandidateLike),
     );
+    const queryUnderstandingSummary = normalizeQueryUnderstandingSummaryFromSearchData(
+      searchResponse.data as SearchResponseDataLike,
+    );
     const semanticAssistSummary = normalizeSemanticAssistSummaryFromSearchData(
       searchResponse.data as SearchResponseDataLike,
     );
@@ -478,7 +595,9 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
       return {
         candidateIds: [],
         rankedCandidates: [],
+        recommendedCandidateIds: [],
         suggestedServiceId: null,
+        queryUnderstandingSummary,
         semanticAssistSummary,
         warnings: searchResponse.data.warnings ?? [],
         trustSummary: null,
@@ -495,6 +614,13 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
           .filter((candidateId): candidateId is string => Boolean(candidateId)),
       ),
     );
+    const recommendedCandidateIds = Array.from(
+      new Set(
+        (searchResponse.data.recommendations ?? [])
+          .map((recommendation) => normalizeCandidateId(recommendation as RecommendationLike))
+          .filter((candidateId): candidateId is string => Boolean(candidateId)),
+      ),
+    );
     const topCandidateId =
       normalizeCandidateId(searchResponse.data.recommendations[0] as RecommendationLike | undefined) ??
       normalizeCandidateId(normalizedCandidates[0]) ??
@@ -503,7 +629,9 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
       return {
         candidateIds,
         rankedCandidates: normalizedCandidates,
+        recommendedCandidateIds,
         suggestedServiceId: null,
+        queryUnderstandingSummary,
         semanticAssistSummary,
         warnings: searchResponse.data.warnings ?? [],
         trustSummary: null,
@@ -521,7 +649,9 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
       return {
         candidateIds,
         rankedCandidates: normalizedCandidates,
+        recommendedCandidateIds,
         suggestedServiceId: topCandidateId,
+        queryUnderstandingSummary,
         semanticAssistSummary,
         warnings: searchResponse.data.warnings ?? [],
         trustSummary: null,
@@ -544,7 +674,9 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
         return {
           candidateIds,
           rankedCandidates: normalizedCandidates,
+          recommendedCandidateIds,
           suggestedServiceId: topCandidateId,
+          queryUnderstandingSummary,
           semanticAssistSummary,
           warnings: searchResponse.data.warnings ?? [],
           trustSummary: null,
@@ -570,7 +702,9 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
         return {
           candidateIds,
           rankedCandidates: normalizedCandidates,
+          recommendedCandidateIds,
           suggestedServiceId: topCandidateId,
+          queryUnderstandingSummary,
           semanticAssistSummary,
           warnings: searchResponse.data.warnings ?? [],
           trustSummary: {
@@ -588,7 +722,9 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
       return {
         candidateIds,
         rankedCandidates: normalizedCandidates,
+        recommendedCandidateIds,
         suggestedServiceId: topCandidateId,
+        queryUnderstandingSummary,
         semanticAssistSummary,
         warnings: searchResponse.data.warnings ?? [],
         bookingRequestSummary: searchResponse.data.booking_context?.summary ?? null,
@@ -610,7 +746,9 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
       return {
         candidateIds,
         rankedCandidates: normalizedCandidates,
+        recommendedCandidateIds,
         suggestedServiceId: topCandidateId,
+        queryUnderstandingSummary,
         semanticAssistSummary,
         warnings: searchResponse.data.warnings ?? [],
         trustSummary: null,
@@ -623,7 +761,9 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
     return {
       candidateIds: [],
       rankedCandidates: [],
+      recommendedCandidateIds: [],
       suggestedServiceId: null,
+      queryUnderstandingSummary: null,
       semanticAssistSummary: null,
       warnings: [],
       trustSummary: null,

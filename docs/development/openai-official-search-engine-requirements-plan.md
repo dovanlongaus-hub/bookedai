@@ -223,6 +223,34 @@ Replay support added on `2026-04-18`:
 - `scripts/run_matching_search_replay.py` now accepts `budget` and `time_window`
 - English replay dataset added at [docs/development/english-search-replay-pack.json](/home/dovanlong/BookedAI/docs/development/english-search-replay-pack.json)
 - current replay pack covers: haircut, restaurant, physio, dentist, childcare, support worker, and private dining
+- hospitality-aware fallback prompting and a second rescue pass now exist for `restaurant`, `table booking`, and `private dining` queries
+- the production fallback request now uses `reasoning.effort = low`, request tracing headers, and explicit HTTP or transport error logging for OpenAI web-search failures
+
+Production verification recorded on `2026-04-18`:
+
+- `bash scripts/healthcheck_stack.sh` passed at `2026-04-18T16:35:01Z`
+- live query validation confirmed sourced public-web results for:
+  - `restaurant table for 6 in Sydney tonight`
+  - `dentist checkup in Sydney CBD this weekend`
+  - `childcare near Sydney for a 4 year old`
+  - `private dining in Melbourne for 8 this Friday night`
+- point-in-time replay across the current English pack produced:
+  - `web_fallback = 4`
+  - `missing_catalog = 2`
+  - `blocked_by_gates = 1`
+  - `tenant_hit = 0`
+
+Residual gaps still open after the official OpenAI rollout:
+
+- hospitality fallback is materially better but still not perfectly stable across repeated live runs
+- some verticals such as `support worker` and some `physio` searches still need better public-web coverage or stronger tenant supply before they become reliably display-safe
+- the replay pack now also contains production-validated tenant-positive cases for:
+  - `gp clinic Adelaide`
+  - `housing Melbourne`
+  - `membership renewal Wollongong`
+  - `kids swimming Brisbane`
+  - `wedding hair Fortitude Valley`
+- targeted replay verification on `2026-04-18` confirmed those tenant-positive cases returned `tenant_hit = 5/5` with `expectation_mismatches = 0`
 
 ## Risks
 
@@ -231,9 +259,9 @@ Replay support added on `2026-04-18`:
 - OpenAI web-search cost and latency should be monitored before scaling
 - if sourced public web results become a large share of total traffic, a dedicated search-provider abstraction may still be worth adding later
 
-## Next actions
+## Current next actions
 
-1. Run targeted Playwright coverage for the new public web fallback scenario.
-2. Add a public web result badge in the shortlist UI so the source type is explicit.
-3. Add replay datasets for core English service searches: haircut, physio, dentist, restaurant, childcare, support worker.
-4. Add rollout flags for public web fallback so it can be enabled per environment.
+1. Stabilize hospitality fallback further so `restaurant` and `private dining` queries do not alternate between success and safe empty states across repeated live runs.
+2. Improve `support worker` and `physio` public-web coverage without weakening strict display gates.
+3. Add an explicit public-web source badge in the shortlist UI so fallback provenance is always visible to the customer.
+4. Tighten the release threshold over time from the current `>= 4/7` public-web baseline toward a stronger fallback-coverage target once hospitality and support-worker stability improve.

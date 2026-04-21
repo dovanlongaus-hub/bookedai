@@ -39,12 +39,18 @@ The first live slice of this package now exists in the repo:
 - tenant website import now supports AI-guided extraction into BookedAI catalog rows
 - import focus can now be steered toward booking-critical fields including service name, duration, location, price, description, imagery, and booking URLs
 - tenant catalog snapshot now exposes search-ready counts, inactive counts, and row-level quality warnings for review inside the tenant surface
+- migration-ready SQL now exists for tenant membership plus catalog ownership and publish-state hardening in `backend/migrations/sql/004_tenant_membership_and_catalog_publish_state.sql`
+- the first official sample tenant seed now also exists from a real PDF source document in `backend/migrations/sql/005_co_mai_hung_chess_sample_tenant.sql`, based on the parsed chess-class brochure at `storage/uploads/documents/fe41/XesZr6pjpiOaMMduIhpspQ.pdf`
+- a separate curated pilot publish row now also exists in `backend/migrations/sql/009_co_mai_hung_chess_published_pilot_row.sql`, so BookedAI can test `tenant-first chess search` without promoting the original brochure-derived review rows directly into public search
 
 What is still incomplete versus the full package:
 
 - tenant claim and membership model now has a first persisted membership record, but still needs stronger enterprise-grade ownership and invitation handling
 - tenant-side row editing plus draft, review, published, and archived state control now exist in the first tenant workflow, but deeper provenance review and richer publish rules still need follow-on implementation
 - file import and richer media or provenance review remain future slices
+- tenant catalog now carries truthful `currency_code` plus `display_price`, so non-AUD tenants can preserve pricing semantics during onboarding and review without forcing fake AUD normalization
+- public publish for PDF-first tenants still needs stronger booking-path completeness and source-document review support, so the first chess-class sample tenant remains intentionally in `review` state even after multi-currency display support landed
+- that rule is now made explicit in the data package itself: the source-document chess rows stay in `review`, while only one curated `Sydney pilot` row is allowed into `published` state for tenant-first search verification
 
 ## Phase and sprint placement
 

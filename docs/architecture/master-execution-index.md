@@ -1,6 +1,6 @@
 # BookedAI Master Execution Index
 
-Date: `2026-04-17`
+Date: `2026-04-21`
 
 Document status: `active leadership index`
 
@@ -9,6 +9,32 @@ Document status: `active leadership index`
 This is the shortest top-level execution index for the current BookedAI program.
 
 It exists so leadership, product, architecture, and delivery owners can understand the whole program from one file before diving into the detailed phase and sprint documents.
+
+Current implementation synchronization note:
+
+- from `2026-04-19`, this index should be read together with `docs/architecture/current-phase-sprint-execution-plan.md`
+- that document is the current bridge between roadmap intent and checked-in code reality
+- from `2026-04-21`, this index should also inherit:
+  - `project.md`
+  - `docs/development/backend-boundaries.md`
+  - `docs/development/env-strategy.md`
+  - `docs/development/roadmap-sprint-document-register.md`
+- current backend execution truth under that stack is:
+  - top-level router ownership is already split in `backend/app.py`
+  - bounded-context `/api/v1/*` routers already exist under `backend/api/v1_router.py`
+  - `backend/api/v1_tenant_handlers.py` is the first live handler extraction module
+  - `backend/api/v1_routes.py` remains the main legacy handler concentration point still being decomposed
+
+## Execution truth rule
+
+The current project should now be managed through one synchronized source-of-truth stack:
+
+1. `project.md`
+2. `docs/architecture/current-phase-sprint-execution-plan.md`
+3. `docs/development/implementation-progress.md`
+4. the relevant roadmap, sprint, execution package, or implementation-slice document for the touched lane
+
+If any one of these layers changes meaningfully and the others are not updated, the program should be treated as temporarily out of sync.
 
 ## Product direction
 
@@ -144,9 +170,18 @@ Core docs:
 | 11 | Tenant IA and API preparation |
 | 12 | Tenant workspace implementation |
 | 13 | Admin IA and commercial drill-ins |
-| 14 | Admin support tooling and rollout readiness |
-| 15 | Telemetry, regression coverage, and release-grade runner enforcement |
-| 16 | Release gates and scale readiness |
+| 14 | Tenant billing, support readiness, and route/auth hardening |
+| 15 | Telemetry, regression coverage, tenant value visibility, and search carry-forward hardening |
+| 16 | Release gates, rollout discipline, and route/auth ownership closeout |
+
+## Current phase emphasis
+
+The current active execution emphasis is:
+
+- finish tenant bounded-context extraction first, including portal-adjacent handlers
+- complete tenant paid-SaaS loops around onboarding, billing, team, and catalog workflow
+- keep Sprint 15 and Sprint 16 focused on release-grade hardening, especially the known public-web fallback regressions in `backend/tests/test_api_v1_routes.py`
+- defer deeper `backend/services.py` decomposition until the active `v1` ownership cleanup is safer and clearer
 
 ## Leadership checkpoints
 
@@ -161,6 +196,8 @@ Leadership should review the program at these points:
 
 ## Primary references
 
+- `project.md`
 - `docs/architecture/solution-architecture-master-execution-plan.md`
 - `docs/architecture/implementation-phase-roadmap.md`
+- `docs/architecture/current-phase-sprint-execution-plan.md`
 - `docs/development/roadmap-sprint-document-register.md`

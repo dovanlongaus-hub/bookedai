@@ -60,6 +60,41 @@ export type AdminOverviewResponse = {
   metrics: AdminMetricCard[];
   recent_bookings: AdminBookingRecord[];
   recent_events: AdminTimelineEvent[];
+  portal_support_queue: AdminPortalSupportQueueItem[];
+};
+
+export type AdminPortalSupportQueueItem = {
+  queue_item_id: string;
+  id: number;
+  source_kind?: string | null;
+  request_type: string;
+  booking_reference?: string | null;
+  booking_status?: string | null;
+  service_name?: string | null;
+  business_name?: string | null;
+  customer_name?: string | null;
+  customer_email?: string | null;
+  support_email?: string | null;
+  preferred_date?: string | null;
+  preferred_time?: string | null;
+  timezone?: string | null;
+  customer_note?: string | null;
+  created_at: string;
+  outbox_event_id?: number | null;
+  outbox_status?: string | null;
+  outbox_available_at?: string | null;
+  resolution_status?: string | null;
+  resolution_note?: string | null;
+  resolved_at?: string | null;
+  resolved_by?: string | null;
+  action_request_id?: number | null;
+};
+
+export type AdminPortalSupportActionResponse = {
+  status: string;
+  request_id: number;
+  action: string;
+  message: string;
 };
 
 export type AdminBookingsResponse = {
@@ -207,6 +242,7 @@ export type AdminWorkspacePanelId =
   | 'bookings'
   | 'recent-events'
   | 'selected-booking'
+  | 'portal-support'
   | 'service-catalog'
   | 'partners'
   | 'prompt5-preview'

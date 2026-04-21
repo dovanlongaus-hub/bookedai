@@ -27,6 +27,8 @@ type PartnerProfileListResponse = {
 
 type PartnersSectionProps = {
   content: PartnersSectionContent;
+  onStartTrial?: () => void;
+  onBookDemo?: () => void;
 };
 
 function isInfrastructurePartner(item: PartnerProfileItem) {
@@ -74,7 +76,11 @@ function getPartnerLogoImageClass(item: PartnerProfileItem) {
     : 'max-h-full w-full max-w-full object-contain';
 }
 
-export function PartnersSection({ content }: PartnersSectionProps) {
+export function PartnersSection({
+  content,
+  onStartTrial,
+  onBookDemo,
+}: PartnersSectionProps) {
   const [items, setItems] = useState<PartnerProfileItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -194,6 +200,22 @@ export function PartnersSection({ content }: PartnersSectionProps) {
             kickerClassName={content.kickerClassName}
             title={content.title}
             body={content.body}
+            actions={
+              onStartTrial || onBookDemo ? (
+                <div className="flex flex-wrap gap-3">
+                  {onStartTrial ? (
+                    <button type="button" onClick={onStartTrial} className="booked-button">
+                      Open Product Trial
+                    </button>
+                  ) : null}
+                  {onBookDemo ? (
+                    <button type="button" onClick={onBookDemo} className="booked-button-secondary">
+                      Talk to Sales
+                    </button>
+                  ) : null}
+                </div>
+              ) : null
+            }
           />
 
           <div className="mt-7 grid gap-3">
@@ -370,6 +392,38 @@ export function PartnersSection({ content }: PartnersSectionProps) {
                         </div>
                       </div>
                     </a>
+                  ))}
+                </div>
+              </SectionCard>
+
+              <SectionCard as="section" tone="subtle" className="rounded-[1.5rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                      Logo wall
+                    </div>
+                    <div className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+                      A lighter scan line of customer, ecosystem, and infrastructure proof
+                    </div>
+                  </div>
+                  <SignalPill className="bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-600 ring-1 ring-slate-200">
+                    At-a-glance proof
+                  </SignalPill>
+                </div>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4 xl:grid-cols-6">
+                  {visibleItems.slice(0, 12).map((item) => (
+                    <div
+                      key={`logo-strip-${item.id}`}
+                      className="flex min-h-[5.5rem] items-center justify-center rounded-[1.1rem] border border-slate-200 bg-white px-4 py-3 shadow-[0_8px_18px_rgba(15,23,42,0.03)]"
+                    >
+                      <img
+                        src={item.logo_url ?? item.image_url ?? ''}
+                        alt={`${item.name} logo`}
+                        className="max-h-8 w-auto max-w-full object-contain"
+                        loading="lazy"
+                      />
+                    </div>
                   ))}
                 </div>
               </SectionCard>

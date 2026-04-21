@@ -165,12 +165,31 @@ Only candidates that satisfy all required conditions may be shown.
 
 When the user selects a result:
 
+- the search screen remains the primary context until the customer makes an explicit booking decision
+- tapping a shortlist card should open a detail preview first, not jump directly into the booking form
+- the detail preview should explain:
+  - why the result matches
+  - tenant or provider identity
+  - location and booking-readiness state
+- closing the preview should return the user to the search shortlist without changing booking state
 - tenant-backed result:
-  - continue with the existing booking-trust and booking-path flow
+  - preview first, then continue with the existing booking-trust and booking-path flow only after the customer presses `Book`
 - public web result:
   - keep BookedAI advisory
   - open partner booking path or source page
   - do not pretend availability was verified by BookedAI
+
+When the user presses `Book` from the preview:
+
+- the selected result should be committed into the booking state
+- the UI should move into the booking form only at that moment
+- the primary booking input area should receive focus immediately
+
+When the booking is submitted successfully:
+
+- the UI should transition out of the search or preview state
+- the customer should land on a dedicated booked or confirmed state
+- the confirmation surface should clearly show a thank-you outcome instead of leaving the customer inside the editable booking form
 
 ## Frontend requirements
 
@@ -181,6 +200,12 @@ Frontend must:
 - keep the shortlist compact at 3 results
 - show location, timing, booking path, and why it matches
 - make public web sourced results visually distinguishable from tenant-owned results
+- keep result browsing and booking commitment as separate UI steps
+- show a service preview popup with tenant or provider context before moving into booking
+- return to the shortlist when the preview is dismissed
+- move to the booking form only after explicit user confirmation
+- focus the booking form input region as soon as the customer commits to booking
+- move to a dedicated confirmed or thank-you state after successful booking creation
 
 ## Backend requirements
 
@@ -224,6 +249,35 @@ Already in place as of `2026-04-18`:
   - constraint relevance
   - official-source or booking-path quality
 - public web fallback returns only the top 3 surviving results
+- hospitality-aware web fallback now includes a rescue pass for `restaurant`, `table booking`, and `private dining` style queries
+- loading state on the public search surface now says `BookedAI is finding the best option for your request.`
+- targeted public E2E coverage now verifies:
+  - tenant shortlist survives trust-resolution gaps without reviving unrelated legacy rows
+  - tenant miss can render sourced public web options
+  - stale shortlist rows stay hidden while a new live search is resolving
+
+### Production validation snapshot
+
+Production validation on `2026-04-18` confirmed the implemented engine is now operating in the intended `tenant-first, public-web-second` shape:
+
+- stack health passed at `2026-04-18T16:35:01Z`
+- direct live validation on `https://api.bookedai.au/api/v1/matching/search` returned public-web fallback results for:
+  - `restaurant table for 6 in Sydney tonight`
+  - `dentist checkup in Sydney CBD this weekend`
+  - `childcare near Sydney for a 4 year old`
+  - `private dining in Melbourne for 8 this Friday night`
+- a point-in-time replay snapshot across the current 7-case English pack produced:
+- a point-in-time replay snapshot across the original 7-case English fallback pack produced:
+  - `web_fallback = 4`
+  - `missing_catalog = 2`
+  - `blocked_by_gates = 1`
+  - `tenant_hit = 0`
+- the replay pack now also includes 5 production-validated tenant-positive cases, and a targeted tenant-positive run on `2026-04-18` confirmed `tenant_hit = 5/5` with `expectation_mismatches = 0`
+
+Current production gaps exposed by that same replay snapshot:
+
+- `restaurant table for 6 in Sydney tonight` can still vary between successful hospitality web fallback and a safe gate-blocked no-result snapshot, which means hospitality retrieval stability is improved but not yet fully deterministic
+- `physio for shoulder pain near Parramatta tomorrow morning` and `NDIS support worker at home in Western Sydney tomorrow` still show moments where the public-web fallback does not surface a display-safe result, so the next tuning loop must keep focusing on reliability and coverage rather than relaxing relevance gates
 
 ## Verification strategy
 
@@ -239,7 +293,10 @@ Already in place as of `2026-04-18`:
 - E2E tenant shortlist survives legacy noise
 - E2E public web fallback renders correctly
 - E2E loading state hides stale results
-- E2E chosen result enters booking flow
+- E2E tapping a result opens preview without entering booking immediately
+- E2E closing preview returns the user to the shortlist
+- E2E `Book` from preview enters booking flow and focuses the first booking input
+- E2E successful booking transitions to confirmed or thank-you state
 
 ## Phase plan
 
@@ -260,6 +317,10 @@ Already in place as of `2026-04-18`:
 - make result source explicit
 - keep top 3 default shortlist
 - tighten booking-ready explanation and next action
+- separate `preview` from `booking commit`
+- show tenant or provider detail in the preview layer
+- move to booking only after explicit `Book` confirmation
+- end the flow on a visible confirmed or thank-you state
 
 ### Phase 4 — Replay and telemetry
 

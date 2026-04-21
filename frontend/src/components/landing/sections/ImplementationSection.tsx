@@ -8,33 +8,33 @@ type ImplementationSectionProps = {
 
 const deploymentModes = [
   {
-    title: 'Standalone first',
-    body: 'Launch as a premium booking surface without changing the SME website on day one.',
+    title: 'Standalone on your website',
+    body: 'Launch a BookedAI-owned booking flow on the SME website first without forcing a heavier rebuild on day one.',
   },
   {
-    title: 'Embed later',
-    body: 'Place the same receptionist flow into a website widget when the business is ready.',
+    title: 'Dedicated customer booking app',
+    body: 'Run a cleaner branded booking surface while BookedAI continues handling qualification, booking logic, and follow-up underneath.',
   },
   {
-    title: 'Plugin-ready',
-    body: 'Connect calendars, payments, CRM, and workflow tools through a cleaner integration layer.',
+    title: 'Linked full BookedAI portal',
+    body: 'Connect the launch flow into the wider BookedAI portal when the business is ready for deeper lifecycle, tenant, and operator workflows.',
   },
   {
-    title: 'Mobile-ready',
-    body: 'Keep the same compact UX ready for a future mobile shell or lightweight app.',
+    title: 'Operator handoff included',
+    body: 'Booking capture, payment-ready flow, confirmation email, and basic operator handoff stay connected from the first rollout.',
   },
 ];
 
 const implementationSignals = [
-  'Start with one surface and prove conversion first.',
-  'Keep branding flexible while the flow stays stable.',
-  'Expand delivery modes without rebuilding the product logic.',
+  'Start with one clean launch surface and prove conversion first.',
+  'Keep deployment flexible while the revenue flow stays stable.',
+  'Expand into deeper BookedAI workflows without rebuilding the commercial path.',
 ];
 
 const rolloutPhases = [
-  { title: 'Launch now', body: 'Standalone booking surface live first.' },
-  { title: 'Embed next', body: 'Reuse the same engine inside a website widget.' },
-  { title: 'Extend later', body: 'Add CRM, calendar, payment, and app surfaces.' },
+  { title: 'Launch now', body: 'Go live as a standalone website flow or dedicated booking app.' },
+  { title: 'Qualify fast', body: 'Keep setup, subscription, and buyer handoff inside one BookedAI-owned path.' },
+  { title: 'Expand later', body: 'Add portal, CRM, calendar, payment, and deeper automation when the rollout is ready.' },
 ];
 
 export function ImplementationSection({ content }: ImplementationSectionProps) {
@@ -44,8 +44,8 @@ export function ImplementationSection({ content }: ImplementationSectionProps) {
         <SectionCard className="p-8 lg:p-10">
           <SectionHeading {...content} />
 
-          <div className="mt-8 grid gap-3">
-            {implementationSignals.map((signal, index) => (
+            <div className="mt-8 grid gap-3">
+              {implementationSignals.map((signal, index) => (
               <SectionCard
                 key={signal}
                 className="flex items-start gap-4 rounded-[1.4rem] bg-[#f5f5f7] px-5 py-4 shadow-none"
@@ -74,13 +74,13 @@ export function ImplementationSection({ content }: ImplementationSectionProps) {
         <div className="grid gap-4 md:grid-cols-2">
           <SectionCard as="article" tone="dark" className="p-6 md:col-span-2">
             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7dd3fc]">
-              Product direction
+              Deployment modes
             </div>
             <div className="mt-3 text-2xl font-semibold tracking-[-0.03em]">
-              One booking engine that can sell now and expand later.
+              One launch system that can go live quickly and grow into the full BookedAI product.
             </div>
             <p className="mt-3 max-w-3xl text-sm leading-6 text-white/78">
-              Start with the cleanest path to revenue, then extend distribution without rebuilding the core buying flow.
+              Remove ambiguity about how an SME starts: standalone first, dedicated booking app, or linked portal rollout later.
             </p>
           </SectionCard>
 

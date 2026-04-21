@@ -8,6 +8,8 @@ It is written for a production system that is already running.
 
 The tenant app is not treated as a generic CRUD dashboard. It is treated as the operational, trust, lifecycle, and revenue surface for SMEs using BookedAI in one or more deployment modes.
 
+The tenant app should also be treated as the canonical tenant product gateway on `tenant.bookedai.au`, with one sign-up and sign-in system used across onboarding, workspace access, data input, reporting, subscription, invoicing, and billing actions.
+
 This strategy inherits and aligns with:
 
 - Prompt 1 product and domain direction
@@ -16,21 +18,25 @@ This strategy inherits and aligns with:
 - Prompt 4 data architecture direction
 - Prompt 5 API and contract strategy
 - Prompt 6 public growth and conversion strategy
+- `docs/architecture/user-surface-saas-upgrade-plan.md`
 
 ## Section 1 — Executive summary
 
 - Current tenant experience maturity:
   - A dedicated tenant app route is now confirmed in the current repo.
+  - `tenant.bookedai.au` is now the approved tenant-facing host and should become the default entry point.
   - The tenant surface now includes `overview`, `catalog`, `bookings`, and `integrations` panels.
-  - Google-authenticated tenant actions and AI-guided website import have started shipping, but the tenant app is still early and should not yet be treated as a fully mature SME product surface.
+  - Password-based and Google-authenticated tenant actions plus AI-guided website import have started shipping, but the tenant app is still early and should not yet be treated as a fully mature SME product surface.
 - Target tenant app direction:
   - A mode-aware tenant app that serves as:
+    - single tenant identity gateway
     - operational control surface
     - visibility surface
     - booking trust surface
     - billing and lifecycle surface
     - integration health surface
     - monthly value reporting surface
+    - paid SaaS billing and subscription surface
 - Biggest opportunities:
   - turn current internal visibility concepts into tenant-safe product flows
   - give SMEs real operational confidence around leads, booking trust, payments, lifecycle messaging, and integrations
@@ -40,6 +46,12 @@ This strategy inherits and aligns with:
   - exposing internal-only config or unsafe controls
   - building a dashboard that shows data but does not help action
   - ignoring deployment-mode differences between standalone, embedded, and integration-led tenants
+
+Implementation synchronization note from `2026-04-19`:
+
+- the current code-aligned planning baseline for this lane is `docs/architecture/current-phase-sprint-execution-plan.md`
+- tenant planning should now treat the workspace shell, auth foundation, catalog workflow, and billing read-model baseline as already implemented
+- the next tenant strategy emphasis is completion of identity, onboarding, billing posture, team membership, and monthly value reporting rather than greenfield creation of a tenant app
 
 ## Section 2 — Current tenant-facing experience assessment
 
@@ -53,13 +65,15 @@ Confirmed from the current repo:
   - `TenantApp`
 - `AdminApp` renders a single large [AdminPage](../../frontend/src/components/AdminPage.tsx)
 - `TenantApp` now renders a dedicated tenant workspace at the tenant route
+- `tenant.bookedai.au` is now wired as a tenant-facing production host
 - the current tenant surface includes:
   - overview summary cards
   - tenant catalog workspace
   - bookings panel
   - integrations panel
-  - Google sign-in entry for tenant-authenticated actions
+  - tenant sign-in entry for password-based and Google-authenticated actions
   - AI-guided website import for booking-critical catalog extraction
+  - truthful catalog pricing fields through `currency_code` and `display_price` so tenant rows can preserve brochure or source-document prices without forcing fake AUD conversion
 - The current admin surface includes:
   - admin login
   - overview metrics
@@ -89,16 +103,18 @@ Confirmed admin routes:
 
 The tenant app now exists, but several SME self-serve areas are still missing:
 
+- no polished tenant sign-up and onboarding gateway yet
+- no single canonical tenant account and membership UX yet
 - no lead lifecycle area
 - no conversation inbox area for SMEs
 - no booking trust dashboard
-- no billing and subscription area
+- no full billing and subscription area
 - no CRM and lifecycle dashboard
 - no email communications workspace
 - no monthly value reporting workspace
-- no team and role view for tenants
 - no full multi-step provenance-review workflow yet
-- no strong invitation or multi-user tenant-membership model beyond the current first authenticated slice
+- no invite email delivery yet
+- no complete role-aware model across every remaining tenant write surface yet
 
 ### What can be reused
 
@@ -132,22 +148,29 @@ Current maturity should be described as:
 
 - internal ops visibility exists
 - first tenant self-serve product surface now exists
-- tenant write actions now include Google-authenticated catalog import plus edit, publish, and archive actions for catalog rows
-- the repo still needs stronger auth, ownership, editing, and publish-state hardening before broader SME rollout
+- tenant write actions now include tenant-authenticated catalog import plus edit, publish, and archive actions for catalog rows
+- tenant catalog editing now also preserves non-AUD pricing truth via `currency_code` and `display_price`, which is especially important for PDF-first onboarding and the first chess-class sample tenant
+- tenant billing now includes self-serve setup, plan choice, trial posture, invoice or payment-method seams, and billing audit visibility
+- tenant team management now includes a member roster, invite seam, and first-pass role or status management
+- role-aware rules now exist for billing, team, and catalog actions
+- the repo still needs stronger auth, onboarding, billing, ownership, editing, and publish-state hardening before broader SME rollout
 
 ### Biggest gaps
 
-- no SME-facing operational visibility
-- no tenant-safe action model
-- no lifecycle, billing, or integration visibility
-- no deployment-mode-aware experience
-- no mobile-usable operator surface
+- no polished create-account and claim-account flow
+- no complete tenant-safe action and identity model
+- no real payment-method or provider-backed invoice management yet
+- no invite-delivery and teammate first-login polish yet
+- no full monthly value reporting surface
+- no complete deployment-mode-aware experience
+- no fully mobile-usable operator surface
 
 ### Biggest opportunities
 
 - separate internal admin from tenant product concerns
 - reuse UI primitives and domain contracts without cloning the whole admin
 - start with read-heavy tenant views and controlled write actions
+- finish the paid-SaaS spine on top of the tenant shell that already exists
 
 ## Section 3 — Tenant app product strategy
 
@@ -155,15 +178,20 @@ Current maturity should be described as:
 
 The tenant app should be treated as:
 
+- single tenant gateway on `tenant.bookedai.au`
+- one canonical tenant account and membership surface
 - operational control surface
 - booking trust surface
 - lead and revenue management surface
 - lifecycle communication surface
 - integration health surface
 - monthly value reporting surface
+- subscription, invoice, and billing control surface
 
 It should help SMEs answer:
 
+- how do I create or access my BookedAI tenant account
+- what plan am I on and what am I paying for
 - what new demand arrived
 - what needs action now
 - which leads are worth pursuing
@@ -228,28 +256,30 @@ The tenant app must adapt to tenant mode.
 
 Recommended tenant app areas:
 
-1. Overview
-2. Leads
-3. Conversations
-4. Matching
-5. Booking And Availability
-6. Payments And Billing
-7. CRM And Lifecycle
-8. Email Communications
-9. Monthly Reports
-10. Integrations
-11. Deployment Modes
-12. Services And Providers
-13. Team And Roles
-14. AI And Trust Settings
-15. Notifications And Tasks
-16. Activity And Sync Status
-17. Settings
+1. Auth And Onboarding
+2. Overview
+3. Leads
+4. Conversations
+5. Matching
+6. Booking And Availability
+7. Payments And Billing
+8. CRM And Lifecycle
+9. Email Communications
+10. Monthly Reports
+11. Integrations
+12. Deployment Modes
+13. Services And Providers
+14. Team And Roles
+15. AI And Trust Settings
+16. Notifications And Tasks
+17. Activity And Sync Status
+18. Settings
 
 ### Page families
 
 #### Daily-operations pages
 
+- Auth And Onboarding
 - Overview
 - Leads
 - Conversations
@@ -277,6 +307,19 @@ Recommended tenant app areas:
 - Activity And Sync Status
 
 ### Key sections and their purpose
+
+#### Auth And Onboarding
+
+- Goal:
+  - provide one premium tenant gateway for account creation, sign-in, and workspace entry
+- User value:
+  - one clear place to start, authenticate, and manage account ownership
+- Mode relevance:
+  - all modes
+- Mobile:
+  - highest priority, because this is the first-touch tenant entry
+- Product requirement:
+  - this section must eventually cover sign-up, sign-in, invite acceptance, password and identity recovery, and account-to-tenant linking without pushing SMEs into admin-only or support-only flows
 
 #### Overview
 
@@ -339,9 +382,9 @@ Recommended tenant app areas:
 #### Payments And Billing
 
 - Goal:
-  - show plan, invoices, dues, collections, status
+  - show plan, invoices, dues, collections, payment methods, and status
 - User value:
-  - revenue and account clarity
+  - revenue, account, and billing clarity
 - Mode relevance:
   - all modes, especially paid tenants
 - Mobile:
@@ -420,7 +463,7 @@ Recommended tenant app areas:
 #### Team And Roles
 
 - Goal:
-  - lightweight team visibility and ownership
+  - lightweight team visibility, ownership, and tenant account control
 - User value:
   - assigned accountability
 - Mode relevance:
@@ -443,6 +486,8 @@ Recommended tenant app areas:
 
 ### Most important KPI cards
 
+- current plan
+- next invoice status
 - new leads today
 - open conversations needing action
 - booking requests pending

@@ -37,9 +37,11 @@ The platform is currently designed around a single Docker host with multiple rou
 
 | Subdomain | Purpose | Runtime Target |
 |---|---|---|
-| `bookedai.au` | Public website and in-site API proxy | frontend + backend |
+| `bookedai.au` | Homepage sales deck and registration entry surface | frontend + backend |
 | `beta.bookedai.au` | Beta staging surface for pre-production validation | beta-web + beta-backend |
 | `admin.bookedai.au` | Admin-facing UI | frontend |
+| `product.bookedai.au` | Live product demo and booking-agent host | frontend + backend |
+| `demo.bookedai.au` | Lightweight conversational demo landing page | frontend |
 | `portal.bookedai.au` | Customer booking portal and booking-detail host | frontend + backend |
 | `api.bookedai.au` | Direct API access | backend |
 | `supabase.bookedai.au` | Self-hosted Supabase gateway | Supabase Kong |
@@ -52,6 +54,8 @@ The platform is currently designed around a single Docker host with multiple rou
 ### Production tier
 
 - `bookedai.au`
+- `product.bookedai.au`
+- `demo.bookedai.au`
 - `admin.bookedai.au`
 - `portal.bookedai.au`
 - `api.bookedai.au`
@@ -77,13 +81,18 @@ Primary directories:
 Primary entry structure:
 
 - `frontend/src/app/AppRouter.tsx`
+- `frontend/src/apps/public/PitchDeckApp.tsx`
+- `frontend/src/apps/public/ProductApp.tsx`
+- `frontend/src/apps/public/DemoLandingApp.tsx`
 - `frontend/src/apps/public/PublicApp.tsx`
 - `frontend/src/apps/admin/AdminApp.tsx`
 - `frontend/src/shared/config/api.ts`
 
 Responsibilities:
 
-- public landing experience
+- homepage sales deck and registration-entry surface
+- live product demo and booking-agent surface
+- demo landing surface
 - assistant dialog
 - admin UI
 - static public pages

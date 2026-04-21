@@ -149,6 +149,7 @@ def catalog_quality_warnings(payload: dict[str, Any]) -> list[str]:
     ) or ""
     location = str(payload.get("location") or "").strip()
     amount_aud = payload.get("amount_aud")
+    display_price = str(payload.get("display_price") or "").strip()
     tags = payload.get("_source_tags_json") or payload.get("tags_json") or []
     content_derived_tags = _derived_topic_tags_from_terms(
         _normalized_terms(
@@ -171,7 +172,9 @@ def catalog_quality_warnings(payload: dict[str, Any]) -> list[str]:
         warnings.append("unknown_category")
     if not location:
         warnings.append("missing_location")
-    if amount_aud is None or float(amount_aud) <= 0:
+    has_numeric_price = amount_aud is not None and float(amount_aud) > 0
+    has_display_price = bool(display_price)
+    if not has_numeric_price and not has_display_price:
         warnings.append("missing_price")
     if not content_derived_tags:
         warnings.append("missing_topic_tags")

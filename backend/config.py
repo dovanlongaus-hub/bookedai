@@ -116,6 +116,9 @@ class Settings:
     upload_base_dir: str
     upload_public_base_url: str
     upload_max_file_size_bytes: int
+    session_signing_secret: str = ""
+    tenant_session_signing_secret: str = ""
+    admin_session_signing_secret: str = ""
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -186,7 +189,7 @@ def get_settings() -> Settings:
         public_api_url=os.getenv("PUBLIC_API_URL", "https://api.bookedai.au"),
         cors_allow_origins=os.getenv(
             "CORS_ALLOW_ORIGINS",
-            "http://localhost:3000,http://localhost:5173,https://bookedai.au,https://www.bookedai.au,https://admin.bookedai.au,https://product.bookedai.au,https://portal.bookedai.au,https://upload.bookedai.au",
+            "http://localhost:3000,http://localhost:5173,https://bookedai.au,https://www.bookedai.au,https://admin.bookedai.au,https://product.bookedai.au,https://portal.bookedai.au,https://tenant.bookedai.au,https://upload.bookedai.au",
         ),
         supabase_url=os.getenv("SUPABASE_URL", "https://supabase.bookedai.au"),
         supabase_anon_key=os.getenv("SUPABASE_ANON_KEY", ""),
@@ -313,6 +316,9 @@ def get_settings() -> Settings:
             os.getenv("ADMIN_API_TOKEN", ""),
         ),
         admin_api_token=os.getenv("ADMIN_API_TOKEN", ""),
+        session_signing_secret=os.getenv("SESSION_SIGNING_SECRET", ""),
+        tenant_session_signing_secret=os.getenv("TENANT_SESSION_SIGNING_SECRET", ""),
+        admin_session_signing_secret=os.getenv("ADMIN_SESSION_SIGNING_SECRET", ""),
         admin_session_ttl_hours=env_int("ADMIN_SESSION_TTL_HOURS", 12),
         expose_api_docs=env_bool("EXPOSE_API_DOCS", False),
         booking_chat_rate_limit_requests=env_int("BOOKING_CHAT_RATE_LIMIT_REQUESTS", 20),

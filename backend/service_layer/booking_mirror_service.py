@@ -199,6 +199,7 @@ async def dual_write_pricing_consultation(
                 "meeting_join_url": result.meeting_join_url,
                 "meeting_event_url": result.meeting_event_url,
                 "email_status": result.email_status,
+                "package_name": result.plan_name,
             }
         ),
     )
@@ -218,6 +219,7 @@ async def dual_write_pricing_consultation(
             {
                 "plan_id": result.plan_id,
                 "plan_name": result.plan_name,
+                "package_name": result.plan_name,
                 "amount_label": result.amount_label,
                 "source_section": payload.source_section,
                 "source_cta": payload.source_cta,

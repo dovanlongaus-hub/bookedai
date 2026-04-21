@@ -41,6 +41,12 @@ Implement the first tenant revenue workspace with dashboard, missed revenue, rec
 - expose tenant-safe endpoints for claim, import, draft review, publish, and archive
 - confirm published rows can be consumed by BookedAI offline search and matching
 - persist tenant membership and explicit catalog ownership so publish rights no longer depend only on fallback heuristics
+- maintain migration-ready schema artifacts for tenant membership and catalog publish-state changes
+- maintain migration-ready schema artifacts for truthful multi-currency catalog pricing via `currency_code` and `display_price`
+- keep the migration apply path operationally documented through `scripts/apply_backend_migrations.sh` and `docs/development/backend-migration-apply-checklist.md`
+- keep a lightweight migration-state verification step runnable through `scripts/verify_backend_migration_state.sh` and release-gate compatible when database access exists
+- run the dedicated tenant publish production-shadow rehearsal in `docs/development/tenant-publish-production-shadow-rehearsal.md` before any broader rollout claim
+- validate the first official sample tenant seeded from a PDF source document, including truthful `VND` display pricing, review-state handling, and missing booking-path data
 
 ## QA or release owner
 

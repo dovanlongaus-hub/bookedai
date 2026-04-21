@@ -1,4 +1,4 @@
-import { brandDescriptor, brandName, type DemoContent, type HeroContent } from '../data';
+import { brandName, type DemoContent, type HeroContent } from '../data';
 import { BrandLockup } from '../ui/BrandLockup';
 import { SectionCard } from '../ui/SectionCard';
 import { SectionShell } from '../ui/SectionShell';
@@ -9,232 +9,164 @@ type HeroSectionProps = {
   demo: DemoContent;
   onStartTrial: () => void;
   onBookDemo: () => void;
+  onSeePricing?: () => void;
 };
 
-const signalStats = [
-  { value: '24/7', label: 'capture window' },
-  { value: '<60s', label: 'to ranked path' },
-  { value: '1 rail', label: 'search to booking' },
-];
-
-const funnelBars = [
-  { label: 'Incoming demand', value: '100%', width: '100%', tone: 'bg-slate-950' },
-  { label: 'Qualified intent', value: '72%', width: '72%', tone: 'bg-sky-500' },
-  { label: 'Ready to book', value: '49%', width: '49%', tone: 'bg-emerald-500' },
-  { label: 'Recovered follow-up', value: '31%', width: '31%', tone: 'bg-amber-400' },
-];
-
-const orchestrationNodes = [
-  { title: 'Search', body: 'Ask naturally in one line.' },
-  { title: 'Rank', body: 'Best-fit option appears first.' },
-  { title: 'Book', body: 'Payment and follow-up stay attached.' },
-];
-
-export function HeroSection({ content, demo, onStartTrial, onBookDemo }: HeroSectionProps) {
+export function HeroSection({
+  content,
+  demo,
+  onStartTrial,
+  onBookDemo,
+  onSeePricing,
+}: HeroSectionProps) {
   const primaryResult = demo.results[0];
   const resultFacts = [
     primaryResult.priceLabel,
     primaryResult.timingLabel,
     primaryResult.locationLabel,
   ];
-  const proofPoints = [
+  const bookingDetailRows = [
+    { label: 'Parent', value: 'Sarah Chen' },
+    { label: 'Email', value: 'sarah@email.com' },
+    { label: 'Child', value: 'Age 7 beginner' },
+    { label: 'Requested slot', value: 'Sun 11:00 AM' },
+  ];
+  const bookingOutcomeRows = [
+    { label: 'Stripe payment', value: 'Ready', tone: 'bg-emerald-50 text-emerald-700' },
+    { label: 'Calendar event', value: 'Prepared', tone: 'bg-sky-50 text-sky-700' },
+    { label: 'Email confirm', value: 'Queued', tone: 'bg-violet-50 text-violet-700' },
+  ];
+  const heroHighlights = [
     {
-      label: 'Live intent',
-      body: demo.query,
+      title: 'Respond instantly',
+      body: 'Every enquiry gets a fast first reply before the lead cools.',
     },
     {
-      label: demo.topPickLabel,
-      body: demo.decisionSummary,
+      title: 'Qualify clearly',
+      body: 'The best-fit option and next step show up without extra back-and-forth.',
     },
     {
-      label: 'Booking-ready output',
-      body: primaryResult.bestFor,
+      title: 'Convert cleanly',
+      body: 'Booking handoff, payment, and follow-up stay in one path.',
     },
   ];
 
   return (
     <SectionShell
       id="hero"
-      className="pb-12 pt-8 lg:pb-20 lg:pt-10"
-      contentClassName="grid gap-6 lg:grid-cols-[0.84fr_1.16fr] lg:items-start"
+      className="pb-10 pt-1 sm:pb-12 lg:pb-20 lg:pt-3"
+      contentClassName="grid gap-4 sm:gap-5 lg:grid-cols-[0.82fr_1.18fr] lg:items-stretch lg:gap-6"
     >
-      <SectionCard className="relative overflow-hidden p-7 lg:min-h-[48rem] lg:p-9">
+      <SectionCard className="relative overflow-hidden p-5 sm:p-6 lg:p-9">
         <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_62%)]" />
         <div className="absolute bottom-0 right-0 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(15,23,42,0.08),transparent_70%)]" />
 
         <div className="relative flex h-full flex-col">
-          <SignalPill variant="brand" className="w-fit px-4 py-1.5 text-sm normal-case tracking-[0.05em] text-[#1d1d1f]">
+          <SignalPill variant="brand" className="w-fit px-3.5 py-1.5 text-[13px] normal-case tracking-[0.04em] text-[#1d1d1f] sm:px-4 sm:text-sm">
             {content.eyebrow}
           </SignalPill>
 
-          <div className="mt-5 rounded-[1.7rem] border border-black/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(246,249,255,0.98)_100%)] px-4 py-4 shadow-[0_18px_50px_rgba(15,23,42,0.05)] sm:px-5 sm:py-5">
-            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-              <BrandLockup
-                compact
-                surface="light"
-                className="min-w-0"
-                logoClassName="booked-brand-image booked-brand-image--hero-banner w-full max-w-[11rem] sm:max-w-[12rem] lg:max-w-[15rem]"
-                descriptorClassName="hidden"
-                eyebrowClassName="hidden"
-              />
-              <div className="grid gap-3 lg:max-w-[21rem] lg:justify-items-end lg:text-right">
-                <SignalPill
-                  variant="soft"
-                  className="w-fit px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[#1d1d1f] lg:justify-self-end"
-                >
-                  Brand system
-                </SignalPill>
-                <div className="text-xs font-medium leading-5 text-[#1d1d1f] sm:text-sm sm:leading-6">
-                  {brandDescriptor}
-                </div>
-                <div className="flex flex-wrap gap-2 lg:justify-end">
-                  {['Search', 'Calls', 'Follow-up'].map((item) => (
-                    <SignalPill
-                      key={item}
-                      variant="soft"
-                      className="px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-black/68 shadow-none"
-                    >
-                      {item}
-                    </SignalPill>
-                  ))}
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <h1 className="template-title mt-6 max-w-[6.2em] text-[2.65rem] font-semibold leading-[0.92] text-[#1d1d1f] sm:text-[4.2rem] lg:text-[5.1rem]">
+          <h1 className="template-title mt-4 max-w-[7.1em] text-[2.2rem] font-semibold leading-[0.94] text-[#1d1d1f] sm:mt-6 sm:text-[4rem] lg:text-[4.85rem]">
             {content.title}
           </h1>
 
-          <p className="template-body mt-5 max-w-[38rem] text-[1rem] leading-7 sm:text-[1.08rem] sm:leading-8">
+          <p className="template-body mt-4 max-w-[33rem] text-[0.98rem] leading-[1.65rem] sm:mt-5 sm:max-w-[34rem] sm:text-[1.08rem] sm:leading-8">
             <span className="font-semibold text-[#1d1d1f]">{content.bodyLead}</span>{' '}
             {content.bodyRest}
           </p>
 
-          <div className="mt-6 flex flex-wrap gap-2.5">
-            {['Demand capture', 'Intent ranking', 'Booking conversion'].map((item) => (
-              <SignalPill
-                key={item}
-                className="bg-white/90 px-4 py-2 text-[11px] uppercase tracking-[0.16em]"
-              >
-                {item}
-              </SignalPill>
-            ))}
-          </div>
-
-          <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+          <div className="mt-6 flex flex-col gap-2.5 sm:mt-7 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
             <button
               type="button"
               onClick={onStartTrial}
-              className="booked-button px-7 py-3.5 text-base font-semibold"
+              className="booked-button"
             >
               {content.primaryCta}
             </button>
             <button
               type="button"
               onClick={onBookDemo}
-              className="booked-button-secondary px-7 py-3.5 text-base font-semibold"
+              className="booked-button-secondary"
             >
               {content.secondaryCta}
             </button>
+            {onSeePricing ? (
+              <button
+                type="button"
+                onClick={onSeePricing}
+                className="booked-button-secondary border-black/8 bg-white/82 text-[#1d1d1f]"
+              >
+                See Pricing
+              </button>
+            ) : null}
           </div>
 
-          <p className="mt-4 max-w-[38rem] text-sm leading-6 text-black/60">{content.note}</p>
+          <p className="mt-3 max-w-[33rem] text-sm leading-6 text-black/56 sm:mt-4 sm:max-w-[34rem]">{content.note}</p>
 
-          <div className="mt-8 grid gap-3 sm:grid-cols-3">
-            {signalStats.map((item) => (
-              <SectionCard key={item.label} as="article" tone="subtle" className="rounded-[1.35rem] px-5 py-5">
-                <div className="text-[2rem] font-semibold tracking-[-0.05em] text-[#1d1d1f]">{item.value}</div>
-                <div className="mt-1 text-sm leading-6 text-black/62">{item.label}</div>
+          <div className="mt-6 grid gap-2.5 sm:mt-8 sm:grid-cols-3 sm:gap-3">
+            {heroHighlights.map((item) => (
+              <SectionCard
+                key={item.title}
+                as="article"
+                tone="subtle"
+                className="rounded-[1.2rem] border border-white/75 bg-white/66 px-3.5 py-3.5 shadow-[0_12px_24px_rgba(15,23,42,0.04)] sm:rounded-[1.4rem] sm:px-4 sm:py-4"
+              >
+                <div className="text-sm font-semibold tracking-[-0.02em] text-[#1d1d1f]">{item.title}</div>
+                <div className="mt-2 text-sm leading-6 text-black/62">{item.body}</div>
               </SectionCard>
             ))}
-          </div>
-
-          <div className="mt-6 grid gap-4 lg:mt-auto">
-            <SectionCard className="rounded-[1.8rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f5f8ff_100%)] p-5">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="template-kicker text-[11px] tracking-[0.16em]">Commercial signal map</div>
-                  <div className="mt-2 text-lg font-semibold tracking-[-0.03em] text-[#1d1d1f]">
-                    Less copy. More visible conversion logic.
-                  </div>
-                </div>
-                <div className="rounded-full bg-[#1d1d1f] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-                  Live ready
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-3">
-                {funnelBars.map((item) => (
-                  <div key={item.label} className="rounded-[1.25rem] bg-white px-4 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="text-sm font-semibold text-[#1d1d1f]">{item.label}</div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{item.value}</div>
-                    </div>
-                    <div className="mt-3 h-2.5 rounded-full bg-slate-100">
-                      <div className={`h-full rounded-full ${item.tone}`} style={{ width: item.width }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
           </div>
         </div>
       </SectionCard>
 
-      <div className="grid gap-5">
-        <SectionCard tone="dark" className="relative overflow-hidden p-5 text-white lg:p-6">
-          <div className="absolute inset-x-12 top-8 h-24 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.26),transparent_72%)] blur-3xl" />
-          <div className="relative flex flex-col gap-5">
-            <div className="flex flex-col gap-4 rounded-[1.8rem] border border-white/10 bg-[rgba(255,255,255,0.06)] p-4 sm:flex-row sm:items-start sm:justify-between">
+      <div className="grid gap-4 sm:gap-5">
+        <SectionCard className="relative overflow-hidden p-4 sm:p-5 lg:p-6">
+          <div className="absolute inset-x-12 top-8 h-24 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.16),transparent_72%)] blur-3xl" />
+          <div className="relative flex flex-col gap-4 sm:gap-5">
+            <div className="flex flex-col gap-3 rounded-[1.45rem] border border-black/5 bg-white/64 p-3.5 shadow-[0_12px_28px_rgba(15,23,42,0.04)] sm:gap-4 sm:rounded-[1.8rem] sm:p-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <SignalPill variant="inverse" className="w-fit px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
-                  Live proof system
+                <SignalPill className="w-fit px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#1459c7] sm:text-[10px] sm:tracking-[0.16em]">
+                  Live product proof
                 </SignalPill>
-                <div className="mt-4 max-w-[25rem] text-[1.65rem] font-semibold leading-tight tracking-[-0.04em] text-white sm:text-[2rem]">
-                  One view for demand capture, qualification, and booking conversion.
+                <div className="mt-3 max-w-[23rem] text-[1.3rem] font-semibold leading-tight tracking-[-0.04em] text-[#1d1d1f] sm:mt-4 sm:max-w-[25rem] sm:text-[2rem]">
+                  See the booking flow in one clean screen.
                 </div>
-                <div className="mt-4 max-w-[24rem]">
-                  <BrandLockup
-                    surface="dark"
-                    showEyebrow={false}
-                    className="items-start"
-                    logoClassName="max-w-[12rem] sm:max-w-[13.5rem]"
-                    descriptorClassName="text-white/62"
-                  />
+                <div className="mt-2.5 max-w-[25rem] text-sm leading-6 text-black/58 sm:mt-3 sm:max-w-[26rem] sm:text-[0.98rem]">
+                  Search comes in, the best-fit option is ranked, and the next booking step is ready without extra back-and-forth.
                 </div>
               </div>
-              <div className="flex items-center gap-2 self-start rounded-full bg-emerald-400/12 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-200">
-                <span className="h-2 w-2 rounded-full bg-emerald-300" />
+              <div className="flex items-center gap-2 self-start rounded-full bg-emerald-50/90 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-700 sm:text-[10px] sm:tracking-[0.16em]">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 {demo.status}
               </div>
             </div>
 
-            <div className="grid gap-5 xl:grid-cols-[0.96fr_0.74fr]">
-              <div className="relative rounded-[2.2rem] border border-white/10 bg-[linear-gradient(180deg,rgba(255,255,255,0.1)_0%,rgba(255,255,255,0.03)_100%)] p-3 shadow-[rgba(15,23,42,0.26)_0_24px_60px]">
-                <div className="rounded-[1.95rem] bg-black p-2.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+            <div className="grid gap-4 sm:gap-5">
+              <div className="relative rounded-[1.85rem] border border-white/35 bg-[linear-gradient(180deg,rgba(255,255,255,0.22)_0%,rgba(255,255,255,0.06)_100%)] p-2.5 shadow-[0_20px_44px_rgba(15,23,42,0.12)] sm:rounded-[2.2rem] sm:p-3 sm:shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
+                <div className="rounded-[1.65rem] bg-[#111214] p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] sm:rounded-[1.95rem] sm:p-2.5">
                   <div className="relative aspect-[9/16.5] overflow-hidden rounded-[1.7rem] bg-[#fbfbfd]">
                     <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(135deg,rgba(255,255,255,0.36)_0%,rgba(255,255,255,0)_26%,rgba(255,255,255,0.08)_60%,rgba(255,255,255,0)_100%)]" />
 
-                    <div className="border-b border-slate-200 bg-white/95 px-4 py-3">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-black/6">
-                          <div className="h-3 w-3 rounded-full bg-[#0071e3]" />
-                        </div>
+                    <div className="border-b border-slate-200/80 bg-white/94 px-3.5 py-3 sm:px-4">
+                      <div className="flex items-start gap-3">
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-slate-950">{brandName}</div>
-                          <div className="line-clamp-1 text-[10px] text-slate-500">
-                            Revenue engine in motion
-                          </div>
+                          <BrandLockup
+                            compact={false}
+                            surface="light"
+                            showEyebrow={false}
+                            className="items-start"
+                            logoClassName="w-full max-w-[8rem] sm:max-w-[8.4rem]"
+                            descriptorClassName="text-[8px] leading-4 text-slate-500 sm:text-[9px]"
+                          />
                         </div>
-                        <div className="rounded-full bg-emerald-50 px-2.5 py-1 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                        <div className="rounded-full bg-emerald-50/90 px-2.5 py-1 text-[8px] font-semibold uppercase tracking-[0.1em] text-emerald-700 sm:text-[9px] sm:tracking-[0.12em]">
                           {demo.status}
                         </div>
                       </div>
                     </div>
 
-                    <div className="space-y-2.5 px-3 py-3">
-                      <div className="rounded-[1.15rem] border border-slate-200 bg-white px-3 py-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+                    <div className="space-y-2 px-2.5 py-2.5 sm:space-y-2.5 sm:px-3 sm:py-3">
+                      <div className="rounded-[1rem] border border-slate-200/85 bg-white/92 px-3 py-2.5 shadow-[0_8px_18px_rgba(15,23,42,0.03)]">
                         <div className="flex items-center justify-between gap-2">
                           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
                             Live enquiry
@@ -273,7 +205,7 @@ export function HeroSection({ content, demo, onStartTrial, onBookDemo }: HeroSec
                         </div>
                       </div>
 
-                      <div className="rounded-[1.35rem] border border-black/6 bg-[#f5f5f7] p-2.5">
+                      <div className="rounded-[1.2rem] border border-black/5 bg-[#f6f7f9] p-2.5">
                         <div className="flex items-start gap-2.5">
                           <img
                             src={primaryResult.imageUrl}
@@ -312,58 +244,83 @@ export function HeroSection({ content, demo, onStartTrial, onBookDemo }: HeroSec
                         </div>
                       </div>
 
-                      <div className="grid grid-cols-3 gap-2">
-                        {['Search', 'Match', 'Book'].map((item) => (
-                          <div key={item} className="rounded-[1rem] bg-white px-2.5 py-2 text-center text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                            {item}
+                      <div className="rounded-[1.15rem] border border-slate-200/85 bg-white/94 p-3 shadow-[0_8px_18px_rgba(15,23,42,0.03)]">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                            Booking input ready
+                          </div>
+                          <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-600">
+                            Step 2
+                          </div>
+                        </div>
+                        <div className="mt-3 grid gap-2">
+                          {bookingDetailRows.map((item) => (
+                            <div
+                              key={item.label}
+                              className="flex items-center justify-between gap-3 rounded-[0.9rem] bg-[#f8fafc] px-3 py-2"
+                            >
+                              <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                {item.label}
+                              </div>
+                              <div className="text-[10px] font-medium text-slate-700">{item.value}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="rounded-[1.15rem] border border-slate-200/85 bg-[linear-gradient(180deg,#fafcff_0%,#ffffff_100%)] p-3 shadow-[0_8px_18px_rgba(15,23,42,0.03)]">
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                            After book
+                          </div>
+                          <div className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-emerald-700">
+                            Step 3
+                          </div>
+                        </div>
+                        <div className="mt-3 grid gap-2">
+                          {bookingOutcomeRows.map((item) => (
+                            <div
+                              key={item.label}
+                              className="flex items-center justify-between gap-3 rounded-[0.95rem] border border-slate-200 bg-white px-3 py-2"
+                            >
+                              <div className="text-[10px] font-semibold text-slate-700">{item.label}</div>
+                              <div className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${item.tone}`}>
+                                {item.value}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-1.5 sm:gap-2">
+                        {[
+                          {
+                            title: 'Intent captured',
+                            body: 'Customer need is understood immediately.',
+                          },
+                          {
+                            title: 'Best-fit ranked',
+                            body: 'Top option is ready with the key facts visible.',
+                          },
+                          {
+                            title: 'Next step ready',
+                            body: 'Input, payment, calendar, and email stay attached.',
+                          },
+                        ].map((item) => (
+                          <div
+                            key={item.title}
+                            className="rounded-[0.95rem] border border-slate-200/80 bg-white/88 px-3 py-2 shadow-none"
+                          >
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              {item.title}
+                            </div>
+                            <div className="mt-1 text-[10px] leading-4 text-slate-600">{item.body}</div>
                           </div>
                         ))}
                       </div>
                     </div>
                   </div>
                 </div>
-              </div>
-
-              <div className="grid gap-4">
-                <SectionCard className="rounded-[1.8rem] border border-white/10 bg-[rgba(255,255,255,0.07)] p-4">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">Proof stack</div>
-                  <div className="mt-4 grid gap-3">
-                    {proofPoints.map((item) => (
-                      <div key={item.label} className="rounded-[1.25rem] border border-white/10 bg-[rgba(0,0,0,0.14)] px-4 py-3">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-white/60">{item.label}</div>
-                        <div className="mt-2 text-sm leading-6 text-white/85">{item.body}</div>
-                      </div>
-                    ))}
-                  </div>
-                </SectionCard>
-
-                <SectionCard className="rounded-[1.8rem] border border-white/10 bg-[rgba(255,255,255,0.07)] p-4">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-300">Flow status</div>
-                      <div className="mt-2 text-xl font-semibold tracking-[-0.04em] text-white">
-                        The page now sells through proof, clarity, and visible next steps.
-                      </div>
-                    </div>
-                    <div className="rounded-full bg-white/10 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-                      Visual-first
-                    </div>
-                  </div>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                    {orchestrationNodes.map((node, index) => (
-                      <div key={node.title} className="rounded-[1.2rem] border border-white/10 bg-white/8 px-4 py-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-slate-950">
-                            {index + 1}
-                          </div>
-                          <div className="text-sm font-semibold text-white">{node.title}</div>
-                        </div>
-                        <div className="mt-2 text-sm leading-6 text-white/80">{node.body}</div>
-                      </div>
-                    ))}
-                  </div>
-                </SectionCard>
               </div>
             </div>
           </div>

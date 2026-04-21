@@ -299,6 +299,19 @@ async function openAssistant(page: Parameters<typeof test>[0]['page']) {
   await page.waitForTimeout(250);
 }
 
+async function openProductAssistant(page: Parameters<typeof test>[0]['page']) {
+  await page.goto('/product');
+  await expect(page.locator('#assistant-chat-input')).toBeVisible();
+  await page.waitForTimeout(250);
+}
+
+function getVisibleMatchCard(
+  page: Parameters<typeof test>[0]['page'],
+  text: string,
+) {
+  return page.locator('button:visible, article:visible').filter({ hasText: text }).first();
+}
+
 async function submitAssistantQuery(
   page: Parameters<typeof test>[0]['page'],
   query: string,
@@ -650,6 +663,657 @@ test.describe('public assistant rollout smoke', () => {
     );
   });
 
+  test('live-read near-me search keeps location warning visible and suppresses unrelated legacy shortlist noise @live-read', async ({
+    page,
+  }) => {
+    const legacyRestaurantNoise = {
+      ...legacyService,
+      id: 'legacy-restaurant',
+      name: 'Restaurant Table Booking',
+      category: 'Food and Beverage',
+      summary: 'Legacy restaurant result that should stay hidden when live-read blocks display.',
+      venue_name: 'Riverside Dining Room',
+      location: 'Southbank VIC 3006',
+      tags: ['restaurant'],
+    };
+    const legacyCafeNoise = {
+      ...legacyService,
+      id: 'legacy-cafe',
+      name: 'Cafe Group Booking',
+      category: 'Food and Beverage',
+      summary: 'Legacy cafe result that should stay hidden when location permission is missing.',
+      venue_name: 'Grounded Social Cafe',
+      location: 'West End QLD 4101',
+      tags: ['cafe'],
+    };
+    const legacyCateringNoise = {
+      ...legacyService,
+      id: 'legacy-catering',
+      name: 'Catering Enquiry and Quote',
+      category: 'Food and Beverage',
+      summary: 'Legacy catering result that should never appear for restaurant near me without location.',
+      venue_name: 'Harvest Catering Co.',
+      location: 'Sydney Olympic Park NSW 2127',
+      tags: ['catering'],
+    };
+
+    await page.route('**/api/booking-assistant/catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          business_email: 'hello@example.com',
+          stripe_enabled: false,
+          services: [legacyRestaurantNoise, legacyCafeNoise, legacyCateringNoise],
+        }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'Legacy search found several broad hospitality matches.',
+          matched_services: [legacyRestaurantNoise, legacyCafeNoise, legacyCateringNoise],
+          matched_events: [],
+          suggested_service_id: legacyRestaurantNoise.id,
+          should_request_location: false,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-near-me',
+            channel_session_id: 'chan-near-me',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-near-me',
+            candidates: [],
+            recommendations: [],
+            confidence: {
+              score: 0.42,
+              reason: 'Location permission is required for near-me matching.',
+              gating_state: 'needs_location',
+            },
+            warnings: [
+              'No strong relevant catalog candidates were found.',
+              'Location access is needed to find services near you.',
+            ],
+            booking_context: {
+              summary: 'near user location',
+            },
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.goto('/');
+    const homepageSearchInput = page
+      .locator('#bookedai-search-assistant')
+      .getByPlaceholder(/What service do you want to book today\?/i)
+      .first();
+    await expect(homepageSearchInput).toBeVisible({ timeout: 10000 });
+    await homepageSearchInput.fill('restaurant near me');
+    await homepageSearchInput.press('Enter');
+
+    const assistantPane = await getActiveAssistantPane(page);
+    await expect(assistantPane.getByText('Location access is needed to find services near you.')).toBeVisible();
+    await expect(assistantPane.getByText('Restaurant Table Booking')).toHaveCount(0);
+    await expect(assistantPane.getByText('Cafe Group Booking')).toHaveCount(0);
+    await expect(assistantPane.getByText('Catering Enquiry and Quote')).toHaveCount(0);
+    await expect(assistantPane.getByText(/BookedAI will prefer accuracy over showing a wrong-domain recommendation\./i)).toBeVisible();
+  });
+
+  test('live-read near-me searches stay empty and do not revive legacy noise across key service verticals @live-read', async ({
+    page,
+  }) => {
+    const scenarios = [
+      {
+        query: 'dentist near me',
+        warning: 'Location access is needed to find services near you.',
+        legacyServices: [
+          {
+            ...legacyService,
+            id: 'legacy-dental-checkup',
+            name: 'Dental Checkup',
+            category: 'Healthcare Service',
+            summary: 'Legacy dental result that should stay hidden without location permission.',
+            venue_name: 'CBD Dental Care',
+            location: 'Sydney CBD NSW 2000',
+            tags: ['dentist', 'checkup'],
+          },
+          {
+            ...legacyService,
+            id: 'legacy-housing-noise',
+            name: 'Auzland Housing Project Consultation',
+            category: 'Housing and Property',
+            summary: 'Wrong-domain legacy housing result that must never appear in dental near-me.',
+            venue_name: 'Auzland',
+            location: 'Melbourne VIC 3000',
+            tags: ['housing', 'property'],
+          },
+        ],
+        hiddenText: ['Dental Checkup', 'Auzland Housing Project Consultation'],
+      },
+      {
+        query: 'haircut near me',
+        warning: 'Location access is needed to find services near you.',
+        legacyServices: [
+          {
+            ...legacyService,
+            id: 'legacy-barber-cut',
+            name: 'Precision Barber Cut',
+            category: 'Salon',
+            summary: 'Legacy barber result that should stay hidden without location permission.',
+            venue_name: 'Precision Barber',
+            location: 'Sydney NSW 2000',
+            tags: ['haircut', 'barber'],
+          },
+          {
+            ...legacyService,
+            id: 'legacy-catering-noise-hair',
+            name: 'Catering Enquiry and Quote',
+            category: 'Food and Beverage',
+            summary: 'Wrong-domain catering result that must never appear in haircut near-me.',
+            venue_name: 'Harvest Catering Co.',
+            location: 'Sydney Olympic Park NSW 2127',
+            tags: ['catering'],
+          },
+        ],
+        hiddenText: ['Precision Barber Cut', 'Catering Enquiry and Quote'],
+      },
+      {
+        query: 'childcare near me',
+        warning: 'Location access is needed to find services near you.',
+        legacyServices: [
+          {
+            ...legacyService,
+            id: 'legacy-childcare-centre',
+            name: 'Occasional Childcare',
+            category: 'Kids Services',
+            summary: 'Legacy childcare result that should stay hidden without location permission.',
+            venue_name: 'City Childcare',
+            location: 'Sydney NSW 2000',
+            tags: ['childcare'],
+          },
+          {
+            ...legacyService,
+            id: 'legacy-membership-noise',
+            name: 'RSL Membership Renewal',
+            category: 'Membership and Community',
+            summary: 'Wrong-domain membership result that must never appear in childcare near-me.',
+            venue_name: 'City RSL Club',
+            location: 'Wollongong NSW 2500',
+            tags: ['membership'],
+          },
+        ],
+        hiddenText: ['Occasional Childcare', 'RSL Membership Renewal'],
+      },
+    ] as const;
+
+    for (const [index, scenario] of scenarios.entries()) {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+
+      await page.route('**/api/partners', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({ status: 'ok', items: [] }),
+        });
+      });
+
+      await page.route('**/api/booking-assistant/catalog', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            business_email: 'hello@example.com',
+            stripe_enabled: false,
+            services: scenario.legacyServices,
+          }),
+        });
+      });
+
+      await page.route('**/api/booking-assistant/chat', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            reply: 'Legacy search found broad service matches.',
+            matched_services: scenario.legacyServices,
+            matched_events: [],
+            suggested_service_id: scenario.legacyServices[0].id,
+            should_request_location: false,
+          }),
+        });
+      });
+
+      await page.route('**/api/v1/conversations/sessions', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            data: {
+              conversation_id: `conv-near-me-${index}`,
+              channel_session_id: `chan-near-me-${index}`,
+              capabilities: ['matching_search'],
+            },
+            meta: { version: 'v1', tenant_id: 'tenant-test' },
+          }),
+        });
+      });
+
+      await page.route('**/api/v1/matching/search', async (route) => {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            data: {
+              request_id: `match-near-me-${index}`,
+              candidates: [],
+              recommendations: [],
+              confidence: {
+                score: 0.42,
+                reason: 'Location permission is required for near-me matching.',
+                gating_state: 'needs_location',
+              },
+              warnings: [
+                'No strong relevant catalog candidates were found.',
+                scenario.warning,
+              ],
+              booking_context: {
+                summary: 'near user location',
+              },
+            },
+            meta: { version: 'v1', tenant_id: 'tenant-test' },
+          }),
+        });
+      });
+
+      await page.goto('/');
+      const homepageSearchInput = page
+        .locator('#bookedai-search-assistant')
+        .getByPlaceholder(/What service do you want to book today\?/i)
+        .first();
+      await expect(homepageSearchInput).toBeVisible({ timeout: 10000 });
+      await homepageSearchInput.fill(scenario.query);
+      await homepageSearchInput.press('Enter');
+
+      const assistantPane = await getActiveAssistantPane(page);
+      await expect(assistantPane.getByText(scenario.warning)).toBeVisible();
+      for (const hiddenText of scenario.hiddenText) {
+        await expect(assistantPane.getByText(hiddenText)).toHaveCount(0);
+      }
+      await expect(
+        assistantPane.getByText(/BookedAI will prefer accuracy over showing a wrong-domain recommendation\./i),
+      ).toBeVisible();
+    }
+  });
+
+  test('homepage runtime keeps chess near-me empty and chess Sydney results recommendation-led @live-read', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1200 });
+    const chessPilot = {
+      ...legacyService,
+      id: 'co-mai-hung-chess-sydney-pilot-group',
+      name: 'Kids Chess Class - Sydney Pilot',
+      category: 'Kids Services',
+      summary: 'Curated pilot chess class listing for Sydney families seeking beginner-friendly coaching.',
+      venue_name: 'Co Mai Hung Chess Class',
+      location: 'Sydney NSW',
+      booking_url: 'https://bookedai.au/?assistant=open',
+      tags: ['kids', 'children', 'chess', 'class', 'strategy', 'sydney'],
+      featured: true,
+    };
+    const swimNoise = {
+      ...legacyService,
+      id: 'future-swim-st-peters-kids-swimming-lessons',
+      name: 'Kids Swimming Lessons - St Peters',
+      category: 'Kids Services',
+      summary: 'Swim-school result that must not outrank or replace the chess result.',
+      venue_name: 'Future Swim St Peters',
+      location: 'Unit 3B, 1-7 Unwins Bridge Road, St Peters, Sydney NSW 2044',
+      booking_url: 'https://futureswim.com.au/locations/st-peters/',
+      tags: ['kids', 'children', 'swimming', 'sydney'],
+      featured: true,
+    };
+
+    await page.route('**/api/partners', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', items: [] }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          business_email: 'hello@example.com',
+          stripe_enabled: false,
+          services: [swimNoise, chessPilot],
+        }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'Legacy search found broad service matches.',
+          matched_services: [swimNoise, chessPilot],
+          matched_events: [],
+          suggested_service_id: swimNoise.id,
+          should_request_location: false,
+        }),
+      });
+    });
+
+    let requestCounter = 0;
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      requestCounter += 1;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: `conv-chess-${requestCounter}`,
+            channel_session_id: `chan-chess-${requestCounter}`,
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      const body = route.request().postDataJSON() as { query?: string };
+      const query = String(body.query ?? '').toLowerCase();
+      if (query.includes('near me')) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            status: 'ok',
+            data: {
+              request_id: 'match-chess-near-me',
+              candidates: [chessPilot, swimNoise].map((service) => ({
+                candidate_id: service.id,
+                provider_name: service.venue_name,
+                service_name: service.name,
+                source_type: 'service_catalog',
+                category: service.category,
+                location: service.location,
+                booking_url: service.booking_url,
+                explanation: service.summary,
+                featured: service.featured,
+                tags: service.tags,
+              })),
+              recommendations: [{ candidate_id: chessPilot.id, reason: 'Would be best if location were available.' }],
+              warnings: [
+                'No strong relevant catalog candidates were found.',
+                'Location access is needed to find services near you.',
+              ],
+              confidence: {
+                score: 0.41,
+                reason: 'Location permission is required for near-me matching.',
+                gating_state: 'needs_location',
+              },
+            },
+            meta: { version: 'v1', tenant_id: 'tenant-test' },
+          }),
+        });
+        return;
+      }
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-chess-sydney',
+            candidates: [swimNoise, chessPilot].map((service) => ({
+              candidate_id: service.id,
+              provider_name: service.venue_name,
+              service_name: service.name,
+              source_type: 'service_catalog',
+              category: service.category,
+              location: service.location,
+              booking_url: service.booking_url,
+              explanation: service.summary,
+              featured: service.featured,
+              tags: service.tags,
+            })),
+            recommendations: [{ candidate_id: chessPilot.id, reason: 'Direct chess match for the Sydney query.' }],
+            warnings: [],
+            confidence: {
+              score: 0.91,
+              reason: 'Strong chess match.',
+              gating_state: 'high',
+            },
+            semantic_assist: {
+              provider: 'openai',
+              provider_chain: ['openai'],
+              fallback_applied: false,
+              normalized_query: 'chess classes in sydney',
+              inferred_location: 'Sydney',
+              inferred_category: 'Kids Services',
+            },
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.goto('/');
+    const homepageSearchInput = await getActiveAssistantInput(page);
+    await expect(homepageSearchInput).toBeVisible({ timeout: 10000 });
+
+    await homepageSearchInput.fill('chess near me');
+    await homepageSearchInput.press('Enter');
+
+    const assistantPane = await getActiveAssistantPane(page);
+    await expect(assistantPane.getByText('Location access is needed to find services near you.')).toBeVisible();
+    await expect(assistantPane.getByText('Kids Chess Class - Sydney Pilot')).toHaveCount(0);
+    await expect(assistantPane.getByText('Kids Swimming Lessons - St Peters')).toHaveCount(0);
+    await expect(assistantPane.getByRole('link', { name: 'Book now' })).toHaveCount(0);
+
+    const refreshedHomepageSearchInput = page
+      .locator('#bookedai-search-assistant')
+      .getByPlaceholder(/What service do you want to book today\?/i)
+      .first();
+    await expect(refreshedHomepageSearchInput).toBeVisible({ timeout: 10000 });
+    await refreshedHomepageSearchInput.fill('chess classes in Sydney');
+    await refreshedHomepageSearchInput.press('Enter');
+
+    await expect(assistantPane.getByText('Kids Chess Class - Sydney Pilot', { exact: true }).first()).toBeVisible();
+    await expect(assistantPane.getByText('Kids Swimming Lessons - St Peters', { exact: true })).toHaveCount(0);
+    await expect(
+      page.locator('#bookedai-search-assistant').getByText('Co Mai Hung Chess Class', { exact: true }).first(),
+    ).toBeVisible();
+  });
+
+  test('homepage runtime only shows tenant-backed results when tenant content matches the current query intent @live-read', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1440, height: 1200 });
+    const chessTenant = {
+      ...legacyService,
+      id: 'tenant-chess-sydney',
+      name: 'Sydney Kids Chess Coaching',
+      category: 'Kids Services',
+      summary: 'Beginner and tournament chess lessons for children in Sydney.',
+      venue_name: 'Co Mai Hung Chess Class',
+      location: 'Sydney NSW',
+      booking_url: 'https://bookedai.au/?assistant=open',
+      tags: ['kids', 'children', 'chess', 'lesson', 'sydney'],
+      featured: true,
+    };
+    const tutorTenant = {
+      ...legacyService,
+      id: 'tenant-maths-sydney',
+      name: 'Sydney Maths Tutor',
+      category: 'Kids Services',
+      summary: 'After-school maths tutoring for primary and high-school students.',
+      venue_name: 'Harbour Tutors',
+      location: 'Sydney NSW',
+      booking_url: 'https://bookedai.au/?assistant=open',
+      tags: ['kids', 'children', 'maths', 'tutor', 'sydney'],
+      featured: true,
+    };
+    const swimTenant = {
+      ...legacyService,
+      id: 'tenant-swim-sydney',
+      name: 'Sydney Swim Lessons',
+      category: 'Kids Services',
+      summary: 'Small-group swimming lessons for children in Sydney.',
+      venue_name: 'Future Swim',
+      location: 'Sydney NSW',
+      booking_url: 'https://futureswim.com.au/book',
+      tags: ['kids', 'children', 'swimming', 'sydney'],
+      featured: true,
+    };
+
+    await page.route('**/api/partners', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', items: [] }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          business_email: 'hello@example.com',
+          stripe_enabled: false,
+          services: [swimTenant, tutorTenant, chessTenant],
+        }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'Legacy search found broad kids-service matches.',
+          matched_services: [swimTenant, tutorTenant, chessTenant],
+          matched_events: [],
+          suggested_service_id: swimTenant.id,
+          should_request_location: false,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-tenant-intent',
+            channel_session_id: 'chan-tenant-intent',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-tenant-intent',
+            candidates: [swimTenant, tutorTenant, chessTenant].map((service) => ({
+              candidate_id: service.id,
+              provider_name: service.venue_name,
+              service_name: service.name,
+              source_type: 'service_catalog',
+              category: service.category,
+              location: service.location,
+              booking_url: service.booking_url,
+              explanation: service.summary,
+              featured: service.featured,
+              tags: service.tags,
+            })),
+            recommendations: [],
+            warnings: [],
+            confidence: {
+              score: 0.88,
+              reason: 'Tenant-backed candidates are available.',
+              gating_state: 'high',
+            },
+            semantic_assist: {
+              provider: 'openai',
+              provider_chain: ['openai'],
+              fallback_applied: false,
+              normalized_query: 'chess lessons in sydney',
+              inferred_location: 'Sydney',
+              inferred_category: 'Kids Services',
+            },
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.goto('/');
+    const homepageSearchInput = await getActiveAssistantInput(page);
+    await expect(homepageSearchInput).toBeVisible({ timeout: 10000 });
+    await homepageSearchInput.fill('chess lessons in Sydney');
+    await homepageSearchInput.press('Enter');
+
+    const assistantPane = await getActiveAssistantPane(page);
+    await expect(assistantPane.getByText('Sydney Kids Chess Coaching', { exact: true }).first()).toBeVisible();
+    await expect(assistantPane.getByText('Sydney Maths Tutor', { exact: true })).toHaveCount(0);
+    await expect(assistantPane.getByText('Sydney Swim Lessons', { exact: true })).toHaveCount(0);
+    await expect(page.locator('#bookedai-search-assistant').getByText('Co Mai Hung Chess Class', { exact: true }).first()).toBeVisible();
+  });
+
   test('live-read no-result state does not rehydrate unrelated legacy matches into chat @live-read', async ({
     page,
   }) => {
@@ -955,6 +1619,14 @@ test.describe('public assistant rollout smoke', () => {
                 trust_signal: 'public_web_search',
                 is_preferred: false,
                 display_summary: 'Public web result for a nearby men’s haircut in Sydney.',
+                why_this_matches:
+                  'Matched men’s haircut intent in Sydney with a direct booking page.',
+                source_label: 'Sourced from the public web',
+                price_posture: 'Check provider site for final pricing',
+                booking_path_type: 'book_on_partner_site',
+                next_step: 'Open the provider booking page to confirm details.',
+                availability_state: 'availability_unknown',
+                booking_confidence: 'medium',
                 explanation:
                   'Public web search fallback matched the request when tenant catalog did not have a strong result.',
               },
@@ -1007,14 +1679,503 @@ test.describe('public assistant rollout smoke', () => {
     await openAssistant(page);
     await submitAssistantQuery(page, "Men's haircut in Sydney");
 
-    await expect(page.getByText("Men's Haircut", { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Precision Barber Sydney', { exact: true }).first()).toBeVisible();
+    const visibleMatchCard = page
+      .locator('button:visible, article:visible')
+      .filter({ hasText: "Men's Haircut" })
+      .first();
+    await expect(visibleMatchCard).toBeVisible();
+    await expect(visibleMatchCard).toContainText('Precision Barber Sydney');
+    await expect(visibleMatchCard).toContainText('Sourced from the public web');
+    await expect(visibleMatchCard).toContainText('Book online');
     await expect(page.getByText(legacyService.name, { exact: true })).toHaveCount(0);
     await expect(
       page.getByText(
         "I found 1 relevant result for men's haircut in sydney. Here are the top 1 to compare first.",
       ),
     ).toBeVisible();
+  });
+
+  test('product popup keeps tenant-first search truth aligned with query intent @live-read', async ({
+    page,
+  }) => {
+    const tenantChessService: ServiceCatalogItem = {
+      id: 'tenant-chess-sydney-pilot',
+      name: 'Kids Chess Class - Sydney Pilot',
+      category: 'Education',
+      summary: 'Curated Sydney chess class for kids.',
+      duration_minutes: 60,
+      amount_aud: 45,
+      image_url: null,
+      map_snapshot_url: null,
+      venue_name: 'Co Mai Hung Chess Class',
+      location: 'Sydney NSW',
+      map_url: 'https://maps.example.com/chess-sydney',
+      booking_url: null,
+      tags: ['chess', 'kids', 'sydney'],
+      featured: true,
+    };
+
+    await stubAssistantApis(page);
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'Legacy shortlist still carried unrelated rows.',
+          matched_services: [legacyService, unrelatedLegacyService],
+          matched_events: [],
+          suggested_service_id: legacyService.id,
+          should_request_location: false,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-popup-tenant',
+            channel_session_id: 'chan-popup-tenant',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-popup-tenant',
+            candidates: [
+              {
+                candidate_id: tenantChessService.id,
+                provider_name: tenantChessService.venue_name,
+                service_name: tenantChessService.name,
+                source_type: 'service_catalog',
+                category: tenantChessService.category,
+                summary: tenantChessService.summary,
+                venue_name: tenantChessService.venue_name,
+                location: tenantChessService.location,
+                booking_url: tenantChessService.booking_url,
+                map_url: tenantChessService.map_url,
+                amount_aud: tenantChessService.amount_aud,
+                duration_minutes: tenantChessService.duration_minutes,
+                distance_km: null,
+                match_score: 0.96,
+                trust_signal: 'tenant_catalog',
+                why_this_matches:
+                  'Matches the requested chess classes content in Sydney, so the tenant-backed result stays ahead of generic activity noise.',
+                source_label: 'From BookedAI tenant catalog',
+                price_posture: 'Price confirmed by tenant',
+                booking_path_type: 'request_callback',
+                next_step: 'Request a callback to confirm the most suitable class time.',
+                availability_state: 'available',
+                booking_confidence: 'high',
+                explanation:
+                  'Tenant catalog result matched the requested chess class topic and Sydney location.',
+              },
+            ],
+            recommendations: [
+              {
+                candidate_id: tenantChessService.id,
+                reason: 'Exact content and location match',
+                path_type: 'request_callback',
+              },
+            ],
+            confidence: {
+              score: 0.96,
+              reason: 'Strong tenant-backed chess match in the requested city.',
+              gating_state: 'high',
+            },
+            warnings: [],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/booking-trust/checks', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            availability_state: 'available',
+            verified: true,
+            booking_confidence: 'high',
+            booking_path_options: ['request_callback'],
+            warnings: [],
+            payment_allowed_now: false,
+            recommended_booking_path: 'request_callback',
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/bookings/path/resolve', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            path_type: 'request_callback',
+            trust_confidence: 'high',
+            warnings: [],
+            next_step: 'Request a callback to confirm the most suitable class time.',
+            payment_allowed_before_confirmation: false,
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await openProductAssistant(page);
+    await submitAssistantQuery(page, 'chess classes in Sydney');
+
+    const visibleMatchCard = getVisibleMatchCard(page, 'Kids Chess Class - Sydney Pilot');
+    await expect(visibleMatchCard).toBeVisible();
+    await expect(visibleMatchCard).toContainText('Co Mai Hung Chess Class');
+    await expect(visibleMatchCard).toContainText('From BookedAI tenant catalog');
+    await expect(visibleMatchCard).toContainText(
+      'Request a callback to confirm the most suitable class time.',
+    );
+    await expect(page.getByText('Legacy Barber Cut', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Legacy GP Clinic', { exact: true })).toHaveCount(0);
+  });
+
+  test('product popup shows sourced public web fallback without reviving legacy shortlist noise @live-read', async ({
+    page,
+  }) => {
+    await stubAssistantApis(page);
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'Legacy shortlist still held an outdated barber row.',
+          matched_services: [legacyService],
+          matched_events: [],
+          suggested_service_id: legacyService.id,
+          should_request_location: false,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-popup-web',
+            channel_session_id: 'chan-popup-web',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-popup-web',
+            candidates: [
+              {
+                candidate_id: 'popup_web_haircut_1',
+                provider_name: 'Precision Barber Sydney',
+                service_name: "Men's Haircut",
+                source_type: 'public_web_search',
+                category: 'Salon',
+                summary: 'Public web result for a nearby men’s haircut in Sydney.',
+                venue_name: 'Precision Barber Sydney',
+                location: 'Sydney NSW',
+                booking_url: 'https://book.example.com/popup-web-haircut',
+                map_url: 'https://maps.example.com/popup-web-haircut',
+                amount_aud: null,
+                duration_minutes: null,
+                tags: ['public_web_search'],
+                featured: false,
+                distance_km: null,
+                match_score: 0.72,
+                trust_signal: 'public_web_search',
+                why_this_matches:
+                  'Matched men’s haircut intent in Sydney with a direct booking page.',
+                source_label: 'Sourced from the public web',
+                price_posture: 'Check provider site for final pricing',
+                booking_path_type: 'book_on_partner_site',
+                next_step: 'Open the provider booking page to confirm details.',
+                availability_state: 'availability_unknown',
+                booking_confidence: 'medium',
+                explanation:
+                  'Public web search fallback matched the request when tenant catalog did not have a strong result.',
+              },
+            ],
+            recommendations: [],
+            confidence: {
+              score: 0.72,
+              reason:
+                'No strong tenant catalog candidate was found, so BookedAI switched to sourced public web results.',
+              gating_state: 'medium',
+            },
+            warnings: [
+              'No strong tenant catalog candidates were found, so BookedAI is showing sourced public web options.',
+            ],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await openProductAssistant(page);
+    await submitAssistantQuery(page, "Men's haircut in Sydney");
+
+    const visibleMatchCard = getVisibleMatchCard(page, "Men's Haircut");
+    await expect(visibleMatchCard).toBeVisible();
+    await expect(visibleMatchCard).toContainText('Precision Barber Sydney');
+    await expect(visibleMatchCard).toContainText('Sourced from the public web');
+    await expect(visibleMatchCard).toContainText('Book online');
+    await expect(page.getByText('Legacy Barber Cut', { exact: true })).toHaveCount(0);
+  });
+
+  test('product popup keeps near-me warning visible and suppresses stale shortlist rows when location is unavailable @live-read', async ({
+    page,
+  }) => {
+    let trustRequests = 0;
+    let pathRequests = 0;
+
+    await page.addInitScript(() => {
+      Object.defineProperty(window.navigator, 'geolocation', {
+        configurable: true,
+        value: {
+          getCurrentPosition: (
+            _success: GeolocationPositionCallback,
+            error?: GeolocationPositionErrorCallback,
+          ) => {
+            error?.({
+              code: 1,
+              message: 'User denied Geolocation',
+              PERMISSION_DENIED: 1,
+              POSITION_UNAVAILABLE: 2,
+              TIMEOUT: 3,
+            } as GeolocationPositionError);
+          },
+        },
+      });
+    });
+
+    await stubAssistantApis(page);
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'Legacy fallback tried to keep a previous shortlist alive.',
+          matched_services: [legacyService, unrelatedLegacyService],
+          matched_events: [],
+          suggested_service_id: legacyService.id,
+          should_request_location: true,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-popup-near-me',
+            channel_session_id: 'chan-popup-near-me',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-popup-near-me',
+            candidates: [],
+            recommendations: [],
+            confidence: {
+              score: 0.12,
+              reason: 'Nearby intent requires device location before ranking local matches.',
+              gating_state: 'low',
+            },
+            warnings: ['Location access is needed before I can rank nearby matches.'],
+            semantic_assist: {
+              applied: true,
+              provider: 'openai',
+              provider_chain: ['openai'],
+              fallback_applied: false,
+              normalized_query: 'restaurant near me',
+              inferred_location: null,
+              inferred_category: 'Restaurant',
+              budget_summary: null,
+              evidence: ['near_me_detected'],
+            },
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/booking-trust/checks', async (route) => {
+      trustRequests += 1;
+      await route.abort();
+    });
+
+    await page.route('**/api/v1/bookings/path/resolve', async (route) => {
+      pathRequests += 1;
+      await route.abort();
+    });
+
+    await openProductAssistant(page);
+    await submitAssistantQuery(page, 'restaurant near me');
+
+    await expect(
+      page.getByText(
+        'Turn on location on this device so I can narrow nearby matches in real time instead of showing broad Australia-wide results.',
+      ).first(),
+    ).toBeVisible();
+    await expect(
+      page.getByText(
+        'I will rerun the nearby search as soon as location is available on this device.',
+      ),
+    ).toBeVisible();
+    await expect(page.getByText('Legacy Barber Cut', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Legacy GP Clinic', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Book now' })).toHaveCount(0);
+    expect(trustRequests).toBe(0);
+    expect(pathRequests).toBe(0);
+  });
+
+  test('product popup suppresses wrong-domain shortlist noise instead of showing a weak city-only match @live-read', async ({
+    page,
+  }) => {
+    let trustRequests = 0;
+    let pathRequests = 0;
+
+    await stubAssistantApis(page);
+
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          reply: 'Legacy shortlist drifted toward city-only matches.',
+          matched_services: [legacyService, unrelatedLegacyService],
+          matched_events: [],
+          suggested_service_id: legacyService.id,
+          should_request_location: false,
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-popup-domain-guard',
+            channel_session_id: 'chan-popup-domain-guard',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-popup-domain-guard',
+            candidates: [],
+            recommendations: [],
+            confidence: {
+              score: 0.19,
+              reason:
+                'The available city-only results do not satisfy the restaurant booking intent strongly enough.',
+              gating_state: 'low',
+            },
+            warnings: [
+              'BookedAI will prefer accuracy over showing a wrong-domain recommendation.',
+            ],
+            semantic_assist: {
+              applied: true,
+              provider: 'openai',
+              provider_chain: ['openai'],
+              fallback_applied: false,
+              normalized_query: 'restaurant in sydney',
+              inferred_location: 'Sydney',
+              inferred_category: 'Restaurant',
+              budget_summary: null,
+              evidence: ['wrong_domain_suppression'],
+            },
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/booking-trust/checks', async (route) => {
+      trustRequests += 1;
+      await route.abort();
+    });
+
+    await page.route('**/api/v1/bookings/path/resolve', async (route) => {
+      pathRequests += 1;
+      await route.abort();
+    });
+
+    await openProductAssistant(page);
+    await submitAssistantQuery(page, 'restaurant in Sydney');
+
+    await expect(
+      page.getByText('BookedAI will prefer accuracy over showing a wrong-domain recommendation.').first(),
+    ).toBeVisible();
+    await expect(page.getByText('Legacy Barber Cut', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Legacy GP Clinic', { exact: true })).toHaveCount(0);
+    await expect(page.getByRole('link', { name: 'Book now' })).toHaveCount(0);
+    expect(trustRequests).toBe(0);
+    expect(pathRequests).toBe(0);
   });
 
   test('near me asks for location just in time and clears stale shortlist state when location is unavailable @live-read', async ({

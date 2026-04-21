@@ -1,3 +1,5 @@
+import { useEffect, useRef } from 'react';
+
 import type { PricingConsultationResponse } from '../../../shared/contracts';
 import { SectionCard } from '../ui/SectionCard';
 import { SignalPill } from '../ui/SignalPill';
@@ -95,13 +97,30 @@ export function PricingConsultationModal({
   onNotesChange,
   formatConsultationDateTime,
 }: PricingConsultationModalProps) {
+  const modalBodyRef = useRef<HTMLDivElement | null>(null);
+  const customerNameInputRef = useRef<HTMLInputElement | null>(null);
+
+  useEffect(() => {
+    if (!isOpen || consultationStep !== 'contact') {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      modalBodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      customerNameInputRef.current?.focus();
+    }, 80);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [isOpen, consultationStep, formState.planId]);
+
   if (!isOpen) {
     return null;
   }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 px-4 py-6 backdrop-blur-sm">
-      <SectionCard className="relative max-h-[90vh] w-full max-w-3xl overflow-auto p-6 text-slate-700 sm:p-8">
+      <div ref={modalBodyRef} className="max-h-[90vh] w-full max-w-3xl overflow-auto">
+      <SectionCard className="relative p-6 text-slate-700 sm:p-8">
         <button
           type="button"
           onClick={onClose}
@@ -112,7 +131,7 @@ export function PricingConsultationModal({
 
         <div className="max-w-2xl">
           <SignalPill variant="brand" className="px-4 py-2 text-[11px]">
-            {flowMode === 'guided' ? 'Recommended package flow' : 'Plan booking flow'}
+            {flowMode === 'guided' ? 'Recommended package flow' : 'Package booking flow'}
           </SignalPill>
           <h3 className="template-title mt-5 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
             {consultationStep === 'contact'
@@ -125,7 +144,7 @@ export function PricingConsultationModal({
             {consultationStep === 'contact'
               ? 'Share the essentials first. We use them to prepare your setup path, trial offer, confirmation email, and performance-based commercial follow-up.'
               : consultationStep === 'calendar'
-                ? 'Your package details are captured. Pick the onboarding time and we will prepare calendar actions, email confirmation, and checkout for the plan you selected.'
+                ? 'Your package details are captured. Pick the onboarding time and we will prepare calendar actions, email confirmation, and checkout for the package you selected.'
                 : 'Your package flow is ready. You can add it to your calendar, continue to payment, or close and return to the homepage.'}
           </p>
         </div>
@@ -133,7 +152,7 @@ export function PricingConsultationModal({
         {consultationStep === 'contact' ? (
           <div className="mt-8 grid gap-5 sm:grid-cols-2">
             <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-slate-700">Selected plan</span>
+              <span className="text-sm font-medium text-slate-700">Selected package</span>
               <select
                 value={formState.planId}
                 onChange={(event) => onPlanChange(event.target.value as PlanId)}
@@ -161,6 +180,7 @@ export function PricingConsultationModal({
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-slate-700">Your name</span>
               <input
+                ref={customerNameInputRef}
                 type="text"
                 value={formState.customerName}
                 onChange={(event) => onCustomerNameChange(event.target.value)}
@@ -267,7 +287,7 @@ export function PricingConsultationModal({
               <button
                 type="button"
                 onClick={onContactContinue}
-                className="booked-button inline-flex items-center justify-center gap-2 px-5 py-4 text-sm font-semibold"
+                className="booked-button inline-flex items-center justify-center gap-2"
               >
                 Continue to installation calendar
                 <ArrowIcon />
@@ -297,7 +317,7 @@ export function PricingConsultationModal({
             </label>
 
             <label className="flex flex-col gap-2">
-              <span className="text-sm font-medium text-slate-700">Selected plan</span>
+              <span className="text-sm font-medium text-slate-700">Selected package</span>
               <input
                 value={`${selectedPlan.name} (${selectedPlan.price}/mo after ${formState.startupReferralEligible ? '3-month' : '30-day'} free subscription period)`}
                 readOnly
@@ -329,7 +349,7 @@ export function PricingConsultationModal({
                   onSetSubmitError('');
                   onSetConsultationStep('contact');
                 }}
-                className="booked-button-secondary inline-flex items-center justify-center gap-2 px-5 py-4 text-sm font-semibold"
+                className="booked-button-secondary inline-flex items-center justify-center gap-2"
               >
                 Back
               </button>
@@ -337,7 +357,7 @@ export function PricingConsultationModal({
                 type="submit"
                 disabled={isSubmitting}
                 aria-label="Book now and open payment + calendar"
-                className="booked-button inline-flex items-center justify-center gap-2 px-5 py-4 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-70"
+                className="booked-button inline-flex items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
               >
                 {isSubmitting ? 'Booking package flow...' : 'Confirm consultation and continue'}
                 <ArrowIcon />
@@ -350,7 +370,7 @@ export function PricingConsultationModal({
           <SectionCard tone="subtle" className="mt-8 p-5 sm:p-6">
             <div className="template-kicker text-sm">Package reserved</div>
             <div className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-              {result.plan_name} plan for {result.amount_label}
+              {(result.package_name || result.plan_name)} package for {result.amount_label}
             </div>
             <p className="mt-3 text-sm leading-6 text-[#2563eb]">{result.trial_summary}</p>
             <p className="mt-2 text-sm leading-6 text-slate-600">
@@ -446,6 +466,7 @@ export function PricingConsultationModal({
           </SectionCard>
         ) : null}
       </SectionCard>
+      </div>
     </div>
   );
 }

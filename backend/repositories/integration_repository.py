@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import json
+
 from sqlalchemy import text
 
 from repositories.base import BaseRepository
@@ -224,6 +226,104 @@ class IntegrationRepository(BaseRepository):
             {"tenant_id": tenant_id},
         )
         return [dict(row._mapping) for row in result]
+
+    async def upsert_connection(
+        self,
+        *,
+        tenant_id: str,
+        provider: str,
+        status: str,
+        sync_mode: str,
+        settings_json: dict[str, object] | None = None,
+    ) -> dict[str, object | None]:
+        normalized_provider = provider.strip().lower()
+        existing_result = await self.session.execute(
+            text(
+                """
+                select settings_json
+                from integration_connections
+                where tenant_id = cast(:tenant_id as uuid)
+                  and provider = :provider
+                limit 1
+                """
+            ),
+            {
+                "tenant_id": tenant_id,
+                "provider": normalized_provider,
+            },
+        )
+        existing_row = existing_result.mappings().first()
+        effective_settings = settings_json
+        if effective_settings is None:
+            existing_settings = existing_row.get("settings_json") if existing_row else None
+            effective_settings = dict(existing_settings) if isinstance(existing_settings, dict) else {}
+
+        if existing_row:
+            result = await self.session.execute(
+                text(
+                    """
+                    update integration_connections
+                    set
+                      status = :status,
+                      sync_mode = :sync_mode,
+                      settings_json = cast(:settings_json as jsonb),
+                      updated_at = now()
+                    where tenant_id = cast(:tenant_id as uuid)
+                      and provider = :provider
+                    returning
+                      provider,
+                      sync_mode,
+                      status,
+                      settings_json,
+                      updated_at,
+                      created_at
+                    """
+                ),
+                {
+                    "tenant_id": tenant_id,
+                    "provider": normalized_provider,
+                    "status": status,
+                    "sync_mode": sync_mode,
+                    "settings_json": json.dumps(effective_settings),
+                },
+            )
+        else:
+            result = await self.session.execute(
+                text(
+                    """
+                    insert into integration_connections (
+                      tenant_id,
+                      provider,
+                      sync_mode,
+                      status,
+                      settings_json
+                    )
+                    values (
+                      cast(:tenant_id as uuid),
+                      :provider,
+                      :sync_mode,
+                      :status,
+                      cast(:settings_json as jsonb)
+                    )
+                    returning
+                      provider,
+                      sync_mode,
+                      status,
+                      settings_json,
+                      updated_at,
+                      created_at
+                    """
+                ),
+                {
+                    "tenant_id": tenant_id,
+                    "provider": normalized_provider,
+                    "status": status,
+                    "sync_mode": sync_mode,
+                    "settings_json": json.dumps(effective_settings),
+                },
+            )
+        row = result.mappings().first()
+        return dict(row) if row else {}
 
     async def summarize_reconciliation(
         self,

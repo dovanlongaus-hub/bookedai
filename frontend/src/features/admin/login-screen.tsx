@@ -92,7 +92,7 @@ export function AdminLoginScreen({
               <button
                 type="submit"
                 disabled={!username || !password || loggingIn}
-                className="booked-button w-full px-5 py-3 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-60"
+                className="booked-button w-full disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {loggingIn ? 'Signing in...' : 'Sign in to admin'}
               </button>

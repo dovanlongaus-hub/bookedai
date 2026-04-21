@@ -9,6 +9,7 @@ REPORT_PATH="${REPORT_DIR}/release-rehearsal-${TIMESTAMP}.md"
 
 RUN_STACK_HEALTHCHECK=true
 RUN_BETA_HEALTHCHECK=false
+RUN_SEARCH_REPLAY_GATE=false
 BETA_BASE_URL="${BETA_BASE_URL:-https://beta.bookedai.au}"
 
 usage() {
@@ -18,6 +19,7 @@ Usage: ./scripts/run_release_rehearsal.sh [options]
 Options:
   --skip-stack-healthcheck   Skip local stack healthcheck after release gate
   --beta-healthcheck         Run beta healthcheck against BETA_BASE_URL
+  --search-replay-gate       Run the production-shaped search replay gate and include it in the report
   --beta-base-url URL        Override beta base URL (default: https://beta.bookedai.au)
   --help                     Show this help
 
@@ -36,6 +38,10 @@ while [[ $# -gt 0 ]]; do
       ;;
     --beta-healthcheck)
       RUN_BETA_HEALTHCHECK=true
+      shift
+      ;;
+    --search-replay-gate)
+      RUN_SEARCH_REPLAY_GATE=true
       shift
       ;;
     --beta-base-url)
@@ -63,10 +69,14 @@ mkdir -p "${REPORT_DIR}"
 release_gate_status="not_run"
 stack_health_status="skipped"
 beta_health_status="skipped"
+search_replay_status="skipped"
 decision="hold"
 decision_note="Release rehearsal did not finish."
 
 echo "[release-rehearsal] running root release gate"
+if [[ "${RUN_SEARCH_REPLAY_GATE}" == "true" ]]; then
+  export RUN_SEARCH_REPLAY_GATE=true
+fi
 if "${ROOT_DIR}/scripts/run_release_gate.sh"; then
   release_gate_status="passed"
 else
@@ -99,6 +109,16 @@ else
     fi
   fi
 
+  if [[ "${RUN_SEARCH_REPLAY_GATE}" == "true" ]]; then
+    if [[ "${release_gate_status}" == "passed" ]]; then
+      search_replay_status="passed"
+    else
+      search_replay_status="failed"
+      decision="hold"
+      decision_note="Root release gate failed while search replay gate was enabled. Do not promote until the search thresholds recover or the drift is explained."
+    fi
+  fi
+
   if [[ "${decision}" == "hold" && "${decision_note}" != "Release rehearsal did not finish." ]]; then
     :
   else
@@ -117,6 +137,7 @@ Date: \`${TIMESTAMP}\`
 - release gate: \`./scripts/run_release_gate.sh\`
 - local stack healthcheck: \`${RUN_STACK_HEALTHCHECK}\`
 - beta healthcheck: \`${RUN_BETA_HEALTHCHECK}\`
+- search replay gate: \`${RUN_SEARCH_REPLAY_GATE}\`
 - beta base url: \`${BETA_BASE_URL}\`
 
 ## Results
@@ -124,6 +145,7 @@ Date: \`${TIMESTAMP}\`
 - release gate: \`${release_gate_status}\`
 - local stack healthcheck: \`${stack_health_status}\`
 - beta healthcheck: \`${beta_health_status}\`
+- search replay gate: \`${search_replay_status}\`
 
 ## Decision
 

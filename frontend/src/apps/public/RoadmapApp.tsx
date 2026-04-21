@@ -100,7 +100,7 @@ export function RoadmapApp({ onStartTrial, onBookDemo }: RoadmapAppProps) {
   }
 
   return (
-    <main className="booked-shell bookedai-brand-shell booked-roadmap-shell relative overflow-hidden">
+    <main className="booked-shell booked-roadmap-shell relative overflow-hidden">
       <Header
         navItems={['Program Timeline', 'Architecture Streams', 'Execution Clusters', 'Sprint Sequence', 'Phase Planner']}
         onStartTrial={onStartTrial}
@@ -145,7 +145,7 @@ function RoadmapDetailLayout({
   children,
 }: RoadmapDetailLayoutProps) {
   return (
-    <main className="booked-shell bookedai-brand-shell booked-roadmap-shell relative overflow-hidden">
+    <main className="booked-shell booked-roadmap-shell relative overflow-hidden">
       <Header
         navItems={['Roadmap Detail']}
         onStartTrial={onStartTrial}

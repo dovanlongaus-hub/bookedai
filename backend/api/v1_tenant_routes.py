@@ -1,0 +1,35 @@
+from fastapi import APIRouter
+
+from api import v1_tenant_handlers as handlers
+
+
+router = APIRouter(prefix="/api/v1", tags=["v1-tenant"])
+
+router.add_api_route("/tenant/auth/google", handlers.tenant_google_auth, methods=["POST"])
+router.add_api_route("/tenant/auth/password", handlers.tenant_password_auth, methods=["POST"])
+router.add_api_route("/tenant/account/create", handlers.tenant_create_account, methods=["POST"])
+router.add_api_route("/tenant/account/claim", handlers.tenant_claim_account, methods=["POST"])
+router.add_api_route("/tenant/overview", handlers.tenant_overview, methods=["GET"])
+router.add_api_route("/tenant/bookings", handlers.tenant_bookings, methods=["GET"])
+router.add_api_route("/tenant/integrations", handlers.tenant_integrations, methods=["GET"])
+router.add_api_route("/tenant/integrations/providers/{provider}", handlers.tenant_integration_provider_update, methods=["PATCH"])
+router.add_api_route("/tenant/billing", handlers.tenant_billing, methods=["GET"])
+router.add_api_route("/tenant/billing/account", handlers.tenant_billing_account_update, methods=["PATCH"])
+router.add_api_route("/tenant/billing/subscription", handlers.tenant_billing_subscription_update, methods=["POST"])
+router.add_api_route("/tenant/billing/invoices/{invoice_id}/mark-paid", handlers.tenant_billing_invoice_mark_paid, methods=["POST"])
+router.add_api_route("/tenant/billing/invoices/{invoice_id}/receipt", handlers.tenant_billing_invoice_receipt, methods=["GET"])
+router.add_api_route("/tenant/onboarding", handlers.tenant_onboarding, methods=["GET"])
+router.add_api_route("/tenant/team", handlers.tenant_team, methods=["GET"])
+router.add_api_route("/tenant/profile", handlers.tenant_profile_update, methods=["PATCH"])
+router.add_api_route("/tenant/team/invite", handlers.tenant_team_invite, methods=["POST"])
+router.add_api_route("/tenant/team/members/{member_email}", handlers.tenant_team_member_update, methods=["PATCH"])
+router.add_api_route("/tenant/team/members/{member_email}/resend-invite", handlers.tenant_team_member_resend_invite, methods=["POST"])
+router.add_api_route("/tenant/catalog", handlers.tenant_catalog, methods=["GET"])
+router.add_api_route("/tenant/catalog/import-website", handlers.tenant_catalog_import_website, methods=["POST"])
+router.add_api_route("/tenant/catalog/{service_id}", handlers.tenant_catalog_update_service, methods=["PATCH"])
+router.add_api_route("/tenant/catalog/{service_id}/publish", handlers.tenant_catalog_publish_service, methods=["POST"])
+router.add_api_route("/tenant/catalog/{service_id}/archive", handlers.tenant_catalog_archive_service, methods=["POST"])
+router.add_api_route("/tenant/revenue-metrics", handlers.tenant_revenue_metrics, methods=["GET"])
+router.add_api_route("/portal/bookings/{booking_reference}", handlers.portal_booking_detail, methods=["GET"])
+router.add_api_route("/portal/bookings/{booking_reference}/reschedule-request", handlers.portal_booking_reschedule_request, methods=["POST"])
+router.add_api_route("/portal/bookings/{booking_reference}/cancel-request", handlers.portal_booking_cancel_request, methods=["POST"])

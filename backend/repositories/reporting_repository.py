@@ -61,6 +61,74 @@ class ReportingRepository(BaseRepository):
             "lifecycle_attention_count": int(row["lifecycle_attention_count"] or 0),
         }
 
+    async def get_revenue_capture_metrics(self, *, days: int = 30) -> dict:
+        """Return booking funnel and revenue capture stats for the revenue dashboard widget."""
+        result = await self.session.execute(
+            text(
+                """
+                with booking_sessions as (
+                  select
+                    count(*) as total_sessions,
+                    count(*) filter (where workflow_status = 'triggered') as confirmed_sessions
+                  from conversation_events
+                  where source = 'booking_assistant'
+                    and event_type = 'booking_session_created'
+                    and created_at >= now() - (:days || ' days')::interval
+                ),
+                revenue_data as (
+                  select
+                    coalesce(sum(amount_aud), 0) as total_revenue_aud,
+                    coalesce(avg(amount_aud), 0) as avg_booking_value_aud,
+                    count(*) as paid_bookings
+                  from payment_intents
+                  where status in ('paid', 'succeeded', 'completed')
+                    and created_at >= now() - (:days || ' days')::interval
+                ),
+                chat_sessions as (
+                  select count(distinct conversation_id) as chat_started
+                  from conversation_events
+                  where source = 'booking_assistant'
+                    and event_type = 'booking_session_created'
+                    and created_at >= now() - (:days || ' days')::interval
+                )
+                select
+                  bs.total_sessions,
+                  bs.confirmed_sessions,
+                  rd.total_revenue_aud,
+                  rd.avg_booking_value_aud,
+                  rd.paid_bookings,
+                  cs.chat_started
+                from booking_sessions bs, revenue_data rd, chat_sessions cs
+                """
+            ),
+            {"days": max(days, 1)},
+        )
+        row = result.mappings().one()
+        total_sessions = int(row["total_sessions"] or 0)
+        confirmed_sessions = int(row["confirmed_sessions"] or 0)
+        total_revenue_aud = float(row["total_revenue_aud"] or 0)
+        avg_booking_value_aud = float(row["avg_booking_value_aud"] or 0)
+        paid_bookings = int(row["paid_bookings"] or 0)
+
+        missed_sessions = max(total_sessions - confirmed_sessions, 0)
+        effective_avg = avg_booking_value_aud if avg_booking_value_aud > 0 else 120.0
+        missed_revenue_aud = missed_sessions * effective_avg
+        capture_rate_pct = (
+            round(confirmed_sessions / total_sessions * 100, 1) if total_sessions > 0 else 0.0
+        )
+
+        return {
+            "period_days": days,
+            "sessions_started": total_sessions,
+            "bookings_confirmed": confirmed_sessions,
+            "capture_rate_pct": capture_rate_pct,
+            "total_revenue_aud": total_revenue_aud,
+            "avg_booking_value_aud": effective_avg,
+            "paid_bookings": paid_bookings,
+            "missed_sessions": missed_sessions,
+            "missed_revenue_aud": missed_revenue_aud,
+        }
+
     async def list_recent_booking_intents(
         self,
         tenant_id: str,

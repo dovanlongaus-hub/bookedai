@@ -121,6 +121,7 @@ export interface StartChatSessionResponse {
 export interface V1BookingChannelContext {
   channel: ApiChannel;
   tenant_id?: string | null;
+  tenant_ref?: string | null;
   deployment_mode?: DeploymentMode | null;
   widget_id?: string | null;
 }
@@ -224,6 +225,25 @@ export interface SearchDiagnosticsSummary {
   droppedCandidates: SearchDiagnosticsDropSummary[];
 }
 
+export interface SearchQueryUnderstandingSummary {
+  normalizedQuery?: string | null;
+  inferredLocation?: string | null;
+  locationTerms: string[];
+  coreIntentTerms: string[];
+  expandedIntentTerms: string[];
+  constraintTerms: string[];
+  requestedCategory?: string | null;
+  budgetLimit?: number | null;
+  nearMeRequested: boolean;
+  isChatStyle: boolean;
+  requestedDate?: string | null;
+  requestedTime?: string | null;
+  scheduleHint?: string | null;
+  partySize?: number | null;
+  intentLabel?: string | null;
+  summary?: string | null;
+}
+
 export interface SearchCandidatesResponse {
   request_id: string;
   candidates: MatchCandidate[];
@@ -232,8 +252,108 @@ export interface SearchCandidatesResponse {
   warnings: string[];
   search_strategy?: string | null;
   booking_context?: BookingRequestContextSummary | null;
+  query_understanding?: SearchQueryUnderstandingSummary | null;
   semantic_assist?: SemanticAssistSummary | null;
   search_diagnostics?: SearchDiagnosticsSummary | null;
+}
+
+export interface PortalBookingAction {
+  id: string;
+  label: string;
+  description: string;
+  enabled: boolean;
+  style: 'primary' | 'secondary' | 'danger';
+  href?: string | null;
+  note?: string | null;
+}
+
+export interface PortalBookingTimelineItem {
+  id: string;
+  label: string;
+  detail: string;
+  tone: 'complete' | 'current' | 'upcoming';
+}
+
+export interface PortalBookingSummary {
+  booking_reference: string;
+  status: string;
+  created_at?: string | null;
+  requested_date?: string | null;
+  requested_time?: string | null;
+  timezone?: string | null;
+  booking_path?: string | null;
+  confidence_level?: string | null;
+  payment_dependency_state?: string | null;
+  notes?: string | null;
+}
+
+export interface PortalBookingCustomer {
+  full_name?: string | null;
+  email?: string | null;
+  phone?: string | null;
+}
+
+export interface PortalBookingService {
+  service_name?: string | null;
+  service_id?: string | null;
+  business_name?: string | null;
+  category?: string | null;
+  summary?: string | null;
+  duration_minutes?: number | null;
+  amount_aud?: number | null;
+  currency_code?: string | null;
+  display_price?: string | null;
+  venue_name?: string | null;
+  location?: string | null;
+  map_url?: string | null;
+  booking_url?: string | null;
+  image_url?: string | null;
+}
+
+export interface PortalBookingPayment {
+  status: string;
+  amount_aud?: number | null;
+  currency?: string | null;
+  payment_url?: string | null;
+}
+
+export interface PortalBookingSupport {
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  contact_label?: string | null;
+}
+
+export interface PortalBookingStatusSummary {
+  tone: 'healthy' | 'monitor' | 'attention';
+  title: string;
+  body: string;
+}
+
+export interface PortalBookingDetailResponse {
+  booking: PortalBookingSummary;
+  customer: PortalBookingCustomer;
+  service: PortalBookingService;
+  payment: PortalBookingPayment;
+  status_summary: PortalBookingStatusSummary;
+  allowed_actions: PortalBookingAction[];
+  support: PortalBookingSupport;
+  status_timeline: PortalBookingTimelineItem[];
+}
+
+export interface PortalBookingActionRequest {
+  customer_note?: string | null;
+  preferred_date?: string | null;
+  preferred_time?: string | null;
+  timezone?: string | null;
+}
+
+export interface PortalBookingActionResponse {
+  request_status: 'queued';
+  request_type: string;
+  booking_reference: string;
+  message: string;
+  support_email?: string | null;
+  outbox_event_id?: number | null;
 }
 
 export interface CheckAvailabilityRequest {
@@ -651,6 +771,148 @@ export interface TenantIntegrationsResponse {
   attention: IntegrationAttentionItem[];
   reconciliation: IntegrationReconciliationDetailsResponse;
   crm_retry_backlog: CrmRetryBacklogResponse;
+  controls?: {
+    available_statuses: string[];
+    available_sync_modes: string[];
+    operator_note: string;
+  };
+  access?: {
+    current_role: string;
+    can_manage_integrations: boolean;
+    write_mode: string;
+    operator_note: string;
+  };
+}
+
+export interface TenantBillingResponse {
+  tenant: TenantOverviewTenantProfile;
+  account: {
+    id?: string | null;
+    billing_email?: string | null;
+    merchant_mode?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+  };
+  subscription: {
+    id?: string | null;
+    billing_account_id?: string | null;
+    status: string;
+    package_code?: string | null;
+    plan_code?: string | null;
+    started_at?: string | null;
+    ended_at?: string | null;
+    created_at?: string | null;
+    updated_at?: string | null;
+    current_period_start?: string | null;
+    current_period_end?: string | null;
+    current_period_status?: string | null;
+  };
+  period_summary: {
+    total_periods: number;
+    open_periods: number;
+    closed_periods: number;
+    latest_status?: string | null;
+  };
+  periods: Array<{
+    id?: string | null;
+    period_start?: string | null;
+    period_end?: string | null;
+    status?: string | null;
+    created_at?: string | null;
+  }>;
+  collection: {
+    has_billing_account: boolean;
+    has_active_subscription: boolean;
+    can_charge: boolean;
+    operator_note: string;
+    recommended_action: string;
+  };
+  self_serve: {
+    billing_setup_complete: boolean;
+    payment_method_status: string;
+    trial_days: number;
+    trial_end_at?: string | null;
+    can_start_trial: boolean;
+    can_change_plan: boolean;
+    can_manage_billing: boolean;
+  };
+  payment_method: {
+    status: string;
+    provider_label?: string | null;
+    brand?: string | null;
+    last4?: string | null;
+    expires_label?: string | null;
+    note: string;
+  };
+  settings: {
+    billing_email?: string | null;
+    merchant_mode?: string | null;
+    invoice_delivery: string;
+    auto_renew: boolean;
+    support_tier: string;
+  };
+  invoices: Array<{
+    id: string;
+    invoice_number: string;
+    status: string;
+    amount_aud: number;
+    currency: string;
+    issued_at?: string | null;
+    due_at?: string | null;
+    period_start?: string | null;
+    period_end?: string | null;
+    receipt_available: boolean;
+    source: string;
+  }>;
+  invoice_summary: {
+    total_invoices: number;
+    open_invoices: number;
+    paid_invoices: number;
+    currency: string;
+  };
+  audit_trail: Array<{
+    id: string;
+    event_type: string;
+    entity_type?: string | null;
+    entity_id?: string | null;
+    actor_type?: string | null;
+    actor_id?: string | null;
+    created_at?: string | null;
+    summary: string;
+  }>;
+  plans: Array<{
+    code: string;
+    label: string;
+    price_label: string;
+    billing_interval: string;
+    description: string;
+    features: string[];
+    recommended: boolean;
+    is_current: boolean;
+    cta_label: string;
+  }>;
+  upcoming_capabilities: string[];
+}
+
+export interface TenantBillingReceiptResponse {
+  receipt_number: string;
+  invoice_id?: string | null;
+  invoice_number: string;
+  tenant_name: string;
+  status: string;
+  currency: string;
+  amount_aud: number;
+  issued_at?: string | null;
+  due_at?: string | null;
+  paid_at?: string | null;
+  billing_email?: string | null;
+  merchant_mode?: string | null;
+  line_items: Array<{
+    description: string;
+    amount_aud: number;
+  }>;
+  download_filename: string;
+  text: string;
 }
 
 export interface TenantUserProfile {
@@ -662,7 +924,7 @@ export interface TenantUserProfile {
 export interface TenantAuthSessionResponse {
   session_token: string;
   expires_at: string;
-  provider: 'google';
+  provider: 'google' | 'password';
   user: TenantUserProfile;
   tenant: TenantOverviewTenantProfile;
   capabilities: string[];
@@ -675,6 +937,148 @@ export interface TenantAuthSessionResponse {
   };
 }
 
+export interface TenantCreateAccountRequest {
+  business_name: string;
+  email: string;
+  username: string;
+  password: string;
+  full_name?: string | null;
+  industry?: string | null;
+  timezone?: string | null;
+  locale?: string | null;
+  tenant_slug?: string | null;
+}
+
+export interface TenantClaimAccountRequest {
+  tenant_ref: string;
+  email: string;
+  username: string;
+  password: string;
+  full_name?: string | null;
+}
+
+export interface TenantOnboardingResponse {
+  tenant: TenantOverviewTenantProfile;
+  progress: {
+    completed_steps: number;
+    total_steps: number;
+    percent: number;
+  };
+  steps: Array<{
+    id: string;
+    label: string;
+    status: string;
+    description: string;
+  }>;
+  checkpoints: {
+    catalog_records: number;
+    published_records: number;
+    has_billing_account: boolean;
+    has_active_subscription: boolean;
+  };
+  recommended_next_action: string;
+}
+
+export interface TenantTeamMember {
+  email: string;
+  full_name?: string | null;
+  role: string;
+  status: string;
+  auth_provider?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface TenantTeamResponse {
+  tenant: TenantOverviewTenantProfile;
+  summary: {
+    total_members: number;
+    active_members: number;
+    invited_members: number;
+    admin_members: number;
+    finance_members: number;
+  };
+  role_counts: Record<string, number>;
+  status_counts: Record<string, number>;
+  available_roles: Array<{
+    code: string;
+    label: string;
+    description: string;
+  }>;
+  access: {
+    current_role: string;
+    can_manage_team: boolean;
+    can_manage_billing: boolean;
+  };
+  invite_delivery?: {
+    status: string;
+    smtp_configured: boolean;
+    recipient_email: string;
+    role: string;
+    invite_url: string;
+    operator_note: string;
+  };
+  invite_activity?: Array<{
+    id: string;
+    event_type?: string | null;
+    created_at?: string | null;
+    actor_id?: string | null;
+    recipient_email?: string | null;
+    role?: string | null;
+    delivery_status?: string | null;
+    invite_url?: string | null;
+    summary: string;
+  }>;
+  members: TenantTeamMember[];
+}
+
+export interface TenantProfileUpdateRequest {
+  business_name?: string | null;
+  industry?: string | null;
+  timezone?: string | null;
+  locale?: string | null;
+  operator_full_name?: string | null;
+}
+
+export interface TenantProfileUpdateResponse {
+  tenant: TenantOverviewTenantProfile;
+  onboarding: TenantOnboardingResponse;
+}
+
+export interface TenantBillingAccountUpdateRequest {
+  billing_email?: string | null;
+  merchant_mode?: string | null;
+}
+
+export interface TenantSubscriptionUpdateRequest {
+  package_code: string;
+  plan_code?: string | null;
+  mode?: 'trial' | 'activate' | null;
+}
+
+export interface TenantBillingWorkspaceResponse {
+  billing: TenantBillingResponse;
+  onboarding: TenantOnboardingResponse;
+}
+
+export interface TenantInviteMemberRequest {
+  email: string;
+  full_name?: string | null;
+  role: string;
+}
+
+export interface TenantUpdateMemberAccessRequest {
+  role?: string | null;
+  status?: string | null;
+}
+
+export interface TenantIntegrationProviderUpdateRequest {
+  status?: string | null;
+  sync_mode?: string | null;
+}
+
+export interface TenantTeamInviteActionResponse extends TenantTeamResponse {}
+
 export interface TenantCatalogItem {
   id: number;
   service_id: string;
@@ -686,6 +1090,8 @@ export interface TenantCatalogItem {
   category?: string | null;
   summary?: string | null;
   amount_aud?: number | null;
+  currency_code?: string | null;
+  display_price?: string | null;
   duration_minutes?: number | null;
   venue_name?: string | null;
   location?: string | null;
@@ -723,6 +1129,16 @@ export interface TenantCatalogResponse {
 export interface TenantGoogleAuthRequest {
   id_token: string;
   tenant_ref?: string | null;
+  auth_intent?: 'sign-in' | 'create' | null;
+  business_name?: string | null;
+  industry?: string | null;
+  tenant_slug?: string | null;
+}
+
+export interface TenantPasswordAuthRequest {
+  username: string;
+  password: string;
+  tenant_ref?: string | null;
 }
 
 export interface TenantCatalogImportRequest {
@@ -741,6 +1157,8 @@ export interface TenantCatalogUpdateRequest {
   category?: string | null;
   summary?: string | null;
   amount_aud?: number | null;
+  currency_code?: string | null;
+  display_price?: string | null;
   duration_minutes?: number | null;
   venue_name?: string | null;
   location?: string | null;
@@ -749,4 +1167,16 @@ export interface TenantCatalogUpdateRequest {
   image_url?: string | null;
   tags?: string[];
   featured?: boolean | null;
+}
+
+export interface TenantRevenueMetrics {
+  period_days: number;
+  sessions_started: number;
+  bookings_confirmed: number;
+  capture_rate_pct: number;
+  total_revenue_aud: number;
+  avg_booking_value_aud: number;
+  paid_bookings: number;
+  missed_sessions: number;
+  missed_revenue_aud: number;
 }

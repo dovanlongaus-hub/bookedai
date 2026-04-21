@@ -182,3 +182,48 @@ class CatalogQualityServiceTestCase(TestCase):
         self.assertIn("hair", normalized["tags_json"])
         self.assertIn("brisbane", normalized["tags_json"])
         self.assertEqual(normalized["is_active"], 1)
+
+    def test_apply_catalog_quality_gate_accepts_display_price_without_amount_aud(self):
+        payload = {
+            "service_id": "chess-class-vnd",
+            "business_name": "Co Mai Hung Chess Class",
+            "name": "Private Chess Coaching Online 60 Minutes",
+            "category": "Kids Services",
+            "summary": "Private online chess coaching for children with tournament preparation.",
+            "amount_aud": None,
+            "currency_code": "VND",
+            "display_price": "1,040,000 VND / session",
+            "duration_minutes": 60,
+            "location": "Online",
+            "tags_json": ["kids", "children", "chess", "coaching"],
+            "is_active": 1,
+        }
+
+        normalized, warnings = apply_catalog_quality_gate(payload)
+
+        self.assertEqual(warnings, [])
+        self.assertEqual(normalized["is_active"], 1)
+        self.assertIn("kids", normalized["tags_json"])
+
+    def test_apply_catalog_quality_gate_accepts_curated_chess_pilot_row_for_sydney(self):
+        payload = {
+            "service_id": "co-mai-hung-chess-sydney-pilot-group",
+            "business_name": "Co Mai Hung Chess Class",
+            "name": "Kids Chess Class - Sydney Pilot",
+            "category": "Kids Services",
+            "summary": "Curated pilot chess class for Sydney families seeking tournament-aware coaching.",
+            "amount_aud": None,
+            "currency_code": "AUD",
+            "display_price": "Price confirmed during enquiry",
+            "duration_minutes": 60,
+            "location": "Sydney NSW",
+            "tags_json": ["kids", "children", "chess", "class", "strategy", "sydney"],
+            "is_active": 1,
+        }
+
+        normalized, warnings = apply_catalog_quality_gate(payload)
+
+        self.assertEqual(warnings, [])
+        self.assertEqual(normalized["is_active"], 1)
+        self.assertIn("kids", normalized["tags_json"])
+        self.assertIn("sydney", normalized["tags_json"])

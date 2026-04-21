@@ -103,6 +103,29 @@ Owns:
 - failure-state visibility
 - fallback and degraded-state tracking
 
+Current execution truth as of `2026-04-18`:
+
+- the live replay harness for public search now exists and is already being used against production
+- search diagnostics now expose enough state to classify `missing_catalog`, `blocked_by_gates`, and `public_web_search` outcomes
+- the current 7-case English production replay snapshot produced:
+- the initial 7-case English production replay snapshot produced:
+  - `web_fallback = 4`
+  - `missing_catalog = 2`
+  - `blocked_by_gates = 1`
+  - `tenant_hit = 0`
+- the replay corpus has since been extended with 5 production-validated tenant-positive cases, and a targeted tenant-positive run on `2026-04-18` confirmed:
+  - `tenant_hit = 5`
+  - `expectation_mismatches = 0`
+- this phase therefore already has a real replay loop in motion, but it still needs:
+  - explicit stability thresholds across repeated runs
+  - promote-or-hold rules tied to those replay buckets
+
+Current release-threshold baseline for the search lane:
+
+- tenant-positive cohort must remain `5/5 tenant_hit`
+- public-web fallback cohort must remain at or above `4/7` sourced fallback outcomes
+- both cohorts must keep `0` wrong-domain tenant leaks
+
 ## Workstream D - Release-gate and promote-or-hold discipline
 
 Owns:

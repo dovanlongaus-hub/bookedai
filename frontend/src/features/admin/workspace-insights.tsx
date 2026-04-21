@@ -5,6 +5,7 @@ type AdminWorkspaceInsightsProps = {
   activePanel: AdminWorkspacePanelId | null;
   bookingsTotal: number;
   shadowStatus: string;
+  portalSupportQueueCount: number;
   importedServicesCount: number;
   partnersCount: number;
   configItemsCount: number;
@@ -19,6 +20,7 @@ export function AdminWorkspaceInsights({
   activePanel,
   bookingsTotal,
   shadowStatus,
+  portalSupportQueueCount,
   importedServicesCount,
   partnersCount,
   configItemsCount,
@@ -39,9 +41,14 @@ export function AdminWorkspaceInsights({
         <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
           Triage bookings and move operators quickly into the next action
         </h2>
-        <div className="mt-5 grid gap-4 md:grid-cols-3">
+        <div className="mt-5 grid gap-4 md:grid-cols-4">
           <InsightCard label="Bookings workspace" value={`${bookingsTotal} visible`} detail="Current query and filter result set." />
           <InsightCard label="Shadow compare" value={shadowStatus} detail="Live-vs-shadow read posture for booking operations." />
+          <InsightCard
+            label="Support queue"
+            value={`${portalSupportQueueCount} queued`}
+            detail="Portal requests plus payment attention items visible to operators."
+          />
           <InsightCard
             label="Booking focus"
             value={selectedBookingReference ?? 'No booking selected'}
@@ -58,6 +65,11 @@ export function AdminWorkspaceInsights({
             label="Open selected booking panel"
             isActive={activePanel === 'selected-booking'}
             onClick={() => onPanelNavigate('selected-booking')}
+          />
+          <PanelLink
+            label="Open support queue"
+            isActive={activePanel === 'portal-support'}
+            onClick={() => onPanelNavigate('portal-support')}
           />
           <PanelLink
             label="Open recent events panel"

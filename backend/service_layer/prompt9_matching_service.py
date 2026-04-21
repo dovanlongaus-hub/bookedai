@@ -32,6 +32,26 @@ class BookingRequestContext:
     is_chat_style: bool = False
 
 
+@dataclass(frozen=True)
+class CanonicalQueryUnderstanding:
+    normalized_query: str | None
+    inferred_location: str | None
+    location_terms: tuple[str, ...]
+    core_intent_terms: tuple[str, ...]
+    expanded_intent_terms: tuple[str, ...]
+    constraint_terms: tuple[str, ...]
+    requested_category: str | None
+    budget_limit: float | None
+    near_me_requested: bool
+    is_chat_style: bool
+    requested_date: str | None
+    requested_time: str | None
+    schedule_hint: str | None
+    party_size: int | None
+    intent_label: str | None
+    summary: str | None
+
+
 MATCH_INTENT_EVIDENCE = {
     "exact_name_phrase",
     "exact_provider_phrase",
@@ -688,6 +708,70 @@ def extract_core_intent_terms(
     return tuple(ordered_terms[:limit])
 
 
+def build_canonical_query_understanding(
+    query: str | None,
+    *,
+    location_hint: str | None = None,
+    requested_category: str | None = None,
+    budget: dict[str, Any] | None = None,
+    time_window: dict[str, Any] | None = None,
+) -> CanonicalQueryUnderstanding:
+    normalized_query = _normalized_text(query) or None
+    inferred_location = extract_query_location_hint(query, location_hint)
+    booking_context = extract_booking_request_context(query, time_window)
+    core_intent_terms = extract_core_intent_terms(
+        query,
+        location_hint=inferred_location,
+        limit=6,
+    )
+    expanded_intent_terms = tuple(
+        sorted(
+            expand_topic_terms(
+                _topical_terms(query, location_hint=inferred_location),
+                query=query,
+            )
+        )
+    )
+    budget_limit = extract_query_budget_limit(query, budget)
+    normalized_requested_category = _string_or_none(requested_category)
+    constraint_terms: list[str] = []
+    if booking_context.party_size:
+        constraint_terms.append(f"party_size:{booking_context.party_size}")
+    if booking_context.requested_date:
+        constraint_terms.append(f"date:{booking_context.requested_date}")
+    if booking_context.requested_time:
+        constraint_terms.append(f"time:{booking_context.requested_time}")
+    if booking_context.schedule_hint:
+        constraint_terms.append(f"schedule:{booking_context.schedule_hint}")
+    if budget_limit is not None:
+        constraint_terms.append("budget_capped")
+    if normalized_requested_category:
+        constraint_terms.append(f"category:{_normalized_text(normalized_requested_category)}")
+    if booking_context.near_me_requested:
+        constraint_terms.append("near_me")
+    if booking_context.intent_label:
+        constraint_terms.append(f"intent:{booking_context.intent_label}")
+
+    return CanonicalQueryUnderstanding(
+        normalized_query=normalized_query,
+        inferred_location=inferred_location,
+        location_terms=tuple(sorted(_location_signals(inferred_location))),
+        core_intent_terms=core_intent_terms,
+        expanded_intent_terms=expanded_intent_terms,
+        constraint_terms=tuple(constraint_terms),
+        requested_category=normalized_requested_category,
+        budget_limit=budget_limit,
+        near_me_requested=booking_context.near_me_requested,
+        is_chat_style=booking_context.is_chat_style,
+        requested_date=booking_context.requested_date,
+        requested_time=booking_context.requested_time,
+        schedule_hint=booking_context.schedule_hint,
+        party_size=booking_context.party_size,
+        intent_label=booking_context.intent_label,
+        summary=booking_context.summary,
+    )
+
+
 def _topic_term_family(term: str) -> set[str]:
     normalized_term = _normalized_text(term)
     if not normalized_term:
@@ -853,6 +937,81 @@ def filter_ranked_matches_for_display_quality(
         display_matches.append(match)
 
     return display_matches
+
+
+def apply_deterministic_ranking_policy(
+    ranked_matches: list[RankedServiceMatch],
+    *,
+    query_understanding: CanonicalQueryUnderstanding | None = None,
+) -> list[RankedServiceMatch]:
+    if len(ranked_matches) <= 1:
+        return ranked_matches
+
+    location_terms = set((query_understanding.location_terms if query_understanding else ()) or ())
+
+    def _intent_bucket(match: RankedServiceMatch) -> int:
+        evidence = set(match.evidence)
+        if "requested_service_match" in evidence:
+            return 5
+        if "core_intent_full_match" in evidence or "exact_name_phrase" in evidence:
+            return 4
+        if "all_terms_in_name" in evidence or "all_terms_in_catalog" in evidence:
+            return 3
+        if "core_intent_partial_match" in evidence:
+            return 2
+        if evidence & {"name_overlap", "tag_overlap", "summary_overlap", "category_overlap"}:
+            return 1
+        return 0
+
+    def _location_bucket(match: RankedServiceMatch) -> int:
+        evidence = set(match.evidence)
+        if not location_terms:
+            return 0
+        service_location_terms = _service_location_terms(match)
+        if location_terms & service_location_terms:
+            return 2
+        if "location_mismatch" in evidence:
+            return 0
+        return 1
+
+    def _constraint_bucket(match: RankedServiceMatch) -> int:
+        evidence = set(match.evidence)
+        bucket = 0
+        if "within_budget" in evidence:
+            bucket += 2
+        if "over_budget" not in evidence:
+            bucket += 1
+        return bucket
+
+    def _booking_bucket(match: RankedServiceMatch) -> int:
+        return 1 if getattr(match.service, "booking_url", None) else 0
+
+    def _completeness_bucket(match: RankedServiceMatch) -> int:
+        service = match.service
+        completeness = 0
+        if _string_or_none(getattr(service, "summary", None)):
+            completeness += 1
+        if _string_or_none(getattr(service, "location", None)) or _string_or_none(getattr(service, "venue_name", None)):
+            completeness += 1
+        if getattr(service, "amount_aud", None) is not None or _string_or_none(getattr(service, "display_price", None)):
+            completeness += 1
+        if getattr(match, "semantic_score", None) is not None:
+            completeness += 1
+        return completeness
+
+    return sorted(
+        ranked_matches,
+        key=lambda match: (
+            _intent_bucket(match),
+            _location_bucket(match),
+            _constraint_bucket(match),
+            _booking_bucket(match),
+            _completeness_bucket(match),
+            match.score,
+            1 if getattr(match.service, "featured", 0) else 0,
+        ),
+        reverse=True,
+    )
 
 
 def rank_catalog_matches(

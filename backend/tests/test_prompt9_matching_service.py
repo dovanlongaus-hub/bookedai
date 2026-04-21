@@ -10,6 +10,8 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from service_layer.prompt9_matching_service import (
+    apply_deterministic_ranking_policy,
+    build_canonical_query_understanding,
     extract_booking_request_context,
     extract_query_budget_limit,
     extract_query_location_hint,
@@ -57,6 +59,80 @@ class Prompt9MatchingServiceTestCase(TestCase):
         self.assertEqual(context.schedule_hint, "tonight")
         self.assertEqual(context.intent_label, "ready_to_book")
         self.assertIn("for 8", context.summary or "")
+
+    def test_build_canonical_query_understanding_combines_intent_location_and_constraints(self):
+        understanding = build_canonical_query_understanding(
+            "Book a private dining room for 8 in South Bank tomorrow evening under $120",
+            requested_category="Restaurant",
+            budget={"max_aud": 120},
+            time_window={"date": "2026-04-20", "time": "18:00", "label": "tomorrow evening"},
+        )
+
+        self.assertEqual(
+            understanding.normalized_query,
+            "book a private dining room for 8 in south bank tomorrow evening under 120",
+        )
+        self.assertEqual(understanding.inferred_location, "South Bank")
+        self.assertIn("private", understanding.core_intent_terms)
+        self.assertIn("dining", understanding.expanded_intent_terms)
+        self.assertIn("metro:brisbane", understanding.location_terms)
+        self.assertIn("party_size:8", understanding.constraint_terms)
+        self.assertIn("schedule:tomorrow evening", understanding.constraint_terms)
+        self.assertIn("budget_capped", understanding.constraint_terms)
+        self.assertEqual(understanding.requested_category, "Restaurant")
+        self.assertEqual(understanding.budget_limit, 120.0)
+        self.assertEqual(understanding.intent_label, "ready_to_book")
+
+    def test_apply_deterministic_ranking_policy_prefers_direct_intent_before_featured_noise(self):
+        understanding = build_canonical_query_understanding(
+            "chess classes in Sydney",
+            location_hint="Sydney",
+        )
+        chess_match = RankedServiceMatch(
+            service=SimpleNamespace(
+                service_id="svc_chess",
+                name="Kids Chess Class - Sydney Pilot",
+                business_name="Co Mai Hung Chess Class",
+                summary="Structured chess lessons for kids in Sydney.",
+                location="Sydney NSW",
+                venue_name="Sydney Chess Studio",
+                amount_aud=35,
+                display_price="$35",
+                featured=0,
+                booking_url=None,
+            ),
+            score=0.74,
+            explanation="Direct chess class match in Sydney.",
+            trust_signal="strong_catalog_match",
+            is_preferred=False,
+            evidence=("core_intent_full_match", "name_overlap", "location_overlap"),
+        )
+        swim_noise = RankedServiceMatch(
+            service=SimpleNamespace(
+                service_id="svc_swim",
+                name="Kids Swim Program",
+                business_name="Future Swim",
+                summary="Featured swim lessons in Sydney.",
+                location="Sydney NSW",
+                venue_name="Future Swim Centre",
+                amount_aud=28,
+                display_price="$28",
+                featured=1,
+                booking_url="https://book.example.com/swim",
+            ),
+            score=0.78,
+            explanation="Featured kids activity in Sydney.",
+            trust_signal="partner_verified",
+            is_preferred=False,
+            evidence=("location_overlap",),
+        )
+
+        ranked = apply_deterministic_ranking_policy(
+            [swim_noise, chess_match],
+            query_understanding=understanding,
+        )
+
+        self.assertEqual([item.service.service_id for item in ranked], ["svc_chess", "svc_swim"])
 
     def test_rank_catalog_matches_prefers_exact_location_and_budget_fit(self):
         services = [

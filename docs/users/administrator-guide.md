@@ -10,6 +10,9 @@ Primary surfaces:
 
 - `admin.bookedai.au`
 - `api.bookedai.au`
+- `tenant.bookedai.au`
+- `portal.bookedai.au`
+- `upload.bookedai.au`
 - `n8n.bookedai.au`
 - `supabase.bookedai.au`
 - deployment scripts and host services
@@ -23,10 +26,12 @@ Administrators can:
 - log into the admin interface
 - review overview metrics
 - inspect bookings
+- review portal support queue items
 - inspect event timelines
 - send manual confirmation emails
 - manage partner profiles
 - import and delete service records
+- review service catalog quality exports
 - inspect selected configuration values
 - inspect API inventory
 
@@ -36,6 +41,7 @@ Administrators are responsible for:
 
 - AI provider configuration
 - n8n webhook configuration
+- session-signing secret management for admin and tenant surfaces
 - Stripe keys
 - Zoho Mail credentials
 - Zoho Calendar credentials
@@ -112,11 +118,29 @@ Before upgrading any admin-facing or infrastructure-facing behavior, administrat
 ## Failure Areas Administrators Must Watch
 
 - env mismatch between root `.env` and `supabase/.env`
+- missing or inconsistent `SESSION_SIGNING_SECRET`, `TENANT_SESSION_SIGNING_SECRET`, or `ADMIN_SESSION_SIGNING_SECRET`
 - certificate coverage mismatch across subdomains
 - broken webhook auth between backend and n8n
 - email credentials drift
 - stale service catalog after business changes
 - undocumented config changes causing operator confusion
+
+## Current backend route ownership
+
+The active backend router registration now splits top-level `/api` ownership across:
+
+- public catalog routes
+- upload routes
+- webhook routes
+- admin routes
+- communication routes
+- tenant routes
+
+Administrators should treat this as the current support and troubleshooting map when triaging route ownership or auth regressions.
+
+The remaining large mixed-surface backend file is still `backend/api/v1_routes.py`.
+
+That file is now an explicit carry-forward refactor target rather than an undocumented implementation detail.
 
 ## Documentation Maintenance Rule
 

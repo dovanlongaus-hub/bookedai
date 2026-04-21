@@ -126,10 +126,14 @@ The system should treat these as separate actor types:
 Current repo already confirms:
 
 - a custom admin login and signed admin bearer session in [backend/api/route_handlers.py](../../backend/api/route_handlers.py)
+- actor-specific session-signing preference in the current codebase:
+  - `ADMIN_SESSION_SIGNING_SECRET`
+  - `TENANT_SESSION_SIGNING_SECRET`
+  - shared fallback via `SESSION_SIGNING_SECRET`
 - a static `ADMIN_API_TOKEN` fallback in [backend/config.py](../../backend/config.py)
 - bearer-token protection for the n8n callback path
 - webhook signature verification seam for Tawk
-- Supabase environment values exist in config, but tenant auth is not yet wired end-to-end
+- Supabase environment values exist in config, and tenant auth is now partially wired end-to-end through the current tenant session model, but centralized actor claims and full multi-role closure are still incomplete
 
 Current repo does not confirm:
 

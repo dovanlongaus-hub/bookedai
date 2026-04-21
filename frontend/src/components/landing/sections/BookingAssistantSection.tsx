@@ -1059,25 +1059,25 @@ export function BookingAssistantSection({
               ))}
             </div>
 
-            <SectionCard tone="dark" className="mt-5 p-5">
+            <SectionCard className="mt-5 p-5">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7dd3fc]">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
                     Live-flow preview
                   </div>
-                  <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-white">
+                  <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">
                     Graphic-led product proof, not just a text demo.
                   </div>
                 </div>
-                <SignalPill variant="inverse" className="px-3 py-1 text-[10px] uppercase tracking-[0.14em]">
+                <SignalPill className="px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-[#1459c7]">
                   Interactive
                 </SignalPill>
               </div>
 
               <div className="mt-5 grid gap-3">
                 {previewSteps.map((step, index) => (
-                  <div key={step} className="flex items-center gap-3 rounded-[1.05rem] border border-white/10 bg-white/8 px-4 py-3 text-sm text-white/82">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-semibold text-slate-950">
+                  <div key={step} className="flex items-center gap-3 rounded-[1.05rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-3 text-sm text-black/72">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1d1d1f] text-[11px] font-semibold text-white">
                       {index + 1}
                     </div>
                     <div>{step}</div>
@@ -1087,7 +1087,7 @@ export function BookingAssistantSection({
 
               <div className="mt-5 flex flex-wrap gap-2">
                 {['Chat-first', 'Shortlist-ready', 'Booking-connected'].map((item) => (
-                  <SignalPill key={item} variant="inverse" className="px-3 py-1.5 text-[10px] uppercase tracking-[0.14em]">
+                  <SignalPill key={item} className="px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-[#1459c7]">
                     {item}
                   </SignalPill>
                 ))}
@@ -1096,7 +1096,7 @@ export function BookingAssistantSection({
               <button
                 type="button"
                 onClick={onOpenAssistant}
-                className="booked-button-secondary mt-6 w-full border-white/12 bg-white/8 px-5 py-3 text-sm font-semibold text-white hover:bg-white/12"
+                className="booked-button-secondary mt-6 w-full px-5 py-3 text-sm font-semibold"
               >
                 Open Full Assistant
               </button>
@@ -1245,7 +1245,7 @@ export function BookingAssistantSection({
                                     className="space-y-2"
                                     listClassName="grid gap-2"
                                     buttonLabel="More results"
-                                    buttonClassName="rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                                    buttonClassName="booked-button-secondary"
                                     emptyState={null}
                                     renderMeta={({ visibleCount, totalCount }) =>
                                       totalCount > CHAT_RESULT_BATCH_SIZE ? (
@@ -1372,7 +1372,7 @@ export function BookingAssistantSection({
                                     className="space-y-2"
                                     listClassName="grid gap-2"
                                     buttonLabel="More events"
-                                    buttonClassName="rounded-[1rem] border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                                    buttonClassName="booked-button-secondary"
                                     emptyState={null}
                                     renderMeta={({ visibleCount, totalCount }) =>
                                       totalCount > CHAT_RESULT_BATCH_SIZE ? (

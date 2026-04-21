@@ -41,32 +41,32 @@ export type ConsultationFormState = {
 };
 
 export const highlightPoints = [
-  '30 days of subscription free on every plan',
-  'online setup included for launch customers',
-  'simple monthly plans from A$79 with no long lock-in',
+  'Plans start from 49$+ for a faster first adoption',
+  'Entry package is designed for a clean, low-friction rollout',
+  'Pro and Pro Max add deeper automation while commission stays tied to real booked revenue',
 ];
 
 export const topOffers = [
   {
-    eyebrow: 'Start small',
-    title: 'Book now from A$79 per month',
-    body: 'Lower entry pricing makes it easier for SMEs to start without a heavy decision or a big upfront commitment.',
+    eyebrow: 'Starter',
+    title: 'Launch from 49$+ before moving into deeper automation',
+    body: 'Use the starter path when you want BookedAI live quickly on a lightweight booking surface before moving into a deeper revenue workflow.',
   },
   {
-    eyebrow: 'Keep it simple',
-    title: 'One monthly fee, clear setup path',
-    body: 'Most customers can launch online first. If you need onsite rollout, we quote it separately after we confirm your location and scope.',
+    eyebrow: 'Simple pricing',
+    title: 'Keep the first buying decision readable and low-friction',
+    body: 'The public offer is designed so SMEs can understand starting price, rollout scope, and upgrade path without a pricing maze.',
   },
 ];
 
 export const setupOptions = [
   {
     label: 'Online setup',
-    detail: 'Fastest option for most SMEs. Included for launch customers so you can get live quickly without extra setup friction.',
+    detail: 'Fastest option for most SMEs. Starting plans can launch from 49$+, with setup quoted separately when a rollout needs more scope.',
   },
   {
     label: 'Onsite setup',
-    detail: 'Available for more complex teams, multi-location rollouts, or in-person training. Quoted separately after address confirmation.',
+    detail: 'Available for more complex teams, multi-location rollouts, or in-person training. Quoted after scope confirmation.',
   },
 ];
 
@@ -74,100 +74,100 @@ export const plans: Plan[] = [
   {
     id: 'basic',
     name: 'Starter',
-    price: 'A$79',
-    subtitle: 'For smaller service businesses that want a clean, affordable first step.',
-    badge: 'Easy Start',
-    ctaLabel: 'Start Free',
-    introLabel: 'Lowest monthly price',
+    price: '49$+',
+    subtitle: 'Best for SMEs that want BookedAI live on a light customer-facing flow before committing to a deeper rollout.',
+    badge: 'Entry plan',
+    ctaLabel: 'Choose Starter',
+    introLabel: 'Start here',
     microcopy:
-      '30 days free, then a simple low monthly fee. Online setup is included for launch customers.',
+      'Use the starter plan to validate demand capture and fit before adding more automation, routing, and revenue logic.',
     supportingText:
-      'Best when you need faster replies, lead capture, and one clear booking path without a complicated rollout.',
+      'Best when you need a low-friction first step for website lead capture and a simple booking path at a clear starting price.',
     features: [
       'AI website chat',
-      'missed call SMS auto-reply',
-      'basic lead capture',
-      '1 business workflow',
-      '1 calendar integration',
-      'best fit for salons, tutors, clinics, and smaller trades teams',
+      'basic enquiry capture',
+      'simple booking handoff',
+      'starter activation path',
+      '1 lightweight service workflow',
+      'best for proving demand before rollout',
     ],
   },
   {
     id: 'standard',
-    name: 'Growth',
+    name: 'Pro',
     price: 'A$149',
-    subtitle: 'For growing local teams that want stronger automation without enterprise pricing.',
-    badge: 'Best Value',
-    ctaLabel: 'Book Most Popular',
-    introLabel: 'Most balanced plan',
+    subtitle: 'The default paid plan for SMEs that want stronger qualification, guided booking, and a clearer conversion engine.',
+    badge: 'Most popular',
+    ctaLabel: 'Choose Pro',
+    introLabel: 'Growth plan',
     microcopy:
-      '30 days free, then one predictable monthly price. Designed to be the easiest yes for busy SMEs.',
+      '1 month free after go-live, then one predictable monthly plan for SMEs that need BookedAI to convert more enquiries into bookings.',
     supportingText:
-      'Strong fit when bookings are regular and you need better qualification, follow-up, and conversion.',
+      'Strong fit for salons, clinics, tutors, swim schools, and growing service operators that need better follow-up and conversion.',
     features: [
-      'everything in Starter',
-      'AI answers inbound calls',
-      'guided booking flows',
-      '2-3 service journeys',
+      'everything in Freemium',
+      'missed call SMS auto-reply',
+      'guided booking flow',
       'SMS follow-up',
-      'weekly reporting',
+      'calendar integration',
+      'weekly performance reporting',
     ],
     featured: true,
   },
   {
     id: 'pro',
-    name: 'Pro',
-    price: 'A$249',
-    subtitle: 'For multi-location or more complex teams that need broader automation.',
-    badge: 'Advanced',
-    ctaLabel: 'Book Pro',
-    introLabel: 'More automation',
+    name: 'Pro Max',
+    price: 'A$349',
+    subtitle: 'For higher-volume or more complex SMEs that need broader automation, deeper qualification, and multi-service or multi-location support.',
+    badge: 'Advanced operations',
+    ctaLabel: 'Choose Pro Max',
+    introLabel: 'Scale plan',
     microcopy:
-      '30 days free. Built for operators who need more service logic, more locations, and deeper workflow support.',
+      '1 month free after go-live, then a higher-capability plan built for service businesses with more operational depth and revenue complexity.',
     supportingText:
-      'Strong fit for larger clinics, hospitality groups, education operators, and more complex trades workflows.',
+      'Best for multi-location clinics, hospitality groups, education operators, and service teams that need deeper automation and operational visibility.',
     features: [
-      'everything in Growth',
-      'advanced booking flows',
+      'everything in Pro',
+      'AI answers inbound calls',
+      'advanced booking and reminder automation',
       'multi-service and multi-location support',
-      'CRM integration',
-      'reminder automation',
-      'lead qualification dashboard',
+      'CRM or workflow integration',
+      'operator visibility dashboard',
     ],
   },
 ];
 
 export const recommendations: Recommendation[] = [
   {
-    label: 'Starter',
-    detail: 'Lowest risk',
+    label: 'Freemium',
+    detail: 'Start small',
   },
   {
-    label: 'Growth',
+    label: 'Pro',
     detail: 'Best value',
     featured: true,
   },
   {
-    label: 'Pro',
-    detail: 'Scale further',
+    label: 'Pro Max',
+    detail: 'Scale operations',
   },
 ];
 
 export const pricingSignals = [
   {
-    label: 'Starting point',
-    value: 'A$79/mo',
-    detail: 'Low-friction entry for service businesses',
+    label: 'Start here',
+    value: '49$+',
+    detail: 'Low-friction starting price for SMEs that want BookedAI live quickly',
   },
   {
-    label: 'Trial offer',
-    value: '30 days free',
-    detail: 'Move into rollout after confidence is clear',
+    label: 'Entry package',
+    value: 'Starter to Pro',
+    detail: 'Start from 49$+, then move into higher-capability plans as revenue operations deepen',
   },
   {
-    label: 'Rollout mode',
-    value: 'Online first',
-    detail: 'Onsite only when the business actually needs it',
+    label: 'Commercial model',
+    value: 'Setup fee + monthly + commission',
+    detail: 'Setup is quoted clearly, monthly plans stay predictable, and commission is only tied to real booked revenue',
   },
 ];
 
@@ -248,11 +248,12 @@ export function buildGoogleCalendarUrl(payload: PricingConsultationResponse) {
   }
 
   const end = new Date(start.getTime() + 30 * 60 * 1000);
+  const packageName = payload.package_name || payload.plan_name;
   const formatUtc = (value: Date) =>
     `${value.getUTCFullYear()}${`${value.getUTCMonth() + 1}`.padStart(2, '0')}${`${value.getUTCDate()}`.padStart(2, '0')}T${`${value.getUTCHours()}`.padStart(2, '0')}${`${value.getUTCMinutes()}`.padStart(2, '0')}${`${value.getUTCSeconds()}`.padStart(2, '0')}Z`;
 
   const details = [
-    `BookedAI ${payload.plan_name} onboarding`,
+    `BookedAI ${packageName} onboarding`,
     `Offer: ${payload.trial_summary}`,
     `Setup mode: ${payload.onboarding_mode === 'onsite' ? 'Onsite' : 'Online'}`,
     payload.meeting_join_url ? `Zoho meeting: ${payload.meeting_join_url}` : null,
@@ -264,7 +265,7 @@ export function buildGoogleCalendarUrl(payload: PricingConsultationResponse) {
 
   const params = new URLSearchParams({
     action: 'TEMPLATE',
-    text: `BookedAI ${payload.plan_name} consultation`,
+    text: `BookedAI ${packageName} consultation`,
     dates: `${formatUtc(start)}/${formatUtc(end)}`,
     details,
     location: payload.meeting_join_url || 'Online',
@@ -280,11 +281,12 @@ export function buildIcsDownloadUrl(payload: PricingConsultationResponse) {
   }
 
   const end = new Date(start.getTime() + 30 * 60 * 1000);
+  const packageName = payload.package_name || payload.plan_name;
   const formatUtc = (value: Date) =>
     `${value.getUTCFullYear()}${`${value.getUTCMonth() + 1}`.padStart(2, '0')}${`${value.getUTCDate()}`.padStart(2, '0')}T${`${value.getUTCHours()}`.padStart(2, '0')}${`${value.getUTCMinutes()}`.padStart(2, '0')}${`${value.getUTCSeconds()}`.padStart(2, '0')}Z`;
 
   const description = [
-    `BookedAI ${payload.plan_name} onboarding`,
+    `BookedAI ${packageName} onboarding`,
     `Offer: ${payload.trial_summary}`,
     `Setup mode: ${payload.onboarding_mode === 'onsite' ? 'Onsite' : 'Online'}`,
     payload.meeting_join_url ? `Zoho meeting: ${payload.meeting_join_url}` : null,
@@ -303,7 +305,7 @@ export function buildIcsDownloadUrl(payload: PricingConsultationResponse) {
     `DTSTAMP:${formatUtc(new Date())}`,
     `DTSTART:${formatUtc(start)}`,
     `DTEND:${formatUtc(end)}`,
-    `SUMMARY:BookedAI ${payload.plan_name} consultation`,
+    `SUMMARY:BookedAI ${packageName} consultation`,
     `DESCRIPTION:${description}`,
     `LOCATION:${payload.meeting_join_url || 'Online'}`,
     'END:VEVENT',

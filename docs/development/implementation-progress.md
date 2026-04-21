@@ -10,9 +10,143 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 ## Status Snapshot
 
-Date: `2026-04-18`
+Date: `2026-04-21`
+
+Planning and execution synchronization update from `2026-04-21`:
+
+- backend router registration is now split more explicitly in code: `backend/app.py` mounts `public_catalog_routes`, `upload_routes`, `webhook_routes`, `admin_routes`, `communication_routes`, and the bounded-context `v1_router`
+- `/api/v1/*` is now further decomposed under `backend/api/v1_router.py` into:
+  - `v1_booking_routes`
+  - `v1_search_routes`
+  - `v1_tenant_routes`
+  - `v1_communication_routes`
+  - `v1_integration_routes`
+- compatibility import shims were preserved for older route modules such as `public_routes`, `automation_routes`, and `email_routes`, so the refactor tightens ownership without breaking older imports immediately
+- current code still carries one major monolith in `backend/api/v1_routes.py`, but that file is now a shrinking legacy handler source instead of the only `/api/v1/*` ownership point
+- tenant extraction has already started in code through `backend/api/v1_tenant_handlers.py`
+- tenant and portal routes under `backend/api/v1_tenant_routes.py` are now fully rewired to `v1_tenant_handlers` instead of mixing new handlers with `v1_routes` legacy handlers
+- the extracted tenant and portal implementation set now includes:
+  - `tenant_google_auth`
+  - `tenant_password_auth`
+  - `tenant_create_account`
+  - `tenant_claim_account`
+  - `tenant_overview`
+  - `tenant_bookings`
+  - `tenant_integrations`
+  - `tenant_integration_provider_update`
+  - `tenant_billing`
+  - `tenant_billing_account_update`
+  - `tenant_billing_subscription_update`
+  - `tenant_billing_invoice_mark_paid`
+  - `tenant_billing_invoice_receipt`
+  - `tenant_onboarding`
+  - `tenant_team`
+  - `tenant_profile_update`
+  - `tenant_team_invite`
+  - `tenant_team_member_update`
+  - `tenant_team_member_resend_invite`
+  - `tenant_catalog`
+  - `tenant_catalog_import_website`
+  - `tenant_catalog_update_service`
+  - `tenant_catalog_publish_service`
+  - `tenant_catalog_archive_service`
+  - `portal_booking_detail`
+  - `portal_booking_reschedule_request`
+  - `portal_booking_cancel_request`
+- session-signing secrets are now separated by actor boundary in code and env docs:
+  - `SESSION_SIGNING_SECRET`
+  - `TENANT_SESSION_SIGNING_SECRET`
+  - `ADMIN_SESSION_SIGNING_SECRET`
+- admin and tenant sessions still preserve compatibility fallback through `ADMIN_API_TOKEN` and `ADMIN_PASSWORD`, and this compatibility posture is now documented as an intentional transition path rather than an implicit hidden dependency
+- central project documents were synchronized again on `2026-04-21` so roadmap, sprint, environment, backend-boundary, and master-index references now reflect the actual router split, session-secret split, and current carry-forward refactor backlog
+- the active docs baseline should no longer describe backend routing as one undifferentiated `/api` monolith only, and should no longer imply one shared actor-signing secret as the target state
+
+An additional technical review artifact was also added on `2026-04-21`:
+
+- `docs/development/codebase-review-2026-04-21.md`
+- this review captures the current architecture assessment, code-smell list, refactor priority matrix, and recommended next-sprint technical action plan based on the checked-in repo state after the router split and first tenant-handler extraction
+
+Carry-forward implementation truth after this pass:
+
+- top-level backend router ownership is cleaner and easier to evolve safely
+- bounded-context `/api/v1/*` router separation is now real in code, not just planned
+- the next backend cleanup target remains continued extraction from `backend/api/v1_routes.py`
+- that remaining split should move by context, not by arbitrary line-count slicing
+- the active extraction order is now:
+  - tenant auth and workspace completion
+  - portal actions
+  - integrations
+  - communications
+  - search and matching
+  - booking
+
+Verification snapshot from `2026-04-21`:
+
+- syntax verification passed for the new session-token, router, and tenant-handler modules via `python3 -m py_compile`
+- after the latest tenant extraction pass, `python3 -m py_compile backend/api/v1_tenant_handlers.py backend/api/v1_tenant_routes.py backend/api/v1_router.py backend/api/v1_routes.py backend/app.py` also passed
+- tenant and portal route tests have now been split out of the old monolith test file into:
+  - `backend/tests/test_api_v1_tenant_routes.py`
+  - `backend/tests/test_api_v1_portal_routes.py`
+- `backend/tests/test_api_v1_routes.py` now keeps the remaining non-tenant, non-portal route coverage instead of carrying every bounded context in one file
+- syntax verification also passed for the split test modules via `python3 -m py_compile backend/tests/test_api_v1_routes.py backend/tests/test_api_v1_tenant_routes.py backend/tests/test_api_v1_portal_routes.py`
+- direct pytest execution for the new split files is still blocked in the current shell because the available virtualenv Python environments do not currently provide the `pytest` module
+- route-related suites previously passed for:
+  - `backend/tests/test_admin_discord_handoff_routes.py`
+  - `backend/tests/test_whatsapp_webhook_routes.py`
+- app import smoke also passed after the router split
+- one broader regression lane remains open outside the router work:
+  - two `backend/tests/test_api_v1_routes.py` public-web fallback cases are still failing in the matching-search lane
+- this issue should remain explicit carry-forward work for Sprint 15 and Sprint 16 hardening rather than being left as an undocumented local test note
+
+Planning and execution synchronization update from `2026-04-19`:
+
+- the public homepage baseline was tightened again on `2026-04-20`: package language was corrected from the intermediate `GPI Pro` wording back to the user-facing `Pro` naming, so the live public stack now reads consistently as `Freemium`, `Pro`, and `Pro Max`
+- homepage conversion storytelling was compressed again on `2026-04-20`: hero, proof, pricing, trust, and CTA sections now use a shorter SME-first and investor-readable message hierarchy instead of the heavier repeated section phrasing that previously diluted the commercial narrative
+- the registration offer lane was synchronized in parallel on `2026-04-20`: user-facing offer choices now read `Freemium`, `Free Setup for First 10 SMEs`, `Pro`, `Pro Max`, and `Advance Customize`, while older `upgrade1-3` query aliases are still accepted for compatibility
+- project, roadmap, current-phase execution, sprint-package, and sprint-register documentation were updated again on `2026-04-20` so the latest homepage tightening, package vocabulary, and live deployment state are now recorded outside the codebase as inherited execution truth
+- the latest public-copy tightening and documentation synchronization pass was followed by another successful live production deployment on `2026-04-20` through `sudo bash scripts/deploy_production.sh`
+
+- the live homepage baseline advanced again on `2026-04-20`: `bookedai.au` now resolves to `frontend/src/apps/public/PublicApp.tsx` instead of the interim apex-domain `PitchDeckApp` routing, while `pitch.bookedai.au` and `/pitch-deck` remain the dedicated pitch surfaces
+- homepage information architecture was compressed again on `2026-04-20`: duplicated public sections were removed from the main shell, and the public flow now centers on `Hero -> Revenue Engine proof -> Deployment -> Pricing -> Proof/FAQ -> CTA`
+- homepage navigation and runtime linkage were tightened again on `2026-04-20`: the public menu now exposes direct paths for `Roadmap`, `Tenant`, `Admin Login`, plus `Google Register` and `Google Login` utility links routed through `tenant.bookedai.au`
+- product-trial routing was tightened again on `2026-04-20`: homepage primary trial CTAs now continue directly into `https://product.bookedai.au/` instead of treating sales-contact or register-interest as the first runtime destination
+- pricing language was rewritten again on `2026-04-20`: the old `Upgrade 1-3` vocabulary has been replaced in the live homepage stack with `Freemium`, `Pro`, and `Pro Max`, while the commercial model is now framed consistently as `setup fee + monthly + commission on real booked revenue`
+- launch-offer positioning was tightened in parallel on `2026-04-20`: the homepage and pricing surfaces now state `first 10 SMEs free online setup` plus `1 month free` on paid plans as the shared public acquisition offer
+- tenant auth entry was widened on `2026-04-20`: `TenantApp` now reads `?auth=create` and `?auth=sign-in` from the gateway URL so the new homepage Google register/login links land on the correct tenant auth mode instead of always defaulting to sign-in
+- the latest homepage, pricing, routing, and tenant-auth entry changes were built successfully with `npm run build` in `frontend/` and then redeployed live to the production stack on `2026-04-20`
+
+- the public-host split moved forward again on `2026-04-19`: homepage sales-deck CTA paths were tightened so `product demo` intent now routes to `https://product.bookedai.au/` instead of legacy mixed-shell entry points, while `https://demo.bookedai.au/` remains the lighter conversational demo surface
+- the homepage information architecture also widened on `2026-04-19`: the sales deck now includes an explicit `agent surface` section that explains the split between homepage conversion, the live product agent on `product.bookedai.au`, and the separate demo host, so users are less likely to fall back into older route assumptions
+- registration and roadmap continuity were tightened in parallel on `2026-04-19`: `RegisterInterestApp` and roadmap CTA fallbacks now send users to `product.bookedai.au` or `register-interest` directly instead of the earlier `/?demo=open` or assistant-open legacy shells
+- README, system-overview, and code-audit documentation were updated again on `2026-04-19` so central docs now list `product.bookedai.au` as a first-class production surface rather than leaving the product host implicit
+
+- the live public baseline changed materially again on `2026-04-19`: `bookedai.au` now resolves to the homepage sales-deck runtime instead of the earlier standalone search-first homepage runtime, and that host-level change was promoted live through the production `web` container after rebuild and verification
+- homepage conversion architecture moved forward again on `2026-04-19`: the sales deck now routes primary trial CTAs into the BookedAI-owned `register-interest` flow with explicit attribution plus launch-offer defaults, while `product` and `demo` remain the deeper proof surfaces instead of carrying homepage-primary conversion responsibility
+- homepage visual storytelling also moved forward on `2026-04-19`: the public sales deck now includes a dedicated flow-map section and CTA rail treatment so the route from traffic, to intent ranking, to booking and registration reads more visually and less like a sparse marketing shell
+- the product route advanced again on `2026-04-19`: `ProductApp` now surfaces direct `Start Free Trial` entry points that continue into `register-interest`, which means the live product experience now participates directly in the same conversion funnel as the homepage instead of acting only as a self-contained booking demo
+- booking-flow UX was tightened again on `2026-04-19`: `BookingAssistantDialog.tsx` now pushes the product flow directly into the booking-details step and focuses the customer form after a service is selected, rather than scrolling the user back through the panel chrome first
+- package-booking UX was tightened in parallel on `2026-04-19`: `PricingConsultationModal.tsx` now auto-focuses the contact form when the selected package changes or the contact step opens, so package selection leads directly into information entry instead of leaving the user to manually reposition
+- the latest public/product CTA and booking-focus improvements were built successfully with `npm run build` in `frontend/` and then redeployed live to the production `web` container on `2026-04-19`
+
+- homepage sales-deck polish moved forward again on `2026-04-19`: the public homepage now includes a dedicated offer strip under hero, cleaner utility navigation for pricing and product-demo access, an explicit `See Pricing` utility CTA in hero, and a tighter section sequence so the page reads more like a premium SME sales deck while still driving one dominant action into the BookedAI-owned `register-interest` flow
+- the homepage deployment story was also tightened on `2026-04-19`: implementation copy now explains the three approved deployment modes more directly, and the homepage CTA hierarchy now keeps `Start Free Trial` primary while treating sales-deck review and product-demo exploration as clearly secondary actions
+
+- a full plan-versus-code audit has now been recorded in `docs/development/project-plan-code-audit-2026-04-19.md`
+- the active code-aligned phase and sprint execution baseline is now `docs/architecture/current-phase-sprint-execution-plan.md`
+- later sprint planning should therefore stop treating the public search shell, tenant workspace, admin workspace, release-gate tooling, and tenant catalog publish workflow as not-yet-started concepts where working code already exists
+- the next execution emphasis is now explicitly narrowed to tenant identity completion, billing posture completion, tenant value visibility, and release-grade hardening across tenant and admin commercial workflows
+- an additional cross-surface productization plan is now active in `docs/architecture/user-surface-saas-upgrade-plan.md`, which adds mandatory upgrade tracks for public frontend UX, customer portal productization, tenant login UX, admin login UX, billing SaaS flows, and whole-system UI/UX harmonization
+- the next implementation wave is now also translated into an execution-ready delivery package at `docs/development/sprint-13-16-user-surface-delivery-package.md`, which breaks Sprint `13-16` down into concrete screens, API seams, backend work, and recommended build order for public, portal, tenant, admin, and billing surfaces
+- the first portal productization slice has now landed in code on `2026-04-19`: the shared frontend runtime now includes a dedicated `PortalApp` for `portal.bookedai.au`, `/api/v1/portal/bookings/{booking_reference}` now exposes a customer-safe booking review snapshot, and the first portal surface now shows booking summary, service context, payment state, support contact, timeline, and request-safe follow-up actions instead of treating the portal as a bare redirect target only
+- the portal lane then advanced again on `2026-04-19`: customer-facing `reschedule-request` and `cancel-request` endpoints now exist under `/api/v1/portal/bookings/{booking_reference}/...`, those requests are recorded through audit and outbox foundations for manual follow-up, and `PortalApp` now includes an in-product request composer so the portal behaves more like a real customer system and less like a read-only booking receipt
+- the portal lane advanced a third time on `2026-04-19`: portal booking detail now includes a status summary tuned for completed, cancelled, payment-attention, and in-review states; the customer timeline now surfaces recent portal reschedule/cancel requests from audit history; and the runtime now handles invalid-reference and closed-booking messaging more explicitly so the portal reads more like a production customer workspace than a single happy-path receipt screen
+- portal and admin operations are now linked more directly on `2026-04-19`: admin overview payloads now include a `portal_support_queue`, the operations workspace now shows recent portal reschedule/cancel requests with outbox posture plus quick booking-open actions, and the queue is backed by audit-log plus outbox joins instead of a UI-only placeholder so support follow-up can start from the real operator surface
+- the admin support lane advanced again on `2026-04-19`: portal support requests can now be marked `reviewed` or `escalated` directly from the admin operations workspace, those operator actions are recorded back into audit logs, and the queue read-model now surfaces latest internal resolution state so the portal support flow behaves more like a real support lifecycle than an unread task pile
+- the same admin support lane widened again on `2026-04-19`: the queue now also includes `payment attention` items sourced from `payment_intents` in failed or follow-up-required states, so operator review can start from one combined support-and-billing exception lane instead of splitting customer follow-up and payment troubleshooting across separate surfaces
 
 Current focus areas:
+
+- the tenant-product requirement baseline was tightened on `2026-04-18`: `tenant.bookedai.au` is now the approved canonical tenant gateway, and follow-on product planning must treat tenant sign-up, sign-in, data input, revenue reporting, subscription visibility, invoice handling, and billing actions as one unified paid-SaaS workspace rather than separate optional surfaces
 
 - the public search shell was tightened again on `2026-04-18` into a more professional workspace-style runtime: `PublicApp.tsx` now pairs a lighter top navigation and stronger hero search surface with a clearer handoff into `HomepageSearchExperience.tsx`
 - the standalone homepage search runtime was redesigned on `2026-04-18` around a structured `search workspace` model: summary header, dominant query bar, quick suggestion chips, shortlist meta row, upgraded result cards, and a dedicated booking rail that reads like an operator side panel instead of a generic landing block
@@ -41,6 +175,12 @@ Current focus areas:
 - Sprint 2 is now formally closed as an implemented and live inherited baseline: the closeout review, code-ready handoff, slice record, and Sprint 3 kickoff docs now agree that Sprint 2 should no longer be treated as an active blueprint-only sprint and that Sprint 3 must inherit the implemented branding, public CTA shell, assistant locality, and search-truth guardrails already closed out on `2026-04-18`
 - Sprint 3 kickoff now has an explicit control lane, a first-week board, and a fill-in kickoff note template, with the inherited browser smoke gate `bash scripts/run_live_read_smoke.sh` documented as the minimum clean-build gate before broad implementation fan-out
 - a live replay utility now exists at `scripts/run_matching_search_replay.py`, and the latest backend diagnostics hardening has now been deployed to both `backend` and `beta-backend` on `2026-04-18`; production replay now returns `search_diagnostics` live, and the latest retrieval hardening converts `kids haircut Sydney` into a clean safe no-result state with `retrieval_candidate_count = 0` instead of surfacing `blowdry-finish`, which confirms the mixed-result instability there has been removed
+- the search-quality lane moved forward again on `2026-04-18`: OpenAI `Responses API + web_search` is now the official live public fallback after tenant miss, unsupported request parameters were removed from the production payload, and direct live validation now confirms sourced fallback results for hospitality, dental, childcare, and private-dining queries while the current 7-case English replay snapshot classifies production outcomes as `web_fallback = 4`, `missing_catalog = 2`, `blocked_by_gates = 1`, and `tenant_hit = 0`
+- the replay lane also matured further on `2026-04-18`: `docs/development/english-search-replay-pack.json` now includes 5 production-validated tenant-positive cases, and a targeted harness run confirmed `tenant_hit = 5/5` with `expectation_mismatches = 0`, so replay now measures both tenant-backed truth and public-web fallback behavior instead of only tenant-miss scenarios
+- release discipline for this lane also tightened on `2026-04-18`: the search replay gate now has an explicit baseline threshold of `5/5 tenant_hit`, `0 expectation mismatches`, `>= 4/7` sourced public-web fallback outcomes, and `0` wrong-domain tenant leaks before the intelligent-search rollout should be treated as promote-ready
+- the gate is now executable through a dedicated command, `python3 scripts/run_search_replay_gate.py`, which writes promote-or-hold artifacts under `artifacts/search-replay-gate/`; `scripts/run_release_rehearsal.sh` can also include it through `--search-replay-gate` so release rehearsal captures search precision in the same pass
+- the root release gate now also supports `RUN_SEARCH_REPLAY_GATE=true`, so CI or a release machine can include the production-shaped search replay decision directly inside `scripts/run_release_gate.sh` instead of relying on a separate manual command
+- homepage search-state hardening also moved forward on `2026-04-18`: `HomepageSearchExperience.tsx` now treats live-read as the authority whenever it returns candidates or warnings, so `restaurant near me` no longer revives legacy hospitality rows when location permission is missing; targeted browser regressions now also cover `dentist near me`, `haircut near me`, and `childcare near me` to keep the homepage shortlist empty and warning-led in the same denied-location state
 - live replay on `2026-04-18` also confirms that `swimming Sydney` currently returns `retrieval_candidate_count = 0`, so the gap for that flow is no longer search-truth logic alone: production still needs real SME swim-school catalog rows, tenant-safe login or ownership plumbing, and a publishable searchable or bookable product path before the assistant can surface saved customer business data from the BookedAI database
 - a dedicated tenant onboarding and catalog-ingestion execution package now exists at `docs/development/sprint-8-tenant-catalog-onboarding-execution-package.md`, and the roadmap, sprint register, sprint 8 or 11 or 12 owner checklists, and Phase 7-8 package now explicitly treat Google sign-in, website or file import review, manual entry, publish-safe searchable rows, and the offline search corpus as a planned delivery lane rather than an implicit future idea
 
@@ -88,6 +228,7 @@ Current focus areas:
 - Sprint 9 tenant shell has now started shipping as release `1.0.4-tenant-shell`, with a read-only tenant runtime, tenant-scoped overview API, and footer source version updated again so this phase is visually distinct from the prior hero polish wave
 - Sprint 9 phase 2 now ships as release `1.0.5-tenant-panels`, extending the tenant shell into clustered `overview`, `bookings`, and `integrations` panels so the workspace reads like an operator console instead of one long dashboard
 - Sprint 9 tenant phase 3 now ships as release `1.0.6-tenant-catalog-workspace`, adding a workspace-first tenant catalog panel, Google sign-in for tenant-authenticated actions, and AI-guided website import tuned toward booking-critical fields such as product or service name, duration, location, price, description, imagery, and booking links
+- Sprint 9 tenant phase 4 now ships as release `1.0.7-tenant-publish-workflow`, adding persisted tenant membership, explicit catalog ownership fields, and the first tenant edit/publish/archive workflow for catalog rows
 - tenant catalog read models now surface search-ready counts, warning counts, inactive counts, and quality-warning detail so the tenant surface can manage searchable supply truth directly instead of relying only on admin-side imports
 - tenant Google-authenticated catalog import now writes into the BookedAI catalog path and immediately refreshes the tenant workspace, giving the tenant app its first controlled write-enabled workflow rather than remaining read-only
 - release rehearsal wrapper now writes promote-or-hold artifacts after the root gate
@@ -156,6 +297,45 @@ Current focus areas:
 - Playwright regression coverage now also locks the shared shortlist and action-footer semantics in both public live-read chat and admin Prompt 5 preview, so `top 3 + See more`, `Book now`, `Open Google map`, `View source`, and `Next action` drift will surface quickly during search-quality changes
 - tenant catalog ownership is now stronger than the earlier heuristic-only slice: Google sign-in creates a persisted tenant membership record, imported catalog rows now carry explicit `tenant_id` and `owner_email`, and publish rights can anchor to those records instead of only matching by email or business-name guesswork
 - tenant workspace now includes the first edit and publish-state workflow for catalog rows, with draft or review save behavior, explicit publish and archive actions, and imported website rows defaulting to review state instead of entering public search immediately
+- migration-ready SQL for this hardening lane now exists in `backend/migrations/sql/004_tenant_membership_and_catalog_publish_state.sql`, so the live ORM fallback and the planned additive schema path no longer diverge on tenant membership and catalog publish-state design
+- the repo now also includes `scripts/apply_backend_migrations.sh` plus `docs/development/backend-migration-apply-checklist.md`, so staging or shadow apply of migrations `001-004` has a concrete operator path instead of depending on ad hoc shell history
+- the release gate and migration lane now also have a lightweight schema-state verifier in `scripts/verify_backend_migration_state.sh`, and `scripts/run_release_gate.sh` can invoke it automatically when `DATABASE_URL` and `psql` are available
+- the tenant membership and publish-state rollout now also has a dedicated production-shadow rehearsal runbook in `docs/development/tenant-publish-production-shadow-rehearsal.md`, covering beta or shadow apply, tenant sign-in, import-to-review, edit, publish, archive, and public-search safety checks
+- the first official sample tenant from a real source document is now `co-mai-hung-chess-class`, seeded from `storage/uploads/documents/fe41/XesZr6pjpiOaMMduIhpspQ.pdf` via `backend/migrations/sql/005_co_mai_hung_chess_sample_tenant.sql`, with eight chess-class offerings loaded into review state
+- the second official tenant seed is now `future-swim`, sourced from verified `https://futureswim.com.au` website pages via `backend/migrations/sql/007_future_swim_official_tenant.sql`, with six published swim-school catalog rows covering Caringbah, Kirrawee, Leichhardt, Miranda, Rouse Hill, and St Peters
+- tenant app auth now also supports a lightweight username-password path for pilot tenants through `backend/migrations/sql/008_tenant_password_credentials_seed.sql` and `/api/v1/tenant/auth/password`, with seeded credentials `tenant1` for `co-mai-hung-chess-class` and `tenant2` for `future-swim`
+- a new reusable tenant-delivery requirements baseline now exists in `docs/development/tenant-implementation-requirements-framework.md`, defining how future branded tenant websites should inherit BookedAI platform behavior for tenant scope, assistant safety, lead capture, lifecycle messaging, CRM posture, and host activation
+- the Future Swim brief is now also normalized into a tenant-specific implementation reference at `docs/development/future-swim-tenant-use-case.md`, so later swim-school or kids-services tenants can inherit the same strict tenant-search policy, branded runtime approach, BookedAI receptionist model, and CRM-plus-email orchestration pattern without re-deriving the whole design from scratch
+- tenant operations now also have a reusable execution companion in `docs/development/tenant-onboarding-operations-checklist.md`, so future tenant launches can follow one consistent path from intake, to catalog setup, to assistant policy, to CRM/email readiness, to host activation instead of rebuilding ad hoc onboarding steps each time
+- the Future Swim rollout now also has a launch-specific execution runbook in `docs/development/future-swim-launch-runbook.md`, covering content approval, catalog verification, tenant-strict assistant checks, lead and booking smoke tests, DNS/cert activation, and go-live hold conditions for `futureswim.bookedai.au`
+- Future Swim now also has a dedicated content-approval pass in `docs/development/future-swim-content-copy-approval-checklist.md`, so brand tone, parent-facing copy, location truth, enquiry wording, and assistant language can be signed off before production promotion
+- production activation for Future Swim is now documented in `docs/development/future-swim-production-activation-pack.md`, and `.env.example` now includes `https://futureswim.bookedai.au` in default CORS plus Cloudflare DNS defaults so the tenant host is represented in the shared production-preparation baseline instead of living only in code and deploy scripts
+- the Future Swim production activation lane completed on `2026-04-21`: local `.env` was updated to use `futureswim@bookedai.au`, SMTP login for that mailbox was verified successfully, the Cloudflare DNS record for `futureswim.bookedai.au` was created and now resolves publicly with the existing wildcard TLS certificate, and a minimal clean-worktree rebuild of the active `bookedai` `web` plus `proxy` services promoted the host mapping live so `https://futureswim.bookedai.au/` now returns `HTTP 200` and `https://futureswim.bookedai.au/api/health` returns `{\"status\":\"ok\",\"service\":\"backend\"}`
+- the Zoho CRM lane for tenant rollouts advanced on `2026-04-21`: a reusable architecture reference now exists in `docs/architecture/zoho-crm-tenant-integration-blueprint.md`, and Future Swim now has a tenant-specific rollout reference plus a seeded `integration_connections` blueprint for provider `zoho_crm` in `write_back + paused` posture so the platform records the intended relationship model before live OAuth credentials are introduced
+- tenant portal phase progress moved forward again on `2026-04-18`: the backend now exposes `/api/v1/tenant/billing`, the frontend tenant workspace now includes a dedicated `Billing` panel, and the unified tenant gateway can now show billing account identity, subscription status, period history, and charge-readiness posture inside the same portal as login, catalog input, bookings, and integrations
+- execution planning for the next tenant-product wave was then made code-ready on `2026-04-19`: `docs/development/tenant-billing-auth-execution-package.md` now translates the canonical tenant-host requirement into a unified auth, onboarding, billing, value-reporting, and rollout package, while Sprint `13-16` owner checklists now also carry detailed technical backlog items for that lane instead of only high-level mission statements
+- the same tenant-product wave now also has a concrete slice map on `2026-04-19`: `docs/development/tenant-billing-auth-implementation-slices.md` breaks the lane into file-scoped execution slices `TB-S1` through `TB-S16`, with cleanup rules, sprint ordering, and owner boundaries so Sprint 13 can start from a code-ready backlog instead of re-planning the module split
+- Sprint 13 tenant foundation also moved from planning into code on `2026-04-19`: the backend now exposes `POST /api/v1/tenant/account/create`, `POST /api/v1/tenant/account/claim`, and `GET /api/v1/tenant/onboarding`, while the tenant portal now includes first-pass `sign in / create account / claim workspace` UX plus onboarding-progress visibility inside the same unified tenant workspace
+- tenant catalog pricing truth has now been extended again on `2026-04-18`: `currency_code` plus `display_price` now exist across schema, tenant API, tenant workspace editing, import guidance, and migration verification so non-AUD tenants can preserve real brochure or source-document pricing without forcing fake AUD conversion
+- the first official chess-class sample tenant now uses that pricing-truth lane directly through `backend/migrations/sql/006_tenant_catalog_currency_display_price.sql`, which backfills truthful `VND` display pricing for the seeded rows while keeping `amount_aud` compatibility for the older search stack where needed
+- this sample tenant still preserves one explicit carry-forward requirement: PDF-first onboarding can now represent non-AUD pricing truthfully inside tenant review, but public publish still needs stronger booking-path completeness and source-document review support before such rows should become publicly searchable
+- to make `tenant-first chess search` testable without breaking that policy, the migration pack now also includes `backend/migrations/sql/009_co_mai_hung_chess_published_pilot_row.sql`, which adds exactly one curated `Sydney` pilot row in `published` state while keeping the original eight brochure-derived rows in `review`
+- that migration was then applied on `2026-04-18`, and direct live validation against `https://api.bookedai.au/api/v1/matching/search` confirmed:
+  - `chess classes in Sydney` now returns `co-mai-hung-chess-sydney-pilot-group` from `service_catalog` with no public-web fallback needed
+  - `chess near me` still returns a safe empty result plus the location-permission warning, so the tenant-positive chess path did not weaken the denied-location safeguards
+- homepage runtime hardening then continued on `2026-04-18`: `HomepageSearchExperience.tsx` now respects recommendation-led live-read ordering, suppresses shortlist rendering entirely for `near me` queries when location permission is still missing, and applies a lightweight query-intent filter before rendering customer-visible cards so broad same-category noise does not outrank the requested service on the homepage surface
+- targeted browser regression now locks that chess behavior explicitly: `chess near me` must stay empty with the location warning, while `chess classes in Sydney` must keep `Kids Chess Class - Sydney Pilot` visible and suppress `Future Swim` noise in the homepage shortlist
+- search-priority hardening also moved forward again on `2026-04-18`: homepage shortlist ordering now uses `intent/content score first`, then `location fit`, so even when multiple tenant-backed rows share a broad category, only the rows whose content matches the user query should survive or win the visible ranking
+- the intelligent-search lane was then reviewed again on `2026-04-19` against the active code-aligned planning baseline, and a new consolidated requirement-plus-gap-plus-upgrade document now exists at `docs/development/intelligent-search-core-review-and-upgrade-plan-2026-04-19.md` so later search-core work can stay synchronized with the broader phase and sprint plan instead of living only in incremental tuning notes
+- the first implementation slice from that new review has now started on `2026-04-19`: `backend/service_layer/prompt9_matching_service.py` and `/api/v1/matching/search` now expose a canonical `query_understanding` payload, and the public homepage assistant has begun consuming backend-supplied intent terms before falling back to UI-only ranking heuristics
+- the next search-core slice also landed on `2026-04-19`: deterministic backend ranking is now applied after relevance and display gates, `/api/v1/matching/search` now emits catalog recommendations in backend-ranked top-3 order, and homepage regression coverage confirms the chess query path keeps direct-intent tenant results ahead of same-city activity noise
+- the search lane then moved into booking-decision detail shaping on `2026-04-19`: candidate payloads now include clearer result-detail fields such as `why_this_matches`, `source_label`, `price_posture`, `booking_path_type`, `next_step`, `availability_state`, and `booking_confidence`, and the shared shortlist card presenter now shows more of that truth directly on public result cards
+- popup assistant runtime hardening also advanced on `2026-04-19`: `BookingAssistantDialog.tsx` now treats live-read as the authoritative search path before any legacy fallback, preserves booking-decision detail metadata through popup normalization, and targeted Playwright coverage now locks the popup/product dialog for `tenant-first`, `public-web`, `near me`, and `wrong-domain suppression` search cases instead of leaving that surface protected only indirectly through homepage regressions
+- backend verification for the tenant pricing-truth lane is now stronger on `2026-04-18`: the repo-local `.venv-backend` executed `/home/dovanlong/BookedAI/.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes backend.tests.test_lifecycle_ops_service` successfully after bringing the lifecycle test fixture up to date with the current `Settings` contract
+- the root release gate was also corrected on `2026-04-18` so Playwright smoke suites build with the correct mode-specific public-assistant flags instead of reusing a stale shared `dist`; that fix restored the live-read authoritative-write smoke path and the homepage `near me -> location warning -> geo hint` smoke path
+- the current tenant currency-truth slice has now also been deployed live on `2026-04-18` through `sudo bash scripts/deploy_production.sh`; post-deploy health returned `{\"status\":\"ok\",\"service\":\"backend\"}`, and `https://bookedai.au` plus `https://api.bookedai.au` are serving from the refreshed production stack
+- the self-hosted Supabase app database was then reviewed directly on `2026-04-18` through `supabase-db` using TCP `psql` inside Docker, confirming that live production already contains `tenant_user_memberships`, the `tenant_id/owner_email/publish_state/currency_code/display_price` columns, the seeded `co-mai-hung-chess-class` tenant, and all `8` VND-priced chess-class rows in `review` state
+- migration helper tooling now also supports that environment explicitly: `scripts/apply_backend_migrations.sh` and `scripts/verify_backend_migration_state.sh` can fall back to `sudo docker exec supabase-db psql ...` when host-level `psql` is unavailable, and the verification helper now passes against the live Supabase-backed BookedAI database from the repo machine
 - Sprint S2 query normalization now also covers Brisbane precinct phrasing such as `Fortitude Valley` and `James Street`, plus higher-intent phrase aliases like `wedding hair`, `bridal hair`, `gp clinic`, and `medical clinic`, so search ranking stays closer to the customer request before semantic rerank is even applied
 - the fixed-query search eval pack now also covers Brisbane bridal-hair intent, giving the current search-quality lane `8/8` passing eval cases across skincare, housing, membership, kids services, signage suppression, and suburb-to-metro hair matching
 - Catalog Quality Agent rules now also normalize `bridal/wedding hair` into `Salon`, map `Castle Hill` into the Sydney metro tag set, and keep healthcare import synonyms aligned with the richer search query lane, so topic and location metadata stay consistent between seed/import data and runtime matching
@@ -829,6 +1009,26 @@ Current execution has also been running through a specialist multi-agent pattern
   - lane: `Sprint 3 landing rebuild`
   - update: added shared landing UI primitives in `frontend/src/components/landing/ui/*` and refactored `HeroSection`, `ProblemSection`, `SolutionSection`, and `CallToActionSection` onto reusable `SectionCard`, `SignalPill`, and `FeatureCard` patterns
   - verification: `npm run build` in `frontend/`
+- `2026-04-19`
+  - lane: `Sprint 14 tenant invite acceptance and catalog gates`
+  - update: upgraded the existing tenant claim flow so invited members can accept an invite and set their first password from the tenant portal, while catalog import, edit, publish, and archive actions are now restricted to `tenant_admin` and `operator` roles with matching read-only UX cues for finance-oriented users
+  - verification: `.venv/bin/pytest backend/tests/test_api_v1_routes.py -q`; `npm --prefix frontend run build`
+- `2026-04-19`
+  - lane: `Sprint 14 tenant access control`
+  - update: added a tenant `Team` workspace with team roster, invite flow, and member role or status updates, while backend now enforces role-aware billing permissions so only `tenant_admin` and `finance_manager` can change billing setup or plans and only `tenant_admin` can manage tenant roles
+  - verification: `.venv/bin/pytest backend/tests/test_api_v1_routes.py -q`; `npm --prefix frontend run build`
+- `2026-04-19`
+  - lane: `Sprint 14 tenant billing seams`
+  - update: extended the tenant billing workspace with truthful invoice history derived from subscription periods, payment-method readiness state, billing settings, and a recent audit timeline backed by `audit_logs`, while tenant profile, billing-account, and subscription writes now append explicit tenant audit entries for later support drill-ins
+  - verification: `.venv/bin/pytest backend/tests/test_api_v1_routes.py -q`; `npm --prefix frontend run build`
+- `2026-04-19`
+  - lane: `Sprint 13 tenant portal self-serve billing`
+  - update: extended the tenant billing tab from read-only status into a self-serve workspace with billing account setup, plan cards, and trial or plan-switch actions wired through new tenant billing account and subscription APIs, while keeping onboarding progress refreshed after each billing action
+  - verification: `.venv/bin/pytest backend/tests/test_api_v1_routes.py -q`; `npm --prefix frontend run build`
+- `2026-04-19`
+  - lane: `Sprint 13 tenant portal foundation`
+  - update: added `PATCH /api/v1/tenant/profile` so signed-in tenant operators can save workspace business basics and refresh onboarding state in one flow, and split the tenant portal auth/onboarding surfaces into feature-level modules to keep the portal ready for the next onboarding and billing slices
+  - verification: `.venv/bin/pytest backend/tests/test_api_v1_routes.py -q`; `npm --prefix frontend run build`
 - `2026-04-17`
   - lane: `Sprint 3 landing rebuild`
   - update: extended the same shared primitives into `ProductProofSection`, `TrustSection`, and the top narrative surfaces of `PricingSection` so the public landing path now shares a more consistent card and signal vocabulary without changing booking-flow logic
@@ -885,6 +1085,30 @@ Current execution has also been running through a specialist multi-agent pattern
   - lane: `Sprint 3 landing rebuild`
   - update: completed beta deploy acceptance for the refreshed landing by confirming `https://beta.bookedai.au` returned `HTTP/2 200`, `/api/health` returned `{"status":"ok","service":"backend"}`, and capturing desktop/mobile screenshots of the live `Pricing` and `CTA` surfaces for visual review
   - verification: reviewed `frontend/output/playwright/landing-qa/beta-pricing-desktop.png`, `frontend/output/playwright/landing-qa/beta-cta-desktop.png`, `frontend/output/playwright/landing-qa/beta-pricing-mobile.png`, and `frontend/output/playwright/landing-qa/beta-cta-mobile.png`
+- `2026-04-19`
+  - lane: `Tenant portal`
+  - update: added tenant invite delivery from the `Team` workspace, generating canonical `tenant.bookedai.au/<slug>` invite links with `Accept invite` query context, sending invite email when SMTP is configured, surfacing manual-link fallback when it is not, and upgrading tenant auth to prefill first-login invite details plus role-aware onboarding cues
+  - verification: `.venv/bin/pytest backend/tests/test_api_v1_routes.py -q`; `npm --prefix frontend run build`
+- `2026-04-19`
+  - lane: `Tenant portal`
+  - update: marked tenant `Integrations` as an explicit read-only monitoring surface by returning access metadata from `/api/v1/tenant/integrations` and reflecting the current role/write posture in the portal UI so permission boundaries stay truthful before integration write actions are introduced
+  - verification: `.venv/bin/pytest backend/tests/test_api_v1_routes.py -q`; `npm --prefix frontend run build`
+- `2026-04-19`
+  - lane: `Tenant portal`
+  - update: upgraded tenant integrations from read-only monitoring to first-write provider posture controls, adding role-gated provider status and sync-mode updates in the tenant portal for `tenant_admin` and `operator`, wiring authenticated integration access reads, and surfacing the new controls directly in the workspace
+  - verification: `.venv/bin/pytest backend/tests/test_api_v1_routes.py -q`; `npm --prefix frontend run build`
+- `2026-04-19`
+  - lane: `Tenant portal`
+  - update: expanded tenant team invite observability with recent invite audit activity in the team workspace so operators can trace invite delivery state, recipient, role, actor, and generated portal links from the same surface used to invite members
+  - verification: `.venv/bin/pytest backend/tests/test_api_v1_routes.py -q`; `npm --prefix frontend run build`
+- `2026-04-19`
+  - lane: `Tenant portal`
+  - update: extended the tenant invite lifecycle with admin-side `resend invite` actions in the team roster, a shared invite delivery helper for first-send and resend flows, and audit capture when an invited member activates the workspace so the tenant portal now records `invited`, `resent`, and `accepted` milestones
+  - verification: `.venv/bin/pytest backend/tests/test_api_v1_routes.py -q`; `npm --prefix frontend run build`
+- `2026-04-20`
+  - lane: `Tenant portal`
+  - update: added first invoice actions to the tenant billing workspace with backend routes for `mark paid` and `receipt` seams, wired download-ready receipt text generation from tenant billing state, and upgraded the billing UI so tenants can mark invoice seams paid and download a receipt file directly from the portal
+  - verification: `.venv/bin/pytest backend/tests/test_api_v1_routes.py -q`; `npm --prefix frontend run build`
 
 - [Project Documentation Root](../../project.md)
 - [Documentation Root](../README.md)

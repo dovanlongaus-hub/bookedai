@@ -42,16 +42,16 @@ export function SolutionSection({
         <SectionCard className="p-7 lg:p-8">
           <SectionHeading {...content} />
 
-          <SectionCard tone="dark" className="mt-8 p-5">
-            <SignalPill variant="inverse" className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]">
+          <SectionCard className="mt-8 p-5">
+            <SignalPill className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
               System view
             </SignalPill>
-            <div className="mt-3 text-xl font-semibold tracking-[-0.03em] text-white">
+            <div className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">
               The buyer sees a clean path. The business sees controlled conversion.
             </div>
             <div className="mt-5 grid gap-3">
               {systemViews.map((item) => (
-                <div key={item} className="rounded-[1.1rem] border border-white/10 bg-white/8 px-4 py-3 text-sm leading-6 text-white/84">
+                <div key={item} className="rounded-[1.1rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-3 text-sm leading-6 text-black/72">
                   {item}
                 </div>
               ))}

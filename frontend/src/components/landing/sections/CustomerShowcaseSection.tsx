@@ -13,15 +13,17 @@ export function CustomerShowcaseSection({
   products,
 }: CustomerShowcaseSectionProps) {
   const bookedAiProductHost = 'product.bookedai.au';
-  const bookedAiLandingDemoPath = '/?demo=open';
+  const bookedAiDemoHost = 'demo.bookedai.au';
   const getActionLabel = (href: string) => {
-    if (href === bookedAiLandingDemoPath) {
-      return 'View demo';
-    }
     try {
-      return new URL(href).hostname === bookedAiProductHost
-        ? 'View product'
-        : 'Visit customer product';
+      const hostname = new URL(href).hostname;
+      if (hostname === bookedAiProductHost) {
+        return 'View product';
+      }
+      if (hostname === bookedAiDemoHost) {
+        return 'View demo';
+      }
+      return 'Visit customer product';
     } catch {
       return 'Visit customer product';
     }
@@ -71,8 +73,8 @@ export function CustomerShowcaseSection({
                 </p>
                 <a
                   href={product.href}
-                  target={product.href === bookedAiLandingDemoPath ? undefined : '_blank'}
-                  rel={product.href === bookedAiLandingDemoPath ? undefined : 'noreferrer'}
+                  target="_blank"
+                  rel="noreferrer"
                   className="mt-auto pt-5 inline-flex text-sm font-semibold text-sky-700 transition hover:text-sky-800"
                 >
                   {getActionLabel(product.href)}

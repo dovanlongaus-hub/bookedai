@@ -37,10 +37,10 @@ export function ProductFlowShowcaseSection({ demo }: ProductFlowShowcaseSectionP
           <div className="max-w-3xl">
             <div className="template-kicker text-sm tracking-[0.14em]">Visual story</div>
             <h2 className="template-title mt-3 max-w-2xl text-3xl font-semibold text-[#1d1d1f] sm:text-4xl">
-              One visual path from intent to booking
+              One visual path from intent to booking-ready action
             </h2>
             <p className="template-body mt-4 max-w-2xl text-base leading-7">
-              Show the product like a sales deck: enquiry in, qualification, recommendation, booking-ready next step.
+              Show the product like a premium sales deck: enquiry in, qualification, recommendation, and a clear BookedAI-owned next step.
             </p>
 
             <div className="mt-6 grid gap-4">
@@ -146,7 +146,7 @@ export function ProductFlowShowcaseSection({ demo }: ProductFlowShowcaseSectionP
                       </div>
                       <button
                         type="button"
-                        className="booked-button w-full px-4 py-3 text-sm font-semibold"
+                        className="booked-button w-full"
                       >
                         {primaryResult.actionLabel}
                       </button>

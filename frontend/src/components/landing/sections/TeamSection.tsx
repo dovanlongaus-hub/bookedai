@@ -6,14 +6,39 @@ import { SignalPill } from '../ui/SignalPill';
 type TeamSectionProps = {
   content: SectionContent;
   members: TeamMember[];
+  onStartTrial?: () => void;
+  onBookDemo?: () => void;
 };
 
-export function TeamSection({ content, members }: TeamSectionProps) {
+export function TeamSection({
+  content,
+  members,
+  onStartTrial,
+  onBookDemo,
+}: TeamSectionProps) {
   return (
     <section id="team-members" className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-8 lg:py-16">
       <div className="grid gap-6 xl:grid-cols-[0.76fr_1.24fr] xl:items-start">
         <SectionCard className="p-7 lg:p-8">
-          <SectionHeading {...content} />
+          <SectionHeading
+            {...content}
+            actions={
+              onStartTrial || onBookDemo ? (
+                <div className="flex flex-wrap gap-3">
+                  {onStartTrial ? (
+                    <button type="button" onClick={onStartTrial} className="booked-button">
+                      Open Product Trial
+                    </button>
+                  ) : null}
+                  {onBookDemo ? (
+                    <button type="button" onClick={onBookDemo} className="booked-button-secondary">
+                      Talk to Sales
+                    </button>
+                  ) : null}
+                </div>
+              ) : null
+            }
+          />
 
           <div className="booked-note-surface mt-7 p-5">
             <div className="template-kicker text-[11px]">
@@ -33,6 +58,19 @@ export function TeamSection({ content, members }: TeamSectionProps) {
                 </div>
               ))}
             </div>
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-3">
+            {[
+              ['Founder-led', 'Commercial direction stays close to the product.'],
+              ['Technical depth', 'Backend, AI, systems, and workflow execution are grounded in real implementation.'],
+              ['Operational lens', 'The team understands service quality, support, and rollout reality.'],
+            ].map(([title, body]) => (
+              <SectionCard key={title} tone="subtle" className="rounded-[1.2rem] px-4 py-4">
+                <div className="text-sm font-semibold text-slate-950">{title}</div>
+                <div className="mt-2 text-sm leading-6 text-slate-600">{body}</div>
+              </SectionCard>
+            ))}
           </div>
         </SectionCard>
 

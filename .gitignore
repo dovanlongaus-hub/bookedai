@@ -1,15 +1,19 @@
 .env
+deploy/openclaw/.env
 .DS_Store
 __pycache__/
 *.pyc
 *.log
 .playwright-cli/
 .claude/
+.codex-tmp-venv/
 .venv*/
+.pytest_cache/
 artifacts/
 test-results/
 output/
 tmp/
+tmp_pg/
 storage/
 backend/storage/
 backend/__pycache__/
@@ -26,3 +30,5 @@ supabase/volumes/db/data/
 supabase/volumes/storage/
 node_modules
 .next/
+tsconfig.tsbuildinfo
+deploy/certbot/www/.well-known/acme-challenge/*

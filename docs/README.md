@@ -72,6 +72,8 @@ It separates documentation by:
 - [Folder Conventions](./development/folder-conventions.md)
 - [Environment Strategy](./development/env-strategy.md)
 - [Implementation Progress](./development/implementation-progress.md)
+- [Backend Boundaries](./development/backend-boundaries.md)
+- [Roadmap Sprint Document Register](./development/roadmap-sprint-document-register.md)
 - [Jira-Ready Delivery Structure](./development/jira-ready-delivery-structure.md)
 - [Notion Import-Ready Execution Backlog](./development/notion-import-ready-execution-backlog.md)
 - [Project-Wide Sprint Execution Checklist](./development/project-wide-sprint-execution-checklist.md)
@@ -94,7 +96,6 @@ It separates documentation by:
 - [Sprint 14 Owner Execution Checklist](./development/sprint-14-owner-execution-checklist.md)
 - [Sprint 15 Owner Execution Checklist](./development/sprint-15-owner-execution-checklist.md)
 - [Sprint 16 Owner Execution Checklist](./development/sprint-16-owner-execution-checklist.md)
-- [Backend Boundaries](./development/backend-boundaries.md)
 - [Rollout And Feature Flags](./development/rollout-feature-flags.md)
 - [Deployment Modes Notes](./development/deployment-modes-notes.md)
 
@@ -119,6 +120,14 @@ These six files together define the official current direction for:
 - CRM, email, billing, and reporting lifecycle design
 - repo and module boundaries
 - phased migration sequencing
+
+For active implementation truth and carry-forward planning, also treat this smaller set as mandatory:
+
+- `development/implementation-progress.md`
+- `development/backend-boundaries.md`
+- `development/env-strategy.md`
+- `development/roadmap-sprint-document-register.md`
+- `architecture/current-phase-sprint-execution-plan.md`
 
 ### Audience guides
 

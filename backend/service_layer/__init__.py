@@ -1,3 +1,16 @@
+from service_layer.booking_assistant_runtime import (
+    ServiceMatchInsight,
+    build_clarification_prompt,
+    build_effective_query,
+    curate_event_matches,
+    curate_service_matches,
+    filter_service_shortlist_for_category_intent,
+    match_services,
+    rank_services,
+    service_search_text,
+    should_match_services,
+    should_request_location,
+)
 from service_layer.booking_mirror_service import dual_write_booking_assistant_session
 from service_layer.booking_mirror_service import (
     dual_write_demo_request,
@@ -5,12 +18,31 @@ from service_layer.booking_mirror_service import (
     sync_callback_status_to_mirrors,
 )
 from service_layer.admin_dashboard_service import (
+    apply_admin_portal_support_action,
     build_admin_booking_detail_payload,
     build_admin_bookings_payload,
     build_admin_bookings_shadow_summary,
     build_admin_overview_payload,
     send_admin_booking_confirmation_email,
 )
+from service_layer.booking_assistant_runtime import (
+    build_clarification_prompt,
+    build_effective_query,
+    curate_event_matches,
+    curate_service_matches,
+    filter_service_shortlist_for_category_intent,
+    should_match_services,
+)
+from service_layer.calls_scheduling import (
+    build_customer_portal_url,
+    build_google_calendar_url,
+    build_qr_code_url,
+    create_zoho_calendar_event,
+    format_amount,
+    get_zoho_access_token,
+    zoho_calendar_configured,
+)
+from service_layer.catalog_assets import resolve_service_image_url
 from service_layer.catalog_quality_service import (
     apply_catalog_quality_gate,
     catalog_quality_warnings,
@@ -19,6 +51,22 @@ from service_layer.catalog_quality_service import (
 from service_layer.email_service import EmailService
 from service_layer.demo_workflow_service import submit_demo_brief, sync_demo_booking_from_brief
 from service_layer.event_store import store_event
+from service_layer.followup_copy import (
+    build_booking_customer_confirmation_text,
+    build_booking_internal_notification_text,
+    build_consultation_customer_confirmation_text,
+    build_consultation_internal_notification_text,
+    build_demo_customer_confirmation_text,
+    build_demo_internal_notification_text,
+    build_manual_followup_url,
+)
+from service_layer.geo_utils import (
+    build_geocode_query,
+    build_google_maps_url,
+    build_map_snapshot_url,
+    geocode_place_query,
+    haversine_km,
+)
 from service_layer.lifecycle_ops_service import (
     orchestrate_lead_capture,
     orchestrate_lifecycle_email,
@@ -28,6 +76,25 @@ from service_layer.lifecycle_ops_service import (
 )
 from service_layer.n8n_service import N8NService
 from service_layer.prompt9_matching_service import build_booking_trust_payload, rank_catalog_matches
+from service_layer.service_query_parsing import (
+    CATEGORY_KEYWORDS,
+    FOLLOW_UP_CONTEXT_TOKENS,
+    SERVICE_KEYWORD_SYNONYMS,
+    ServiceQuerySignals,
+    extract_preferred_locations_from_query,
+    extract_service_query_signals,
+    merge_service_query_signals,
+    tokenize_text,
+)
+from service_layer.website_import_utils import (
+    discover_product_pages,
+    discover_related_pages,
+    extract_search_result_urls,
+    extract_structured_services_from_html_pages,
+    extract_visible_text_from_html,
+    looks_like_url,
+    resolve_imported_service_image,
+)
 from service_layer.prompt9_semantic_search_service import Prompt9SemanticSearchService, SemanticSearchOutcome
 from service_layer.prompt11_integration_service import (
     build_integration_attention_items,
@@ -40,19 +107,62 @@ from service_layer.upload_service import save_uploaded_file
 __all__ = [
     "build_admin_booking_detail_payload",
     "build_admin_bookings_payload",
+    "build_clarification_prompt",
+    "build_effective_query",
+    "build_customer_portal_url",
+    "build_google_calendar_url",
+    "build_qr_code_url",
+    "create_zoho_calendar_event",
+    "curate_event_matches",
+    "curate_service_matches",
     "build_admin_bookings_shadow_summary",
+    "apply_admin_portal_support_action",
     "build_integration_attention_items",
     "build_admin_overview_payload",
     "apply_catalog_quality_gate",
     "catalog_quality_warnings",
     "derive_catalog_topic_tags",
+    "filter_service_shortlist_for_category_intent",
+    "format_amount",
+    "get_zoho_access_token",
+    "match_services",
+    "rank_services",
+    "resolve_service_image_url",
+    "discover_product_pages",
+    "discover_related_pages",
+    "extract_search_result_urls",
+    "extract_structured_services_from_html_pages",
+    "extract_visible_text_from_html",
+    "looks_like_url",
+    "resolve_imported_service_image",
     "dual_write_booking_assistant_session",
     "dual_write_demo_request",
     "dual_write_pricing_consultation",
     "send_admin_booking_confirmation_email",
     "EmailService",
     "N8NService",
+    "build_booking_customer_confirmation_text",
+    "build_booking_internal_notification_text",
+    "build_consultation_customer_confirmation_text",
+    "build_consultation_internal_notification_text",
+    "build_demo_customer_confirmation_text",
+    "build_demo_internal_notification_text",
+    "build_manual_followup_url",
+    "build_geocode_query",
+    "build_google_maps_url",
+    "build_map_snapshot_url",
+    "geocode_place_query",
+    "haversine_km",
     "build_booking_trust_payload",
+    "zoho_calendar_configured",
+    "CATEGORY_KEYWORDS",
+    "FOLLOW_UP_CONTEXT_TOKENS",
+    "SERVICE_KEYWORD_SYNONYMS",
+    "ServiceQuerySignals",
+    "extract_preferred_locations_from_query",
+    "extract_service_query_signals",
+    "merge_service_query_signals",
+    "tokenize_text",
     "build_integration_provider_statuses",
     "build_reconciliation_details",
     "build_reconciliation_summary",
@@ -62,6 +172,10 @@ __all__ = [
     "record_lifecycle_email",
     "rank_catalog_matches",
     "Prompt9SemanticSearchService",
+    "service_search_text",
+    "ServiceMatchInsight",
+    "should_match_services",
+    "should_request_location",
     "SemanticSearchOutcome",
     "save_uploaded_file",
     "seed_crm_sync_for_lead",

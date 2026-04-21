@@ -21,6 +21,7 @@ class ReplayCase:
     service_category: str | None = None
     budget: dict[str, Any] | None = None
     time_window: dict[str, Any] | None = None
+    expected_outcome: str | None = None
 
 
 DEFAULT_REPLAY_CASES: tuple[ReplayCase, ...] = (
@@ -31,6 +32,7 @@ DEFAULT_REPLAY_CASES: tuple[ReplayCase, ...] = (
         service_category="Salon",
         budget={"max_aud": 80},
         time_window={"label": "tomorrow evening"},
+        expected_outcome="web_fallback",
     ),
     ReplayCase(
         name="restaurant-sydney-party-6-tonight",
@@ -38,6 +40,7 @@ DEFAULT_REPLAY_CASES: tuple[ReplayCase, ...] = (
         location="Sydney",
         service_category="Food and Beverage",
         time_window={"label": "tonight"},
+        expected_outcome="web_fallback",
     ),
     ReplayCase(
         name="physio-parramatta-shoulder-pain",
@@ -45,6 +48,7 @@ DEFAULT_REPLAY_CASES: tuple[ReplayCase, ...] = (
         location="Parramatta",
         service_category="Healthcare Service",
         time_window={"label": "tomorrow morning"},
+        expected_outcome="web_fallback",
     ),
     ReplayCase(
         name="dentist-sydney-checkup",
@@ -52,12 +56,14 @@ DEFAULT_REPLAY_CASES: tuple[ReplayCase, ...] = (
         location="Sydney CBD",
         service_category="Healthcare Service",
         time_window={"label": "this weekend"},
+        expected_outcome="web_fallback",
     ),
     ReplayCase(
         name="childcare-sydney",
         query="childcare near Sydney for a 4 year old",
         location="Sydney",
         service_category="Kids Services",
+        expected_outcome="web_fallback",
     ),
     ReplayCase(
         name="support-worker-western-sydney",
@@ -65,6 +71,7 @@ DEFAULT_REPLAY_CASES: tuple[ReplayCase, ...] = (
         location="Western Sydney",
         service_category="NDIS Support",
         time_window={"label": "tomorrow"},
+        expected_outcome="web_fallback",
     ),
     ReplayCase(
         name="private-dining-melbourne",
@@ -72,12 +79,42 @@ DEFAULT_REPLAY_CASES: tuple[ReplayCase, ...] = (
         location="Melbourne",
         service_category="Food and Beverage",
         time_window={"label": "friday night"},
+        expected_outcome="web_fallback",
     ),
     ReplayCase(
         name="gp-clinic-adelaide",
         query="gp clinic Adelaide",
         location="Adelaide",
         service_category="Healthcare Service",
+        expected_outcome="tenant_hit",
+    ),
+    ReplayCase(
+        name="housing-melbourne",
+        query="housing Melbourne",
+        location="Melbourne",
+        service_category="Housing and Property",
+        expected_outcome="tenant_hit",
+    ),
+    ReplayCase(
+        name="membership-renewal-wollongong",
+        query="membership renewal Wollongong",
+        location="Wollongong",
+        service_category="Membership and Community",
+        expected_outcome="tenant_hit",
+    ),
+    ReplayCase(
+        name="kids-swimming-brisbane",
+        query="kids swimming Brisbane",
+        location="Brisbane",
+        service_category="Kids Services",
+        budget={"max_aud": 40},
+        expected_outcome="tenant_hit",
+    ),
+    ReplayCase(
+        name="wedding-hair-fortitude-valley",
+        query="wedding hair Fortitude Valley",
+        service_category="Salon",
+        expected_outcome="tenant_hit",
     ),
 )
 
@@ -162,6 +199,8 @@ def _build_case_summary(case: ReplayCase, response_body: dict[str, Any]) -> dict
         "search_strategy": data.get("search_strategy"),
         "warnings": data.get("warnings", []) or [],
         "outcome": outcome,
+        "expected_outcome": case.expected_outcome,
+        "expectation_matched": None if not case.expected_outcome else outcome == case.expected_outcome,
         "top_source_type": top_source_type,
         "semantic_assist": {
             "applied": bool(semantic_assist.get("applied")),
@@ -204,6 +243,7 @@ def _build_rollup(results: list[dict[str, Any]]) -> dict[str, Any]:
         "blocked_by_gates": 0,
         "no_result_unclear": 0,
         "error": 0,
+        "expectation_mismatches": 0,
     }
     for item in results:
         if item.get("error"):
@@ -212,8 +252,10 @@ def _build_rollup(results: list[dict[str, Any]]) -> dict[str, Any]:
         outcome = str(item.get("outcome") or "no_result_unclear")
         if outcome not in counts:
             counts["no_result_unclear"] += 1
-            continue
-        counts[outcome] += 1
+        else:
+            counts[outcome] += 1
+        if item.get("expectation_matched") is False:
+            counts["expectation_mismatches"] += 1
     return counts
 
 
@@ -259,6 +301,7 @@ def _load_cases(cases_json: str | None) -> list[ReplayCase]:
                 service_category=str(item.get("service_category") or "").strip() or None,
                 budget=item.get("budget") if isinstance(item.get("budget"), dict) else None,
                 time_window=item.get("time_window") if isinstance(item.get("time_window"), dict) else None,
+                expected_outcome=str(item.get("expected_outcome") or "").strip() or None,
             )
         )
     return cases
@@ -319,6 +362,12 @@ def main() -> None:
             continue
         print(f"  strategy: {item.get('search_strategy')}")
         print(f"  outcome: {item.get('outcome')} source={item.get('top_source_type')}")
+        if item.get("expected_outcome"):
+            print(
+                "  expected:"
+                f" {item.get('expected_outcome')}"
+                f" matched={item.get('expectation_matched')}"
+            )
         print(f"  warnings: {item.get('warnings')}")
         print(f"  semantic: {item.get('semantic_assist')}")
         print(f"  candidates: {item.get('candidate_preview')}")

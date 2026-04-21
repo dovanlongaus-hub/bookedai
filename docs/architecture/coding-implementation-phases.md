@@ -622,15 +622,24 @@ Create the first code foundations for a tenant-safe product surface.
 
 1. Add permission abstraction and actor classes.
 2. Add tenant-aware checks for new APIs.
-3. Add tenant app shell and navigation foundation.
-4. Build first read-heavy tenant modules:
+3. Add tenant app shell and navigation foundation on `tenant.bookedai.au` as the canonical tenant host.
+4. Add a unified tenant identity foundation covering:
+   - tenant sign-up
+   - tenant sign-in
+   - tenant membership and invite ownership
+   - one tenant session across workspace, reporting, and billing
+5. Build first read-heavy tenant modules:
    - overview
    - leads/conversations
    - booking requests and trust
    - billing summary
    - integrations status
-5. Hide internal-only controls from tenant experiences.
-6. Add tenant permission and route-access runner checks before the tenant shell expands further.
+6. Build first write-enabled tenant supply modules:
+   - business profile input
+   - services and provider data entry
+   - catalog ownership and publish workflow
+7. Hide internal-only controls from tenant experiences.
+8. Add tenant permission and route-access runner checks before the tenant shell expands further.
 
 ### Dependency rules
 
@@ -644,6 +653,7 @@ Create the first code foundations for a tenant-safe product surface.
 ### Definition of done
 
 - the codebase can support a tenant-safe rollout without cloning the admin app
+- the codebase can support one tenant identity gateway instead of fragmented tenant logins
 - tenant-safe access rules are runner-verifiable
 
 ## Coding Phase 9 — CRM, Email, Billing, and Integration Lifecycles
@@ -684,8 +694,13 @@ Implement the lifecycle and integration code that turns the platform into a real
 3. Add email template engine foundation and delivery tracking.
 4. Add invoice, reminder, thank-you, and monthly-report lifecycle hooks.
 5. Add idempotent payment callback handling.
-6. Add sync retries, failure tracking, and reconciliation visibility.
-7. Expand the integration runner to cover callback replay, retry safety, and reconciliation outcomes.
+6. Add tenant-facing billing workspace primitives for:
+   - current plan
+   - invoice history
+   - payment method state
+   - billing status and next charge visibility
+7. Add sync retries, failure tracking, and reconciliation visibility.
+8. Expand the integration runner to cover callback replay, retry safety, and reconciliation outcomes.
 
 ### Dependency rules
 

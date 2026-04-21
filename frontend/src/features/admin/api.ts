@@ -8,6 +8,7 @@ import {
   AdminBookingsResponse,
   AdminConfigResponse,
   AdminOverviewResponse,
+  AdminPortalSupportActionResponse,
   AdminServiceCatalogQualityResponse,
   AdminServiceMerchantListResponse,
   EmailSendResponse,
@@ -315,6 +316,34 @@ export async function sendAdminConfirmationEmail(
     throw new Error(parseErrorMessage(payload, 'Could not send confirmation email.'));
   }
   return payload as EmailSendResponse;
+}
+
+export async function applyAdminPortalSupportAction(
+  apiBaseUrl: string,
+  sessionToken: string,
+  requestId: number,
+  action: 'reviewed' | 'escalated',
+  note: string | null,
+) {
+  const response = await fetch(`${apiBaseUrl}/admin/portal-support/${requestId}/${action}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...createAdminAuthHeaders(sessionToken),
+    },
+    body: JSON.stringify({ note }),
+  });
+  const payload = (await parseJsonOrNull(response)) as
+    | AdminPortalSupportActionResponse
+    | { detail?: string }
+    | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not update portal support request.'));
+  }
+  return payload as AdminPortalSupportActionResponse;
 }
 
 export async function sendAdminDiscordHandoff(
