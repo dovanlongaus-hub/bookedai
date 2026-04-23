@@ -329,21 +329,22 @@ function metricCards(
   bookings: TenantBookingsResponse,
   billing: TenantBillingResponse,
 ) {
+  const futureSwim = isFutureSwimTenant(overview.tenant);
   return [
     {
-      label: 'Search-ready services',
+      label: futureSwim ? 'Search-ready lessons' : 'Search-ready services',
       value: catalog.counts.search_ready_records,
-      caption: `${catalog.counts.total_records} total catalog records`,
+      caption: futureSwim ? `${catalog.counts.total_records} total lesson or class records` : `${catalog.counts.total_records} total catalog records`,
     },
     {
       label: 'Needs review',
       value: catalog.counts.warning_records,
-      caption: 'Services missing booking-critical data or review signals',
+      caption: futureSwim ? 'Lessons or classes missing parent-enquiry or booking-critical data' : 'Services missing booking-critical data or review signals',
     },
     {
-      label: 'Active bookings',
+      label: futureSwim ? 'Active parent enquiries' : 'Active bookings',
       value: bookings.status_summary.active,
-      caption: `${overview.summary.open_booking_requests} requests still open`,
+      caption: `${overview.summary.open_booking_requests} request(s) still open`,
     },
     {
       label: 'Connected providers',
@@ -356,6 +357,12 @@ function metricCards(
       caption: billing.collection.recommended_action,
     },
   ];
+}
+
+function isFutureSwimTenant(tenant: TenantOverviewResponse['tenant']) {
+  const slug = tenant.slug.toLowerCase();
+  const industry = (tenant.industry || '').toLowerCase();
+  return slug.includes('future-swim') || slug.includes('swim') || industry.includes('swim');
 }
 
 function formatAud(value: number) {
@@ -421,9 +428,16 @@ function buildRevenueProofNarrative(
   const paidInvoices = billing.invoice_summary.paid_invoices;
   const attentionCount = overview.integration_snapshot.attention_count + overview.summary.lifecycle_attention_count;
   const paidRevenueAud = derivePaidRevenueAud(billing, revenueMetrics);
+  const futureSwim = isFutureSwimTenant(overview.tenant);
 
   if (!revenueMetrics && paidRevenueAud <= 0 && openInvoices <= 0) {
-    return 'BookedAI is still collecting enough tenant activity to generate a stronger monthly value story. Finish activation, billing, and publish posture first.';
+    return futureSwim
+      ? 'BookedAI is still collecting enough Future Swim activity to show a stronger monthly value story. Finish lesson setup, parent enquiry capture, billing, and publish posture first.'
+      : 'BookedAI is still collecting enough tenant activity to generate a stronger monthly value story. Finish activation, billing, and publish posture first.';
+  }
+
+  if (futureSwim) {
+    return `BookedAI helped capture ${revenueMetrics?.sessions_started ?? overview.recent_bookings.length} parent enquiries, convert ${revenueMetrics?.bookings_confirmed ?? overview.recent_bookings.length} lesson or class bookings, and surface ${formatAud(paidRevenueAud)} in lesson revenue${revenueMetrics ? ` over the last ${revenueMetrics.period_days} days` : ' from the current tenant billing and booking posture'}. ${openInvoices > 0 ? `${openInvoices} invoice item(s) still need parent follow-up. ` : ''}${paidInvoices > 0 ? `${paidInvoices} invoice item(s) are already marked paid. ` : ''}${attentionCount > 0 ? `${attentionCount} enrolment or CRM attention signal(s) still need review.` : 'Enrolment and CRM attention signals are currently under control.'}`;
   }
 
   return `BookedAI helped capture ${revenueMetrics?.sessions_started ?? overview.recent_bookings.length} sessions, convert ${revenueMetrics?.bookings_confirmed ?? overview.recent_bookings.length} bookings, and surface ${formatAud(paidRevenueAud)} in revenue${revenueMetrics ? ` over the last ${revenueMetrics.period_days} days` : ' from the current tenant billing and booking posture'}. ${openInvoices > 0 ? `${openInvoices} invoice item(s) still need follow-up. ` : ''}${paidInvoices > 0 ? `${paidInvoices} invoice item(s) are already marked paid. ` : ''}${attentionCount > 0 ? `${attentionCount} operational attention signal(s) still need review.` : 'Operational attention signals are currently under control.'}`;
@@ -2780,6 +2794,7 @@ export function TenantApp() {
     () => deriveTenantActivationState({ session, onboarding, overview }),
     [session, onboarding, overview],
   );
+  const futureSwim = isFutureSwimTenant(overview.tenant);
   const outstandingRevenueAud = useMemo(() => deriveOutstandingRevenueAud(billing), [billing]);
   const paidRevenueAud = useMemo(() => derivePaidRevenueAud(billing, revenueMetrics), [billing, revenueMetrics]);
   const sourceContribution = useMemo(() => deriveSourceContribution(overview), [overview]);
@@ -2925,6 +2940,7 @@ export function TenantApp() {
 
         <TenantActivationChecklistCard
           activation={activationState}
+          eyebrow={futureSwim ? 'Future Swim activation control tower' : 'Activation control tower'}
           action={
             activationState.actionPanel ? (
               <button
@@ -3042,10 +3058,10 @@ export function TenantApp() {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-600">
-                      Revenue proof loop
+                      {futureSwim ? 'Future Swim revenue proof loop' : 'Revenue proof loop'}
                     </div>
                     <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-950">
-                      Monthly value board
+                      {futureSwim ? 'Monthly swim value board' : 'Monthly value board'}
                     </h2>
                   </div>
                   {revenueMetrics ? (
@@ -3063,7 +3079,7 @@ export function TenantApp() {
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-6">
                   <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Leads captured
+                      {futureSwim ? 'Parent enquiries' : 'Leads captured'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
                       {overview.summary.total_leads}
@@ -3072,34 +3088,34 @@ export function TenantApp() {
                   </div>
                   <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Bookings created
+                      {futureSwim ? 'Lessons booked' : 'Bookings created'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
                       {revenueMetrics?.bookings_confirmed ?? bookings.status_summary.active + bookings.status_summary.completed}
                     </div>
-                    <div className="mt-0.5 text-[11px] text-slate-500">booking proof</div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">{futureSwim ? 'class conversion proof' : 'booking proof'}</div>
                   </div>
                   <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Paid revenue
+                      {futureSwim ? 'Lesson revenue' : 'Paid revenue'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-emerald-700">
                       {formatAud(paidRevenueAud)}
                     </div>
-                    <div className="mt-0.5 text-[11px] text-slate-500">captured value</div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">{futureSwim ? 'captured swim value' : 'captured value'}</div>
                   </div>
                   <div className="rounded-[1.2rem] border border-amber-100 bg-white px-4 py-4">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Outstanding revenue
+                      {futureSwim ? 'Uncollected lesson revenue' : 'Outstanding revenue'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-amber-700">
                       {formatAud(outstandingRevenueAud)}
                     </div>
-                    <div className="mt-0.5 text-[11px] text-slate-500">open invoice posture</div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">{futureSwim ? 'open family invoice posture' : 'open invoice posture'}</div>
                   </div>
                   <div className="rounded-[1.2rem] border border-sky-100 bg-white px-4 py-4">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Source contribution
+                      {futureSwim ? 'Class demand signal' : 'Source contribution'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
                       {sourceContribution[0]?.[1] ?? overview.recent_bookings.length}
@@ -3108,12 +3124,12 @@ export function TenantApp() {
                   </div>
                   <div className="rounded-[1.2rem] border border-rose-100 bg-white px-4 py-4">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Follow-up and CRM
+                      {futureSwim ? 'Parent follow-up' : 'Follow-up and CRM'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
                       {overview.summary.lifecycle_attention_count + overview.integration_snapshot.attention_count}
                     </div>
-                    <div className="mt-0.5 text-[11px] text-slate-500">attention signals</div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">{futureSwim ? 'family attention signals' : 'attention signals'}</div>
                   </div>
                 </div>
 
@@ -3124,13 +3140,17 @@ export function TenantApp() {
                     </div>
                     <p className="mt-2 text-sm leading-6 text-slate-700">
                       {revenueMetrics || paidRevenueAud > 0 || outstandingRevenueAud > 0
-                        ? `BookedAI is turning tenant activity into commercial proof: ${revenueMetrics?.sessions_started ?? overview.recent_bookings.length} captured sessions, ${revenueMetrics?.bookings_confirmed ?? bookings.status_summary.active + bookings.status_summary.completed} confirmed bookings, ${formatAud(paidRevenueAud)} paid revenue, and ${formatAud(outstandingRevenueAud)} still recoverable through billing follow-up.`
-                        : 'BookedAI is still building the first revenue proof sample for this tenant. Finish tenant activation, publish one offer, and attach billing posture to unlock stronger monthly reporting.'}
+                        ? futureSwim
+                          ? `BookedAI is turning Future Swim activity into commercial proof: ${revenueMetrics?.sessions_started ?? overview.recent_bookings.length} parent enquiries, ${revenueMetrics?.bookings_confirmed ?? bookings.status_summary.active + bookings.status_summary.completed} lessons booked, ${formatAud(paidRevenueAud)} lesson revenue, and ${formatAud(outstandingRevenueAud)} still recoverable through family follow-up.`
+                          : `BookedAI is turning tenant activity into commercial proof: ${revenueMetrics?.sessions_started ?? overview.recent_bookings.length} captured sessions, ${revenueMetrics?.bookings_confirmed ?? bookings.status_summary.active + bookings.status_summary.completed} confirmed bookings, ${formatAud(paidRevenueAud)} paid revenue, and ${formatAud(outstandingRevenueAud)} still recoverable through billing follow-up.`
+                        : futureSwim
+                          ? 'BookedAI is still building the first Future Swim revenue proof sample. Finish swim-business activation, publish one lesson, and attach billing posture to unlock stronger monthly reporting.'
+                          : 'BookedAI is still building the first revenue proof sample for this tenant. Finish tenant activation, publish one offer, and attach billing posture to unlock stronger monthly reporting.'}
                     </p>
                   </div>
                   <div className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Top source signals
+                      {futureSwim ? 'Top class demand signals' : 'Top source signals'}
                     </div>
                     <div className="mt-3 space-y-2">
                       {sourceContribution.length ? sourceContribution.map(([label, value]) => (
@@ -3140,7 +3160,9 @@ export function TenantApp() {
                         </div>
                       )) : (
                         <div className="rounded-full border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500">
-                          Source contribution will appear after more booking activity lands. For now, BookedAI is still collecting enough signals to identify the strongest booking or payment path.
+                          {futureSwim
+                            ? 'Class demand signals will appear after more parent enquiry and booking activity lands. For now, BookedAI is still collecting enough signals to identify the strongest lesson pathway.'
+                            : 'Source contribution will appear after more booking activity lands. For now, BookedAI is still collecting enough signals to identify the strongest booking or payment path.'}
                         </div>
                       )}
                     </div>
@@ -3151,7 +3173,9 @@ export function TenantApp() {
                   <div className="mt-4 rounded-[1rem] border border-rose-100 bg-rose-50 px-4 py-3">
                     <p className="text-xs text-rose-700">
                       <span className="font-semibold">{formatAud(revenueMetrics.missed_revenue_aud)} in potential revenue</span>{' '}
-                      walked away from {revenueMetrics.missed_sessions} incomplete sessions in this period. Improving publish posture, response speed, and billing follow-through is the fastest recovery lever.
+                      {futureSwim
+                        ? `walked away from ${revenueMetrics.missed_sessions} incomplete parent enquiries in this period. Improving lesson publish posture, response speed, and family billing follow-through is the fastest recovery lever.`
+                        : `walked away from ${revenueMetrics.missed_sessions} incomplete sessions in this period. Improving publish posture, response speed, and billing follow-through is the fastest recovery lever.`}
                     </p>
                   </div>
                 )}
@@ -3209,10 +3233,10 @@ export function TenantApp() {
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Search intelligence
+                      {futureSwim ? 'Swim search intelligence' : 'Search intelligence'}
                     </div>
                     <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                      Catalog readiness
+                      {futureSwim ? 'Lesson readiness' : 'Catalog readiness'}
                     </h2>
                   </div>
                   <button
@@ -3227,7 +3251,7 @@ export function TenantApp() {
                 <div className="mt-5 grid gap-3 sm:grid-cols-3">
                   <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      Search-ready
+                      {futureSwim ? 'Search-ready lessons' : 'Search-ready'}
                     </div>
                     <div className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
                       {catalog.counts.search_ready_records}
@@ -3294,7 +3318,11 @@ export function TenantApp() {
                 </div>
               </article>
 
-              <TenantOnboardingStatusCard onboarding={onboarding} />
+              <TenantOnboardingStatusCard
+                onboarding={onboarding}
+                eyebrow={futureSwim ? 'Swim business onboarding' : 'Onboarding posture'}
+                title={futureSwim ? 'Future Swim setup progress' : 'Workspace setup progress'}
+              />
 
               <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
                 <div className="flex items-center justify-between gap-3">
@@ -3393,8 +3421,8 @@ export function TenantApp() {
 
               <TenantOnboardingStatusCard
                 onboarding={onboarding}
-                eyebrow="Profile readiness"
-                title="Experience completion"
+                eyebrow={futureSwim ? 'Swim profile readiness' : 'Profile readiness'}
+                title={futureSwim ? 'Swim business profile completion' : 'Experience completion'}
                 compact
               />
 
@@ -3443,6 +3471,7 @@ export function TenantApp() {
               canManageExperience={canManageExperience}
               currentRoleLabel={roleLabel(roleFirstLoginHint)}
               activity={overview.workspace.activity}
+              vertical={futureSwim ? 'future-swim' : 'default'}
             />
           </section>
         ) : null}
@@ -3626,22 +3655,22 @@ export function TenantApp() {
                 </div>
 
                 <p className="mt-3 text-sm leading-6 text-slate-600">
-                  Tune the search focus before import so AI extracts only booking-critical content:
-                  product or service name, duration, location, pricing, description, image, booking
-                  link, and directly relevant commercial details.
+                  {futureSwim
+                    ? 'Tune the search focus before import so AI extracts only swim-business content that matters for parent conversion: lesson or class name, age band, confidence level, venue, schedule, pricing, description, imagery, and booking or enquiry links.'
+                    : 'Tune the search focus before import so AI extracts only booking-critical content: product or service name, duration, location, pricing, description, image, booking link, and directly relevant commercial details.'}
                 </p>
 
                 <form className="mt-5 space-y-4" onSubmit={handleCatalogImport}>
                   <label className="block">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      Website URL
+                      {futureSwim ? 'Swim website URL' : 'Website URL'}
                     </div>
                     <input
                       value={importForm.website_url ?? ''}
                       onChange={(event) =>
                         setImportForm((current) => ({ ...current, website_url: event.target.value }))
                       }
-                      placeholder="https://business.example.com"
+                      placeholder={futureSwim ? 'https://futureswim.com.au' : 'https://business.example.com'}
                       className="h-12 w-full rounded-[1rem] border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-sky-300 focus:bg-white"
                     />
                   </label>
@@ -3649,7 +3678,7 @@ export function TenantApp() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="block">
                       <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Business name
+                        {futureSwim ? 'Swim school name' : 'Business name'}
                       </div>
                       <input
                         value={importForm.business_name ?? ''}
@@ -3676,27 +3705,27 @@ export function TenantApp() {
                   <div className="grid gap-4 sm:grid-cols-2">
                     <label className="block">
                       <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Search category
+                        {futureSwim ? 'Lesson category' : 'Search category'}
                       </div>
                       <input
                         value={importForm.category ?? ''}
                         onChange={(event) =>
                           setImportForm((current) => ({ ...current, category: event.target.value }))
                         }
-                        placeholder="Beauty, dining, wellness, services..."
+                        placeholder={futureSwim ? 'Baby lessons, preschool swim, beginner class...' : 'Beauty, dining, wellness, services...'}
                         className="h-12 w-full rounded-[1rem] border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-sky-300 focus:bg-white"
                       />
                     </label>
                     <label className="block">
                       <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Location hint
+                        {futureSwim ? 'Centre location hint' : 'Location hint'}
                       </div>
                       <input
                         value={importForm.location_hint ?? ''}
                         onChange={(event) =>
                           setImportForm((current) => ({ ...current, location_hint: event.target.value }))
                         }
-                        placeholder="Sydney CBD, Melbourne, Brisbane..."
+                        placeholder={futureSwim ? 'Caringbah, Bondi, Inner West...' : 'Sydney CBD, Melbourne, Brisbane...'}
                         className="h-12 w-full rounded-[1rem] border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none transition focus:border-sky-300 focus:bg-white"
                       />
                     </label>
@@ -3704,7 +3733,7 @@ export function TenantApp() {
 
                   <label className="block">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                      AI search focus
+                      {futureSwim ? 'AI lesson import focus' : 'AI search focus'}
                     </div>
                     <textarea
                       rows={5}
@@ -3713,13 +3742,14 @@ export function TenantApp() {
                         setImportForm((current) => ({ ...current, search_focus: event.target.value }))
                       }
                       className="w-full rounded-[1rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-900 outline-none transition focus:border-sky-300 focus:bg-white"
+                      placeholder={futureSwim ? 'Prioritize child age bands, beginner vs confident swimmers, class ratios, centre names, timetable cues, make-up lesson policy, trial lesson wording, and parent enquiry details.' : undefined}
                     />
                   </label>
 
                   <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
                     <div className="flex items-center gap-2 text-sm font-semibold text-slate-900">
                       <DatabaseIcon className="h-4 w-4" />
-                      Fields AI should prioritize
+                      {futureSwim ? 'Fields AI should prioritize for swim bookings' : 'Fields AI should prioritize'}
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {catalog.import_guidance.required_fields.map((field) => (
@@ -3740,7 +3770,9 @@ export function TenantApp() {
                   ) : null}
                   {session && !canWriteCatalog ? (
                     <div className="rounded-[1rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      Your current role can review the tenant catalog, but only tenant admins and operators can import or publish catalog changes.
+                      {futureSwim
+                        ? 'Your current role can review the swim lesson catalogue, but only tenant admins and operators can import or publish lesson changes.'
+                        : 'Your current role can review the tenant catalog, but only tenant admins and operators can import or publish catalog changes.'}
                     </div>
                   ) : null}
 
@@ -3754,7 +3786,7 @@ export function TenantApp() {
                     }`}
                   >
                     <SparkIcon className="h-4 w-4" />
-                    {importPending ? 'Importing website data...' : 'Import into BookedAI'}
+                    {importPending ? (futureSwim ? 'Importing swim website data...' : 'Importing website data...') : (futureSwim ? 'Import swim website into BookedAI' : 'Import into BookedAI')}
                   </button>
                 </form>
               </article>
@@ -3853,9 +3885,9 @@ export function TenantApp() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="block">
-                        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Service name
-                        </div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                          {futureSwim ? 'Lesson or class name' : 'Service name'}
+                      </div>
                         <input
                           value={catalogEditForm.name}
                           onChange={(event) =>
@@ -3865,9 +3897,9 @@ export function TenantApp() {
                         />
                       </label>
                       <label className="block">
-                        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Category
-                        </div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                          {futureSwim ? 'Lesson category' : 'Category'}
+                      </div>
                         <input
                           value={catalogEditForm.category}
                           onChange={(event) =>
@@ -3880,7 +3912,7 @@ export function TenantApp() {
 
                     <label className="block">
                       <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Description
+                        {futureSwim ? 'Parent-facing description' : 'Description'}
                       </div>
                       <textarea
                         rows={4}
@@ -3921,16 +3953,16 @@ export function TenantApp() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="block">
-                        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Display price
-                        </div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                          {futureSwim ? 'Displayed lesson price' : 'Display price'}
+                      </div>
                         <input
                           value={catalogEditForm.display_price}
                           onChange={(event) =>
                             setCatalogEditForm((current) => ({ ...current, display_price: event.target.value }))
                           }
                           className="h-11 w-full rounded-[1rem] border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none focus:border-sky-300 focus:bg-white"
-                          placeholder="260,000 VND / student / session"
+                          placeholder={futureSwim ? '$32 per lesson or trial class available' : '260,000 VND / student / session'}
                         />
                       </label>
                       <label className="block">
@@ -3949,9 +3981,9 @@ export function TenantApp() {
 
                     <div className="grid gap-4 sm:grid-cols-2">
                       <label className="block">
-                        <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                          Venue name
-                        </div>
+                      <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                          {futureSwim ? 'Centre name' : 'Venue name'}
+                      </div>
                         <input
                           value={catalogEditForm.venue_name}
                           onChange={(event) =>
@@ -4003,14 +4035,14 @@ export function TenantApp() {
 
                     <label className="block">
                       <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Tags
+                        {futureSwim ? 'Lesson tags' : 'Tags'}
                       </div>
                       <input
                         value={catalogEditForm.tags}
                         onChange={(event) =>
                           setCatalogEditForm((current) => ({ ...current, tags: event.target.value }))
                         }
-                        placeholder="spa, facial, sydney"
+                        placeholder={futureSwim ? 'preschool, beginner, caringbah, trial' : 'spa, facial, sydney'}
                         className="h-11 w-full rounded-[1rem] border border-slate-200 bg-slate-50 px-4 text-sm text-slate-900 outline-none focus:border-sky-300 focus:bg-white"
                       />
                     </label>
@@ -4023,7 +4055,7 @@ export function TenantApp() {
                           setCatalogEditForm((current) => ({ ...current, featured: event.target.checked }))
                         }
                       />
-                      Mark this row as featured
+                      {futureSwim ? 'Mark this lesson as featured' : 'Mark this row as featured'}
                     </label>
 
                     {catalogEditError ? (
@@ -4093,6 +4125,7 @@ export function TenantApp() {
             copiedSnippetKey={copiedSnippetKey}
             onCopySnippet={handleCopySnippet}
             onSubmit={handlePluginSave}
+            vertical={futureSwim ? 'future-swim' : 'default'}
           />
         ) : null}
 

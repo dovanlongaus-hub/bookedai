@@ -219,6 +219,16 @@ Must include:
 - reusable onboarding prompts for different SME types
 - commercial copy that works for parent-led, individual-led, and enterprise-led service businesses
 
+Current implementation baseline from `2026-04-23`:
+
+- the shipped tenant workspace now begins the `Future Swim` packaging pass directly in product copy, not only in planning docs
+- activation headlines and next-step actions now switch into swim-school language when the tenant is `Future Swim` or another swim tenant
+- the tenant value board now uses swim-specific KPI wording such as `Parent enquiries`, `Lessons booked`, `Lesson revenue`, and `Parent follow-up`
+- the same overview narrative now explains monthly value in Future Swim language so lesson, class, parent enquiry, and enrolment follow-up all read like the real business instead of generic SaaS terminology
+- the Experience Studio now also switches into swim-school wording for business profile, parent-facing introduction HTML, preview, and workspace guidance so Future Swim operators are editing a swim business, not a generic tenant shell
+- the catalog import and edit flow now uses swim-specific prompts and placeholders for lesson categories, centre locations, parent-facing descriptions, lesson pricing, and lesson tags
+- the plugin/embed workspace now speaks in Future Swim website language, including widget framing, lesson counts, parent-facing CTA embed descriptions, and Future Swim-only widget settings
+
 ## Immediate non-goals
 
 Do not prioritize these before the golden loop is complete:

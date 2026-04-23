@@ -52,6 +52,12 @@ function getVerticalHint(tenant: TenantOverviewResponse['tenant']) {
   return 'Activation is only complete once this workspace has a publishable offer, commercial posture, and a visible value story.';
 }
 
+function isFutureSwimTenant(tenant: TenantOverviewResponse['tenant']) {
+  const slug = tenant.slug.toLowerCase();
+  const industry = (tenant.industry || '').toLowerCase();
+  return slug.includes('future-swim') || slug.includes('swim') || industry.includes('swim');
+}
+
 export function deriveTenantActivationState({
   session,
   onboarding,
@@ -61,6 +67,7 @@ export function deriveTenantActivationState({
   onboarding: TenantOnboardingResponse;
   overview: TenantOverviewResponse;
 }): TenantActivationState {
+  const futureSwim = isFutureSwimTenant(overview.tenant);
   const checklist = [
     {
       id: 'identity',
@@ -117,9 +124,9 @@ export function deriveTenantActivationState({
   if (!hasCompletedStep(onboarding, 'business_profile')) {
     return {
       phase: 'complete_profile',
-      headline: 'Complete the business profile',
+      headline: futureSwim ? 'Complete the swim school profile' : 'Complete the business profile',
       body: `Set the workspace basics first so later catalog, billing, and reporting states have a stable tenant identity. ${getVerticalHint(overview.tenant)}`,
-      actionLabel: 'Open experience studio',
+      actionLabel: futureSwim ? 'Open swim business profile' : 'Open experience studio',
       actionPanel: 'experience',
       statusTone: 'amber',
       checklist,
@@ -129,9 +136,9 @@ export function deriveTenantActivationState({
   if (onboarding.checkpoints.catalog_records < 1) {
     return {
       phase: 'add_catalog',
-      headline: 'Add the first offer to activate this workspace',
+      headline: futureSwim ? 'Add the first lesson or class offer' : 'Add the first offer to activate this workspace',
       body: `This tenant still needs at least one real offer in the catalog before BookedAI can convert discovery into bookings or consultations. ${getVerticalHint(overview.tenant)}`,
-      actionLabel: 'Open catalog workspace',
+      actionLabel: futureSwim ? 'Open lesson catalog' : 'Open catalog workspace',
       actionPanel: 'catalog',
       statusTone: 'amber',
       checklist,
@@ -141,9 +148,9 @@ export function deriveTenantActivationState({
   if (onboarding.checkpoints.published_records < 1) {
     return {
       phase: 'publish_offer',
-      headline: 'Publish one search-ready offer',
+      headline: futureSwim ? 'Publish one search-ready lesson' : 'Publish one search-ready offer',
       body: `Catalog data exists, but activation is still blocked until at least one service is publicly publishable. ${getVerticalHint(overview.tenant)}`,
-      actionLabel: 'Review publish-ready offers',
+      actionLabel: futureSwim ? 'Review publish-ready lessons' : 'Review publish-ready offers',
       actionPanel: 'catalog',
       statusTone: 'amber',
       checklist,
@@ -175,9 +182,11 @@ export function deriveTenantActivationState({
   }
 
   return {
-    phase: 'activation_complete',
-    headline: 'Tenant activation baseline is complete',
-    body: 'This workspace has crossed the setup baseline. The next priority is proving monthly value through leads, bookings, paid revenue, and retention-oriented reporting.',
+      phase: 'activation_complete',
+    headline: futureSwim ? 'Future Swim activation baseline is complete' : 'Tenant activation baseline is complete',
+    body: futureSwim
+      ? 'This workspace has crossed the setup baseline. The next priority is proving monthly value through parent enquiries, lessons booked, lesson revenue, and retention-oriented reporting.'
+      : 'This workspace has crossed the setup baseline. The next priority is proving monthly value through leads, bookings, paid revenue, and retention-oriented reporting.',
     actionLabel: 'Review workspace overview',
     actionPanel: 'overview',
     statusTone: 'emerald',

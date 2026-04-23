@@ -62,6 +62,7 @@ export function TenantBusinessProfileCard({
   canManageExperience,
   currentRoleLabel,
   activity,
+  vertical = 'default',
 }: {
   profileForm: TenantBusinessProfileFormState;
   setProfileForm: Dispatch<SetStateAction<TenantBusinessProfileFormState>>;
@@ -74,6 +75,7 @@ export function TenantBusinessProfileCard({
   canManageExperience: boolean;
   currentRoleLabel?: string | null;
   activity: TenantSectionActivity;
+  vertical?: 'default' | 'future-swim';
 }) {
   function handleAssetChange(kind: 'logo' | 'hero', event: ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0];
@@ -94,41 +96,45 @@ export function TenantBusinessProfileCard({
     ['guide_billing', 'Billing guide'],
     ['guide_team', 'Team guide'],
   ] as const;
+  const futureSwim = vertical === 'future-swim';
 
   return (
     <article className="rounded-[1.85rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
       <div className="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-            Tenant experience studio
+            {futureSwim ? 'Swim business experience studio' : 'Tenant experience studio'}
           </div>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            Enterprise workspace profile
+            {futureSwim ? 'Swim school workspace profile' : 'Enterprise workspace profile'}
           </h2>
           <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
-            Control the tenant identity, editable introduction HTML, and section-by-section
-            operating guidelines from one structured workspace.
+            {futureSwim
+              ? 'Control the swim school identity, parent-facing introduction HTML, and section-by-section operating guidance from one structured workspace.'
+              : 'Control the tenant identity, editable introduction HTML, and section-by-section operating guidelines from one structured workspace.'}
           </p>
         </div>
         <div className="rounded-[1.1rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
           {canManageExperience
-            ? 'Updates save directly into the tenant workspace and can be refined without repo edits.'
+            ? futureSwim
+              ? 'Updates save directly into the swim business workspace and can be refined without repo edits.'
+              : 'Updates save directly into the tenant workspace and can be refined without repo edits.'
             : `Current role${currentRoleLabel ? `: ${currentRoleLabel}` : ''}. Preview is available, but only tenant admins and operators can edit tenant identity or branding.`}
         </div>
       </div>
 
       <div className="mt-4">
-        <TenantSectionActivityCard label="Experience audit" activity={activity} />
+        <TenantSectionActivityCard label={futureSwim ? 'Swim experience audit' : 'Experience audit'} activity={activity} />
       </div>
 
       <form className="mt-6 space-y-6" onSubmit={onSubmit}>
         <section className="grid gap-4 lg:grid-cols-2">
           <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-5">
-            <div className="text-sm font-semibold text-slate-950">Identity and ownership</div>
+            <div className="text-sm font-semibold text-slate-950">{futureSwim ? 'Swim school identity' : 'Identity and ownership'}</div>
             <div className="mt-4 grid gap-4 sm:grid-cols-2">
               <label className="block">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Business name
+                  {futureSwim ? 'Swim school name' : 'Business name'}
                 </div>
                 <input
                   value={profileForm.business_name}
@@ -141,7 +147,7 @@ export function TenantBusinessProfileCard({
               </label>
               <label className="block">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Operator name
+                  {futureSwim ? 'Centre operator name' : 'Operator name'}
                 </div>
                 <input
                   value={profileForm.operator_full_name}
@@ -154,7 +160,7 @@ export function TenantBusinessProfileCard({
               </label>
               <label className="block">
                 <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                  Industry
+                  {futureSwim ? 'Business type' : 'Industry'}
                 </div>
                 <input
                   value={profileForm.industry}
@@ -264,9 +270,9 @@ export function TenantBusinessProfileCard({
                   {uploadingAsset === 'hero' ? 'Uploading hero image...' : 'Upload hero image'}
                 </label>
                 <AssetPreview
-                  label="Hero preview"
+                  label={futureSwim ? 'Swim hero preview' : 'Hero preview'}
                   imageUrl={profileForm.hero_image_url}
-                  placeholder="Upload or paste a hero image for the tenant workspace."
+                  placeholder={futureSwim ? 'Upload or paste a pool, centre, or lesson hero image.' : 'Upload or paste a hero image for the tenant workspace.'}
                 />
               </div>
             </div>
@@ -276,12 +282,13 @@ export function TenantBusinessProfileCard({
         <section className="grid gap-4 xl:grid-cols-[1.1fr_0.9fr]">
           <div className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-5">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-sm font-semibold text-slate-950">Introduction HTML</div>
+            <div className="text-sm font-semibold text-slate-950">{futureSwim ? 'Parent-facing introduction HTML' : 'Introduction HTML'}</div>
               <div className="text-xs text-slate-500">Safe HTML preview only</div>
             </div>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Use editable HTML for the tenant introduction, highlights, service promise, or
-              enterprise summary. Scripts are stripped from preview and save.
+              {futureSwim
+                ? 'Use editable HTML for the swim school introduction, teaching approach, centre highlights, or parent trust story. Scripts are stripped from preview and save.'
+                : 'Use editable HTML for the tenant introduction, highlights, service promise, or enterprise summary. Scripts are stripped from preview and save.'}
             </p>
             <textarea
               rows={14}
@@ -291,12 +298,12 @@ export function TenantBusinessProfileCard({
                 setProfileForm((current) => ({ ...current, introduction_html: event.target.value }))
               }
               className="mt-4 w-full rounded-[1rem] border border-slate-200 bg-white px-4 py-3 font-mono text-sm leading-6 text-slate-900 outline-none focus:border-sky-300"
-              placeholder="<h2>About this tenant</h2><p>...</p>"
+              placeholder={futureSwim ? '<h2>Why parents choose Future Swim</h2><p>...</p>' : '<h2>About this tenant</h2><p>...</p>'}
             />
           </div>
 
           <div className="rounded-[1.35rem] border border-slate-200 bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] p-5">
-            <div className="text-sm font-semibold text-slate-950">Live preview</div>
+            <div className="text-sm font-semibold text-slate-950">{futureSwim ? 'Parent-facing preview' : 'Live preview'}</div>
             <div className="mt-4 overflow-hidden rounded-[1.2rem] border border-slate-200 bg-white">
               {profileForm.hero_image_url.trim() ? (
                 <img
@@ -316,7 +323,7 @@ export function TenantBusinessProfileCard({
                   ) : null}
                   <div>
                     <div className="text-lg font-semibold text-slate-950">
-                      {profileForm.business_name || 'Tenant name'}
+                      {profileForm.business_name || (futureSwim ? 'Swim school name' : 'Tenant name')}
                     </div>
                     <div className="text-sm text-slate-500">
                       {profileForm.industry || 'Industry'}
@@ -326,7 +333,7 @@ export function TenantBusinessProfileCard({
                 <div
                   className="prose prose-slate max-w-none text-sm"
                   dangerouslySetInnerHTML={{
-                    __html: sanitizeTenantHtml(profileForm.introduction_html || '<p>Add tenant introduction HTML to preview it here.</p>'),
+                    __html: sanitizeTenantHtml(profileForm.introduction_html || (futureSwim ? '<p>Add a parent-facing swim school introduction to preview it here.</p>' : '<p>Add tenant introduction HTML to preview it here.</p>')),
                   }}
                 />
               </div>
@@ -335,10 +342,11 @@ export function TenantBusinessProfileCard({
         </section>
 
         <section className="rounded-[1.35rem] border border-slate-200 bg-slate-50 p-5">
-          <div className="text-sm font-semibold text-slate-950">Menu guidelines</div>
+          <div className="text-sm font-semibold text-slate-950">{futureSwim ? 'Swim workspace guidelines' : 'Menu guidelines'}</div>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Each workspace section can carry its own operator guidance so the menu feels structured
-            and the expected action is obvious at first glance.
+            {futureSwim
+              ? 'Each workspace section can carry swim-business guidance so the menu feels structured and the next action is obvious for enrolment, class setup, and parent follow-up.'
+              : 'Each workspace section can carry its own operator guidance so the menu feels structured and the expected action is obvious at first glance.'}
           </p>
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             {guideFields.map(([field, label]) => (
@@ -377,10 +385,12 @@ export function TenantBusinessProfileCard({
                 : ''
             }`}
           >
-            {profilePending ? 'Saving workspace profile...' : 'Save workspace profile'}
+            {profilePending ? (futureSwim ? 'Saving swim workspace profile...' : 'Saving workspace profile...') : (futureSwim ? 'Save swim workspace profile' : 'Save workspace profile')}
           </button>
           <div className="text-sm text-slate-500">
-            Save updates identity, content, and section guidance in one tenant-facing flow.
+            {futureSwim
+              ? 'Save updates identity, parent-facing content, and swim-specific section guidance in one flow.'
+              : 'Save updates identity, content, and section guidance in one tenant-facing flow.'}
           </div>
         </div>
       </form>

@@ -33,6 +33,7 @@ type TenantPluginWorkspaceProps = {
   copiedSnippetKey: string | null;
   onCopySnippet: (key: string, content: string) => void;
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
+  vertical?: 'default' | 'future-swim';
 };
 
 function buildInlineSnippet(form: TenantPluginFormState) {
@@ -132,26 +133,29 @@ export function TenantPluginWorkspace({
   copiedSnippetKey,
   onCopySnippet,
   onSubmit,
+  vertical = 'default',
 }: TenantPluginWorkspaceProps) {
   const inlineSnippet = buildInlineSnippet(form);
   const modalSnippet = buildModalSnippet(form);
   const iframeSnippet = buildIframeSnippet(form);
   const canManagePlugin = Boolean(sessionReady && plugin.access?.can_manage_plugin);
   const tenantRefLocked = plugin.tenant?.slug || form.tenant_ref;
+  const futureSwim = vertical === 'future-swim';
 
   return (
     <section className="grid gap-6 xl:grid-cols-[0.95fr_1.05fr]">
       <div className="space-y-6">
         <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Official partner runtime
+            {futureSwim ? 'Official swim website runtime' : 'Official partner runtime'}
           </div>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            Plugin and embed control center
+            {futureSwim ? 'Future Swim widget and embed control center' : 'Plugin and embed control center'}
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Save the exact partner-facing runtime configuration here, then copy the embed code for
-            the partner website without editing repo files.
+            {futureSwim
+              ? 'Save the exact Future Swim website widget configuration here, then copy the embed code for the swim school website without editing repo files.'
+              : 'Save the exact partner-facing runtime configuration here, then copy the embed code for the partner website without editing repo files.'}
           </p>
 
           <div className="mt-5 flex flex-wrap gap-2 text-xs text-slate-600">
@@ -162,7 +166,7 @@ export function TenantPluginWorkspace({
               Runtime {plugin.runtime.embed_url}
             </span>
             <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5">
-              Products {plugin.catalog_summary.published_product_count}
+              {futureSwim ? 'Lessons' : 'Products'} {plugin.catalog_summary.published_product_count}
             </span>
           </div>
 
@@ -180,27 +184,27 @@ export function TenantPluginWorkspace({
           </div>
 
           <div className="mt-5 rounded-[1rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600">
-            {plugin.access?.operator_note || 'Preview mode only. Sign in with a tenant role that can manage plugin settings.'}
+            {plugin.access?.operator_note || (futureSwim ? 'Preview mode only. Sign in with a tenant role that can manage Future Swim widget settings.' : 'Preview mode only. Sign in with a tenant role that can manage plugin settings.')}
           </div>
 
           <div className="mt-5">
-            <TenantSectionActivityCard label="Plugin audit" activity={plugin.activity} />
+            <TenantSectionActivityCard label={futureSwim ? 'Widget audit' : 'Plugin audit'} activity={plugin.activity} />
           </div>
         </article>
 
         <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Published products
+            {futureSwim ? 'Published lessons and classes' : 'Published products'}
           </div>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            Catalog included in the plugin
+            {futureSwim ? 'Lesson catalogue included in the widget' : 'Catalog included in the plugin'}
           </h2>
           <div className="mt-5 space-y-3">
             {plugin.products.map((item) => (
               <div key={`${item.service_id || item.name}`} className="rounded-[1rem] border border-slate-200 bg-slate-50 px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-sm font-semibold text-slate-950">{item.name || 'Service'}</div>
+                    <div className="text-sm font-semibold text-slate-950">{item.name || (futureSwim ? 'Lesson' : 'Service')}</div>
                     <div className="mt-1 text-xs text-slate-600">
                       {(item.category || 'Uncategorized')} • {item.display_price || 'Price on request'}
                     </div>
@@ -221,10 +225,10 @@ export function TenantPluginWorkspace({
           className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]"
         >
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Tenant-managed configuration
+            {futureSwim ? 'Swim widget configuration' : 'Tenant-managed configuration'}
           </div>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            Partner embed settings
+            {futureSwim ? 'Future Swim embed settings' : 'Partner embed settings'}
           </h2>
 
           <div className="mt-5 grid gap-4 sm:grid-cols-2">
@@ -261,7 +265,9 @@ export function TenantPluginWorkspace({
           </div>
 
           <div className="mt-4 rounded-[1rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-            Tenant ref is locked to this signed-in workspace so embeds always point to the current tenant only.
+            {futureSwim
+              ? 'Tenant ref is locked to this signed-in swim workspace so every widget stays Future Swim-only.'
+              : 'Tenant ref is locked to this signed-in workspace so embeds always point to the current tenant only.'}
           </div>
 
           <div className="mt-4 space-y-4">
@@ -311,14 +317,14 @@ export function TenantPluginWorkspace({
                   : 'bg-slate-950 text-white'
               }`}
             >
-              {pluginPending ? 'Saving...' : 'Save plugin settings'}
+              {pluginPending ? 'Saving...' : futureSwim ? 'Save widget settings' : 'Save plugin settings'}
             </button>
           </div>
         </form>
 
         <SnippetCard
-          title="Inline widget"
-          description="Render the full assistant directly inside a section of the partner website."
+          title={futureSwim ? 'Inline swim widget' : 'Inline widget'}
+          description={futureSwim ? 'Render the full Future Swim receptionist directly inside a section of the swim school website.' : 'Render the full assistant directly inside a section of the partner website.'}
           snippet={inlineSnippet}
           snippetKey="inline"
           copiedSnippetKey={copiedSnippetKey}
@@ -326,8 +332,8 @@ export function TenantPluginWorkspace({
         />
 
         <SnippetCard
-          title="Modal button"
-          description="Show a CTA button and open the BookedAI assistant in a popup."
+          title={futureSwim ? 'Modal enquiry button' : 'Modal button'}
+          description={futureSwim ? 'Show a parent-facing CTA button and open the Future Swim assistant in a popup.' : 'Show a CTA button and open the BookedAI assistant in a popup.'}
           snippet={modalSnippet}
           snippetKey="modal"
           copiedSnippetKey={copiedSnippetKey}
@@ -335,8 +341,8 @@ export function TenantPluginWorkspace({
         />
 
         <SnippetCard
-          title="Iframe embed"
-          description="Use a direct iframe when the partner wants a no-script integration path."
+          title={futureSwim ? 'Iframe swim embed' : 'Iframe embed'}
+          description={futureSwim ? 'Use a direct iframe when the swim school wants a simple no-script integration path.' : 'Use a direct iframe when the partner wants a no-script integration path.'}
           snippet={iframeSnippet}
           snippetKey="iframe"
           copiedSnippetKey={copiedSnippetKey}
