@@ -1074,7 +1074,7 @@ async def tenant_plugin_interface_update(
     role_error = _require_tenant_membership_role(
         membership,
         allowed_roles=TENANT_CATALOG_WRITE_ROLES,
-        missing_message="Only tenant admins and operators can change the partner plugin interface.",
+        message="Only tenant admins and operators can change the partner plugin interface.",
     )
     if role_error:
         return _error_response(role_error, tenant_id=tenant_id, actor_context=None)

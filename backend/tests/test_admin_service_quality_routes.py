@@ -107,6 +107,8 @@ class AdminServiceQualityRoutesTestCase(TestCase):
                 "search_ready_records": 1,
                 "warning_records": 1,
                 "inactive_records": 1,
+                "published_records": 0,
+                "review_records": 0,
             },
         )
 
@@ -160,12 +162,14 @@ class AdminServiceQualityRoutesTestCase(TestCase):
                 get=_get,
             )
 
+        test_case = self
+
         class _FakeTenantRepository:
             def __init__(self, *_args, **_kwargs):
                 pass
 
             async def get_tenant_profile(self, tenant_ref):
-                self.assertEqual(tenant_ref, "harbour-glow")
+                test_case.assertEqual(tenant_ref, "harbour-glow")
                 return {"id": "tenant-harbour-glow", "slug": "harbour-glow", "name": "Harbour Glow Spa"}
 
         with patch("api.route_handlers.get_session", _fake_tenant_session), patch(

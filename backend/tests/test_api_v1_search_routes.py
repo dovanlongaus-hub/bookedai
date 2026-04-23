@@ -234,19 +234,19 @@ class ApiV1SearchRoutesTestCase(TestCase):
             captured_phase2_calls.append(kwargs)
 
         with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_search_handlers.get_session",
+            "api.v1_booking_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_search_handlers.ContactRepository.upsert_contact",
+            "api.v1_booking_handlers.ContactRepository.upsert_contact",
             _upsert_contact,
         ), patch(
-            "api.v1_search_handlers.LeadRepository.upsert_lead",
+            "api.v1_booking_handlers.LeadRepository.upsert_lead",
             _upsert_lead,
         ), patch(
-            "api.v1_search_handlers.orchestrate_lead_capture",
+            "api.v1_booking_handlers.orchestrate_lead_capture",
             _orchestrate_lead_capture,
         ), patch(
-            "api.v1_search_handlers._record_phase2_write_activity",
+            "api.v1_booking_handlers._record_phase2_write_activity",
             _record_phase2_write_activity,
         ):
             client = TestClient(create_test_app())
@@ -464,13 +464,18 @@ class ApiV1SearchRoutesTestCase(TestCase):
         self.assertIn("team", payload["data"]["query_understanding"]["core_intent_terms"])
         self.assertIn("party_size:8", payload["data"]["query_understanding"]["constraint_terms"])
         self.assertEqual(payload["data"]["query_understanding"]["requested_category"], "Restaurant")
-        self.assertEqual(payload["data"]["candidates"], [])
-        self.assertEqual(payload["data"]["recommendations"], [])
+        self.assertEqual(len(payload["data"]["candidates"]), 1)
+        self.assertEqual(payload["data"]["candidates"][0]["candidate_id"], "svc_team_dinner")
+        self.assertEqual(payload["data"]["candidates"][0]["booking_path_type"], "request_callback")
         self.assertEqual(
-            payload["data"]["warnings"],
-            ["No live restaurant result with a direct booking or call path was found for this area yet."],
+            payload["data"]["candidates"][0]["next_step"],
+            "Route to a callback path so an operator can confirm capacity and policy constraints.",
         )
-        self.assertEqual(payload["data"]["search_strategy"], "public_web_live_search_restaurant_only")
+        self.assertEqual(payload["data"]["warnings"], [])
+        self.assertEqual(
+            payload["data"]["search_strategy"],
+            "catalog_term_retrieval_with_prompt9_rerank_with_relevance_gate",
+        )
 
     def test_search_candidates_returns_top_recommendations_in_deterministic_backend_order(self):
         class _FakeExecuteResult:
@@ -768,14 +773,14 @@ class ApiV1SearchRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["recommendations"], [])
         self.assertEqual(
             payload["data"]["warnings"],
-            ["No live restaurant result with a direct booking or call path was found for this area yet."],
+            ["No strong relevant catalog candidates were found."],
         )
-        self.assertFalse(payload["data"]["semantic_assist"]["applied"])
-        self.assertIsNone(payload["data"]["semantic_assist"]["inferred_category"])
-        self.assertEqual(payload["data"]["search_diagnostics"]["heuristic_candidate_ids"], [])
+        self.assertTrue(payload["data"]["semantic_assist"]["applied"])
+        self.assertEqual(payload["data"]["semantic_assist"]["inferred_category"], "Restaurant")
+        self.assertEqual(payload["data"]["search_diagnostics"]["heuristic_candidate_ids"], ["svc_medical"])
         self.assertEqual(payload["data"]["search_diagnostics"]["post_domain_candidate_ids"], [])
         self.assertEqual(payload["data"]["search_diagnostics"]["final_candidate_ids"], [])
-        self.assertEqual(payload["data"]["search_diagnostics"]["dropped_candidates"], [])
+        self.assertEqual(payload["data"]["search_diagnostics"]["dropped_candidates"][0]["stage"], "semantic_domain_gate")
 
     def test_search_candidates_hides_weak_english_match_before_display(self):
         class _FakeExecuteResult:
@@ -1238,16 +1243,22 @@ class ApiV1SearchRoutesTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(web_calls, 1)
-        self.assertEqual(rank_calls, 0)
+        self.assertEqual(rank_calls, 1)
         self.assertEqual(payload["data"]["candidates"][0]["source_type"], "public_web_search")
         self.assertEqual(payload["data"]["candidates"][0]["contact_phone"], "(02) 9123 4567")
         self.assertEqual(payload["data"]["candidates"][0]["booking_path_type"], "call_provider")
         self.assertEqual(payload["data"]["candidates"][0]["next_step"], "Call the venue directly to confirm the table booking.")
-        self.assertEqual(payload["data"]["warnings"], [])
-        self.assertEqual(payload["data"]["search_strategy"], "public_web_live_search_restaurant_only")
+        self.assertEqual(
+            payload["data"]["warnings"],
+            ["No strong tenant catalog candidates were found, so BookedAI is showing sourced public web options."],
+        )
+        self.assertEqual(
+            payload["data"]["search_strategy"],
+            "catalog_term_retrieval_with_prompt9_rerank_plus_public_web_search",
+        )
         self.assertEqual(
             payload["data"]["confidence"]["reason"],
-            "BookedAI used live restaurant web search and only kept venue results with a real booking page or call path.",
+            "No strong tenant catalog candidate was found, so BookedAI switched to sourced public web results.",
         )
 
     def test_search_candidates_infers_location_hint_from_query_when_payload_location_missing(self):

@@ -205,6 +205,79 @@ async function stubAdminDashboard(page: Parameters<typeof test>[0]['page']) {
       body: JSON.stringify({ status: 'ok', items: [] }),
     });
   });
+
+  await page.route('**/api/admin/messaging?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', items: [] }),
+    });
+  });
+
+  await page.route('**/api/admin/tenants', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        items: [
+          {
+            id: 'tenant-admin',
+            slug: 'admin-tenant',
+            name: 'Admin Tenant',
+            status: 'active',
+            timezone: 'Australia/Sydney',
+            locale: 'en-AU',
+            industry: 'Clinic',
+            active_memberships: 1,
+            total_services: 1,
+            published_services: 1,
+            updated_at: '2026-04-18T00:00:00Z',
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/tenants/admin-tenant', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        tenant: {
+          id: 'tenant-admin',
+          slug: 'admin-tenant',
+          name: 'Admin Tenant',
+          status: 'active',
+          timezone: 'Australia/Sydney',
+          locale: 'en-AU',
+          industry: 'Clinic',
+          active_memberships: 1,
+          total_services: 1,
+          published_services: 1,
+          updated_at: '2026-04-18T00:00:00Z',
+        },
+        workspace: {
+          logo_url: null,
+          hero_image_url: null,
+          introduction_html: '<p>Admin tenant workspace.</p>',
+          guides: {
+            overview: '',
+            experience: '',
+            catalog: '',
+            plugin: '',
+            bookings: '',
+            integrations: '',
+            billing: '',
+            team: '',
+          },
+        },
+        members: [],
+        services: [],
+      }),
+    });
+  });
 }
 
 test.describe('admin bookings filters', () => {

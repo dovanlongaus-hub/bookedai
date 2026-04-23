@@ -109,6 +109,11 @@ export function PricingSection() {
   const [flowMode, setFlowMode] = useState<ConsultationFlowMode>('full');
   const [consultationStep, setConsultationStep] = useState<ConsultationStep>('contact');
   const [showReturnMessage, setShowReturnMessage] = useState(false);
+  const [pricingReturnNotice, setPricingReturnNotice] = useState<{
+    title: string;
+    body: string;
+    tone: 'success' | 'warning';
+  } | null>(null);
   const [consultationAttribution, setConsultationAttribution] =
     useState<PublicCtaAttribution | null>(null);
   const [formState, setFormState] = useState<ConsultationFormState>(() =>
@@ -135,6 +140,37 @@ export function PricingSection() {
 
     return () => window.clearTimeout(timeoutId);
   }, [showReturnMessage]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const search = new URLSearchParams(window.location.search);
+    const pricingState = (search.get('pricing') ?? '').trim().toLowerCase();
+    const plan = (search.get('plan') ?? 'Plan').trim() || 'Plan';
+    const reference = (search.get('ref') ?? '').trim();
+
+    if (pricingState === 'success') {
+      setPricingReturnNotice({
+        title: 'Plan booking complete',
+        body: `${plan} plan ${reference || 'booking'} is confirmed. Stripe is complete and your onboarding email plus calendar flow are already in motion.`,
+        tone: 'success',
+      });
+      return;
+    }
+
+    if (pricingState === 'cancelled') {
+      setPricingReturnNotice({
+        title: 'Plan payment not completed yet',
+        body: `Your plan booking ${reference || 'reference'} is still saved. You can reopen pricing and continue payment when ready.`,
+        tone: 'warning',
+      });
+      return;
+    }
+
+    setPricingReturnNotice(null);
+  }, []);
 
   function openConsultation(
     planId: PlanId,
@@ -315,6 +351,29 @@ export function PricingSection() {
       />
 
       <div className="relative mx-auto max-w-7xl">
+        {pricingReturnNotice ? (
+          <SectionCard
+            tone="subtle"
+            className={`mx-auto mb-6 flex max-w-3xl items-start justify-between gap-4 px-5 py-4 text-sm ${
+              pricingReturnNotice.tone === 'success'
+                ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                : 'border-amber-200 bg-amber-50 text-amber-900'
+            }`}
+          >
+            <div>
+              <div className="text-base font-semibold text-slate-950">{pricingReturnNotice.title}</div>
+              <p className="mt-2 leading-6">{pricingReturnNotice.body}</p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPricingReturnNotice(null)}
+              className="booked-button-secondary shrink-0 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em]"
+            >
+              Dismiss
+            </button>
+          </SectionCard>
+        ) : null}
+
         {showReturnMessage ? (
           <SectionCard tone="subtle" className="mx-auto mb-6 flex max-w-3xl items-start justify-between gap-4 px-5 py-4 text-sm text-slate-700">
             <p className="leading-6">

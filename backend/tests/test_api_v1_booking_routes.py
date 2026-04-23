@@ -26,9 +26,15 @@ from repositories.tenant_repository import TenantRepository
 
 
 def create_test_app() -> FastAPI:
+    async def _default_close():
+        return None
+
+    def _default_session_factory():
+        return SimpleNamespace(execute=_fake_execute, commit=_async_noop, close=_default_close)
+
     app = FastAPI()
     app.include_router(v1_router)
-    app.state.session_factory = object()
+    app.state.session_factory = _default_session_factory
     app.state.settings = SimpleNamespace(
         admin_api_token="test-admin-token",
         admin_password="test-admin-password",
@@ -192,8 +198,8 @@ class Apiv1BookingRoutes(TestCase):
         async def _fake_trust_session(_session_factory):
             yield SimpleNamespace(execute=_execute, commit=_async_noop)
 
-        with patch("api.v1_booking_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_booking_handlers.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_trust_session,
         ):
             client = TestClient(create_test_app())

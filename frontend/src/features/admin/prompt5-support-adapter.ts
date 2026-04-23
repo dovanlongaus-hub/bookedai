@@ -562,7 +562,7 @@ export async function runPrompt5SupportPreview({
     runtimeActivityResponse,
     outboxBacklogResponse,
     outboxDispatchedAuditResponse,
-  ] = await Promise.all([
+  ] = await Promise.allSettled([
     apiV1.createLead({
       lead_type: 'admin_preview',
       contact: {
@@ -600,6 +600,21 @@ export async function runPrompt5SupportPreview({
     apiV1.getOutboxDispatchedAudit(),
   ]);
 
+  const settledValue = <T,>(result: PromiseSettledResult<T>): T | null =>
+    result.status === 'fulfilled' ? result.value : null;
+
+  const leadPayload = settledValue(leadResponse);
+  const emailPayload = settledValue(emailResponse);
+  const integrationPayload = settledValue(integrationResponse);
+  const attentionPayload = settledValue(attentionResponse);
+  const triagePayload = settledValue(triageResponse);
+  const crmRetryBacklogPayload = settledValue(crmRetryBacklogResponse);
+  const reconciliationPayload = settledValue(reconciliationResponse);
+  const reconciliationDetailsPayload = settledValue(reconciliationDetailsResponse);
+  const runtimeActivityPayload = settledValue(runtimeActivityResponse);
+  const outboxBacklogPayload = settledValue(outboxBacklogResponse);
+  const outboxDispatchedAuditPayload = settledValue(outboxDispatchedAuditResponse);
+
   return {
     candidates,
     trustSummary: {
@@ -619,11 +634,11 @@ export async function runPrompt5SupportPreview({
           }
         : null,
     semanticAssist,
-    leadPreviewId: 'data' in leadResponse ? leadResponse.data.lead_id : null,
-    emailPreviewId: 'data' in emailResponse ? emailResponse.data.message_id : null,
+    leadPreviewId: leadPayload && 'data' in leadPayload ? leadPayload.data.lead_id : null,
+    emailPreviewId: emailPayload && 'data' in emailPayload ? emailPayload.data.message_id : null,
     integrationStatuses:
-      'data' in integrationResponse
-        ? integrationResponse.data.items.map((item) => ({
+      integrationPayload && 'data' in integrationPayload
+        ? integrationPayload.data.items.map((item) => ({
             provider: item.provider,
             status: item.status,
             syncMode: item.sync_mode,
@@ -631,21 +646,21 @@ export async function runPrompt5SupportPreview({
           }))
         : [],
     integrationAttention:
-      'data' in attentionResponse
-        ? attentionResponse.data.items.map(mapAttentionItem)
+      attentionPayload && 'data' in attentionPayload
+        ? attentionPayload.data.items.map(mapAttentionItem)
         : [],
     triageSnapshot:
-      'data' in triageResponse
+      triagePayload && 'data' in triagePayload
         ? {
-            status: triageResponse.data.status,
+            status: triagePayload.data.status,
             triageLanes: {
-              immediateAction: triageResponse.data.triage_lanes.immediate_action.map(
+              immediateAction: triagePayload.data.triage_lanes.immediate_action.map(
                 mapAttentionItem,
               ),
-              monitor: triageResponse.data.triage_lanes.monitor.map(mapAttentionItem),
-              stable: triageResponse.data.triage_lanes.stable.map(mapAttentionItem),
+              monitor: triagePayload.data.triage_lanes.monitor.map(mapAttentionItem),
+              stable: triagePayload.data.triage_lanes.stable.map(mapAttentionItem),
             },
-            sourceSlices: triageResponse.data.source_slices.map((item) => ({
+            sourceSlices: triagePayload.data.source_slices.map((item) => ({
               source: item.source,
               openItems: item.open_items,
               highestSeverity: item.highest_severity,
@@ -656,28 +671,28 @@ export async function runPrompt5SupportPreview({
               operatorNote: item.operator_note,
             })),
             retryPosture: {
-              queuedRetries: triageResponse.data.retry_posture.queued_retries,
-              manualReviewBacklog: triageResponse.data.retry_posture.manual_review_backlog,
-              failedRecords: triageResponse.data.retry_posture.failed_records,
-              latestRetryAt: triageResponse.data.retry_posture.latest_retry_at,
-              holdRecommended: triageResponse.data.retry_posture.hold_recommended,
-              operatorNote: triageResponse.data.retry_posture.operator_note,
+              queuedRetries: triagePayload.data.retry_posture.queued_retries,
+              manualReviewBacklog: triagePayload.data.retry_posture.manual_review_backlog,
+              failedRecords: triagePayload.data.retry_posture.failed_records,
+              latestRetryAt: triagePayload.data.retry_posture.latest_retry_at,
+              holdRecommended: triagePayload.data.retry_posture.hold_recommended,
+              operatorNote: triagePayload.data.retry_posture.operator_note,
             },
           }
         : null,
     crmRetryBacklog:
-      'data' in crmRetryBacklogResponse
+      crmRetryBacklogPayload && 'data' in crmRetryBacklogPayload
         ? {
-            status: crmRetryBacklogResponse.data.status,
-            checkedAt: crmRetryBacklogResponse.data.checked_at,
+            status: crmRetryBacklogPayload.data.status,
+            checkedAt: crmRetryBacklogPayload.data.checked_at,
             summary: {
-              retryingRecords: crmRetryBacklogResponse.data.summary.retrying_records,
-              manualReviewRecords: crmRetryBacklogResponse.data.summary.manual_review_records,
-              failedRecords: crmRetryBacklogResponse.data.summary.failed_records,
-              holdRecommended: crmRetryBacklogResponse.data.summary.hold_recommended,
-              operatorNote: crmRetryBacklogResponse.data.summary.operator_note,
+              retryingRecords: crmRetryBacklogPayload.data.summary.retrying_records,
+              manualReviewRecords: crmRetryBacklogPayload.data.summary.manual_review_records,
+              failedRecords: crmRetryBacklogPayload.data.summary.failed_records,
+              holdRecommended: crmRetryBacklogPayload.data.summary.hold_recommended,
+              operatorNote: crmRetryBacklogPayload.data.summary.operator_note,
             },
-            items: crmRetryBacklogResponse.data.items.map((item) => ({
+            items: crmRetryBacklogPayload.data.items.map((item) => ({
               recordId: item.record_id,
               provider: item.provider,
               entityType: item.entity_type,
@@ -696,17 +711,17 @@ export async function runPrompt5SupportPreview({
           }
         : null,
     reconciliationSummary:
-      'data' in reconciliationResponse
+      reconciliationPayload && 'data' in reconciliationPayload
         ? {
-            status: reconciliationResponse.data.status,
-            conflicts: reconciliationResponse.data.conflicts,
+            status: reconciliationPayload.data.status,
+            conflicts: reconciliationPayload.data.conflicts,
           }
         : null,
     reconciliationDetails:
-      'data' in reconciliationDetailsResponse
+      reconciliationDetailsPayload && 'data' in reconciliationDetailsPayload
         ? {
-            status: reconciliationDetailsResponse.data.status,
-            sections: reconciliationDetailsResponse.data.sections.map((section) => ({
+            status: reconciliationDetailsPayload.data.status,
+            sections: reconciliationDetailsPayload.data.sections.map((section) => ({
               area: section.area,
               status: section.status,
               totalCount: section.total_count,
@@ -718,11 +733,11 @@ export async function runPrompt5SupportPreview({
           }
         : null,
     runtimeActivity:
-      'data' in runtimeActivityResponse
+      runtimeActivityPayload && 'data' in runtimeActivityPayload
         ? {
-            status: runtimeActivityResponse.data.status,
-            checkedAt: runtimeActivityResponse.data.checked_at,
-            items: runtimeActivityResponse.data.items.map((item) => ({
+            status: runtimeActivityPayload.data.status,
+            checkedAt: runtimeActivityPayload.data.checked_at,
+            items: runtimeActivityPayload.data.items.map((item) => ({
               source: item.source,
               itemId: item.item_id,
               title: item.title,
@@ -737,16 +752,16 @@ export async function runPrompt5SupportPreview({
           }
         : null,
     outboxBacklog:
-      'data' in outboxBacklogResponse
+      outboxBacklogPayload && 'data' in outboxBacklogPayload
         ? {
-            status: outboxBacklogResponse.data.status,
-            checkedAt: outboxBacklogResponse.data.checked_at,
+            status: outboxBacklogPayload.data.status,
+            checkedAt: outboxBacklogPayload.data.checked_at,
             summary: {
-              failedEvents: outboxBacklogResponse.data.summary.failed_events,
-              retryingEvents: outboxBacklogResponse.data.summary.retrying_events,
-              pendingEvents: outboxBacklogResponse.data.summary.pending_events,
+              failedEvents: outboxBacklogPayload.data.summary.failed_events,
+              retryingEvents: outboxBacklogPayload.data.summary.retrying_events,
+              pendingEvents: outboxBacklogPayload.data.summary.pending_events,
             },
-            items: outboxBacklogResponse.data.items.map((item) => ({
+            items: outboxBacklogPayload.data.items.map((item) => ({
               outboxEventId: item.outbox_event_id,
               eventType: item.event_type,
               aggregateType: item.aggregate_type,
@@ -764,8 +779,8 @@ export async function runPrompt5SupportPreview({
           }
         : null,
     outboxDispatchAudit:
-      'data' in outboxDispatchedAuditResponse
-        ? outboxDispatchedAuditResponse.data.items.map((item) => {
+      outboxDispatchedAuditPayload && 'data' in outboxDispatchedAuditPayload
+        ? outboxDispatchedAuditPayload.data.items.map((item) => {
             const payload = item.payload ?? {};
             return {
               id: item.id,

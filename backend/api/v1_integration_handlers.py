@@ -656,6 +656,21 @@ async def zoho_deal_feedback_webhook(request: Request, payload: ZohoDealWebhookT
         actor_context=actor_context,
     )
     poll_response = await poll_zoho_deal_feedback(request, poll_payload)
+    if hasattr(poll_response, "model_dump"):
+        envelope = poll_response.model_dump(mode="json")
+        if webhook_event_id is not None and isinstance(envelope.get("data"), dict):
+            envelope["data"]["webhook_event_id"] = webhook_event_id
+            envelope["data"]["module"] = module_name
+            envelope["data"]["operation"] = payload.operation
+        return envelope
+
+    if isinstance(poll_response, dict):
+        if webhook_event_id is not None and isinstance(poll_response.get("data"), dict):
+            poll_response["data"]["webhook_event_id"] = webhook_event_id
+            poll_response["data"]["module"] = module_name
+            poll_response["data"]["operation"] = payload.operation
+        return poll_response
+
     body = getattr(poll_response, "body", b"")
     if webhook_event_id is not None:
         async with get_session(request.app.state.session_factory) as session:

@@ -28,7 +28,7 @@ const pricingConsultationResult: PricingConsultationResponse = {
   status: 'ok',
   consultation_reference: 'CONS-3003',
   plan_id: 'standard',
-  plan_name: 'Growth',
+  plan_name: 'Pro',
   amount_aud: 149,
   amount_label: 'A$149',
   preferred_date: '2026-04-18',
@@ -116,12 +116,12 @@ test.describe('pricing and demo flows', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/pitch-deck');
     const recommendedPlanButton = page.getByRole('button', { name: 'Book Recommended Plan' });
     await recommendedPlanButton.scrollIntoViewIfNeeded();
     await recommendedPlanButton.click({ force: true });
 
-    await expect(page.getByRole('heading', { name: 'Book the Growth package' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Book the Pro package' })).toBeVisible();
     await page.getByLabel('Your name').fill('BookedAI Owner');
     await page.getByLabel('Work email').fill('owner@example.com');
     await page.getByLabel('Business name').fill('BookedAI Studio');
@@ -133,7 +133,7 @@ test.describe('pricing and demo flows', () => {
     await page.getByRole('button', { name: 'Book now and open payment + calendar' }).click();
 
     await expect(page.getByText('Package reserved')).toBeVisible();
-    await expect(page.getByText('Growth plan for A$149')).toBeVisible();
+    await expect(page.getByText('Pro package for A$149')).toBeVisible();
     await expect(page.getByText('Reference: CONS-3003')).toBeVisible();
     await expect(page.getByText('Email status: Sent')).toBeVisible();
     await expect(page.getByRole('link', { name: 'Continue to Stripe' })).toHaveAttribute(
@@ -159,19 +159,19 @@ test.describe('pricing and demo flows', () => {
 
   test('plan payment success banner renders after pricing return @legacy', async ({ page }) => {
     await preserveBannerQueryDuringMount(page);
-    await page.goto('/?pricing=success&plan=Growth&ref=CONS-3003');
+    await page.goto('/pitch-deck?pricing=success&plan=Pro&ref=CONS-3003');
 
     await expect(page.getByText('Plan booking complete')).toBeVisible({ timeout: 15000 });
     await expect(
       page.getByText(
-        'Growth plan CONS-3003 is confirmed. Stripe is complete and your onboarding email plus calendar flow are already in motion.',
+        'Pro plan CONS-3003 is confirmed. Stripe is complete and your onboarding email plus calendar flow are already in motion.',
       ),
     ).toBeVisible({ timeout: 15000 });
   });
 
   test('plan payment cancelled banner keeps retry messaging visible @legacy', async ({ page }) => {
     await preserveBannerQueryDuringMount(page);
-    await page.goto('/?pricing=cancelled&ref=CONS-3003');
+    await page.goto('/pitch-deck?pricing=cancelled&ref=CONS-3003');
 
     await expect(page.getByText('Plan payment not completed yet')).toBeVisible({ timeout: 15000 });
     await expect(
@@ -223,7 +223,7 @@ test.describe('pricing and demo flows', () => {
       });
     });
 
-    await page.goto('/?demo=open');
+    await page.goto('/demo?demo=open');
 
     await expect(page.getByRole('heading', { name: 'Share your context, then choose the best time' })).toBeVisible();
     await expect(page.getByTestId('demo-embed-ready')).toBeVisible();
@@ -287,7 +287,7 @@ test.describe('pricing and demo flows', () => {
       });
     });
 
-    await page.goto('/?demo=open');
+    await page.goto('/demo?demo=open');
 
     await expect(
       page.getByRole('heading', { name: 'Share your context, then choose the best time' }),
@@ -350,7 +350,7 @@ test.describe('pricing and demo flows', () => {
       });
     });
 
-    await page.goto('/?demo=open');
+    await page.goto('/demo?demo=open');
 
     await expect(
       page.getByRole('heading', { name: 'Share your context, then choose the best time' }),
@@ -399,7 +399,7 @@ test.describe('pricing and demo flows', () => {
       });
     });
 
-    await page.goto('/?demo=open');
+    await page.goto('/demo?demo=open');
 
     await expect(
       page.getByRole('heading', { name: 'Share your context, then choose the best time' }),

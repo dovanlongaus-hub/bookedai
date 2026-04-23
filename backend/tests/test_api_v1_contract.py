@@ -139,7 +139,8 @@ def test_search_candidates_returns_catalog_matches(client, monkeypatch):
         booking_url="https://book.example.com/facial",
     )
     session = FakeSession(lambda *_: FakeResult(scalars_all=[service]))
-    monkeypatch.setattr(v1_routes, "get_session", make_fake_get_session(session))
+    monkeypatch.setattr("api.v1_search_handlers.get_session", make_fake_get_session(session))
+    monkeypatch.setattr("api.v1_search_handlers.is_flag_enabled", AsyncMock(return_value=False))
 
     response = client.post(
         "/api/v1/matching/search",
@@ -190,7 +191,8 @@ def test_search_candidates_returns_catalog_matches(client, monkeypatch):
 def test_check_availability_returns_booking_trust_contract(client, monkeypatch):
     service = SimpleNamespace(booking_url="https://book.example.com")
     session = FakeSession(lambda *_: FakeResult(scalar_one_or_none=service))
-    monkeypatch.setattr(v1_routes, "get_session", make_fake_get_session(session))
+    monkeypatch.setattr("api.v1_search_handlers.get_session", make_fake_get_session(session))
+    monkeypatch.setattr("api.v1_search_handlers.is_flag_enabled", AsyncMock(return_value=False))
 
     response = client.post(
         "/api/v1/booking-trust/checks",
@@ -210,7 +212,7 @@ def test_check_availability_returns_booking_trust_contract(client, monkeypatch):
 
 def test_create_lead_returns_captured_envelope(client, monkeypatch):
     session = FakeSession(lambda *_: FakeResult())
-    monkeypatch.setattr(v1_routes, "get_session", make_fake_get_session(session))
+    monkeypatch.setattr("api.v1_booking_handlers.get_session", make_fake_get_session(session))
 
     contact_mock = AsyncMock(return_value="contact_123")
     lead_mock = AsyncMock(return_value="lead_456")
@@ -253,7 +255,7 @@ def test_create_lead_returns_captured_envelope(client, monkeypatch):
 
 def test_create_booking_intent_returns_trust_envelope(client, monkeypatch):
     session = FakeSession(lambda *_: FakeResult())
-    monkeypatch.setattr(v1_routes, "get_session", make_fake_get_session(session))
+    monkeypatch.setattr("api.v1_booking_handlers.get_session", make_fake_get_session(session))
 
     contact_mock = AsyncMock(return_value="contact_789")
     lead_mock = AsyncMock(return_value="lead_789")
@@ -296,7 +298,7 @@ def test_create_payment_intent_returns_pending_envelope(client, monkeypatch):
         return FakeResult()
 
     session = FakeSession(execute_handler)
-    monkeypatch.setattr(v1_routes, "get_session", make_fake_get_session(session))
+    monkeypatch.setattr("api.v1_booking_handlers.get_session", make_fake_get_session(session))
 
     payment_mock = AsyncMock(return_value="payment_123")
     monkeypatch.setattr(v1_routes.PaymentIntentRepository, "upsert_payment_intent", payment_mock)

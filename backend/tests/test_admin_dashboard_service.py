@@ -177,8 +177,10 @@ class AdminDashboardServiceTests(IsolatedAsyncioTestCase):
 
         self.assertTrue(bookings_view_enabled)
         self.assertEqual(payload["portal_support_queue"], queue_items)
-        self.assertEqual(payload["metrics"][3]["label"], "Portal support queue")
-        self.assertEqual(payload["metrics"][3]["value"], "1")
+        portal_metric = next(
+            metric for metric in payload["metrics"] if metric["label"] == "Portal support queue"
+        )
+        self.assertEqual(portal_metric["value"], "1")
 
     async def test_apply_admin_portal_support_action_records_resolution_audit(self):
         class _ActionSession:

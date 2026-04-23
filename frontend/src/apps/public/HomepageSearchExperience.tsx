@@ -1,4 +1,12 @@
-import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ChangeEvent,
+  FormEvent,
+  KeyboardEvent as ReactKeyboardEvent,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 
 import {
   buildPublicCtaAttribution,
@@ -167,6 +175,12 @@ type LiveReadBookingSummary = {
   nextStep: string | null;
   paymentAllowedBeforeConfirmation: boolean;
   bookingPath: string | null;
+};
+
+type BookingReturnNotice = {
+  tone: 'success' | 'warning';
+  title: string;
+  body: string;
 };
 
 const SEARCH_PROGRESS_STAGES = [
@@ -1460,6 +1474,13 @@ function buildLiveReadResultsSummary(params: {
   inferredLocation: string | null;
   inferredCategory: string | null;
 }) {
+  const preferredWarning =
+    params.warnings.find((warning) => /location access is needed/i.test(warning)) ??
+    params.warnings.find((warning) =>
+      /accuracy over showing a wrong-domain recommendation/i.test(warning),
+    ) ??
+    params.warnings[0] ??
+    null;
   const normalizedQuery = params.normalizedQuery?.trim() || null;
   const inferredLocation = params.inferredLocation?.trim() || null;
   const normalizedQueryAlreadyCarriesLocation =
@@ -1475,8 +1496,13 @@ function buildLiveReadResultsSummary(params: {
     null;
 
   if (!params.rankedCount) {
+    const isLocationWarning = Boolean(
+      preferredWarning && /location access is needed/i.test(preferredWarning),
+    );
     const warningLine =
-      params.warnings[0] ?? 'I could not find a strong relevant match for that request.';
+      isLocationWarning
+        ? 'Turn on location on this device so I can narrow nearby matches in real time instead of showing broad Australia-wide results.'
+        : preferredWarning ?? 'I could not find a strong relevant match for that request.';
     return descriptor
       ? `${warningLine} I stayed grounded to ${descriptor}, so I am not showing unrelated stored results.`
       : `${warningLine} I am not showing unrelated stored results.`;
@@ -1542,6 +1568,7 @@ export function HomepageSearchExperience({
   const [voiceError, setVoiceError] = useState('');
   const [geoContext, setGeoContext] = useState<UserGeoContext | null>(null);
   const [liveReadBookingSummary, setLiveReadBookingSummary] = useState<LiveReadBookingSummary | null>(null);
+  const [bookingReturnNotice, setBookingReturnNotice] = useState<BookingReturnNotice | null>(null);
   const [lastHandledRequestId, setLastHandledRequestId] = useState(0);
   const bookingPanelRef = useRef<HTMLDivElement | null>(null);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
@@ -1551,6 +1578,36 @@ export function HomepageSearchExperience({
   const recognitionBaseQueryRef = useRef('');
   const bookingAssistantV1SessionIdRef = useRef<string | null>(null);
   const lastScrollYRef = useRef(0);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const currentUrl = new URL(window.location.href);
+    const bookingStatus = currentUrl.searchParams.get('booking');
+    const bookingRef = currentUrl.searchParams.get('ref')?.trim() || null;
+
+    if (bookingStatus === 'success' && bookingRef) {
+      setBookingReturnNotice({
+        tone: 'success',
+        title: 'Payment complete',
+        body: `Booking ${bookingRef} has been sent through payment, confirmation, and workflow handoff.`,
+      });
+      return;
+    }
+
+    if (bookingStatus === 'cancelled' && bookingRef) {
+      setBookingReturnNotice({
+        tone: 'warning',
+        title: 'Payment not completed',
+        body: `Booking ${bookingRef} is still saved. Reopen the booking flow when you are ready to finish payment.`,
+      });
+      return;
+    }
+
+    setBookingReturnNotice(null);
+  }, []);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1729,6 +1786,19 @@ export function HomepageSearchExperience({
     () => results.find((service) => service.id === selectedServiceId) ?? null,
     [results, selectedServiceId],
   );
+
+  async function handleSearchComposerKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
+    if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
+      return;
+    }
+
+    event.preventDefault();
+    if (searchLoading) {
+      return;
+    }
+
+    await runSearch(searchQuery);
+  }
 
   async function requestGeoContext() {
     if (geoContext) {
@@ -3659,6 +3729,18 @@ export function HomepageSearchExperience({
         }`}
       >
         <form onSubmit={handleSearchSubmit} className="public-apple-workspace-shell rounded-[1.45rem] border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-2.5 shadow-[0_24px_56px_rgba(15,23,42,0.14)] backdrop-blur-md sm:p-3">
+          {bookingReturnNotice ? (
+            <div
+              className={`mb-3 rounded-[1rem] border px-4 py-3 ${
+                bookingReturnNotice.tone === 'success'
+                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                  : 'border-amber-200 bg-amber-50 text-amber-900'
+              }`}
+            >
+              <div className="text-sm font-semibold">{bookingReturnNotice.title}</div>
+              <p className="mt-1 text-sm leading-6">{bookingReturnNotice.body}</p>
+            </div>
+          ) : null}
           <div className={`flex flex-col ${isMobileViewport ? 'gap-2' : 'gap-3'}`}>
             <div className={`flex items-center justify-between gap-2 ${isMobileViewport ? 'flex-nowrap' : 'flex-wrap'}`}>
               <div
@@ -3721,6 +3803,9 @@ export function HomepageSearchExperience({
                         <textarea
                           value={searchQuery}
                           onChange={(event) => setSearchQuery(event.target.value)}
+                          onKeyDown={(event) => {
+                            void handleSearchComposerKeyDown(event);
+                          }}
                           onFocus={() => {
                             setIsBottomBarVisible(true);
                             if (!searchQuery.trim()) {

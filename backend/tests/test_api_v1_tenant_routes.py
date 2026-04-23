@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import asyncio
 from pathlib import Path
 import sys
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 
+import httpx
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -15,9 +17,11 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from api.v1_routes import (
+    AppError,
     _query_intent_constraint_groups,
     _raw_query_intent_terms,
     _search_terms,
+    _verify_google_identity_token,
 )
 from api.v1_router import router as v1_router
 from repositories.integration_repository import IntegrationRepository
@@ -26,13 +30,21 @@ from repositories.tenant_repository import TenantRepository
 
 
 def create_test_app() -> FastAPI:
+    async def _default_close():
+        return None
+
+    def _default_session_factory():
+        return SimpleNamespace(execute=_fake_execute, commit=_async_noop, close=_default_close)
+
     app = FastAPI()
     app.include_router(v1_router)
-    app.state.session_factory = object()
+    app.state.session_factory = _default_session_factory
     app.state.settings = SimpleNamespace(
         admin_api_token="test-admin-token",
         admin_password="test-admin-password",
         admin_session_ttl_hours=8,
+        session_signing_secret="test-session-signing-secret",
+        tenant_session_signing_secret="test-tenant-session-signing-secret",
         google_oauth_client_id="google-client-id",
     )
     app.state.email_service = SimpleNamespace(
@@ -123,7 +135,37 @@ class _WritableFakeSession:
         return None
 
 
+class _GoogleTokenInfoInvalidClient:
+    async def __aenter__(self):
+        return self
+
+    async def __aexit__(self, *_args):
+        return None
+
+    async def get(self, *_args, **_kwargs):
+        request = httpx.Request("GET", "https://oauth2.googleapis.com/tokeninfo")
+        return httpx.Response(
+            400,
+            request=request,
+            json={"error": "invalid_token", "error_description": "Invalid Value"},
+        )
+
+
 class ApiV1TenantRoutesTestCase(TestCase):
+    def test_google_identity_tokeninfo_invalid_token_returns_actionable_error(self):
+        cfg = SimpleNamespace(google_oauth_client_id="google-client-id")
+
+        with patch("api.v1_routes.httpx.AsyncClient", lambda **_kwargs: _GoogleTokenInfoInvalidClient()):
+            with self.assertRaises(AppError) as context:
+                asyncio.run(_verify_google_identity_token(cfg, id_token="stale-token"))
+
+        error = context.exception
+        self.assertEqual(error.code, "google_identity_token_invalid")
+        self.assertEqual(error.status_code, 401)
+        self.assertIn("verify again", error.message)
+        self.assertEqual(error.details["provider"], "google")
+        self.assertEqual(error.details["provider_status"], 400)
+
     def test_tenant_overview_returns_success_envelope(self):
         async def _resolve_tenant_id(_self, _tenant_ref):
             return "tenant-test"
@@ -180,8 +222,8 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 ],
             }
 
-        with patch("api.v1_routes.get_session", _fake_get_session), patch(
-            "api.v1_routes.build_tenant_overview",
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.build_tenant_overview",
             _build_tenant_overview,
         ), patch.object(
             TenantRepository,
@@ -232,8 +274,8 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 ],
             }
 
-        with patch("api.v1_routes.get_session", _fake_get_session), patch(
-            "api.v1_routes.build_tenant_bookings_snapshot",
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.build_tenant_bookings_snapshot",
             _build_tenant_bookings_snapshot,
         ), patch.object(
             TenantRepository,
@@ -318,8 +360,8 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 },
             }
 
-        with patch("api.v1_routes.get_session", _fake_get_session), patch(
-            "api.v1_routes.build_tenant_integrations_snapshot",
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.build_tenant_integrations_snapshot",
             _build_tenant_integrations_snapshot,
         ), patch.object(
             TenantRepository,
@@ -397,8 +439,8 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 ],
             }
 
-        with patch("api.v1_routes.get_session", _fake_get_session), patch(
-            "api.v1_routes.build_tenant_billing_snapshot",
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.build_tenant_billing_snapshot",
             _build_tenant_billing_snapshot,
         ), patch.object(
             TenantRepository,
@@ -436,8 +478,8 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "members": [],
             }
 
-        with patch("api.v1_routes.get_session", _fake_get_session), patch(
-            "api.v1_routes.build_tenant_team_snapshot",
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.build_tenant_team_snapshot",
             _build_tenant_team_snapshot,
         ), patch.object(
             TenantRepository,
@@ -515,18 +557,18 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "recommended_next_action": "Choose a package to move this tenant into a trial.",
             }
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             TenantRepository,
             "upsert_billing_account",
             _upsert_billing_account,
         ), patch(
-            "api.v1_routes.build_tenant_billing_snapshot",
+            "api.v1_tenant_handlers.build_tenant_billing_snapshot",
             _build_tenant_billing_snapshot,
         ), patch(
-            "api.v1_routes.build_tenant_onboarding_snapshot",
+            "api.v1_tenant_handlers.build_tenant_onboarding_snapshot",
             _build_tenant_onboarding_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -553,7 +595,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 {"email": "operator@future.test", "role": "operator", "status": "active"},
             )
 
-        with patch("api.v1_routes._resolve_tenant_request_context", _resolve_tenant_request_context):
+        with patch("api.v1_tenant_handlers._resolve_tenant_request_context", _resolve_tenant_request_context):
             client = TestClient(create_test_app())
             response = client.patch(
                 "/api/v1/tenant/billing/account?tenant_ref=future-swim",
@@ -654,8 +696,8 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "recommended_next_action": "Complete live billing setup before production charging.",
             }
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             TenantRepository,
@@ -670,10 +712,10 @@ class ApiV1TenantRoutesTestCase(TestCase):
             "replace_subscription_period",
             _replace_subscription_period,
         ), patch(
-            "api.v1_routes.build_tenant_billing_snapshot",
+            "api.v1_tenant_handlers.build_tenant_billing_snapshot",
             _build_tenant_billing_snapshot,
         ), patch(
-            "api.v1_routes.build_tenant_onboarding_snapshot",
+            "api.v1_tenant_handlers.build_tenant_onboarding_snapshot",
             _build_tenant_onboarding_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -766,8 +808,8 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "recommended_next_action": "Billing healthy.",
             }
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             TenantRepository,
@@ -778,10 +820,10 @@ class ApiV1TenantRoutesTestCase(TestCase):
             "update_subscription_period_status",
             _update_subscription_period_status,
         ), patch(
-            "api.v1_routes.build_tenant_billing_snapshot",
+            "api.v1_tenant_handlers.build_tenant_billing_snapshot",
             _build_tenant_billing_snapshot,
         ), patch(
-            "api.v1_routes.build_tenant_onboarding_snapshot",
+            "api.v1_tenant_handlers.build_tenant_onboarding_snapshot",
             _build_tenant_onboarding_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -826,11 +868,11 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 ],
             }
 
-        with patch("api.v1_routes.get_session", _fake_get_session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch(
-            "api.v1_routes.build_tenant_billing_snapshot",
+            "api.v1_tenant_handlers.build_tenant_billing_snapshot",
             _build_tenant_billing_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -879,8 +921,8 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "members": [],
             }
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             TenantRepository,
@@ -891,7 +933,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
             "upsert_tenant_member",
             _upsert_tenant_member,
         ), patch(
-            "api.v1_routes.build_tenant_team_snapshot",
+            "api.v1_tenant_handlers.build_tenant_team_snapshot",
             _build_tenant_team_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -959,8 +1001,8 @@ class ApiV1TenantRoutesTestCase(TestCase):
             send_email=_send_email,
         )
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             TenantRepository,
@@ -971,7 +1013,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
             "upsert_tenant_member",
             _upsert_tenant_member,
         ), patch(
-            "api.v1_routes.build_tenant_team_snapshot",
+            "api.v1_tenant_handlers.build_tenant_team_snapshot",
             _build_tenant_team_snapshot,
         ):
             client = TestClient(app)
@@ -1046,15 +1088,15 @@ class ApiV1TenantRoutesTestCase(TestCase):
             send_email=_send_email,
         )
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             TenantRepository,
             "get_tenant_profile",
             _get_tenant_profile,
         ), patch(
-            "api.v1_routes.build_tenant_team_snapshot",
+            "api.v1_tenant_handlers.build_tenant_team_snapshot",
             _build_tenant_team_snapshot,
         ):
             client = TestClient(app)
@@ -1105,15 +1147,15 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "invite_activity": [],
             }
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             TenantRepository,
             "get_tenant_profile",
             _get_tenant_profile,
         ), patch(
-            "api.v1_routes.build_tenant_team_snapshot",
+            "api.v1_tenant_handlers.build_tenant_team_snapshot",
             _build_tenant_team_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -1159,15 +1201,15 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "members": [],
             }
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             TenantRepository,
             "update_tenant_member_access",
             _update_tenant_member_access,
         ), patch(
-            "api.v1_routes.build_tenant_team_snapshot",
+            "api.v1_tenant_handlers.build_tenant_team_snapshot",
             _build_tenant_team_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -1223,15 +1265,15 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 },
             }
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             IntegrationRepository,
             "upsert_connection",
             _upsert_connection,
         ), patch(
-            "api.v1_routes.build_tenant_integrations_snapshot",
+            "api.v1_tenant_handlers.build_tenant_integrations_snapshot",
             _build_tenant_integrations_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -1256,7 +1298,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
             )
 
         client = TestClient(create_test_app())
-        with patch("api.v1_routes._resolve_tenant_request_context", _resolve_tenant_request_context):
+        with patch("api.v1_tenant_handlers._resolve_tenant_request_context", _resolve_tenant_request_context):
             response = client.patch(
                 "/api/v1/tenant/integrations/providers/hubspot?tenant_ref=future-swim",
                 json={"status": "connected", "sync_mode": "read_only"},
@@ -1955,8 +1997,8 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "recommended_next_action": "Attach an active subscription or trial before paid rollout.",
             }
 
-        with patch("api.v1_routes.get_session", _fake_get_session), patch(
-            "api.v1_routes.build_tenant_onboarding_snapshot",
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.build_tenant_onboarding_snapshot",
             _build_tenant_onboarding_snapshot,
         ), patch.object(
             TenantRepository,
@@ -2032,15 +2074,15 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "recommended_next_action": "Attach billing before converting this tenant to paid.",
             }
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             TenantRepository,
             "update_tenant_profile",
             _update_tenant_profile,
         ), patch(
-            "api.v1_routes.build_tenant_onboarding_snapshot",
+            "api.v1_tenant_handlers.build_tenant_onboarding_snapshot",
             _build_tenant_onboarding_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -2239,15 +2281,15 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "name": "BookedAI Demo Tenant",
             }
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             TenantRepository,
             "get_tenant_profile",
             _get_tenant_profile,
         ), patch(
-            "api.v1_routes._resolve_tenant_catalog_service",
+            "api.v1_tenant_handlers._resolve_tenant_catalog_service",
             _async_value_factory(fake_service),
         ):
             client = TestClient(create_test_app())
@@ -2276,7 +2318,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
             extract_services_from_website=_async_value_factory([]),
         )
 
-        with patch("api.v1_routes._resolve_tenant_request_context", _resolve_tenant_request_context):
+        with patch("api.v1_tenant_handlers._resolve_tenant_request_context", _resolve_tenant_request_context):
             response = client.post(
                 "/api/v1/tenant/catalog/import-website?tenant_ref=future-swim",
                 json={"website_url": "https://future.test"},
@@ -2367,18 +2409,18 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "import_guidance": {"required_fields": [], "recommended_focus": "focus"},
             }
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._resolve_tenant_request_context",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
             _resolve_tenant_request_context,
         ), patch.object(
             TenantRepository,
             "get_tenant_profile",
             _get_tenant_profile,
         ), patch(
-            "api.v1_routes._resolve_tenant_catalog_service",
+            "api.v1_tenant_handlers._resolve_tenant_catalog_service",
             _async_value_factory(fake_service),
         ), patch(
-            "api.v1_routes.build_tenant_catalog_snapshot",
+            "api.v1_tenant_handlers.build_tenant_catalog_snapshot",
             _build_tenant_catalog_snapshot,
         ):
             client = TestClient(create_test_app())

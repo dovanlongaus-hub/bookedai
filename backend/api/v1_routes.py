@@ -538,39 +538,92 @@ async def _verify_google_identity_token(
     *,
     id_token: str,
 ) -> dict[str, str | None]:
-    if not cfg.google_oauth_client_id:
-        raise ValidationAppError(
-            "google_oauth_not_configured",
-            GOOGLE_TENANT_AUTH_CONFIG_MESSAGE,
+    normalized_token = id_token.strip()
+    if not normalized_token:
+        raise AppError(
+            code="google_identity_token_missing",
+            message="Google verification did not return a usable credential. Use the Google button to try again.",
+            status_code=422,
         )
 
-    async with httpx.AsyncClient(timeout=10) as client:
-        response = await client.get(
-            "https://oauth2.googleapis.com/tokeninfo",
-            params={"id_token": id_token},
+    if not cfg.google_oauth_client_id:
+        raise AppError(
+            code="google_oauth_not_configured",
+            message=GOOGLE_TENANT_AUTH_CONFIG_MESSAGE,
+            status_code=503,
         )
-        response.raise_for_status()
-        payload = response.json()
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            response = await client.get(
+                "https://oauth2.googleapis.com/tokeninfo",
+                params={"id_token": normalized_token},
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except httpx.HTTPStatusError as error:
+        provider_status = error.response.status_code
+        provider_error: str | None = None
+        try:
+            provider_payload = error.response.json()
+            provider_error = str(
+                provider_payload.get("error_description")
+                or provider_payload.get("error")
+                or ""
+            ).strip() or None
+        except ValueError:
+            provider_error = None
+
+        if provider_status in {400, 401}:
+            raise AppError(
+                code="google_identity_token_invalid",
+                message="Google verification expired or was rejected. Use another Google account to verify again.",
+                status_code=401,
+                details={
+                    "provider": "google",
+                    "provider_status": provider_status,
+                    "provider_error": provider_error,
+                },
+            ) from error
+
+        raise IntegrationAppError(
+            "Google verification is temporarily unavailable. Please try again shortly.",
+            provider="google",
+            details={"provider_status": provider_status},
+        ) from error
+    except httpx.HTTPError as error:
+        raise IntegrationAppError(
+            "Google verification is temporarily unavailable. Please try again shortly.",
+            provider="google",
+        ) from error
+    except ValueError as error:
+        raise IntegrationAppError(
+            "Google verification returned an unreadable response. Please try again shortly.",
+            provider="google",
+        ) from error
 
     audience = str(payload.get("aud") or "").strip()
     if cfg.google_oauth_client_id and audience != cfg.google_oauth_client_id:
-        raise ValidationAppError(
-            "google_audience_mismatch",
-            "Google sign-in was accepted by a different client application.",
+        raise AppError(
+            code="google_audience_mismatch",
+            message="Google sign-in was accepted by a different client application.",
+            status_code=401,
             details={"aud": audience},
         )
 
     if str(payload.get("email_verified") or "").lower() not in {"true", "1"}:
-        raise ValidationAppError(
-            "google_email_not_verified",
-            "Google account email must be verified before tenant access is granted.",
+        raise AppError(
+            code="google_email_not_verified",
+            message="Google account email must be verified before tenant access is granted.",
+            status_code=403,
         )
 
     email = str(payload.get("email") or "").strip().lower()
     if not email:
-        raise ValidationAppError(
-            "google_email_missing",
-            "Google sign-in did not provide a usable account email.",
+        raise AppError(
+            code="google_email_missing",
+            message="Google sign-in did not provide a usable account email.",
+            status_code=422,
         )
 
     return {

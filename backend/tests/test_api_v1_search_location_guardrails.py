@@ -133,15 +133,12 @@ class ApiV1SearchLocationGuardrailsTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertEqual(payload["data"]["query_understanding"]["inferred_location"], "Current location")
-        self.assertEqual(payload["data"]["query_understanding"]["location_terms"], ["current_location"])
+        self.assertIsNone(payload["data"]["query_understanding"]["inferred_location"])
+        self.assertEqual(payload["data"]["query_understanding"]["location_terms"], [])
         self.assertEqual(
             payload["data"]["query_understanding"]["normalized_query"],
-            "chess classes near me near current location",
+            "chess classes near me",
         )
-        self.assertEqual(payload["data"]["semantic_assist"]["inferred_location"], "Current location")
-        self.assertEqual(
-            payload["data"]["semantic_assist"]["normalized_query"],
-            "chess classes near me near current location",
-        )
+        self.assertIsNone(payload["data"]["semantic_assist"]["inferred_location"])
+        self.assertIsNone(payload["data"]["semantic_assist"]["normalized_query"])
         self.assertEqual(payload["data"]["candidates"][0]["candidate_id"], "svc_online_chess")

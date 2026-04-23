@@ -26,9 +26,15 @@ from repositories.tenant_repository import TenantRepository
 
 
 def create_test_app() -> FastAPI:
+    async def _default_close():
+        return None
+
+    def _default_session_factory():
+        return SimpleNamespace(execute=_fake_execute, commit=_async_noop, close=_default_close)
+
     app = FastAPI()
     app.include_router(v1_router)
-    app.state.session_factory = object()
+    app.state.session_factory = _default_session_factory
     app.state.settings = SimpleNamespace(
         admin_api_token="test-admin-token",
         admin_password="test-admin-password",
@@ -46,6 +52,7 @@ def create_test_app() -> FastAPI:
         zoho_crm_default_task_module="Tasks",
         zoho_crm_notification_token="",
         zoho_crm_notification_channel_id="",
+        public_api_url="https://api.bookedai.au",
     )
     app.state.email_service = SimpleNamespace(
         smtp_configured=lambda: False,

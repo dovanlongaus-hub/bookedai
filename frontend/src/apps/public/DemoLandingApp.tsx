@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 
+import { DemoBookingDialog } from '../../components/landing/DemoBookingDialog';
 import {
   brandDescriptor,
   brandHomeUrl,
@@ -79,6 +80,7 @@ const conversationalSignals = [
 
 export function DemoLandingApp() {
   const [streamedCharacters, setStreamedCharacters] = useState(0);
+  const [isDemoDialogOpen, setIsDemoDialogOpen] = useState(false);
 
   useEffect(() => {
     let timeoutId: number | undefined;
@@ -97,6 +99,17 @@ export function DemoLandingApp() {
 
     return () => window.clearTimeout(timeoutId);
   }, [streamedCharacters]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const search = new URLSearchParams(window.location.search);
+    if ((search.get('demo') ?? '').trim().toLowerCase() === 'open') {
+      setIsDemoDialogOpen(true);
+    }
+  }, []);
 
   const renderedMessage = streamedMessage.slice(0, streamedCharacters);
 
@@ -165,9 +178,16 @@ export function DemoLandingApp() {
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setIsDemoDialogOpen(true)}
+                className="booked-button"
+              >
+                Book a Demo
+              </button>
               <a
                 href="https://product.bookedai.au/"
-                className="booked-button"
+                className="booked-button-secondary"
               >
                 Try Now
               </a>
@@ -318,6 +338,21 @@ export function DemoLandingApp() {
             <p className="mt-4 text-base leading-8 text-white/78 sm:text-lg">
               Use this demo surface for `demo.bookedai.au`, then send traffic straight into the live BookedAI experience.
             </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => setIsDemoDialogOpen(true)}
+                className="booked-button bg-white text-slate-950"
+              >
+                Open demo brief
+              </button>
+              <a
+                href="https://product.bookedai.au/"
+                className="booked-button-secondary border-white/30 text-white hover:bg-white/10"
+              >
+                Open live product
+              </a>
+            </div>
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3 lg:mt-0 lg:justify-end">
@@ -336,6 +371,11 @@ export function DemoLandingApp() {
           </div>
         </div>
       </section>
+
+      <DemoBookingDialog
+        isOpen={isDemoDialogOpen}
+        onClose={() => setIsDemoDialogOpen(false)}
+      />
     </main>
   );
 }
