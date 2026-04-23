@@ -1,0 +1,40 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="900" rx="48" fill="#09121E"/>
+  <rect x="28" y="28" width="1144" height="844" rx="38" fill="url(#bg)"/>
+  <path d="M134 250H1066" stroke="#1E293B" stroke-width="2" stroke-dasharray="8 14"/>
+  <path d="M134 350H1066" stroke="#1E293B" stroke-width="2" stroke-dasharray="8 14"/>
+  <path d="M134 450H1066" stroke="#1E293B" stroke-width="2" stroke-dasharray="8 14"/>
+  <path d="M134 550H1066" stroke="#1E293B" stroke-width="2" stroke-dasharray="8 14"/>
+  <path d="M134 650H1066" stroke="#1E293B" stroke-width="2" stroke-dasharray="8 14"/>
+  <path d="M260 214V746" stroke="#1E293B" stroke-width="2" stroke-dasharray="8 14"/>
+  <path d="M454 214V746" stroke="#1E293B" stroke-width="2" stroke-dasharray="8 14"/>
+  <path d="M648 214V746" stroke="#1E293B" stroke-width="2" stroke-dasharray="8 14"/>
+  <path d="M842 214V746" stroke="#1E293B" stroke-width="2" stroke-dasharray="8 14"/>
+  <text x="136" y="148" fill="#F8FAFC" font-family="Arial, Helvetica, sans-serif" font-size="56" font-weight="700">Project-based AI builder mentoring</text>
+  <text x="136" y="192" fill="#BFDBFE" font-family="Arial, Helvetica, sans-serif" font-size="28">Flexible blueprint-style support for custom product scope, architecture, and build outcomes</text>
+  <rect x="170" y="274" width="236" height="164" rx="28" fill="#1D4ED8" fill-opacity="0.88"/>
+  <rect x="432" y="406" width="268" height="192" rx="28" fill="#14B8A6" fill-opacity="0.86"/>
+  <rect x="724" y="310" width="262" height="226" rx="28" fill="#F97316" fill-opacity="0.9"/>
+  <rect x="232" y="492" width="160" height="170" rx="28" fill="#0F172A" stroke="#60A5FA" stroke-width="4"/>
+  <path d="M288 540H336" stroke="#93C5FD" stroke-width="10" stroke-linecap="round"/>
+  <path d="M288 578H336" stroke="#93C5FD" stroke-width="10" stroke-linecap="round"/>
+  <path d="M288 616H320" stroke="#93C5FD" stroke-width="10" stroke-linecap="round"/>
+  <path d="M406 356L456 356" stroke="#7DD3FC" stroke-width="12" stroke-linecap="round"/>
+  <path d="M700 468L724 468" stroke="#99F6E4" stroke-width="12" stroke-linecap="round"/>
+  <path d="M640 310L724 310" stroke="#67E8F9" stroke-width="12" stroke-linecap="round"/>
+  <path d="M406 356L432 406" stroke="#38BDF8" stroke-width="8" stroke-linecap="round"/>
+  <path d="M700 468L724 468" stroke="#2DD4BF" stroke-width="8" stroke-linecap="round"/>
+  <path d="M700 530L724 530" stroke="#2DD4BF" stroke-width="8" stroke-linecap="round"/>
+  <rect x="772" y="364" width="168" height="28" rx="14" fill="#FFEDD5"/>
+  <rect x="772" y="414" width="126" height="22" rx="11" fill="#FED7AA"/>
+  <rect x="772" y="456" width="148" height="22" rx="11" fill="#FDBA74"/>
+  <rect x="136" y="790" width="368" height="72" rx="22" fill="#1E40AF"/>
+  <text x="178" y="834" fill="#E0E7FF" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700">Custom Scope Blueprint</text>
+  <defs>
+    <linearGradient id="bg" x1="72" y1="68" x2="1106" y2="846" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1524"/>
+      <stop offset="0.45" stop-color="#0D1B2A"/>
+      <stop offset="1" stop-color="#09121E"/>
+    </linearGradient>
+  </defs>
+</svg>

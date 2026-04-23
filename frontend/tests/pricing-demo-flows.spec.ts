@@ -75,6 +75,34 @@ async function preserveBannerQueryDuringMount(page: Parameters<typeof test>[0]['
 }
 
 test.describe('pricing and demo flows', () => {
+  test('register interest surfaces backend validation details instead of a generic API status @legacy', async ({
+    page,
+  }) => {
+    await page.route('**/api/pricing/consultation', async (route) => {
+      await route.fulfill({
+        status: 400,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          detail: 'Enter a valid phone number with at least 8 digits',
+        }),
+      });
+    });
+
+    await page.goto('/register-interest');
+
+    await page.getByLabel('Business name').fill('BookedAI Studio');
+    await page.getByLabel('Website or app URL').fill('https://bookedai.au');
+    await page.getByLabel('Business type').fill('Salon');
+    await page.getByLabel('Work email').fill('owner@example.com');
+    await page.getByLabel('Phone number').fill('1234567');
+    await page.getByLabel('Your name').fill('BookedAI Owner');
+    await page.getByRole('button', { name: 'Register SME and Continue' }).click();
+
+    await expect(
+      page.getByText('Enter a valid phone number with at least 8 digits.'),
+    ).toBeVisible();
+  });
+
   test('pricing consultation success flow surfaces payment, calendar, and return states @legacy', async ({
     page,
   }) => {

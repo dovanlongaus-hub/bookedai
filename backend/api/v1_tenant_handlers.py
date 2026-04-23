@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 
 from fastapi import Header, Request
+from httpx import HTTPError
 
 from api.v1_routes import (
     ActorContextPayload,
@@ -21,13 +22,17 @@ from api.v1_routes import (
     TENANT_TEAM_ROLE_CODES,
     TenantBillingAccountUpdateRequestPayload,
     TenantCatalogImportRequestPayload,
+    TenantCatalogCreateRequestPayload,
     TenantCatalogUpdateRequestPayload,
     TenantClaimAccountRequestPayload,
     TenantCreateAccountRequestPayload,
+    TenantEmailCodeRequestPayload,
+    TenantEmailCodeVerifyRequestPayload,
     TenantGoogleAuthRequestPayload,
     TenantIntegrationProviderUpdateRequestPayload,
     TenantInviteMemberRequestPayload,
     TenantMemberAccessUpdateRequestPayload,
+    TenantPluginInterfaceUpdateRequestPayload,
     TenantPasswordAuthRequestPayload,
     TenantProfileUpdateRequestPayload,
     TenantRepository,
@@ -42,15 +47,20 @@ from api.v1_routes import (
     _create_or_update_tenant_credential,
     _create_tenant_session_token,
     _deliver_tenant_invite_email,
+    _deliver_tenant_email_login_code,
     _error_response,
     _load_tenant_credential,
+    _load_tenant_credential_by_email,
+    _load_valid_tenant_email_login_code,
     _load_tenant_membership,
     _load_tenant_memberships_for_google_identity,
     _membership_role,
+    _normalize_tenant_email_auth_intent,
     _normalize_tenant_slug_candidate,
     _require_tenant_membership_role,
     _resolve_tenant_catalog_service,
     _resolve_tenant_request_context,
+    _store_tenant_email_login_code,
     _slugify_value,
     _success_response,
     _tenant_period_id_from_invoice_id,
@@ -66,18 +76,386 @@ from api.v1_routes import (
     build_tenant_invoice_receipt,
     build_tenant_onboarding_snapshot,
     build_tenant_overview,
+    build_tenant_plugin_interface_snapshot,
     build_tenant_team_snapshot,
     get_session,
     queue_portal_booking_request,
     select,
 )
 from repositories.reporting_repository import ReportingRepository
+from service_layer.tenant_app_service import (
+    TENANT_BILLING_PLAN_CATALOG,
+    _clean_optional_text,
+    _sanitize_workspace_html,
+    create_tenant_stripe_billing_portal_session,
+    create_tenant_stripe_checkout_session,
+)
+
+
+def _derive_google_tenant_business_name(
+    *,
+    business_name: str | None,
+    google_name: str | None,
+    google_email: str | None,
+) -> str:
+    normalized_business_name = str(business_name or "").strip()
+    if normalized_business_name:
+        return normalized_business_name
+
+    normalized_google_name = str(google_name or "").strip()
+    if normalized_google_name:
+        return normalized_google_name
+
+    email_local_part = str(google_email or "").strip().split("@", 1)[0]
+    readable_local_part = " ".join(
+        part
+        for part in email_local_part.replace(".", " ").replace("_", " ").replace("-", " ").split()
+        if part
+    )
+    return readable_local_part.title() or "BookedAI Tenant"
+
+
+async def _resolve_available_google_tenant_slug(
+    tenant_repository: TenantRepository,
+    *,
+    tenant_slug: str | None,
+    business_name: str,
+    google_email: str | None,
+) -> str:
+    base_slug = _normalize_tenant_slug_candidate(
+        str(tenant_slug or "").strip() or business_name or str(google_email or "").split("@", 1)[0]
+    )
+    candidate = base_slug
+    suffix = 2
+    while await tenant_repository.get_tenant_profile(candidate):
+        candidate = _normalize_tenant_slug_candidate(f"{base_slug}-{suffix}")
+        suffix += 1
+    return candidate
+
+
+async def _resolve_tenant_memberships_for_email(
+    session,
+    *,
+    email: str,
+) -> list[dict[str, str | None]]:
+    return await _load_tenant_memberships_for_google_identity(
+        session,
+        email=email,
+        google_sub=None,
+    )
+
+
+async def tenant_email_code_request(request: Request, payload: TenantEmailCodeRequestPayload):
+    normalized_email = payload.email.strip().lower()
+    if not normalized_email:
+        return _error_response(
+            ValidationAppError(
+                "tenant_email_code_email_required",
+                "Email is required before BookedAI can send a tenant login code.",
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    auth_intent = _normalize_tenant_email_auth_intent(payload.auth_intent, default="sign-in")
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_id: str | None = None
+        tenant_slug: str | None = None
+        tenant_name: str | None = None
+        metadata: dict[str, str | None] = {
+            "business_name": str(payload.business_name or "").strip() or None,
+            "full_name": str(payload.full_name or "").strip() or None,
+            "industry": str(payload.industry or "").strip() or None,
+            "tenant_slug": str(payload.tenant_slug or "").strip() or None,
+        }
+
+        if auth_intent == "sign-in":
+            if payload.tenant_ref:
+                tenant_id = await tenant_repository.resolve_tenant_id(payload.tenant_ref)
+                if not tenant_id:
+                    return _error_response(
+                        AppError(
+                            code="tenant_not_found",
+                            message="The requested tenant could not be resolved for email sign-in.",
+                            status_code=404,
+                            details={"tenant_ref": payload.tenant_ref},
+                        ),
+                        tenant_id=None,
+                        actor_context=None,
+                    )
+                membership = await _load_tenant_membership(
+                    session,
+                    tenant_id=tenant_id,
+                    email=normalized_email,
+                    statuses=("active",),
+                )
+                if not membership:
+                    return _error_response(
+                        AppError(
+                            code="tenant_email_code_membership_not_found",
+                            message="No active tenant membership matches that email for this workspace.",
+                            status_code=404,
+                        ),
+                        tenant_id=tenant_id,
+                        actor_context=None,
+                    )
+                tenant_slug = str(membership.get("tenant_slug") or "").strip() or str(payload.tenant_ref)
+                tenant_profile = await tenant_repository.get_tenant_profile(tenant_id)
+                tenant_name = str((tenant_profile or {}).get("name") or "").strip() or tenant_slug
+            else:
+                memberships = await _resolve_tenant_memberships_for_email(session, email=normalized_email)
+                if not memberships:
+                    return _error_response(
+                        AppError(
+                            code="tenant_email_code_membership_not_found",
+                            message="No active tenant workspace was found for that email. Use New workspace or Google create instead.",
+                            status_code=404,
+                        ),
+                        tenant_id=None,
+                        actor_context=None,
+                    )
+                if len(memberships) > 1:
+                    return _error_response(
+                        AppError(
+                            code="tenant_email_code_multiple_memberships",
+                            message="This email is linked to multiple tenant workspaces. Open the exact workspace URL first, then request the login code again.",
+                            status_code=409,
+                            details={"tenant_slugs": [item["tenant_slug"] for item in memberships if item.get("tenant_slug")]},
+                        ),
+                        tenant_id=None,
+                        actor_context=None,
+                    )
+                membership = memberships[0]
+                tenant_id = str(membership.get("tenant_id") or "").strip()
+                tenant_slug = str(membership.get("tenant_slug") or "").strip()
+                tenant_profile = await tenant_repository.get_tenant_profile(tenant_id)
+                tenant_name = str((tenant_profile or {}).get("name") or "").strip() or tenant_slug
+
+        elif auth_intent == "claim":
+            if not payload.tenant_ref:
+                return _error_response(
+                    ValidationAppError(
+                        "tenant_claim_invalid",
+                        "Open the tenant workspace first before requesting an invite-acceptance code.",
+                    ),
+                    tenant_id=None,
+                    actor_context=None,
+                )
+            tenant_id = await tenant_repository.resolve_tenant_id(payload.tenant_ref)
+            if not tenant_id:
+                return _error_response(
+                    AppError(
+                        code="tenant_not_found",
+                        message="The requested tenant could not be resolved for invite acceptance.",
+                        status_code=404,
+                    ),
+                    tenant_id=None,
+                    actor_context=None,
+                )
+            tenant_profile = await tenant_repository.get_tenant_profile(payload.tenant_ref or tenant_id)
+            tenant_slug = str((tenant_profile or {}).get("slug") or payload.tenant_ref).strip()
+            tenant_name = str((tenant_profile or {}).get("name") or tenant_slug).strip()
+
+        else:
+            business_name = str(payload.business_name or "").strip()
+            if not business_name:
+                return _error_response(
+                    ValidationAppError(
+                        "tenant_account_create_invalid",
+                        "Business name and email are required to create a tenant workspace by email code.",
+                    ),
+                    tenant_id=None,
+                    actor_context=None,
+                )
+            tenant_name = business_name
+            tenant_slug = str(payload.tenant_slug or "").strip() or None
+
+        _code_row, code = await _store_tenant_email_login_code(
+            session,
+            email=normalized_email,
+            auth_intent=auth_intent,
+            tenant_id=tenant_id,
+            tenant_slug=tenant_slug,
+            metadata=metadata,
+        )
+        delivery = await _deliver_tenant_email_login_code(
+            request,
+            email=normalized_email,
+            code=code,
+            auth_intent=auth_intent,
+            tenant_name=tenant_name,
+            tenant_slug=tenant_slug,
+        )
+        await session.commit()
+
+    return _success_response(
+        {
+            "email": normalized_email,
+            "auth_intent": auth_intent,
+            "tenant_slug": tenant_slug,
+            "tenant_name": tenant_name,
+            "delivery": delivery,
+        },
+        tenant_id=tenant_id,
+        actor_context=None,
+    )
+
+
+async def tenant_email_code_verify(request: Request, payload: TenantEmailCodeVerifyRequestPayload):
+    cfg: Settings = request.app.state.settings
+    normalized_email = payload.email.strip().lower()
+    normalized_code = "".join(character for character in str(payload.code or "") if character.isdigit())
+    if not normalized_email or len(normalized_code) < 4:
+        return _error_response(
+            ValidationAppError(
+                "tenant_email_code_invalid",
+                "Email and the verification code are required to complete tenant sign-in.",
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    auth_intent = _normalize_tenant_email_auth_intent(payload.auth_intent, default="sign-in")
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        requested_tenant_id = await tenant_repository.resolve_tenant_id(payload.tenant_ref) if payload.tenant_ref else None
+        login_code = await _load_valid_tenant_email_login_code(
+            session,
+            email=normalized_email,
+            auth_intent=auth_intent,
+            code=normalized_code,
+            tenant_id=requested_tenant_id,
+        )
+        if not login_code:
+            return _error_response(
+                AppError(
+                    code="tenant_email_code_invalid",
+                    message="That tenant email code is invalid or has expired. Request a new code and try again.",
+                    status_code=401,
+                ),
+                tenant_id=requested_tenant_id,
+                actor_context=None,
+            )
+
+        login_code.consumed_at = datetime.now(UTC)
+        metadata = login_code.metadata_json if isinstance(login_code.metadata_json, dict) else {}
+        tenant_id = str(login_code.tenant_id or requested_tenant_id or "").strip() or None
+        tenant_profile: dict[str, str | None] | None = None
+        membership: dict[str, str | None] | None = None
+        role = "tenant_admin"
+        full_name = str(payload.full_name or metadata.get("full_name") or "").strip() or None
+
+        if auth_intent == "sign-in":
+            memberships = await _resolve_tenant_memberships_for_email(session, email=normalized_email)
+            if requested_tenant_id:
+                memberships = [item for item in memberships if str(item.get("tenant_id") or "").strip() == requested_tenant_id]
+            if not memberships:
+                return _error_response(
+                    AppError(
+                        code="tenant_email_code_membership_not_found",
+                        message="No active tenant membership matches that email any longer.",
+                        status_code=404,
+                    ),
+                    tenant_id=requested_tenant_id,
+                    actor_context=None,
+                )
+            if len(memberships) > 1:
+                return _error_response(
+                    AppError(
+                        code="tenant_email_code_multiple_memberships",
+                        message="This email is linked to multiple tenant workspaces. Open the exact workspace URL first, then request a new code there.",
+                        status_code=409,
+                        details={"tenant_slugs": [item["tenant_slug"] for item in memberships if item.get("tenant_slug")]},
+                    ),
+                    tenant_id=None,
+                    actor_context=None,
+                )
+            membership = memberships[0]
+            tenant_id = str(membership.get("tenant_id") or "").strip()
+            role = str(membership.get("role") or "tenant_admin")
+            tenant_profile = await tenant_repository.get_tenant_profile(tenant_id)
+            credential = await _load_tenant_credential_by_email(
+                session,
+                tenant_id=tenant_id,
+                email=normalized_email,
+            )
+            if credential:
+                role = str(credential.role or role or "tenant_admin")
+
+        elif auth_intent == "claim":
+            tenant_ref = payload.tenant_ref or str(login_code.tenant_slug or "").strip()
+            if not tenant_ref:
+                return _error_response(
+                    ValidationAppError(
+                        "tenant_claim_invalid",
+                        "Tenant reference is required to accept this invite.",
+                    ),
+                    tenant_id=None,
+                    actor_context=None,
+                )
+            claim_payload = TenantClaimAccountRequestPayload(
+                tenant_ref=tenant_ref,
+                email=normalized_email,
+                username=normalized_email,
+                password=normalized_code,
+                full_name=full_name,
+            )
+            return await tenant_claim_account(request, claim_payload)
+
+        else:
+            business_name = str(payload.business_name or metadata.get("business_name") or "").strip()
+            if not business_name:
+                return _error_response(
+                    ValidationAppError(
+                        "tenant_account_create_invalid",
+                        "Business name is required to finish tenant workspace creation.",
+                    ),
+                    tenant_id=None,
+                    actor_context=None,
+                )
+            create_payload = TenantCreateAccountRequestPayload(
+                business_name=business_name,
+                email=normalized_email,
+                username=normalized_email,
+                password=normalized_code,
+                full_name=full_name,
+                industry=str(payload.industry or metadata.get("industry") or "").strip() or None,
+                tenant_slug=str(payload.tenant_slug or metadata.get("tenant_slug") or "").strip() or None,
+            )
+            return await tenant_create_account(request, create_payload)
+
+        await session.commit()
+
+    if not tenant_profile or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_email_code_verify_failed",
+                message="Tenant email-code verification could not be completed.",
+                status_code=500,
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    response, actor_context = await _build_tenant_auth_response(
+        cfg,
+        tenant_id=tenant_id,
+        tenant_profile=tenant_profile,
+        email=normalized_email,
+        name=full_name,
+        picture_url=None,
+        provider="password",
+        role=role,
+        membership=membership,
+    )
+    return _success_response(response, tenant_id=tenant_id, actor_context=actor_context)
 
 
 async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestPayload):
     cfg: Settings = request.app.state.settings
     google_identity = await _verify_google_identity_token(cfg, id_token=payload.id_token)
-    auth_intent = str(payload.auth_intent or "sign-in").strip().lower()
+    auth_intent = str(payload.auth_intent or "create").strip().lower()
     if auth_intent not in {"sign-in", "create"}:
         return _error_response(
             ValidationAppError(
@@ -163,43 +541,17 @@ async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestP
                         auth_provider="google",
                     )
             else:
-                if auth_intent != "create":
-                    return _error_response(
-                        AppError(
-                            code="tenant_google_auth_not_found",
-                            message="No tenant workspace is linked to this Google account yet. Create a new tenant account first.",
-                            status_code=404,
-                        ),
-                        tenant_id=None,
-                        actor_context=None,
-                    )
-
-                normalized_business_name = str(payload.business_name or "").strip()
-                if not normalized_business_name:
-                    return _error_response(
-                        ValidationAppError(
-                            "tenant_google_create_business_name_required",
-                            "Business name is required before creating a tenant account with Google.",
-                        ),
-                        tenant_id=None,
-                        actor_context=None,
-                    )
-
-                normalized_slug = _normalize_tenant_slug_candidate(
-                    str(payload.tenant_slug or normalized_business_name)
+                normalized_business_name = _derive_google_tenant_business_name(
+                    business_name=payload.business_name,
+                    google_name=google_identity["name"],
+                    google_email=google_identity["email"],
                 )
-                existing_tenant = await tenant_repository.get_tenant_profile(normalized_slug)
-                if existing_tenant:
-                    return _error_response(
-                        AppError(
-                            code="tenant_account_slug_taken",
-                            message="That tenant workspace slug already exists. Sign in instead or choose a different business name.",
-                            status_code=409,
-                            details={"tenant_slug": normalized_slug},
-                        ),
-                        tenant_id=str(existing_tenant.get("id") or ""),
-                        actor_context=None,
-                    )
+                normalized_slug = await _resolve_available_google_tenant_slug(
+                    tenant_repository,
+                    tenant_slug=payload.tenant_slug,
+                    business_name=normalized_business_name,
+                    google_email=google_identity["email"],
+                )
 
                 tenant_profile = await tenant_repository.create_tenant(
                     slug=normalized_slug,
@@ -248,20 +600,31 @@ async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestP
 
 async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequestPayload):
     cfg: Settings = request.app.state.settings
-    normalized_username = payload.username.strip().lower()
+    normalized_identifier = payload.username.strip().lower()
     normalized_password = payload.password.strip()
-    if not normalized_username or not normalized_password:
+    if not normalized_identifier or not normalized_password:
         return _error_response(
             ValidationAppError(
                 "tenant_auth_invalid_credentials",
-                "Username and password are required for tenant sign-in.",
+                "Email or username and password are required for tenant sign-in.",
             ),
             tenant_id=None,
             actor_context=None,
         )
 
     async with get_session(request.app.state.session_factory) as session:
-        credential = await _load_tenant_credential(session, username=normalized_username)
+        credential = None
+        if "@" in normalized_identifier and payload.tenant_ref:
+            tenant_repository = TenantRepository(RepositoryContext(session=session))
+            requested_tenant_id = await tenant_repository.resolve_tenant_id(payload.tenant_ref)
+            if requested_tenant_id:
+                credential = await _load_tenant_credential_by_email(
+                    session,
+                    tenant_id=requested_tenant_id,
+                    email=normalized_identifier,
+                )
+        if not credential:
+            credential = await _load_tenant_credential(session, username=normalized_identifier)
         if not credential or not _verify_tenant_password(
             password=normalized_password,
             salt=credential.password_salt,
@@ -270,7 +633,7 @@ async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequ
             return _error_response(
                 AppError(
                     code="tenant_auth_invalid_credentials",
-                    message="The tenant username or password is incorrect.",
+                    message="The tenant email or password is incorrect.",
                     status_code=401,
                 ),
                 tenant_id=None,
@@ -284,9 +647,9 @@ async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequ
             return _error_response(
                 AppError(
                     code="tenant_not_found",
-                    message="The tenant profile could not be loaded for username-based sign-in.",
+                    message="The tenant profile could not be loaded for credential-based sign-in.",
                     status_code=404,
-                    details={"tenant_ref": payload.tenant_ref, "username": normalized_username},
+                    details={"tenant_ref": payload.tenant_ref, "username": normalized_identifier},
                 ),
                 tenant_id=None,
                 actor_context=None,
@@ -320,7 +683,7 @@ async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequ
                 session,
                 tenant_profile=tenant_profile,
                 email=str(credential.email or "").strip().lower(),
-                full_name=normalized_username,
+                full_name=normalized_identifier,
                 google_sub=None,
                 auth_provider="password",
             )
@@ -330,7 +693,7 @@ async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequ
         cfg,
         email=str(credential.email or "").strip().lower(),
         tenant_ref=str(credential.tenant_slug or tenant_profile["slug"] or tenant_id),
-        name=normalized_username,
+        name=normalized_identifier,
         picture_url=None,
         google_sub=None,
     )
@@ -347,7 +710,7 @@ async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequ
             "provider": "password",
             "user": {
                 "email": str(credential.email or "").strip().lower(),
-                "full_name": normalized_username,
+                "full_name": normalized_identifier,
                 "picture_url": None,
             },
             "tenant": tenant_profile,
@@ -648,6 +1011,170 @@ async def tenant_bookings(request: Request, authorization: str | None = Header(d
     )
 
 
+async def tenant_plugin_interface(request: Request, authorization: str | None = Header(default=None)):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    async with get_session(request.app.state.session_factory) as session:
+        if not tenant_id:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved.",
+                    status_code=404,
+                    details={"tenant_ref": tenant_ref},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        snapshot = await build_tenant_plugin_interface_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        snapshot["access"] = {
+            "current_role": _membership_role(membership) if tenant_session else "tenant_preview",
+            "can_manage_plugin": bool(
+                tenant_session and _membership_role(membership) in TENANT_CATALOG_WRITE_ROLES
+            ),
+            "operator_note": (
+                "Tenant admins and operators can manage the official partner plugin configuration, copy widget snippets, and keep the tenant website embed aligned with the BookedAI runtime."
+            ),
+        }
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership) if tenant_session else "tenant_preview",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+async def tenant_plugin_interface_update(
+    request: Request,
+    payload: TenantPluginInterfaceUpdateRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before changing the plugin interface setup.",
+                status_code=401,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_CATALOG_WRITE_ROLES,
+        missing_message="Only tenant admins and operators can change the partner plugin interface.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    if not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_not_found",
+                message="The requested tenant could not be resolved.",
+                status_code=404,
+                details={"tenant_ref": tenant_ref},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    scoped_tenant_ref = str(
+        tenant_ref
+        or tenant_session.get("tenant_ref")
+        or membership.get("tenant_slug")
+        or tenant_id
+    ).strip()
+
+    update_payload = {
+        "partner_name": payload.partner_name,
+        "partner_website_url": payload.partner_website_url,
+        "bookedai_host": payload.bookedai_host,
+        "embed_path": payload.embed_path,
+        "widget_script_path": payload.widget_script_path,
+        "tenant_ref": scoped_tenant_ref,
+        "widget_id": payload.widget_id,
+        "accent_color": payload.accent_color,
+        "button_label": payload.button_label,
+        "modal_title": payload.modal_title,
+        "headline": payload.headline,
+        "prompt": payload.prompt,
+        "inline_target_selector": payload.inline_target_selector,
+        "support_email": payload.support_email,
+        "support_whatsapp": payload.support_whatsapp,
+        "logo_url": payload.logo_url,
+    }
+    sanitized_payload = {
+        key: str(value).strip()
+        for key, value in update_payload.items()
+        if value is not None and str(value).strip()
+    }
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+
+        next_settings = {
+            "partner_plugin_interface": sanitized_payload,
+        }
+        if payload.headline is not None and str(payload.headline).strip():
+            next_settings["main_message"] = str(payload.headline).strip()
+
+        await tenant_repository.upsert_tenant_settings(
+            tenant_id=tenant_id,
+            settings_json=next_settings,
+        )
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.plugin_interface.updated",
+            entity_type="tenant_settings",
+            entity_id=tenant_id,
+            actor_type="tenant_user",
+            actor_id=str(tenant_session.get("email") or tenant_session.get("sub") or tenant_id),
+            payload={
+                "summary": "Tenant partner plugin configuration updated from the tenant portal.",
+                "fields": sorted(sanitized_payload.keys()),
+                "partner_website_url": sanitized_payload.get("partner_website_url"),
+                "embed_path": sanitized_payload.get("embed_path"),
+                "widget_id": sanitized_payload.get("widget_id"),
+                "tenant_ref": sanitized_payload.get("tenant_ref"),
+            },
+        )
+        await session.commit()
+
+        snapshot = await build_tenant_plugin_interface_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        snapshot["access"] = {
+            "current_role": _membership_role(membership),
+            "can_manage_plugin": True,
+            "operator_note": (
+                "Tenant admins and operators can manage the official partner plugin configuration, copy widget snippets, and keep the tenant website embed aligned with the BookedAI runtime."
+            ),
+        }
+
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership),
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
 async def tenant_integrations(request: Request, authorization: str | None = Header(default=None)):
     tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
         request,
@@ -902,6 +1429,301 @@ async def tenant_billing_account_update(
         tenant_id=tenant_id,
         actor_context=actor_context,
     )
+
+
+async def tenant_billing_checkout_session(
+    request: Request,
+    payload: TenantSubscriptionUpdateRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before starting Stripe checkout.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_BILLING_WRITE_ROLES,
+        message="Only tenant admins and finance managers can start Stripe billing flows.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    plan_code = str(payload.package_code or payload.plan_code or "").strip().lower()
+    selected_plan = next(
+        (plan for plan in TENANT_BILLING_PLAN_CATALOG if str(plan.get("code") or "").strip().lower() == plan_code),
+        None,
+    )
+    if not selected_plan:
+        return _error_response(
+            AppError(
+                code="invalid_plan_code",
+                message="Select a valid tenant subscription package before continuing to Stripe.",
+                status_code=422,
+                details={"allowed_plan_codes": sorted(TENANT_SUBSCRIPTION_PLAN_CODES)},
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    mode = str(payload.mode or "trial").strip().lower()
+    if mode not in {"trial", "activate"}:
+        mode = "trial"
+
+    cfg: Settings = request.app.state.settings
+    if not cfg.stripe_secret_key:
+        return _error_response(
+            AppError(
+                code="stripe_not_configured",
+                message="Stripe is not configured on this BookedAI runtime yet.",
+                status_code=503,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref or tenant_id)
+        if not tenant_profile:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved for Stripe checkout.",
+                    status_code=404,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        billing_account = await tenant_repository.upsert_billing_account(
+            tenant_id=tenant_id,
+            billing_email=str(tenant_session.get("email") or "").strip().lower() or None,
+            merchant_mode=None,
+        )
+        merchant_mode = str(billing_account.get("merchant_mode") or "").strip().lower()
+        if merchant_mode not in {"live", "production"}:
+            return _error_response(
+                AppError(
+                    code="tenant_billing_not_live",
+                    message="Switch the tenant billing account to live mode before opening the real Stripe checkout flow.",
+                    status_code=409,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        try:
+            stripe_checkout = await create_tenant_stripe_checkout_session(
+                session,
+                cfg,
+                tenant_profile=tenant_profile,
+                billing_email=_clean_optional_text(billing_account.get("billing_email"))
+                or str(tenant_session.get("email") or "").strip().lower()
+                or None,
+                plan_code=plan_code,
+                plan_label=str(selected_plan.get("label") or plan_code.title()),
+                plan_description=str(selected_plan.get("description") or "").strip(),
+                monthly_amount_aud=int(selected_plan.get("monthly_amount_aud") or 0),
+                mode=mode,
+            )
+        except HTTPError:
+            return _error_response(
+                AppError(
+                    code="stripe_checkout_failed",
+                    message="Stripe checkout could not be created for this tenant right now.",
+                    status_code=502,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+        except Exception as exc:
+            return _error_response(
+                AppError(
+                    code="stripe_checkout_failed",
+                    message=str(exc) or "Stripe checkout could not be created for this tenant right now.",
+                    status_code=502,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.billing.stripe_checkout_created",
+            entity_type="subscription",
+            entity_id=str(stripe_checkout.get("stripe_checkout_session_id") or ""),
+            actor_type="tenant_app",
+            actor_id=str(tenant_session.get("email") or ""),
+            payload={
+                "summary": "Stripe checkout session created from the tenant billing workspace.",
+                "package_code": plan_code,
+                "plan_code": plan_code,
+                "mode": mode,
+                "stripe_customer_id": stripe_checkout.get("stripe_customer_id"),
+            },
+        )
+        await session.commit()
+        billing = await build_tenant_billing_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        onboarding = await build_tenant_onboarding_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+
+    return _success_response(
+        {
+            "checkout_url": stripe_checkout.get("checkout_url"),
+            "billing": billing,
+            "onboarding": onboarding,
+        },
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=str(membership.get("role") or "tenant_admin"),
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+async def tenant_billing_portal_session(
+    request: Request,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with an active tenant account before opening the Stripe billing portal.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_BILLING_WRITE_ROLES,
+        message="Only tenant admins and finance managers can open the Stripe billing portal.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    cfg: Settings = request.app.state.settings
+    if not cfg.stripe_secret_key:
+        return _error_response(
+            AppError(
+                code="stripe_not_configured",
+                message="Stripe is not configured on this BookedAI runtime yet.",
+                status_code=503,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref or tenant_id)
+        if not tenant_profile:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved for Stripe billing portal access.",
+                    status_code=404,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        billing_account = await tenant_repository.upsert_billing_account(
+            tenant_id=tenant_id,
+            billing_email=str(tenant_session.get("email") or "").strip().lower() or None,
+            merchant_mode=None,
+        )
+        merchant_mode = str(billing_account.get("merchant_mode") or "").strip().lower()
+        if merchant_mode not in {"live", "production"}:
+            return _error_response(
+                AppError(
+                    code="tenant_billing_not_live",
+                    message="Switch the tenant billing account to live mode before opening the real Stripe billing portal.",
+                    status_code=409,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        try:
+            stripe_portal = await create_tenant_stripe_billing_portal_session(
+                session,
+                cfg,
+                tenant_profile=tenant_profile,
+                billing_email=_clean_optional_text(billing_account.get("billing_email"))
+                or str(tenant_session.get("email") or "").strip().lower()
+                or None,
+            )
+        except HTTPError:
+            return _error_response(
+                AppError(
+                    code="stripe_portal_failed",
+                    message="Stripe billing portal could not be opened for this tenant right now.",
+                    status_code=502,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+        except Exception as exc:
+            return _error_response(
+                AppError(
+                    code="stripe_portal_failed",
+                    message=str(exc) or "Stripe billing portal could not be opened for this tenant right now.",
+                    status_code=502,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.billing.stripe_portal_opened",
+            entity_type="billing_account",
+            entity_id=str(stripe_portal.get("stripe_customer_id") or ""),
+            actor_type="tenant_app",
+            actor_id=str(tenant_session.get("email") or ""),
+            payload={
+                "summary": "Stripe billing portal opened from the tenant billing workspace.",
+                "stripe_customer_id": stripe_portal.get("stripe_customer_id"),
+            },
+        )
+        await session.commit()
+        billing = await build_tenant_billing_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+        onboarding = await build_tenant_onboarding_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+
+    return _success_response(
+        {
+            "portal_url": stripe_portal.get("portal_url"),
+            "billing": billing,
+            "onboarding": onboarding,
+        },
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=str(membership.get("role") or "tenant_admin"),
+            deployment_mode="standalone_app",
+        ),
+    )
+
 
 async def tenant_billing_subscription_update(
     request: Request,
@@ -1224,6 +2046,14 @@ async def tenant_profile_update(
             actor_context=None,
         )
 
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_CATALOG_WRITE_ROLES,
+        message="Only tenant admins and operators can edit tenant workspace profile, branding, or introduction content.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
     async with get_session(request.app.state.session_factory) as session:
         tenant_repository = TenantRepository(RepositoryContext(session=session))
         tenant_profile = await tenant_repository.update_tenant_profile(
@@ -1256,6 +2086,37 @@ async def tenant_profile_update(
         if membership_record and payload.operator_full_name is not None:
             membership_record.full_name = payload.operator_full_name.strip() or membership_record.full_name
 
+        workspace_guides = {
+            "overview": payload.guide_overview,
+            "experience": payload.guide_experience,
+            "catalog": payload.guide_catalog,
+            "plugin": payload.guide_plugin,
+            "bookings": payload.guide_bookings,
+            "integrations": payload.guide_integrations,
+            "billing": payload.guide_billing,
+            "team": payload.guide_team,
+        }
+        sanitized_guides = {
+            key: str(value).strip()
+            for key, value in workspace_guides.items()
+            if value is not None and str(value).strip()
+        }
+        workspace_settings: dict[str, object] = {}
+        if payload.logo_url is not None and str(payload.logo_url).strip():
+            workspace_settings["logo_url"] = str(payload.logo_url).strip()
+        if payload.hero_image_url is not None and str(payload.hero_image_url).strip():
+            workspace_settings["hero_image_url"] = str(payload.hero_image_url).strip()
+        sanitized_intro_html = _sanitize_workspace_html(payload.introduction_html)
+        if sanitized_intro_html:
+            workspace_settings["introduction_html"] = sanitized_intro_html
+        if sanitized_guides:
+            workspace_settings["guides"] = sanitized_guides
+        if workspace_settings:
+            await tenant_repository.upsert_tenant_settings(
+                tenant_id=tenant_id,
+                settings_json={"tenant_workspace": workspace_settings},
+            )
+
         audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
         await audit_repository.append_entry(
             tenant_id=tenant_id,
@@ -1270,6 +2131,7 @@ async def tenant_profile_update(
                 "industry": tenant_profile.get("industry"),
                 "timezone": tenant_profile.get("timezone"),
                 "locale": tenant_profile.get("locale"),
+                "workspace_fields": sorted(workspace_settings.keys()),
             },
         )
 
@@ -1902,6 +2764,109 @@ async def tenant_catalog_import_website(
             channel="tenant_app",
             tenant_id=tenant_id,
             role="tenant_admin",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+async def tenant_catalog_create_service(
+    request: Request,
+    payload: TenantCatalogCreateRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="An authenticated tenant membership is required before creating catalog services.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_CATALOG_WRITE_ROLES,
+        message="Only tenant admins and operators can create or edit tenant catalog records.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref or tenant_id)
+        if not tenant_profile:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved.",
+                    status_code=404,
+                    details={"tenant_ref": tenant_ref},
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        tenant_slug = str(tenant_profile.get("slug") or tenant_id).strip() or tenant_id
+        draft_business_name = (
+            _clean_optional_text(payload.business_name)
+            or str(tenant_profile.get("name") or tenant_slug)
+        )
+        draft_service_name = _clean_optional_text(payload.name) or "New service draft"
+        draft_category = _clean_optional_text(payload.category)
+        service_id = _slugify_value(
+            f"{tenant_slug}-{draft_service_name}-{datetime.now(UTC).strftime('%Y%m%d%H%M%S%f')}"
+        )
+        service = ServiceMerchantProfile(
+            service_id=service_id,
+            tenant_id=tenant_id,
+            business_name=draft_business_name,
+            business_email=str(tenant_session.get("email") or "").strip().lower() or None,
+            owner_email=str(tenant_session.get("email") or "").strip().lower() or None,
+            name=draft_service_name,
+            category=draft_category,
+            summary="",
+            currency_code="AUD",
+            tags_json=[],
+            featured=0,
+            is_active=0,
+            publish_state="draft",
+        )
+        _apply_catalog_quality_to_service(service)
+        session.add(service)
+        await session.flush()
+
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="tenant.catalog.service_created",
+            entity_type="service_catalog",
+            entity_id=service.service_id,
+            actor_type="tenant_app",
+            actor_id=str(tenant_session.get("email") or ""),
+            payload={
+                "summary": "Tenant catalog draft created from the tenant workspace.",
+                "service_name": service.name,
+                "publish_state": service.publish_state,
+            },
+        )
+        await session.commit()
+        snapshot = await build_tenant_catalog_snapshot(
+            session,
+            tenant_ref=tenant_ref or tenant_id,
+            tenant_user_email=tenant_session["email"],
+        )
+
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership),
             deployment_mode="standalone_app",
         ),
     )

@@ -7,7 +7,7 @@ ZONE="${ZONE:-australia-southeast1-a}"
 INSTANCE_NAME="${INSTANCE_NAME:-instance-20260317-160016}"
 RULE_HTTP="${RULE_HTTP:-bookedai-allow-http}"
 RULE_HTTPS="${RULE_HTTPS:-bookedai-allow-https}"
-EXPECTED_IP="${EXPECTED_IP:-34.151.154.204}"
+EXPECTED_IP="${EXPECTED_IP:-34.40.192.68}"
 
 echo "== Active Account =="
 gcloud auth list --filter=status:ACTIVE

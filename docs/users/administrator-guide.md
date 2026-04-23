@@ -25,15 +25,37 @@ Administrators can:
 
 - log into the admin interface
 - review overview metrics
+- navigate a menu-first admin workspace by operational module
 - inspect bookings
 - review portal support queue items
 - inspect event timelines
 - send manual confirmation emails
+- search and manage tenants
+- inspect tenant detail and workspace state
+- update tenant business identity fields
+- update tenant branding assets such as logo and hero image
+- update tenant introduction and explanatory content, including HTML-backed introduction content
+- review and change tenant team roles and statuses
+- create, edit, save, archive, publish, and delete tenant-owned products or services
 - manage partner profiles
 - import and delete service records
 - review service catalog quality exports
 - inspect selected configuration values
 - inspect API inventory
+
+### Admin experience target
+
+The inherited admin target is now a friendlier but enterprise-grade internal workspace.
+
+That means administrators should expect the next admin surface to be organized by:
+
+- clear left-menu navigation
+- section-level guidance for operators
+- tenant management as a first-class module
+- direct-edit forms with explicit save behavior
+- tenant-scoped catalog and permission controls
+
+The admin console should not be interpreted as only a one-page diagnostics dashboard anymore.
 
 ### Integration operations
 
@@ -105,6 +127,8 @@ sudo bash scripts/install_healthcheck_cron.sh
 sudo bash scripts/install_cloudflare_dns_autoupdate.sh
 ```
 
+The Cloudflare DNS installer now enables both a boot-time service and a recurring `systemd` timer, so the host keeps auto-detecting its current public IPv4 and reconciling the configured DNS records after reboots and during later IP changes. Public IP detection now prefers cloud instance metadata when available and falls back to external IPv4 echo services only when needed.
+
 ## Admin Change Discipline
 
 Before upgrading any admin-facing or infrastructure-facing behavior, administrators must review:
@@ -124,6 +148,8 @@ Before upgrading any admin-facing or infrastructure-facing behavior, administrat
 - email credentials drift
 - stale service catalog after business changes
 - undocumented config changes causing operator confusion
+- tenant branding or HTML introduction drift between admin intent and tenant-facing presentation
+- tenant-role mistakes causing the wrong people to own content, billing, or product changes
 
 ## Current backend route ownership
 

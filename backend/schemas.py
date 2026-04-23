@@ -324,6 +324,113 @@ class AdminServiceImportRequest(BaseModel):
     category: str | None = Field(default=None, max_length=100)
 
 
+class AdminTenantListItem(BaseModel):
+    id: str
+    slug: str
+    name: str
+    status: str
+    timezone: str | None = None
+    locale: str | None = None
+    industry: str | None = None
+    active_memberships: int = 0
+    total_services: int = 0
+    published_services: int = 0
+    updated_at: str | None = None
+
+
+class AdminTenantListResponse(BaseModel):
+    status: str
+    items: list[AdminTenantListItem]
+
+
+class AdminTenantWorkspaceGuides(BaseModel):
+    overview: str | None = None
+    experience: str | None = None
+    catalog: str | None = None
+    plugin: str | None = None
+    bookings: str | None = None
+    integrations: str | None = None
+    billing: str | None = None
+    team: str | None = None
+
+
+class AdminTenantWorkspaceSettings(BaseModel):
+    logo_url: str | None = None
+    hero_image_url: str | None = None
+    introduction_html: str | None = None
+    guides: AdminTenantWorkspaceGuides = Field(default_factory=AdminTenantWorkspaceGuides)
+
+
+class AdminTenantMemberItem(BaseModel):
+    email: str
+    full_name: str | None = None
+    role: str
+    status: str
+    auth_provider: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class AdminTenantDetailResponse(BaseModel):
+    status: str
+    tenant: AdminTenantListItem
+    workspace: AdminTenantWorkspaceSettings = Field(default_factory=AdminTenantWorkspaceSettings)
+    members: list[AdminTenantMemberItem] = Field(default_factory=list)
+    services: list[AdminServiceMerchantItem] = Field(default_factory=list)
+
+
+class AdminTenantProfileUpdateRequest(BaseModel):
+    business_name: str | None = None
+    industry: str | None = None
+    timezone: str | None = None
+    locale: str | None = None
+    logo_url: str | None = None
+    hero_image_url: str | None = None
+    introduction_html: str | None = None
+    guide_overview: str | None = None
+    guide_experience: str | None = None
+    guide_catalog: str | None = None
+    guide_plugin: str | None = None
+    guide_bookings: str | None = None
+    guide_integrations: str | None = None
+    guide_billing: str | None = None
+    guide_team: str | None = None
+
+
+class AdminTenantMemberAccessUpdateRequest(BaseModel):
+    full_name: str | None = Field(default=None, max_length=255)
+    role: str | None = Field(default=None, max_length=64)
+    status: str | None = Field(default=None, max_length=64)
+
+
+class AdminTenantCatalogUpsertRequest(BaseModel):
+    service_id: str | None = Field(default=None, max_length=255)
+    business_name: str | None = Field(default=None, max_length=255)
+    business_email: str | None = Field(default=None, max_length=255)
+    name: str = Field(min_length=1, max_length=255)
+    category: str | None = Field(default=None, max_length=100)
+    summary: str | None = None
+    amount_aud: float | None = None
+    currency_code: str | None = Field(default=None, max_length=8)
+    display_price: str | None = Field(default=None, max_length=255)
+    duration_minutes: int | None = None
+    venue_name: str | None = Field(default=None, max_length=255)
+    location: str | None = Field(default=None, max_length=500)
+    map_url: str | None = Field(default=None, max_length=500)
+    booking_url: str | None = Field(default=None, max_length=500)
+    image_url: str | None = Field(default=None, max_length=500)
+    source_url: str | None = Field(default=None, max_length=500)
+    tags: list[str] = Field(default_factory=list)
+    featured: bool = False
+    publish_state: str | None = Field(default=None, max_length=32)
+
+
+class AdminTenantCatalogResponse(BaseModel):
+    status: str
+    tenant: AdminTenantListItem
+    items: list[AdminServiceMerchantItem]
+
+
 class ServiceCatalogItem(BaseModel):
     id: str
     name: str

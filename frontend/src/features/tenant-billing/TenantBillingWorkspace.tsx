@@ -1,6 +1,7 @@
 import type { Dispatch, FormEventHandler, SetStateAction } from 'react';
 
 import type { TenantBillingResponse } from '../../shared/contracts';
+import { TenantSectionActivityCard } from '../tenant-shared/TenantSectionActivityCard';
 
 export type TenantBillingAccountFormState = {
   billing_email: string;
@@ -41,9 +42,11 @@ export function TenantBillingWorkspace({
   billingError,
   billingMessage,
   subscriptionPendingPlanCode,
+  billingPortalPending,
   invoiceActionPendingId,
   onSaveBillingAccount,
   onSelectPlan,
+  onOpenBillingPortal,
   onMarkInvoicePaid,
   onDownloadReceipt,
 }: {
@@ -55,9 +58,11 @@ export function TenantBillingWorkspace({
   billingError: string | null;
   billingMessage: string | null;
   subscriptionPendingPlanCode: string | null;
+  billingPortalPending: boolean;
   invoiceActionPendingId: string | null;
   onSaveBillingAccount: FormEventHandler<HTMLFormElement>;
   onSelectPlan: (planCode: string) => void;
+  onOpenBillingPortal: () => void;
   onMarkInvoicePaid: (invoiceId: string) => void;
   onDownloadReceipt: (invoiceId: string) => void;
 }) {
@@ -132,6 +137,10 @@ export function TenantBillingWorkspace({
             </p>
             <p className="mt-3 text-sm leading-6 text-slate-600">{billing.collection.operator_note}</p>
           </div>
+
+          <div className="mt-5">
+            <TenantSectionActivityCard label="Billing audit" activity={billing.activity} />
+          </div>
         </article>
 
         <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
@@ -153,6 +162,7 @@ export function TenantBillingWorkspace({
               </div>
               <input
                 value={accountForm.billing_email}
+                disabled={!billing.self_serve.can_manage_billing || billingPending}
                 onChange={(event) =>
                   setAccountForm((current) => ({ ...current, billing_email: event.target.value }))
                 }
@@ -166,6 +176,7 @@ export function TenantBillingWorkspace({
               </div>
               <select
                 value={accountForm.merchant_mode}
+                disabled={!billing.self_serve.can_manage_billing || billingPending}
                 onChange={(event) =>
                   setAccountForm((current) => ({ ...current, merchant_mode: event.target.value }))
                 }
@@ -189,15 +200,29 @@ export function TenantBillingWorkspace({
 
             <button
               type="submit"
-              disabled={billingPending || !sessionReady || !accountForm.billing_email.trim()}
+              disabled={
+                billingPending
+                || !sessionReady
+                || !billing.self_serve.can_manage_billing
+                || !accountForm.billing_email.trim()
+              }
               className={`inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-semibold transition ${
-                billingPending || !sessionReady || !accountForm.billing_email.trim()
+                billingPending
+                || !sessionReady
+                || !billing.self_serve.can_manage_billing
+                || !accountForm.billing_email.trim()
                   ? 'cursor-not-allowed bg-slate-200 text-slate-500'
                   : 'bg-slate-950 text-white hover:bg-slate-800'
               }`}
             >
               {billingPending ? 'Saving billing setup...' : 'Save billing setup'}
             </button>
+
+            {!billing.self_serve.can_manage_billing ? (
+              <div className="text-sm text-slate-500">
+                Only tenant admins and finance managers can change billing setup in this workspace.
+              </div>
+            ) : null}
           </form>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
@@ -230,6 +255,11 @@ export function TenantBillingWorkspace({
             Collection status
           </h2>
           <p className="mt-3 text-sm leading-6 text-slate-600">{billing.payment_method.note}</p>
+          {billing.gateway ? (
+            <div className="mt-3 rounded-[1rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+              {billing.gateway.note}
+            </div>
+          ) : null}
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
@@ -263,9 +293,37 @@ export function TenantBillingWorkspace({
                 Gateway note
               </div>
               <div className="mt-2 text-sm font-medium text-slate-950">
-                {billing.payment_method.expires_label ?? 'Gateway tokenization will plug into this seam later.'}
+                {billing.payment_method.expires_label ?? 'Managed through the connected Stripe billing flow.'}
               </div>
             </div>
+          </div>
+
+          <div className="mt-5 flex flex-wrap gap-3">
+            <button
+              type="button"
+              onClick={onOpenBillingPortal}
+              disabled={
+                !sessionReady
+                || !billing.self_serve.can_manage_billing
+                || !billing.self_serve.can_open_billing_portal
+                || billingPortalPending
+              }
+              className={`inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-semibold transition ${
+                !sessionReady
+                || !billing.self_serve.can_manage_billing
+                || !billing.self_serve.can_open_billing_portal
+                || billingPortalPending
+                  ? 'cursor-not-allowed bg-slate-200 text-slate-500'
+                  : 'bg-slate-950 text-white hover:bg-slate-800'
+              }`}
+            >
+              {billingPortalPending ? 'Opening Stripe portal...' : 'Open Stripe billing portal'}
+            </button>
+            {!billing.self_serve.can_open_billing_portal ? (
+              <div className="flex items-center text-sm text-slate-500">
+                Save billing setup in live mode first, then launch the real Stripe portal from here.
+              </div>
+            ) : null}
           </div>
         </article>
       </div>
@@ -353,6 +411,12 @@ export function TenantBillingWorkspace({
             <div className="mt-5 rounded-[1.1rem] border border-amber-300 bg-amber-50 px-4 py-4 text-sm text-amber-900">
               Save billing setup first, then the tenant can start a trial or switch packages from this portal.
             </div>
+          ) : billing.gateway ? (
+            <div className="mt-5 rounded-[1.1rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+              {billing.gateway.checkout_enabled
+                ? 'Package selection now continues into the live Stripe Checkout flow already configured in BookedAI.'
+                : 'Package selection will move into live Stripe Checkout as soon as this tenant is switched to live merchant mode.'}
+            </div>
           ) : null}
         </article>
 
@@ -421,7 +485,11 @@ export function TenantBillingWorkspace({
                       </div>
                       <div className="mt-1 text-xs text-slate-600">{invoice.status.replace(/_/g, ' ')}</div>
                       <div className="mt-1 text-xs text-slate-500">
-                        {invoice.receipt_available ? 'Receipt available seam' : 'Receipt pending'}
+                        {invoice.receipt_available
+                          ? invoice.source === 'stripe'
+                            ? 'Stripe receipt available'
+                            : 'Receipt available'
+                          : 'Receipt pending'}
                       </div>
                     </div>
                   </div>
@@ -445,12 +513,14 @@ export function TenantBillingWorkspace({
                         !sessionReady
                         || !billing.self_serve.can_manage_billing
                         || invoice.status === 'paid'
+                        || invoice.can_mark_paid === false
                         || invoiceActionPendingId === invoice.id
                       }
                       className={`inline-flex items-center justify-center rounded-full px-4 py-2 text-sm font-semibold transition ${
                         !sessionReady
                         || !billing.self_serve.can_manage_billing
                         || invoice.status === 'paid'
+                        || invoice.can_mark_paid === false
                         || invoiceActionPendingId === invoice.id
                           ? 'cursor-not-allowed bg-slate-200 text-slate-500'
                           : 'bg-slate-950 text-white hover:bg-slate-800'
@@ -460,6 +530,8 @@ export function TenantBillingWorkspace({
                         ? 'Updating invoice...'
                         : invoice.status === 'paid'
                           ? 'Marked paid'
+                          : invoice.can_mark_paid === false
+                            ? 'Managed in Stripe'
                           : 'Mark as paid'}
                     </button>
                   </div>

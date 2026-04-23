@@ -13,13 +13,14 @@ if [[ -f "${ENV_FILE}" ]]; then
   set +a
 fi
 
-if [[ ! -x "${CONFIGURE_SCRIPT}" ]]; then
-  echo "Missing executable script: ${CONFIGURE_SCRIPT}"
+if [[ ! -f "${CONFIGURE_SCRIPT}" ]]; then
+  echo "Missing script: ${CONFIGURE_SCRIPT}"
   exit 1
 fi
 
-AUTO_DNS_RECORDS="${CLOUDFLARE_AUTO_DNS_RECORDS:-bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,futureswim.bookedai.au,portal.bookedai.au,tenant.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,upload.bookedai.au,calendar.bookedai.au}"
-PROXIED_DNS_RECORDS="${CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS:-bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,futureswim.bookedai.au,portal.bookedai.au,tenant.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,calendar.bookedai.au}"
+AUTO_DNS_IPV4="${CLOUDFLARE_AUTO_DNS_IPV4:-${1:-}}"
+AUTO_DNS_RECORDS="${CLOUDFLARE_AUTO_DNS_RECORDS:-bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,futureswim.bookedai.au,ai.longcare.au,portal.bookedai.au,tenant.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,upload.bookedai.au,calendar.bookedai.au,bot.bookedai.au}"
+PROXIED_DNS_RECORDS="${CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS:-bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,futureswim.bookedai.au,ai.longcare.au,portal.bookedai.au,tenant.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,calendar.bookedai.au,bot.bookedai.au}"
 
 IFS=',' read -r -a records <<<"${AUTO_DNS_RECORDS}"
 IFS=',' read -r -a proxied_records <<<"${PROXIED_DNS_RECORDS}"
@@ -52,5 +53,5 @@ for record in "${records[@]}"; do
     proxied="true"
   fi
 
-  bash "${CONFIGURE_SCRIPT}" "${record}" "" "${proxied}"
+  bash "${CONFIGURE_SCRIPT}" "${record}" "${AUTO_DNS_IPV4}" "${proxied}"
 done

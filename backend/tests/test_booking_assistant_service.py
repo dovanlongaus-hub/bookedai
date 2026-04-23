@@ -13,7 +13,6 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-service_layer_module = types.ModuleType("service_layer")
 email_service_module = types.ModuleType("service_layer.email_service")
 event_store_module = types.ModuleType("service_layer.event_store")
 n8n_service_module = types.ModuleType("service_layer.n8n_service")
@@ -35,7 +34,6 @@ email_service_module.EmailService = _DummyEmailService
 event_store_module.store_event = _dummy_store_event
 n8n_service_module.N8NService = _DummyN8NService
 
-sys.modules.setdefault("service_layer", service_layer_module)
 sys.modules["service_layer.email_service"] = email_service_module
 sys.modules["service_layer.event_store"] = event_store_module
 sys.modules["service_layer.n8n_service"] = n8n_service_module
@@ -96,6 +94,27 @@ class BookingAssistantServiceTestCase(IsolatedAsyncioTestCase):
         self.assertTrue(
             all(service.category == "Housing and Property" for service in response.matched_services)
         )
+
+    async def test_chat_degrades_gracefully_when_ai_event_search_fails(self):
+        with patch(
+            "services.AIEventSearchService.search",
+            new=AsyncMock(side_effect=RuntimeError("meetup scrape failed")),
+        ):
+            response = await self.service.chat(
+                message="Book an AI Mentor 1-1 session for startup growth this week.",
+                conversation=[
+                    BookingAssistantChatMessage(
+                        role="user",
+                        content="Book an AI Mentor 1-1 session for startup growth this week.",
+                    )
+                ],
+                openai_service=_FakeOpenAIService(),
+            )
+
+        self.assertEqual(response.status, "ok")
+        self.assertFalse(response.matched_events)
+        self.assertTrue(response.matched_services)
+        self.assertIsNotNone(response.suggested_service_id)
 
     async def test_search_public_service_candidates_uses_low_reasoning_for_web_search(self):
         captured_request: dict[str, object] = {}
@@ -302,6 +321,73 @@ class BookingAssistantServiceTestCase(IsolatedAsyncioTestCase):
         self.assertIn("hospitality rescue pass", rescue_prompt)
         self.assertEqual(rescue_payload["search_focus"]["mode"], "hospitality_rescue_pass")
         self.assertEqual(results[0]["candidate_id"], "venue_1")
+
+    async def test_search_public_service_candidates_keeps_contact_phone_for_restaurant_results(self):
+        class _FakeResponse:
+            def __init__(self):
+                self.status_code = 200
+                self.headers = {"x-request-id": "req_test_restaurant_phone"}
+
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "output_text": __import__("json").dumps(
+                        {
+                            "results": [
+                                {
+                                    "candidate_id": "venue_phone_1",
+                                    "provider_name": "Harbour Table",
+                                    "service_name": "Dinner reservation",
+                                    "summary": "Waterfront dinner booking.",
+                                    "location": "Sydney NSW",
+                                    "source_url": "https://harbour.example.com/reservations",
+                                    "booking_url": None,
+                                    "contact_phone": "(02) 9123 4567",
+                                    "match_score": 0.86,
+                                    "service_relevance": 0.91,
+                                    "location_relevance": 0.84,
+                                    "time_relevance": 0.72,
+                                    "constraint_relevance": 0.75,
+                                    "official_source": True,
+                                    "why_this_matches": "Named venue with an official contact path for reservations.",
+                                }
+                            ]
+                        }
+                    )
+                }
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                self.timeout = kwargs.get("timeout")
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, endpoint, *, headers, json):
+                return _FakeResponse()
+
+        settings = replace(
+            get_settings(),
+            openai_api_key="test-openai-key",
+            openai_base_url="https://api.openai.com/v1",
+            openai_model="gpt-5-mini",
+        )
+        service = OpenAIService(settings)
+
+        with patch("services.httpx.AsyncClient", _FakeAsyncClient):
+            results = await service.search_public_service_candidates(
+                query="restaurant table in Sydney tonight",
+                location_hint="Sydney",
+                booking_context={"schedule_hint": "tonight"},
+                preferences={"service_category": "Food and Beverage"},
+            )
+
+        self.assertEqual(results[0]["contact_phone"], "(02) 9123 4567")
 
     async def test_search_public_service_candidates_returns_empty_on_http_status_error(self):
         request = httpx.Request("POST", "https://api.openai.com/v1/responses")

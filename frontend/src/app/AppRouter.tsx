@@ -24,6 +24,10 @@ const FutureSwimApp = lazy(async () => {
   const module = await import('../apps/public/FutureSwimApp');
   return { default: module.FutureSwimApp };
 });
+const AIMentorProApp = lazy(async () => {
+  const module = await import('../apps/public/AIMentorProApp');
+  return { default: module.AIMentorProApp };
+});
 const PitchDeckApp = lazy(async () => {
   const module = await import('../apps/public/PitchDeckApp');
   return { default: module.PitchDeckApp };
@@ -121,6 +125,20 @@ function isFutureSwimRuntime() {
   );
 }
 
+function isAIMentorProRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname, pathname } = window.location;
+  return (
+    hostname === 'ai.longcare.au' ||
+    pathname === '/ai-mentor-pro' ||
+    pathname === '/ai-mentor-pro/' ||
+    pathname.startsWith('/partner/ai-mentor-pro')
+  );
+}
+
 function isTenantRuntime() {
   if (typeof window === 'undefined') {
     return false;
@@ -193,6 +211,14 @@ export function AppRouter() {
     return (
       <Suspense fallback={fallback}>
         <FutureSwimApp />
+      </Suspense>
+    );
+  }
+
+  if (isAIMentorProRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <AIMentorProApp />
       </Suspense>
     );
   }

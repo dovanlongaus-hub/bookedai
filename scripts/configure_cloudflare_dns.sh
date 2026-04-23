@@ -6,13 +6,39 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ENV_FILE="${PROJECT_DIR}/.env"
 
 detect_public_ipv4() {
+  local response
   local candidates=(
     "https://api.ipify.org"
     "https://ipv4.icanhazip.com"
     "https://ifconfig.me/ip"
   )
   local candidate
-  local response
+
+  # Prefer instance metadata when available so we can read the host's real public
+  # address directly from the platform instead of depending on an external echo service.
+  response="$(curl -fsS --max-time 3 -H 'Metadata-Flavor: Google' \
+    'http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip' \
+    2>/dev/null | tr -d '[:space:]' || true)"
+  if [[ "${response}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    printf '%s\n' "${response}"
+    return 0
+  fi
+
+  response="$(curl -fsS --max-time 3 \
+    'http://169.254.169.254/latest/meta-data/public-ipv4' \
+    2>/dev/null | tr -d '[:space:]' || true)"
+  if [[ "${response}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    printf '%s\n' "${response}"
+    return 0
+  fi
+
+  response="$(curl -fsS --max-time 3 -H 'Metadata: true' \
+    'http://169.254.169.254/metadata/instance/network/interface/0/ipv4/ipAddress/0/publicIpAddress?api-version=2021-02-01&format=text' \
+    2>/dev/null | tr -d '[:space:]' || true)"
+  if [[ "${response}" =~ ^([0-9]{1,3}\.){3}[0-9]{1,3}$ ]]; then
+    printf '%s\n' "${response}"
+    return 0
+  fi
 
   for candidate in "${candidates[@]}"; do
     response="$(curl -4fsS --max-time 10 "${candidate}" 2>/dev/null | tr -d '[:space:]' || true)"

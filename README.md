@@ -77,12 +77,13 @@ Production traffic is expected to follow this path:
 - `https://product.bookedai.au/` -> live product demo and booking-agent frontend
 - `https://demo.bookedai.au/` -> minimal conversational landing page for the AI revenue engine demo
 - `https://portal.bookedai.au/` -> customer booking portal routes on the shared frontend plus backend proxy
-- `https://tenant.bookedai.au/` -> tenant operator sign-in and catalog workspace on the shared frontend plus backend proxy
+- `https://tenant.bookedai.au/` -> tenant auth gateway with email-first sign-in, email verification code flow, Google continuation, workspace creation, and catalog workspace on the shared frontend plus backend proxy
 - `https://supabase.bookedai.au/` -> Supabase Studio, Auth, REST, Storage via Kong
 - `https://n8n.bookedai.au/` -> n8n editor and webhooks
 - `https://hermes.bookedai.au/` -> Hermes knowledge/documentation service
 - `https://upload.bookedai.au/` -> simple upload page plus public file hosting from `storage/uploads`
 - `https://calendar.bookedai.au/` -> redirect to Zoho Bookings calendar page
+- `https://bot.bookedai.au/` -> OpenClaw Control UI served through the gateway proxy
 
 Core production services defined in [`docker-compose.prod.yml`](/home/dovanlong/BookedAI/docker-compose.prod.yml:1):
 
@@ -128,11 +129,42 @@ AI provider:
 Additional developer references:
 
 - [Foundation Scaffold Notes](./docs/development/foundation-scaffold.md)
+- [CI/CD Collaboration Guide](./docs/development/ci-cd-collaboration-guide.md)
 - [Release Note - 2026-04-20 Homepage Product Live](./docs/development/release-note-2026-04-20-homepage-product-live.md)
 - [Target Platform Architecture](./docs/architecture/target-platform-architecture.md)
 - [Repo And Module Strategy](./docs/architecture/repo-module-strategy.md)
 - [Go-To-Market Sales And Event Strategy](./docs/architecture/go-to-market-sales-event-strategy.md)
 - [Demo Script Storytelling And Video Strategy](./docs/architecture/demo-script-storytelling-video-strategy.md)
+
+## Documentation closeout discipline
+
+Every substantive BookedAI change should be closed out as one continuous delivery step, not as a later documentation chore.
+
+Minimum required write-back:
+
+- update the changed requirement-facing or request-facing document
+- update [`docs/development/implementation-progress.md`](./docs/development/implementation-progress.md)
+- update the corresponding sprint, roadmap, or phase artifact
+- sync the resulting detailed note to Notion
+- mirror a concise summary to Discord when the change is meaningful for operator visibility
+
+Delivery channel split:
+
+- Discord = direct short summary text for operators
+- Notion = full detailed document and long-form change context
+
+Preferred operator commands:
+
+```sh
+python3 scripts/telegram_workspace_ops.py sync-doc \
+  --title "..." \
+  --summary "..." \
+  --details-file path/to/change-note.md
+```
+
+```sh
+python3 scripts/telegram_workspace_ops.py sync-repo-docs --skip-discord
+```
 
 ## Production deployment for bookedai.au
 
@@ -150,6 +182,7 @@ Additional developer references:
 - `A` record for `hermes.bookedai.au` -> same public IP
 - `A` record for `upload.bookedai.au` -> same public IP
 - `A` record for `calendar.bookedai.au` -> same public IP
+- `A` record for `bot.bookedai.au` -> same public IP
 
 2. Prepare environment:
 
@@ -172,11 +205,36 @@ Additional developer references:
 - `DISCORD_APPLICATION_ID`, `DISCORD_BOT_TOKEN`, and `DISCORD_PUBLIC_KEY` if you want a real Discord slash-command bot for team chat
 - optional `DISCORD_GUILD_ID` if you want faster guild-scoped command registration during rollout
 - optional `DISCORD_ANNOUNCE_CHANNEL_ID` if you want delivery updates posted into a fixed Discord text channel
+- `NOTION_API_TOKEN` plus either `NOTION_PARENT_PAGE_ID` or `NOTION_DATABASE_ID` if you want Telegram-driven change summaries written directly into Notion
+- optional `NOTION_VERSION` to override the default Notion API version used by the sync script
+- `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` with the Telegram user ids allowed to run elevated BookedAI workspace actions through `telegram_workspace_ops.py`
+- `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` to define which elevated Telegram actions are allowed, such as `build_frontend`, `deploy_live`, `test`, `workspace_write`, `repo_structure`, `host_command`, or `full_project`
 - `ADMIN_API_TOKEN` for protected email admin routes
 - `ADMIN_PASSWORD` for admin login credentials
+- optional `ADMIN_BOOTSTRAP_PASSWORD` for the root `Next.js` admin auth routes if you want a dedicated bootstrap password instead of reusing `ADMIN_PASSWORD`
 - `TAWK_WEBHOOK_SECRET` if you enable signature verification
 - `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_SMTP_PASSWORD`, `EMAIL_SMTP_FROM`
 - `EMAIL_IMAP_HOST`, `EMAIL_IMAP_PORT`, `EMAIL_IMAP_USERNAME`, `EMAIL_IMAP_PASSWORD`
+- `ZOHO_CRM_CLIENT_ID`, `ZOHO_CRM_CLIENT_SECRET`, and `ZOHO_CRM_REFRESH_TOKEN` for durable Zoho CRM write-back
+- optional `ZOHO_CRM_ACCESS_TOKEN` for short-lived smoke tests only
+- optional `ZOHO_CRM_NOTIFICATION_TOKEN` and `ZOHO_CRM_NOTIFICATION_CHANNEL_ID` when using Zoho CRM Notifications API to push `Deals` updates into BookedAI webhook feedback ingestion
+- Zoho Notifications registration and lifecycle calls require the OAuth scope `ZohoCRM.notifications.ALL`; if the original refresh token was minted with only CRM `modules/settings` scopes, re-consent is required before webhook registration can succeed
+- backend can now register a Zoho Notifications channel for `Deals` through `POST /api/v1/integrations/crm-feedback/zoho-webhook/register`, which targets `https://api.bookedai.au/api/v1/integrations/crm-feedback/zoho-webhook` by default
+- backend now also supports:
+  - `GET /api/v1/integrations/crm-feedback/zoho-webhook?channel_id=...` to inspect a channel
+  - `POST /api/v1/integrations/crm-feedback/zoho-webhook/auto-renew` to run a tracked maintenance check and renew the channel when expiry is near
+  - `POST /api/v1/integrations/crm-feedback/zoho-webhook/renew` to update expiry, token, notify URL, or events
+  - `POST /api/v1/integrations/crm-feedback/zoho-webhook/disable` to unsubscribe one or more channel ids
+- low-overhead automation is now available too:
+  - `python3 scripts/run_zoho_crm_webhook_auto_renew.py`
+  - `sudo bash scripts/install_zoho_crm_webhook_auto_renew_cron.sh`
+  - this path is intentionally lightweight for performance: one short-lived API call every 6 hours by default, with configurable threshold and timeout envs
+  - production hosts can also point that runner at local Nginx instead of Cloudflare with:
+  - `ZOHO_CRM_NOTIFICATION_AUTO_RENEW_API_URL=https://127.0.0.1`
+  - `ZOHO_CRM_NOTIFICATION_AUTO_RENEW_HOST_HEADER=api.bookedai.au`
+  - `ZOHO_CRM_NOTIFICATION_AUTO_RENEW_SKIP_TLS_VERIFY=true`
+  - current live AU tenant is now registered on channel `1000000068001` with token `deals.all.notif`, and auto-renew has been verified end-to-end through the BookedAI maintenance route
+- optional `ZOHO_ACCOUNTS_BASE_URL`; leave it blank to auto-derive from the configured Zoho API data center, or set it explicitly such as `https://accounts.zoho.com.au` for AU
 
 Session secret notes:
 
@@ -184,6 +242,33 @@ Session secret notes:
 - `TENANT_SESSION_SIGNING_SECRET` is the preferred signing key for tenant sessions.
 - `SESSION_SIGNING_SECRET` is a shared fallback for session signing when a more specific secret is not set.
 - Current code still falls back to legacy `ADMIN_API_TOKEN` and `ADMIN_PASSWORD` to avoid breaking older environments.
+- The root `Next.js` admin auth lane now also accepts `ADMIN_BOOTSTRAP_PASSWORD` as the preferred bootstrap credential for `/api/admin/auth/login`.
+
+Zoho CRM connection helper:
+
+```sh
+python3 scripts/zoho_crm_connect.py authorize-url \
+  --redirect-uri https://api.bookedai.au/zoho/oauth/callback
+```
+
+The helper now requests `ZohoCRM.modules.ALL,ZohoCRM.settings.ALL,ZohoCRM.notifications.ALL` by default so one consent flow can support both CRM write-back and notification-channel lifecycle.
+
+```sh
+python3 scripts/zoho_crm_connect.py exchange-code \
+  --code '<zoho-auth-code>' \
+  --redirect-uri https://api.bookedai.au/zoho/oauth/callback \
+  --write-env
+```
+
+```sh
+python3 scripts/zoho_crm_connect.py test-connection --module Leads
+```
+
+This helper keeps the repo-side setup closed-loop:
+
+- `authorize-url` prints the consent URL using the current client id and the correct Zoho Accounts domain for the selected data center
+- `exchange-code` swaps the returned auth code for OAuth tokens and can persist them into root `.env`
+- `test-connection` runs the same metadata smoke test that the backend integration route uses
 
    Then prepare the Supabase env file:
 
@@ -218,6 +303,14 @@ Session secret notes:
    bash scripts/deploy_production.sh
    ```
 
+   For Telegram/OpenClaw-driven live deploys on the VPS host, prefer:
+
+   ```sh
+   bash scripts/deploy_live_host.sh
+   ```
+
+   This wrapper is intended for host-level execution and will use passwordless `sudo` when available so the bot can deploy from the real Docker host instead of the container runtime.
+
 6. Access:
 
 - App: `https://bookedai.au`
@@ -232,6 +325,7 @@ Session secret notes:
 - Hermes: `https://hermes.bookedai.au`
 - Uploads: `https://upload.bookedai.au`
 - Calendar redirect: `https://calendar.bookedai.au`
+- OpenClaw Control UI: `https://bot.bookedai.au`
 
 7. Optional hardening (health monitoring):
 
@@ -304,6 +398,96 @@ python3 scripts/post_discord_delivery_update.py phase 8
 
 The script reads `.env`, uses `DISCORD_GUILD_ID`, and posts to `DISCORD_ANNOUNCE_CHANNEL_ID` when present. If no announce channel is configured, it falls back to the guild system channel, then `#general`, then the first visible text channel.
 
+## Telegram change sync
+
+For Telegram or OpenClaw-driven change summaries that should be archived, written into Notion, and mirrored into Discord, run:
+
+```sh
+python3 scripts/telegram_workspace_ops.py sync-doc \
+  --title "Homepage booking flow refined" \
+  --summary "Added the in-flow shortlist preview modal, kept Back inside the same path, and focused the booking Name field after Book." \
+  --details-file docs/development/example-change-note.md
+```
+
+What it does:
+
+- always archives the update under `docs/development/telegram-sync/YYYY-MM-DD/`
+- attempts to create a Notion page when `NOTION_API_TOKEN` plus `NOTION_PARENT_PAGE_ID` or `NOTION_DATABASE_ID` are configured
+- posts the same summary through the configured Discord bot when `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, and optional `DISCORD_ANNOUNCE_CHANNEL_ID` are present
+- supports a fuller detailed document through `--details` or `--details-file`, which is included in the archive and written into Notion under a `Detailed document` section
+
+Helpful flags:
+
+- `--summary-file path/to/file.md` to send a longer prepared summary
+- `--details-file path/to/file.md` to send the full detailed document body into Notion
+- `--discord-channel-id CHANNEL_ID` to override the Discord destination for one specific update
+- `--skip-notion` or `--skip-discord` to target only one destination
+- `--require-notion` or `--require-discord` to fail the command if that destination does not succeed
+
+For sprint-complete summaries that should go to the dedicated sprint-results Discord channel, use:
+
+```sh
+python3 scripts/telegram_workspace_ops.py sync-doc \
+  --title "Sprint X summary" \
+  --summary-file path/to/sprint-summary.txt \
+  --details-file path/to/sprint-summary.md \
+  --discord-channel-id 1492396016563912875 \
+  --require-discord
+```
+
+## Telegram build and deploy
+
+For Telegram or OpenClaw-driven product operations, use the Telegram workspace wrapper:
+
+```sh
+python3 scripts/telegram_workspace_ops.py build-frontend
+python3 scripts/telegram_workspace_ops.py deploy-live
+python3 scripts/telegram_workspace_ops.py test --command "./scripts/run_release_gate.sh"
+python3 scripts/telegram_workspace_ops.py workspace-command --command "git mv old/path new/path"
+python3 scripts/telegram_workspace_ops.py host-command --command "apt-get update"
+```
+
+The wrapper keeps the operator path explicit:
+
+- `build-frontend` runs the BookedAI production frontend build in `frontend/`
+- `deploy-live` runs the approved VPS-host deployment wrapper `bash scripts/deploy_live_host.sh`
+- `test` runs a repo-scoped validation command such as release-gate, backend, or frontend verification
+- `workspace-command` runs a repo-scoped shell command so Telegram/OpenClaw can handle broader BookedAI changes, including file moves, refactors, and multi-surface rollout steps
+- `host-command` runs a host-level command through `sudo -n` only when the requested program is in the checked-in allowlist such as `apt-get`, `docker`, `systemctl`, `journalctl`, `service`, `timedatectl`, or `ufw`
+- `sync-doc` is the documentation or Notion or Discord path for Telegram change tracking
+- `host-command` intentionally does not expose `bash`, `sh`, or arbitrary executable paths, so it can support machine operations without turning the Telegram path into a general-purpose root shell
+- on the current VPS host, Linux user `openclaw` is provisioned with ACL-based write access to the host repo path `/home/dovanlong/BookedAI`; because that path is bind-mounted into the container at `/workspace/bookedai.au`, trusted OpenClaw execution can now create, edit, rename, and delete project files there without changing the repo owner
+- that ACL posture was then re-applied recursively across the whole repo tree on `2026-04-22` so previously restricted subdirectories inherit the same write model; direct verification as `openclaw` now also covers the homepage landing files `frontend/src/components/landing/sections/HomepageExecutiveBoardSection.tsx` and `frontend/src/components/landing/sections/HomepageOverviewSection.tsx`
+- the standard OpenClaw gateway runtime writes the bind mount as container user `node` (`uid 1000`, mapped to host ACL entry `ubuntu` on this machine), so the same ACL write model is now granted to host `uid 1000` as well; this restores memory flushes and other repo writes initiated from the gateway runtime
+- the live OpenClaw webchat elevated-exec path was then fixed on `2026-04-22` by allowing provider `webchat` under `tools.elevated.allowFrom` in the live OpenClaw state file and by correcting `openclaw-cli` to run `openclaw node run --host 127.0.0.1 --port 18789` instead of exiting after printing CLI help; this removes the tool-policy blocker where webchat could not request host-elevated actions such as `deploy-live`
+
+Telegram authorization for elevated actions:
+
+- `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` is the allowlist of Telegram actor ids
+- `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` controls which elevated actions that allowlist can run
+- the default checked-in operator baseline now includes trusted operator `8426853622` with full BookedAI workspace coverage for live deploy, test, repo-structure work, safe host commands, and broader project commands
+- if your Telegram bridge can pass the actor id, use `--telegram-user-id` or set `BOOKEDAI_TELEGRAM_USER_ID` or `TELEGRAM_USER_ID`
+- inspect the current permission snapshot with:
+
+```sh
+python3 scripts/telegram_workspace_ops.py permissions --telegram-user-id 8426853622
+```
+
+## CI/CD collaboration summary
+
+BookedAI currently uses a practical script-driven CI/CD model rather than a fully automated GitHub Actions promotion pipeline.
+
+Team summary:
+
+- validate locally and with `./scripts/run_release_gate.sh`
+- rehearse on `beta.bookedai.au` with `bash scripts/deploy_beta.sh`
+- promote live from the Docker host with `bash scripts/deploy_live_host.sh`
+- verify health after deploy
+- update repo docs, then sync the detailed note to Notion and the short summary text to Discord
+
+Use [CI/CD Collaboration Guide](./docs/development/ci-cd-collaboration-guide.md) as the quick handoff document for other collaborators.
+Use [CI/CD And Deployment Runbook](./docs/development/ci-cd-deployment-runbook.md) when you need the full beta-to-production operator sequence.
+
 Discord Developer Portal checklist:
 
 - `Installation` / `OAuth2`: ensure the app can be installed to the target server.
@@ -328,12 +512,13 @@ Discord Developer Portal checklist:
 - `supabase.bookedai.au`
 - `upload.bookedai.au`
 - `calendar.bookedai.au`
+- `bot.bookedai.au`
 
    You can customize the record list in root `.env`:
 
    ```env
-   CLOUDFLARE_AUTO_DNS_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,product.bookedai.au,portal.bookedai.au,calendar.bookedai.au
-   CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,product.bookedai.au,portal.bookedai.au,calendar.bookedai.au
+   CLOUDFLARE_AUTO_DNS_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,portal.bookedai.au,tenant.bookedai.au,futureswim.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,upload.bookedai.au,calendar.bookedai.au,bot.bookedai.au
+   CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,portal.bookedai.au,tenant.bookedai.au,futureswim.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,calendar.bookedai.au,bot.bookedai.au
    ```
 
    To run the sync manually at any time:
@@ -342,7 +527,7 @@ Discord Developer Portal checklist:
    bash scripts/update_cloudflare_dns_records.sh
    ```
 
-   The sync script auto-detects the machine's current public IPv4 on each run, so it does not depend on a fixed `SERVER_IPV4` value.
+   The sync script auto-detects the machine's current public IPv4 on each run, preferring cloud instance metadata when available and falling back to public IPv4 echo services only when needed. The install script enables both a boot-time service and a recurring `systemd` timer so Cloudflare keeps following the host's current public IP after reboots and during later IP changes too.
 
 ## Email sending and inbox
 

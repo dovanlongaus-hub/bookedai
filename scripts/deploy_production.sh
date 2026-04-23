@@ -22,6 +22,7 @@ DOMAIN_SUPABASE="${DOMAIN_SUPABASE:-supabase.bookedai.au}"
 DOMAIN_HERMES="${DOMAIN_HERMES:-hermes.bookedai.au}"
 DOMAIN_UPLOAD="${DOMAIN_UPLOAD:-upload.bookedai.au}"
 DOMAIN_CALENDAR="${DOMAIN_CALENDAR:-calendar.bookedai.au}"
+DOMAIN_BOT="${DOMAIN_BOT:-bot.bookedai.au}"
 EMAIL="${LETSENCRYPT_EMAIL:-info@bookedai.au}"
 
 CERT_DOMAINS=(
@@ -40,6 +41,7 @@ CERT_DOMAINS=(
   "${DOMAIN_SUPABASE}"
   "${DOMAIN_HERMES}"
   "${DOMAIN_CALENDAR}"
+  "${DOMAIN_BOT}"
 )
 
 if [[ -n "${DOMAIN_UPLOAD}" ]] && getent ahosts "${DOMAIN_UPLOAD}" >/dev/null 2>&1; then
@@ -96,6 +98,8 @@ elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_HER
   NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_CALENDAR}([, ]|$)"; then
   NEEDS_CERT_UPDATE="true"
+elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_BOT}([, ]|$)"; then
+  NEEDS_CERT_UPDATE="true"
 fi
 
 if [[ "${NEEDS_CERT_UPDATE}" == "true" ]]; then
@@ -140,3 +144,4 @@ echo "Supabase: https://${DOMAIN_SUPABASE}"
 echo "Hermes: https://${DOMAIN_HERMES}"
 echo "Uploads: https://${DOMAIN_UPLOAD}"
 echo "Calendar redirect: https://${DOMAIN_CALENDAR}"
+echo "OpenClaw Control UI: https://${DOMAIN_BOT}"

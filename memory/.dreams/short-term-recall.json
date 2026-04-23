@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-21T03:35:02.013Z",
+  "updatedAt": "2026-04-23T00:58:30.275Z",
   "entries": {
     "memory:memory/2026-04-21.md:85:86": {
       "key": "memory:memory/2026-04-21.md:85:86",
@@ -72,15 +72,16 @@
       "endLine": 70,
       "source": "memory",
       "snippet": "- Split search-heavy route coverage out of `backend/tests/test_api_v1_routes.py` into `backend/tests/test_api_v1_search_routes.py` so the matching and fallback lane can be verified independently from communications and admin coverage - Verified compile health for `backend/api/v1_routes.py`, `backend/tests/test_api_v1_routes.py`, and `backend/tests/test_api_v1_search_routes.py` with `python3 -m py_compile`; runtime test execution is still blocked in the available shell environments because FastAPI and pytest are not installed there - Started the next bounded-context extraction pass for integrations: added `backend/api/v1_integration_handlers.py`, moved the current integration and outbox handl",
-      "recallCount": 1,
+      "recallCount": 2,
       "dailyCount": 0,
       "groundedCount": 0,
-      "totalScore": 1,
+      "totalScore": 2,
       "maxScore": 1,
       "firstRecalledAt": "2026-04-21T03:30:39.845Z",
-      "lastRecalledAt": "2026-04-21T03:30:39.845Z",
+      "lastRecalledAt": "2026-04-21T11:23:23.799Z",
       "queryHashes": [
-        "f9753c289ac4"
+        "f9753c289ac4",
+        "4f70f41f47cb"
       ],
       "recallDays": [
         "2026-04-21"
@@ -249,6 +250,471 @@
         "scan-path",
         "config-like",
         "config.php"
+      ]
+    },
+    "memory:memory/2026-04-21.md:25:39": {
+      "key": "memory:memory/2026-04-21.md:25:39",
+      "path": "memory/2026-04-21.md",
+      "startLine": 25,
+      "endLine": 39,
+      "source": "memory",
+      "snippet": "- When Telegram tasks modify architecture or setup, sync repo docs in the same workstream - Keep using this daily note to preserve continuity between Telegram-driven requests ## Homepage Architecture Refresh - Redesigned the public homepage `#architecture` section in `frontend/src/components/landing/sections/ArchitectureInfographicSection.tsx` - Replaced the older investor-style infographic with a clearer layered architecture layout showing explicit system roles, role ownership, and the runtime stack from surfaces through access control, orchestration, integrations, and cloud foundation - Verified the frontend build passes after the update with `npm run build` from `frontend/` - Expanded t",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T11:23:23.799Z",
+      "lastRecalledAt": "2026-04-21T11:23:23.799Z",
+      "queryHashes": [
+        "4f70f41f47cb"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "telegram-driven",
+        "investor-style",
+        "when",
+        "telegram",
+        "tasks",
+        "modify",
+        "architecture",
+        "setup"
+      ]
+    },
+    "memory:memory/2026-04-21.md:18:30": {
+      "key": "memory:memory/2026-04-21.md:18:30",
+      "path": "memory/2026-04-21.md",
+      "startLine": 18,
+      "endLine": 30,
+      "source": "memory",
+      "snippet": "- Review conclusion: the repo is materially implemented and on the right modularization path, but the main technical debt is still concentrated in `backend/api/v1_routes.py`, `backend/services.py`, `backend/tests/test_api_v1_routes.py`, `frontend/src/apps/tenant/TenantApp.tsx`, and `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` - Recommended next engineering sequence: finish tenant and portal handler extraction first, split route tests by bounded context, fix the known public-web fallback regressions, then move on to integrations and communications before touching deeper search/booking and `backend/services.py` decomposition - Completed the tenant and portal handler e",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T11:23:23.799Z",
+      "lastRecalledAt": "2026-04-21T11:23:23.799Z",
+      "queryHashes": [
+        "4f70f41f47cb"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "backend/api/v1-routes.py",
+        "backend/services.py",
+        "public-web",
+        "search/booking",
+        "review",
+        "conclusion",
+        "the",
+        "repo"
+      ]
+    },
+    "memory:memory/2026-04-21.md:1:19": {
+      "key": "memory:memory/2026-04-21.md:1:19",
+      "path": "memory/2026-04-21.md",
+      "startLine": 1,
+      "endLine": 19,
+      "source": "memory",
+      "snippet": "# 2026-04-21 ## Telegram Bot Runtime - Activated `@Bookedairevenuebot` on OpenClaw for the BookedAI repository - Fixed Telegram webhook routing to `https://api.bookedai.au/telegram-webhook` - Enabled trusted Telegram user access for operator user `8426853622` - Set model path to `openai-codex/gpt-5.4` ## Workspace Reliability - Opened repo write permissions so the OpenClaw runtime user can edit project files - Added workspace context files at repo root so Telegram tasks can run with expected startup context ## Code Review And Planning - Added `docs/development/codebase-review-2026-04-21.md` as a repo-state code review snapshot covering architecture review, code smells, refactor priorit",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T11:23:23.799Z",
+      "lastRecalledAt": "2026-04-21T11:23:23.799Z",
+      "queryHashes": [
+        "4f70f41f47cb"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "gpt",
+        "openai",
+        "api.bookedai.au/telegram-webhook",
+        "openai-codex/gpt-5.4",
+        "repo-state",
+        "telegram",
+        "bot",
+        "runtime"
+      ]
+    },
+    "memory:memory/2026-04-21.md:70:72": {
+      "key": "memory:memory/2026-04-21.md:70:72",
+      "path": "memory/2026-04-21.md",
+      "startLine": 70,
+      "endLine": 72,
+      "source": "memory",
+      "snippet": "- Continued the bounded-context extraction with communications: added `backend/api/v1_communication_handlers.py`, moved lifecycle email, SMS, and WhatsApp handlers there behind the same transitional `from api.v1_routes import *` import pattern, rewired `backend/api/v1_communication_routes.py`, and verified compile health for the communication route stack with `python3 -m py_compile` - Continued with search and matching extraction: added `backend/api/v1_search_handlers.py`, moved `/api/v1/matching/search` and `/api/v1/booking-trust/checks` handler implementations there behind the same transitional wildcard import pattern, rewired `backend/api/v1_search_routes.py`, and verified compile health",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T11:23:23.799Z",
+      "lastRecalledAt": "2026-04-21T11:23:23.799Z",
+      "queryHashes": [
+        "4f70f41f47cb"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "bounded-context",
+        "api.v1-routes",
+        "py-compile",
+        "api/v1/matching/search",
+        "api/v1/booking-trust/checks",
+        "backend/api/v1-search-routes.py",
+        "continued",
+        "the"
+      ]
+    },
+    "memory:memory/2026-04-21.md:72:74": {
+      "key": "memory:memory/2026-04-21.md:72:74",
+      "path": "memory/2026-04-21.md",
+      "startLine": 72,
+      "endLine": 74,
+      "source": "memory",
+      "snippet": "- Completed the first booking extraction pass: added `backend/api/v1_booking_handlers.py`, moved lead creation, conversation session start, booking path resolution, booking intent creation, and payment intent creation there behind the same transitional wildcard import pattern, rewired `backend/api/v1_booking_routes.py`, and verified compile health across the current v1 route modules and split route test files with `python3 -m py_compile` - Started the dependency cleanup pass for extracted v1 handlers: replaced `from api.v1_routes import *` with explicit `from api.v1_routes import (...)` imports in `backend/api/v1_booking_handlers.py`, `backend/api/v1_search_handlers.py`, `backend/api/v1_comm",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T11:23:23.799Z",
+      "lastRecalledAt": "2026-04-21T11:23:23.799Z",
+      "queryHashes": [
+        "4f70f41f47cb"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "backend/api/v1-booking-routes.py",
+        "py-compile",
+        "api.v1-routes",
+        "backend/api/v1-comm",
+        "completed",
+        "the",
+        "first",
+        "booking"
+      ]
+    },
+    "memory:memory/2026-04-21.md:92:98": {
+      "key": "memory:memory/2026-04-21.md:92:98",
+      "path": "memory/2026-04-21.md",
+      "startLine": 92,
+      "endLine": 98,
+      "source": "memory",
+      "snippet": "- Continued the context-based backend service split with a CALLS or meeting-scheduling slice: added `backend/service_layer/calls_scheduling.py`, moved customer portal URL, QR code URL, amount formatting, Google Calendar link building, Zoho calendar configuration checks, Zoho access-token retrieval, and Zoho meeting-event creation there, rewired `backend/services.py` methods to delegate to the new scheduling helpers, exported the new helpers from `backend/service_layer/__init__.py`, and verified compile health with `python3 -m py_compile` - Continued the context-based backend service split with a first `booking_assistant_runtime` slice: added `backend/service_layer/booking_assistant_runtime.p",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T11:23:23.799Z",
+      "lastRecalledAt": "2026-04-21T11:23:23.799Z",
+      "queryHashes": [
+        "4f70f41f47cb"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "context-based",
+        "meeting-scheduling",
+        "access-token",
+        "meeting-event",
+        "backend/services.py",
+        "backend/service-layer",
+        "py-compile",
+        "booking-assistant-runtime"
+      ]
+    },
+    "memory:memory/2026-04-21.md:177:187": {
+      "key": "memory:memory/2026-04-21.md:177:187",
+      "path": "memory/2026-04-21.md",
+      "startLine": 177,
+      "endLine": 187,
+      "source": "memory",
+      "snippet": "- Verified the product popup booking assistant path is still mounted correctly in `ProductApp` and `BookingAssistantDialog`; no matching regression was found there - Confirmed this OpenClaw runtime cannot complete live deploys because Docker is unavailable here, and cannot complete full Playwright browser E2E because required Chromium host libraries are missing in the current host environment - Prepared a repo-side Notion sync pack for the current execution plan at `docs/development/notion-sync-2026-04-21.md`, plus import-friendly CSVs and an operator guide: `notion-sync-2026-04-21-phases.csv`, `notion-sync-2026-04-21-sprints.csv`, `notion-sync-2026-04-21-active-stories.csv`, and `notion-syn",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T12:33:36.014Z",
+      "lastRecalledAt": "2026-04-21T12:33:36.014Z",
+      "queryHashes": [
+        "a8a925716ae2"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "repo-side",
+        "import-friendly",
+        "notion-syn",
+        "verified",
+        "the",
+        "product",
+        "popup",
+        "booking"
+      ]
+    },
+    "memory:memory/2026-04-21.md:120:128": {
+      "key": "memory:memory/2026-04-21.md:120:128",
+      "path": "memory/2026-04-21.md",
+      "startLine": 120,
+      "endLine": 128,
+      "source": "memory",
+      "snippet": "- Added `docs/development/notion-sync-2026-04-21.md` as a repo-side sync pack that consolidates the current source-of-truth stack, active phase and sprint interpretation, code-aligned execution truth, and recommended Notion row/status updates for the live BookedAI workspace - Updated `docs/README.md` to expose the new Notion sync pack alongside the older import-ready backlog docs - Direct Notion writeback from this session is still blocked because the browser bridge is unavailable in the current runtime, so this pass prepared the exact sync payload but did not push it into Notion itself - Added paste/import-friendly Notion sync artifacts: `docs/development/notion-sync-2026-04-21-phases.csv`,",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T12:33:36.014Z",
+      "lastRecalledAt": "2026-04-21T12:33:36.014Z",
+      "queryHashes": [
+        "a8a925716ae2"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "repo-side",
+        "source-of-truth",
+        "code-aligned",
+        "row/status",
+        "docs/readme.md",
+        "import-ready",
+        "paste/import-friendly",
+        "added"
+      ]
+    },
+    "memory:memory/2026-04-21.md:167:174": {
+      "key": "memory:memory/2026-04-21.md:167:174",
+      "path": "memory/2026-04-21.md",
+      "startLine": 167,
+      "endLine": 174,
+      "source": "memory",
+      "snippet": "- Added `scripts/sync_telegram_update.py` so Telegram/OpenClaw can archive a change summary locally, attempt direct Notion writeback when `NOTION_API_TOKEN` plus `NOTION_PARENT_PAGE_ID` or `NOTION_DATABASE_ID` are configured, and mirror the same summary into Discord through the configured bot channel - Updated `README.md`, `.env.example`, and `TOOLS.md` so the new Telegram sync workflow is documented for operators and the bot runtime, and verified the script compiles plus passes a local archive-only smoke test with `--skip-notion --skip-discord` - Checked the Notion workspace connection claim: the target page id is now configured in `.env` as `NOTION_PARENT_PAGE_ID=345b21fdf8c78164af16d35bcc",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T12:33:36.014Z",
+      "lastRecalledAt": "2026-04-21T12:33:36.014Z",
+      "queryHashes": [
+        "a8a925716ae2"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "scripts/sync-telegram-update.py",
+        "telegram/openclaw",
+        "notion-api-token",
+        "notion-parent-page-id",
+        "notion-database-id",
+        "readme.md",
+        "env.example",
+        "tools.md"
+      ]
+    },
+    "memory:memory/2026-04-21.md:124:132": {
+      "key": "memory:memory/2026-04-21.md:124:132",
+      "path": "memory/2026-04-21.md",
+      "startLine": 124,
+      "endLine": 132,
+      "source": "memory",
+      "snippet": "- Added a single-entry `docs/development/notion-master-export-pack-2026-04-21.md` and a ready-to-paste `docs/development/notion-hub-summary-2026-04-21.md` so the whole Notion sync can now be handed off as one pack instead of multiple loose files - Added `docs/development/notion-export-bundle-checklist-2026-04-21.md` as a tick-off operator index and `docs/development/notion-executive-status-2026-04-21.md` as a five-line paste-ready status summary for Notion hub, leadership, or quick update blocks ## Public Chat Flow Fix - Traced a public BookedAI chat failure to the homepage runtime: `frontend/src/apps/public/PublicApp.tsx` no longer rendered `HomepageSearchExperience`, so the homepage sear",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T12:33:36.014Z",
+      "lastRecalledAt": "2026-04-21T12:33:36.014Z",
+      "queryHashes": [
+        "a8a925716ae2"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "single-entry",
+        "ready-to-paste",
+        "tick-off",
+        "five-line",
+        "paste-ready",
+        "added",
+        "single",
+        "entry"
+      ]
+    },
+    "memory:memory/2026-04-21.md:171:178": {
+      "key": "memory:memory/2026-04-21.md:171:178",
+      "path": "memory/2026-04-21.md",
+      "startLine": 171,
+      "endLine": 178,
+      "source": "memory",
+      "snippet": "- Added a live `NOTION_API_TOKEN` to local `.env` and re-ran the Notion sync smoke test; the request now reaches Notion but returns `http_404 object_not_found` for parent page `345b21fdf8c78164af16d35bcc96fb95`, which indicates the Execution Hub page still needs to be shared with the Notion integration (`bookedai.au`) before Telegram-driven writeback can create pages there ## Public Chat Flow, Build Resilience, And Notion Sync Pack - Restored the public homepage chat or search runtime by mounting `HomepageSearchExperience` back into `frontend/src/apps/public/PublicApp.tsx`, fixing the user-visible BookedAI public chat-flow regression - Added frontend build resilience for mount-blocked outp",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-21T12:33:36.014Z",
+      "lastRecalledAt": "2026-04-21T12:33:36.014Z",
+      "queryHashes": [
+        "a8a925716ae2"
+      ],
+      "recallDays": [
+        "2026-04-21"
+      ],
+      "conceptTags": [
+        "notion-api-token",
+        "re-ran",
+        "http-404",
+        "object-not-found",
+        "bookedai.au",
+        "telegram-driven",
+        "user-visible",
+        "chat-flow"
+      ]
+    },
+    "memory:memory/2026-04-22.md:26:30": {
+      "key": "memory:memory/2026-04-22.md:26:30",
+      "path": "memory/2026-04-22.md",
+      "startLine": 26,
+      "endLine": 30,
+      "source": "memory",
+      "snippet": "- Upgraded the root `Next.js` admin `Bookings` slice with list view, date-grouped calendar view, confirm/cancel/reschedule actions, explicit customer/service linkage, booking create form, time-range validation, and API routes under `/api/admin/bookings` plus dedicated action endpoints for `confirm`, `cancel`, and `reschedule`. - Turned the root `Next.js` admin dashboard into a real revenue overview in `app/admin/page.tsx`, with KPI cards for revenue/pipeline/bookings/conversion, chart sections for revenue trend plus booking and lead distributions, and operational panels for overdue follow-ups, recent bookings, and audit highlights. - Added a tenant-scoped `getDashboardSnapshot(...)` read mod",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-23T00:58:30.275Z",
+      "lastRecalledAt": "2026-04-23T00:58:30.275Z",
+      "queryHashes": [
+        "96210df2a009"
+      ],
+      "recallDays": [
+        "2026-04-23"
+      ],
+      "conceptTags": [
+        "next.js",
+        "date-grouped",
+        "confirm/cancel/reschedule",
+        "customer/service",
+        "time-range",
+        "api/admin/bookings",
+        "app/admin/page.tsx",
+        "follow-ups"
+      ]
+    },
+    "memory:memory/2026-04-22.md:23:27": {
+      "key": "memory:memory/2026-04-22.md:23:27",
+      "path": "memory/2026-04-22.md",
+      "startLine": 23,
+      "endLine": 27,
+      "source": "memory",
+      "snippet": "- Added root `Next.js` admin API routes for Leads at `/api/admin/leads`, `/api/admin/leads/[leadId]`, `/api/admin/leads/[leadId]/convert-to-customer`, and `/api/admin/leads/[leadId]/convert-to-booking`, with Zod validation, RBAC, soft delete, and build verification via `node node_modules/typescript/bin/tsc --noEmit` plus `node node_modules/next/dist/bin/next build`. - Locked a new documentation rule that `Customers` and `Leads` in the admin workspace must preserve a `Zoho CRM` sync seam, including future retry/manual-review posture, instead of being treated as local-only CRUD modules. - Simplified the root `Next.js` admin `Services` slice around `name`, `duration`, and `price`, with a simple",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-23T00:58:30.275Z",
+      "lastRecalledAt": "2026-04-23T00:58:30.275Z",
+      "queryHashes": [
+        "96210df2a009"
+      ],
+      "recallDays": [
+        "2026-04-23"
+      ],
+      "conceptTags": [
+        "next.js",
+        "api/admin/leads",
+        "convert-to-customer",
+        "convert-to-booking",
+        "node-modules/typescript/bin/tsc",
+        "node-modules/next/dist/bin/next",
+        "retry/manual-review",
+        "local-only"
+      ]
+    },
+    "memory:memory/2026-04-22.md:19:23": {
+      "key": "memory:memory/2026-04-22.md:19:23",
+      "path": "memory/2026-04-22.md",
+      "startLine": 19,
+      "endLine": 23,
+      "source": "memory",
+      "snippet": "- Upgraded the root `Next.js` admin `Customers` module into a richer tenant-scoped workspace with KPI cards, lifecycle and source filters, sort controls, reusable create/update form components, row-level archive actions, and detail tabs for overview, bookings, payments, and notes plus audit. - Extended `lib/db/admin-repository.ts` with richer customer mock data, payment history, and entity-specific audit records; tightened customer validation so email or phone is required; and verified the change with `node node_modules/typescript/bin/tsc --noEmit` plus `node node_modules/next/dist/bin/next build`. - Added root `Next.js` admin API routes for Customers at `/api/admin/customers` and `/api/admi",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-23T00:58:30.275Z",
+      "lastRecalledAt": "2026-04-23T00:58:30.275Z",
+      "queryHashes": [
+        "96210df2a009"
+      ],
+      "recallDays": [
+        "2026-04-23"
+      ],
+      "conceptTags": [
+        "next.js",
+        "tenant-scoped",
+        "create/update",
+        "row-level",
+        "lib/db/admin-repository.ts",
+        "entity-specific",
+        "node-modules/typescript/bin/tsc",
+        "node-modules/next/dist/bin/next"
+      ]
+    },
+    "memory:memory/2026-04-22.md:41:46": {
+      "key": "memory:memory/2026-04-22.md:41:46",
+      "path": "memory/2026-04-22.md",
+      "startLine": 41,
+      "endLine": 46,
+      "source": "memory",
+      "snippet": "- Extended that same Phase 3 lane with `Roles` and `Audit` workspaces, including role-permission editing, paginated audit-log investigation, repository support for permission and audit reads, and matching `/api/admin/roles` plus `/api/admin/audit` contracts. - Verification for the Phase 3 extension again passed with `node node_modules/typescript/bin/tsc --noEmit` and `node node_modules/next/dist/bin/next build`. - Started the first practical Phase 4 slice by adding a dedicated lead detail workspace with follow-up timeline and conversion actions, plus shared customer timeline rendering across notes, tags, bookings, payments, and audit events. - Verification for the Phase 4 opening slice passe",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-23T00:58:30.275Z",
+      "lastRecalledAt": "2026-04-23T00:58:30.275Z",
+      "queryHashes": [
+        "96210df2a009"
+      ],
+      "recallDays": [
+        "2026-04-23"
+      ],
+      "conceptTags": [
+        "role-permission",
+        "audit-log",
+        "api/admin/roles",
+        "api/admin/audit",
+        "node-modules/typescript/bin/tsc",
+        "node-modules/next/dist/bin/next",
+        "follow-up",
+        "extended"
       ]
     }
   }

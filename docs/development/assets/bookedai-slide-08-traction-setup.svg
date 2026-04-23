@@ -1,0 +1,33 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg8" x1="180" y1="90" x2="1410" y2="820" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#142847"/>
+      <stop offset="1" stop-color="#06101A"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" rx="36" fill="url(#bg8)"/>
+  <circle cx="260" cy="180" r="120" fill="#6EE7FF" fill-opacity="0.09"/>
+  <circle cx="1340" cy="720" r="150" fill="#8B5CF6" fill-opacity="0.10"/>
+  <text x="110" y="120" fill="#6EE7FF" font-size="24" font-family="Arial, sans-serif" letter-spacing="4">TRACTION SETUP</text>
+  <text x="110" y="178" fill="#F5F9FF" font-size="54" font-family="Arial, sans-serif" font-weight="700">Progress today is infrastructure depth,</text>
+  <text x="110" y="232" fill="#F5F9FF" font-size="54" font-family="Arial, sans-serif" font-weight="700">not vanity packaging</text>
+
+  <rect x="140" y="340" width="300" height="230" rx="28" fill="#11233C" stroke="rgba(255,255,255,0.12)"/>
+  <text x="180" y="410" fill="#F5F9FF" font-size="54" font-family="Arial, sans-serif" font-weight="700">AI</text>
+  <text x="180" y="460" fill="#ADC0DA" font-size="24" font-family="Arial, sans-serif">public assistant and hosted product surfaces</text>
+
+  <rect x="490" y="340" width="300" height="230" rx="28" fill="#11233C" stroke="rgba(255,255,255,0.12)"/>
+  <text x="530" y="410" fill="#F5F9FF" font-size="54" font-family="Arial, sans-serif" font-weight="700">Admin</text>
+  <text x="530" y="460" fill="#ADC0DA" font-size="24" font-family="Arial, sans-serif">tenant, role, audit, bookings, payments</text>
+
+  <rect x="840" y="340" width="300" height="230" rx="28" fill="#11233C" stroke="rgba(255,255,255,0.12)"/>
+  <text x="880" y="410" fill="#F5F9FF" font-size="54" font-family="Arial, sans-serif" font-weight="700">Sync</text>
+  <text x="880" y="460" fill="#ADC0DA" font-size="24" font-family="Arial, sans-serif">Zoho CRM connection, replay, and visibility foundations</text>
+
+  <rect x="1190" y="340" width="270" height="230" rx="28" fill="#11233C" stroke="rgba(255,255,255,0.12)"/>
+  <text x="1230" y="410" fill="#F5F9FF" font-size="54" font-family="Arial, sans-serif" font-weight="700">Ops</text>
+  <text x="1230" y="460" fill="#ADC0DA" font-size="24" font-family="Arial, sans-serif">Telegram and OpenClaw operator workflow</text>
+
+  <rect x="240" y="690" width="1120" height="96" rx="22" fill="#0D1A2D" stroke="rgba(255,255,255,0.1)"/>
+  <text x="295" y="748" fill="#F5F9FF" font-size="30" font-family="Arial, sans-serif" font-weight="700">The company is building the operating foundation required to support repeatable revenue, not just a demo layer.</text>
+</svg>

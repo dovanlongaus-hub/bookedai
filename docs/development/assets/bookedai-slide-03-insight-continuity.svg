@@ -1,0 +1,44 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg3" x1="220" y1="120" x2="1360" y2="780" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#142743"/>
+      <stop offset="1" stop-color="#07101C"/>
+    </linearGradient>
+    <linearGradient id="flow3" x1="280" y1="450" x2="1320" y2="450" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6EE7FF"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" rx="36" fill="url(#bg3)"/>
+  <circle cx="230" cy="170" r="120" fill="#6EE7FF" fill-opacity="0.08"/>
+  <circle cx="1320" cy="720" r="160" fill="#8B5CF6" fill-opacity="0.10"/>
+
+  <text x="110" y="120" fill="#6EE7FF" font-size="24" font-family="Arial, sans-serif" letter-spacing="4">INSIGHT</text>
+  <text x="110" y="178" fill="#F5F9FF" font-size="56" font-family="Arial, sans-serif" font-weight="700">AI alone is not enough.</text>
+  <text x="110" y="230" fill="#F5F9FF" font-size="56" font-family="Arial, sans-serif" font-weight="700">Revenue continuity is the real product.</text>
+  <text x="110" y="282" fill="#ADC0DA" font-size="24" font-family="Arial, sans-serif">The winning system keeps context alive from first question to booking, follow-up, payment, and operator truth.</text>
+
+  <rect x="170" y="360" width="220" height="150" rx="24" fill="#122239" stroke="rgba(255,255,255,0.12)"/>
+  <text x="210" y="420" fill="#6EE7FF" font-size="18" font-family="Arial, sans-serif" letter-spacing="2">STEP 1</text>
+  <text x="210" y="470" fill="#F5F9FF" font-size="30" font-family="Arial, sans-serif" font-weight="700">Question</text>
+
+  <rect x="470" y="360" width="220" height="150" rx="24" fill="#122239" stroke="rgba(255,255,255,0.12)"/>
+  <text x="510" y="420" fill="#6EE7FF" font-size="18" font-family="Arial, sans-serif" letter-spacing="2">STEP 2</text>
+  <text x="510" y="470" fill="#F5F9FF" font-size="30" font-family="Arial, sans-serif" font-weight="700">Booking</text>
+
+  <rect x="770" y="360" width="220" height="150" rx="24" fill="#122239" stroke="rgba(255,255,255,0.12)"/>
+  <text x="810" y="420" fill="#6EE7FF" font-size="18" font-family="Arial, sans-serif" letter-spacing="2">STEP 3</text>
+  <text x="810" y="470" fill="#F5F9FF" font-size="30" font-family="Arial, sans-serif" font-weight="700">Follow-up</text>
+
+  <rect x="1070" y="360" width="220" height="150" rx="24" fill="#122239" stroke="rgba(255,255,255,0.12)"/>
+  <text x="1110" y="420" fill="#6EE7FF" font-size="18" font-family="Arial, sans-serif" letter-spacing="2">STEP 4</text>
+  <text x="1110" y="470" fill="#F5F9FF" font-size="30" font-family="Arial, sans-serif" font-weight="700">Payment truth</text>
+
+  <path d="M390 435H470" stroke="url(#flow3)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M690 435H770" stroke="url(#flow3)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M990 435H1070" stroke="url(#flow3)" stroke-width="10" stroke-linecap="round"/>
+
+  <rect x="250" y="635" width="1100" height="130" rx="24" fill="#0D1A2D" stroke="rgba(255,255,255,0.1)"/>
+  <text x="305" y="695" fill="#F5F9FF" font-size="32" font-family="Arial, sans-serif" font-weight="700">BookedAI keeps one continuous revenue context across the whole customer path.</text>
+  <text x="305" y="740" fill="#ADC0DA" font-size="24" font-family="Arial, sans-serif">That continuity is what turns AI from a surface feature into an operating system for service revenue.</text>
+</svg>

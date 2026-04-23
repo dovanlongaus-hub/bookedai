@@ -1,6 +1,7 @@
 import type { Dispatch, FormEventHandler, SetStateAction } from 'react';
 
 import type { TenantTeamResponse } from '../../shared/contracts';
+import { TenantSectionActivityCard } from '../tenant-shared/TenantSectionActivityCard';
 
 export type TenantInviteMemberFormState = {
   email: string;
@@ -95,6 +96,10 @@ export function TenantTeamWorkspace({
                 : 'This session can view team access but cannot change roles.'}
             </div>
           </div>
+
+          <div className="mt-5">
+            <TenantSectionActivityCard label="Team access audit" activity={team.activity} />
+          </div>
         </article>
 
         <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
@@ -112,6 +117,7 @@ export function TenantTeamWorkspace({
               </div>
               <input
                 value={inviteForm.email}
+                disabled={teamPending || !team.access.can_manage_team}
                 onChange={(event) =>
                   setInviteForm((current) => ({ ...current, email: event.target.value }))
                 }
@@ -125,6 +131,7 @@ export function TenantTeamWorkspace({
               </div>
               <input
                 value={inviteForm.full_name}
+                disabled={teamPending || !team.access.can_manage_team}
                 onChange={(event) =>
                   setInviteForm((current) => ({ ...current, full_name: event.target.value }))
                 }
@@ -138,6 +145,7 @@ export function TenantTeamWorkspace({
               </div>
               <select
                 value={inviteForm.role}
+                disabled={teamPending || !team.access.can_manage_team}
                 onChange={(event) =>
                   setInviteForm((current) => ({ ...current, role: event.target.value }))
                 }

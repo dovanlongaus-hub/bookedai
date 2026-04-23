@@ -13,26 +13,26 @@ type TrustSectionProps = {
 const headingContent = {
   kicker: 'Trust',
   kickerClassName: 'text-emerald-600',
-  title: `Give buyers and investors enough proof to trust ${brandName} quickly`,
-  body: 'Keep the proof realistic, compact, and easy to scan so service businesses can judge fit while investors can understand the commercial logic fast.',
+  title: `Give buyers and investors enough proof to take ${brandName} seriously in the first minute`,
+  body: 'Keep the strongest proof realistic, compact, and easy to scan so buyers can judge fit quickly while investors can recognise commercial discipline without reading a wall of claims.',
 };
 
 const trustSignals = [
-  { label: 'Commercial model', value: 'Clear' },
+  { label: 'Commercial model', value: 'Legible' },
   { label: 'Proof style', value: 'Grounded' },
-  { label: 'Decision effort', value: 'Low' },
+  { label: 'Scale posture', value: 'Visible' },
 ];
 
 export function TrustSection({ items, faqItems }: TrustSectionProps) {
   return (
-    <SectionShell id="trust" className="py-10">
+    <SectionShell id="trust" className="py-14 lg:py-16">
       <div className="grid gap-5 lg:grid-cols-[0.68fr_1.32fr]">
-        <SectionCard className="p-7 lg:p-8">
+        <SectionCard className="border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fcfb_100%)] p-7 shadow-[0_22px_56px_rgba(15,23,42,0.05)] lg:p-8">
           <SectionHeading {...headingContent} />
 
           <div className="mt-8 grid gap-3">
             {trustSignals.map((item) => (
-              <SectionCard key={item.label} as="article" tone="subtle" className="rounded-[1.35rem] px-5 py-4">
+              <SectionCard key={item.label} as="article" tone="subtle" className="rounded-[1.35rem] border border-black/6 bg-white px-5 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                   {item.label}
                 </div>
@@ -43,18 +43,18 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
             ))}
           </div>
 
-          <SectionCard className="mt-5 rounded-[1.8rem] p-5">
+          <SectionCard className="mt-5 rounded-[1.8rem] border border-black/6 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.04)]">
             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
               Trust frame
             </div>
             <div className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">
-              Confidence is the goal, not overclaiming.
+              Credibility is the goal, not noise.
             </div>
             <div className="mt-4 grid gap-3">
               {[
-                'Show how the buyer moves from enquiry to booking.',
-                'Use short proof blocks instead of dense marketing copy.',
-                'Answer risk questions before the buyer needs to ask.',
+                'Show how the operating path works from demand to booking outcome.',
+                'Use compact proof blocks instead of inflated enterprise language.',
+                'Answer scale, rollout, and credibility questions before the buyer needs to ask.',
               ].map((item) => (
                 <div key={item} className="rounded-[1.05rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-3 text-sm leading-6 text-black/72">
                   {item}
@@ -65,7 +65,7 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
         </SectionCard>
 
         <div className="grid gap-5">
-          <SectionCard className="overflow-hidden p-6 lg:p-7">
+          <SectionCard className="overflow-hidden border border-black/6 bg-white p-6 shadow-[0_22px_56px_rgba(15,23,42,0.05)] lg:p-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="template-kicker text-sm tracking-[0.14em]">Proof wall</div>
@@ -84,7 +84,7 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
                   key={item.name + item.business}
                   as="article"
                   tone="subtle"
-                  className="flex h-full flex-col rounded-[1.45rem] p-5"
+                  className="flex h-full flex-col rounded-[1.45rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1d1d1f] text-[11px] font-semibold text-white">
@@ -104,7 +104,7 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
             </div>
           </SectionCard>
 
-          <SectionCard className="rounded-[2.2rem] p-6 lg:p-7">
+          <SectionCard className="rounded-[2.2rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-6 shadow-[0_22px_56px_rgba(15,23,42,0.05)] lg:p-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <div className="template-kicker text-sm tracking-[0.14em]">FAQ signal board</div>
@@ -123,7 +123,7 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
                   key={item.question}
                   as="article"
                   tone="subtle"
-                  className="flex h-full flex-col rounded-[1.45rem] p-5"
+                  className="flex h-full flex-col rounded-[1.45rem] border border-black/6 bg-white p-5 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
                 >
                   <h3 className="text-lg font-semibold tracking-[-0.02em] text-slate-950">{item.question}</h3>
                   <p className="mt-3 text-sm leading-7 text-slate-600">{item.answer}</p>

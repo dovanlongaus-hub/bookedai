@@ -351,6 +351,53 @@ class Prompt9MatchingServiceTestCase(TestCase):
         self.assertEqual([item.service.service_id for item in filtered], ["svc_sydney_facial"])
         self.assertIn("location_mismatch", ranked[1].evidence)
 
+    def test_filter_ranked_matches_for_relevance_keeps_online_service_when_location_is_required(self):
+        services = [
+            SimpleNamespace(
+                service_id="svc_online_chess",
+                business_name="Co Mai Hung Chess Class",
+                name="Online Group Chess Class",
+                summary="Tournament-oriented online group chess coaching for children.",
+                category="Kids Services",
+                venue_name="Co Mai Hung Chess Class",
+                location="Melbourne VIC 3000",
+                amount_aud=20,
+                tags_json=["kids", "children", "chess", "class", "online"],
+                featured=1,
+                booking_url="https://book.example.com/online-chess",
+            ),
+            SimpleNamespace(
+                service_id="svc_offline_chess",
+                business_name="Docklands Chess",
+                name="In-Person Chess Class",
+                summary="Local chess coaching in Melbourne.",
+                category="Kids Services",
+                venue_name="Docklands Chess",
+                location="Melbourne VIC 3000",
+                amount_aud=25,
+                tags_json=["kids", "children", "chess", "class"],
+                featured=0,
+                booking_url=None,
+            ),
+        ]
+
+        ranked = rank_catalog_matches(
+            query="online chess class near me",
+            services=services,
+            location_hint="Sydney",
+            requested_category="Kids Services",
+        )
+        filtered = filter_ranked_matches_for_relevance(
+            ranked,
+            semantic_applied=False,
+            require_location_match=True,
+            location_hint="Sydney",
+        )
+
+        self.assertEqual([item.service.service_id for item in filtered], ["svc_online_chess"])
+        self.assertIn("online_location_flexible", ranked[0].evidence)
+        self.assertIn("location_mismatch", ranked[1].evidence)
+
     def test_filter_ranked_matches_for_relevance_treats_caringbah_as_sydney_metro(self):
         services = [
             SimpleNamespace(

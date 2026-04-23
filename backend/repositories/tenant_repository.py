@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
+import json
 from uuid import uuid4
 
 from sqlalchemy import text
@@ -91,6 +92,29 @@ class TenantRepository(BaseRepository):
             "locale": row["locale"],
             "industry": row["industry"],
         }
+
+    async def get_tenant_settings(self, tenant_ref: str | None) -> dict[str, object]:
+        effective_tenant_id = await self.resolve_tenant_id(tenant_ref)
+        if not effective_tenant_id:
+            return {}
+
+        result = await self.session.execute(
+            text(
+                """
+                select settings_json
+                from tenant_settings
+                where tenant_id = cast(:tenant_id as uuid)
+                limit 1
+                """
+            ),
+            {"tenant_id": effective_tenant_id},
+        )
+        row = result.mappings().first()
+        if not row:
+            return {}
+
+        settings = row.get("settings_json")
+        return dict(settings) if isinstance(settings, dict) else {}
 
     async def create_tenant(
         self,
@@ -209,6 +233,41 @@ class TenantRepository(BaseRepository):
             "timezone": row["timezone"],
             "locale": row["locale"],
             "industry": row["industry"],
+        }
+
+    async def upsert_tenant_settings(
+        self,
+        *,
+        tenant_id: str,
+        settings_json: dict[str, object],
+    ) -> dict[str, object]:
+        result = await self.session.execute(
+            text(
+                """
+                insert into tenant_settings (tenant_id, settings_json)
+                values (cast(:tenant_id as uuid), cast(:settings_json as jsonb))
+                on conflict (tenant_id) do update
+                set
+                  settings_json = coalesce(tenant_settings.settings_json, '{}'::jsonb) || cast(:settings_json as jsonb),
+                  version = tenant_settings.version + 1,
+                  updated_at = now()
+                returning
+                  settings_json,
+                  version,
+                  updated_at
+                """
+            ),
+            {
+                "tenant_id": tenant_id,
+                "settings_json": json.dumps(settings_json),
+            },
+        )
+        row = result.mappings().first() or {}
+        settings = row.get("settings_json")
+        return {
+            "settings_json": dict(settings) if isinstance(settings, dict) else {},
+            "version": int(row.get("version") or 1),
+            "updated_at": row.get("updated_at"),
         }
 
     async def list_tenant_members(self, tenant_id: str) -> list[dict[str, str | None]]:

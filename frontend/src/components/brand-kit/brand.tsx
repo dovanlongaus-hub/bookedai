@@ -16,10 +16,11 @@ export const brandColorTokens = {
   border: 'rgba(255,255,255,0.08)',
 } as const;
 
-const BRAND_ASSET_VERSION = '20260418-brand-system';
-const BRAND_LOGO_LIGHT = `/branding/bookedai-logo-light.png?v=${BRAND_ASSET_VERSION}`;
-const BRAND_LOGO_DARK = `/branding/bookedai-logo-dark-badge.png?v=${BRAND_ASSET_VERSION}`;
-const BRAND_LOGO_BLACK = `/branding/bookedai-logo-black.png?v=${BRAND_ASSET_VERSION}`;
+const BRAND_ASSET_VERSION = '20260421-branding-suite';
+const BRAND_LOGO_LIGHT = `/branding/bookedai-logo-light.webp?v=${BRAND_ASSET_VERSION}`;
+const BRAND_LOGO_DARK = `/branding/bookedai-logo-dark.webp?v=${BRAND_ASSET_VERSION}`;
+const BRAND_LOGO_BLACK = `/branding/bookedai-logo-black.webp?v=${BRAND_ASSET_VERSION}`;
+const BRAND_LOGO_TRANSPARENT = `/branding/bookedai-logo-transparent.webp?v=${BRAND_ASSET_VERSION}`;
 const BRAND_ICON = `/branding/bookedai-app-icon-1024.png?v=${BRAND_ASSET_VERSION}`;
 
 export const brandLogoSources = {
@@ -29,7 +30,7 @@ export const brandLogoSources = {
   monoBlack: BRAND_LOGO_BLACK,
   white: BRAND_LOGO_DARK,
   black: BRAND_LOGO_BLACK,
-  transparent: BRAND_LOGO_LIGHT,
+  transparent: BRAND_LOGO_TRANSPARENT,
   icon: BRAND_ICON,
 } as const;
 
@@ -56,9 +57,13 @@ function normalizeVariant(variant: LogoProps['variant']): BrandLogoVariant | 'ic
 export function Logo({
   variant = 'dark',
   className = '',
-  showTagline = false,
+  showTagline: _showTagline = false,
 }: LogoProps) {
   const normalizedVariant = normalizeVariant(variant);
+  const imageClassName =
+    normalizedVariant === 'dark'
+      ? 'rounded-[1rem] bg-white px-3 py-2 shadow-[0_14px_30px_rgba(15,23,42,0.16)]'
+      : '';
 
   if (normalizedVariant === 'icon') {
     return (
@@ -68,11 +73,6 @@ export function Logo({
           alt="BookedAI.au logo"
           className="h-auto w-[3.875rem]"
         />
-        {showTagline ? (
-          <span className="mt-1 text-xs uppercase tracking-[0.24em] text-brand-muted">
-            The AI Revenue Engine
-          </span>
-        ) : null}
       </div>
     );
   }
@@ -83,13 +83,8 @@ export function Logo({
         <img
           src={brandLogoSources.transparent}
           alt="BookedAI.au logo"
-          className="h-auto w-[15rem]"
+          className={cx('h-auto w-[15rem]', imageClassName)}
         />
-        {showTagline ? (
-          <span className="mt-1 text-xs uppercase tracking-[0.24em] text-brand-muted">
-            The AI Revenue Engine
-          </span>
-        ) : null}
       </div>
     );
   }
@@ -99,14 +94,8 @@ export function Logo({
       <img
         src={brandLogoSources[normalizedVariant]}
         alt="BookedAI.au logo"
-        className="h-auto w-full max-w-[15rem]"
+        className={cx('h-auto w-full max-w-[15rem]', imageClassName)}
       />
-
-      {showTagline ? (
-        <span className="mt-1 text-xs uppercase tracking-[0.24em] text-brand-muted">
-          The AI Revenue Engine
-        </span>
-      ) : null}
     </div>
   );
 }

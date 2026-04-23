@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from urllib.parse import urlencode
 
+import httpx
 from sqlalchemy import desc, select, text
 
 from db import ServiceMerchantProfile
@@ -67,6 +69,86 @@ TENANT_BILLING_PLAN_CATALOG = [
     },
 ]
 
+TENANT_PLUGIN_DEFAULT_FEATURES = {
+    "chat": True,
+    "search": True,
+    "booking": True,
+    "payment": True,
+    "email": True,
+    "crm": True,
+    "whatsapp": True,
+}
+
+TENANT_WORKSPACE_GUIDE_DEFAULTS = {
+    "overview": "Review the live operating posture first: revenue capture, onboarding progress, search readiness, and the next action that needs leadership attention.",
+    "experience": "Update tenant identity, brand imagery, and HTML introduction here so the workspace stays enterprise-ready and consistent across operator-facing flows.",
+    "catalog": "Keep services grouped clearly by business function, confirm pricing and imagery, then publish only rows that are ready for search and booking.",
+    "plugin": "Use this area when the tenant needs BookedAI embedded into another website or product surface, with saved runtime configuration and reusable snippets.",
+    "bookings": "Monitor booking states, payment dependency, and confidence from one queue so customer follow-up can move without switching tools.",
+    "integrations": "Treat provider posture as controlled infrastructure: pause or resume carefully, and confirm retries or alerts before changing production sync behavior.",
+    "billing": "Keep billing identity, collection readiness, invoices, and plan posture accurate here so the workspace stays commercially production-safe.",
+    "team": "Manage roles with least-privilege discipline, invite only the people needed for the workflow, and keep finance and operator responsibilities distinct.",
+}
+
+
+def _sanitize_workspace_html(value: object) -> str | None:
+    normalized = _clean_optional_text(value)
+    if not normalized:
+        return None
+
+    sanitized = normalized.replace("<script", "&lt;script").replace("</script>", "&lt;/script&gt;")
+    return sanitized
+
+
+def _audit_actor_label(item: dict[str, object]) -> str | None:
+    actor_id = _clean_optional_text(item.get("actor_id"))
+    if actor_id:
+        return actor_id
+    actor_type = _clean_optional_text(item.get("actor_type"))
+    if actor_type:
+        return actor_type.replace("_", " ")
+    return None
+
+
+def _build_section_activity(
+    audit_rows: list[dict[str, object]],
+    *,
+    event_types: set[str] | None = None,
+    event_prefixes: tuple[str, ...] = (),
+    entity_types: set[str] | None = None,
+    fallback_summary: str,
+    fallback_updated_at: object | None = None,
+    fallback_actor: str | None = None,
+) -> dict[str, object]:
+    for item in audit_rows:
+        event_type = str(item.get("event_type") or "").strip()
+        entity_type = str(item.get("entity_type") or "").strip()
+        matches = False
+        if event_types and event_type in event_types:
+            matches = True
+        elif event_prefixes and any(event_type.startswith(prefix) for prefix in event_prefixes):
+            matches = True
+        elif entity_types and entity_type in entity_types:
+            matches = True
+        if not matches:
+            continue
+
+        payload = item.get("payload") if isinstance(item.get("payload"), dict) else {}
+        return {
+            "last_updated_at": item.get("created_at"),
+            "last_updated_by": _audit_actor_label(item),
+            "last_event_type": event_type or None,
+            "summary": str(payload.get("summary") or event_type.replace(".", " ")).strip()
+            or fallback_summary,
+        }
+
+    return {
+        "last_updated_at": fallback_updated_at,
+        "last_updated_by": fallback_actor,
+        "last_event_type": None,
+        "summary": fallback_summary,
+    }
+
 
 async def _load_tenant_context(session, *, tenant_ref: str | None = None) -> tuple[dict, str] | tuple[None, None]:
     tenant_repository = TenantRepository(RepositoryContext(session=session))
@@ -83,15 +165,21 @@ async def build_tenant_overview(session, *, tenant_ref: str | None = None) -> di
     if not tenant_profile or not tenant_id:
         return {}
 
+    tenant_repository = TenantRepository(RepositoryContext(session=session, tenant_id=tenant_id))
     reporting_repository = ReportingRepository(RepositoryContext(session=session, tenant_id=tenant_id))
     feature_flag_repository = FeatureFlagRepository(
         RepositoryContext(session=session, tenant_id=tenant_id)
     )
+    audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
 
     summary = await reporting_repository.summarize_tenant_overview(tenant_id)
     recent_bookings = await reporting_repository.list_recent_booking_intents(tenant_id, limit=5)
     integration_items = await build_integration_provider_statuses(session, tenant_id=tenant_id)
     attention_items = await build_integration_attention_items(session, tenant_id=tenant_id)
+    tenant_settings = await tenant_repository.get_tenant_settings(tenant_id)
+    workspace_settings = _read_nested_dict(tenant_settings, "tenant_workspace")
+    workspace_guides = _read_nested_dict(workspace_settings, "guides")
+    recent_audit_entries = await audit_repository.list_recent_entries(tenant_id=tenant_id, limit=12)
     tenant_mode_enabled = await feature_flag_repository.get_flag(
         "tenant_mode_enabled",
         tenant_id=tenant_id,
@@ -132,6 +220,24 @@ async def build_tenant_overview(session, *, tenant_ref: str | None = None) -> di
             "deployment_mode": "standalone_app",
         },
         "summary": summary,
+        "workspace": {
+            "logo_url": _clean_optional_text(workspace_settings.get("logo_url")),
+            "hero_image_url": _clean_optional_text(workspace_settings.get("hero_image_url")),
+            "introduction_html": _sanitize_workspace_html(
+                workspace_settings.get("introduction_html")
+            ),
+            "guides": {
+                key: _clean_text(workspace_guides.get(key), fallback)
+                for key, fallback in TENANT_WORKSPACE_GUIDE_DEFAULTS.items()
+            },
+            "activity": _build_section_activity(
+                recent_audit_entries,
+                event_types={"tenant.profile.updated"},
+                fallback_summary="Tenant experience studio has not recorded a profile change yet.",
+                fallback_updated_at=tenant_profile.get("updated_at"),
+                fallback_actor=_clean_optional_text(tenant_profile.get("owner_email")),
+            ),
+        },
         "integration_snapshot": {
             "connected_count": len(
                 [item for item in integration_items if item.get("status") == "connected"]
@@ -162,13 +268,25 @@ async def build_tenant_bookings_snapshot(session, *, tenant_ref: str | None = No
 
     for booking in recent_bookings:
         status = str(booking.get("status") or "").lower()
-        if status == "pending_confirmation":
+        payment_state = str(booking.get("payment_dependency_state") or "").lower()
+        if status in {"pending_confirmation", "unverified"}:
             status_summary["pending_confirmation"] += 1
-        elif status in {"captured", "pending", "confirmed", "in_progress"}:
+        elif status in {
+            "captured",
+            "pending",
+            "confirmed",
+            "in_progress",
+            "active",
+            "scheduled",
+            "payment_pending",
+            "processed_by_n8n",
+            "triggered",
+            "synced",
+        } or payment_state in {"stripe_checkout_ready", "payment_follow_up_required"}:
             status_summary["active"] += 1
-        elif status == "completed":
+        elif status in {"completed", "paid"}:
             status_summary["completed"] += 1
-        elif status == "cancelled":
+        elif status in {"cancelled", "failed", "expired", "refunded"}:
             status_summary["cancelled"] += 1
         else:
             status_summary["other"] += 1
@@ -189,6 +307,8 @@ async def build_tenant_integrations_snapshot(session, *, tenant_ref: str | None 
     attention_items = await build_integration_attention_items(session, tenant_id=tenant_id)
     reconciliation = await build_reconciliation_details(session, tenant_id=tenant_id)
     crm_backlog = await build_crm_retry_backlog(session, tenant_id=tenant_id)
+    audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    recent_audit_entries = await audit_repository.list_recent_entries(tenant_id=tenant_id, limit=12)
 
     return {
         "tenant": tenant_profile,
@@ -196,6 +316,12 @@ async def build_tenant_integrations_snapshot(session, *, tenant_ref: str | None 
         "attention": attention_items,
         "reconciliation": reconciliation,
         "crm_retry_backlog": crm_backlog,
+        "activity": _build_section_activity(
+            recent_audit_entries,
+            event_prefixes=("tenant.integrations.",),
+            fallback_summary="No integration control changes have been recorded yet for this tenant.",
+            fallback_actor=_clean_optional_text(tenant_profile.get("owner_email")),
+        ),
         "controls": {
             "available_statuses": ["connected", "paused"],
             "available_sync_modes": ["read_only", "write_back", "bidirectional"],
@@ -208,6 +334,15 @@ async def build_tenant_billing_snapshot(session, *, tenant_ref: str | None = Non
     tenant_profile, tenant_id = await _load_tenant_context(session, tenant_ref=tenant_ref)
     if not tenant_profile or not tenant_id:
         return {}
+
+    tenant_repository = TenantRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    tenant_settings = await tenant_repository.get_tenant_settings(tenant_id)
+    billing_gateway_settings = _read_billing_gateway_settings(tenant_settings)
+    stripe_customer_id = _clean_optional_text(billing_gateway_settings.get("stripe_customer_id"))
+    stripe_live_configured = bool(
+        stripe_customer_id
+        and _clean_optional_text(billing_gateway_settings.get("merchant_mode_override")) != "disabled"
+    )
 
     billing_account_result = await session.execute(
         text(
@@ -284,6 +419,54 @@ async def build_tenant_billing_snapshot(session, *, tenant_ref: str | None = Non
     merchant_mode = str(billing_account.get("merchant_mode") or "").strip().lower() if billing_account else ""
     can_charge = has_active_subscription and merchant_mode in {"live", "production"}
 
+    stripe_state: dict[str, object] = {}
+    stripe_subscription: dict[str, object] | None = None
+    stripe_invoices: list[dict[str, object]] = []
+    stripe_default_payment_method: dict[str, object] | None = None
+    stripe_checkout_configured = bool(
+        getattr(session.bind, "url", None) is not None
+        and stripe_customer_id
+    )
+
+    if stripe_customer_id:
+        try:
+            from config import get_settings
+
+            runtime_settings = get_settings()
+            if runtime_settings.stripe_secret_key:
+                stripe_state = await _load_tenant_stripe_billing_state(
+                    runtime_settings,
+                    stripe_customer_id=stripe_customer_id,
+                )
+                stripe_subscription = next(
+                    (
+                        item
+                        for item in stripe_state.get("subscriptions", [])
+                        if isinstance(item, dict)
+                    ),
+                    None,
+                )
+                stripe_invoices = [
+                    item
+                    for item in stripe_state.get("invoices", [])
+                    if isinstance(item, dict)
+                ]
+                customer_payload = stripe_state.get("customer")
+                if isinstance(customer_payload, dict):
+                    payment_method_payload = customer_payload.get("invoice_settings", {})
+                    if isinstance(payment_method_payload, dict):
+                        default_payment_method = payment_method_payload.get("default_payment_method")
+                        if isinstance(default_payment_method, dict):
+                            stripe_default_payment_method = default_payment_method
+        except Exception:
+            stripe_state = {}
+
+    if stripe_subscription:
+        stripe_subscription_status = str(stripe_subscription.get("status") or "").strip().lower()
+        if stripe_subscription_status:
+            has_active_subscription = stripe_subscription_status in {"active", "trialing"}
+            can_charge = has_active_subscription and merchant_mode in {"live", "production"}
+
     if not has_billing_account:
         recommended_action = "Create a billing account before enabling package-based tenant charging."
         operator_note = "Billing identity has not been configured for this tenant yet."
@@ -303,10 +486,18 @@ async def build_tenant_billing_snapshot(session, *, tenant_ref: str | None = Non
     trial_days = 14
     plan_catalog = []
     current_plan_code = str(subscription.get("plan_code") or "").strip().lower() if subscription else ""
+    if stripe_subscription:
+        stripe_plan_code = _clean_optional_text(
+            ((stripe_subscription.get("metadata") or {}) if isinstance(stripe_subscription.get("metadata"), dict) else {}).get("plan_code")
+        )
+        if stripe_plan_code:
+            current_plan_code = stripe_plan_code.lower()
     for plan in TENANT_BILLING_PLAN_CATALOG:
         is_current = current_plan_code == plan["code"]
         if is_current and has_active_subscription:
             cta_label = "Current package"
+        elif merchant_mode in {"live", "production"}:
+            cta_label = "Continue to Stripe"
         elif has_active_subscription:
             cta_label = "Switch to this package"
         else:
@@ -352,11 +543,42 @@ async def build_tenant_billing_snapshot(session, *, tenant_ref: str | None = Non
             }
         )
 
+    if stripe_invoices:
+        invoice_items = []
+        for invoice in stripe_invoices:
+            raw_status = str(invoice.get("status") or "").strip().lower() or "open"
+            amount_paid = int(invoice.get("amount_paid") or 0)
+            amount_due = int(invoice.get("amount_due") or 0)
+            amount_total = int(invoice.get("amount_total") or 0)
+            amount_cents = amount_paid or amount_due or amount_total
+            hosted_invoice_url = _clean_optional_text(invoice.get("hosted_invoice_url"))
+            invoice_pdf = _clean_optional_text(invoice.get("invoice_pdf"))
+            invoice_items.append(
+                {
+                    "id": _clean_optional_text(invoice.get("id")) or f"stripe-invoice-{len(invoice_items) + 1}",
+                    "invoice_number": _clean_optional_text(invoice.get("number")) or _clean_optional_text(invoice.get("id")) or f"STRIPE-{len(invoice_items) + 1:03d}",
+                    "status": raw_status,
+                    "amount_aud": amount_cents / 100,
+                    "currency": str(invoice.get("currency") or "aud").upper(),
+                    "issued_at": datetime.fromtimestamp(int(invoice.get("created") or 0), UTC).isoformat() if invoice.get("created") else None,
+                    "due_at": datetime.fromtimestamp(int(invoice.get("due_date") or 0), UTC).isoformat() if invoice.get("due_date") else None,
+                    "period_start": datetime.fromtimestamp(int((invoice.get("period_start") or 0)), UTC).isoformat() if invoice.get("period_start") else None,
+                    "period_end": datetime.fromtimestamp(int((invoice.get("period_end") or 0)), UTC).isoformat() if invoice.get("period_end") else None,
+                    "receipt_available": bool(hosted_invoice_url or invoice_pdf or raw_status == "paid"),
+                    "source": "stripe",
+                    "hosted_invoice_url": hosted_invoice_url,
+                    "receipt_url": invoice_pdf or hosted_invoice_url,
+                    "can_mark_paid": False,
+                }
+            )
+
     payment_method_status = "configured" if can_charge else "not_collected"
     if has_billing_account and not has_active_subscription:
         payment_method_status = "setup_pending"
     elif has_active_subscription and not can_charge:
         payment_method_status = "needs_collection"
+    if stripe_default_payment_method:
+        payment_method_status = "configured"
 
     audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
     recent_audit_entries = await audit_repository.list_recent_entries(tenant_id=tenant_id, limit=12)
@@ -387,6 +609,17 @@ async def build_tenant_billing_snapshot(session, *, tenant_ref: str | None = Non
 
     return {
         "tenant": tenant_profile,
+        "activity": _build_section_activity(
+            recent_audit_entries,
+            event_prefixes=("tenant.billing.",),
+            entity_types={"billing_account", "subscription"},
+            fallback_summary="No billing control changes have been recorded yet for this tenant.",
+            fallback_updated_at=(
+                (billing_account.get("updated_at") if billing_account else None)
+                or (subscription.get("updated_at") if subscription else None)
+            ),
+            fallback_actor=_clean_optional_text(tenant_profile.get("owner_email")),
+        ),
         "account": {
             "id": billing_account.get("id") if billing_account else None,
             "billing_email": billing_account.get("billing_email") if billing_account else None,
@@ -395,18 +628,18 @@ async def build_tenant_billing_snapshot(session, *, tenant_ref: str | None = Non
             "updated_at": billing_account.get("updated_at") if billing_account else None,
         },
         "subscription": {
-            "id": subscription.get("id") if subscription else None,
+            "id": (_clean_optional_text(stripe_subscription.get("id")) if stripe_subscription else None) or (subscription.get("id") if subscription else None),
             "billing_account_id": subscription.get("billing_account_id") if subscription else None,
-            "status": subscription.get("status") if subscription else "not_started",
-            "package_code": subscription.get("plan_code") if subscription else None,
-            "plan_code": subscription.get("plan_code") if subscription else None,
-            "started_at": subscription.get("started_at") if subscription else None,
-            "ended_at": subscription.get("ended_at") if subscription else None,
+            "status": (_clean_optional_text(stripe_subscription.get("status")) if stripe_subscription else None) or (subscription.get("status") if subscription else "not_started"),
+            "package_code": current_plan_code or (subscription.get("plan_code") if subscription else None),
+            "plan_code": current_plan_code or (subscription.get("plan_code") if subscription else None),
+            "started_at": datetime.fromtimestamp(int(stripe_subscription.get("start_date") or 0), UTC).isoformat() if stripe_subscription and stripe_subscription.get("start_date") else (subscription.get("started_at") if subscription else None),
+            "ended_at": datetime.fromtimestamp(int(stripe_subscription.get("cancel_at") or 0), UTC).isoformat() if stripe_subscription and stripe_subscription.get("cancel_at") else (subscription.get("ended_at") if subscription else None),
             "created_at": subscription.get("created_at") if subscription else None,
             "updated_at": subscription.get("updated_at") if subscription else None,
-            "current_period_start": latest_period.get("period_start") if latest_period else None,
-            "current_period_end": latest_period.get("period_end") if latest_period else None,
-            "current_period_status": latest_period.get("status") if latest_period else None,
+            "current_period_start": datetime.fromtimestamp(int(stripe_subscription.get("current_period_start") or 0), UTC).isoformat() if stripe_subscription and stripe_subscription.get("current_period_start") else (latest_period.get("period_start") if latest_period else None),
+            "current_period_end": datetime.fromtimestamp(int(stripe_subscription.get("current_period_end") or 0), UTC).isoformat() if stripe_subscription and stripe_subscription.get("current_period_end") else (latest_period.get("period_end") if latest_period else None),
+            "current_period_status": (_clean_optional_text(stripe_subscription.get("status")) if stripe_subscription else None) or (latest_period.get("status") if latest_period else None),
         },
         "period_summary": {
             "total_periods": len(period_rows),
@@ -439,17 +672,27 @@ async def build_tenant_billing_snapshot(session, *, tenant_ref: str | None = Non
             "can_start_trial": has_billing_account and not has_active_subscription,
             "can_change_plan": has_billing_account,
             "can_manage_billing": True,
+            "can_open_billing_portal": bool(stripe_customer_id and merchant_mode in {"live", "production"}),
+            "can_start_stripe_checkout": bool(merchant_mode in {"live", "production"}),
         },
         "payment_method": {
             "status": payment_method_status,
-            "provider_label": "BookedAI billing",
-            "brand": "Card on file" if can_charge else None,
-            "last4": "4242" if can_charge else None,
-            "expires_label": "Placeholder until gateway tokenization is connected" if can_charge else None,
+            "provider_label": "Stripe" if stripe_customer_id else "BookedAI billing",
+            "brand": _clean_optional_text(((stripe_default_payment_method.get("card") or {}) if isinstance(stripe_default_payment_method.get("card"), dict) else {}).get("brand")) if stripe_default_payment_method else None,
+            "last4": _clean_optional_text(((stripe_default_payment_method.get("card") or {}) if isinstance(stripe_default_payment_method.get("card"), dict) else {}).get("last4")) if stripe_default_payment_method else None,
+            "expires_label": (
+                f"{str(((stripe_default_payment_method.get('card') or {}) if isinstance(stripe_default_payment_method.get('card'), dict) else {}).get('exp_month') or '').strip()}/{str(((stripe_default_payment_method.get('card') or {}) if isinstance(stripe_default_payment_method.get('card'), dict) else {}).get('exp_year') or '').strip()}"
+                if stripe_default_payment_method
+                else None
+            ),
             "note": (
-                "Payment collection is enabled in live mode."
-                if can_charge
-                else "Payment method capture is not connected yet; this portal is exposing truthful readiness state only."
+                "Stripe payment collection is enabled for this tenant."
+                if stripe_default_payment_method
+                else (
+                    "Stripe is configured. Start checkout for a package or open the billing portal to attach a payment method."
+                    if merchant_mode in {"live", "production"}
+                    else "Switch merchant mode to live before opening the real Stripe billing flow for this tenant."
+                )
             ),
         },
         "settings": {
@@ -465,6 +708,21 @@ async def build_tenant_billing_snapshot(session, *, tenant_ref: str | None = Non
             "open_invoices": sum(1 for item in invoice_items if item["status"] == "open"),
             "paid_invoices": sum(1 for item in invoice_items if item["status"] == "paid"),
             "currency": "AUD",
+        },
+        "gateway": {
+            "provider": "stripe" if stripe_customer_id else "bookedai_manual",
+            "checkout_enabled": bool(merchant_mode in {"live", "production"}),
+            "portal_enabled": bool(stripe_customer_id and merchant_mode in {"live", "production"}),
+            "customer_id_present": bool(stripe_customer_id),
+            "note": (
+                "Tenant billing is linked to the live Stripe customer and can continue into hosted checkout or portal management."
+                if stripe_customer_id and merchant_mode in {"live", "production"}
+                else (
+                    "Stripe is configured in BookedAI, but this tenant is still in test posture. Switch merchant mode to live to use the real Stripe flow."
+                    if stripe_customer_id or merchant_mode not in {"live", "production"}
+                    else "Stripe has not been attached to this tenant yet."
+                )
+            ),
         },
         "audit_trail": billing_audit_events,
         "plans": plan_catalog,
@@ -718,6 +976,12 @@ async def build_tenant_team_snapshot(session, *, tenant_ref: str | None = None) 
 
     return {
         "tenant": tenant_profile,
+        "activity": _build_section_activity(
+            invite_audit_rows,
+            event_prefixes=("tenant.team.",),
+            fallback_summary="No team access changes have been recorded yet for this tenant.",
+            fallback_actor=_clean_optional_text(tenant_profile.get("owner_email")),
+        ),
         "summary": {
             "total_members": len(normalized_members),
             "active_members": status_counts["active"],
@@ -811,6 +1075,7 @@ async def _load_portal_booking_row(session, *, booking_reference: str):
               on c.id = bi.contact_id
             left join service_merchant_profiles sm
               on sm.service_id = bi.service_id
+             and sm.tenant_id = bi.tenant_id
             where bi.booking_reference = :booking_reference
             limit 1
             """
@@ -846,14 +1111,12 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
               pi.metadata_json,
               pi.created_at::text as created_at
             from payment_intents pi
-            join booking_intents bi
-              on bi.id = pi.booking_intent_id
-            where bi.booking_reference = :booking_reference
+            where pi.booking_intent_id = cast(:booking_intent_id as uuid)
             order by pi.created_at desc
             limit 1
             """
         ),
-        {"booking_reference": normalized_reference},
+        {"booking_intent_id": booking_row.get("booking_intent_id")},
     )
     payment_row = payment_result.mappings().first()
 
@@ -1239,4 +1502,412 @@ async def build_tenant_catalog_snapshot(
             ],
             "recommended_focus": "Capture only booking-relevant services and structured fields that improve search quality.",
         },
+    }
+
+
+def _read_nested_dict(record: dict[str, object], key: str) -> dict[str, object]:
+    value = record.get(key)
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _clean_text(value: object, fallback: str) -> str:
+    text_value = str(value or "").strip()
+    return text_value or fallback
+
+
+def _clean_optional_text(value: object) -> str | None:
+    text_value = str(value or "").strip()
+    return text_value or None
+
+
+def _tenant_billing_return_url(tenant_slug: str | None) -> str:
+    normalized_slug = str(tenant_slug or "").strip()
+    if normalized_slug:
+        return f"https://tenant.bookedai.au/{normalized_slug}#billing"
+    return "https://tenant.bookedai.au#billing"
+
+
+def _read_billing_gateway_settings(settings: dict[str, object]) -> dict[str, object]:
+    return _read_nested_dict(settings, "billing_gateway")
+
+
+async def _stripe_post_form(
+    *,
+    stripe_secret_key: str,
+    path: str,
+    form_data: list[tuple[str, str]],
+) -> dict[str, object]:
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.post(
+            f"https://api.stripe.com{path}",
+            headers={
+                "Authorization": f"Bearer {stripe_secret_key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            content=urlencode(form_data).encode(),
+        )
+        response.raise_for_status()
+        payload = response.json()
+    return payload if isinstance(payload, dict) else {}
+
+
+async def _stripe_get(
+    *,
+    stripe_secret_key: str,
+    path: str,
+    params: list[tuple[str, str]] | None = None,
+) -> dict[str, object]:
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.get(
+            f"https://api.stripe.com{path}",
+            headers={
+                "Authorization": f"Bearer {stripe_secret_key}",
+            },
+            params=params,
+        )
+        response.raise_for_status()
+        payload = response.json()
+    return payload if isinstance(payload, dict) else {}
+
+
+async def ensure_tenant_stripe_customer(
+    session,
+    settings,
+    *,
+    tenant_profile: dict[str, object],
+    billing_email: str | None,
+) -> tuple[str, dict[str, object]]:
+    tenant_repository = TenantRepository(RepositoryContext(session=session, tenant_id=str(tenant_profile.get("id") or "")))
+    current_settings = await tenant_repository.get_tenant_settings(str(tenant_profile.get("id") or ""))
+    billing_gateway_settings = _read_billing_gateway_settings(current_settings)
+
+    customer_id = _clean_optional_text(billing_gateway_settings.get("stripe_customer_id"))
+    normalized_email = _clean_optional_text(billing_email) or _clean_optional_text(tenant_profile.get("owner_email"))
+    tenant_name = _clean_optional_text(tenant_profile.get("name")) or "BookedAI Tenant"
+    tenant_slug = _clean_optional_text(tenant_profile.get("slug")) or ""
+    tenant_id = _clean_optional_text(tenant_profile.get("id")) or ""
+
+    if customer_id:
+        update_form = [
+            ("name", tenant_name),
+            ("metadata[tenant_id]", tenant_id),
+            ("metadata[tenant_slug]", tenant_slug),
+        ]
+        if normalized_email:
+            update_form.append(("email", normalized_email))
+        await _stripe_post_form(
+            stripe_secret_key=settings.stripe_secret_key,
+            path=f"/v1/customers/{customer_id}",
+            form_data=update_form,
+        )
+        return customer_id, billing_gateway_settings
+
+    create_form = [
+        ("name", tenant_name),
+        ("metadata[tenant_id]", tenant_id),
+        ("metadata[tenant_slug]", tenant_slug),
+        ("metadata[source]", "tenant_billing_workspace"),
+    ]
+    if normalized_email:
+        create_form.append(("email", normalized_email))
+    stripe_customer = await _stripe_post_form(
+        stripe_secret_key=settings.stripe_secret_key,
+        path="/v1/customers",
+        form_data=create_form,
+    )
+    customer_id = _clean_optional_text(stripe_customer.get("id"))
+    if not customer_id:
+        raise ValueError("Stripe did not return a customer id for tenant billing.")
+
+    next_gateway_settings = {
+        **billing_gateway_settings,
+        "stripe_customer_id": customer_id,
+        "stripe_customer_email": normalized_email,
+        "last_synced_at": datetime.now(UTC).isoformat(),
+    }
+    await tenant_repository.upsert_tenant_settings(
+        tenant_id=tenant_id,
+        settings_json={"billing_gateway": next_gateway_settings},
+    )
+    return customer_id, next_gateway_settings
+
+
+async def create_tenant_stripe_checkout_session(
+    session,
+    settings,
+    *,
+    tenant_profile: dict[str, object],
+    billing_email: str | None,
+    plan_code: str,
+    plan_label: str,
+    plan_description: str,
+    monthly_amount_aud: int,
+    mode: str,
+) -> dict[str, object]:
+    tenant_id = _clean_optional_text(tenant_profile.get("id")) or ""
+    tenant_repository = TenantRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    customer_id, gateway_settings = await ensure_tenant_stripe_customer(
+        session,
+        settings,
+        tenant_profile=tenant_profile,
+        billing_email=billing_email,
+    )
+    tenant_slug = _clean_optional_text(tenant_profile.get("slug")) or ""
+    return_url = _tenant_billing_return_url(tenant_slug)
+    form_data: list[tuple[str, str]] = [
+        ("mode", "subscription"),
+        ("customer", customer_id),
+        ("success_url", return_url),
+        ("cancel_url", return_url),
+        ("payment_method_types[]", "card"),
+        ("line_items[0][quantity]", "1"),
+        ("line_items[0][price_data][currency]", settings.stripe_currency),
+        ("line_items[0][price_data][unit_amount]", str(int(monthly_amount_aud) * 100)),
+        ("line_items[0][price_data][recurring][interval]", "month"),
+        ("line_items[0][price_data][product_data][name]", f"BookedAI {plan_label}"),
+        ("line_items[0][price_data][product_data][description]", plan_description),
+        ("client_reference_id", tenant_id),
+        ("metadata[tenant_id]", tenant_id),
+        ("metadata[tenant_slug]", tenant_slug),
+        ("metadata[plan_code]", plan_code),
+        ("metadata[source]", "tenant_billing_workspace"),
+        ("subscription_data[metadata][tenant_id]", tenant_id),
+        ("subscription_data[metadata][tenant_slug]", tenant_slug),
+        ("subscription_data[metadata][plan_code]", plan_code),
+    ]
+    if mode == "trial":
+        form_data.append(("subscription_data[trial_period_days]", "14"))
+    if billing_email:
+        form_data.append(("customer_email", billing_email.strip().lower()))
+
+    stripe_session = await _stripe_post_form(
+        stripe_secret_key=settings.stripe_secret_key,
+        path="/v1/checkout/sessions",
+        form_data=form_data,
+    )
+    checkout_url = _clean_optional_text(stripe_session.get("url"))
+    if not checkout_url:
+        raise ValueError("Stripe did not return a checkout url for tenant billing.")
+
+    next_gateway_settings = {
+        **gateway_settings,
+        "stripe_checkout_session_id": _clean_optional_text(stripe_session.get("id")),
+        "stripe_checkout_plan_code": plan_code,
+        "stripe_checkout_mode": mode,
+        "last_synced_at": datetime.now(UTC).isoformat(),
+    }
+    await tenant_repository.upsert_tenant_settings(
+        tenant_id=tenant_id,
+        settings_json={"billing_gateway": next_gateway_settings},
+    )
+    return {
+        "checkout_url": checkout_url,
+        "stripe_customer_id": customer_id,
+        "stripe_checkout_session_id": _clean_optional_text(stripe_session.get("id")),
+    }
+
+
+async def create_tenant_stripe_billing_portal_session(
+    session,
+    settings,
+    *,
+    tenant_profile: dict[str, object],
+    billing_email: str | None,
+) -> dict[str, object]:
+    customer_id, _ = await ensure_tenant_stripe_customer(
+        session,
+        settings,
+        tenant_profile=tenant_profile,
+        billing_email=billing_email,
+    )
+    stripe_session = await _stripe_post_form(
+        stripe_secret_key=settings.stripe_secret_key,
+        path="/v1/billing_portal/sessions",
+        form_data=[
+            ("customer", customer_id),
+            ("return_url", _tenant_billing_return_url(_clean_optional_text(tenant_profile.get("slug")))),
+        ],
+    )
+    portal_url = _clean_optional_text(stripe_session.get("url"))
+    if not portal_url:
+        raise ValueError("Stripe did not return a customer portal url for tenant billing.")
+    return {
+        "portal_url": portal_url,
+        "stripe_customer_id": customer_id,
+    }
+
+
+async def _load_tenant_stripe_billing_state(
+    settings,
+    *,
+    stripe_customer_id: str,
+) -> dict[str, object]:
+    customer = await _stripe_get(
+        stripe_secret_key=settings.stripe_secret_key,
+        path=f"/v1/customers/{stripe_customer_id}",
+        params=[("expand[]", "invoice_settings.default_payment_method")],
+    )
+    subscriptions_payload = await _stripe_get(
+        stripe_secret_key=settings.stripe_secret_key,
+        path="/v1/subscriptions",
+        params=[
+            ("customer", stripe_customer_id),
+            ("status", "all"),
+            ("limit", "6"),
+        ],
+    )
+    invoices_payload = await _stripe_get(
+        stripe_secret_key=settings.stripe_secret_key,
+        path="/v1/invoices",
+        params=[
+            ("customer", stripe_customer_id),
+            ("limit", "6"),
+        ],
+    )
+    subscriptions = subscriptions_payload.get("data") if isinstance(subscriptions_payload.get("data"), list) else []
+    invoices = invoices_payload.get("data") if isinstance(invoices_payload.get("data"), list) else []
+    return {
+        "customer": customer,
+        "subscriptions": subscriptions,
+        "invoices": invoices,
+    }
+
+
+async def build_tenant_plugin_interface_snapshot(session, *, tenant_ref: str | None = None) -> dict:
+    tenant_profile, tenant_id = await _load_tenant_context(session, tenant_ref=tenant_ref)
+    if not tenant_profile or not tenant_id:
+        return {}
+
+    tenant_repository = TenantRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    settings = await tenant_repository.get_tenant_settings(tenant_id)
+    plugin_settings = _read_nested_dict(settings, "partner_plugin_interface")
+    feature_settings = _read_nested_dict(plugin_settings, "features")
+    recent_audit_entries = await audit_repository.list_recent_entries(tenant_id=tenant_id, limit=12)
+
+    service_rows = (
+        await session.execute(
+            text(
+                """
+                select
+                  service_id,
+                  name,
+                  category,
+                  display_price,
+                  booking_url,
+                  image_url,
+                  publish_state
+                from service_merchant_profiles
+                where tenant_id = :tenant_id
+                order by
+                  case when coalesce(publish_state, 'draft') = 'published' then 0 else 1 end,
+                  featured desc,
+                  name asc
+                limit 24
+                """
+            ),
+            {"tenant_id": tenant_id},
+        )
+    ).mappings().all()
+
+    published_product_names = [
+        str(item.get("name") or "").strip()
+        for item in service_rows
+        if str(item.get("publish_state") or "").strip().lower() == "published"
+        and str(item.get("name") or "").strip()
+    ]
+    first_booking_url = next(
+        (
+            str(item.get("booking_url") or "").strip()
+            for item in service_rows
+            if str(item.get("booking_url") or "").strip()
+        ),
+        None,
+    )
+
+    partner_name = _clean_text(
+        plugin_settings.get("partner_name"),
+        str(tenant_profile.get("name") or "BookedAI Partner"),
+    )
+    main_message = _clean_text(
+        plugin_settings.get("headline") or settings.get("main_message"),
+        f"Book {partner_name} through BookedAI",
+    )
+    partner_website_url = _clean_text(
+        plugin_settings.get("partner_website_url") or first_booking_url,
+        f"https://{tenant_profile.get('slug')}.bookedai.au",
+    )
+    bookedai_host = _clean_text(plugin_settings.get("bookedai_host"), "https://product.bookedai.au")
+    embed_path = _clean_text(plugin_settings.get("embed_path"), f"/partner/{tenant_profile.get('slug')}/embed")
+    widget_script_path = _clean_text(
+        plugin_settings.get("widget_script_path"),
+        "/partner-plugins/ai-mentor-pro-widget.js",
+    )
+    widget_id = _clean_text(
+        plugin_settings.get("widget_id"),
+        f"{tenant_profile.get('slug')}-plugin",
+    )
+    tenant_slug = str(tenant_profile.get("slug") or "").strip()
+
+    features = {
+        key: bool(feature_settings.get(key, fallback))
+        for key, fallback in TENANT_PLUGIN_DEFAULT_FEATURES.items()
+    }
+
+    products = [
+        {
+            "service_id": item.get("service_id"),
+            "name": item.get("name"),
+            "category": item.get("category"),
+            "display_price": item.get("display_price"),
+            "booking_url": item.get("booking_url"),
+            "image_url": item.get("image_url"),
+            "publish_state": item.get("publish_state"),
+        }
+        for item in service_rows
+    ]
+
+    return {
+        "tenant": tenant_profile,
+        "activity": _build_section_activity(
+            recent_audit_entries,
+            event_types={"tenant.plugin_interface.updated"},
+            fallback_summary="No plugin configuration changes have been recorded yet for this tenant.",
+            fallback_actor=_clean_optional_text(tenant_profile.get("owner_email")),
+        ),
+        "experience": {
+            "partner_name": partner_name,
+            "partner_website_url": partner_website_url,
+            "bookedai_host": bookedai_host,
+            "embed_path": embed_path,
+            "widget_script_path": widget_script_path,
+            "tenant_ref": tenant_slug,
+            "widget_id": widget_id,
+            "accent_color": _clean_text(plugin_settings.get("accent_color"), "#1f7a6b"),
+            "button_label": _clean_text(plugin_settings.get("button_label"), f"Book {partner_name}"),
+            "modal_title": _clean_text(plugin_settings.get("modal_title"), partner_name),
+            "headline": main_message,
+            "prompt": _clean_text(plugin_settings.get("prompt"), main_message),
+            "inline_target_selector": _clean_text(
+                plugin_settings.get("inline_target_selector"),
+                "#bookedai-partner-widget",
+            ),
+            "support_email": _clean_optional_text(plugin_settings.get("support_email")),
+            "support_whatsapp": _clean_optional_text(plugin_settings.get("support_whatsapp")),
+            "logo_url": _clean_optional_text(plugin_settings.get("logo_url")),
+        },
+        "features": features,
+        "runtime": {
+            "deployment_mode": "plugin_integrated",
+            "channel": "embedded_widget",
+            "source": _clean_text(plugin_settings.get("source"), f"{tenant_slug}_plugin"),
+            "widget_script_url": f"{bookedai_host.rstrip('/')}{widget_script_path}",
+            "embed_url": f"{bookedai_host.rstrip('/')}{embed_path}",
+            "documentation_url": "https://tenant.bookedai.au/",
+        },
+        "catalog_summary": {
+            "published_product_count": len(published_product_names),
+            "product_names": published_product_names,
+        },
+        "products": products,
     }

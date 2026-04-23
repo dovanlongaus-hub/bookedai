@@ -9,6 +9,10 @@ services:
       CODEX_HOME: /home/node/.codex
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS: ${BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS:-8426853622}
+      BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS: ${BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS:-sync_doc,sync_repo_docs,build_frontend,deploy_live,test,workspace_write,repo_structure,host_command,full_project}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
@@ -43,17 +47,15 @@ services:
       interval: 30s
       timeout: 5s
       retries: 5
-      start_period: 20s
+      start_period: 720s
 
   openclaw-cli:
     image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:2026.3.12}
     container_name: openclaw-bookedai-cli
     network_mode: "service:openclaw-gateway"
-    cap_drop:
-      - NET_RAW
-      - NET_ADMIN
-    security_opt:
-      - no-new-privileges:true
+    user: "0:0"
+    privileged: true
+    pid: host
     environment:
       HOME: /home/node
       TERM: xterm-256color
@@ -62,15 +64,32 @@ services:
       CODEX_HOME: /home/node/.codex
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
+      BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS: ${BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS:-8426853622}
+      BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS: ${BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS:-sync_doc,sync_repo_docs,build_frontend,deploy_live,test,workspace_write,repo_structure,host_command,full_project}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
     volumes:
       - ${OPENCLAW_CONFIG_DIR}:/home/node/.openclaw
       - ${OPENCLAW_WORKSPACE_DIR}:/home/node/.openclaw/workspace
       - ${BOOKEDAI_REPO_DIR}:/workspace/bookedai.au
       - ${CODEX_HOME_DIR}:/home/node/.codex
+      - /:/hostfs
+      - /var/run/docker.sock:/var/run/docker.sock
     stdin_open: true
     tty: true
     init: true
     entrypoint: ["node", "dist/index.js"]
+    command:
+      [
+        "node",
+        "run",
+        "--host",
+        "127.0.0.1",
+        "--port",
+        "18789",
+        "--display-name",
+        "bookedai-host-cli"
+      ]
     depends_on:
       - openclaw-gateway
 

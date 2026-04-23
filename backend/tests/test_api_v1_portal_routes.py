@@ -18,8 +18,8 @@ from api.v1_routes import (
     _query_intent_constraint_groups,
     _raw_query_intent_terms,
     _search_terms,
-    router as v1_router,
 )
+from api.v1_router import router as v1_router
 from repositories.integration_repository import IntegrationRepository
 from service_layer.prompt9_matching_service import RankedServiceMatch
 from repositories.tenant_repository import TenantRepository
@@ -181,8 +181,8 @@ class ApiV1PortalRoutesTestCase(TestCase):
                 ],
             }
 
-        with patch("api.v1_routes.get_session", _fake_get_session), patch(
-            "api.v1_routes.build_portal_booking_snapshot",
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.build_portal_booking_snapshot",
             _build_portal_booking_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -198,8 +198,8 @@ class ApiV1PortalRoutesTestCase(TestCase):
         async def _build_portal_booking_snapshot(*_args, **_kwargs):
             return {}
 
-        with patch("api.v1_routes.get_session", _fake_get_session), patch(
-            "api.v1_routes.build_portal_booking_snapshot",
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.build_portal_booking_snapshot",
             _build_portal_booking_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -221,8 +221,8 @@ class ApiV1PortalRoutesTestCase(TestCase):
                 "outbox_event_id": 42,
             }
 
-        with patch("api.v1_routes.get_session", _fake_get_session), patch(
-            "api.v1_routes.queue_portal_booking_request",
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.queue_portal_booking_request",
             _queue_portal_booking_request,
         ):
             client = TestClient(create_test_app())

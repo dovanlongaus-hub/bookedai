@@ -22,12 +22,17 @@ export function LogoMark({
   variant = 'light',
   src,
 }: LogoMarkProps) {
+  const surfaceSupportClassName =
+    variant === 'dark' || variant === 'white'
+      ? 'rounded-[1rem] bg-white px-3 py-2 shadow-[0_14px_30px_rgba(15,23,42,0.16)]'
+      : '';
+
   if (src) {
     return (
       <img
         src={src}
         alt={alt ?? `${brandName} logo`}
-        className={className}
+        className={[className, surfaceSupportClassName].filter(Boolean).join(' ')}
         loading="eager"
         decoding="async"
       />
@@ -50,7 +55,7 @@ export function LogoMark({
     <img
       src={logoPath}
       alt={alt ?? `${brandName} logo`}
-      className={className}
+      className={[className, surfaceSupportClassName].filter(Boolean).join(' ')}
       loading="eager"
       decoding="async"
       onError={() => {

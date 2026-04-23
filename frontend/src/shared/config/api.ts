@@ -17,7 +17,8 @@ export function getApiBaseUrl() {
     (window.location.hostname === 'product.bookedai.au' ||
       window.location.hostname === 'admin.bookedai.au' ||
       window.location.hostname === 'tenant.bookedai.au' ||
-      window.location.hostname === 'futureswim.bookedai.au')
+      window.location.hostname === 'futureswim.bookedai.au' ||
+      window.location.hostname === 'ai.longcare.au')
   ) {
     return '/api';
   }

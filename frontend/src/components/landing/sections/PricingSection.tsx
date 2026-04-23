@@ -37,34 +37,34 @@ import { SignalPill } from '../ui/SignalPill';
 
 const pricingFlow = [
   {
-    title: 'Pick the package',
-    body: 'Start with Freemium, claim the Top 10 SME launch offer, or choose the paid plan that matches your current revenue stage.',
+    title: 'Choose the operating entry point',
+    body: 'Start with the lightest sensible deployment, then step up only when workflow depth and revenue upside justify it.',
   },
   {
-    title: 'Confirm setup',
-    body: 'Online first for most teams, onsite only when complexity justifies it.',
+    title: 'Confirm rollout scope',
+    body: 'Online is the default for most teams. Higher-touch rollout is reserved for real operational complexity and visible ROI.',
   },
   {
-    title: 'Lock the close',
-    body: 'Consultation, confirmation, and the commercial next step continue from one buying path.',
+    title: 'Keep the commercial path clean',
+    body: 'Consultation, confirmation, and the next paid step continue through one visible buying path instead of a pricing maze.',
   },
 ];
 
 const pricingModelPillars = [
   {
     label: 'Setup',
-    value: 'Separate',
-    detail: 'Quoted clearly so launch work does not blur with the monthly plan.',
+    value: 'Scoped clearly',
+    detail: 'Launch work is priced separately so implementation complexity never muddies the monthly decision.',
   },
   {
     label: 'Subscription',
     value: 'Predictable',
-    detail: 'Simple monthly pricing keeps the first paid decision easy to understand.',
+    detail: 'Monthly pricing stays simple enough to approve, while still reading like a serious operating commitment.',
   },
   {
     label: 'Commission',
-    value: 'Performance-based',
-    detail: 'Introduced only when the rollout context and revenue path are clear.',
+    value: 'Performance-linked',
+    detail: 'Introduced only when the rollout context and booked-revenue path are clear.',
   },
 ];
 
@@ -333,17 +333,16 @@ export function PricingSection() {
 
         <div className="mx-auto max-w-4xl text-center">
           <SignalPill className="inline-flex items-center justify-center px-4 py-2 text-[11px] uppercase tracking-[0.24em]">
-            Starter from 49$+ • Pro and Pro Max • commission on real booked revenue
+            Entry from 49$+ • clearer commercial ladder • commission on real booked revenue
           </SignalPill>
           <h2 className="template-title mt-6 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-            Package pricing that helps SMEs say yes quickly without losing commercial clarity
+            Commercial packaging that feels easier to approve and more serious to scale
           </h2>
           <p className="template-body mx-auto mt-5 max-w-2xl text-lg leading-8">
-            Start from 49$+, move into Pro when you need more guided booking power, then scale through a setup, plan, and commission model that stays easy to understand.
+            The pricing story is designed to win quickly without sounding lightweight: clear entry path, clear rollout scope, predictable monthly layer, and performance upside tied to real booked revenue.
           </p>
           <p className="template-body mx-auto mt-4 max-w-3xl text-sm leading-6 sm:text-base">
-            Built for salons, clinics, swim schools, tutors, trades, hospitality, and other
-            local businesses across Australia. You can launch standalone on your website, as a dedicated booking app, or as a path linked into the broader BookedAI portal.
+            Built for service operators who want a cleaner operating model, not only a cheaper chatbot. Launch standalone on your website, as a dedicated booking app, or as part of the broader BookedAI portal path.
           </p>
 
           <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
@@ -370,7 +369,7 @@ export function PricingSection() {
               <div>
                 <div className="template-kicker text-[11px]">Pricing flow graphic</div>
                 <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                  The homepage should explain the offer clearly before the buyer ever opens the deeper product runtime.
+                  The homepage should make the commercial model legible before the buyer ever opens the deeper product runtime.
                 </div>
               </div>
               <div className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
@@ -412,8 +411,8 @@ export function PricingSection() {
                 Freemium first, then Pro, then Pro Max as the revenue engine gets deeper
               </h3>
             </div>
-            <p className="template-body mt-5 max-w-2xl text-base leading-7">
-              Pick the package that matches your current volume and workflow. Every registration and booking action should take the buyer into the same onboarding flow, timing selection, confirmation path, and commercial handoff without hiding the setup or commission model.
+              <p className="template-body mt-5 max-w-2xl text-base leading-7">
+              Pick the package that matches your current operating maturity. Every registration and booking action should continue into the same onboarding, timing, confirmation, and commercial handoff path without hiding implementation scope or performance logic.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {topOffers.map((offer) => (
@@ -438,28 +437,28 @@ export function PricingSection() {
                     Buying story
                   </div>
                   <div className="mt-2 text-lg font-semibold text-slate-950">
-                    Start with Freemium or the Top 10 SME launch cohort, then expand into Pro or Pro Max once the conversion layer is proven.
+                    Start with the lightest sensible commercial step, then expand into Pro or Pro Max once the operating case is proven.
                   </div>
                 </div>
                 <SignalPill className="bg-white px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-600">
-                  Low friction
+                  Clear approval path
                 </SignalPill>
               </div>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Buyers should be able to see the launch offer, the setup path, the monthly plan, and the commission logic in one pass.
+                Buyers should be able to see the launch path, setup scope, monthly layer, and performance logic in one pass.
               </p>
             </SectionCard>
           </SectionCard>
 
           <SectionCard className="p-7 sm:p-8">
             <div className="text-sm font-medium uppercase tracking-[0.18em] text-[#1459c7]">
-              How setup works
+              Rollout scope
             </div>
             <h3 className="mt-3 text-2xl font-semibold tracking-tight text-[#1d1d1f]">
-              Keep launch simple, add complexity only if needed
+              Keep launch simple, and only add complexity when the operation actually needs it
             </h3>
             <p className="mt-4 text-base leading-7 text-slate-600">
-              Most SMEs can launch online first, either as a standalone website flow or a dedicated booking app. If your team needs onsite support, training, or a more hands-on rollout, we quote that separately so the monthly plan stays clean and the performance model stays credible.
+              Most teams can launch online first, either as a standalone website flow or a dedicated booking app. If you need onsite support, training, or a more hands-on rollout, that scope is quoted separately so the monthly layer stays clean and the commercial story stays credible.
             </p>
             <div className="mt-6 grid gap-3">
               {setupOptions.map((item) => (
@@ -510,7 +509,7 @@ export function PricingSection() {
                     {advancedPlan.name}
                   </div>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Multi-location, deeper automation, or broader operational rollout that needs custom setup and commercial shaping.
+                    Multi-location, deeper automation, or broader operational rollout that needs custom scope and higher-touch commercial shaping.
                   </p>
                 </div>
                 <SignalPill className="px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1459c7] ring-1 ring-black/6">
@@ -525,8 +524,7 @@ export function PricingSection() {
                 Usually starts from {advancedPlan.price}/mo after your 1 month free period
               </p>
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                We keep advanced rollout off the main buying path so smaller SMEs can decide
-                quickly, while larger operators can still get the right package and performance model.
+                We keep advanced rollout off the main buying path so smaller teams can decide quickly, while larger operators can still enter with the right scope, governance, and performance model.
               </p>
 
               <ul className="mt-8 space-y-3">
@@ -551,7 +549,7 @@ export function PricingSection() {
                   )}
                 className="booked-button-secondary mt-8 flex w-full items-center justify-center gap-2"
               >
-                Talk To Us About Pro Max
+                Review Pro Max Scope
                 <ArrowIcon />
               </button>
             </div>

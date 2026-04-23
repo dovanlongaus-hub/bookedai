@@ -13,7 +13,10 @@
 - Gateway health endpoint: `http://127.0.0.1:18789/healthz`
 - Telegram webhook target: `https://api.bookedai.au/telegram-webhook`
 - Preferred model path: `openai-codex/gpt-5.4`
-- Elevated Telegram tool access is restricted to trusted operator user `8426853622`
+- Elevated Telegram workspace actions now run through `python3 scripts/telegram_workspace_ops.py`
+- Trusted Telegram actor ids come from `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS`
+- Allowed elevated action scope comes from `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS`
+- Current default trusted operator id remains `8426853622`
 
 ## Memory Policy
 

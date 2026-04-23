@@ -41,6 +41,10 @@ The first live slice of this package now exists in the repo:
 - tenant catalog snapshot now exposes search-ready counts, inactive counts, and row-level quality warnings for review inside the tenant surface
 - migration-ready SQL now exists for tenant membership plus catalog ownership and publish-state hardening in `backend/migrations/sql/004_tenant_membership_and_catalog_publish_state.sql`
 - the first official sample tenant seed now also exists from a real PDF source document in `backend/migrations/sql/005_co_mai_hung_chess_sample_tenant.sql`, based on the parsed chess-class brochure at `storage/uploads/documents/fe41/XesZr6pjpiOaMMduIhpspQ.pdf`
+- a third official tenant seed now also exists in `backend/migrations/sql/013_ai_mentor_tenant_seed.sql`, turning operator-curated AI mentor package copy into a published online catalog with private `1-1`, group mentoring, and seeded tenant password access for pilot onboarding
+- that AI mentor seed now also carries a curated package-illustration asset set plus tenant website links, so tenant onboarding can cover branded imagery and destination URLs in addition to raw service text and pricing data
+- the same tenant lane now also includes a first-class partner plugin surface for `ai.longcare.au`, proving that BookedAI tenant onboarding can end in a real embedded or standalone widget runtime rather than stopping at catalog storage alone
+- tenant onboarding now also extends into the signed-in tenant portal itself: `tenant.bookedai.au/<tenant>#plugin` can persist partner plugin settings in `tenant_settings`, show the tenant's published catalog context, and let the tenant copy official inline, modal, and iframe embed code for later website integration work
 - a separate curated pilot publish row now also exists in `backend/migrations/sql/009_co_mai_hung_chess_published_pilot_row.sql`, so BookedAI can test `tenant-first chess search` without promoting the original brochure-derived review rows directly into public search
 
 What is still incomplete versus the full package:

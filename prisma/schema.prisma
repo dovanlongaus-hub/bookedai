@@ -1,0 +1,412 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum TenantStatus {
+  ACTIVE
+  TRIAL
+  SUSPENDED
+  ARCHIVED
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  DISABLED
+}
+
+enum LeadStatus {
+  NEW
+  QUALIFIED
+  CONTACTED
+  PROPOSAL_SENT
+  WON
+  LOST
+  ARCHIVED
+}
+
+enum BookingStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+  ARCHIVED
+}
+
+enum CampaignStatus {
+  DRAFT
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+model Tenant {
+  id        String       @id @default(cuid())
+  slug      String       @unique
+  name      String
+  status    TenantStatus @default(ACTIVE)
+  timezone  String       @default("UTC")
+  locale    String       @default("en")
+  currency  String       @default("USD")
+  createdAt DateTime     @default(now()) @map("created_at")
+  updatedAt DateTime     @updatedAt @map("updated_at")
+  deletedAt DateTime?    @map("deleted_at")
+  users     User[]
+  roles     Role[]
+  userRoles UserRole[]
+  permissions Permission[]
+  rolePermissions RolePermission[]
+  branches  Branch[]
+  settings  TenantSetting[]
+  subscriptions Subscription[]
+  invoices  Invoice[]
+  customers Customer[]
+  leads     Lead[]
+  campaigns Campaign[]
+  services  Service[]
+  bookings  Booking[]
+  payments  Payment[]
+  auditLogs AuditLog[]
+
+  @@index([slug, deletedAt])
+  @@map("tenants")
+}
+
+model User {
+  id           String      @id @default(cuid())
+  tenantId     String      @map("tenant_id")
+  email        String      @unique
+  name         String?
+  passwordHash String?     @map("password_hash")
+  status       UserStatus  @default(ACTIVE)
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  deletedAt    DateTime?   @map("deleted_at")
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  assignedRoles UserRole[]
+  auditLogs    AuditLog[]  @relation("AuditActor")
+
+  @@index([tenantId, email, deletedAt])
+  @@map("users")
+}
+
+model Role {
+  id          String     @id @default(cuid())
+  tenantId    String     @map("tenant_id")
+  name        String
+  slug        String
+  description String?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+  deletedAt   DateTime?  @map("deleted_at")
+  tenant      Tenant     @relation(fields: [tenantId], references: [id])
+  userRoles   UserRole[]
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, deletedAt])
+  @@map("roles")
+}
+
+model UserRole {
+  id         String     @id @default(cuid())
+  tenantId   String     @map("tenant_id")
+  userId     String     @map("user_id")
+  roleId     String     @map("role_id")
+  createdAt  DateTime   @default(now()) @map("created_at")
+  updatedAt  DateTime   @updatedAt @map("updated_at")
+  deletedAt  DateTime?  @map("deleted_at")
+  tenant     Tenant     @relation(fields: [tenantId], references: [id])
+  user       User       @relation(fields: [userId], references: [id])
+  role       Role       @relation(fields: [roleId], references: [id])
+
+  @@unique([tenantId, userId, roleId])
+  @@index([tenantId, deletedAt])
+  @@index([userId, roleId, deletedAt])
+  @@map("user_roles")
+}
+
+model Permission {
+  id            String     @id @default(cuid())
+  tenantId      String     @map("tenant_id")
+  name          String
+  slug          String
+  description   String?
+  category      String?
+  createdAt     DateTime   @default(now()) @map("created_at")
+  updatedAt     DateTime   @updatedAt @map("updated_at")
+  deletedAt     DateTime?  @map("deleted_at")
+  tenant        Tenant     @relation(fields: [tenantId], references: [id])
+  rolePermissions RolePermission[]
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, deletedAt])
+  @@map("permissions")
+}
+
+model RolePermission {
+  id           String      @id @default(cuid())
+  tenantId     String      @map("tenant_id")
+  roleId       String      @map("role_id")
+  permissionId String      @map("permission_id")
+  createdAt    DateTime    @default(now()) @map("created_at")
+  updatedAt    DateTime    @updatedAt @map("updated_at")
+  deletedAt    DateTime?   @map("deleted_at")
+  tenant       Tenant      @relation(fields: [tenantId], references: [id])
+  role         Role        @relation(fields: [roleId], references: [id])
+  permission   Permission  @relation(fields: [permissionId], references: [id])
+
+  @@unique([tenantId, roleId, permissionId])
+  @@index([tenantId, deletedAt])
+  @@map("role_permissions")
+}
+
+model Branch {
+  id          String      @id @default(cuid())
+  tenantId    String      @map("tenant_id")
+  name        String
+  slug        String
+  timezone    String      @default("UTC")
+  isActive    Boolean     @default(true) @map("is_active")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  deletedAt   DateTime?   @map("deleted_at")
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, slug])
+  @@index([tenantId, deletedAt])
+  @@map("branches")
+}
+
+model TenantSetting {
+  id          String      @id @default(cuid())
+  tenantId    String      @map("tenant_id")
+  key         String
+  valueJson   Json?       @map("value_json")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  deletedAt   DateTime?   @map("deleted_at")
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, key])
+  @@index([tenantId, deletedAt])
+  @@map("tenant_settings")
+}
+
+model Subscription {
+  id          String      @id @default(cuid())
+  tenantId    String      @map("tenant_id")
+  provider    String
+  externalId  String?     @map("external_id")
+  planCode    String      @map("plan_code")
+  status      String
+  renewsAt    DateTime?   @map("renews_at")
+  createdAt   DateTime    @default(now()) @map("created_at")
+  updatedAt   DateTime    @updatedAt @map("updated_at")
+  deletedAt   DateTime?   @map("deleted_at")
+  tenant      Tenant      @relation(fields: [tenantId], references: [id])
+  invoices    Invoice[]
+
+  @@index([tenantId, status, deletedAt])
+  @@map("subscriptions")
+}
+
+model Invoice {
+  id            String      @id @default(cuid())
+  tenantId      String      @map("tenant_id")
+  subscriptionId String?    @map("subscription_id")
+  provider      String
+  externalId    String?     @map("external_id")
+  amountCents   Int         @map("amount_cents")
+  currency      String
+  status        String
+  dueAt         DateTime?   @map("due_at")
+  paidAt        DateTime?   @map("paid_at")
+  createdAt     DateTime    @default(now()) @map("created_at")
+  updatedAt     DateTime    @updatedAt @map("updated_at")
+  deletedAt     DateTime?   @map("deleted_at")
+  tenant        Tenant      @relation(fields: [tenantId], references: [id])
+  subscription  Subscription? @relation(fields: [subscriptionId], references: [id])
+
+  @@index([tenantId, status, deletedAt])
+  @@index([subscriptionId, deletedAt])
+  @@map("invoices")
+}
+
+model Customer {
+  id                String    @id @default(cuid())
+  tenantId          String    @map("tenant_id")
+  firstName         String    @map("first_name")
+  lastName          String    @map("last_name")
+  fullName          String    @default("") @map("full_name")
+  email             String?
+  phone             String?
+  company           String?
+  lifecycleStage    String    @default("active") @map("lifecycle_stage")
+  sourceLabel       String    @default("manual_entry") @map("source_label")
+  tagsJson          Json?     @map("tags_json")
+  marketingConsent  Boolean   @default(false) @map("marketing_consent")
+  notes             String?
+  notesSummary      String?   @map("notes_summary")
+  totalBookings     Int       @default(0) @map("total_bookings")
+  totalRevenueCents Int       @default(0) @map("total_revenue_cents")
+  lastBookedAt      DateTime? @map("last_booked_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  leads             Lead[]
+  bookings          Booking[]
+  payments          Payment[]
+
+  @@index([tenantId, email, deletedAt])
+  @@index([tenantId, lastName, firstName, deletedAt])
+  @@map("customers")
+}
+
+model Lead {
+  id                  String     @id @default(cuid())
+  tenantId            String     @map("tenant_id")
+  customerId          String?    @map("customer_id")
+  title               String
+  source              String
+  status              LeadStatus @default(NEW)
+  pipelineStage       String     @default("new") @map("pipeline_stage")
+  score               Int        @default(0)
+  estimatedValueCents Int        @default(0) @map("estimated_value_cents")
+  expectedCloseDate   DateTime?  @map("expected_close_date")
+  ownerName           String?    @map("owner_name")
+  nextFollowUpAt      DateTime?  @map("next_follow_up_at")
+  lastContactAt       DateTime?  @map("last_contact_at")
+  notes               String?
+  createdAt           DateTime   @default(now()) @map("created_at")
+  updatedAt           DateTime   @updatedAt @map("updated_at")
+  deletedAt           DateTime?  @map("deleted_at")
+  tenant              Tenant     @relation(fields: [tenantId], references: [id])
+  customer            Customer?  @relation(fields: [customerId], references: [id])
+
+  @@index([tenantId, status, deletedAt])
+  @@index([tenantId, source, deletedAt])
+  @@map("leads")
+}
+
+model Service {
+  id              String    @id @default(cuid())
+  tenantId        String    @map("tenant_id")
+  name            String
+  category        String
+  description     String?
+  durationMinutes Int       @map("duration_minutes")
+  priceCents      Int       @map("price_cents")
+  currency        String    @default("USD")
+  isActive        Boolean   @default(true) @map("is_active")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+  deletedAt       DateTime? @map("deleted_at")
+  tenant          Tenant    @relation(fields: [tenantId], references: [id])
+  bookings        Booking[]
+
+  @@index([tenantId, category, deletedAt])
+  @@index([tenantId, name, deletedAt])
+  @@map("services")
+}
+
+model Campaign {
+  id             String         @id @default(cuid())
+  tenantId       String         @map("tenant_id")
+  name           String
+  channel        String
+  sourcePlatform String         @default("manual") @map("source_platform")
+  sourceKey      String         @map("source_key")
+  status         CampaignStatus @default(DRAFT)
+  budgetCents    Int            @default(0) @map("budget_cents")
+  startDate      DateTime?      @map("start_date")
+  endDate        DateTime?      @map("end_date")
+  utmSource      String?        @map("utm_source")
+  utmMedium      String?        @map("utm_medium")
+  utmCampaign    String?        @map("utm_campaign")
+  notes          String?
+  createdAt      DateTime       @default(now()) @map("created_at")
+  updatedAt      DateTime       @updatedAt @map("updated_at")
+  deletedAt      DateTime?      @map("deleted_at")
+  tenant         Tenant         @relation(fields: [tenantId], references: [id])
+
+  @@unique([tenantId, sourceKey])
+  @@index([tenantId, status, deletedAt])
+  @@index([tenantId, channel, deletedAt])
+  @@map("campaigns")
+}
+
+model Booking {
+  id           String        @id @default(cuid())
+  tenantId     String        @map("tenant_id")
+  customerId   String        @map("customer_id")
+  serviceId    String        @map("service_id")
+  status       BookingStatus @default(PENDING)
+  startAt      DateTime      @map("start_at")
+  endAt        DateTime      @map("end_at")
+  revenueCents Int           @map("revenue_cents")
+  channel      String        @default("website")
+  notes        String?
+  createdAt    DateTime      @default(now()) @map("created_at")
+  updatedAt    DateTime      @updatedAt @map("updated_at")
+  deletedAt    DateTime?     @map("deleted_at")
+  tenant       Tenant        @relation(fields: [tenantId], references: [id])
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  service      Service       @relation(fields: [serviceId], references: [id])
+  payments     Payment[]
+
+  @@index([tenantId, status, startAt, deletedAt])
+  @@index([customerId, serviceId, deletedAt])
+  @@map("bookings")
+}
+
+model Payment {
+  id                String    @id @default(cuid())
+  tenantId          String    @map("tenant_id")
+  bookingId         String?   @map("booking_id")
+  customerId        String    @map("customer_id")
+  provider          String
+  externalPaymentId String?   @map("external_payment_id")
+  amountCents       Int       @map("amount_cents")
+  currency          String
+  status            String
+  paymentMethod     String?   @map("payment_method")
+  paidAt            DateTime? @map("paid_at")
+  refundedAt        DateTime? @map("refunded_at")
+  createdAt         DateTime  @default(now()) @map("created_at")
+  updatedAt         DateTime  @updatedAt @map("updated_at")
+  deletedAt         DateTime? @map("deleted_at")
+  tenant            Tenant    @relation(fields: [tenantId], references: [id])
+  booking           Booking?  @relation(fields: [bookingId], references: [id])
+  customer          Customer  @relation(fields: [customerId], references: [id])
+
+  @@index([tenantId, customerId, deletedAt])
+  @@index([bookingId, deletedAt])
+  @@map("payments")
+}
+
+model AuditLog {
+  id           String    @id @default(cuid())
+  tenantId     String    @map("tenant_id")
+  actorUserId  String?   @map("actor_user_id")
+  entityType   String    @map("entity_type")
+  entityId     String    @map("entity_id")
+  action       String
+  metadataJson Json?     @map("metadata_json")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+  deletedAt    DateTime? @map("deleted_at")
+  tenant       Tenant    @relation(fields: [tenantId], references: [id])
+  actorUser    User?     @relation("AuditActor", fields: [actorUserId], references: [id])
+
+  @@index([tenantId, entityType, entityId, createdAt])
+  @@index([actorUserId, createdAt])
+  @@map("audit_logs")
+}

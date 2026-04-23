@@ -11,6 +11,9 @@ from schemas import (
     AdminOverviewResponse,
     AdminServiceCatalogQualityResponse,
     AdminServiceMerchantListResponse,
+    AdminTenantCatalogResponse,
+    AdminTenantDetailResponse,
+    AdminTenantListResponse,
     AdminSessionResponse,
     EmailSendResponse,
     PartnerProfileListResponse,
@@ -119,6 +122,48 @@ router.add_api_route(
     handlers.admin_partner_delete,
     methods=["DELETE"],
     response_model=PartnerProfileListResponse,
+)
+router.add_api_route(
+    "/admin/tenants",
+    handlers.admin_tenants,
+    methods=["GET"],
+    response_model=AdminTenantListResponse,
+)
+router.add_api_route(
+    "/admin/tenants/{tenant_ref}",
+    handlers.admin_tenant_detail,
+    methods=["GET"],
+    response_model=AdminTenantDetailResponse,
+)
+router.add_api_route(
+    "/admin/tenants/{tenant_ref}",
+    handlers.admin_tenant_update,
+    methods=["PATCH"],
+    response_model=AdminTenantDetailResponse,
+)
+router.add_api_route(
+    "/admin/tenants/{tenant_ref}/members/{member_email}",
+    handlers.admin_tenant_member_update,
+    methods=["PATCH"],
+    response_model=AdminTenantDetailResponse,
+)
+router.add_api_route(
+    "/admin/tenants/{tenant_ref}/services",
+    handlers.admin_tenant_service_create,
+    methods=["POST"],
+    response_model=AdminTenantCatalogResponse,
+)
+router.add_api_route(
+    "/admin/tenants/{tenant_ref}/services/{service_row_id}",
+    handlers.admin_tenant_service_update,
+    methods=["PUT"],
+    response_model=AdminTenantCatalogResponse,
+)
+router.add_api_route(
+    "/admin/tenants/{tenant_ref}/services/{service_row_id}",
+    handlers.admin_tenant_service_delete,
+    methods=["DELETE"],
+    response_model=AdminTenantCatalogResponse,
 )
 router.add_api_route(
     "/admin/config",

@@ -94,6 +94,10 @@ Implementation start recorded on `2026-04-19`:
 - Phase `S6-E` has now started as well:
   - candidate payloads now carry booking-decision detail fields such as `why_this_matches`, `source_label`, `price_posture`, `booking_path_type`, `next_step`, `availability_state`, and `booking_confidence`
   - shared shortlist cards now surface more of that detail directly so customers can compare options without guessing what is tenant-backed, public-web sourced, booking-ready, or still review-first
+- the next search-core contract pass landed on `2026-04-22`:
+  - `backend/domain/matching/service.py` now owns a richer intelligent-matching read model instead of leaving all response shaping inside the route
+  - `/api/v1/matching/search` now also emits normalized `booking_fit` summaries on candidates and recommendations, so Phase 2 shortlist reasoning includes budget, party-size, schedule, location, and booking-readiness posture in one shared shape
+  - `search_diagnostics` now also includes `stage_counts`, which makes retrieval -> rerank -> gate -> final-shortlist volume changes easier to inspect from replay tooling and future admin diagnostics
 - the product-route booking dialog now follows a stricter interaction sequence:
   - live search renders the shortlist first
   - tapping a shortlist item opens a preview popup instead of immediately jumping into booking

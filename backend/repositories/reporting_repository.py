@@ -22,7 +22,19 @@ class ReportingRepository(BaseRepository):
                     select count(*)
                     from leads
                     where tenant_id = cast(:tenant_id as uuid)
-                      and status in ('new', 'qualified', 'contacted')
+                      and status in (
+                        'new',
+                        'qualified',
+                        'contacted',
+                        'captured',
+                        'engaged',
+                        'active',
+                        'payment_pending',
+                        'scheduled',
+                        'processed_by_n8n',
+                        'triggered',
+                        'synced'
+                      )
                   ), 0) as active_leads,
                   coalesce((
                     select count(*)
@@ -33,7 +45,7 @@ class ReportingRepository(BaseRepository):
                     select count(*)
                     from booking_intents
                     where tenant_id = cast(:tenant_id as uuid)
-                      and status not in ('completed', 'cancelled')
+                      and status not in ('completed', 'cancelled', 'failed', 'expired', 'refunded')
                   ), 0) as open_booking_requests,
                   coalesce((
                     select count(*)

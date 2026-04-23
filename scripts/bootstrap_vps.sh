@@ -20,6 +20,7 @@ DOMAIN_N8N="${DOMAIN_N8N:-n8n.bookedai.au}"
 DOMAIN_SUPABASE="${DOMAIN_SUPABASE:-supabase.bookedai.au}"
 DOMAIN_UPLOAD="${DOMAIN_UPLOAD:-upload.bookedai.au}"
 DOMAIN_CALENDAR="${DOMAIN_CALENDAR:-calendar.bookedai.au}"
+DOMAIN_BOT="${DOMAIN_BOT:-bot.bookedai.au}"
 DEPLOY_USER="${DEPLOY_USER:-$SUDO_USER}"
 
 if [[ -z "${DEPLOY_USER}" ]]; then
@@ -56,6 +57,6 @@ ufw allow 443/tcp || true
 ufw --force enable || true
 
 echo "Bootstrap completed."
-echo "DNS must already point ${DOMAIN_ROOT}, ${DOMAIN_WWW}, ${DOMAIN_API}, ${DOMAIN_PRODUCT}, ${DOMAIN_DEMO}, ${DOMAIN_FUTURESWIM}, ${DOMAIN_PORTAL}, ${DOMAIN_TENANT}, ${DOMAIN_PITCH}, ${DOMAIN_N8N}, ${DOMAIN_SUPABASE}, ${DOMAIN_UPLOAD}, ${DOMAIN_CALENDAR} to this server."
+echo "DNS must already point ${DOMAIN_ROOT}, ${DOMAIN_WWW}, ${DOMAIN_API}, ${DOMAIN_PRODUCT}, ${DOMAIN_DEMO}, ${DOMAIN_FUTURESWIM}, ${DOMAIN_PORTAL}, ${DOMAIN_TENANT}, ${DOMAIN_PITCH}, ${DOMAIN_N8N}, ${DOMAIN_SUPABASE}, ${DOMAIN_UPLOAD}, ${DOMAIN_CALENDAR}, ${DOMAIN_BOT} to this server."
 echo "Next step:"
 echo "  sudo -u ${DEPLOY_USER} bash scripts/deploy_production.sh"

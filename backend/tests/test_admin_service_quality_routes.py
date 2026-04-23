@@ -140,3 +140,46 @@ class AdminServiceQualityRoutesTestCase(TestCase):
         body = response.text
         self.assertIn("service_id,business_name,name,category,location,is_active,is_search_ready,quality_warnings,tags,updated_at", body)
         self.assertIn("novo-print-banner,NOVO PRINT,Outdoor Banner Print,Print and Signage,,False,False,missing_location,signage,", body)
+
+    def test_admin_tenant_service_delete_requires_archive_before_published_delete(self):
+        published_service = SimpleNamespace(
+            id=11,
+            service_id="signature-facial-sydney",
+            tenant_id="tenant-harbour-glow",
+            publish_state="published",
+            name="Signature Facial",
+        )
+
+        @asynccontextmanager
+        async def _fake_tenant_session(_session_factory):
+            async def _get(model, row_id):
+                self.assertEqual(row_id, 11)
+                return published_service
+
+            yield SimpleNamespace(
+                get=_get,
+            )
+
+        class _FakeTenantRepository:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            async def get_tenant_profile(self, tenant_ref):
+                self.assertEqual(tenant_ref, "harbour-glow")
+                return {"id": "tenant-harbour-glow", "slug": "harbour-glow", "name": "Harbour Glow Spa"}
+
+        with patch("api.route_handlers.get_session", _fake_tenant_session), patch(
+            "api.route_handlers.TenantRepository",
+            _FakeTenantRepository,
+        ):
+            client = TestClient(create_test_app())
+            response = client.delete(
+                "/api/admin/tenants/harbour-glow/services/11",
+                headers={"X-Admin-Token": "test-admin-token"},
+            )
+
+        self.assertEqual(response.status_code, 422)
+        self.assertEqual(
+            response.json()["detail"],
+            "Archive the service before deleting it from the admin workspace.",
+        )

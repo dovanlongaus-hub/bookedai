@@ -1,6 +1,12 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const htmlPath = new URL('../dist/index.html', import.meta.url);
+const rootDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
+const outputDir = process.env.BUILD_OUT_DIR?.trim()
+  ? path.resolve(rootDir, process.env.BUILD_OUT_DIR.trim())
+  : path.join(rootDir, 'dist');
+const htmlPath = path.join(outputDir, 'index.html');
 const sourceHtml = await readFile(htmlPath, 'utf8');
 
 const variants = [
@@ -71,14 +77,28 @@ const variants = [
       ['https://bookedai.au/', 'https://futureswim.bookedai.au/'],
     ],
   },
+  {
+    filename: 'ai-mentor-pro.html',
+    replacements: [
+      [
+        'BookedAI | The AI Revenue Engine for Service Businesses',
+        'AI Mentor Pro | Powered by BookedAI',
+      ],
+      [
+        'BookedAI captures demand across website, calls, chat, email, and follow-up, then converts it into bookings, revenue, and recovery opportunities for service businesses.',
+        'AI Mentor Pro uses the BookedAI engine for tenant-scoped mentoring search, booking, payment, email, CRM, and WhatsApp-ready follow-up across 1-1 and group AI mentoring packages.',
+      ],
+      ['https://bookedai.au/', 'https://ai.longcare.au/'],
+    ],
+  },
 ];
 
-await mkdir(new URL('../dist', import.meta.url), { recursive: true });
+await mkdir(outputDir, { recursive: true });
 
 for (const variant of variants) {
   let nextHtml = sourceHtml;
   for (const [from, to] of variant.replacements) {
     nextHtml = nextHtml.split(from).join(to);
   }
-  await writeFile(new URL(`../dist/${variant.filename}`, import.meta.url), nextHtml, 'utf8');
+  await writeFile(path.join(outputDir, variant.filename), nextHtml, 'utf8');
 }

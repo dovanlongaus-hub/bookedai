@@ -15,6 +15,8 @@ export type BookingReadyServiceItem = {
   location: string | null;
   map_url: string | null;
   booking_url: string | null;
+  contact_phone?: string | null;
+  source_url?: string | null;
   tags: string[];
   featured: boolean;
   source_type?: string | null;
@@ -40,6 +42,7 @@ export type PartnerMatchCardModel = {
   metricLine: string;
   explanation: string | null;
   bookingUrl: string | null;
+  contactPhone: string | null;
   sourceUrl: string | null;
   imageUrl: string | null;
   imageLabel: string | null;
@@ -103,6 +106,7 @@ export type PartnerMatchActionFooterModel = {
   title: string;
   detail: string;
   statusLabel: string;
+  contactPhone: string | null;
   links: PartnerMatchActionLinkModel[];
 };
 
@@ -127,6 +131,8 @@ export function toBookingReadyServiceItem(candidate: MatchCandidate): BookingRea
     location: candidate.location ?? null,
     map_url: candidate.mapUrl ?? null,
     booking_url: candidate.bookingUrl ?? null,
+    contact_phone: candidate.contactPhone ?? null,
+    source_url: candidate.sourceUrl ?? null,
     tags: candidate.tags ?? [],
     featured: candidate.featured ?? false,
     source_type: candidate.sourceType ?? null,
@@ -145,6 +151,29 @@ export function buildPartnerMatchLocationLabel(candidate: MatchCandidate) {
   return [candidate.venueName, candidate.location].filter(Boolean).join(' • ') || 'Location confirmed during booking';
 }
 
+function buildCompactPhoneLabel(value: string | null | undefined) {
+  const normalized = value?.trim() || null;
+  if (!normalized) {
+    return null;
+  }
+
+  const digitsOnly = normalized.replace(/\D/g, '');
+  if (digitsOnly.length < 8) {
+    return normalized;
+  }
+
+  if (digitsOnly.length === 10 && digitsOnly.startsWith('0')) {
+    return `${digitsOnly.slice(0, 4)} ${digitsOnly.slice(4, 7)} ${digitsOnly.slice(7)}`;
+  }
+
+  return normalized;
+}
+
+function buildCallHref(value: string | null | undefined) {
+  const digitsOnly = (value ?? '').replace(/[^\d+]/g, '');
+  return digitsOnly ? `tel:${digitsOnly}` : null;
+}
+
 export function buildPartnerMatchNextStepLabel(candidate: MatchCandidate) {
   if (candidate.nextStep?.trim()) {
     return candidate.nextStep.trim();
@@ -154,6 +183,9 @@ export function buildPartnerMatchNextStepLabel(candidate: MatchCandidate) {
   }
   if (candidate.bookingUrl) {
     return 'Book online now';
+  }
+  if (candidate.contactPhone) {
+    return 'Call to book now';
   }
   return 'Lock in a time in chat';
 }
@@ -170,6 +202,8 @@ export function buildPartnerMatchConfidenceNotes(candidate: MatchCandidate) {
       ? isHousingCategory(candidate.category)
         ? 'Partner consultation link'
         : 'Direct booking link'
+      : candidate.contactPhone
+        ? 'Direct call path'
       : isHousingCategory(candidate.category)
         ? 'Project consult flow ready'
         : 'Chat booking flow ready',
@@ -222,6 +256,9 @@ function buildBookingStatusLabel(candidate: MatchCandidate) {
   if (candidate.bookingPathType === 'book_on_partner_site') {
     return 'Book online';
   }
+  if (candidate.bookingPathType === 'call_provider') {
+    return 'Call venue';
+  }
   if (candidate.bookingPathType === 'request_callback') {
     return 'Review first';
   }
@@ -253,6 +290,7 @@ export function buildPartnerMatchCardModel(candidate: MatchCandidate): PartnerMa
     metricLine: buildPartnerMatchMetricLine(candidate),
     explanation: buildMatchReasonLabel(candidate) ?? candidate.summary ?? null,
     bookingUrl: candidate.bookingUrl ?? null,
+    contactPhone: buildCompactPhoneLabel(candidate.contactPhone ?? null),
     sourceUrl: candidate.sourceUrl ?? null,
     imageUrl,
     imageLabel,
@@ -285,9 +323,20 @@ export function buildPartnerMatchActionFooterModel(
     });
   }
 
-  if (includeSourceLink && candidate.sourceUrl) {
+  if (!candidate.bookingUrl && candidate.contactPhone) {
+    const callHref = buildCallHref(candidate.contactPhone);
+    if (callHref) {
+      links.push({
+        label: 'Call',
+        href: callHref,
+        tone: 'accent',
+      });
+    }
+  }
+
+  if ((includeSourceLink || candidate.sourceType === 'public_web_search') && candidate.sourceUrl) {
     links.push({
-      label: 'View source',
+      label: candidate.bookingUrl ? 'View source' : 'View venue',
       href: candidate.sourceUrl,
       tone: 'neutral',
     });
@@ -304,7 +353,10 @@ export function buildPartnerMatchActionFooterModel(
         ? isHousingCategory(candidate.category)
           ? 'Consultation ready'
           : 'Ready to book'
+        : candidate.contactPhone
+          ? 'Ready to call'
         : 'Review match',
+    contactPhone: buildCompactPhoneLabel(candidate.contactPhone ?? null),
     links,
   };
 }
@@ -327,8 +379,9 @@ export function buildPartnerMatchCardModelFromServiceItem(
     venueName: service.venue_name,
     location: service.location,
     bookingUrl: service.booking_url,
+    contactPhone: service.contact_phone ?? null,
     mapUrl: service.map_url,
-    sourceUrl: null,
+    sourceUrl: service.source_url ?? null,
     imageUrl: service.image_url,
     amountAud: service.amount_aud,
     currencyCode: service.currency_code ?? null,
@@ -372,8 +425,9 @@ export function buildPartnerMatchActionFooterModelFromServiceItem(
       venueName: service.venue_name,
       location: service.location,
       bookingUrl: service.booking_url,
+      contactPhone: service.contact_phone ?? null,
       mapUrl: service.map_url,
-      sourceUrl: null,
+      sourceUrl: service.source_url ?? null,
       imageUrl: service.image_url,
       amountAud: service.amount_aud,
       currencyCode: service.currency_code ?? null,

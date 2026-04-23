@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 
 import { ApiClientError } from '../../shared/api/client';
 import { apiV1 } from '../../shared/api/v1';
@@ -6,6 +6,7 @@ import type {
   TenantAuthSessionResponse,
   TenantBillingResponse,
   TenantBookingsResponse,
+  TenantCatalogCreateRequest,
   TenantCatalogImportRequest,
   TenantCatalogItem,
   TenantCatalogResponse,
@@ -13,6 +14,7 @@ import type {
   TenantOnboardingResponse,
   TenantOverviewPriority,
   TenantOverviewResponse,
+  TenantPluginInterfaceResponse,
   TenantRevenueMetrics,
   TenantTeamResponse,
 } from '../../shared/contracts';
@@ -20,9 +22,12 @@ import { releaseLabel, releaseVersion } from '../../shared/config/release';
 import { PartnerMatchActionFooter } from '../../shared/components/PartnerMatchActionFooter';
 import { PartnerMatchCard } from '../../shared/components/PartnerMatchCard';
 import {
-  TenantAuthWorkspace,
+  TenantAuthWorkspaceEmail,
+  type TenantEmailCodeDeliveryState,
   type TenantAuthMode,
-} from '../../features/tenant-auth/TenantAuthWorkspace';
+  type TenantClaimAccountFormState,
+  type TenantCreateAccountFormState,
+} from '../../features/tenant-auth/TenantAuthWorkspaceEmail';
 import {
   TenantBusinessProfileCard,
   type TenantBusinessProfileFormState,
@@ -37,12 +42,18 @@ import {
   type TenantInviteMemberFormState,
 } from '../../features/tenant-team/TenantTeamWorkspace';
 import {
+  TenantPluginWorkspace,
+  type TenantPluginFormState,
+} from '../../features/tenant-plugin/TenantPluginWorkspace';
+import { TenantSectionActivityCard } from '../../features/tenant-shared/TenantSectionActivityCard';
+import {
   buildPartnerMatchActionFooterModelFromServiceItem,
   buildPartnerMatchCardModelFromServiceItem,
   type BookingReadyServiceItem,
 } from '../../shared/presenters/partnerMatch';
+import { getApiBaseUrl } from '../../shared/config/api';
 
-type TenantPanel = 'overview' | 'catalog' | 'bookings' | 'integrations' | 'billing' | 'team';
+type TenantPanel = 'overview' | 'experience' | 'catalog' | 'plugin' | 'bookings' | 'integrations' | 'billing' | 'team';
 type CatalogStatusFilter = 'all' | 'search-ready' | 'needs-review' | 'inactive';
 
 type TenantLoadState =
@@ -52,6 +63,7 @@ type TenantLoadState =
       status: 'ready';
       overview: TenantOverviewResponse;
       bookings: TenantBookingsResponse;
+      plugin: TenantPluginInterfaceResponse;
       integrations: TenantIntegrationsResponse;
       billing: TenantBillingResponse;
       onboarding: TenantOnboardingResponse;
@@ -77,6 +89,12 @@ type TenantInviteContext = {
   role: string | null;
 };
 
+type AdminReturnContext = {
+  investigationHref: string;
+  scopeHref: string | null;
+  scopeLabel: string;
+};
+
 type GoogleAccountsId = {
   initialize: (config: {
     client_id: string;
@@ -100,6 +118,8 @@ declare global {
 }
 
 const GOOGLE_IDENTITY_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
+const GOOGLE_TENANT_AUTH_CONFIG_MESSAGE =
+  'Add `VITE_GOOGLE_CLIENT_ID` in the frontend environment and `GOOGLE_OAUTH_CLIENT_ID` in the backend to enable tenant Google login.';
 
 function resolveTenantRef() {
   if (typeof window === 'undefined') {
@@ -183,6 +203,8 @@ function resolveInitialPanel(): TenantPanel {
   if (
     hash === 'catalog'
     || hash === 'bookings'
+    || hash === 'experience'
+    || hash === 'plugin'
     || hash === 'integrations'
     || hash === 'billing'
     || hash === 'team'
@@ -193,6 +215,40 @@ function resolveInitialPanel(): TenantPanel {
   return 'overview';
 }
 
+function resolveAdminReturnContext(tenantSlug: string | null): AdminReturnContext | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const url = new URL(window.location.href);
+  if (url.searchParams.get('admin_return') !== '1') {
+    return null;
+  }
+
+  const scope = url.searchParams.get('admin_scope')?.trim() || '';
+  const scopeLabel = url.searchParams.get('admin_scope_label')?.trim() || 'Admin workspace';
+  const safeScopeHref = scope.startsWith('/admin') ? scope : null;
+  const investigationHref = tenantSlug
+    ? `/admin/tenants?tenant=${encodeURIComponent(tenantSlug)}`
+    : '/admin/tenants';
+
+  return {
+    investigationHref,
+    scopeHref: safeScopeHref,
+    scopeLabel,
+  };
+}
+
+function resolveGoogleButtonText(authMode: TenantAuthMode): 'signin_with' | 'signup_with' | 'continue_with' {
+  if (authMode === 'create') {
+    return 'signup_with';
+  }
+  if (authMode === 'claim') {
+    return 'continue_with';
+  }
+  return 'signin_with';
+}
+
 function syncPanelHash(panel: TenantPanel) {
   if (typeof window === 'undefined') {
     return;
@@ -201,6 +257,13 @@ function syncPanelHash(panel: TenantPanel) {
   const url = new URL(window.location.href);
   url.hash = panel === 'overview' ? '' : panel;
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function stripHtmlPreview(value: string | null | undefined) {
+  return (value || '')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
 }
 
 function formatCatalogPrice(options: {
@@ -384,9 +447,9 @@ function buildGatewayOnboardingState(): TenantOnboardingResponse {
       },
       {
         id: 'create',
-        label: 'Create a new tenant account',
+        label: 'Open a new tenant workspace',
         status: 'pending',
-        description: 'Register a new tenant workspace from the shared login gateway.',
+        description: 'Start from the shared gateway and let Google or password setup create the workspace owner path.',
       },
       {
         id: 'redirect',
@@ -402,7 +465,7 @@ function buildGatewayOnboardingState(): TenantOnboardingResponse {
       has_active_subscription: false,
     },
     recommended_next_action:
-      'Sign in to an existing tenant or create a new tenant account from this shared gateway.',
+      'Sign in to an existing tenant or open a new workspace from this shared gateway.',
   };
 }
 
@@ -490,6 +553,47 @@ function buildPublishStateLabel(item: TenantCatalogItem) {
   return 'Draft';
 }
 
+function roleLabel(value: string | null | undefined) {
+  return (value || 'tenant_preview')
+    .replace(/_/g, ' ')
+    .replace(/\b\w/g, (character) => character.toUpperCase());
+}
+
+function buildTenantPermissionMatrix() {
+  return [
+    {
+      capability: 'Experience studio',
+      detail: 'Edit tenant branding, hero image, HTML introduction, and section guidance.',
+      roles: ['tenant_admin', 'operator'],
+    },
+    {
+      capability: 'Catalog import and draft edits',
+      detail: 'Create new draft services, run website import, edit draft fields, and publish search-ready rows.',
+      roles: ['tenant_admin', 'operator'],
+    },
+    {
+      capability: 'Plugin and integrations',
+      detail: 'Update widget configuration and provider posture from the tenant workspace.',
+      roles: ['tenant_admin', 'operator'],
+    },
+    {
+      capability: 'Billing controls',
+      detail: 'Manage billing email, plan controls, and finance-facing Stripe actions.',
+      roles: ['tenant_admin', 'finance_manager'],
+    },
+    {
+      capability: 'Team administration',
+      detail: 'Invite members, change roles, and control workspace access.',
+      roles: ['tenant_admin'],
+    },
+    {
+      capability: 'Workspace visibility',
+      detail: 'Review overview, bookings, catalog state, and workspace guidance.',
+      roles: ['tenant_admin', 'operator', 'finance_manager'],
+    },
+  ];
+}
+
 function SearchIcon({ className = 'h-5 w-5' }: { className?: string }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
@@ -556,6 +660,14 @@ export function TenantApp() {
   const isGateway = !tenantRef;
   const googleClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID?.trim();
   const googleButtonRef = useRef<HTMLDivElement | null>(null);
+  const googleInitializedRef = useRef(false);
+  const googleAuthContextRef = useRef({
+    authMode: 'sign-in' as TenantAuthMode,
+    businessName: '',
+    industry: '',
+    isGateway: false,
+    tenantRef: null as string | null,
+  });
   const [panel, setPanel] = useState<TenantPanel>(resolveInitialPanel);
   const [authMode, setAuthMode] = useState<TenantAuthMode>(() =>
     resolveInitialAuthMode(isGateway, inviteContext),
@@ -570,21 +682,18 @@ export function TenantApp() {
     isGateway ? readStoredTenantGatewayChoices() : [],
   );
   const [lastGoogleCredential, setLastGoogleCredential] = useState<string | null>(null);
-  const [passwordUsername, setPasswordUsername] = useState('');
-  const [passwordValue, setPasswordValue] = useState('');
-  const [createAccountForm, setCreateAccountForm] = useState({
+  const [emailSignInValue, setEmailSignInValue] = useState('');
+  const [emailCodeValue, setEmailCodeValue] = useState('');
+  const [emailCodeDelivery, setEmailCodeDelivery] = useState<TenantEmailCodeDeliveryState | null>(null);
+  const [createAccountForm, setCreateAccountForm] = useState<TenantCreateAccountFormState>({
     business_name: '',
     full_name: '',
     email: '',
-    username: '',
-    password: '',
     industry: '',
   });
-  const [claimAccountForm, setClaimAccountForm] = useState({
+  const [claimAccountForm, setClaimAccountForm] = useState<TenantClaimAccountFormState>({
     full_name: inviteContext?.full_name || '',
     email: inviteContext?.email || '',
-    username: '',
-    password: '',
   });
   const [profileForm, setProfileForm] = useState<TenantBusinessProfileFormState>({
     business_name: '',
@@ -592,10 +701,44 @@ export function TenantApp() {
     timezone: 'Australia/Sydney',
     locale: 'en-AU',
     operator_full_name: '',
+    logo_url: '',
+    hero_image_url: '',
+    introduction_html: '',
+    guide_overview: '',
+    guide_experience: '',
+    guide_catalog: '',
+    guide_plugin: '',
+    guide_bookings: '',
+    guide_integrations: '',
+    guide_billing: '',
+    guide_team: '',
   });
   const [profilePending, setProfilePending] = useState(false);
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
   const [profileError, setProfileError] = useState<string | null>(null);
+  const [uploadingProfileAsset, setUploadingProfileAsset] = useState<'logo' | 'hero' | null>(null);
+  const [pluginForm, setPluginForm] = useState<TenantPluginFormState>({
+    partner_name: '',
+    partner_website_url: '',
+    bookedai_host: 'https://product.bookedai.au',
+    embed_path: '',
+    widget_script_path: '/partner-plugins/ai-mentor-pro-widget.js',
+    tenant_ref: '',
+    widget_id: '',
+    accent_color: '#1f7a6b',
+    button_label: '',
+    modal_title: '',
+    headline: '',
+    prompt: '',
+    inline_target_selector: '#bookedai-partner-widget',
+    support_email: '',
+    support_whatsapp: '',
+    logo_url: '',
+  });
+  const [pluginPending, setPluginPending] = useState(false);
+  const [pluginMessage, setPluginMessage] = useState<string | null>(null);
+  const [pluginError, setPluginError] = useState<string | null>(null);
+  const [copiedSnippetKey, setCopiedSnippetKey] = useState<string | null>(null);
   const [billingAccountForm, setBillingAccountForm] = useState<TenantBillingAccountFormState>({
     billing_email: '',
     merchant_mode: 'test',
@@ -604,6 +747,7 @@ export function TenantApp() {
   const [billingMessage, setBillingMessage] = useState<string | null>(null);
   const [billingError, setBillingError] = useState<string | null>(null);
   const [subscriptionPendingPlanCode, setSubscriptionPendingPlanCode] = useState<string | null>(null);
+  const [billingPortalPending, setBillingPortalPending] = useState(false);
   const [invoiceActionPendingId, setInvoiceActionPendingId] = useState<string | null>(null);
   const [inviteMemberForm, setInviteMemberForm] = useState<TenantInviteMemberFormState>({
     email: '',
@@ -624,6 +768,7 @@ export function TenantApp() {
   const [importError, setImportError] = useState<string | null>(null);
   const [catalogEditPending, setCatalogEditPending] = useState(false);
   const [catalogActionPending, setCatalogActionPending] = useState(false);
+  const [catalogCreatePending, setCatalogCreatePending] = useState(false);
   const [catalogEditMessage, setCatalogEditMessage] = useState<string | null>(null);
   const [catalogEditError, setCatalogEditError] = useState<string | null>(null);
   const [catalogEditForm, setCatalogEditForm] = useState({
@@ -644,6 +789,15 @@ export function TenantApp() {
     tags: '',
     featured: false,
   });
+  const tenantMembershipRole = session?.membership?.role?.toLowerCase() ?? null;
+  const scopedTenantRef = session?.membership?.tenant_slug ?? session?.tenant?.slug ?? tenantRef;
+  const adminReturnContext = useMemo(() => resolveAdminReturnContext(scopedTenantRef), [scopedTenantRef]);
+  const canWriteCatalog = !!session?.session_token && (
+    tenantMembershipRole === 'tenant_admin' || tenantMembershipRole === 'operator'
+  );
+  const canManageExperience = !!session?.session_token && (
+    tenantMembershipRole === 'tenant_admin' || tenantMembershipRole === 'operator'
+  );
   const [importForm, setImportForm] = useState<TenantCatalogImportRequest>({
     website_url: '',
     business_name: '',
@@ -696,16 +850,18 @@ export function TenantApp() {
     let cancelled = false;
 
     async function loadTenantWorkspace() {
+      const nextTenantRef = scopedTenantRef;
       try {
-        const [overviewEnvelope, bookingsEnvelope, integrationsEnvelope, billingEnvelope, onboardingEnvelope, teamEnvelope, catalogEnvelope] =
+        const [overviewEnvelope, bookingsEnvelope, pluginEnvelope, integrationsEnvelope, billingEnvelope, onboardingEnvelope, teamEnvelope, catalogEnvelope] =
           await Promise.all([
-            apiV1.getTenantOverview(tenantRef),
-            apiV1.getTenantBookings(tenantRef),
-            apiV1.getTenantIntegrations(tenantRef, session?.session_token ?? null),
-            apiV1.getTenantBilling(tenantRef, session?.session_token ?? null),
-            apiV1.getTenantOnboarding(tenantRef, session?.session_token ?? null),
-            apiV1.getTenantTeam(tenantRef, session?.session_token ?? null),
-            apiV1.getTenantCatalog(tenantRef, session?.session_token ?? null),
+            apiV1.getTenantOverview(nextTenantRef),
+            apiV1.getTenantBookings(nextTenantRef),
+            apiV1.getTenantPluginInterface(nextTenantRef, session?.session_token ?? null),
+            apiV1.getTenantIntegrations(nextTenantRef, session?.session_token ?? null),
+            apiV1.getTenantBilling(nextTenantRef, session?.session_token ?? null),
+            apiV1.getTenantOnboarding(nextTenantRef, session?.session_token ?? null),
+            apiV1.getTenantTeam(nextTenantRef, session?.session_token ?? null),
+            apiV1.getTenantCatalog(nextTenantRef, session?.session_token ?? null),
           ]);
 
         if (cancelled) {
@@ -715,6 +871,7 @@ export function TenantApp() {
         if (
           overviewEnvelope.status !== 'ok' ||
           bookingsEnvelope.status !== 'ok' ||
+          pluginEnvelope.status !== 'ok' ||
           integrationsEnvelope.status !== 'ok' ||
           billingEnvelope.status !== 'ok' ||
           onboardingEnvelope.status !== 'ok' ||
@@ -729,6 +886,7 @@ export function TenantApp() {
           status: 'ready',
           overview: overviewEnvelope.data,
           bookings: bookingsEnvelope.data,
+          plugin: pluginEnvelope.data,
           integrations: integrationsEnvelope.data,
           billing: billingEnvelope.data,
           onboarding: onboardingEnvelope.data,
@@ -737,7 +895,7 @@ export function TenantApp() {
         });
 
         apiV1
-          .getTenantRevenueMetrics(tenantRef, session?.session_token ?? null)
+          .getTenantRevenueMetrics(nextTenantRef, session?.session_token ?? null)
           .then((env) => {
             if (!cancelled && env.status === 'ok') setRevenueMetrics(env.data);
           })
@@ -759,12 +917,41 @@ export function TenantApp() {
           timezone: overviewEnvelope.data.tenant.timezone || current.timezone,
           locale: overviewEnvelope.data.tenant.locale || current.locale,
           operator_full_name: session?.user.full_name || current.operator_full_name,
+          logo_url: overviewEnvelope.data.workspace.logo_url || current.logo_url,
+          hero_image_url: overviewEnvelope.data.workspace.hero_image_url || current.hero_image_url,
+          introduction_html: overviewEnvelope.data.workspace.introduction_html || current.introduction_html,
+          guide_overview: overviewEnvelope.data.workspace.guides.overview || current.guide_overview,
+          guide_experience: overviewEnvelope.data.workspace.guides.experience || current.guide_experience,
+          guide_catalog: overviewEnvelope.data.workspace.guides.catalog || current.guide_catalog,
+          guide_plugin: overviewEnvelope.data.workspace.guides.plugin || current.guide_plugin,
+          guide_bookings: overviewEnvelope.data.workspace.guides.bookings || current.guide_bookings,
+          guide_integrations: overviewEnvelope.data.workspace.guides.integrations || current.guide_integrations,
+          guide_billing: overviewEnvelope.data.workspace.guides.billing || current.guide_billing,
+          guide_team: overviewEnvelope.data.workspace.guides.team || current.guide_team,
         }));
         setImportForm((current) => ({
           ...current,
           business_name: current.business_name || overviewEnvelope.data.tenant.name || '',
           business_email: current.business_email || session?.user.email || '',
         }));
+        setPluginForm({
+          partner_name: pluginEnvelope.data.experience.partner_name || '',
+          partner_website_url: pluginEnvelope.data.experience.partner_website_url || '',
+          bookedai_host: pluginEnvelope.data.experience.bookedai_host || 'https://product.bookedai.au',
+          embed_path: pluginEnvelope.data.experience.embed_path || '',
+          widget_script_path: pluginEnvelope.data.experience.widget_script_path || '',
+          tenant_ref: pluginEnvelope.data.experience.tenant_ref || '',
+          widget_id: pluginEnvelope.data.experience.widget_id || '',
+          accent_color: pluginEnvelope.data.experience.accent_color || '#1f7a6b',
+          button_label: pluginEnvelope.data.experience.button_label || '',
+          modal_title: pluginEnvelope.data.experience.modal_title || '',
+          headline: pluginEnvelope.data.experience.headline || '',
+          prompt: pluginEnvelope.data.experience.prompt || '',
+          inline_target_selector: pluginEnvelope.data.experience.inline_target_selector || '#bookedai-partner-widget',
+          support_email: pluginEnvelope.data.experience.support_email || '',
+          support_whatsapp: pluginEnvelope.data.experience.support_whatsapp || '',
+          logo_url: pluginEnvelope.data.experience.logo_url || '',
+        });
         setBillingAccountForm((current) => ({
           ...current,
           billing_email: billingEnvelope.data.account.billing_email || session?.user.email || current.billing_email,
@@ -802,7 +989,7 @@ export function TenantApp() {
     return () => {
       cancelled = true;
     };
-  }, [isGateway, session?.session_token, session?.user.email, tenantRef]);
+  }, [isGateway, scopedTenantRef, session?.session_token, session?.user.email]);
 
   useEffect(() => {
     syncPanelHash(panel);
@@ -846,72 +1033,77 @@ export function TenantApp() {
     const container = googleButtonRef.current;
     container.innerHTML = '';
 
-    window.google.accounts.id.initialize({
-      client_id: googleClientId,
-      callback: (response) => {
-        const idToken = response.credential?.trim();
-        if (!idToken) {
-          setAuthError('Google sign-in did not return a usable credential.');
-          return;
-        }
+    if (!googleInitializedRef.current) {
+      window.google.accounts.id.initialize({
+        client_id: googleClientId,
+        callback: (response) => {
+          const authContext = googleAuthContextRef.current;
+          const idToken = response.credential?.trim();
+          if (!idToken) {
+            setAuthError('Google sign-in did not return a usable credential.');
+            return;
+          }
 
-        if (isGateway && authMode === 'create' && !createAccountForm.business_name.trim()) {
-          setAuthError('Enter a business name before creating a tenant account with Google.');
-          return;
-        }
+          setAuthPending(true);
+          setAuthError(null);
+          setTenantChoices([]);
+          setLastGoogleCredential(idToken);
 
-        setAuthPending(true);
-        setAuthError(null);
-        setTenantChoices([]);
-        setLastGoogleCredential(idToken);
+          const googleAuthIntent = authContext.tenantRef
+            ? authContext.authMode === 'claim'
+              ? 'create'
+              : 'sign-in'
+            : 'create';
 
-        void apiV1
-          .tenantGoogleAuth({
-            id_token: idToken,
-            tenant_ref: tenantRef,
-            auth_intent: authMode === 'create' ? 'create' : 'sign-in',
-            business_name: authMode === 'create' ? createAccountForm.business_name.trim() : null,
-            industry: authMode === 'create' ? createAccountForm.industry.trim() || null : null,
-          })
-          .then((envelope) => {
-            if (envelope.status !== 'ok') {
-              throw new Error('Tenant authentication could not be established.');
-            }
+          void apiV1
+            .tenantGoogleAuth({
+              id_token: idToken,
+              tenant_ref: authContext.tenantRef,
+              auth_intent: googleAuthIntent,
+              business_name: authContext.isGateway ? authContext.businessName : null,
+              industry: authContext.isGateway ? authContext.industry || null : null,
+            })
+            .then((envelope) => {
+              if (envelope.status !== 'ok') {
+                throw new Error('Tenant authentication could not be established.');
+              }
 
-            return completeTenantAuth(
-              envelope.data,
-              isGateway
-                ? 'Google account connected. Redirecting to your tenant workspace now.'
-                : 'Google account connected. AI import and catalog controls are now enabled.',
-            );
-          })
-          .catch((error: unknown) => {
-            const fallbackMessage =
-              error instanceof Error ? error.message : 'Google sign-in failed.';
-            const apiError = error as ApiClientError | undefined;
-            const nextTenantChoices = normalizeTenantChoicesFromApiError(apiError);
-            const bodyMessage =
-              typeof apiError?.body === 'object' &&
-              apiError?.body &&
-              'error' in apiError.body &&
-              typeof (apiError.body as { error?: { message?: unknown } }).error?.message === 'string'
-                ? ((apiError.body as { error?: { message?: string } }).error?.message as string)
-                : null;
+              return completeTenantAuth(
+                envelope.data,
+                authContext.isGateway
+                  ? 'Google account connected. Redirecting into your tenant workspace now.'
+                  : 'Google account connected. AI import and catalog controls are now enabled.',
+              );
+            })
+            .catch((error: unknown) => {
+              const fallbackMessage =
+                error instanceof Error ? error.message : 'Google sign-in failed.';
+              const apiError = error as ApiClientError | undefined;
+              const nextTenantChoices = normalizeTenantChoicesFromApiError(apiError);
+              const bodyMessage =
+                typeof apiError?.body === 'object' &&
+                apiError?.body &&
+                'error' in apiError.body &&
+                typeof (apiError.body as { error?: { message?: unknown } }).error?.message === 'string'
+                  ? ((apiError.body as { error?: { message?: string } }).error?.message as string)
+                  : null;
 
-            setTenantChoices(nextTenantChoices);
-            setAuthError(bodyMessage ?? fallbackMessage);
-          })
-          .finally(() => {
-            setAuthPending(false);
-          });
-      },
-    });
+              setTenantChoices(nextTenantChoices);
+              setAuthError(bodyMessage ?? fallbackMessage);
+            })
+            .finally(() => {
+              setAuthPending(false);
+            });
+        },
+      });
+      googleInitializedRef.current = true;
+    }
 
     window.google.accounts.id.renderButton(container, {
       theme: 'outline',
       size: 'large',
       shape: 'pill',
-      text: 'signin_with',
+      text: resolveGoogleButtonText(authMode),
       width: 280,
     });
   }, [
@@ -920,9 +1112,38 @@ export function TenantApp() {
     createAccountForm.industry,
     googleClientId,
     googleReady,
+  ]);
+
+  useEffect(() => {
+    googleAuthContextRef.current = {
+      authMode,
+      businessName: createAccountForm.business_name.trim(),
+      industry: createAccountForm.industry.trim(),
+      isGateway,
+      tenantRef,
+    };
+  }, [
+    authMode,
+    createAccountForm.business_name,
+    createAccountForm.industry,
     isGateway,
     tenantRef,
   ]);
+
+  function handleAuthModeChange(nextAuthMode: TenantAuthMode | ((current: TenantAuthMode) => TenantAuthMode)) {
+    setAuthMode((current) => {
+      const resolvedMode =
+        typeof nextAuthMode === 'function' ? nextAuthMode(current) : nextAuthMode;
+      if (resolvedMode !== current) {
+        setAuthError(null);
+        setTenantChoices([]);
+        setLastGoogleCredential(null);
+        setEmailCodeDelivery(null);
+        setEmailCodeValue('');
+      }
+      return resolvedMode;
+    });
+  }
 
   const metrics = useMemo(() => {
     if (state.status !== 'ready') {
@@ -1023,19 +1244,25 @@ export function TenantApp() {
   }, [selectedCatalogItem]);
 
   async function refreshTenantWorkspace(nextSession = session) {
-    const [overviewEnvelope, bookingsEnvelope, integrationsEnvelope, billingEnvelope, onboardingEnvelope, teamEnvelope, catalogEnvelope] = await Promise.all([
-      apiV1.getTenantOverview(tenantRef),
-      apiV1.getTenantBookings(tenantRef),
-      apiV1.getTenantIntegrations(tenantRef, nextSession?.session_token ?? null),
-      apiV1.getTenantBilling(tenantRef, nextSession?.session_token ?? null),
-      apiV1.getTenantOnboarding(tenantRef, nextSession?.session_token ?? null),
-      apiV1.getTenantTeam(tenantRef, nextSession?.session_token ?? null),
-      apiV1.getTenantCatalog(tenantRef, nextSession?.session_token ?? null),
+    const nextTenantRef =
+      nextSession?.membership?.tenant_slug
+      ?? nextSession?.tenant?.slug
+      ?? tenantRef;
+    const [overviewEnvelope, bookingsEnvelope, pluginEnvelope, integrationsEnvelope, billingEnvelope, onboardingEnvelope, teamEnvelope, catalogEnvelope] = await Promise.all([
+      apiV1.getTenantOverview(nextTenantRef),
+      apiV1.getTenantBookings(nextTenantRef),
+      apiV1.getTenantPluginInterface(nextTenantRef, nextSession?.session_token ?? null),
+      apiV1.getTenantIntegrations(nextTenantRef, nextSession?.session_token ?? null),
+      apiV1.getTenantBilling(nextTenantRef, nextSession?.session_token ?? null),
+      apiV1.getTenantOnboarding(nextTenantRef, nextSession?.session_token ?? null),
+      apiV1.getTenantTeam(nextTenantRef, nextSession?.session_token ?? null),
+      apiV1.getTenantCatalog(nextTenantRef, nextSession?.session_token ?? null),
     ]);
 
     if (
       overviewEnvelope.status !== 'ok' ||
       bookingsEnvelope.status !== 'ok' ||
+      pluginEnvelope.status !== 'ok' ||
       integrationsEnvelope.status !== 'ok' ||
       billingEnvelope.status !== 'ok' ||
       onboardingEnvelope.status !== 'ok' ||
@@ -1049,6 +1276,7 @@ export function TenantApp() {
       status: 'ready',
       overview: overviewEnvelope.data,
       bookings: bookingsEnvelope.data,
+      plugin: pluginEnvelope.data,
       integrations: integrationsEnvelope.data,
       billing: billingEnvelope.data,
       onboarding: onboardingEnvelope.data,
@@ -1074,6 +1302,9 @@ export function TenantApp() {
   ) {
     setTenantChoices([]);
     setLastGoogleCredential(null);
+    setEmailCodeDelivery(null);
+    setEmailCodeValue('');
+    setAuthError(null);
     writeStoredTenantSession(nextSession.tenant.slug, nextSession);
     setSession(nextSession);
     setImportMessage(successMessage);
@@ -1152,6 +1383,19 @@ export function TenantApp() {
     }
   }
 
+  function handlePromptGoogle() {
+    setAuthError(null);
+    if (!googleClientId) {
+      setAuthError(GOOGLE_TENANT_AUTH_CONFIG_MESSAGE);
+      return;
+    }
+    if (!googleReady || !window.google?.accounts.id) {
+      setAuthError('Google sign-in is still loading. Please try again in a moment.');
+      return;
+    }
+    window.google.accounts.id.prompt();
+  }
+
   async function handleCatalogImport(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session?.session_token) {
@@ -1183,7 +1427,7 @@ export function TenantApp() {
           location_hint: importForm.location_hint?.trim() || null,
         },
         {
-          tenantRef,
+          tenantRef: scopedTenantRef,
           sessionToken: session.session_token,
         },
       );
@@ -1223,6 +1467,10 @@ export function TenantApp() {
     }
     setSession(null);
     setAuthError(null);
+    setTenantChoices([]);
+    setLastGoogleCredential(null);
+    setEmailCodeDelivery(null);
+    setEmailCodeValue('');
     setImportMessage('Tenant session cleared. Preview remains available, but AI import is locked.');
     if (!isGateway) {
       void refreshTenantWorkspace(null).catch(() => {
@@ -1231,37 +1479,68 @@ export function TenantApp() {
     }
   }
 
-  async function handlePasswordSignIn(event: FormEvent<HTMLFormElement>) {
+  async function handleRequestEmailCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (!passwordUsername.trim() || !passwordValue.trim()) {
-      setAuthError('Enter the tenant username and password.');
+    const requestEmail =
+      authMode === 'create'
+        ? createAccountForm.email.trim()
+        : authMode === 'claim'
+          ? claimAccountForm.email.trim()
+          : emailSignInValue.trim();
+    if (!requestEmail) {
+      setAuthError('Enter the tenant email before requesting a verification code.');
       return;
     }
-
+    if (authMode === 'create' && !createAccountForm.business_name.trim()) {
+      setAuthError('Enter the business name before requesting the setup code.');
+      return;
+    }
+    if (authMode === 'claim' && !tenantRef) {
+      setAuthError('Open the tenant workspace first before accepting the invite.');
+      return;
+    }
     setAuthPending(true);
     setAuthError(null);
+    setEmailCodeValue('');
 
     try {
-      const envelope = await apiV1.tenantPasswordAuth({
-        username: passwordUsername.trim(),
-        password: passwordValue,
+      const envelope = await apiV1.tenantEmailCodeRequest({
+        email: requestEmail,
         tenant_ref: tenantRef,
+        auth_intent: authMode,
+        business_name: authMode === 'create' ? createAccountForm.business_name.trim() || null : null,
+        full_name:
+          authMode === 'create'
+            ? createAccountForm.full_name.trim() || null
+            : authMode === 'claim'
+              ? claimAccountForm.full_name.trim() || null
+              : null,
+        industry: authMode === 'create' ? createAccountForm.industry.trim() || null : null,
       });
 
       if (envelope.status !== 'ok') {
-        throw new Error('Tenant authentication could not be established.');
+        throw new Error('Tenant verification code could not be requested.');
       }
 
-      setPasswordValue('');
-      await completeTenantAuth(
-        envelope.data,
-        isGateway
-          ? 'Tenant account connected. Redirecting to your tenant workspace now.'
-          : 'Tenant account connected. Catalog import and tenant write access are now enabled.',
+      setEmailCodeDelivery({
+        email: envelope.data.email,
+        auth_intent: envelope.data.auth_intent,
+        tenant_slug: envelope.data.tenant_slug,
+        tenant_name: envelope.data.tenant_name,
+        code_last4: envelope.data.delivery.code_last4,
+        expires_in_minutes: envelope.data.delivery.expires_in_minutes,
+        operator_note: envelope.data.delivery.operator_note,
+      });
+      setImportMessage(
+        authMode === 'create'
+          ? 'Setup code sent. Verify it to create the tenant workspace.'
+          : authMode === 'claim'
+            ? 'Invite code sent. Verify it to activate tenant access.'
+            : 'Login code sent. Verify it to continue into the tenant workspace.',
       );
     } catch (error) {
       const fallbackMessage =
-        error instanceof Error ? error.message : 'Tenant password sign-in failed.';
+        error instanceof Error ? error.message : 'Tenant email-code request failed.';
       const apiError = error as ApiClientError | undefined;
       const bodyMessage =
         typeof apiError?.body === 'object' &&
@@ -1277,15 +1556,16 @@ export function TenantApp() {
     }
   }
 
-  async function handleCreateAccount(event: FormEvent<HTMLFormElement>) {
+  async function handleVerifyEmailCode(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (
-      !createAccountForm.business_name.trim()
-      || !createAccountForm.email.trim()
-      || !createAccountForm.username.trim()
-      || !createAccountForm.password.trim()
-    ) {
-      setAuthError('Enter business name, email, username, and password to create a tenant account.');
+    const requestEmail =
+      authMode === 'create'
+        ? createAccountForm.email.trim()
+        : authMode === 'claim'
+          ? claimAccountForm.email.trim()
+          : emailSignInValue.trim();
+    if (!requestEmail || !emailCodeValue.trim()) {
+      setAuthError('Enter the tenant email and the verification code.');
       return;
     }
 
@@ -1293,79 +1573,40 @@ export function TenantApp() {
     setAuthError(null);
 
     try {
-      const envelope = await apiV1.tenantCreateAccount({
-        business_name: createAccountForm.business_name.trim(),
-        full_name: createAccountForm.full_name.trim() || null,
-        email: createAccountForm.email.trim(),
-        username: createAccountForm.username.trim(),
-        password: createAccountForm.password,
-        industry: createAccountForm.industry.trim() || null,
-      });
-
-      if (envelope.status !== 'ok') {
-        throw new Error('Tenant account could not be created.');
-      }
-
-      await completeTenantAuth(
-        envelope.data,
-        'Tenant account created. Redirecting into your workspace now.',
-      );
-    } catch (error) {
-      const fallbackMessage =
-        error instanceof Error ? error.message : 'Tenant account creation failed.';
-      const apiError = error as ApiClientError | undefined;
-      const bodyMessage =
-        typeof apiError?.body === 'object' &&
-        apiError?.body &&
-        'error' in apiError.body &&
-        typeof (apiError.body as { error?: { message?: unknown } }).error?.message === 'string'
-          ? ((apiError.body as { error?: { message?: string } }).error?.message as string)
-          : null;
-
-      setAuthError(bodyMessage ?? fallbackMessage);
-    } finally {
-      setAuthPending(false);
-    }
-  }
-
-  async function handleClaimAccount(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    if (!tenantRef) {
-      setAuthError('Open a tenant workspace first before claiming it.');
-      return;
-    }
-    if (
-      !claimAccountForm.email.trim()
-      || !claimAccountForm.username.trim()
-      || !claimAccountForm.password.trim()
-    ) {
-      setAuthError('Enter email, username, and password to claim this tenant workspace.');
-      return;
-    }
-
-    setAuthPending(true);
-    setAuthError(null);
-
-    try {
-      const envelope = await apiV1.tenantClaimAccount({
+      const envelope = await apiV1.tenantEmailCodeVerify({
+        email: requestEmail,
+        code: emailCodeValue.trim(),
         tenant_ref: tenantRef,
-        email: claimAccountForm.email.trim(),
-        username: claimAccountForm.username.trim(),
-        password: claimAccountForm.password,
-        full_name: claimAccountForm.full_name.trim() || null,
+        auth_intent: authMode,
+        business_name: authMode === 'create' ? createAccountForm.business_name.trim() || null : null,
+        full_name:
+          authMode === 'create'
+            ? createAccountForm.full_name.trim() || null
+            : authMode === 'claim'
+              ? claimAccountForm.full_name.trim() || null
+              : null,
+        industry: authMode === 'create' ? createAccountForm.industry.trim() || null : null,
       });
 
       if (envelope.status !== 'ok') {
-        throw new Error('Tenant workspace claim failed.');
+        throw new Error('Tenant verification could not be completed.');
       }
 
+      setEmailCodeValue('');
+      setEmailCodeDelivery(null);
       await completeTenantAuth(
         envelope.data,
-        'Tenant workspace claimed. Write access is now enabled for this tenant.',
+        authMode === 'create'
+          ? 'Tenant account created. Redirecting into your workspace now.'
+          : authMode === 'claim'
+            ? 'Tenant workspace claimed. Write access is now enabled for this tenant.'
+            : isGateway
+              ? 'Tenant account connected. Redirecting to your tenant workspace now.'
+              : 'Tenant account connected. Catalog import and tenant write access are now enabled.',
       );
     } catch (error) {
       const fallbackMessage =
-        error instanceof Error ? error.message : 'Tenant workspace claim failed.';
+        error instanceof Error ? error.message : 'Tenant email-code verification failed.';
       const apiError = error as ApiClientError | undefined;
       const bodyMessage =
         typeof apiError?.body === 'object' &&
@@ -1387,6 +1628,10 @@ export function TenantApp() {
       setProfileError('Sign in with a tenant account before updating workspace profile details.');
       return;
     }
+    if (!canManageExperience) {
+      setProfileError('Only tenant admins and operators can update tenant branding, introduction HTML, or workspace guidance.');
+      return;
+    }
 
     setProfilePending(true);
     setProfileError(null);
@@ -1400,9 +1645,20 @@ export function TenantApp() {
           timezone: profileForm.timezone.trim() || null,
           locale: profileForm.locale.trim() || null,
           operator_full_name: profileForm.operator_full_name.trim() || null,
+          logo_url: profileForm.logo_url.trim() || null,
+          hero_image_url: profileForm.hero_image_url.trim() || null,
+          introduction_html: profileForm.introduction_html.trim() || null,
+          guide_overview: profileForm.guide_overview.trim() || null,
+          guide_experience: profileForm.guide_experience.trim() || null,
+          guide_catalog: profileForm.guide_catalog.trim() || null,
+          guide_plugin: profileForm.guide_plugin.trim() || null,
+          guide_bookings: profileForm.guide_bookings.trim() || null,
+          guide_integrations: profileForm.guide_integrations.trim() || null,
+          guide_billing: profileForm.guide_billing.trim() || null,
+          guide_team: profileForm.guide_team.trim() || null,
         },
         {
-          tenantRef,
+          tenantRef: scopedTenantRef,
           sessionToken: session.session_token,
         },
       );
@@ -1431,6 +1687,124 @@ export function TenantApp() {
     }
   }
 
+  async function handleProfileAssetUpload(kind: 'logo' | 'hero', file: File) {
+    if (!canManageExperience) {
+      setProfileError('Only tenant admins and operators can upload tenant branding assets.');
+      return;
+    }
+
+    setUploadingProfileAsset(kind);
+    setProfileError(null);
+    setProfileMessage(null);
+
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+
+      const response = await fetch(`${getApiBaseUrl()}/uploads/images`, {
+        method: 'POST',
+        body: formData,
+      });
+      const payload = (await response.json()) as { url?: string; detail?: string };
+      if (!response.ok || !payload.url) {
+        throw new Error(payload.detail || 'Image upload failed.');
+      }
+
+      setProfileForm((current) => ({
+        ...current,
+        logo_url: kind === 'logo' ? payload.url || '' : current.logo_url,
+        hero_image_url: kind === 'hero' ? payload.url || '' : current.hero_image_url,
+      }));
+      setProfileMessage(kind === 'logo' ? 'Logo uploaded. Save to persist the workspace profile.' : 'Hero image uploaded. Save to persist the workspace profile.');
+    } catch (error) {
+      setProfileError(error instanceof Error ? error.message : 'Image upload failed.');
+    } finally {
+      setUploadingProfileAsset(null);
+    }
+  }
+
+  async function handlePluginSave(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!session?.session_token) {
+      setPluginError('Sign in with a tenant account before updating plugin interface settings.');
+      return;
+    }
+
+    setPluginPending(true);
+    setPluginError(null);
+    setPluginMessage(null);
+
+    try {
+      const envelope = await apiV1.updateTenantPluginInterface(
+        {
+          partner_name: pluginForm.partner_name.trim() || null,
+          partner_website_url: pluginForm.partner_website_url.trim() || null,
+          bookedai_host: pluginForm.bookedai_host.trim() || null,
+          embed_path: pluginForm.embed_path.trim() || null,
+          widget_script_path: pluginForm.widget_script_path.trim() || null,
+          tenant_ref: scopedTenantRef || pluginForm.tenant_ref.trim() || null,
+          widget_id: pluginForm.widget_id.trim() || null,
+          accent_color: pluginForm.accent_color.trim() || null,
+          button_label: pluginForm.button_label.trim() || null,
+          modal_title: pluginForm.modal_title.trim() || null,
+          headline: pluginForm.headline.trim() || null,
+          prompt: pluginForm.prompt.trim() || null,
+          inline_target_selector: pluginForm.inline_target_selector.trim() || null,
+          support_email: pluginForm.support_email.trim() || null,
+          support_whatsapp: pluginForm.support_whatsapp.trim() || null,
+          logo_url: pluginForm.logo_url.trim() || null,
+        },
+        {
+          tenantRef: scopedTenantRef,
+          sessionToken: session.session_token,
+        },
+      );
+
+      if (envelope.status !== 'ok') {
+        throw new Error('Tenant plugin interface did not return a refreshed state.');
+      }
+
+      setState((current) =>
+        current.status === 'ready'
+          ? {
+              ...current,
+              plugin: envelope.data,
+            }
+          : current,
+      );
+      setPluginMessage('Partner plugin settings saved. Copy snippets below to update the partner website.');
+    } catch (error) {
+      const fallbackMessage =
+        error instanceof Error ? error.message : 'Tenant plugin interface update failed.';
+      const apiError = error as ApiClientError | undefined;
+      const bodyMessage =
+        typeof apiError?.body === 'object' &&
+        apiError?.body &&
+        'error' in apiError.body &&
+        typeof (apiError.body as { error?: { message?: unknown } }).error?.message === 'string'
+          ? ((apiError.body as { error?: { message?: string } }).error?.message as string)
+          : null;
+
+      setPluginError(bodyMessage ?? fallbackMessage);
+    } finally {
+      setPluginPending(false);
+    }
+  }
+
+  function handleCopySnippet(key: string, content: string) {
+    if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
+      setPluginError('Clipboard access is not available in this browser.');
+      return;
+    }
+
+    void navigator.clipboard.writeText(content).then(() => {
+      setCopiedSnippetKey(key);
+      setTimeout(() => setCopiedSnippetKey((current) => (current === key ? null : current)), 1800);
+    }).catch(() => {
+      setPluginError('Could not copy the snippet automatically. Select and copy it manually.');
+    });
+  }
+
   async function handleBillingAccountSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session?.session_token) {
@@ -1453,7 +1827,7 @@ export function TenantApp() {
           merchant_mode: billingAccountForm.merchant_mode.trim() || 'test',
         },
         {
-          tenantRef,
+          tenantRef: scopedTenantRef,
           sessionToken: session.session_token,
         },
       );
@@ -1493,16 +1867,22 @@ export function TenantApp() {
     setBillingMessage(null);
 
     try {
-      const envelope = await apiV1.updateTenantSubscription(
-        {
-          package_code: planCode,
-          mode: billing.collection.has_active_subscription ? 'activate' : 'trial',
-        },
-        {
-          tenantRef,
-          sessionToken: session.session_token,
-        },
-      );
+      const nextMode: 'trial' | 'activate' = billing.collection.has_active_subscription
+        ? 'activate'
+        : 'trial';
+      const request = {
+        package_code: planCode,
+        mode: nextMode,
+      };
+      const envelope = billing.self_serve.can_start_stripe_checkout
+        ? await apiV1.createTenantBillingCheckoutSession(request, {
+            tenantRef: scopedTenantRef,
+            sessionToken: session.session_token,
+          })
+        : await apiV1.updateTenantSubscription(request, {
+            tenantRef: scopedTenantRef,
+            sessionToken: session.session_token,
+          });
 
       if (envelope.status !== 'ok') {
         throw new Error('Tenant package update did not return a refreshed workspace state.');
@@ -1510,6 +1890,11 @@ export function TenantApp() {
 
       const selectedPackageLabel =
         billing.plans.find((plan) => plan.code === planCode)?.label ?? planCode;
+      if (billing.self_serve.can_start_stripe_checkout && envelope.data.checkout_url) {
+        setBillingMessage(`Redirecting to Stripe Checkout for ${selectedPackageLabel}.`);
+        window.location.assign(envelope.data.checkout_url);
+        return;
+      }
       setBillingMessage(
         billing.collection.has_active_subscription
           ? 'Tenant package updated. Billing and onboarding have been refreshed.'
@@ -1533,6 +1918,50 @@ export function TenantApp() {
     }
   }
 
+  async function handleOpenBillingPortal() {
+    if (!session?.session_token) {
+      setBillingError('Sign in with a tenant account before opening the Stripe billing portal.');
+      return;
+    }
+
+    setBillingPortalPending(true);
+    setBillingError(null);
+    setBillingMessage(null);
+
+    try {
+      const envelope = await apiV1.createTenantBillingPortalSession({
+        tenantRef: scopedTenantRef,
+        sessionToken: session.session_token,
+      });
+
+      if (envelope.status !== 'ok') {
+        throw new Error('Stripe billing portal did not return a usable redirect.');
+      }
+
+      if (!envelope.data.portal_url) {
+        throw new Error('Stripe billing portal did not return a usable redirect.');
+      }
+
+      setBillingMessage('Opening Stripe billing portal...');
+      window.location.assign(envelope.data.portal_url);
+    } catch (error) {
+      const fallbackMessage =
+        error instanceof Error ? error.message : 'Stripe billing portal could not be opened.';
+      const apiError = error as ApiClientError | undefined;
+      const bodyMessage =
+        typeof apiError?.body === 'object' &&
+        apiError?.body &&
+        'error' in apiError.body &&
+        typeof (apiError.body as { error?: { message?: unknown } }).error?.message === 'string'
+          ? ((apiError.body as { error?: { message?: string } }).error?.message as string)
+          : null;
+
+      setBillingError(bodyMessage ?? fallbackMessage);
+    } finally {
+      setBillingPortalPending(false);
+    }
+  }
+
   async function handleMarkInvoicePaid(invoiceId: string) {
     if (!session?.session_token) {
       setBillingError('Sign in with a tenant billing account before updating invoice state.');
@@ -1547,7 +1976,7 @@ export function TenantApp() {
       const envelope = await apiV1.markTenantBillingInvoicePaid(
         invoiceId,
         {
-          tenantRef,
+          tenantRef: scopedTenantRef,
           sessionToken: session.session_token,
         },
       );
@@ -1586,10 +2015,18 @@ export function TenantApp() {
     setBillingMessage(null);
 
     try {
+      const invoice = billing.invoices.find((item) => item.id === invoiceId);
+      const externalReceiptUrl = invoice?.receipt_url ?? invoice?.hosted_invoice_url;
+      if (externalReceiptUrl) {
+        window.open(externalReceiptUrl, '_blank', 'noopener,noreferrer');
+        setBillingMessage(`Opened receipt for ${invoice?.invoice_number ?? invoiceId} in Stripe.`);
+        return;
+      }
+
       const envelope = await apiV1.getTenantBillingInvoiceReceipt(
         invoiceId,
         {
-          tenantRef,
+          tenantRef: scopedTenantRef,
           sessionToken: session.session_token,
         },
       );
@@ -1648,7 +2085,7 @@ export function TenantApp() {
           role: inviteMemberForm.role,
         },
         {
-          tenantRef,
+          tenantRef: scopedTenantRef,
           sessionToken: session.session_token,
         },
       );
@@ -1706,7 +2143,7 @@ export function TenantApp() {
           status: nextStatus,
         },
         {
-          tenantRef,
+          tenantRef: scopedTenantRef,
           sessionToken: session.session_token,
         },
       );
@@ -1756,7 +2193,7 @@ export function TenantApp() {
       const envelope = await apiV1.resendTenantTeamInvite(
         email,
         {
-          tenantRef,
+          tenantRef: scopedTenantRef,
           sessionToken: session.session_token,
         },
       );
@@ -1813,7 +2250,7 @@ export function TenantApp() {
           sync_mode: nextSyncMode,
         },
         {
-          tenantRef,
+          tenantRef: scopedTenantRef,
           sessionToken: session.session_token,
         },
       );
@@ -1893,7 +2330,7 @@ export function TenantApp() {
           featured: catalogEditForm.featured,
         },
         {
-          tenantRef,
+          tenantRef: scopedTenantRef,
           sessionToken: session.session_token,
         },
       );
@@ -1921,6 +2358,59 @@ export function TenantApp() {
     }
   }
 
+  async function handleCatalogCreate() {
+    if (!session?.session_token) {
+      setCatalogEditError('Sign in with a tenant account before creating catalog drafts.');
+      return;
+    }
+    if (!canWriteCatalog) {
+      setCatalogEditError('Your current tenant role can review catalog data but cannot create or publish catalog rows.');
+      return;
+    }
+
+    setCatalogCreatePending(true);
+    setCatalogEditError(null);
+    setCatalogEditMessage(null);
+
+    try {
+      const request: TenantCatalogCreateRequest = {
+        business_name: profileForm.business_name.trim() || overview.tenant.name,
+        name: 'New service draft',
+        category: importForm.category?.trim() || null,
+      };
+      const envelope = await apiV1.createTenantCatalogService(request, {
+        tenantRef: scopedTenantRef,
+        sessionToken: session.session_token,
+      });
+
+      if (envelope.status !== 'ok') {
+        throw new Error('Catalog draft creation did not return a refreshed catalog snapshot.');
+      }
+
+      const previousServiceIds = new Set(catalog.items.map((item) => item.service_id));
+      applyCatalogSnapshot(envelope.data);
+      const createdItem = envelope.data.items.find((item) => !previousServiceIds.has(item.service_id));
+      if (createdItem) {
+        setSelectedCatalogServiceId(createdItem.service_id);
+      }
+      setCatalogEditMessage('A new draft service is ready. Fill in the booking-critical details, then save or publish it.');
+    } catch (error) {
+      const fallbackMessage =
+        error instanceof Error ? error.message : 'Catalog draft creation failed.';
+      const apiError = error as ApiClientError | undefined;
+      const bodyMessage =
+        typeof apiError?.body === 'object' &&
+        apiError?.body &&
+        'error' in apiError.body &&
+        typeof (apiError.body as { error?: { message?: unknown } }).error?.message === 'string'
+          ? ((apiError.body as { error?: { message?: string } }).error?.message as string)
+          : null;
+      setCatalogEditError(bodyMessage ?? fallbackMessage);
+    } finally {
+      setCatalogCreatePending(false);
+    }
+  }
+
   async function runCatalogStateAction(action: 'publish' | 'archive') {
     if (!session?.session_token || !selectedCatalogItem) {
       setCatalogEditError('Sign in with a tenant account before changing publish state.');
@@ -1939,11 +2429,11 @@ export function TenantApp() {
       const envelope =
         action === 'publish'
           ? await apiV1.publishTenantCatalogService(selectedCatalogItem.service_id, {
-              tenantRef,
+              tenantRef: scopedTenantRef,
               sessionToken: session.session_token,
             })
           : await apiV1.archiveTenantCatalogService(selectedCatalogItem.service_id, {
-              tenantRef,
+              tenantRef: scopedTenantRef,
               sessionToken: session.session_token,
             });
 
@@ -1980,62 +2470,76 @@ export function TenantApp() {
     return (
       <main className="booked-admin-shell booked-page-shell text-slate-950">
         <div className="booked-page-frame booked-page-stack">
-          <section className="overflow-hidden rounded-[2rem] border border-black/6 bg-[radial-gradient(circle_at_top_left,rgba(72,123,255,0.14),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.96),rgba(246,249,255,0.98))] p-6 text-[var(--apple-near-black)] shadow-[0_24px_60px_rgba(15,23,42,0.08)] lg:p-8">
-            <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+          <section className="overflow-hidden rounded-[2.25rem] border border-sky-100 bg-[radial-gradient(circle_at_top_left,rgba(72,123,255,0.18),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.14),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,248,255,0.98))] p-6 text-[var(--apple-near-black)] shadow-[0_28px_80px_rgba(15,23,42,0.10)] lg:p-8">
+            <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
               <div className="max-w-3xl">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--apple-blue)]">
+                <div className="inline-flex items-center rounded-full border border-sky-200 bg-white/85 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--apple-blue)] shadow-[0_10px_24px_rgba(59,130,246,0.10)] backdrop-blur">
                   Shared tenant gateway
                 </div>
-                <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--apple-near-black)] lg:text-4xl">
-                  One login portal for every tenant workspace
+                <h1 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-[var(--apple-near-black)] lg:text-[2.8rem] lg:leading-[1.02]">
+                  One polished sign-in flow for every tenant workspace
                 </h1>
-                <p className="mt-3 max-w-2xl text-sm leading-6 text-black/66">
-                  Sign in with your tenant credentials, continue with Google, or create a brand-new
-                  tenant account from one canonical entry point at `tenant.bookedai.au`.
+                <p className="mt-4 max-w-2xl text-[15px] leading-7 text-black/66">
+                  Create a new tenant, continue with Google, or return to an existing workspace
+                  from one canonical entry point at `tenant.bookedai.au`.
                 </p>
+                <div className="mt-5 flex flex-wrap gap-2.5">
+                  {[
+                    'Google-first access',
+                    'Shared tenant gateway',
+                    'Automatic workspace routing',
+                  ].map((item) => (
+                    <span
+                      key={item}
+                      className="rounded-full border border-sky-200 bg-white/82 px-3.5 py-1.5 text-xs font-semibold text-sky-800 shadow-[0_8px_20px_rgba(59,130,246,0.08)] backdrop-blur"
+                    >
+                      {item}
+                    </span>
+                  ))}
+                </div>
               </div>
 
               <div className="grid gap-3 text-sm text-black/72 sm:grid-cols-2">
-                <div className="rounded-[1.25rem] border border-black/6 bg-white/72 px-4 py-3 backdrop-blur">
+                <div className="rounded-[1.35rem] border border-black/6 bg-white/78 px-4 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] backdrop-blur">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42">
                     Entry point
                   </div>
-                  <div className="mt-1 font-semibold text-[var(--apple-near-black)]">
+                  <div className="mt-2 text-lg font-semibold tracking-tight text-[var(--apple-near-black)]">
                     tenant.bookedai.au
                   </div>
-                  <div className="mt-1 text-xs text-black/54">
-                    Shared sign-in and tenant registration
+                  <div className="mt-2 text-xs leading-5 text-black/54">
+                    Shared tenant sign-in, Google access, and workspace creation
                   </div>
                 </div>
-                <div className="rounded-[1.25rem] border border-black/6 bg-white/72 px-4 py-3 backdrop-blur">
+                <div className="rounded-[1.35rem] border border-black/6 bg-white/78 px-4 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] backdrop-blur">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42">
                     Release
                   </div>
-                  <div className="mt-1 font-semibold text-[var(--apple-near-black)]">{releaseLabel}</div>
-                  <div className="mt-1 text-xs text-black/54">Source {releaseVersion}</div>
+                  <div className="mt-2 text-lg font-semibold tracking-tight text-[var(--apple-near-black)]">{releaseLabel}</div>
+                  <div className="mt-2 text-xs leading-5 text-black/54">Source {releaseVersion}</div>
                 </div>
               </div>
             </div>
           </section>
 
-          <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <section className="grid gap-6 xl:grid-cols-[1.02fr_0.98fr]">
             <div className="space-y-6">
-              <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+              <article className="rounded-[1.85rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-6 shadow-[0_22px_52px_rgba(15,23,42,0.07)]">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                   Gateway flow
                 </div>
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                  Sign in or create a tenant from one place
+                  One tenant entry point, three clean paths
                 </h2>
-                <div className="mt-5 space-y-3">
+                <div className="mt-5 grid gap-3">
                   {[
-                    'Existing tenants can sign in with username/password and get routed into the correct workspace.',
-                    'New tenants can create an account with password credentials or Google sign-up from this same gateway.',
-                    'After authentication, BookedAI stores the session against the resolved tenant workspace and redirects automatically.',
+                    'Existing tenants can return with Google-first sign-in or password fallback.',
+                    'New tenants can create the workspace from the same gateway without switching surfaces.',
+                    'After authentication, BookedAI routes each operator into the correct tenant automatically.',
                   ].map((item) => (
                     <div
                       key={item}
-                      className="rounded-[1.15rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm leading-6 text-slate-600"
+                      className="rounded-[1.2rem] border border-slate-200 bg-white/88 px-4 py-4 text-sm leading-6 text-slate-600 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
                     >
                       {item}
                     </div>
@@ -2043,36 +2547,39 @@ export function TenantApp() {
                 </div>
               </article>
 
-              <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+              <article className="rounded-[1.85rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-6 shadow-[0_22px_52px_rgba(15,23,42,0.07)]">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                   After sign-in
                 </div>
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                  Tenant workspace routing
+                  Straight into the right workspace
                 </h2>
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  Successful authentication always lands on `/tenant/&lt;slug&gt;`, so operators
-                  move from the shared gateway into their own overview, catalog, bookings,
-                  integrations, and billing workspace without a second login.
-                </p>
+                <div className="mt-4 rounded-[1.2rem] border border-slate-200 bg-white/88 px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+                  <p className="text-sm leading-6 text-slate-600">
+                    Successful authentication lands on `/tenant/&lt;slug&gt;`, so operators move from the
+                    shared gateway into overview, catalog, bookings, integrations, and billing
+                    without a second login step.
+                  </p>
+                </div>
               </article>
             </div>
 
-            <TenantAuthWorkspace
+            <TenantAuthWorkspaceEmail
               tenantName="BookedAI Tenant Gateway"
               tenantSlug="tenant.bookedai.au"
               tenantRef={null}
               session={session}
               onboarding={gatewayOnboarding}
               authMode={authMode}
-              setAuthMode={setAuthMode}
+              setAuthMode={handleAuthModeChange}
               authPending={authPending}
               authError={authError}
               importMessage={importMessage}
-              passwordUsername={passwordUsername}
-              setPasswordUsername={setPasswordUsername}
-              passwordValue={passwordValue}
-              setPasswordValue={setPasswordValue}
+              emailSignInValue={emailSignInValue}
+              setEmailSignInValue={setEmailSignInValue}
+              emailCodeValue={emailCodeValue}
+              setEmailCodeValue={setEmailCodeValue}
+              emailCodeDelivery={emailCodeDelivery}
               createAccountForm={createAccountForm}
               setCreateAccountForm={setCreateAccountForm}
               claimAccountForm={claimAccountForm}
@@ -2080,10 +2587,9 @@ export function TenantApp() {
               googleEnabled={Boolean(googleClientId)}
               googleReady={googleReady}
               googleButtonSlot={<div ref={googleButtonRef} />}
-              onPromptGoogle={() => window.google?.accounts.id.prompt()}
-              onPasswordSignIn={handlePasswordSignIn}
-              onCreateAccount={handleCreateAccount}
-              onClaimAccount={handleClaimAccount}
+              onPromptGoogle={handlePromptGoogle}
+              onRequestEmailCode={handleRequestEmailCode}
+              onVerifyEmailCode={handleVerifyEmailCode}
               tenantChoices={tenantChoices}
               onSelectTenantChoice={handleTenantChoiceSelection}
               onSignOut={handleSignOut}
@@ -2134,97 +2640,146 @@ export function TenantApp() {
     );
   }
 
-  const { overview, bookings, integrations, billing, onboarding, team, catalog } = state;
+  const { overview, bookings, plugin, integrations, billing, onboarding, team, catalog } = state;
   const selectionService = selectedCatalogItem ? toBookingReadyServiceItem(selectedCatalogItem) : null;
-  const tenantMembershipRole = session?.membership?.role?.toLowerCase() ?? null;
-  const canWriteCatalog = !!session?.session_token && (
-    tenantMembershipRole === 'tenant_admin' || tenantMembershipRole === 'operator'
-  );
+  const permissionMatrix = useMemo(buildTenantPermissionMatrix, []);
   const roleFirstLoginHint = inviteContext?.role ?? tenantMembershipRole;
+  const tenantPanels: Array<{
+    key: TenantPanel;
+    label: string;
+    description: string;
+    icon: ReactNode;
+  }> = [
+    {
+      key: 'overview',
+      label: 'Overview',
+      description: 'Executive summary, priorities, and health.',
+      icon: <SparkIcon className="h-4 w-4" />,
+    },
+    {
+      key: 'experience',
+      label: 'Experience Studio',
+      description: 'Branding, intro HTML, and workspace guidance.',
+      icon: <ShieldIcon className="h-4 w-4" />,
+    },
+    {
+      key: 'catalog',
+      label: 'Catalog',
+      description: 'Service input, review, and publish control.',
+      icon: <SearchIcon className="h-4 w-4" />,
+    },
+    {
+      key: 'plugin',
+      label: 'Plugin',
+      description: 'Embed runtime and partner integration snippets.',
+      icon: <LinkIcon className="h-4 w-4" />,
+    },
+    {
+      key: 'bookings',
+      label: 'Bookings',
+      description: 'Booking queue, status, and payment dependency.',
+      icon: <CalendarIcon className="h-4 w-4" />,
+    },
+    {
+      key: 'integrations',
+      label: 'Integrations',
+      description: 'Provider posture, alerts, and retry signals.',
+      icon: <DatabaseIcon className="h-4 w-4" />,
+    },
+    {
+      key: 'billing',
+      label: 'Billing',
+      description: 'Commercial readiness, invoices, and plans.',
+      icon: <SparkIcon className="h-4 w-4" />,
+    },
+    {
+      key: 'team',
+      label: 'Team',
+      description: 'Members, roles, and access governance.',
+      icon: <ShieldIcon className="h-4 w-4" />,
+    },
+  ];
+  const activePanelMeta = tenantPanels.find((item) => item.key === panel) ?? tenantPanels[0];
+  const activePanelGuide = overview.workspace.guides[panel === 'experience' ? 'experience' : panel];
+  const introPreview = stripHtmlPreview(overview.workspace.introduction_html);
 
   return (
     <main className="booked-admin-shell booked-page-shell text-slate-950">
       <div className="booked-page-frame booked-page-stack">
         <section className="overflow-hidden rounded-[2rem] border border-black/6 bg-[radial-gradient(circle_at_top_left,rgba(72,123,255,0.14),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.96),rgba(246,249,255,0.98))] p-6 text-[var(--apple-near-black)] shadow-[0_24px_60px_rgba(15,23,42,0.08)] lg:p-8">
-          <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
-            <div className="max-w-3xl">
+          <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
+            <div className="max-w-4xl">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--apple-blue)]">
-                Tenant search workspace
+                Tenant enterprise workspace
               </div>
               <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--apple-near-black)] lg:text-4xl">
                 {overview.tenant.name}
               </h1>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-black/66">
-                Search, shortlist, booking data, and AI-assisted catalog import now live in one
-                operator surface. Public discovery and tenant curation use the same result language,
-                so services stay consistent from search to booking.
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-black/66">
+                A structured enterprise surface for tenant operations: profile content, catalog,
+                bookings, integrations, billing, team control, and plugin readiness all sit behind
+                one role-aware workspace.
               </p>
-            </div>
-
-            <div className="grid gap-3 text-sm text-black/72 sm:grid-cols-2">
-              <div className="rounded-[1.25rem] border border-black/6 bg-white/72 px-4 py-3 backdrop-blur">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42">
-                  Runtime mode
-                </div>
-                <div className="mt-1 font-semibold text-[var(--apple-near-black)]">{overview.shell.current_role}</div>
-                <div className="mt-1 text-xs text-black/54">
-                  {overview.shell.read_only ? 'Preview access' : 'Live access'} • {overview.shell.deployment_mode}
-                </div>
-              </div>
-              <div className="rounded-[1.25rem] border border-black/6 bg-white/72 px-4 py-3 backdrop-blur">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42">
-                  Release
-                </div>
-                <div className="mt-1 font-semibold text-[var(--apple-near-black)]">{releaseLabel}</div>
-                <div className="mt-1 text-xs text-black/54">Source {releaseVersion}</div>
+              <div className="mt-6 flex flex-wrap gap-3 text-xs text-black/62">
+                <span className="rounded-full border border-black/6 bg-white/72 px-3 py-1.5">
+                  Tenant: {overview.tenant.slug}
+                </span>
+                <span className="rounded-full border border-black/6 bg-white/72 px-3 py-1.5">
+                  Status: {overview.tenant.status ?? 'unknown'}
+                </span>
+                <span className="rounded-full border border-black/6 bg-white/72 px-3 py-1.5">
+                  Timezone: {overview.tenant.timezone ?? 'n/a'}
+                </span>
+                <span className="rounded-full border border-black/6 bg-white/72 px-3 py-1.5">
+                  Search-ready: {catalog.counts.search_ready_records}/{catalog.counts.total_records}
+                </span>
               </div>
             </div>
-          </div>
 
-          <div className="mt-6 flex flex-wrap gap-3 text-xs text-black/62">
-            <span className="rounded-full border border-black/6 bg-white/72 px-3 py-1.5">
-              Tenant: {overview.tenant.slug}
-            </span>
-            <span className="rounded-full border border-black/6 bg-white/72 px-3 py-1.5">
-              Status: {overview.tenant.status ?? 'unknown'}
-            </span>
-            <span className="rounded-full border border-black/6 bg-white/72 px-3 py-1.5">
-              Timezone: {overview.tenant.timezone ?? 'n/a'}
-            </span>
-            <span className="rounded-full border border-black/6 bg-white/72 px-3 py-1.5">
-              Search-ready: {catalog.counts.search_ready_records}/{catalog.counts.total_records}
-            </span>
-          </div>
-
-          <div className="mt-6 flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex flex-wrap gap-2">
-              {([
-                { key: 'overview', label: 'Overview' },
-                { key: 'catalog', label: 'Catalog' },
-                { key: 'bookings', label: 'Bookings' },
-                { key: 'integrations', label: 'Integrations' },
-                { key: 'billing', label: 'Billing' },
-                { key: 'team', label: 'Team' },
-              ] as const).map((item) => (
-                <button
-                  key={item.key}
-                  type="button"
-                  onClick={() => setPanel(item.key)}
-                  className={`rounded-full px-4 py-2 text-sm font-semibold transition ${
-                    panel === item.key
-                      ? 'bg-[var(--apple-near-black)] text-white shadow-[0_12px_28px_rgba(15,23,42,0.12)]'
-                      : 'border border-black/6 bg-white/72 text-black/72 hover:bg-white'
-                  }`}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
+            <div className="grid gap-4">
+              <div className="rounded-[1.5rem] border border-black/6 bg-white/78 p-4 backdrop-blur">
+                <div className="flex items-start gap-4">
+                  {overview.workspace.logo_url ? (
+                    <img
+                      src={overview.workspace.logo_url}
+                      alt={`${overview.tenant.name} logo`}
+                      className="h-14 w-14 rounded-[1rem] border border-slate-200 bg-white object-cover"
+                    />
+                  ) : null}
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42">
+                      Active section
+                    </div>
+                    <div className="mt-1 text-lg font-semibold text-[var(--apple-near-black)]">
+                      {activePanelMeta.label}
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-black/62">
+                      {activePanelMeta.description}
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="grid gap-3 text-sm text-black/72 sm:grid-cols-2">
+                <div className="rounded-[1.25rem] border border-black/6 bg-white/72 px-4 py-3 backdrop-blur">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42">
+                    Runtime mode
+                  </div>
+                  <div className="mt-1 font-semibold text-[var(--apple-near-black)]">{overview.shell.current_role}</div>
+                  <div className="mt-1 text-xs text-black/54">
+                    {overview.shell.read_only ? 'Preview access' : 'Live access'} • {overview.shell.deployment_mode}
+                  </div>
+                </div>
+                <div className="rounded-[1.25rem] border border-black/6 bg-white/72 px-4 py-3 backdrop-blur">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42">
+                    Release
+                  </div>
+                  <div className="mt-1 font-semibold text-[var(--apple-near-black)]">{releaseLabel}</div>
+                  <div className="mt-1 text-xs text-black/54">Source {releaseVersion}</div>
+                </div>
+              </div>
               {session ? (
-                <>
-                  <div className="rounded-full border border-emerald-400/30 bg-emerald-400/12 px-3 py-1.5 text-xs font-medium text-emerald-100">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-medium text-emerald-800">
                     Connected as {session.user.full_name || session.user.email}
                   </div>
                   <button
@@ -2234,12 +2789,12 @@ export function TenantApp() {
                   >
                     Sign out
                   </button>
-                </>
+                </div>
               ) : (
                 <button
                   type="button"
-                  onClick={() => setPanel('catalog')}
-                  className="inline-flex items-center gap-2 rounded-full border border-sky-300/35 bg-sky-400/14 px-4 py-2 text-sm font-semibold text-sky-100 transition hover:bg-sky-400/18"
+                  onClick={() => setPanel('overview')}
+                  className="inline-flex w-fit items-center gap-2 rounded-full border border-sky-300 bg-white/80 px-4 py-2 text-sm font-semibold text-sky-800 transition hover:bg-white"
                 >
                   <ShieldIcon className="h-4 w-4" />
                   Open tenant sign-in
@@ -2249,22 +2804,127 @@ export function TenantApp() {
           </div>
         </section>
 
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {metrics.map((item) => (
-            <article
-              key={item.label}
-              className="rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.06)]"
-            >
+        {adminReturnContext ? (
+          <section className="rounded-[1.75rem] border border-sky-200 bg-[linear-gradient(180deg,rgba(240,249,255,0.96),rgba(224,242,254,0.92))] p-5 shadow-[0_16px_40px_rgba(14,116,144,0.10)]">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <div className="inline-flex rounded-full border border-sky-200 bg-white px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                  Admin support return link
+                </div>
+                <div className="mt-3 text-lg font-semibold text-slate-950">
+                  This tenant runtime was opened from an admin support investigation.
+                </div>
+                <p className="mt-2 text-sm leading-6 text-slate-700">
+                  Use these links to jump back to the same admin investigation context without losing the tenant you are currently reviewing.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={adminReturnContext.investigationHref}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-800 transition hover:bg-slate-50"
+                >
+                  Return to tenant investigation
+                </a>
+                {adminReturnContext.scopeHref ? (
+                  <a
+                    href={adminReturnContext.scopeHref}
+                    className="rounded-full border border-sky-300 bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+                  >
+                    Return to {adminReturnContext.scopeLabel}
+                  </a>
+                ) : null}
+              </div>
+            </div>
+          </section>
+        ) : null}
+
+        <section className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
+          <aside className="space-y-4">
+            <article className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                {item.label}
+                Workspace menu
               </div>
-              <div className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">
-                {item.value}
+              <div className="mt-4 space-y-2">
+                {tenantPanels.map((item) => (
+                  <button
+                    key={item.key}
+                    type="button"
+                    onClick={() => setPanel(item.key)}
+                    className={`flex w-full items-start gap-3 rounded-[1.1rem] border px-4 py-3 text-left transition ${
+                      panel === item.key
+                        ? 'border-slate-950 bg-slate-950 text-white shadow-[0_16px_34px_rgba(15,23,42,0.16)]'
+                        : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <span className={`mt-0.5 ${panel === item.key ? 'text-white' : 'text-slate-500'}`}>{item.icon}</span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-semibold">{item.label}</span>
+                      <span className={`mt-1 block text-xs leading-5 ${panel === item.key ? 'text-white/78' : 'text-slate-500'}`}>
+                        {item.description}
+                      </span>
+                    </span>
+                  </button>
+                ))}
               </div>
-              <p className="mt-3 text-sm leading-6 text-slate-600">{item.caption}</p>
             </article>
-          ))}
-        </section>
+
+            <article className="rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">
+                Section guideline
+              </div>
+              <h2 className="mt-2 text-lg font-semibold tracking-tight text-slate-950">
+                {activePanelMeta.label}
+              </h2>
+              <p className="mt-3 text-sm leading-6 text-slate-700">
+                {activePanelGuide}
+              </p>
+            </article>
+
+            {(overview.workspace.hero_image_url || introPreview) ? (
+              <article className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+                {overview.workspace.hero_image_url ? (
+                  <img
+                    src={overview.workspace.hero_image_url}
+                    alt={`${overview.tenant.name} hero`}
+                    className="h-40 w-full object-cover"
+                  />
+                ) : null}
+                <div className="p-5">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Tenant introduction
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">
+                    {introPreview || 'Use Experience Studio to add an enterprise introduction for this tenant.'}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setPanel('experience')}
+                    className="mt-4 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
+                  >
+                    Open Experience Studio
+                  </button>
+                </div>
+              </article>
+            ) : null}
+          </aside>
+
+          <div className="space-y-6">
+            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+              {metrics.map((item) => (
+                <article
+                  key={item.label}
+                  className="rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.06)]"
+                >
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    {item.label}
+                  </div>
+                  <div className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">
+                    {item.value}
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-600">{item.caption}</p>
+                </article>
+              ))}
+            </section>
 
         {panel === 'overview' ? (
           <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
@@ -2485,14 +3145,55 @@ export function TenantApp() {
 
               <TenantOnboardingStatusCard onboarding={onboarding} />
 
-              <TenantBusinessProfileCard
-                profileForm={profileForm}
-                setProfileForm={setProfileForm}
-                profilePending={profilePending}
-                profileError={profileError}
-                profileMessage={profileMessage}
-                onSubmit={handleProfileSave}
-              />
+              <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Experience studio
+                    </div>
+                    <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                      Tenant brand and content
+                    </h2>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setPanel('experience')}
+                    className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-medium text-slate-600"
+                  >
+                    Open studio
+                  </button>
+                </div>
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  Keep identity, imagery, and introduction content current so the tenant workspace
+                  reads like a professional enterprise surface after login.
+                </p>
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Logo
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-950">
+                      {profileForm.logo_url.trim() ? 'Configured' : 'Missing'}
+                    </div>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Hero image
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-950">
+                      {profileForm.hero_image_url.trim() ? 'Configured' : 'Missing'}
+                    </div>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Intro content
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-950">
+                      {profileForm.introduction_html.trim() ? 'HTML ready' : 'Not added'}
+                    </div>
+                  </div>
+                </div>
+              </article>
 
               <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -2517,6 +3218,84 @@ export function TenantApp() {
           </section>
         ) : null}
 
+        {panel === 'experience' ? (
+          <section className="grid gap-6 xl:grid-cols-[0.86fr_1.14fr]">
+            <div className="space-y-6">
+              <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Workspace guidance
+                </div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  Manage the tenant presentation layer
+                </h2>
+                <div className="mt-5 space-y-3 text-sm leading-6 text-slate-600">
+                  <p>
+                    This studio is where tenant operators keep branding, introduction copy, and
+                    section guidance aligned with the real business.
+                  </p>
+                  <p>
+                    Image upload is direct, HTML intro content can be updated without repo access,
+                    and the save action writes the content back into tenant-managed settings.
+                  </p>
+                </div>
+              </article>
+
+              <TenantOnboardingStatusCard
+                onboarding={onboarding}
+                eyebrow="Profile readiness"
+                title="Experience completion"
+                compact
+              />
+
+              <article className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+                {profileForm.hero_image_url.trim() ? (
+                  <img
+                    src={profileForm.hero_image_url}
+                    alt={`${overview.tenant.name} hero`}
+                    className="h-52 w-full object-cover"
+                  />
+                ) : (
+                  <div className="flex h-52 items-center justify-center bg-slate-50 px-6 text-center text-sm text-slate-500">
+                    Add a hero image to give the tenant workspace a stronger enterprise identity.
+                  </div>
+                )}
+                <div className="p-6">
+                  <div className="flex items-center gap-4">
+                    {profileForm.logo_url.trim() ? (
+                      <img
+                        src={profileForm.logo_url}
+                        alt={`${overview.tenant.name} logo`}
+                        className="h-14 w-14 rounded-[1rem] border border-slate-200 object-cover"
+                      />
+                    ) : null}
+                    <div>
+                      <div className="text-lg font-semibold text-slate-950">{overview.tenant.name}</div>
+                      <div className="text-sm text-slate-500">{overview.tenant.industry || 'Industry not set'}</div>
+                    </div>
+                  </div>
+                  <p className="mt-4 text-sm leading-6 text-slate-600">
+                    {introPreview || 'Add HTML introduction content to explain the tenant offering, positioning, and enterprise promise.'}
+                  </p>
+                </div>
+              </article>
+            </div>
+
+            <TenantBusinessProfileCard
+              profileForm={profileForm}
+              setProfileForm={setProfileForm}
+              profilePending={profilePending}
+              profileError={profileError}
+              profileMessage={profileMessage}
+              onSubmit={handleProfileSave}
+              onUploadAsset={handleProfileAssetUpload}
+              uploadingAsset={uploadingProfileAsset}
+              canManageExperience={canManageExperience}
+              currentRoleLabel={roleLabel(roleFirstLoginHint)}
+              activity={overview.workspace.activity}
+            />
+          </section>
+        ) : null}
+
         {panel === 'catalog' ? (
           <section className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
             <div className="space-y-6">
@@ -2534,6 +3313,20 @@ export function TenantApp() {
                       search readiness, then inspect individual service cards using the same visual
                       language as the public discovery experience.
                     </p>
+                  </div>
+                  <div className="flex flex-wrap gap-3">
+                    <button
+                      type="button"
+                      onClick={() => void handleCatalogCreate()}
+                      disabled={catalogCreatePending || !session || !canWriteCatalog}
+                      className={`inline-flex h-11 items-center justify-center rounded-full px-5 text-sm font-semibold transition ${
+                        catalogCreatePending || !session || !canWriteCatalog
+                          ? 'cursor-not-allowed bg-slate-200 text-slate-500'
+                          : 'bg-slate-950 text-white hover:bg-slate-800'
+                      }`}
+                    >
+                      {catalogCreatePending ? 'Creating draft...' : 'New service draft'}
+                    </button>
                   </div>
                 </div>
 
@@ -2611,21 +3404,22 @@ export function TenantApp() {
             </div>
 
             <div className="space-y-6">
-              <TenantAuthWorkspace
+              <TenantAuthWorkspaceEmail
                 tenantName={overview.tenant.name}
                 tenantSlug={overview.tenant.slug}
                 tenantRef={tenantRef}
                 session={session}
                 onboarding={onboarding}
                 authMode={authMode}
-                setAuthMode={setAuthMode}
+                setAuthMode={handleAuthModeChange}
                 authPending={authPending}
                 authError={authError}
                 importMessage={importMessage}
-                passwordUsername={passwordUsername}
-                setPasswordUsername={setPasswordUsername}
-                passwordValue={passwordValue}
-                setPasswordValue={setPasswordValue}
+                emailSignInValue={emailSignInValue}
+                setEmailSignInValue={setEmailSignInValue}
+                emailCodeValue={emailCodeValue}
+                setEmailCodeValue={setEmailCodeValue}
+                emailCodeDelivery={emailCodeDelivery}
                 createAccountForm={createAccountForm}
                 setCreateAccountForm={setCreateAccountForm}
                 claimAccountForm={claimAccountForm}
@@ -2633,17 +3427,39 @@ export function TenantApp() {
                 googleEnabled={Boolean(googleClientId)}
                 googleReady={googleReady}
                 googleButtonSlot={<div ref={googleButtonRef} />}
-              onPromptGoogle={() => window.google?.accounts.id.prompt()}
-              onPasswordSignIn={handlePasswordSignIn}
-              onCreateAccount={handleCreateAccount}
-              onClaimAccount={handleClaimAccount}
-              tenantChoices={tenantChoices}
-              onSelectTenantChoice={handleTenantChoiceSelection}
-              onSignOut={handleSignOut}
-              inviteContext={inviteContext}
-            />
+                onPromptGoogle={handlePromptGoogle}
+                onRequestEmailCode={handleRequestEmailCode}
+                onVerifyEmailCode={handleVerifyEmailCode}
+                tenantChoices={tenantChoices}
+                onSelectTenantChoice={handleTenantChoiceSelection}
+                onSignOut={handleSignOut}
+                inviteContext={inviteContext}
+              />
 
               <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Permission guide
+                  </div>
+                  <div className="mt-2 text-sm font-semibold text-slate-950">
+                    Current role: {roleLabel(tenantMembershipRole)}
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-600">
+                    Catalog creation, import, save, publish, plugin edits, and integrations are reserved for tenant admins and operators. Finance managers keep billing authority without changing catalog or workspace presentation.
+                  </div>
+                </div>
+
+                <article className="mt-6 rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Catalog workflow
+                  </div>
+                  <div className="mt-3 space-y-2 text-sm leading-6 text-slate-600">
+                    <p>Create a draft first when the service does not exist yet.</p>
+                    <p>Save the draft after entering booking-critical fields such as name, summary, price, location, image, and booking URL.</p>
+                    <p>Publish only when warnings are cleared and the service is genuinely ready for public search.</p>
+                  </div>
+                </article>
+
                 <div className="flex items-start gap-3">
                   <div className="rounded-2xl bg-slate-950 p-2 text-white">
                     <SparkIcon className="h-5 w-5" />
@@ -3114,6 +3930,21 @@ export function TenantApp() {
           </section>
         ) : null}
 
+        {panel === 'plugin' ? (
+          <TenantPluginWorkspace
+            plugin={plugin}
+            form={pluginForm}
+            setForm={setPluginForm}
+            sessionReady={!!session?.session_token}
+            pluginPending={pluginPending}
+            pluginMessage={pluginMessage}
+            pluginError={pluginError}
+            copiedSnippetKey={copiedSnippetKey}
+            onCopySnippet={handleCopySnippet}
+            onSubmit={handlePluginSave}
+          />
+        ) : null}
+
         {panel === 'bookings' ? (
           <section className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
             <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
@@ -3208,6 +4039,9 @@ export function TenantApp() {
                     {integrationMessage}
                   </div>
                 ) : null}
+                <div className="mt-4">
+                  <TenantSectionActivityCard label="Integration audit" activity={integrations.activity} />
+                </div>
               </article>
 
               <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
@@ -3349,6 +4183,11 @@ export function TenantApp() {
                           </select>
                         </label>
                       </div>
+                      {!integrations.access?.can_manage_integrations ? (
+                        <div className="mt-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-3 text-sm text-amber-900">
+                          Access denied for editing provider posture in this session. Restricted roles stay read-only here even though monitoring remains available.
+                        </div>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -3398,27 +4237,92 @@ export function TenantApp() {
             billingError={billingError}
             billingMessage={billingMessage}
             subscriptionPendingPlanCode={subscriptionPendingPlanCode}
+            billingPortalPending={billingPortalPending}
             invoiceActionPendingId={invoiceActionPendingId}
             onSaveBillingAccount={handleBillingAccountSave}
             onSelectPlan={handlePlanSelection}
+            onOpenBillingPortal={handleOpenBillingPortal}
             onMarkInvoicePaid={handleMarkInvoicePaid}
             onDownloadReceipt={handleDownloadReceipt}
           />
         ) : null}
 
         {panel === 'team' ? (
-          <TenantTeamWorkspace
-            team={team}
-            inviteForm={inviteMemberForm}
-            setInviteForm={setInviteMemberForm}
-            teamPending={teamPending}
-            teamMessage={teamMessage}
-            teamError={teamError}
-            onInviteMember={handleInviteMember}
-            onResendInvite={handleResendInvite}
-            onUpdateMemberAccess={handleUpdateMemberAccess}
-          />
+          <section className="space-y-6">
+            <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Enterprise access map
+                  </div>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                    Tenant permission matrix
+                  </h2>
+                  <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+                    Each lane below maps the real workspace authority model so tenant operators know who can edit experience content, who owns commercial controls, and where admin-only escalation still applies.
+                  </p>
+                </div>
+                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+                  Signed in as <span className="font-semibold text-slate-950">{roleLabel(team.access.current_role)}</span>
+                </div>
+              </div>
+
+              <div className="mt-6 grid gap-4 xl:grid-cols-2">
+                {permissionMatrix.map((entry) => {
+                  const activeForCurrentRole = entry.roles.includes(team.access.current_role);
+                  return (
+                    <article
+                      key={entry.capability}
+                      className={`rounded-[1.25rem] border px-4 py-4 ${
+                        activeForCurrentRole
+                          ? 'border-emerald-200 bg-emerald-50'
+                          : 'border-slate-200 bg-slate-50'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="text-sm font-semibold text-slate-950">{entry.capability}</div>
+                        <span
+                          className={`rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] ${
+                            activeForCurrentRole
+                              ? 'bg-emerald-600 text-white'
+                              : 'border border-slate-200 bg-white text-slate-600'
+                          }`}
+                        >
+                          {activeForCurrentRole ? 'Current role can manage' : 'Restricted'}
+                        </span>
+                      </div>
+                      <p className="mt-3 text-sm leading-6 text-slate-600">{entry.detail}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {entry.roles.map((role) => (
+                          <span
+                            key={`${entry.capability}-${role}`}
+                            className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600"
+                          >
+                            {roleLabel(role)}
+                          </span>
+                        ))}
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </article>
+
+            <TenantTeamWorkspace
+              team={team}
+              inviteForm={inviteMemberForm}
+              setInviteForm={setInviteMemberForm}
+              teamPending={teamPending}
+              teamMessage={teamMessage}
+              teamError={teamError}
+              onInviteMember={handleInviteMember}
+              onResendInvite={handleResendInvite}
+              onUpdateMemberAccess={handleUpdateMemberAccess}
+            />
+          </section>
         ) : null}
+          </div>
+        </section>
       </div>
     </main>
   );

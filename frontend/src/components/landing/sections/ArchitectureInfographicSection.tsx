@@ -297,6 +297,13 @@ const closingPanelPoints = [
   'Runs on recognizable AI, cloud, data, and workflow infrastructure',
 ];
 
+const investorArchitectureLegend = [
+  { label: 'Demand surfaces', tone: 'bg-sky-100 text-sky-700' },
+  { label: 'Revenue engine', tone: 'bg-indigo-100 text-indigo-700' },
+  { label: 'Business operations', tone: 'bg-emerald-100 text-emerald-700' },
+  { label: 'Workflow + AI + Data', tone: 'bg-amber-100 text-amber-700' },
+];
+
 function RoleCard({
   eyebrow,
   title,
@@ -324,6 +331,157 @@ function RoleCard({
             className="rounded-full border border-black/6 bg-white/88 px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-600"
           >
             {chip}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function InvestorArchitectureImage() {
+  return (
+    <div className="overflow-hidden rounded-[1.8rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4 shadow-[0_18px_44px_rgba(15,23,42,0.05)] sm:p-5">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+            Investor System Snapshot
+          </div>
+          <h3 className="mt-2 font-['Space_Grotesk'] text-[1.85rem] font-semibold tracking-[-0.05em] text-slate-950">
+            One image that shows how the whole platform works together
+          </h3>
+        </div>
+        <div className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-indigo-700">
+          Investor-friendly visual
+        </div>
+      </div>
+
+      <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
+        This image is designed for a quick investor read: customer demand enters through visible
+        surfaces, the BookedAI revenue engine structures and routes it, operator workflows keep it
+        controlled, and AI plus cloud infrastructure keep the entire system reliable underneath.
+      </p>
+
+      <div className="mt-4 rounded-[1.6rem] border border-black/6 bg-[radial-gradient(circle_at_top,rgba(56,189,248,0.10),transparent_24%),linear-gradient(180deg,#fdfefe_0%,#f3f8ff_100%)] p-3 sm:p-4">
+        <svg
+          viewBox="0 0 1240 720"
+          role="img"
+          aria-label="BookedAI architecture overview from demand surfaces through revenue engine, business operations, and cloud infrastructure"
+          className="h-auto w-full"
+        >
+          <defs>
+            <linearGradient id="investor-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ffffff" />
+              <stop offset="100%" stopColor="#eef6ff" />
+            </linearGradient>
+            <linearGradient id="surfaces" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#eff6ff" />
+              <stop offset="100%" stopColor="#ffffff" />
+            </linearGradient>
+            <linearGradient id="engine" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#1e1b4b" />
+              <stop offset="100%" stopColor="#1d4ed8" />
+            </linearGradient>
+            <linearGradient id="ops" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#ecfdf5" />
+              <stop offset="100%" stopColor="#ffffff" />
+            </linearGradient>
+            <linearGradient id="infra" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#fff7ed" />
+              <stop offset="100%" stopColor="#ffffff" />
+            </linearGradient>
+          </defs>
+
+          <rect x="8" y="8" width="1224" height="704" rx="36" fill="url(#investor-bg)" stroke="rgba(15,23,42,0.08)" />
+
+          <g opacity="0.9">
+            <rect x="48" y="58" width="250" height="198" rx="28" fill="url(#surfaces)" stroke="#bfdbfe" />
+            <text x="78" y="100" fill="#0369a1" fontSize="18" fontWeight="700" letterSpacing="2.8">ENTRY SURFACES</text>
+            <text x="78" y="138" fill="#0f172a" fontSize="32" fontWeight="700">Demand capture</text>
+            <text x="78" y="176" fill="#475569" fontSize="20">bookedai.au, product demo, search chat,</text>
+            <text x="78" y="206" fill="#475569" fontSize="20">mobile booking, portal entry</text>
+            <rect x="78" y="224" width="74" height="30" rx="15" fill="#e0f2fe" />
+            <text x="95" y="244" fill="#0369a1" fontSize="14" fontWeight="700">Web</text>
+            <rect x="162" y="224" width="92" height="30" rx="15" fill="#e0f2fe" />
+            <text x="180" y="244" fill="#0369a1" fontSize="14" fontWeight="700">Product</text>
+          </g>
+
+          <g>
+            <rect x="344" y="40" width="552" height="238" rx="34" fill="url(#engine)" />
+            <text x="382" y="86" fill="#bfdbfe" fontSize="18" fontWeight="700" letterSpacing="3">BOOKEDAI REVENUE ENGINE</text>
+            <text x="382" y="128" fill="#ffffff" fontSize="36" fontWeight="700">AI qualification to booking control</text>
+            <text x="382" y="166" fill="rgba(255,255,255,0.78)" fontSize="20">Intent capture, shortlist ranking, booking handoff, follow-up state, and audit-ready events.</text>
+
+            <rect x="382" y="194" width="148" height="54" rx="20" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.16)" />
+            <text x="410" y="227" fill="#ffffff" fontSize="18" fontWeight="700">Intent + fit</text>
+
+            <rect x="548" y="194" width="148" height="54" rx="20" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.16)" />
+            <text x="578" y="227" fill="#ffffff" fontSize="18" fontWeight="700">Match + rank</text>
+
+            <rect x="714" y="194" width="144" height="54" rx="20" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.16)" />
+            <text x="741" y="227" fill="#ffffff" fontSize="18" fontWeight="700">Book + recover</text>
+          </g>
+
+          <g opacity="0.94">
+            <rect x="942" y="58" width="250" height="198" rx="28" fill="url(#ops)" stroke="#a7f3d0" />
+            <text x="972" y="100" fill="#047857" fontSize="18" fontWeight="700" letterSpacing="2.8">ROLE-SAFE OPERATIONS</text>
+            <text x="972" y="138" fill="#0f172a" fontSize="32" fontWeight="700">Business control</text>
+            <text x="972" y="176" fill="#475569" fontSize="20">Tenant workspace, admin, support queue,</text>
+            <text x="972" y="206" fill="#475569" fontSize="20">portal actions, reporting posture</text>
+            <rect x="972" y="224" width="78" height="30" rx="15" fill="#dcfce7" />
+            <text x="989" y="244" fill="#047857" fontSize="14" fontWeight="700">Tenant</text>
+            <rect x="1060" y="224" width="70" height="30" rx="15" fill="#dcfce7" />
+            <text x="1078" y="244" fill="#047857" fontSize="14" fontWeight="700">Admin</text>
+          </g>
+
+          <g>
+            <path d="M298 156H344" stroke="#60a5fa" strokeWidth="8" strokeLinecap="round" />
+            <path d="m328 138 28 18-28 18" fill="none" stroke="#60a5fa" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M896 156H942" stroke="#34d399" strokeWidth="8" strokeLinecap="round" />
+            <path d="m926 138 28 18-28 18" fill="none" stroke="#34d399" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" />
+          </g>
+
+          <g>
+            <rect x="116" y="338" width="1008" height="128" rx="28" fill="#ffffff" stroke="rgba(15,23,42,0.08)" />
+            <text x="156" y="382" fill="#475569" fontSize="18" fontWeight="700" letterSpacing="2.8">WORKFLOW AND COMMUNICATION PLANE</text>
+            <text x="156" y="422" fill="#0f172a" fontSize="28" fontWeight="700">n8n, CRM sync, notifications, reminders, provider and webhook execution</text>
+
+            <rect x="760" y="370" width="94" height="34" rx="17" fill="#fff7ed" />
+            <text x="790" y="392" fill="#c2410c" fontSize="15" fontWeight="700">n8n</text>
+            <rect x="866" y="370" width="110" height="34" rx="17" fill="#fff7ed" />
+            <text x="892" y="392" fill="#c2410c" fontSize="15" fontWeight="700">Zoho CRM</text>
+            <rect x="988" y="370" width="90" height="34" rx="17" fill="#fff7ed" />
+            <text x="1014" y="392" fill="#c2410c" fontSize="15" fontWeight="700">Email</text>
+          </g>
+
+          <g>
+            <rect x="86" y="516" width="1068" height="146" rx="30" fill="url(#infra)" stroke="#fed7aa" />
+            <text x="126" y="560" fill="#c2410c" fontSize="18" fontWeight="700" letterSpacing="2.8">FOUNDATION LAYER</text>
+            <text x="126" y="602" fill="#0f172a" fontSize="34" fontWeight="700">FastAPI API + Supabase data + OpenAI reasoning + GCP hosting</text>
+
+            <rect x="742" y="536" width="88" height="34" rx="17" fill="#ffffff" />
+            <text x="764" y="558" fill="#334155" fontSize="15" fontWeight="700">FastAPI</text>
+            <rect x="842" y="536" width="104" height="34" rx="17" fill="#ffffff" />
+            <text x="865" y="558" fill="#334155" fontSize="15" fontWeight="700">Supabase</text>
+            <rect x="958" y="536" width="82" height="34" rx="17" fill="#ffffff" />
+            <text x="981" y="558" fill="#334155" fontSize="15" fontWeight="700">OpenAI</text>
+            <rect x="1052" y="536" width="64" height="34" rx="17" fill="#ffffff" />
+            <text x="1073" y="558" fill="#334155" fontSize="15" fontWeight="700">GCP</text>
+
+            <path d="M620 278V338" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" />
+            <path d="m604 324 16 16 16-16" fill="none" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+            <path d="M620 466V516" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" />
+            <path d="m604 500 16 16 16-16" fill="none" stroke="#94a3b8" strokeWidth="6" strokeLinecap="round" strokeLinejoin="round" />
+          </g>
+        </svg>
+      </div>
+
+      <div className="mt-4 flex flex-wrap gap-2">
+        {investorArchitectureLegend.map((item) => (
+          <div
+            key={item.label}
+            className={`rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${item.tone}`}
+          >
+            {item.label}
           </div>
         ))}
       </div>
@@ -429,6 +587,10 @@ export function ArchitectureInfographicSection({
               <div className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">
                 Visual summary
               </div>
+            </div>
+
+            <div className="mt-5">
+              <InvestorArchitectureImage />
             </div>
 
             <div className="mt-5 grid gap-3 xl:grid-cols-[0.24fr_0.26fr_0.26fr_0.24fr]">

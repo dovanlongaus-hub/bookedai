@@ -137,6 +137,24 @@ class TenantUserCredential(Base):
     )
 
 
+class TenantEmailLoginCode(Base):
+    __tablename__ = "tenant_email_login_codes"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    tenant_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    tenant_slug: Mapped[str | None] = mapped_column(String(255), index=True)
+    email: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    auth_intent: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    code_hash: Mapped[str] = mapped_column(String(255), nullable=False)
+    code_last4: Mapped[str] = mapped_column(String(4), nullable=False)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 def create_engine(database_url: str) -> AsyncEngine:
     return create_async_engine(database_url, future=True)
 
@@ -147,43 +165,49 @@ def create_session_factory(engine: AsyncEngine) -> async_sessionmaker[AsyncSessi
 
 async def init_database(engine: AsyncEngine) -> None:
     async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.create_all)
-        await connection.execute(
-            text(
-                "ALTER TABLE service_merchant_profiles "
-                "ADD COLUMN IF NOT EXISTS business_email VARCHAR(255)"
+        advisory_lock_id = 2026042201
+        await connection.execute(text("SELECT pg_advisory_lock(:lock_id)"), {"lock_id": advisory_lock_id})
+        try:
+            # Serialize ORM-driven bootstrap so parallel backend startups do not race on sequence creation.
+            await connection.run_sync(Base.metadata.create_all)
+            await connection.execute(
+                text(
+                    "ALTER TABLE service_merchant_profiles "
+                    "ADD COLUMN IF NOT EXISTS business_email VARCHAR(255)"
+                )
             )
-        )
-        await connection.execute(
-            text(
-                "ALTER TABLE service_merchant_profiles "
-                "ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64)"
+            await connection.execute(
+                text(
+                    "ALTER TABLE service_merchant_profiles "
+                    "ADD COLUMN IF NOT EXISTS tenant_id VARCHAR(64)"
+                )
             )
-        )
-        await connection.execute(
-            text(
-                "ALTER TABLE service_merchant_profiles "
-                "ADD COLUMN IF NOT EXISTS owner_email VARCHAR(255)"
+            await connection.execute(
+                text(
+                    "ALTER TABLE service_merchant_profiles "
+                    "ADD COLUMN IF NOT EXISTS owner_email VARCHAR(255)"
+                )
             )
-        )
-        await connection.execute(
-            text(
-                "ALTER TABLE service_merchant_profiles "
-                "ADD COLUMN IF NOT EXISTS publish_state VARCHAR(32) NOT NULL DEFAULT 'draft'"
+            await connection.execute(
+                text(
+                    "ALTER TABLE service_merchant_profiles "
+                    "ADD COLUMN IF NOT EXISTS publish_state VARCHAR(32) NOT NULL DEFAULT 'draft'"
+                )
             )
-        )
-        await connection.execute(
-            text(
-                "ALTER TABLE service_merchant_profiles "
-                "ADD COLUMN IF NOT EXISTS currency_code VARCHAR(8) NOT NULL DEFAULT 'AUD'"
+            await connection.execute(
+                text(
+                    "ALTER TABLE service_merchant_profiles "
+                    "ADD COLUMN IF NOT EXISTS currency_code VARCHAR(8) NOT NULL DEFAULT 'AUD'"
+                )
             )
-        )
-        await connection.execute(
-            text(
-                "ALTER TABLE service_merchant_profiles "
-                "ADD COLUMN IF NOT EXISTS display_price VARCHAR(255)"
+            await connection.execute(
+                text(
+                    "ALTER TABLE service_merchant_profiles "
+                    "ADD COLUMN IF NOT EXISTS display_price VARCHAR(255)"
+                )
             )
-        )
+        finally:
+            await connection.execute(text("SELECT pg_advisory_unlock(:lock_id)"), {"lock_id": advisory_lock_id})
 
 
 @asynccontextmanager

@@ -1,0 +1,52 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg4" x1="160" y1="100" x2="1410" y2="820" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#153056"/>
+      <stop offset="1" stop-color="#07111D"/>
+    </linearGradient>
+    <linearGradient id="accent4" x1="510" y1="450" x2="1090" y2="450" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6EE7FF"/>
+      <stop offset="1" stop-color="#8B5CF6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" rx="36" fill="url(#bg4)"/>
+  <circle cx="280" cy="160" r="120" fill="#6EE7FF" fill-opacity="0.10"/>
+  <circle cx="1340" cy="720" r="170" fill="#8B5CF6" fill-opacity="0.10"/>
+
+  <text x="110" y="120" fill="#6EE7FF" font-size="24" font-family="Arial, sans-serif" letter-spacing="4">SOLUTION</text>
+  <text x="110" y="178" fill="#F5F9FF" font-size="54" font-family="Arial, sans-serif" font-weight="700">BookedAI turns service intent into</text>
+  <text x="110" y="232" fill="#F5F9FF" font-size="54" font-family="Arial, sans-serif" font-weight="700">a managed revenue workflow</text>
+
+  <rect x="130" y="330" width="360" height="320" rx="30" fill="#11233C" stroke="rgba(255,255,255,0.12)"/>
+  <text x="170" y="385" fill="#6EE7FF" font-size="20" font-family="Arial, sans-serif" letter-spacing="3">CUSTOMER-FACING</text>
+  <text x="170" y="445" fill="#F5F9FF" font-size="34" font-family="Arial, sans-serif" font-weight="700">AI assistant</text>
+  <g fill="#ADC0DA" font-size="24" font-family="Arial, sans-serif">
+    <text x="170" y="505">Public web and hosted surfaces</text>
+    <text x="170" y="545">Booking-aware intent handling</text>
+    <text x="170" y="585">Partner and embed paths</text>
+  </g>
+
+  <rect x="560" y="280" width="480" height="420" rx="34" fill="#162A46" stroke="#6EE7FF" stroke-opacity="0.4"/>
+  <text x="610" y="350" fill="#6EE7FF" font-size="20" font-family="Arial, sans-serif" letter-spacing="3">REVENUE OPS CORE</text>
+  <text x="610" y="420" fill="#F5F9FF" font-size="42" font-family="Arial, sans-serif" font-weight="700">Leads, bookings,</text>
+  <text x="610" y="470" fill="#F5F9FF" font-size="42" font-family="Arial, sans-serif" font-weight="700">services, payments, audit</text>
+  <g fill="#ADC0DA" font-size="24" font-family="Arial, sans-serif">
+    <text x="610" y="540">The managed system that keeps context</text>
+    <text x="610" y="575">alive across the revenue journey.</text>
+  </g>
+
+  <rect x="1110" y="330" width="360" height="320" rx="30" fill="#11233C" stroke="rgba(255,255,255,0.12)"/>
+  <text x="1150" y="385" fill="#8B5CF6" font-size="20" font-family="Arial, sans-serif" letter-spacing="3">OPERATOR-FACING</text>
+  <text x="1150" y="445" fill="#F5F9FF" font-size="34" font-family="Arial, sans-serif" font-weight="700">Control plane</text>
+  <g fill="#ADC0DA" font-size="24" font-family="Arial, sans-serif">
+    <text x="1150" y="505">Tenant settings and access</text>
+    <text x="1150" y="545">CRM sync and payment posture</text>
+    <text x="1150" y="585">Audit and recovery workflows</text>
+  </g>
+
+  <path d="M490 490H560" stroke="url(#accent4)" stroke-width="10" stroke-linecap="round"/>
+  <path d="M1040 490H1110" stroke="url(#accent4)" stroke-width="10" stroke-linecap="round"/>
+
+  <rect x="290" y="755" width="1020" height="88" rx="22" fill="#0D1A2D" stroke="rgba(255,255,255,0.1)"/>
+  <text x="340" y="810" fill="#F5F9FF" font-size="28" font-family="Arial, sans-serif" font-weight="700">One system connects customer capture, revenue operations, and operator control.</text>
+</svg>

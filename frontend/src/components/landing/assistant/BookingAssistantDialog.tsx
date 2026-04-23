@@ -6,15 +6,19 @@ import {
   demoContent,
   type BookingAssistantContent,
 } from '../data';
+import { apiV1 } from '../../../shared/api';
 import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../../shared/config/api';
+import { resolveApiErrorMessage } from '../../../shared/api/client';
 import {
   isPublicBookingAssistantV1Enabled,
   isPublicBookingAssistantV1LiveReadEnabled,
 } from '../../../shared/config/publicBookingAssistant';
 import {
+  createPublicBookingAssistantLeadAndBookingIntent,
   createPublicBookingAssistantSessionId,
   getPublicBookingAssistantLiveReadRecommendation,
   primePublicBookingAssistantSession,
+  type PublicBookingAssistantRuntimeConfig,
   shadowPublicBookingAssistantLeadAndBookingIntent,
   shadowPublicBookingAssistantSearch,
 } from './publicBookingAssistantV1';
@@ -84,6 +88,56 @@ type BookingAssistantSessionResponse = {
   confirmation_message: string;
   contact_email: string;
   workflow_status: string | null;
+  crm_sync?: {
+    lead?: {
+      record_id?: number | null;
+      sync_status?: string | null;
+      external_entity_id?: string | null;
+      warning_codes?: string[];
+    } | null;
+    contact?: {
+      record_id?: number | null;
+      sync_status?: string | null;
+      external_entity_id?: string | null;
+      warning_codes?: string[];
+    } | null;
+    deal?: {
+      record_id?: number | null;
+      sync_status?: string | null;
+      external_entity_id?: string | null;
+    } | null;
+    task?: {
+      record_id?: number | null;
+      sync_status?: string | null;
+      external_entity_id?: string | null;
+    } | null;
+    warning_codes?: string[];
+  } | null;
+  automation?: {
+    paymentIntent?: {
+      status: string;
+      paymentIntentId?: string | null;
+      warnings: string[];
+      checkoutUrl?: string | null;
+    } | null;
+    lifecycleEmail?: {
+      status: string;
+      messageId?: string | null;
+      warnings: string[];
+    } | null;
+    sms?: {
+      status: string;
+      messageId?: string | null;
+      provider?: string | null;
+      warnings: string[];
+    } | null;
+    whatsapp?: {
+      status: string;
+      messageId?: string | null;
+      provider?: string | null;
+      warnings: string[];
+    } | null;
+  } | null;
 };
 
 type ChatApiMessage = {
@@ -144,6 +198,7 @@ type BookingAssistantDialogProps = {
   initialQuery?: string | null;
   initialQueryRequestId?: number;
   surfaceVariant?: 'default' | 'homepage_search';
+  runtimeConfig?: PublicBookingAssistantRuntimeConfig | null;
 };
 
 type ProductSheetSnap = 'peek' | 'half' | 'full';
@@ -183,6 +238,34 @@ type ProcessStep = {
   title: string;
   detail: string;
   status: 'pending' | 'in_progress' | 'completed';
+};
+
+type EnterpriseJourneyStatus = 'completed' | 'in_progress' | 'attention' | 'pending';
+
+type EnterpriseJourneyStep = {
+  id: string;
+  title: string;
+  description: string;
+  status: EnterpriseJourneyStatus;
+  channel?: string;
+};
+
+type CommunicationPreviewCard = {
+  id: string;
+  title: string;
+  channel: string;
+  tone: 'dark' | 'light' | 'success';
+  recipient: string;
+  summary: string;
+  body: string;
+};
+
+type OperationTimelineItem = {
+  id: string;
+  title: string;
+  detail: string;
+  status: EnterpriseJourneyStatus;
+  reference?: string | null;
 };
 
 function buildFallbackCatalog(): BookingAssistantCatalogResponse {
@@ -429,6 +512,49 @@ function parsePreferredSlot(preferredSlot: string) {
   return {
     requestedDate: `${year}-${month}-${day}`,
     requestedTime: `${hours}:${minutes}`,
+  };
+}
+
+function buildAuthoritativeBookingIntentResult(params: {
+  authoritativeResult: Awaited<ReturnType<typeof createPublicBookingAssistantLeadAndBookingIntent>>;
+  selectedService: ServiceCatalogItem;
+  requestedDate: string;
+  requestedTime: string;
+  customerEmail: string;
+  trustWarnings: string[];
+  nextStep: string | null;
+}): BookingAssistantSessionResponse {
+  const { authoritativeResult, selectedService, requestedDate, requestedTime, customerEmail, trustWarnings, nextStep } = params;
+  const bookingReference =
+    authoritativeResult.bookingReference?.trim() || authoritativeResult.bookingIntentId;
+  const amountLabel =
+    typeof selectedService.amount_aud === 'number' && Number.isFinite(selectedService.amount_aud)
+      ? `A$${selectedService.amount_aud}`
+      : 'TBC';
+  const detailLine = nextStep?.trim() || trustWarnings[0] || 'We will confirm the final slot with the provider.';
+
+  return {
+    status: 'ok',
+    booking_reference: bookingReference,
+    portal_url: `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(bookingReference)}`,
+    service: selectedService,
+    amount_aud: selectedService.amount_aud,
+    amount_label: amountLabel,
+    requested_date: requestedDate,
+    requested_time: requestedTime,
+    timezone: 'Australia/Sydney',
+    payment_status: 'payment_follow_up_required',
+    payment_url: '',
+    qr_code_url: '',
+    email_status: customerEmail.trim() ? 'sent' : 'pending_manual_followup',
+    meeting_status: 'configuration_required',
+    meeting_join_url: null,
+    meeting_event_url: null,
+    calendar_add_url: null,
+    confirmation_message: `Booking request captured in v1. ${detailLine}`,
+    contact_email: customerEmail.trim() || 'follow-up required',
+    workflow_status: authoritativeResult.trust.recommended_booking_path ?? 'request_callback',
+    crm_sync: authoritativeResult.crmSync ?? null,
   };
 }
 
@@ -796,15 +922,23 @@ function buildReadyToBookConfidence(service: ServiceCatalogItem, userQuery: stri
 }
 
 function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
+  const lifecycleEmailStatus = normalizeAutomationStatus(result.automation?.lifecycleEmail?.status);
+  const smsStatus = normalizeAutomationStatus(result.automation?.sms?.status);
+  const whatsappStatus = normalizeAutomationStatus(result.automation?.whatsapp?.status);
+
   return [
     {
       label: 'Confirmation email',
       value:
-        result.email_status === 'sent'
+        lifecycleEmailStatus === 'sent' || lifecycleEmailStatus === 'delivered'
+          ? 'Sent to customer'
+          : lifecycleEmailStatus === 'queued'
+            ? 'Queued for follow-up'
+            : result.email_status === 'sent'
           ? 'Sent to customer'
           : `Handled by ${result.contact_email}`,
       tone:
-        result.email_status === 'sent'
+        lifecycleEmailStatus === 'sent' || lifecycleEmailStatus === 'delivered' || result.email_status === 'sent'
           ? 'bg-emerald-50 text-emerald-700'
           : 'bg-amber-50 text-amber-800',
     },
@@ -833,6 +967,21 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
         result.meeting_status === 'scheduled' || result.workflow_status
           ? 'bg-emerald-50 text-emerald-700'
           : 'bg-slate-100 text-slate-600',
+    },
+    {
+      label: 'SMS and WhatsApp',
+      value:
+        smsStatus === 'sent' || whatsappStatus === 'sent' || smsStatus === 'delivered' || whatsappStatus === 'delivered'
+          ? 'Messaging sent'
+          : smsStatus === 'queued' || whatsappStatus === 'queued'
+            ? 'Messaging queued'
+            : 'Awaiting phone-based follow-up',
+      tone:
+        smsStatus === 'sent' || whatsappStatus === 'sent' || smsStatus === 'delivered' || whatsappStatus === 'delivered'
+          ? 'bg-emerald-50 text-emerald-700'
+          : smsStatus === 'queued' || whatsappStatus === 'queued'
+            ? 'bg-sky-50 text-sky-700'
+            : 'bg-slate-100 text-slate-600',
     },
   ];
 }
@@ -877,18 +1026,410 @@ function buildBookingJourneySteps(params: {
   ] as const;
 }
 
+function normalizeSyncStatus(value: string | null | undefined) {
+  return (value || '').trim().toLowerCase();
+}
+
+function normalizeAutomationStatus(value: string | null | undefined) {
+  return (value || '').trim().toLowerCase();
+}
+
+function buildV1ActorContext(runtimeConfig?: PublicBookingAssistantRuntimeConfig | null) {
+  return {
+    channel: runtimeConfig?.channel ?? 'public_web',
+    tenant_ref: runtimeConfig?.tenantRef ?? null,
+    deployment_mode: runtimeConfig?.deploymentMode ?? 'standalone_app',
+  };
+}
+
+function derivePaymentOptionForAutomation(params: {
+  paymentAllowedBeforeConfirmation: boolean;
+  bookingPath: string | null;
+}) {
+  if (params.paymentAllowedBeforeConfirmation) {
+    return 'stripe_card' as const;
+  }
+
+  if (params.bookingPath === 'book_on_partner_site') {
+    return 'partner_checkout' as const;
+  }
+
+  return 'invoice_after_confirmation' as const;
+}
+
+function deriveCommunicationLaneStatus(
+  lane:
+    | {
+        status?: string | null;
+        warnings?: string[];
+      }
+    | null
+    | undefined,
+): EnterpriseJourneyStatus {
+  const status = normalizeAutomationStatus(lane?.status);
+  if (!status) {
+    return 'pending';
+  }
+  if (['sent', 'delivered'].includes(status)) {
+    return 'completed';
+  }
+  if (['queued', 'opened', 'unknown'].includes(status)) {
+    return 'in_progress';
+  }
+  if (['failed', 'error'].includes(status) || (lane?.warnings?.length ?? 0) > 0) {
+    return 'attention';
+  }
+  return 'in_progress';
+}
+
+function buildOperationTimeline(result: BookingAssistantSessionResponse): OperationTimelineItem[] {
+  const paymentStatus = normalizeAutomationStatus(result.automation?.paymentIntent?.status);
+  const emailStatus = normalizeAutomationStatus(result.automation?.lifecycleEmail?.status);
+  const smsStatus = normalizeAutomationStatus(result.automation?.sms?.status);
+  const whatsappStatus = normalizeAutomationStatus(result.automation?.whatsapp?.status);
+  const crmStatus = deriveCrmSyncStatus(result);
+
+  return [
+    {
+      id: 'booking-captured',
+      title: 'Booking captured',
+      detail: `Booking reference ${result.booking_reference} was created for ${result.service.name}.`,
+      status: 'completed',
+      reference: result.booking_reference,
+    },
+    {
+      id: 'payment-intent',
+      title: 'Payment intent',
+      detail:
+        paymentStatus === 'pending'
+          ? 'Payment intent is recorded and awaiting downstream checkout orchestration.'
+          : paymentStatus
+            ? `Payment intent returned status ${paymentStatus}.`
+            : 'Payment automation has not returned a payment intent state yet.',
+      status:
+        result.payment_status === 'stripe_checkout_ready'
+          ? 'completed'
+          : result.automation?.paymentIntent
+            ? 'in_progress'
+            : 'pending',
+      reference: result.automation?.paymentIntent?.paymentIntentId ?? null,
+    },
+    {
+      id: 'email-dispatch',
+      title: 'Confirmation email',
+      detail:
+        emailStatus === 'sent' || emailStatus === 'delivered'
+          ? 'Lifecycle confirmation email completed successfully.'
+          : emailStatus === 'queued'
+            ? 'Lifecycle email is queued or recorded for follow-up.'
+            : result.contact_email
+              ? `Email handoff remains tied to ${result.contact_email}.`
+              : 'No email recipient was supplied for this flow.',
+      status: deriveCommunicationLaneStatus(result.automation?.lifecycleEmail),
+      reference: result.automation?.lifecycleEmail?.messageId ?? null,
+    },
+    {
+      id: 'sms-dispatch',
+      title: 'SMS handoff',
+      detail:
+        smsStatus === 'sent' || smsStatus === 'delivered'
+          ? 'SMS confirmation was sent successfully.'
+          : smsStatus === 'queued'
+            ? 'SMS was queued or recorded for operator follow-up.'
+            : 'SMS is optional and only runs when a valid phone number is supplied.',
+      status: deriveCommunicationLaneStatus(result.automation?.sms),
+      reference: result.automation?.sms?.messageId ?? null,
+    },
+    {
+      id: 'whatsapp-dispatch',
+      title: 'WhatsApp handoff',
+      detail:
+        whatsappStatus === 'sent' || whatsappStatus === 'delivered'
+          ? 'WhatsApp confirmation was sent successfully.'
+          : whatsappStatus === 'queued'
+            ? 'WhatsApp was queued or recorded for operator follow-up.'
+            : 'WhatsApp is optional and only runs when a valid phone number is supplied.',
+      status: deriveCommunicationLaneStatus(result.automation?.whatsapp),
+      reference: result.automation?.whatsapp?.messageId ?? null,
+    },
+    {
+      id: 'crm-sync',
+      title: 'CRM linkage',
+      detail:
+        crmStatus === 'completed'
+          ? 'CRM sync completed across lead, contact, deal, and task records.'
+          : crmStatus === 'attention'
+            ? 'CRM sync needs operator review or retry attention.'
+            : 'CRM sync is still in progress or pending reconciliation.',
+      status: crmStatus,
+      reference:
+        result.crm_sync?.deal?.external_entity_id ??
+        result.crm_sync?.contact?.external_entity_id ??
+        result.crm_sync?.lead?.external_entity_id ??
+        null,
+    },
+  ];
+}
+
+function deriveCrmSyncStatus(result: BookingAssistantSessionResponse | null): EnterpriseJourneyStatus {
+  if (!result?.crm_sync) {
+    return 'pending';
+  }
+
+  const statuses = [
+    normalizeSyncStatus(result.crm_sync.lead?.sync_status),
+    normalizeSyncStatus(result.crm_sync.contact?.sync_status),
+    normalizeSyncStatus(result.crm_sync.deal?.sync_status),
+    normalizeSyncStatus(result.crm_sync.task?.sync_status),
+  ].filter(Boolean);
+
+  if (!statuses.length) {
+    return 'pending';
+  }
+  if (statuses.some((status) => ['failed', 'manual_review_required'].includes(status))) {
+    return 'attention';
+  }
+  if (statuses.every((status) => status === 'synced')) {
+    return 'completed';
+  }
+  if (statuses.some((status) => ['retrying', 'pending'].includes(status))) {
+    return 'in_progress';
+  }
+  return 'in_progress';
+}
+
+function getEnterpriseStatusTone(status: EnterpriseJourneyStatus) {
+  switch (status) {
+    case 'completed':
+      return 'border-emerald-200 bg-emerald-50 text-emerald-800';
+    case 'in_progress':
+      return 'border-sky-200 bg-sky-50 text-sky-800';
+    case 'attention':
+      return 'border-amber-200 bg-amber-50 text-amber-800';
+    default:
+      return 'border-slate-200 bg-slate-50 text-slate-600';
+  }
+}
+
+function getEnterpriseStatusLabel(status: EnterpriseJourneyStatus) {
+  switch (status) {
+    case 'completed':
+      return 'Completed';
+    case 'in_progress':
+      return 'In progress';
+    case 'attention':
+      return 'Needs review';
+    default:
+      return 'Pending';
+  }
+}
+
+function buildEnterpriseJourneySteps(params: {
+  result: BookingAssistantSessionResponse | null;
+  selectedService: ServiceCatalogItem | null;
+  customerEmail: string;
+  customerPhone: string;
+}) {
+  const { result, selectedService, customerEmail, customerPhone } = params;
+  const hasPhone = customerPhone.trim().replace(/\D/g, '').length >= 8;
+  const hasEmail = customerEmail.trim().length > 3;
+  const paymentReady = result?.payment_status === 'stripe_checkout_ready';
+  const calendarReady = Boolean(result?.meeting_event_url || result?.calendar_add_url);
+  const crmStatus = deriveCrmSyncStatus(result);
+  const emailLaneStatus = deriveCommunicationLaneStatus(result?.automation?.lifecycleEmail);
+  const smsLaneStatus = deriveCommunicationLaneStatus(result?.automation?.sms);
+  const whatsappLaneStatus = deriveCommunicationLaneStatus(result?.automation?.whatsapp);
+  const paymentIntentStatus = normalizeAutomationStatus(result?.automation?.paymentIntent?.status);
+  const paymentWarnings = result?.automation?.paymentIntent?.warnings ?? [];
+
+  return [
+    {
+      id: 'match',
+      title: 'Search and matching',
+      description: selectedService
+        ? `${selectedService.name} is selected from the matched shortlist.`
+        : 'BookedAI is still turning the request into a ranked shortlist.',
+      status: selectedService ? 'completed' : 'in_progress',
+      channel: 'Search',
+    },
+    {
+      id: 'preview',
+      title: 'Preview and decision',
+      description: selectedService
+        ? 'Price, duration, location, and trust signals are ready before checkout.'
+        : 'Preview opens once a service is selected.',
+      status: selectedService ? 'completed' : 'pending',
+      channel: 'Preview',
+    },
+    {
+      id: 'booking',
+      title: 'Booking capture',
+      description: result
+        ? `Booking reference ${result.booking_reference} is stored and ready for downstream automation.`
+        : 'Contact, preferred slot, and notes will create the booking record.',
+      status: result ? 'completed' : selectedService ? 'in_progress' : 'pending',
+      channel: 'Booking',
+    },
+    {
+      id: 'email',
+      title: 'Email confirmation',
+      description: hasEmail
+        ? emailLaneStatus === 'completed'
+          ? `Confirmation email has been sent for ${customerEmail.trim().toLowerCase()}.`
+          : emailLaneStatus === 'in_progress'
+            ? `Confirmation email is queued for ${customerEmail.trim().toLowerCase()}.`
+            : `Email follow-up requires operator review for ${customerEmail.trim().toLowerCase()}.`
+        : 'Email remains optional until the customer provides an address.',
+      status: !hasEmail ? 'pending' : result ? emailLaneStatus : 'pending',
+      channel: 'Email',
+    },
+    {
+      id: 'calendar',
+      title: 'Calendar handoff',
+      description: calendarReady
+        ? 'Calendar action is ready for the customer and ops team.'
+        : result
+          ? 'Calendar follow-up is still required from ops.'
+          : 'Calendar event will be prepared after the booking request is created.',
+      status: calendarReady ? 'completed' : result ? 'attention' : 'pending',
+      channel: 'Calendar',
+    },
+    {
+      id: 'payment',
+      title: 'Payment readiness',
+      description: paymentReady
+        ? 'Checkout link is ready for immediate payment.'
+        : paymentIntentStatus
+          ? paymentWarnings.length
+            ? `Payment intent is recorded, but provider checkout still needs additive orchestration.`
+            : 'Payment intent is recorded and waiting on the next provider step.'
+        : result
+          ? 'Payment follow-up stays under operator control before confirmation.'
+          : 'Payment step activates after the booking request is accepted.',
+      status: paymentReady ? 'completed' : paymentIntentStatus ? 'in_progress' : result ? 'attention' : 'pending',
+      channel: 'Payment',
+    },
+    {
+      id: 'crm',
+      title: 'CRM sync',
+      description: result?.crm_sync
+        ? 'Lead, contact, deal, and follow-up task sync are tracked from the booking write path.'
+        : 'CRM linkage begins once the booking intent is written.',
+      status: result ? crmStatus : 'pending',
+      channel: 'CRM',
+    },
+    {
+      id: 'messaging',
+      title: 'SMS and WhatsApp follow-up',
+      description: hasPhone
+        ? smsLaneStatus === 'completed' || whatsappLaneStatus === 'completed'
+          ? 'SMS and WhatsApp follow-up have usable outbound status for the same booking reference.'
+          : smsLaneStatus === 'in_progress' || whatsappLaneStatus === 'in_progress'
+            ? 'SMS and WhatsApp are queued or prepared from the provided phone number.'
+            : 'Phone-provided follow-up can continue over SMS or WhatsApp with the same booking reference.'
+        : 'SMS and WhatsApp stay on hold until the customer shares a valid phone number.',
+      status: !hasPhone
+        ? 'pending'
+        : result
+          ? smsLaneStatus === 'attention' || whatsappLaneStatus === 'attention'
+            ? 'attention'
+            : smsLaneStatus === 'completed' || whatsappLaneStatus === 'completed'
+              ? 'completed'
+              : smsLaneStatus === 'in_progress' || whatsappLaneStatus === 'in_progress'
+                ? 'in_progress'
+                : 'pending'
+          : 'in_progress',
+      channel: 'Messaging',
+    },
+    {
+      id: 'thank-you',
+      title: 'Thank-you and aftercare',
+      description: result
+        ? 'Thank-you state, portal access, and next-step guidance are ready immediately.'
+        : 'Thank-you and aftercare content unlock after booking submission.',
+      status: result ? 'completed' : 'pending',
+      channel: 'Aftercare',
+    },
+  ] satisfies EnterpriseJourneyStep[];
+}
+
+function buildCommunicationPreviewCards(params: {
+  result: BookingAssistantSessionResponse;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+}) {
+  const { result, customerName, customerEmail, customerPhone } = params;
+  const displayName = customerName.trim() || 'Customer';
+  const normalizedEmail = customerEmail.trim().toLowerCase();
+  const normalizedPhone = customerPhone.trim();
+  const slotLine = `${result.requested_date} at ${result.requested_time} ${result.timezone}`;
+  const serviceLabel = result.service.name;
+  const paymentLine =
+    result.payment_status === 'stripe_checkout_ready'
+      ? `Payment link: ${result.payment_url}`
+      : 'Payment will be completed after manual confirmation.';
+  const calendarLine =
+    result.meeting_event_url || result.calendar_add_url
+      ? `Calendar link: ${result.meeting_event_url ?? result.calendar_add_url}`
+      : 'Calendar invite will be completed by the operations team.';
+
+  const cards: CommunicationPreviewCard[] = [];
+
+  if (normalizedEmail) {
+    cards.push({
+      id: 'email',
+      title: 'Confirmation email',
+      channel: 'Email',
+      tone: 'dark',
+      recipient: normalizedEmail,
+      summary: 'Enterprise-format confirmation with booking reference, payment, and calendar next step.',
+      body: `Subject: Your ${serviceLabel} booking is in progress\n\nHi ${displayName},\n\nThanks for choosing ${serviceLabel}. Your booking reference is ${result.booking_reference}.\nRequested slot: ${slotLine}.\n${paymentLine}\n${calendarLine}\nPortal: ${getBookingPortalUrl(result)}\n\nBookedAI Revenue Ops`,
+    });
+  }
+
+  if (normalizedPhone) {
+    cards.push({
+      id: 'sms',
+      title: 'SMS follow-up',
+      channel: 'SMS',
+      tone: 'light',
+      recipient: normalizedPhone,
+      summary: 'Short-form operational reminder designed for high open rates.',
+      body: `${displayName}, your ${serviceLabel} booking ref is ${result.booking_reference}. Slot: ${slotLine}. ${paymentReadyCopy(result)} Portal: ${getBookingPortalUrl(result)}`,
+    });
+    cards.push({
+      id: 'whatsapp',
+      title: 'WhatsApp handoff',
+      channel: 'WhatsApp',
+      tone: 'success',
+      recipient: normalizedPhone,
+      summary: 'Richer channel for payment nudges, reschedule help, and concierge follow-up.',
+      body: `Hi ${displayName}, thanks for booking ${serviceLabel} with BookedAI.\nBooking reference: ${result.booking_reference}\nRequested slot: ${slotLine}\n${paymentLine}\nIf you need to reschedule or ask a question, reply here and our team will continue the conversation.`,
+    });
+  }
+
+  return cards;
+}
+
+function paymentReadyCopy(result: BookingAssistantSessionResponse) {
+  return result.payment_status === 'stripe_checkout_ready'
+    ? `Pay here: ${result.payment_url}`
+    : 'Payment follow-up will be sent separately.';
+}
+
 const productWelcomeSignals = [
   {
-    label: 'Best-fit search',
-    value: 'Finds the strongest local match from a natural message.',
+    label: 'V1 search',
+    value: 'Turns a natural message into a ranked shortlist with the current BookedAI flow config.',
   },
   {
-    label: 'Booking cues',
-    value: 'Shows price, duration, and location before the booking step.',
+    label: 'Trust layer',
+    value: 'Shows price, duration, location, and next-step cues before booking details are filled.',
   },
   {
-    label: 'Ready to book',
-    value: 'Moves the chosen result straight into booking and checkout.',
+    label: 'Booking intent',
+    value: 'Moves the selected result into the current write path without losing search context.',
   },
 ];
 
@@ -907,6 +1448,7 @@ export function BookingAssistantDialog({
   initialQuery = null,
   initialQueryRequestId = 0,
   surfaceVariant = 'default',
+  runtimeConfig = null,
 }: BookingAssistantDialogProps) {
   const isProductAppLayout = standalone && layoutMode === 'product_app';
   const isDefaultPopupLayout = !standalone && layoutMode === 'default';
@@ -1005,6 +1547,228 @@ export function BookingAssistantDialog({
   bookingAssistantV1SessionIdRef.current = bookingAssistantV1SessionId;
   const assistantSourcePath = resolveAssistantEntrySourcePath(entrySourcePath);
 
+  function buildAssistantApiUrl(pathname: string) {
+    const url = new URL(`${getApiBaseUrl()}${pathname}`, window.location.origin);
+    if (runtimeConfig?.tenantRef) {
+      url.searchParams.set('tenant_ref', runtimeConfig.tenantRef);
+    }
+    if (runtimeConfig?.widgetId) {
+      url.searchParams.set('widget_id', runtimeConfig.widgetId);
+    }
+    if (runtimeConfig?.deploymentMode) {
+      url.searchParams.set('deployment_mode', runtimeConfig.deploymentMode);
+    }
+    return `${url.pathname}${url.search}`;
+  }
+
+  async function requestLegacyBookingSession(params: {
+    serviceId: string;
+    customerName: string;
+    customerEmail: string | null;
+    customerPhone: string | null;
+    requestedDate: string;
+    requestedTime: string;
+    notes: string | null;
+  }) {
+    const response = await fetch(buildAssistantApiUrl('/booking-assistant/session'), {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        service_id: params.serviceId,
+        customer_name: params.customerName.trim(),
+        customer_email: params.customerEmail,
+        customer_phone: params.customerPhone,
+        requested_date: params.requestedDate,
+        requested_time: params.requestedTime,
+        timezone: 'Australia/Sydney',
+        notes: params.notes,
+      }),
+    });
+
+    const rawResponseText = await response.text();
+    let payload: { detail?: string } | BookingAssistantSessionResponse | null = null;
+    if (rawResponseText) {
+      try {
+        payload = JSON.parse(rawResponseText) as { detail?: string } | BookingAssistantSessionResponse;
+      } catch {
+        payload = null;
+      }
+    }
+
+    if (!response.ok) {
+      throw new Error(
+        (payload as { detail?: string } | null)?.detail || 'Unable to create booking session.',
+      );
+    }
+
+    if (!payload) {
+      throw new Error('Unable to create booking session.');
+    }
+
+    return payload as BookingAssistantSessionResponse;
+  }
+
+  async function runPostBookingAutomation(params: {
+    bookingIntentId: string;
+    bookingReference: string;
+    customerName: string;
+    customerEmail: string | null;
+    customerPhone: string | null;
+    selectedService: ServiceCatalogItem;
+    requestedDate: string;
+    requestedTime: string;
+    notes: string | null;
+    paymentAllowedBeforeConfirmation: boolean;
+    bookingPath: string | null;
+    paymentLink?: string | null;
+    portalUrl?: string | null;
+  }) {
+    const actorContext = buildV1ActorContext(runtimeConfig);
+    const slotLabel = `${params.requestedDate} ${params.requestedTime} Australia/Sydney`;
+    const paymentOption = derivePaymentOptionForAutomation({
+      paymentAllowedBeforeConfirmation: params.paymentAllowedBeforeConfirmation,
+      bookingPath: params.bookingPath,
+    });
+    const communicationVariables = {
+      customer_name: params.customerName.trim(),
+      service_name: params.selectedService.name,
+      slot_label: slotLabel,
+      booking_reference: params.bookingReference,
+      business_name: params.selectedService.venue_name ?? brandName,
+      venue_name: buildServiceLocationLabel(params.selectedService),
+      support_email: 'info@bookedai.au',
+      payment_link: params.paymentLink?.trim() || '',
+      manage_link: params.portalUrl?.trim() || '',
+      timezone: 'Australia/Sydney',
+      additional_note: params.notes?.trim() || '',
+    };
+
+    const automation: NonNullable<BookingAssistantSessionResponse['automation']> = {};
+
+    try {
+      const paymentIntentResponse = await apiV1.createPaymentIntent({
+        booking_intent_id: params.bookingIntentId,
+        selected_payment_option: paymentOption,
+        actor_context: actorContext,
+      });
+
+      if ('data' in paymentIntentResponse) {
+        automation.paymentIntent = {
+          status: paymentIntentResponse.data.payment_status,
+          paymentIntentId: paymentIntentResponse.data.payment_intent_id ?? null,
+          warnings: paymentIntentResponse.data.warnings ?? [],
+          checkoutUrl: paymentIntentResponse.data.checkout_url ?? null,
+        };
+      }
+    } catch (error) {
+      automation.paymentIntent = {
+        status: 'error',
+        paymentIntentId: null,
+        warnings: [error instanceof Error ? error.message : 'Payment intent automation failed.'],
+        checkoutUrl: null,
+      };
+    }
+
+    if (params.customerEmail?.trim()) {
+      try {
+        const emailResponse = await apiV1.sendLifecycleEmail({
+          template_key: 'bookedai_booking_confirmation',
+          to: [params.customerEmail.trim().toLowerCase()],
+          subject: null,
+          variables: communicationVariables,
+          context: {
+            booking_intent_id: params.bookingIntentId,
+            booking_reference: params.bookingReference,
+            source_page: assistantSourcePath,
+          },
+          actor_context: actorContext,
+        });
+
+        if ('data' in emailResponse) {
+          automation.lifecycleEmail = {
+            status: emailResponse.data.delivery_status,
+            messageId: emailResponse.data.message_id ?? null,
+            warnings: emailResponse.data.warnings ?? [],
+          };
+        }
+      } catch (error) {
+        automation.lifecycleEmail = {
+          status: 'error',
+          messageId: null,
+          warnings: [error instanceof Error ? error.message : 'Lifecycle email automation failed.'],
+        };
+      }
+    }
+
+    if (params.customerPhone?.trim()) {
+      const phone = params.customerPhone.trim();
+
+      try {
+        const smsResponse = await apiV1.sendSmsMessage({
+          to: phone,
+          template_key: 'bookedai_booking_confirmation',
+          variables: communicationVariables,
+          context: {
+            booking_intent_id: params.bookingIntentId,
+            booking_reference: params.bookingReference,
+            channel: 'sms',
+          },
+          actor_context: actorContext,
+        });
+
+        if ('data' in smsResponse) {
+          automation.sms = {
+            status: smsResponse.data.delivery_status,
+            messageId: smsResponse.data.message_id ?? null,
+            provider: smsResponse.data.provider ?? null,
+            warnings: smsResponse.data.warnings ?? [],
+          };
+        }
+      } catch (error) {
+        automation.sms = {
+          status: 'error',
+          messageId: null,
+          provider: null,
+          warnings: [error instanceof Error ? error.message : 'SMS automation failed.'],
+        };
+      }
+
+      try {
+        const whatsappResponse = await apiV1.sendWhatsAppMessage({
+          to: phone,
+          template_key: 'bookedai_booking_confirmation',
+          variables: communicationVariables,
+          context: {
+            booking_intent_id: params.bookingIntentId,
+            booking_reference: params.bookingReference,
+            channel: 'whatsapp',
+          },
+          actor_context: actorContext,
+        });
+
+        if ('data' in whatsappResponse) {
+          automation.whatsapp = {
+            status: whatsappResponse.data.delivery_status,
+            messageId: whatsappResponse.data.message_id ?? null,
+            provider: whatsappResponse.data.provider ?? null,
+            warnings: whatsappResponse.data.warnings ?? [],
+          };
+        }
+      } catch (error) {
+        automation.whatsapp = {
+          status: 'error',
+          messageId: null,
+          provider: null,
+          warnings: [error instanceof Error ? error.message : 'WhatsApp automation failed.'],
+        };
+      }
+    }
+
+    return automation;
+  }
+
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -1021,11 +1785,12 @@ export function BookingAssistantDialog({
       }
 
       try {
-        const response = await fetch(`${getApiBaseUrl()}/booking-assistant/catalog`, {
+        const response = await fetch(buildAssistantApiUrl('/booking-assistant/catalog'), {
           signal: controller.signal,
         });
         if (!response.ok) {
-          throw new Error('Unable to load service catalog');
+          const payload = await response.json().catch(() => null);
+          throw new Error(resolveApiErrorMessage(payload, 'Unable to load service catalog'));
         }
 
         const data = (await response.json()) as BookingAssistantCatalogResponse;
@@ -1042,7 +1807,7 @@ export function BookingAssistantDialog({
 
     loadCatalog();
     return () => controller.abort();
-  }, [isOpen]);
+  }, [isOpen, runtimeConfig?.deploymentMode, runtimeConfig?.tenantRef, runtimeConfig?.widgetId]);
 
   async function requestGeoContext() {
     if (userGeoContext || geoPromptState === 'denied') {
@@ -1081,7 +1846,7 @@ export function BookingAssistantDialog({
     nextMessages: ChatMessage[],
     geoContext?: UserGeoContext | null,
   ) {
-    const response = await fetch(`${getApiBaseUrl()}/booking-assistant/chat`, {
+    const response = await fetch(buildAssistantApiUrl('/booking-assistant/chat'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1098,11 +1863,22 @@ export function BookingAssistantDialog({
       }),
     });
 
-    const payload = (await response.json()) as BookingAssistantChatResponse & {
-      detail?: string;
-    };
+    const rawBody = await response.text();
+    let payload: (BookingAssistantChatResponse & { detail?: string }) | string | null = null;
+    if (rawBody.trim()) {
+      try {
+        payload = JSON.parse(rawBody) as BookingAssistantChatResponse & { detail?: string };
+      } catch {
+        payload = rawBody;
+      }
+    }
+
     if (!response.ok) {
-      throw new Error(payload.detail || 'Unable to send message');
+      throw new Error(resolveApiErrorMessage(payload, 'Unable to send message'));
+    }
+
+    if (!payload || typeof payload === 'string') {
+      throw new Error('Unable to send message');
     }
 
     return payload;
@@ -1124,7 +1900,7 @@ export function BookingAssistantDialog({
       user_locality: geoContext?.locality ?? userGeoContext?.locality ?? null,
     });
 
-    const response = await fetch(`${getApiBaseUrl()}/booking-assistant/chat/stream`, {
+    const response = await fetch(buildAssistantApiUrl('/booking-assistant/chat/stream'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
@@ -1233,12 +2009,21 @@ export function BookingAssistantDialog({
     void primePublicBookingAssistantSession({
       anonymousSessionId: bookingAssistantV1SessionId,
       sourcePage: assistantSourcePath,
+      runtimeConfig,
     });
   }, [
     isOpen,
     bookingAssistantV1Enabled,
     bookingAssistantV1LiveReadEnabled,
     assistantSourcePath,
+    runtimeConfig?.channel,
+    runtimeConfig?.campaign,
+    runtimeConfig?.deploymentMode,
+    runtimeConfig?.medium,
+    runtimeConfig?.source,
+    runtimeConfig?.surface,
+    runtimeConfig?.tenantRef,
+    runtimeConfig?.widgetId,
   ]);
 
   useEffect(() => {
@@ -1430,6 +2215,17 @@ export function BookingAssistantDialog({
   const shouldCondenseProductChrome =
     isProductAppLayout &&
     (hasConversationStarted || hasSelectionReadyForBooking || productSheetSnap !== 'peek');
+  const shouldUseAuthoritativeV1Booking = bookingAssistantV1Enabled;
+  const productFlowModeLabel = !bookingAssistantV1Enabled
+    ? 'BookedAI fallback mode'
+    : bookingAssistantV1LiveReadEnabled
+      ? 'BookedAI live booking flow'
+      : 'BookedAI booking flow';
+  const productFlowSupportCopy = !bookingAssistantV1Enabled
+    ? 'Search stays visible here, but booking confirmation still falls back to the legacy session path until the v1 runtime is fully active.'
+    : bookingAssistantV1LiveReadEnabled
+      ? 'This runtime is following the visible BookedAI shortlist, trust, booking, and follow-up flow.'
+      : 'This runtime already writes through the BookedAI v1 booking path while shortlist guidance stays on the safer transition lane.';
   const shouldHideProductSupportCopy =
     isProductAppLayout && (isCompactMobileViewport || hasConversationStarted);
   const shouldUseProductBottomNav = isProductAppLayout && isCompactMobileViewport;
@@ -1533,14 +2329,14 @@ export function BookingAssistantDialog({
   const productBookingSheetPeek = shouldUseProductBottomNav
     ? 0
     : hasSelectionReadyForBooking
-      ? 112
-      : 92;
+      ? 104
+      : 84;
   const compactProductFooterOffset = shouldUseProductBottomNav
     ? hasSelectionReadyForBooking
-      ? 132
-      : 96
-    : productBookingSheetPeek + 44;
-  const productBookingSheetHalf = isCompactMobileViewport ? 236 : 352;
+      ? 124
+      : 92
+    : productBookingSheetPeek + 38;
+  const productBookingSheetHalf = isCompactMobileViewport ? 214 : 328;
   const productSheetVisibleHeight =
     productSheetSnap === 'full'
       ? viewportSize.height || 0
@@ -1572,6 +2368,32 @@ export function BookingAssistantDialog({
         result,
       }),
     [customerEmail, customerName, customerPhone, preferredSlot, result, selectedService],
+  );
+  const enterpriseJourneySteps = useMemo(
+    () =>
+      buildEnterpriseJourneySteps({
+        result,
+        selectedService,
+        customerEmail,
+        customerPhone,
+      }),
+    [customerEmail, customerPhone, result, selectedService],
+  );
+  const communicationPreviewCards = useMemo(
+    () =>
+      result
+        ? buildCommunicationPreviewCards({
+            result,
+            customerName,
+            customerEmail,
+            customerPhone,
+          })
+        : [],
+    [customerEmail, customerName, customerPhone, result],
+  );
+  const operationTimeline = useMemo(
+    () => (result ? buildOperationTimeline(result) : []),
+    [result],
   );
   const currentFlowTab = useMemo<ProductModuleTab>(() => {
     if (result) {
@@ -1715,14 +2537,20 @@ export function BookingAssistantDialog({
       >
         <div className="flex items-start gap-4">
           <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-white shadow-[0_10px_24px_rgba(14,116,144,0.12)]">
-            <div className="h-5 w-5 animate-spin rounded-full border-2 border-sky-200 border-t-sky-600" />
+            <div className="relative flex h-5 w-5 items-center justify-center">
+              <div className="absolute inset-0 animate-spin rounded-full border-2 border-sky-200 border-t-sky-600" />
+              <svg aria-hidden="true" viewBox="0 0 16 16" className="relative h-2.5 w-2.5 fill-none stroke-sky-700">
+                <circle cx="7" cy="7" r="3.1" strokeWidth="1.4" />
+                <path d="m10.1 10.1 2.4 2.4" strokeWidth="1.4" strokeLinecap="round" />
+              </svg>
+            </div>
           </div>
           <div className="min-w-0 flex-1">
             <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
-              Live search in progress
+              Matching services now
             </div>
             <div className="mt-2 text-sm font-semibold text-slate-950">
-              BookedAI is finding the best option for your request.
+              BookedAI is searching for the best matching service for this request.
             </div>
             <div className="mt-2 text-sm leading-6 text-slate-600">
               {pendingSearchQuery
@@ -1865,6 +2693,7 @@ export function BookingAssistantDialog({
               longitude: userGeoContext.longitude,
             }
           : null,
+        runtimeConfig,
       });
       const shadowSearchPromise = bookingAssistantV1Enabled
         ? shadowPublicBookingAssistantSearch({
@@ -1876,9 +2705,10 @@ export function BookingAssistantDialog({
             userLocation: userGeoContext
               ? {
                   latitude: userGeoContext.latitude,
-                  longitude: userGeoContext.longitude,
-                }
-              : null,
+                longitude: userGeoContext.longitude,
+              }
+            : null,
+            runtimeConfig,
           })
         : Promise.resolve({
             candidateIds: [] as string[],
@@ -2158,24 +2988,109 @@ export function BookingAssistantDialog({
     setSubmitError('');
     setResult(null);
 
-    if (bookingAssistantV1Enabled) {
-      void shadowPublicBookingAssistantLeadAndBookingIntent({
-        sourcePage: assistantSourcePath,
-        serviceId: selectedService.id,
-        serviceName: selectedService.name,
-        serviceCategory: selectedService.category,
-        customerName,
-        customerEmail: customerEmail.trim() ? customerEmail.trim().toLowerCase() : null,
-        customerPhone: customerPhone.trim() || null,
-        notes: notes.trim() || null,
-        requestedDate: slot.requestedDate,
-        requestedTime: slot.requestedTime,
-        timezone: 'Australia/Sydney',
-      });
-    }
-
+    const normalizedCustomerEmail = customerEmail.trim() ? customerEmail.trim().toLowerCase() : null;
+    const normalizedCustomerPhone = customerPhone.trim() || null;
+    const normalizedNotes = notes.trim() || null;
     try {
-      const response = await fetch(`${getApiBaseUrl()}/booking-assistant/session`, {
+      if (shouldUseAuthoritativeV1Booking) {
+        const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
+          sourcePage: assistantSourcePath,
+          serviceId: selectedService.id,
+          serviceName: selectedService.name,
+          serviceCategory: selectedService.category,
+          customerName,
+          customerEmail: normalizedCustomerEmail,
+          customerPhone: normalizedCustomerPhone,
+          notes: normalizedNotes,
+          requestedDate: slot.requestedDate,
+          requestedTime: slot.requestedTime,
+          timezone: 'Australia/Sydney',
+          runtimeConfig,
+        });
+
+        const shouldHydrateRichBookingSession =
+          liveReadSummary?.serviceId === selectedService.id &&
+          liveReadSummary.paymentAllowedBeforeConfirmation;
+
+        let bookingResult: BookingAssistantSessionResponse;
+
+        if (shouldHydrateRichBookingSession) {
+          const payload = await requestLegacyBookingSession({
+            serviceId: selectedService.id,
+            customerName,
+            customerEmail: normalizedCustomerEmail,
+            customerPhone: normalizedCustomerPhone,
+            requestedDate: slot.requestedDate,
+            requestedTime: slot.requestedTime,
+            notes: normalizedNotes,
+          });
+          bookingResult = {
+            ...payload,
+            crm_sync: payload.crm_sync ?? authoritativeResult.crmSync ?? null,
+          };
+        } else {
+          bookingResult = buildAuthoritativeBookingIntentResult({
+            authoritativeResult,
+            selectedService,
+            requestedDate: slot.requestedDate,
+            requestedTime: slot.requestedTime,
+            customerEmail: normalizedCustomerEmail ?? '',
+            trustWarnings: authoritativeResult.warnings,
+            nextStep: liveReadSummary?.serviceId === selectedService.id ? liveReadSummary.nextStep : null,
+          });
+        }
+
+        const automation = await runPostBookingAutomation({
+          bookingIntentId: authoritativeResult.bookingIntentId,
+          bookingReference: bookingResult.booking_reference,
+          customerName,
+          customerEmail: normalizedCustomerEmail,
+          customerPhone: normalizedCustomerPhone,
+          selectedService,
+          requestedDate: slot.requestedDate,
+          requestedTime: slot.requestedTime,
+          notes: normalizedNotes,
+          paymentAllowedBeforeConfirmation:
+            shouldHydrateRichBookingSession ||
+            Boolean(
+              (liveReadSummary?.serviceId === selectedService.id &&
+                liveReadSummary.paymentAllowedBeforeConfirmation) ||
+                authoritativeResult.trust.payment_allowed_now,
+            ),
+          bookingPath:
+            liveReadSummary?.serviceId === selectedService.id
+              ? liveReadSummary.pathType
+              : authoritativeResult.trust.recommended_booking_path ?? bookingResult.workflow_status,
+          paymentLink: bookingResult.payment_url,
+          portalUrl: getBookingPortalUrl(bookingResult),
+        });
+
+        setResult({
+          ...bookingResult,
+          automation,
+        });
+        setProductModuleTab('confirmed');
+        return;
+      }
+
+      if (bookingAssistantV1Enabled) {
+        void shadowPublicBookingAssistantLeadAndBookingIntent({
+          sourcePage: assistantSourcePath,
+          serviceId: selectedService.id,
+          serviceName: selectedService.name,
+          serviceCategory: selectedService.category,
+          customerName,
+          customerEmail: normalizedCustomerEmail,
+          customerPhone: normalizedCustomerPhone,
+          notes: normalizedNotes,
+          requestedDate: slot.requestedDate,
+          requestedTime: slot.requestedTime,
+          timezone: 'Australia/Sydney',
+          runtimeConfig,
+        });
+      }
+
+      const response = await fetch(buildAssistantApiUrl('/booking-assistant/session'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -2183,18 +3098,35 @@ export function BookingAssistantDialog({
         body: JSON.stringify({
           service_id: selectedService.id,
           customer_name: customerName.trim(),
-          customer_email: customerEmail.trim() ? customerEmail.trim().toLowerCase() : null,
-          customer_phone: customerPhone.trim() || null,
+          customer_email: normalizedCustomerEmail,
+          customer_phone: normalizedCustomerPhone,
           requested_date: slot.requestedDate,
           requested_time: slot.requestedTime,
           timezone: 'Australia/Sydney',
-          notes: notes.trim() || null,
+          notes: normalizedNotes,
         }),
       });
 
-      const payload = await response.json();
+      const rawResponseText = await response.text();
+      let payload: { detail?: string } | BookingAssistantSessionResponse | null = null;
+      if (rawResponseText) {
+        try {
+          payload = JSON.parse(rawResponseText) as { detail?: string } | BookingAssistantSessionResponse;
+        } catch {
+          payload = null;
+        }
+      }
       if (!response.ok) {
-        throw new Error(payload.detail || 'Unable to create booking request');
+        throw new Error(
+          resolveApiErrorMessage(
+            payload ?? rawResponseText,
+            'Unable to create booking request',
+          ),
+        );
+      }
+
+      if (!payload) {
+        throw new Error('Booking request returned an empty response');
       }
 
       setResult(payload as BookingAssistantSessionResponse);
@@ -2309,7 +3241,7 @@ export function BookingAssistantDialog({
           <div
                 className={
                   isProductAppLayout
-                    ? 'relative mx-auto flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden border-0 border-slate-900/10 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] shadow-none sm:max-w-[34rem] sm:border sm:border-white/40 sm:rounded-[2.3rem] sm:shadow-[0_35px_120px_rgba(15,23,42,0.22)] sm:ring-1 sm:ring-black/5 lg:max-w-[38rem]'
+                    ? 'relative mx-auto flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden border-0 border-slate-900/10 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] shadow-none sm:max-w-[31rem] sm:border sm:border-white/40 sm:rounded-[2rem] sm:shadow-[0_35px_120px_rgba(15,23,42,0.18)] sm:ring-1 sm:ring-black/5 lg:max-w-[34rem]'
                     : 'relative flex min-h-0 flex-1 flex-col'
                 }
           >
@@ -2370,7 +3302,7 @@ export function BookingAssistantDialog({
                         </div>
                         <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                          <span>{catalogError ? 'Assistant offline' : 'Search to booking'}</span>
+                          <span>{catalogError ? 'Assistant offline' : productFlowModeLabel}</span>
                         </div>
                       </div>
                     </div>
@@ -2760,7 +3692,7 @@ export function BookingAssistantDialog({
                         <div className="mt-1 text-[11px] leading-5 text-slate-500">
                           {hasSelectionReadyForBooking
                             ? 'The selected result stays attached to the booking sheet while the chat remains visible behind it.'
-                            : 'Search chat, shortlist, and booking stay connected in one compact mobile flow.'}
+                            : productFlowSupportCopy}
                         </div>
                       ) : null}
                     </div>
@@ -2807,25 +3739,25 @@ export function BookingAssistantDialog({
                 {showProductWelcomeState ? (
                   <div className={isCompactMobileViewport ? 'space-y-2.5' : 'space-y-3'}>
                     {isCompactMobileViewport ? (
-                      <div className="rounded-[1.1rem] border border-slate-200 bg-white/94 px-3 py-2.5 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+                      <div className="rounded-[1rem] border border-slate-200 bg-white/94 px-3 py-2 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
                             <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                              Search bar
+                              {productFlowModeLabel}
                             </div>
                             <div className="mt-1 text-[12px] font-semibold leading-4 text-slate-950">
-                              Ask naturally. BookedAI keeps the best match ready below.
+                              Ask naturally. The mobile shell keeps search and booking in one v1 flow.
                             </div>
                           </div>
                           <div className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                            Live
+                            V1
                           </div>
                         </div>
                       </div>
                     ) : (
                       <div className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(155deg,#0f172a_0%,#111827_38%,#1d4ed8_100%)] p-4 text-white shadow-[0_18px_52px_rgba(15,23,42,0.18)]">
                         <div className="inline-flex items-center rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-100">
-                          Native search flow
+                          {productFlowModeLabel}
                         </div>
                         <div className="mt-3 text-[1.1rem] font-semibold leading-7 tracking-tight">
                           One message in. Best result out. Booking next.
@@ -2876,12 +3808,12 @@ export function BookingAssistantDialog({
                       }`}>
                         {popupShortcutTopics.map((topic) => (
                           <button
-                            key={`welcome-${topic.label}`}
-                            type="button"
-                            onClick={() => void sendChatMessage(topic.prompt)}
-                            className={`rounded-[1.1rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] text-left transition hover:border-slate-300 hover:shadow-[0_10px_26px_rgba(15,23,42,0.08)] ${
-                              isCompactMobileViewport
-                                ? 'w-[82vw] max-w-[17rem] min-w-[13rem] shrink-0 px-3 py-2.5'
+                              key={`welcome-${topic.label}`}
+                              type="button"
+                              onClick={() => void sendChatMessage(topic.prompt)}
+                              className={`rounded-[1.1rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] text-left transition hover:border-slate-300 hover:shadow-[0_10px_26px_rgba(15,23,42,0.08)] ${
+                                isCompactMobileViewport
+                                ? 'w-[80vw] max-w-[16rem] min-w-[12.5rem] shrink-0 px-3 py-2.5'
                                 : 'px-3 py-3'
                             }`}
                           >
@@ -3114,7 +4046,7 @@ export function BookingAssistantDialog({
                 {chatLoading && !isSearchResolving ? (
                   <div className="flex justify-start">
                     <div className="rounded-[1.5rem] rounded-bl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-                      {brandName} is thinking...
+                      {brandName} is matching the best service...
                     </div>
                   </div>
                 ) : null}
@@ -3143,7 +4075,7 @@ export function BookingAssistantDialog({
                           : 'bg-slate-100 text-slate-600'
                     }`}>
                       <span className={`h-1.5 w-1.5 rounded-full ${chatLoading ? 'animate-pulse bg-current' : 'bg-current/80'}`} />
-                      {chatLoading ? 'Searching' : hasConversationStarted ? 'Ready' : 'Receive'}
+                      {chatLoading ? 'Matching services' : hasConversationStarted ? 'Ready' : 'Receive'}
                     </div>
                     <button
                       type="button"
@@ -3340,11 +4272,11 @@ export function BookingAssistantDialog({
               ref={bookingScrollRef}
                 className={`min-h-0 overflow-y-auto overscroll-contain bg-[#f8fafc] px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-6 sm:py-5 ${
                 isProductAppLayout
-                  ? `absolute inset-x-0 bottom-0 z-20 flex max-h-[82%] w-full max-w-full flex-col overflow-hidden rounded-t-[1.5rem] border border-slate-200 bg-[#f8fafc] shadow-[0_-24px_60px_rgba(15,23,42,0.18)] ${
+                  ? `absolute inset-x-0 bottom-0 z-20 flex max-h-[82%] w-full max-w-full flex-col overflow-hidden rounded-t-[1.35rem] border border-slate-200 bg-[#f8fafc] shadow-[0_-24px_60px_rgba(15,23,42,0.16)] ${
                       productSheetDragOffset !== 0 ? '' : 'transition-transform duration-300 ease-out'
-                    } ${isCompactMobileViewport ? 'max-h-[76%] px-2 py-2' : ''} ${
+                    } ${isCompactMobileViewport ? 'max-h-[72%] px-2 py-1.5' : ''} ${
                       shouldUseProductBottomNav ? 'pb-[calc(env(safe-area-inset-bottom)+4.5rem)]' : ''
-                    } sm:left-3 sm:right-3 sm:mx-auto sm:max-h-[88%] sm:max-w-[calc(100%_-_1.5rem)] sm:rounded-t-[2rem] ${
+                    } sm:left-3 sm:right-3 sm:mx-auto sm:max-h-[88%] sm:max-w-[calc(100%_-_1.5rem)] sm:rounded-t-[1.85rem] ${
                       isCompactMobileViewport ? '' : ''
                     }`
                   : isDefaultPopupLayout
@@ -3869,7 +4801,11 @@ export function BookingAssistantDialog({
               <form
                 key={`booking-form-${selectedServiceId || selectedEvent?.url || 'empty'}-${selectionAnimationKey}`}
                 ref={bookingDetailsSectionRef}
-                className="booking-reveal mt-5 space-y-4 rounded-[1.75rem] border border-slate-200 bg-white p-5"
+                className={`booking-reveal mt-4 border border-slate-200 bg-white ${
+                  isCompactMobileViewport
+                    ? 'space-y-3 rounded-[1.35rem] p-3.5'
+                    : 'space-y-4 rounded-[1.6rem] p-4.5 sm:p-5'
+                }`}
                 onSubmit={handleSubmit}
               >
                 {isDefaultPopupMobileViewport ? (
@@ -3940,7 +4876,9 @@ export function BookingAssistantDialog({
                     </div>
                   )}
                   {selectedService && isProductAppLayout ? (
-                    <div className="mt-3 rounded-[1.35rem] border border-slate-200 bg-[#fbfbfd] p-4">
+                    <div className={`mt-3 rounded-[1.25rem] border border-slate-200 bg-[#fbfbfd] ${
+                      isCompactMobileViewport ? 'p-3' : 'p-4'
+                    }`}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
@@ -3996,7 +4934,7 @@ export function BookingAssistantDialog({
                   ) : null}
                   {selectedService && liveReadSummary?.serviceId === selectedService.id ? (
                     <div className="mt-3 rounded-[1.25rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-                      <div className="font-semibold">Prompt 5 live-read guidance</div>
+                      <div className="font-semibold">BookedAI v1 guidance</div>
                       <div className="mt-1 text-xs text-sky-800">
                         Availability: {liveReadSummary.availabilityState} • Confidence:{' '}
                         {liveReadSummary.bookingConfidence}
@@ -4037,6 +4975,46 @@ export function BookingAssistantDialog({
                       ) : null}
                     </div>
                   ) : null}
+                  <div className="mt-3 rounded-[1.25rem] border border-slate-200 bg-[#fbfbfd] px-4 py-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Enterprise journey
+                        </div>
+                        <div className="mt-1 text-sm font-semibold text-slate-950">
+                          Search to booking, payment, CRM, and follow-up
+                        </div>
+                      </div>
+                      <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600 ring-1 ring-slate-200">
+                        Ops-ready
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2">
+                      {enterpriseJourneySteps.slice(0, 6).map((step) => (
+                        <div
+                          key={`pre-submit-${step.id}`}
+                          className="flex items-start justify-between gap-3 rounded-[1rem] bg-white px-3 py-3 ring-1 ring-slate-200"
+                        >
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <div className="text-[11px] font-semibold text-slate-950">{step.title}</div>
+                              {step.channel ? (
+                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                  {step.channel}
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-1 text-[11px] leading-5 text-slate-600">{step.description}</div>
+                          </div>
+                          <div
+                            className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getEnterpriseStatusTone(step.status)}`}
+                          >
+                            {getEnterpriseStatusLabel(step.status)}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
                   {selectedEvent ? (
                     <div className="mt-3 rounded-[1.25rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -4066,7 +5044,9 @@ export function BookingAssistantDialog({
                 </div>
 
                 {isProductAppLayout ? (
-                  <div className="rounded-[1.25rem] border border-slate-200 bg-[#fbfbfd] p-4">
+                  <div className={`rounded-[1.25rem] border border-slate-200 bg-[#fbfbfd] ${
+                    isCompactMobileViewport ? 'p-3' : 'p-4'
+                  }`}>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Booking journey
                     </div>
@@ -4128,7 +5108,7 @@ export function BookingAssistantDialog({
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
                   />
                   <span className="mt-2 block text-xs text-slate-500">
-                    Enter either email or phone. You do not need both.
+                    Enter either email or phone. If a phone number is provided, BookedAI can prepare SMS and WhatsApp follow-up.
                   </span>
                 </label>
 
@@ -4387,6 +5367,174 @@ export function BookingAssistantDialog({
                         </div>
                       </div>
                     ))}
+                  </div>
+
+                  <div className="mt-5 rounded-[1.4rem] border border-slate-200 bg-[#fbfbfd] p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Enterprise workflow lane
+                        </div>
+                        <div className="mt-1 text-sm font-semibold text-slate-950">
+                          Operational status from capture to follow-up
+                        </div>
+                      </div>
+                      <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600 ring-1 ring-slate-200">
+                        Live state
+                      </div>
+                    </div>
+                    <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                      {enterpriseJourneySteps.map((step) => (
+                        <div
+                          key={`confirmed-${step.id}`}
+                          className="rounded-[1rem] bg-white px-3 py-3 ring-1 ring-slate-200"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <div className="text-[11px] font-semibold text-slate-950">{step.title}</div>
+                                {step.channel ? (
+                                  <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                    {step.channel}
+                                  </span>
+                                ) : null}
+                              </div>
+                              <div className="mt-1 text-[11px] leading-5 text-slate-600">{step.description}</div>
+                            </div>
+                            <div
+                              className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getEnterpriseStatusTone(step.status)}`}
+                            >
+                              {getEnterpriseStatusLabel(step.status)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    {(result.automation?.paymentIntent?.warnings?.length ||
+                      result.automation?.lifecycleEmail?.warnings?.length ||
+                      result.automation?.sms?.warnings?.length ||
+                      result.automation?.whatsapp?.warnings?.length) ? (
+                      <div className="mt-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-3">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700">
+                          Operator attention
+                        </div>
+                        <div className="mt-2 space-y-1 text-[11px] leading-5 text-amber-900">
+                          {[
+                            ...(result.automation?.paymentIntent?.warnings ?? []),
+                            ...(result.automation?.lifecycleEmail?.warnings ?? []),
+                            ...(result.automation?.sms?.warnings ?? []),
+                            ...(result.automation?.whatsapp?.warnings ?? []),
+                          ].map((warning, index) => (
+                            <div key={`automation-warning-${index}`}>{warning}</div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
+                  </div>
+
+                  <div className="mt-5 rounded-[1.4rem] border border-slate-200 bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Communication design
+                        </div>
+                        <div className="mt-1 text-sm font-semibold text-slate-950">
+                          Customer-facing email, SMS, and WhatsApp drafts
+                        </div>
+                      </div>
+                      <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                        Ready to reuse
+                      </div>
+                    </div>
+                    {communicationPreviewCards.length ? (
+                      <div className="mt-3 grid grid-cols-1 gap-3">
+                        {communicationPreviewCards.map((card) => (
+                          <div
+                            key={card.id}
+                            className={`overflow-hidden rounded-[1.15rem] border ${
+                              card.tone === 'dark'
+                                ? 'border-slate-900 bg-slate-950 text-white'
+                                : card.tone === 'success'
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-950'
+                                  : 'border-slate-200 bg-[#fbfbfd] text-slate-900'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between gap-3 border-b border-black/5 px-3 py-2.5">
+                              <div>
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                                  {card.channel}
+                                </div>
+                                <div className="mt-0.5 text-[12px] font-semibold">{card.title}</div>
+                              </div>
+                              <div className="max-w-[11rem] truncate rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
+                                {card.recipient}
+                              </div>
+                            </div>
+                            <div className="px-3 py-3">
+                              <div className={`text-[11px] leading-5 ${
+                                card.tone === 'dark' ? 'text-white/75' : 'text-slate-600'
+                              }`}>
+                                {card.summary}
+                              </div>
+                              <pre className={`mt-3 whitespace-pre-wrap break-words rounded-[0.95rem] px-3 py-3 text-[11px] leading-5 ${
+                                card.tone === 'dark'
+                                  ? 'bg-white/10 text-white'
+                                  : card.tone === 'success'
+                                    ? 'bg-white/70 text-emerald-950'
+                                    : 'bg-white text-slate-800 ring-1 ring-slate-200'
+                              }`}>
+                                {card.body}
+                              </pre>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="mt-3 rounded-[1rem] border border-dashed border-slate-200 bg-[#fbfbfd] px-4 py-4 text-[12px] leading-6 text-slate-600">
+                        Add an email address or phone number to generate customer-facing confirmation drafts for email, SMS, and WhatsApp.
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="mt-5 rounded-[1.4rem] border border-slate-200 bg-white p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          Delivery timeline
+                        </div>
+                        <div className="mt-1 text-sm font-semibold text-slate-950">
+                          Traceable operations after booking capture
+                        </div>
+                      </div>
+                      <div className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                        Ops trace
+                      </div>
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {operationTimeline.map((item) => (
+                        <div
+                          key={item.id}
+                          className="rounded-[1rem] bg-[#fbfbfd] px-3 py-3 ring-1 ring-slate-200"
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <div className="text-[11px] font-semibold text-slate-950">{item.title}</div>
+                              <div className="mt-1 text-[11px] leading-5 text-slate-600">{item.detail}</div>
+                              {item.reference ? (
+                                <div className="mt-2 inline-flex max-w-full rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                                  Ref: {item.reference}
+                                </div>
+                              ) : null}
+                            </div>
+                            <div
+                              className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getEnterpriseStatusTone(item.status)}`}
+                            >
+                              {getEnterpriseStatusLabel(item.status)}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
                   </div>
 
                   <div className="mt-5 flex items-center gap-2 overflow-x-auto pb-1">

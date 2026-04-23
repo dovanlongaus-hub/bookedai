@@ -1,4 +1,5 @@
 export type EmailTemplateKey =
+  | 'bookedai_booking_confirmation'
   | 'lead_follow_up'
   | 'booking_confirmation'
   | 'invoice'
@@ -23,4 +24,3 @@ export interface MonthlyReportSummary {
   totalRevenueAud?: number | null;
   periodLabel?: string | null;
 }
-

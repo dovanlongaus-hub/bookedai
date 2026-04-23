@@ -62,6 +62,11 @@ export function PartnerMatchActionFooter({
             >
               {model.detail}
             </div>
+            {model.contactPhone ? (
+              <div className="mt-1 text-[11px] text-slate-500">
+                Call: {model.contactPhone}
+              </div>
+            ) : null}
           </div>
           <div
             className={`rounded-full px-3 py-2 text-[11px] font-semibold ${

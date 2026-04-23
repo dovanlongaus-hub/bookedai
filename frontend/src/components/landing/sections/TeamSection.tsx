@@ -16,6 +16,17 @@ export function TeamSection({
   onStartTrial,
   onBookDemo,
 }: TeamSectionProps) {
+  const leadershipSignals = [
+    'Founder-led product and commercial direction',
+    'Deep backend, AI, and systems implementation capability',
+    'Operational grounding in service quality and rollout reality',
+  ];
+  const credibilityCards = [
+    ['Founder-led', 'Commercial direction stays close to the product and the rollout story.'],
+    ['Technical depth', 'Backend, AI, systems, and workflow execution are grounded in real implementation.'],
+    ['Operational lens', 'The team understands service quality, support, adoption friction, and rollout reality.'],
+  ];
+
   return (
     <section id="team-members" className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-8 lg:py-16">
       <div className="grid gap-6 xl:grid-cols-[0.76fr_1.24fr] xl:items-start">
@@ -42,14 +53,10 @@ export function TeamSection({
 
           <div className="booked-note-surface mt-7 p-5">
             <div className="template-kicker text-[11px]">
-              Team shape
+              Leadership signal
             </div>
             <div className="mt-3 grid gap-3">
-              {[
-                'Technical depth across backend, systems, and AI implementation.',
-                'Operational perspective grounded in real service and quality workflows.',
-                'Founder-led commercial and product drive to turn prototypes into rollouts.',
-              ].map((item) => (
+              {leadershipSignals.map((item) => (
                 <div
                   key={item}
                   className="rounded-[1.15rem] bg-white px-4 py-3 text-sm leading-6 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
@@ -61,11 +68,7 @@ export function TeamSection({
           </div>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            {[
-              ['Founder-led', 'Commercial direction stays close to the product.'],
-              ['Technical depth', 'Backend, AI, systems, and workflow execution are grounded in real implementation.'],
-              ['Operational lens', 'The team understands service quality, support, and rollout reality.'],
-            ].map(([title, body]) => (
+            {credibilityCards.map(([title, body]) => (
               <SectionCard key={title} tone="subtle" className="rounded-[1.2rem] px-4 py-4">
                 <div className="text-sm font-semibold text-slate-950">{title}</div>
                 <div className="mt-2 text-sm leading-6 text-slate-600">{body}</div>
@@ -97,7 +100,7 @@ export function TeamSection({
                       {member.role}
                     </div>
                     <SignalPill variant="brand" className="bg-white px-3 py-1 text-[9px] text-slate-600">
-                      Core team
+                      Leadership team
                     </SignalPill>
                   </div>
                   <h3 className="mt-3 text-lg font-semibold text-slate-950 lg:text-xl">{member.name}</h3>

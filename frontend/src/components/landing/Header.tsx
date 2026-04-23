@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { roadmapHref, videoDemoHref, type NavItem } from './data';
 import { BrandLockup } from './ui/BrandLockup';
+import { LogoMark } from './ui/LogoMark';
 import { SignalPill } from './ui/SignalPill';
 
 type HeaderProps = {
@@ -162,6 +163,22 @@ export function Header({
   compactMenuOnly = false,
 }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const resolvedNavItems = navItems.map(getNavItemModel);
+  const resolvedUtilityLinks =
+    utilityLinks ?? [
+        { label: 'Roadmap', href: roadmapHref },
+        { label: 'Watch Demo', href: videoDemoHref },
+      ];
+  const workspaceAccessLinks = resolvedUtilityLinks.filter((link) =>
+    link.label.toLowerCase().includes('login'),
+  );
+  const exploreLinks = resolvedUtilityLinks.filter(
+    (link) => !link.label.toLowerCase().includes('login'),
+  );
+  const railLabelClass =
+    'min-w-0 overflow-hidden text-left transition-all duration-300 max-w-0 -translate-x-2 opacity-0 group-hover:max-w-[11.5rem] group-hover:translate-x-0 group-hover:opacity-100 group-focus-within:max-w-[11.5rem] group-focus-within:translate-x-0 group-focus-within:opacity-100';
+  const railRowClass =
+    'flex w-full items-center justify-center gap-3 rounded-[1.2rem] border border-transparent px-3 py-3 text-sm font-semibold text-slate-700 transition-all duration-200 hover:border-slate-200 hover:bg-white/96 hover:text-slate-950 group-hover:justify-start group-focus-within:justify-start';
 
   function closeMobileMenu() {
     setIsMobileMenuOpen(false);
@@ -236,9 +253,151 @@ export function Header({
   return (
     <header className={compactMenuOnly ? 'relative z-30 px-4 pt-4 sm:px-6' : 'sticky top-0 z-30 px-3 pt-3 sm:px-4'}>
       {compactMenuOnly ? (
-        <div className="mx-auto flex w-full max-w-7xl justify-end">
-          {menuToggleButton}
-        </div>
+        <>
+          <aside className="group fixed left-4 top-4 bottom-4 z-40 hidden w-[5.5rem] flex-col overflow-hidden rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,253,0.96)_100%)] p-3 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur xl:flex hover:w-[16rem] focus-within:w-[16rem]">
+            <div className="px-1">
+              <div className="flex items-center justify-center rounded-full bg-slate-100/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 group-hover:justify-start group-focus-within:justify-start">
+                <span className={railLabelClass}>Navigate</span>
+              </div>
+            </div>
+
+            <nav className="mt-4 flex flex-1 flex-col gap-1.5" aria-label="Homepage primary">
+              {resolvedNavItems.map((navItem) => (
+                <a
+                  key={navItem.id}
+                  href={navItem.href ?? `#${navItem.id}`}
+                  title={navItem.label}
+                  className={railRowClass}
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-[#eef4fb] text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                    <MenuGlyph kind={getMenuGlyphKind(navItem.label)} />
+                  </span>
+                  <span className={railLabelClass}>
+                    <span className="block whitespace-nowrap text-sm font-semibold text-slate-900">
+                      {navItem.label}
+                    </span>
+                  </span>
+                </a>
+              ))}
+            </nav>
+
+            <div className="mt-3 border-t border-slate-200/80 pt-3">
+              <div className="flex flex-col gap-1.5">
+                {resolvedUtilityLinks.slice(0, 4).map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    title={link.label}
+                    className={railRowClass}
+                  >
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-white text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+                      <MenuGlyph kind={getMenuGlyphKind(link.label)} />
+                    </span>
+                    <span className={railLabelClass}>
+                      <span className="block whitespace-nowrap text-sm font-semibold text-slate-900">
+                        {link.label}
+                      </span>
+                    </span>
+                  </a>
+                ))}
+
+                <button
+                  type="button"
+                  onClick={onBookDemo}
+                  className={`${railRowClass} bg-white/82`}
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-[#eef4fb] text-slate-700">
+                    <MenuGlyph kind="sales" />
+                  </span>
+                  <span className={railLabelClass}>
+                    <span className="block whitespace-nowrap text-sm font-semibold text-slate-900">
+                      {bookDemoLabel}
+                    </span>
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={onStartTrial}
+                  className="mt-1 flex w-full items-center justify-center gap-3 rounded-[1.25rem] bg-[#1d1d1f] px-3 py-3 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(15,23,42,0.18)] transition-all duration-200 hover:translate-y-[-1px] group-hover:justify-start group-focus-within:justify-start"
+                >
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-white/10">
+                    <MenuGlyph kind="trial" />
+                  </span>
+                  <span className={railLabelClass}>
+                    <span className="block whitespace-nowrap text-sm font-semibold text-white">
+                      {startTrialLabel}
+                    </span>
+                  </span>
+                </button>
+              </div>
+            </div>
+          </aside>
+
+          <div className="mx-auto hidden w-full max-w-7xl xl:flex xl:justify-end">
+            <div className="flex items-center gap-3 rounded-[1.55rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,253,0.96)_100%)] px-3 py-2.5 shadow-[0_18px_50px_rgba(15,23,42,0.10)] backdrop-blur">
+              {exploreLinks.length > 0 ? (
+                <div className="flex items-center gap-2 rounded-[1.25rem] bg-white/70 px-2.5 py-2">
+                  <div className="px-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Explore
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {exploreLinks.map((link) => (
+                      <a
+                        key={link.href}
+                        href={link.href}
+                        className="inline-flex items-center justify-center rounded-full px-3.5 py-2 text-sm font-semibold text-slate-600 transition hover:bg-white hover:text-slate-950"
+                      >
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {workspaceAccessLinks.length > 0 ? (
+                <div className="flex items-center gap-2 rounded-[1.25rem] border border-slate-200/80 bg-white px-2.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+                  <div className="px-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Workspace Access
+                  </div>
+                  <div className="flex items-center gap-1">
+                    {workspaceAccessLinks.map((link) => (
+                      <a
+                        key={link.href}
+                        href={link.href}
+                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]"
+                      >
+                        {link.label}
+                      </a>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              <div className="mx-0.5 h-8 w-px bg-slate-200/80" />
+
+              <button
+                type="button"
+                onClick={onBookDemo}
+                className="booked-button-secondary whitespace-nowrap px-4 py-2 text-sm font-semibold"
+              >
+                {bookDemoLabel}
+              </button>
+              <button
+                type="button"
+                onClick={onStartTrial}
+                className="booked-button whitespace-nowrap px-4 py-2 text-sm font-semibold"
+              >
+                {startTrialLabel}
+              </button>
+            </div>
+          </div>
+
+          <div className="mx-auto flex w-full max-w-7xl justify-end xl:hidden">
+            {menuToggleButton}
+          </div>
+
+        </>
       ) : (
         <>
           <div className="template-nav mx-auto flex w-full max-w-7xl items-center justify-between gap-4 px-4 py-3 sm:px-5 lg:px-6">
@@ -267,10 +426,7 @@ export function Header({
             </div>
 
             <div className="hidden items-center gap-3 md:!flex">
-              {(utilityLinks ?? [
-                { label: 'Roadmap', href: roadmapHref },
-                { label: 'Watch Demo', href: videoDemoHref },
-              ]).map((link) => (
+              {resolvedUtilityLinks.map((link) => (
                 <a key={link.href} href={link.href} className="booked-nav-link">
                   {link.label}
                 </a>
@@ -299,9 +455,7 @@ export function Header({
             aria-label="Primary"
           >
             <div className="flex flex-wrap items-center gap-2">
-              {navItems.map((item) => {
-                const navItem = getNavItemModel(item);
-
+              {resolvedNavItems.map((navItem) => {
                 return (
                   <a
                     key={navItem.id}
@@ -341,7 +495,7 @@ export function Header({
           {compactMenuOnly ? (
             <div
               id="mobile-nav"
-              className="absolute right-4 top-[4.8rem] z-40 w-[19rem] rounded-[1.6rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(245,248,255,0.98)_100%)] p-3 shadow-[0_22px_60px_rgba(15,23,42,0.16)] sm:right-6"
+              className="absolute right-4 top-[4.8rem] z-40 w-[20.5rem] rounded-[1.75rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(245,248,255,0.98)_100%)] p-3 shadow-[0_22px_60px_rgba(15,23,42,0.16)] sm:right-6"
             >
               <div className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-black/6 bg-white/86 px-3 py-2.5">
                 <div>
@@ -355,43 +509,45 @@ export function Header({
                 </div>
               </div>
 
-              <div className="mt-3 grid grid-cols-4 gap-2">
-                {navItems.map((item) => {
-                  const navItem = getNavItemModel(item);
-                  const compactLabel = getCompactItemLabel(navItem.label);
+              <nav className="mt-3 flex flex-col gap-2" aria-label="Homepage mobile primary">
+                {resolvedNavItems.map((navItem) => {
                   return (
                     <a
                       key={navItem.id}
                       href={navItem.href ?? `#${navItem.id}`}
                       onClick={closeMobileMenu}
-                      className="flex flex-col items-center justify-center gap-2 rounded-[1.1rem] border border-black/6 bg-white px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600 shadow-[0_8px_18px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5"
+                      className="flex items-center gap-3 rounded-[1.15rem] border border-black/6 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:text-slate-950"
                     >
-                      <span className="flex h-9 w-9 items-center justify-center rounded-full bg-[#f3f7fb] text-slate-700">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-[#f3f7fb] text-slate-700">
                         <MenuGlyph kind={getMenuGlyphKind(navItem.label)} />
                       </span>
-                      <span>{compactLabel}</span>
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-sm font-semibold text-slate-950">{navItem.label}</span>
+                        <span className="mt-0.5 block text-[11px] font-medium text-slate-500">
+                          Jump to this section
+                        </span>
+                      </span>
                     </a>
                   );
                 })}
-              </div>
+              </nav>
 
-              <div className="mt-3 grid grid-cols-3 gap-2">
-                {(utilityLinks ?? [
-                  { label: 'Roadmap', href: roadmapHref },
-                  { label: 'Watch Demo', href: videoDemoHref },
-                ])
-                  .slice(0, 3)
-                  .map((link) => (
+              <div className="mt-3 border-t border-slate-200/80 pt-3">
+                <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  Quick actions
+                </div>
+                <div className="flex flex-col gap-2">
+                  {resolvedUtilityLinks.slice(0, 4).map((link) => (
                   <a
                     key={link.href}
                     href={link.href}
                     onClick={closeMobileMenu}
-                    className="flex flex-col items-center justify-center gap-2 rounded-[1.1rem] border border-black/6 bg-[#f8fbff] px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600"
+                    className="flex items-center gap-3 rounded-[1.15rem] border border-black/6 bg-[#f8fbff] px-3 py-3 text-left text-sm font-semibold text-slate-700"
                   >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white text-slate-700">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-white text-slate-700">
                       <MenuGlyph kind={getMenuGlyphKind(link.label)} />
                     </span>
-                    <span>{getCompactItemLabel(link.label)}</span>
+                    <span className="block flex-1 text-sm font-semibold text-slate-900">{link.label}</span>
                   </a>
                 ))}
                 <button
@@ -400,12 +556,12 @@ export function Header({
                     closeMobileMenu();
                     onBookDemo();
                   }}
-                  className="flex flex-col items-center justify-center gap-2 rounded-[1.1rem] border border-black/6 bg-white px-2 py-3 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600"
+                  className="flex items-center gap-3 rounded-[1.15rem] border border-black/6 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700"
                 >
-                  <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#f8fafc] text-slate-700">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-[#f8fafc] text-slate-700">
                     <MenuGlyph kind="sales" />
                   </span>
-                  <span>Sales</span>
+                  <span className="block flex-1 text-sm font-semibold text-slate-900">{bookDemoLabel}</span>
                 </button>
                 <button
                   type="button"
@@ -413,11 +569,14 @@ export function Header({
                     closeMobileMenu();
                     onStartTrial();
                   }}
-                  className="col-span-2 flex items-center justify-center gap-2 rounded-[1.1rem] bg-[#1d1d1f] px-3 py-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white"
+                  className="mt-1 flex items-center gap-3 rounded-[1.2rem] bg-[#1d1d1f] px-3 py-3 text-left text-sm font-semibold text-white"
                 >
-                  <MenuGlyph kind="trial" />
-                  <span>Start Trial</span>
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-white/10">
+                    <MenuGlyph kind="trial" />
+                  </span>
+                  <span className="block flex-1 text-sm font-semibold text-white">{startTrialLabel}</span>
                 </button>
+                </div>
               </div>
             </div>
           ) : (
@@ -441,10 +600,7 @@ export function Header({
                 </div>
 
                 <div className="mt-4 grid gap-3">
-                  {(utilityLinks ?? [
-                    { label: 'Roadmap', href: roadmapHref },
-                    { label: 'Watch Demo', href: videoDemoHref },
-                  ]).map((link) => (
+                  {resolvedUtilityLinks.map((link) => (
                     <a
                       key={link.href}
                       href={link.href}
@@ -478,9 +634,7 @@ export function Header({
               </div>
 
               <nav className="mt-4 flex flex-col gap-2" aria-label="Mobile primary">
-                {navItems.map((item) => {
-                  const navItem = getNavItemModel(item);
-
+                {resolvedNavItems.map((navItem) => {
                   return (
                     <a
                       key={navItem.id}

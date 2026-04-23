@@ -1,6 +1,7 @@
 import os
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
@@ -60,9 +61,20 @@ class Settings:
     stripe_secret_key: str
     stripe_publishable_key: str
     stripe_currency: str
+    zoho_crm_api_base_url: str
     zoho_calendar_api_base_url: str
     zoho_bookings_api_base_url: str
     zoho_accounts_base_url: str
+    zoho_crm_access_token: str
+    zoho_crm_refresh_token: str
+    zoho_crm_client_id: str
+    zoho_crm_client_secret: str
+    zoho_crm_default_lead_module: str
+    zoho_crm_default_contact_module: str
+    zoho_crm_default_deal_module: str
+    zoho_crm_default_task_module: str
+    zoho_crm_notification_token: str
+    zoho_crm_notification_channel_id: str
     zoho_calendar_uid: str
     zoho_calendar_access_token: str
     zoho_calendar_refresh_token: str
@@ -161,6 +173,27 @@ def env_str(name: str, default: str = "") -> str:
     return raw.strip()
 
 
+def derive_zoho_accounts_base_url(*candidate_api_urls: str) -> str:
+    host_to_accounts_url = {
+        "www.zohoapis.com": "https://accounts.zoho.com",
+        "www.zohoapis.com.au": "https://accounts.zoho.com.au",
+        "www.zohoapis.eu": "https://accounts.zoho.eu",
+        "www.zohoapis.in": "https://accounts.zoho.in",
+        "www.zohoapis.com.cn": "https://accounts.zoho.com.cn",
+        "www.zohoapis.jp": "https://accounts.zoho.jp",
+        "www.zohocloud.ca": "https://accounts.zohocloud.ca",
+    }
+    for candidate in candidate_api_urls:
+        value = (candidate or "").strip()
+        if not value:
+            continue
+        parsed = urlparse(value)
+        hostname = (parsed.hostname or "").lower()
+        if hostname in host_to_accounts_url:
+            return host_to_accounts_url[hostname]
+    return "https://accounts.zoho.com"
+
+
 def get_settings() -> Settings:
     openai_api_key = env_str("OPENAI_API_KEY", "")
     openai_base_url = env_str("OPENAI_BASE_URL", "https://api.openai.com/v1")
@@ -178,6 +211,17 @@ def get_settings() -> Settings:
     semantic_search_api_key = env_str("SEMANTIC_SEARCH_API_KEY", "") or ai_api_key
     semantic_search_base_url = env_str("SEMANTIC_SEARCH_BASE_URL", "") or ai_base_url
     semantic_search_model = env_str("SEMANTIC_SEARCH_MODEL", "") or ai_model
+    zoho_crm_api_base_url = env_str("ZOHO_CRM_API_BASE_URL", "https://www.zohoapis.com.au/crm/v8")
+    zoho_bookings_api_base_url = env_str(
+        "ZOHO_BOOKINGS_API_BASE_URL",
+        "https://www.zohoapis.com.au/bookings/v1/json",
+    )
+    zoho_accounts_base_url = env_str("ZOHO_ACCOUNTS_BASE_URL", "")
+    if not zoho_accounts_base_url:
+        zoho_accounts_base_url = derive_zoho_accounts_base_url(
+            zoho_crm_api_base_url,
+            zoho_bookings_api_base_url,
+        )
 
     return Settings(
         app_name=os.getenv("APP_NAME", "BookedAI"),
@@ -236,15 +280,22 @@ def get_settings() -> Settings:
         stripe_secret_key=os.getenv("STRIPE_SECRET_KEY", ""),
         stripe_publishable_key=os.getenv("STRIPE_PUBLISHABLE_KEY", ""),
         stripe_currency=os.getenv("STRIPE_CURRENCY", "aud"),
+        zoho_crm_api_base_url=zoho_crm_api_base_url,
         zoho_calendar_api_base_url=os.getenv(
             "ZOHO_CALENDAR_API_BASE_URL", "https://calendar.zoho.com/api/v1"
         ),
-        zoho_bookings_api_base_url=os.getenv(
-            "ZOHO_BOOKINGS_API_BASE_URL", "https://www.zohoapis.com.au/bookings/v1/json"
-        ),
-        zoho_accounts_base_url=os.getenv(
-            "ZOHO_ACCOUNTS_BASE_URL", "https://accounts.zoho.com"
-        ),
+        zoho_bookings_api_base_url=zoho_bookings_api_base_url,
+        zoho_accounts_base_url=zoho_accounts_base_url,
+        zoho_crm_access_token=os.getenv("ZOHO_CRM_ACCESS_TOKEN", ""),
+        zoho_crm_refresh_token=os.getenv("ZOHO_CRM_REFRESH_TOKEN", ""),
+        zoho_crm_client_id=os.getenv("ZOHO_CRM_CLIENT_ID", ""),
+        zoho_crm_client_secret=os.getenv("ZOHO_CRM_CLIENT_SECRET", ""),
+        zoho_crm_default_lead_module=os.getenv("ZOHO_CRM_DEFAULT_LEAD_MODULE", "Leads"),
+        zoho_crm_default_contact_module=os.getenv("ZOHO_CRM_DEFAULT_CONTACT_MODULE", "Contacts"),
+        zoho_crm_default_deal_module=os.getenv("ZOHO_CRM_DEFAULT_DEAL_MODULE", "Deals"),
+        zoho_crm_default_task_module=os.getenv("ZOHO_CRM_DEFAULT_TASK_MODULE", "Tasks"),
+        zoho_crm_notification_token=os.getenv("ZOHO_CRM_NOTIFICATION_TOKEN", ""),
+        zoho_crm_notification_channel_id=os.getenv("ZOHO_CRM_NOTIFICATION_CHANNEL_ID", ""),
         zoho_calendar_uid=os.getenv("ZOHO_CALENDAR_UID", ""),
         zoho_calendar_access_token=os.getenv("ZOHO_CALENDAR_ACCESS_TOKEN", ""),
         zoho_calendar_refresh_token=os.getenv("ZOHO_CALENDAR_REFRESH_TOKEN", ""),

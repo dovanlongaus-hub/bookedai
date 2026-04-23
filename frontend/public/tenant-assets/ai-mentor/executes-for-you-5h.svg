@@ -1,0 +1,41 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1200" height="900" rx="48" fill="#06111B"/>
+  <rect x="28" y="28" width="1144" height="844" rx="38" fill="url(#bg)"/>
+  <circle cx="216" cy="170" r="124" fill="#0EA5E9" fill-opacity="0.2"/>
+  <circle cx="988" cy="152" r="144" fill="#22C55E" fill-opacity="0.18"/>
+  <circle cx="940" cy="734" r="190" fill="#2563EB" fill-opacity="0.18"/>
+  <text x="140" y="148" fill="#E2E8F0" font-family="Arial, Helvetica, sans-serif" font-size="58" font-weight="700">AI that executes workflows for you</text>
+  <text x="140" y="192" fill="#93C5FD" font-family="Arial, Helvetica, sans-serif" font-size="28">Automation, infrastructure, and real operating flow for the 5-hour execution package</text>
+  <rect x="144" y="248" width="912" height="502" rx="34" fill="#091827" stroke="#5EEAD4" stroke-opacity="0.34" stroke-width="4"/>
+  <path d="M262 494H934" stroke="#17406A" stroke-width="12" stroke-linecap="round"/>
+  <path d="M332 360V628" stroke="#17406A" stroke-width="12" stroke-linecap="round"/>
+  <path d="M602 326V640" stroke="#17406A" stroke-width="12" stroke-linecap="round"/>
+  <path d="M870 360V628" stroke="#17406A" stroke-width="12" stroke-linecap="round"/>
+  <circle cx="332" cy="360" r="58" fill="#2563EB"/>
+  <circle cx="602" cy="326" r="58" fill="#14B8A6"/>
+  <circle cx="870" cy="360" r="58" fill="#38BDF8"/>
+  <circle cx="332" cy="628" r="58" fill="#F97316"/>
+  <circle cx="602" cy="640" r="58" fill="#22C55E"/>
+  <circle cx="870" cy="628" r="58" fill="#A78BFA"/>
+  <path d="M314 360H350" stroke="#E0F2FE" stroke-width="10" stroke-linecap="round"/>
+  <path d="M602 308V344" stroke="#ECFEFF" stroke-width="10" stroke-linecap="round"/>
+  <path d="M852 360H888" stroke="#E0F2FE" stroke-width="10" stroke-linecap="round"/>
+  <path d="M332 610V646" stroke="#FFF7ED" stroke-width="10" stroke-linecap="round"/>
+  <path d="M584 640H620" stroke="#ECFDF5" stroke-width="10" stroke-linecap="round"/>
+  <path d="M852 628H888" stroke="#F5F3FF" stroke-width="10" stroke-linecap="round"/>
+  <rect x="234" y="430" width="206" height="102" rx="24" fill="#0B2136"/>
+  <rect x="500" y="430" width="206" height="102" rx="24" fill="#0B2136"/>
+  <rect x="766" y="430" width="206" height="102" rx="24" fill="#0B2136"/>
+  <text x="270" y="490" fill="#93C5FD" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">Prompt</text>
+  <text x="548" y="490" fill="#5EEAD4" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">Workflow</text>
+  <text x="816" y="490" fill="#C4B5FD" font-family="Arial, Helvetica, sans-serif" font-size="24" font-weight="700">Execution</text>
+  <rect x="144" y="778" width="316" height="72" rx="22" fill="#0F766E"/>
+  <text x="188" y="822" fill="#ECFEFF" font-family="Arial, Helvetica, sans-serif" font-size="34" font-weight="700">Automation System</text>
+  <defs>
+    <linearGradient id="bg" x1="72" y1="64" x2="1110" y2="842" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#08131F"/>
+      <stop offset="0.45" stop-color="#0C1C2D"/>
+      <stop offset="1" stop-color="#08131F"/>
+    </linearGradient>
+  </defs>
+</svg>

@@ -22,6 +22,7 @@ Root `.env.example` is now grouped into:
 - admin runtime
 - Hermes service
 - deployment and DNS automation
+- Telegram/OpenClaw operator authorization
 
 ## Current repo reality
 
@@ -56,6 +57,7 @@ Compatibility fallback is still present through:
 
 - `ADMIN_API_TOKEN`
 - `ADMIN_PASSWORD`
+- optional `ADMIN_BOOTSTRAP_PASSWORD` now exists as the preferred bootstrap credential for the root `Next.js` admin auth routes while older environments can still reuse `ADMIN_PASSWORD`
 
 That fallback exists to avoid breaking older environments during rollout.
 
@@ -70,6 +72,68 @@ It should be treated as transitional compatibility, not the preferred long-term 
 - new rollout-sensitive runtime toggles should be added carefully and documented
 - do not expose Stripe, Zoho, email, AI, session-signing, or admin secrets to the browser
 - auth secrets should now be separated by actor boundary where practical instead of sharing one signing value for every surface
+
+## Zoho CRM connection rule
+
+- `ZOHO_ACCOUNTS_BASE_URL` should match the Zoho data center that issued the CRM refresh token
+- if `ZOHO_ACCOUNTS_BASE_URL` is left blank, backend settings now auto-derive it from `ZOHO_CRM_API_BASE_URL` or `ZOHO_BOOKINGS_API_BASE_URL`
+- for AU tenants, the expected accounts host is `https://accounts.zoho.com.au`
+- durable BookedAI CRM connectivity should prefer:
+  - `ZOHO_CRM_REFRESH_TOKEN`
+- `ZOHO_CRM_CLIENT_ID`
+- `ZOHO_CRM_CLIENT_SECRET`
+- optional inbound notification hardening:
+  - `ZOHO_CRM_NOTIFICATION_TOKEN`
+  - `ZOHO_CRM_NOTIFICATION_CHANNEL_ID`
+- the refresh token used for notification registration must include `ZohoCRM.notifications.ALL`; older CRM-only refresh tokens will fail Zoho `actions/watch` calls with `OAUTH_SCOPE_MISMATCH`
+- these pair naturally with the new registration route:
+  - `POST /api/v1/integrations/crm-feedback/zoho-webhook/register`
+  - if the route generates a fresh token or channel id, persist those values into env when you want strict webhook verification enabled
+- ongoing channel operations now also live in backend:
+  - `GET /api/v1/integrations/crm-feedback/zoho-webhook`
+  - `POST /api/v1/integrations/crm-feedback/zoho-webhook/auto-renew`
+  - `POST /api/v1/integrations/crm-feedback/zoho-webhook/renew`
+  - `POST /api/v1/integrations/crm-feedback/zoho-webhook/disable`
+- low-overhead auto-renew tuning:
+  - `ZOHO_CRM_NOTIFICATION_AUTO_RENEW_THRESHOLD_HOURS`
+  - `ZOHO_CRM_NOTIFICATION_AUTO_RENEW_TIMEOUT_SECONDS`
+- optional host-local routing for the auto-renew runner:
+  - `ZOHO_CRM_NOTIFICATION_AUTO_RENEW_API_URL`
+  - `ZOHO_CRM_NOTIFICATION_AUTO_RENEW_HOST_HEADER`
+  - `ZOHO_CRM_NOTIFICATION_AUTO_RENEW_SKIP_TLS_VERIFY`
+- `ZOHO_CRM_ACCESS_TOKEN` is still useful for short-lived smoke tests, but it should not be treated as the durable production credential
+- the preferred repo helper for OAuth setup and smoke tests is:
+  - `python3 scripts/zoho_crm_connect.py authorize-url ...`
+  - `python3 scripts/zoho_crm_connect.py exchange-code ... --write-env`
+  - `python3 scripts/zoho_crm_connect.py test-connection --module Leads`
+
+## Telegram/OpenClaw operator authorization
+
+The current approved Telegram operator authorization variables are:
+
+- `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS`
+- `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS`
+
+Current intent:
+
+- `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` defines which Telegram actor ids may run elevated workspace actions through `python3 scripts/telegram_workspace_ops.py`
+- `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` defines the elevated action set for those trusted users
+
+Current elevated action vocabulary:
+
+- `build_frontend`
+- `deploy_live`
+- `test`
+- `workspace_write`
+- `repo_structure`
+- `host_command`
+- `sync_doc`
+- `sync_repo_docs`
+- `full_project`
+
+Use `host_command` when the trusted Telegram operator should be able to run the checked-in allowlist of host-maintenance binaries such as `apt-get`, `docker`, `systemctl`, `journalctl`, `service`, `timedatectl`, or `ufw` through `python3 scripts/telegram_workspace_ops.py host-command --command "..."`.
+
+Use `full_project` when the trusted Telegram operator should be able to test, refactor file structure, update any project area, run approved host commands, and deploy the result across the whole BookedAI repo.
 
 ## Documentation sync rule
 

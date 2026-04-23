@@ -35,17 +35,17 @@ export function PricingRecommendationPanel({
         <div>
           <div className="template-kicker text-sm">Need help choosing?</div>
           <h3 className="template-title mt-3 max-w-[10ch] text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-            Choose the package that fits your stage, then keep the buying path moving
+            Choose the layer that matches your current operating maturity
           </h3>
           <p className="template-body mt-4 max-w-[26rem] text-base leading-7">
-            Freemium is the easiest first yes, Pro is the default paid path for most SMEs,
-            and Pro Max stays off the main lane until complexity is real.
+            Starter is the easiest credible first step, Pro is the default paid path for most teams,
+            and Pro Max stays off the main lane until operational complexity is real.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             {[
-              'Freemium first',
-              'Best paid default',
-              'Custom scope when complexity is real',
+              'Starter for fit validation',
+              'Pro as default paid layer',
+              'Custom scope only when complexity is real',
             ].map((item) => (
               <SignalPill key={item} className="px-3 py-2 text-[11px]">
                 {item}
@@ -55,9 +55,9 @@ export function PricingRecommendationPanel({
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
             {[
-              ['Fast yes', 'Start with freemium or the Top 10 SME offer without procurement-style friction'],
-              ['Best value', 'Pro is the default paid path for most teams'],
-              ['Custom only when needed', 'Keep Pro Max and custom scope off the main buying lane'],
+              ['Fast approval', 'Start with Starter when the goal is fit validation without procurement-style friction'],
+              ['Default paid path', 'Pro is the clearest paid operating layer for most teams'],
+              ['Custom only when needed', 'Keep Pro Max and custom scope off the main buying lane until complexity is justified'],
             ].map(([title, body]) => (
               <SectionCard key={title} tone="subtle" className="rounded-[1.15rem] px-4 py-4">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{title}</div>
@@ -121,7 +121,7 @@ export function PricingRecommendationPanel({
             aria-label="Book Recommended Plan"
             className="booked-button mt-3 inline-flex items-center justify-center gap-2"
           >
-            Choose Recommended Pro
+            Review Recommended Pro
             <ArrowIcon />
           </button>
         </div>

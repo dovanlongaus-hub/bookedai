@@ -15,6 +15,7 @@ The roadmap now assumes:
 This roadmap aligns with:
 
 - `docs/architecture/bookedai-master-prd.md`
+- `docs/architecture/admin-workspace-blueprint.md`
 - `docs/architecture/current-phase-sprint-execution-plan.md`
 - `docs/architecture/phase-0-detailed-implementation-plan.md`
 - `docs/architecture/phase-1-2-detailed-implementation-package.md`
@@ -22,7 +23,10 @@ This roadmap aligns with:
 - `docs/architecture/pricing-packaging-monetization-strategy.md`
 - `docs/architecture/analytics-metrics-revenue-bi-strategy.md`
 - `docs/architecture/crm-email-revenue-lifecycle-strategy.md`
+- `docs/architecture/bookedai-zoho-crm-integration-map.md`
 - `docs/development/sprint-dependency-and-inheritance-map.md`
+- `docs/development/bookedai-chatbot-landing-implementation-plan.md`
+- `docs/development/bookedai-sample-video-brief.md`
 
 ## Planning principles
 
@@ -113,6 +117,21 @@ Owns:
 - CRM, calendar, payment, and communication integrations
 - worker and outbox processing
 - recovery workflow execution
+- current Zoho CRM activation baseline now includes:
+  - runtime `ZOHO_CRM_*` configuration loading in backend settings
+  - a reusable Zoho CRM adapter that can authenticate through direct token or refresh-token exchange
+  - a smoke-test route at `/api/v1/integrations/providers/zoho-crm/connection-test` for module and field metadata validation before live write-back is enabled
+  - the first local-first lead write-back slice, where BookedAI persists local lead truth first, then attempts Zoho lead upsert and records `pending`, `manual_review_required`, `failed`, or `synced` in the CRM ledger
+  - replayable CRM recovery, where operator-triggered retry can now re-execute stored lead or contact sync payloads instead of only toggling retry status
+  - a root-admin bridge so customer create and update flows can call backend contact sync without moving Zoho orchestration into the `Next.js` admin runtime
+  - booking-intent follow-up orchestration, where BookedAI can now seed Zoho `Deals` and follow-up `Tasks` from the same local booking request flow
+  - a linked Future Swim sample seed so QA and operator demos can inspect one complete `contact -> lead -> booking -> payment -> crm_sync` chain
+  - the next active CRM execution lane is now explicitly event-driven:
+    - `booking created -> Zoho deal/task`
+    - `call scheduled -> Zoho task/activity`
+    - `email sent -> Zoho task/note/activity mirror`
+    - `lead qualified -> Zoho lead/contact/deal update`
+    - `deal won/lost -> BookedAI dashboard/reporting feedback`
 
 ### 5. Tenant and admin layer
 
@@ -145,7 +164,7 @@ Owns:
 
 ## Current implementation snapshot
 
-Date: `2026-04-21`
+Date: `2026-04-22`
 
 The current repo already has valuable production foundations:
 
@@ -170,11 +189,16 @@ The current repo already has valuable production foundations:
   - `v1_integration_routes`
 - first extracted tenant handler module at `backend/api/v1_tenant_handlers.py`
 - search and matching quality work
+- the matching lane now includes a richer Phase 2 contract with normalized `booking_fit` summaries plus `stage_counts` diagnostics
 - Stripe checkout initiation
 - calendar and email integrations
 - rollout and reliability foundations
 - BookedAI brand UI kit foundation with local SVG assets, reusable brand primitives, and dark-mode token layer
 - root App Router starter baseline that now builds successfully as a forward-compatible translation target for the new brand system
+- tenant auth is now explicitly moving through an `email-first` gateway with verification-code flows, while Google remains on the same screen as the preferred continuation path
+- backend QA/demo coverage now includes the reusable cross-industry full-flow pack under `backend/migrations/sql/016_cross_industry_full_flow_test_pack.sql`
+- the root admin lane now includes `/admin/campaigns` as the first explicit Phase 7 growth module
+- request-facing delivery inventory now also includes synced landing, pitch, storyboard, and promo-video working docs under `docs/development/`
 
 The next roadmap change is not to discard that work.
 
@@ -196,7 +220,7 @@ Current execution interpretation now locked from `2026-04-20`:
 - the public-facing layer must still preserve premium branding, investor-facing credibility, and user attraction while those core flows are being hardened
 - the public homepage should now prioritize compact revenue-engine storytelling, launch-offer conversion, and clear runtime entrypoints instead of acting like the full live runtime
 - the current approved public pricing vocabulary is now locked as `Freemium`, `Pro`, and `Pro Max`, with the higher-touch registration-only lane allowed to expose `Advance Customize` as the custom commercial path
-- `bookedai.au` is now live on that tighter homepage posture, with primary trial CTA routing centered on `product.bookedai.au`, direct menu entry into `roadmap`, `tenant`, and `admin`, and Google register/login entry routed through `tenant.bookedai.au`
+- `bookedai.au` is now live on that tighter homepage posture, with primary trial CTA routing centered on `product.bookedai.au`, direct menu entry into `roadmap`, `tenant`, and `admin`, and tenant Google auth entry routed through `tenant.bookedai.au`
 - the whole product app experience should still be framed more clearly under `product/demo`, with homepage previews pointing into that deeper lane
 - real SME acquisition should be treated as a live validation lane, whether each SME runs first in standalone mode or through a linked full BookedAI portal path
 - module-level polish, advanced features, legal review, and user-group-specific data depth should be sequenced only after those core journeys are dependable
@@ -218,6 +242,71 @@ Additional execution interpretation locked from `2026-04-21`:
   - `TENANT_SESSION_SIGNING_SECRET`
   - `ADMIN_SESSION_SIGNING_SECRET`
 - legacy `ADMIN_API_TOKEN` and `ADMIN_PASSWORD` fallback should be treated as compatibility support during migration, not the target end-state architecture
+- the next admin productization wave is now requirements-locked in `docs/architecture/admin-enterprise-workspace-requirements.md`
+- the detailed module, data-model, API, role, KPI, and sprint blueprint for that wave now lives in `docs/architecture/admin-workspace-blueprint.md`
+- later Sprint 13-16 admin work should now be interpreted as:
+  - enterprise login redesign
+  - menu-first admin navigation
+  - tenant management as a first-class admin lane
+  - tenant branding and HTML content editing
+  - tenant role and permission management
+  - full tenant product and service CRUD
+  - phased revenue-ops expansion across customers, leads, services, bookings, payments, dashboard, audit, campaigns, workflows, and messaging
+- the admin execution order should now be read more concretely from current repo state:
+  - `Phase 0`: runtime and production-ownership decision for the new admin lane
+  - `Phase 1`: production auth, signed session, tenant context, RBAC parity, and immutable audit baseline
+  - `Phase 2`: Prisma and repository parity so current admin modules stop depending on mock-only data truth
+  - `Phase 3`: tenant, users, roles, settings, and audit control-plane completion
+  - `Phase 4`: revenue-ops module hardening across customers, leads, services, and bookings, including the `Zoho CRM` seam for customers, leads, booking-driven deals, and follow-up tasks
+  - `Phase 5`: payments and revenue-truth enrichment
+  - `Phase 6`: dashboard, reporting, and operator analytics expansion, including CRM-derived owner/stage/activity feedback back into BookedAI surfaces
+  - `Phase 7`: growth modules such as campaigns, messaging, workflows, and automation
+- until runtime ownership changes explicitly, the root `Next.js` admin tree should be treated as the active implementation lane for this new workspace, while the broader deployed frontend source of truth still remains `frontend/`
+- the first `Phase 1` admin slice is now implemented in the root `Next.js` lane:
+  - signed-session verification with expiry
+  - auth routes for `login`, `logout`, `me`, and `switch-tenant`
+  - session-scoped tenant context
+  - broader RBAC vocabulary for later enterprise lanes
+  - auth-event audit logging baseline
+- the first practical `Phase 2` admin slice is now also implemented in the same lane:
+  - Prisma schema parity for the richer customer, lead, and payment fields already expected by the root admin UI
+  - seed parity for those richer fields
+  - Prisma-backed repository reads and writes for dashboard, customers, leads, services, bookings, payments, and audit logs when Prisma is enabled
+  - fallback mock data preserved only as a compatibility path while the new admin workspace moves toward real database truth
+  - that slice now also includes:
+    - new Prisma models for permissions, role-permission joins, branches, tenant settings, subscriptions, and invoices
+    - preparatory repository seams for users, roles, settings, and paginated payments
+    - migration artifact `20260422034156_phase2_admin_prisma_parity`
+  - the first practical `Phase 3` control-plane slice now also exists:
+    - `Team` lane for user creation plus role and status assignment
+    - `Settings` lane for tenant profile and branding HTML updates
+    - `Payments` lane for filtered ledger reads, payment recording, and payment status updates
+  - that same `Phase 3` lane now also includes:
+    - `Roles` permission editing
+    - `Audit` workspace investigation view
+    - repository and API support for paginated audit reads and role-permission updates
+  - that same `Phase 3` lane now also includes:
+    - a dedicated `/admin/tenants` investigation workspace
+    - tenant-auth, billing, and CRM retry posture snapshots pulled into the root admin lane before operator escalation
+    - audited `read_only` tenant support mode as the approved safe impersonation baseline
+  - the first practical `Phase 4` hardening slice now also exists:
+    - lead detail workspace with follow-up timeline and conversion actions
+    - shared customer timeline across notes, tags, bookings, payments, and audit events
+    - repository and API support for lead and customer timeline payloads
+  - that same `Phase 4` lane now also includes:
+    - booking detail workspace
+    - booking-linked payment visibility and derived payment status
+    - repository and API support for booking payments and booking timeline payloads
+  - and now also includes:
+    - lead quick-note and follow-up actions
+    - explicit repository and API write seams for lead notes and follow-up scheduling
+  - and now also includes:
+    - lead quick-note and follow-up actions
+    - explicit repository and API write seams for lead notes and follow-up scheduling
+  - that same `Phase 3` lane now also includes:
+    - `Roles` permission editing
+    - `Audit` workspace investigation view
+    - repository and API support for paginated audit reads and role-permission updates
 
 Operational companion for this roadmap:
 
@@ -471,10 +560,10 @@ Harden the full commercial platform so releases are governed by explicit regress
 | Sprint 10 | Admin commercial operations and release readiness | admin reconciliation, commission, support tooling, and commercial release controls expanded |
 | Sprint 11 | Tenant IA and mobile workspace hardening | tenant shell, route boundaries, action queues, and mobile-priority views aligned |
 | Sprint 12 | Tenant workspace expansion | deeper payment, recovery, integration, and commission visibility implemented |
-| Sprint 13 | Admin commercial IA and drill-ins | issue-first admin navigation and tenant commercial drill-ins shipped |
-| Sprint 14 | Admin support tooling and rollout readiness | reconciliation polish, support tooling, and rollout controls completed |
-| Sprint 15 | Telemetry and regression coverage | commercial telemetry, replay readiness, and regression scope established |
-| Sprint 16 | Release gates and scale readiness | promote-or-hold discipline, rollback rules, and scale-readiness review completed |
+| Sprint 13 | Unified tenant identity and onboarding completion | email-first tenant auth, claim/create continuity, onboarding posture, and session-safe entry locked |
+| Sprint 14 | Tenant billing workspace and admin support readiness | tenant billing seams, admin support-safe drill-ins, tenant editing, and permission posture shipped |
+| Sprint 15 | Portal, tenant value, and proof-pack production | first customer portal, stronger tenant value UX, regression growth, and landing or pitch or video assets aligned |
+| Sprint 16 | Release gates, final polish, and publish-ready proof | promote-or-hold discipline, rollback rules, scale-readiness review, and final cross-surface polish completed |
 
 ## Current status by sprint
 
@@ -608,24 +697,42 @@ Focus:
 - create account, claim, and invite-acceptance flows
 - onboarding progress and business profile capture
 - first tenant team and role baseline
+- current implementation overlap already exists through the live email-first tenant gateway, so this sprint should now be treated as active completion rather than untouched planning
 
-### Sprint 14 - Pending
+### Sprint 14 - In Progress
 
 Focus:
 
+- tenant-management-first admin productization
 - tenant billing workspace
 - self-serve billing setup, plan and trial state
 - invoice and payment-method seams
 - team workspace and role-aware tenant actions
+- tenant detail and workspace editing from admin
+- tenant branding, hero image, and HTML introduction editing
+- tenant role and permission control from admin
+- current progress on `2026-04-21`:
+  - admin tenant directory/detail routes are now in code
+  - the admin shell now has a dedicated `tenants` workspace with profile, team, and services panels
+  - direct tenant branding, HTML introduction, role/status update, and tenant service mutation flows have started
+  - a root `Next.js` admin foundation is now also in code with Prisma schema, auth, tenant context, RBAC, dashboard, and first-pass domain modules
 
 ### Sprint 15 - Pending
 
 Focus:
 
+- first customer portal runtime and booking-review continuity
 - tenant value and retention messaging
 - invite-delivery and first-login polish
 - remaining role-aware write gates
 - telemetry and replay readiness
+- full tenant-scoped product and service CRUD from admin
+- regression coverage for admin tenant editing, permission changes, and catalog mutations
+- landing, pitch, storyboard, and promo-video asset production aligned to the same repo-truth product story
+- enterprise tenant workspace refinement:
+  - sidebar or menu-first navigation
+  - per-panel guidance and function grouping
+  - direct image upload plus HTML introduction editing for tenant-managed profile content
 
 ### Sprint 16 - Pending
 
@@ -635,6 +742,7 @@ Focus:
 - rollback discipline
 - scale-readiness review
 - auth, invite, role, catalog, and billing rollout hardening
+- final polish and publish-ready proof-pack review across homepage, pitch, and promo-video deliverables
 
 ## Cross-phase dependencies
 

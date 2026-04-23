@@ -170,12 +170,16 @@ export type PartnerProfileListResponse = {
 export type AdminServiceMerchantItem = {
   id: number;
   service_id: string;
+  tenant_id?: string | null;
   business_name: string;
   business_email: string | null;
+  owner_email?: string | null;
   name: string;
   category: string | null;
   summary: string | null;
   amount_aud: number | null;
+  currency_code?: string | null;
+  display_price?: string | null;
   duration_minutes: number | null;
   venue_name: string | null;
   location: string | null;
@@ -186,6 +190,8 @@ export type AdminServiceMerchantItem = {
   tags: string[];
   featured: boolean;
   is_active: boolean;
+  publish_state?: string | null;
+  is_publish_ready?: boolean;
   is_search_ready: boolean;
   quality_warnings: string[];
   updated_at: string;
@@ -193,6 +199,65 @@ export type AdminServiceMerchantItem = {
 
 export type AdminServiceMerchantListResponse = {
   status: string;
+  items: AdminServiceMerchantItem[];
+};
+
+export type AdminTenantListItem = {
+  id: string;
+  slug: string;
+  name: string;
+  status: string;
+  timezone: string | null;
+  locale: string | null;
+  industry: string | null;
+  active_memberships: number;
+  total_services: number;
+  published_services: number;
+  updated_at: string | null;
+};
+
+export type AdminTenantMemberItem = {
+  email: string;
+  full_name: string | null;
+  role: string;
+  status: string;
+  auth_provider: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+};
+
+export type AdminTenantWorkspaceSettings = {
+  logo_url: string | null;
+  hero_image_url: string | null;
+  introduction_html: string | null;
+  guides: {
+    overview: string | null;
+    experience: string | null;
+    catalog: string | null;
+    plugin: string | null;
+    bookings: string | null;
+    integrations: string | null;
+    billing: string | null;
+    team: string | null;
+  };
+};
+
+export type AdminTenantDetailResponse = {
+  status: string;
+  tenant: AdminTenantListItem;
+  workspace: AdminTenantWorkspaceSettings;
+  members: AdminTenantMemberItem[];
+  services: AdminServiceMerchantItem[];
+};
+
+export type AdminTenantListResponse = {
+  status: string;
+  items: AdminTenantListItem[];
+};
+
+export type AdminTenantCatalogResponse = {
+  status: string;
+  tenant: AdminTenantListItem;
   items: AdminServiceMerchantItem[];
 };
 
@@ -236,13 +301,56 @@ export type ServiceImportFormState = {
   category: string;
 };
 
-export type AdminWorkspaceId = 'operations' | 'catalog' | 'reliability';
+export type AdminTenantProfileFormState = {
+  business_name: string;
+  industry: string;
+  timezone: string;
+  locale: string;
+  logo_url: string;
+  hero_image_url: string;
+  introduction_html: string;
+  guide_overview: string;
+  guide_experience: string;
+  guide_catalog: string;
+  guide_plugin: string;
+  guide_bookings: string;
+  guide_integrations: string;
+  guide_billing: string;
+  guide_team: string;
+};
+
+export type AdminTenantServiceFormState = {
+  name: string;
+  business_name: string;
+  business_email: string;
+  category: string;
+  summary: string;
+  amount_aud: string;
+  currency_code: string;
+  display_price: string;
+  duration_minutes: string;
+  venue_name: string;
+  location: string;
+  map_url: string;
+  booking_url: string;
+  image_url: string;
+  source_url: string;
+  tags: string;
+  featured: boolean;
+  publish_state: 'draft' | 'published' | 'archived';
+};
+
+export type AdminWorkspaceId = 'operations' | 'tenants' | 'catalog' | 'reliability';
 
 export type AdminWorkspacePanelId =
   | 'bookings'
   | 'recent-events'
   | 'selected-booking'
   | 'portal-support'
+  | 'tenant-directory'
+  | 'tenant-profile'
+  | 'tenant-team'
+  | 'tenant-services'
   | 'service-catalog'
   | 'partners'
   | 'prompt5-preview'
@@ -322,5 +430,48 @@ export function emptyServiceImportForm(): ServiceImportFormState {
     business_name: '',
     business_email: '',
     category: '',
+  };
+}
+
+export function emptyAdminTenantProfileForm(): AdminTenantProfileFormState {
+  return {
+    business_name: '',
+    industry: '',
+    timezone: '',
+    locale: '',
+    logo_url: '',
+    hero_image_url: '',
+    introduction_html: '',
+    guide_overview: '',
+    guide_experience: '',
+    guide_catalog: '',
+    guide_plugin: '',
+    guide_bookings: '',
+    guide_integrations: '',
+    guide_billing: '',
+    guide_team: '',
+  };
+}
+
+export function emptyAdminTenantServiceForm(): AdminTenantServiceFormState {
+  return {
+    name: '',
+    business_name: '',
+    business_email: '',
+    category: '',
+    summary: '',
+    amount_aud: '',
+    currency_code: 'AUD',
+    display_price: '',
+    duration_minutes: '',
+    venue_name: '',
+    location: '',
+    map_url: '',
+    booking_url: '',
+    image_url: '',
+    source_url: '',
+    tags: '',
+    featured: false,
+    publish_state: 'draft',
   };
 }

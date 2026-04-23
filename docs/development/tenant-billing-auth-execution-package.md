@@ -53,7 +53,12 @@ The repo already contains the first foundation for this lane:
   - `integrations`
   - `billing`
   - `team`
-- tenant password auth and Google-authenticated actions already exist
+- tenant auth now has an explicit email-first execution target:
+  - email is the primary tenant identifier
+  - tenant sign-in can run through one-time verification codes sent by email
+  - invite acceptance can run through the same email-code path
+  - Google-authenticated actions stay available on the same login form for both `Create account` and `Sign in`
+  - legacy password credentials remain as a fallback compatibility seam instead of the desired front-door UX
 - tenant catalog import, edit, publish, and archive workflows already exist
 - backend now exposes `/api/v1/tenant/billing`
 - tenant billing panel now shows:
@@ -77,7 +82,7 @@ The repo already contains the first foundation for this lane:
   - billing writes are limited to `tenant_admin` and `finance_manager`
   - team management is limited to `tenant_admin`
   - catalog import and publish actions are limited to `tenant_admin` and `operator`
-- the existing claim flow now doubles as `accept invite and set first password`
+- the existing claim flow now doubles as compatibility support while the preferred product posture becomes `accept invite with email verification`
 - top-level backend route ownership is now split more explicitly outside the tenant surface:
   - `public_catalog_routes`
   - `upload_routes`
@@ -89,10 +94,8 @@ The repo already contains the first foundation for this lane:
 
 What is still incomplete versus the target product:
 
-- no polished self-serve sign-up flow yet
-- no canonical tenant account creation flow yet
-- no invite email delivery flow yet
-- no dedicated invite-acceptance UI separate from the claim form yet
+- no fully centralized external auth provider yet
+- invite delivery still depends on SMTP readiness or manual fallback, so it is not yet a fully hardened provider-backed operator lane
 - no real payment gateway tokenization yet
 - no provider-backed invoice ledger yet
 - no tenant-facing monthly value reporting tied to plan posture yet
@@ -104,6 +107,7 @@ The portal should now follow these rules:
 
 1. `One identity`
    - the same tenant identity must work across login, onboarding, data input, reporting, billing, and support-safe actions
+   - email should be the main identifier across those states
 2. `One workspace`
    - tenant should not bounce across separate portals for setup, operations, and billing
 3. `Safe write boundaries`
@@ -155,6 +159,8 @@ Outputs:
 - account creation contract
 - session and capability model
 - tenant-scoped identity UI
+- email-code request and verify contract for `sign in`, `create`, and `claim`
+- Google sign-in and Google-led first-create path on the same login form
 
 ### Workstream B — Tenant onboarding and workspace creation
 
@@ -379,6 +385,17 @@ Recommended endpoint sequence:
 8. future `GET /api/v1/tenant/billing/invoices`
 9. future `GET /api/v1/tenant/billing/payment-method`
 10. future `POST /api/v1/tenant/billing/checkout-session`
+
+## Current Stripe linkage
+
+- Tenant billing now reads the real BookedAI Stripe posture when a tenant has a linked Stripe customer in `tenant_settings.billing_gateway`.
+- `GET /api/v1/tenant/billing` can now surface live Stripe-backed subscription, invoice, and default payment-method details alongside the local billing-account posture.
+- `POST /api/v1/tenant/billing/checkout` now creates a hosted Stripe Checkout session for the selected tenant package when the tenant billing account is already in `live` merchant mode.
+- `POST /api/v1/tenant/billing/portal` now creates a hosted Stripe Billing Portal session so the tenant can manage saved payment methods and Stripe-side billing details from the same workspace.
+- The tenant UI now uses those hosted Stripe routes directly: package CTA buttons redirect into Stripe Checkout, payment-method management opens the Stripe Billing Portal, and Stripe-backed invoices prefer hosted receipt/invoice URLs over the local receipt seam.
+- Current guardrail: if the tenant billing account is still in `test`, the workspace stays truthful and blocks live Stripe redirect actions until the operator switches merchant mode to `live`.
+- Tenant Google-login setup failures should now surface one explicit config message: add `VITE_GOOGLE_CLIENT_ID` in the frontend env and `GOOGLE_OAUTH_CLIENT_ID` in the backend before expecting tenant Google auth to work.
+- Production env wiring is now in place for that auth path: `docker-compose.prod.yml` passes `GOOGLE_OAUTH_CLIENT_ID` into `backend` and `beta-backend`, and the `web` plus `beta-web` frontend builds now receive `VITE_GOOGLE_CLIENT_ID` with a fallback to the same backend client ID so one real Google OAuth client can drive both token verification and the rendered tenant Google button.
 
 ## Release and QA gates
 

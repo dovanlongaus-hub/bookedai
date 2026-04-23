@@ -17,6 +17,7 @@ from api.v1_routes import (
     get_session,
     httpx,
     orchestrate_communication_touch,
+    orchestrate_email_sent_sync,
     orchestrate_lifecycle_email,
     render_bookedai_confirmation_email,
 )
@@ -78,6 +79,16 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
                     "cc_count": len(payload.cc),
                 },
             )
+            email_crm_sync_result = await orchestrate_email_sent_sync(
+                session,
+                tenant_id=tenant_id,
+                message_id=email_result.message_id,
+                template_key=payload.template_key,
+                subject=subject,
+                recipient_email=payload.to[0] if payload.to else None,
+                provider="smtp" if smtp_configured else "unconfigured",
+                delivery_status=delivery_status,
+            )
             await _record_phase2_write_activity(
                 session,
                 tenant_id=tenant_id,
@@ -90,6 +101,7 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
                     "delivery_status": email_result.delivery_status,
                     "provider": email_result.provider,
                     "recipient_count": len(payload.to),
+                    "crm_task_sync_status": email_crm_sync_result.task_sync_status,
                 },
                 outbox_event_type="email.lifecycle.dispatch_recorded",
                 outbox_payload={
@@ -97,6 +109,7 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
                     "template_key": payload.template_key,
                     "delivery_status": email_result.delivery_status,
                     "provider": email_result.provider,
+                    "crm_task_record_id": email_crm_sync_result.task_record_id,
                 },
                 idempotency_key=f"email-message:{email_result.message_id}",
             )
@@ -107,7 +120,14 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
                 "message_id": email_result.message_id,
                 "delivery_status": email_result.delivery_status,
                 "provider_message_id": None,
-                "warnings": warnings,
+                "warnings": warnings + email_crm_sync_result.warning_codes,
+                "crm_sync": {
+                    "task": {
+                        "record_id": email_crm_sync_result.task_record_id,
+                        "sync_status": email_crm_sync_result.task_sync_status,
+                        "external_entity_id": email_crm_sync_result.task_external_entity_id,
+                    }
+                },
             },
             tenant_id=tenant_id,
             actor_context=payload.actor_context,

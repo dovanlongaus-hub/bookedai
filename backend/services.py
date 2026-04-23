@@ -845,6 +845,16 @@ GENERIC_MATCH_TOKENS = {
     "toi",
     "can",
 }
+
+
+def _normalize_contact_phone(value: Any) -> str | None:
+    normalized = str(value or "").strip()
+    if not normalized or not PHONE_PATTERN.match(normalized):
+        return None
+    digits_only = re.sub(r"\D", "", normalized)
+    if len(digits_only) < 8:
+        return None
+    return normalized
 AI_EVENT_DISCOVERY_KEYWORDS = {
     "event",
     "events",
@@ -1538,6 +1548,7 @@ class OpenAIService:
                     "location": str(item.get("location") or "").strip() or None,
                     "source_url": source_url,
                     "booking_url": str(item.get("booking_url") or "").strip() or None,
+                    "contact_phone": _normalize_contact_phone(item.get("contact_phone")),
                     "match_score": match_score,
                     "service_relevance": service_relevance,
                     "location_relevance": location_relevance,
@@ -1556,6 +1567,7 @@ class OpenAIService:
                 float(item.get("time_relevance") or 0.0),
                 float(item.get("constraint_relevance") or 0.0),
                 1 if item.get("booking_url") else 0,
+                1 if item.get("contact_phone") else 0,
                 1 if item.get("official_source") else 0,
             ),
             reverse=True,
@@ -1599,6 +1611,7 @@ class OpenAIService:
                             "location": {"type": ["string", "null"]},
                             "source_url": {"type": "string"},
                             "booking_url": {"type": ["string", "null"]},
+                            "contact_phone": {"type": ["string", "null"]},
                             "match_score": {"type": "number", "minimum": 0, "maximum": 1},
                             "service_relevance": {"type": "number", "minimum": 0, "maximum": 1},
                             "location_relevance": {"type": "number", "minimum": 0, "maximum": 1},
@@ -1615,6 +1628,7 @@ class OpenAIService:
                             "location",
                             "source_url",
                             "booking_url",
+                            "contact_phone",
                             "match_score",
                             "service_relevance",
                             "location_relevance",
@@ -2511,7 +2525,11 @@ class BookingAssistantService:
         matched_events: list[AIEventItem] = []
         if wants_events:
             event_search_service = AIEventSearchService(self.settings)
-            matched_events = await event_search_service.search(message)
+            try:
+                matched_events = await event_search_service.search(message)
+            except Exception as exc:
+                logger.warning("booking_assistant_event_search_failed: %s", exc)
+                matched_events = []
 
         ranked_matches = _rank_services(
             effective_query,
@@ -2607,6 +2625,210 @@ class BookingAssistantService:
             matched_events=matched_events if wants_events else [],
             suggested_service_id=suggested_service_id,
             should_request_location=should_request_location,
+        )
+
+    async def create_session(
+        self,
+        payload: BookingAssistantSessionRequest,
+        *,
+        email_service: "EmailService",
+        n8n_service: N8NService,
+        services: list[ServiceCatalogItem] | None = None,
+    ) -> BookingAssistantSessionResponse:
+        catalog = services or SERVICE_CATALOG
+        service = next((item for item in catalog if item.id == payload.service_id), None)
+        if not service:
+            raise ValueError("Selected service was not found")
+
+        normalized_email = (payload.customer_email or "").strip().lower() or None
+        normalized_phone = payload.customer_phone.strip() if payload.customer_phone else None
+
+        self._validate_customer_details(
+            customer_name=payload.customer_name,
+            customer_email=normalized_email,
+            customer_phone=normalized_phone,
+        )
+        self._validate_requested_slot(
+            requested_date=payload.requested_date,
+            requested_time=payload.requested_time,
+            timezone_name=payload.timezone,
+        )
+
+        booking_reference = f"BAI-{uuid4().hex[:8].upper()}"
+        portal_url = build_customer_portal_url(self.CUSTOMER_PORTAL_BASE_URL, booking_reference)
+        business_recipient = (
+            (service.business_email or "").strip().lower() or self.settings.booking_business_email
+        )
+        info_recipient = self.settings.booking_business_email.strip().lower()
+        amount_label = format_amount(service.amount_aud)
+
+        payment_status = "payment_follow_up_required"
+        payment_url = build_manual_followup_url(
+            booking_reference=booking_reference,
+            service_name=service.name,
+            business_recipient=business_recipient,
+            customer_name=payload.customer_name,
+            customer_email=normalized_email,
+            customer_phone=normalized_phone,
+            requested_date=payload.requested_date.isoformat(),
+            requested_time=payload.requested_time.strftime("%H:%M"),
+            timezone=payload.timezone,
+            notes=payload.notes,
+        )
+        meeting_status = "configuration_required"
+        meeting_join_url: str | None = None
+        meeting_event_url: str | None = None
+        calendar_add_url = build_google_calendar_url(
+            booking_reference=booking_reference,
+            service=service,
+            customer_name=payload.customer_name,
+            requested_date=payload.requested_date,
+            requested_time=payload.requested_time,
+            timezone=payload.timezone,
+            notes=payload.notes,
+        )
+
+        if normalized_email and zoho_calendar_configured(self.settings):
+            try:
+                meeting_join_url, meeting_event_url = await create_zoho_calendar_event(
+                    settings=self.settings,
+                    booking_reference=booking_reference,
+                    service=service,
+                    payload=payload,
+                    customer_email=normalized_email,
+                )
+                meeting_status = "scheduled"
+            except Exception:
+                meeting_status = "configuration_required"
+
+        if self.settings.stripe_secret_key:
+            try:
+                payment_url = await self._create_stripe_checkout_url(
+                    booking_reference=booking_reference,
+                    service=service,
+                    payload=payload,
+                )
+                payment_status = "stripe_checkout_ready"
+            except Exception:
+                payment_status = "payment_follow_up_required"
+
+        email_status = "pending_manual_followup"
+        if email_service.smtp_configured():
+            try:
+                if normalized_email:
+                    await email_service.send_email(
+                        to=[normalized_email],
+                        cc=[business_recipient, info_recipient],
+                        subject=f"BookedAI booking request {booking_reference}",
+                        text=build_booking_customer_confirmation_text(
+                            booking_reference=booking_reference,
+                            service_name=service.name,
+                            requested_date=payload.requested_date.isoformat(),
+                            requested_time=payload.requested_time.strftime("%H:%M"),
+                            timezone=payload.timezone,
+                            amount_label=amount_label,
+                            payment_url=payment_url,
+                            business_email=business_recipient,
+                            meeting_join_url=meeting_join_url,
+                            meeting_event_url=meeting_event_url,
+                            calendar_add_url=calendar_add_url,
+                        ),
+                    )
+                await email_service.send_email(
+                    to=[business_recipient],
+                    cc=[info_recipient],
+                    subject=f"New BookedAI booking lead {booking_reference}",
+                    text=build_booking_internal_notification_text(
+                        booking_reference=booking_reference,
+                        service_name=service.name,
+                        customer_name=payload.customer_name,
+                        customer_email=normalized_email,
+                        customer_phone=normalized_phone,
+                        requested_date=payload.requested_date.isoformat(),
+                        requested_time=payload.requested_time.strftime("%H:%M"),
+                        timezone=payload.timezone,
+                        notes=payload.notes,
+                        payment_url=payment_url,
+                        meeting_join_url=meeting_join_url,
+                        meeting_event_url=meeting_event_url,
+                        calendar_add_url=calendar_add_url,
+                    ),
+                )
+                email_status = "sent" if normalized_email else "pending_manual_followup"
+            except Exception:
+                email_status = "pending_manual_followup"
+
+        workflow_status = await n8n_service.trigger_booking(
+            BookingWorkflowPayload(
+                conversation_id=booking_reference,
+                message_id=booking_reference,
+                source="booking_assistant",
+                customer_message=payload.notes or f"Booking request for {service.name}",
+                ai_summary=(
+                    f"{payload.customer_name} requested {service.name} on "
+                    f"{payload.requested_date} at {payload.requested_time}"
+                ),
+                ai_intent="booking",
+                customer_reply="Booking assistant session created and ready for payment or follow-up.",
+                contact={
+                    "name": payload.customer_name,
+                    "email": normalized_email,
+                    "phone": normalized_phone,
+                },
+                booking={
+                    "requested_service": service.name,
+                    "requested_date": payload.requested_date.isoformat(),
+                    "requested_time": payload.requested_time.strftime("%H:%M"),
+                    "timezone": payload.timezone,
+                    "notes": payload.notes,
+                },
+                metadata={
+                    "booking_reference": booking_reference,
+                    "service_id": service.id,
+                    "business_email": business_recipient,
+                    "portal_url": portal_url,
+                    "meeting_status": meeting_status,
+                    "meeting_join_url": meeting_join_url,
+                    "meeting_event_url": meeting_event_url,
+                    "calendar_add_url": calendar_add_url,
+                    "payment_status": payment_status,
+                    "payment_url": payment_url,
+                },
+            )
+        )
+
+        confirmation_message = (
+            "Your booking request is ready. Continue to Stripe checkout to secure the appointment."
+            if payment_status == "stripe_checkout_ready"
+            else (
+                "Your booking request has been captured. Payment checkout will be completed with "
+                f"a follow-up from {business_recipient}."
+            )
+        )
+        if meeting_status == "scheduled":
+            confirmation_message += " Your calendar event has also been prepared."
+
+        return BookingAssistantSessionResponse(
+            status="ok",
+            booking_reference=booking_reference,
+            portal_url=portal_url,
+            service=service,
+            amount_aud=service.amount_aud,
+            amount_label=amount_label,
+            requested_date=payload.requested_date.isoformat(),
+            requested_time=payload.requested_time.strftime("%H:%M"),
+            timezone=payload.timezone,
+            payment_status=payment_status,  # type: ignore[arg-type]
+            payment_url=payment_url,
+            qr_code_url=build_qr_code_url(payment_url),
+            email_status=email_status,  # type: ignore[arg-type]
+            meeting_status=meeting_status,  # type: ignore[arg-type]
+            meeting_join_url=meeting_join_url,
+            meeting_event_url=meeting_event_url,
+            calendar_add_url=calendar_add_url,
+            confirmation_message=confirmation_message,
+            contact_email=business_recipient,
+            workflow_status=workflow_status,
         )
 
     def _should_search_ai_events(self, message: str) -> bool:

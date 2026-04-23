@@ -15,6 +15,13 @@ const workspaceConfigs: WorkspaceConfig[] = [
     backendSurface: '/api/admin/overview, /api/admin/bookings, /api/admin/bookings/{id}',
   },
   {
+    id: 'tenants',
+    label: 'Tenants',
+    summary: 'Tenant identity, permissions, branding, HTML intro, and tenant catalog editing.',
+    backendSurface:
+      '/api/admin/tenants, /api/admin/tenants/{tenant}, members, services, media upload',
+  },
+  {
     id: 'catalog',
     label: 'Catalog',
     summary: 'Service import, partner publishing, and content activation.',
@@ -63,7 +70,7 @@ export function AdminWorkspaceNav({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-3">
+      <div className="mt-6 grid gap-4 xl:grid-cols-4">
         {workspaceConfigs.map((workspace) => {
           const isActive = workspace.id === activeWorkspace;
           return (

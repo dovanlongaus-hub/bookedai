@@ -26,6 +26,132 @@ async function stubAdminApis(page: Parameters<typeof test>[0]['page']) {
     window.localStorage.setItem('bookedai_admin_expires_at', session.expiresAt);
   }, storedSession);
 
+  const tenantDirectory = [
+    {
+      id: 'tenant-harbour-glow',
+      slug: 'harbour-glow',
+      name: 'Harbour Glow Spa',
+      status: 'active',
+      timezone: 'Australia/Sydney',
+      locale: 'en-AU',
+      industry: 'Spa',
+      active_memberships: 2,
+      total_services: 2,
+      published_services: 1,
+      updated_at: '2026-04-16T00:00:00Z',
+    },
+  ];
+  const tenantWorkspace = {
+    logo_url: 'https://example.com/logo.png',
+    hero_image_url: 'https://example.com/hero.png',
+    introduction_html: '<p>Hydrating treatments for Sydney clients.</p>',
+    guides: {
+      overview: 'Start with brand posture.',
+      experience: 'Keep the intro HTML concise and premium.',
+      catalog: 'Publish only complete booking-critical rows.',
+      plugin: '',
+      bookings: '',
+      integrations: '',
+      billing: '',
+      team: 'Use least privilege when changing access.',
+    },
+  };
+  const tenantMembers = [
+    {
+      email: 'owner@harbourglow.example.com',
+      full_name: 'Alicia Glow',
+      role: 'tenant_admin',
+      status: 'active',
+      auth_provider: 'google',
+      created_at: '2026-04-15T00:00:00Z',
+      updated_at: '2026-04-16T00:00:00Z',
+    },
+    {
+      email: 'ops@harbourglow.example.com',
+      full_name: 'Casey Ops',
+      role: 'operator',
+      status: 'active',
+      auth_provider: 'password',
+      created_at: '2026-04-15T00:00:00Z',
+      updated_at: '2026-04-16T00:00:00Z',
+    },
+  ];
+  const tenantServices = [
+    {
+      id: 11,
+      service_id: 'signature-facial-sydney',
+      tenant_id: 'tenant-harbour-glow',
+      business_name: 'Harbour Glow Spa',
+      business_email: 'bookings@harbourglow.example.com',
+      name: 'Signature Facial',
+      category: 'Spa',
+      summary: 'Hydrating skin treatment in central Sydney.',
+      amount_aud: 139,
+      currency_code: 'AUD',
+      display_price: '',
+      duration_minutes: 60,
+      venue_name: 'Harbour Glow Spa',
+      location: 'Sydney NSW 2000',
+      map_url: null,
+      booking_url: 'https://book.example.com/facial',
+      image_url: null,
+      source_url: 'https://example.com/facial',
+      tags: ['facial', 'skin'],
+      featured: true,
+      is_active: true,
+      publish_state: 'published',
+      is_publish_ready: true,
+      is_search_ready: true,
+      quality_warnings: [],
+      updated_at: '2026-04-16T00:00:00Z',
+    },
+    {
+      id: 12,
+      service_id: 'outdoor-banner-print',
+      tenant_id: 'tenant-harbour-glow',
+      business_name: 'Harbour Glow Spa',
+      business_email: 'bookings@harbourglow.example.com',
+      name: 'Outdoor Banner Print',
+      category: 'Print and Signage',
+      summary: 'Event banner print service for activations.',
+      amount_aud: 80,
+      currency_code: 'AUD',
+      display_price: '',
+      duration_minutes: 30,
+      venue_name: 'Harbour Glow Spa',
+      location: '',
+      map_url: null,
+      booking_url: 'https://example.com/banner',
+      image_url: null,
+      source_url: 'https://example.com/banner',
+      tags: ['signage'],
+      featured: false,
+      is_active: false,
+      publish_state: 'draft',
+      is_publish_ready: false,
+      is_search_ready: false,
+      quality_warnings: ['missing_location'],
+      updated_at: '2026-04-16T00:00:00Z',
+    },
+  ];
+
+  function buildTenantDetail() {
+    tenantDirectory[0].active_memberships = tenantMembers.filter(
+      (member) => member.status === 'active',
+    ).length;
+    tenantDirectory[0].total_services = tenantServices.length;
+    tenantDirectory[0].published_services = tenantServices.filter(
+      (service) => service.publish_state === 'published',
+    ).length;
+    return {
+      status: 'ok',
+      tenant: tenantDirectory[0],
+      workspace: tenantWorkspace,
+      members: tenantMembers,
+      services: tenantServices,
+    };
+  }
+
   await page.route('**/api/admin/overview', async (route) => {
     await route.fulfill({
       status: 200,
@@ -292,6 +418,254 @@ async function stubAdminApis(page: Parameters<typeof test>[0]['page']) {
         ],
       }),
     });
+  });
+
+  await page.route('**/api/admin/tenants', async (route) => {
+    if (route.request().method() !== 'GET') {
+      await route.continue();
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', items: tenantDirectory }),
+    });
+  });
+
+  await page.route('**/api/admin/tenants/harbour-glow/members/*', async (route) => {
+    const method = route.request().method();
+    if (method !== 'PATCH') {
+      await route.continue();
+      return;
+    }
+    const memberEmail = decodeURIComponent(route.request().url().split('/members/')[1] || '');
+    const payload = route.request().postDataJSON() as {
+      full_name?: string | null;
+      role?: string | null;
+      status?: string | null;
+    };
+    const member = tenantMembers.find((item) => item.email === memberEmail);
+    if (!member) {
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Tenant member was not found.' }),
+      });
+      return;
+    }
+    member.full_name = payload.full_name ?? member.full_name;
+    member.role = payload.role ?? member.role;
+    member.status = payload.status ?? member.status;
+    member.updated_at = '2026-04-22T00:00:00Z';
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(buildTenantDetail()),
+    });
+  });
+
+  await page.route('**/api/admin/tenants/harbour-glow/services/*', async (route) => {
+    const method = route.request().method();
+    const serviceRowId = Number(route.request().url().split('/services/')[1] || '');
+    const service = tenantServices.find((item) => item.id === serviceRowId);
+
+    if (method === 'DELETE') {
+      if (!service) {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Tenant service was not found.' }),
+        });
+        return;
+      }
+      if (service.publish_state === 'published') {
+        await route.fulfill({
+          status: 422,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            detail: 'Archive the service before deleting it from the admin workspace.',
+          }),
+        });
+        return;
+      }
+      const serviceIndex = tenantServices.findIndex((item) => item.id === serviceRowId);
+      tenantServices.splice(serviceIndex, 1);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          tenant: tenantDirectory[0],
+          items: tenantServices,
+        }),
+      });
+      return;
+    }
+
+    if (method === 'PUT') {
+      const payload = route.request().postDataJSON() as Record<string, unknown>;
+      if (!service) {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({ detail: 'Tenant service was not found.' }),
+        });
+        return;
+      }
+
+      const nextCategory = String(payload.category ?? '').trim();
+      const nextLocation = String(payload.location ?? '').trim();
+      const nextDisplayPrice = String(payload.display_price ?? '').trim();
+      const nextAmount = payload.amount_aud == null ? null : Number(payload.amount_aud);
+      const requestedPublishState = String(payload.publish_state ?? 'draft');
+      const qualityWarnings = [];
+      if (!nextCategory) {
+        qualityWarnings.push('missing_category');
+      }
+      if (!nextLocation) {
+        qualityWarnings.push('missing_location');
+      }
+      if (!(nextAmount != null && nextAmount > 0) && !nextDisplayPrice) {
+        qualityWarnings.push('missing_price');
+      }
+      if (requestedPublishState === 'published' && qualityWarnings.length) {
+        await route.fulfill({
+          status: 422,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            detail: 'This service cannot be published until booking-critical fields are complete.',
+          }),
+        });
+        return;
+      }
+
+      service.business_name = String(payload.business_name ?? service.business_name);
+      service.business_email = String(payload.business_email ?? service.business_email ?? '');
+      service.name = String(payload.name ?? service.name);
+      service.category = nextCategory || null;
+      service.summary = String(payload.summary ?? service.summary ?? '');
+      service.amount_aud = nextAmount;
+      service.currency_code = String(payload.currency_code ?? service.currency_code ?? 'AUD');
+      service.display_price = nextDisplayPrice;
+      service.duration_minutes =
+        payload.duration_minutes == null ? null : Number(payload.duration_minutes);
+      service.venue_name = String(payload.venue_name ?? service.venue_name ?? '');
+      service.location = nextLocation;
+      service.booking_url = String(payload.booking_url ?? service.booking_url ?? '');
+      service.image_url = String(payload.image_url ?? service.image_url ?? '');
+      service.source_url = String(payload.source_url ?? service.source_url ?? '');
+      service.tags = Array.isArray(payload.tags)
+        ? payload.tags.map((item) => String(item))
+        : service.tags;
+      service.featured = Boolean(payload.featured);
+      service.quality_warnings = qualityWarnings;
+      service.publish_state =
+        requestedPublishState === 'archived'
+          ? 'archived'
+          : requestedPublishState === 'published'
+            ? 'published'
+            : qualityWarnings.length
+              ? 'review'
+              : 'draft';
+      service.is_active = service.publish_state === 'published';
+      service.is_publish_ready = qualityWarnings.length === 0;
+      service.is_search_ready = service.publish_state === 'published' && qualityWarnings.length === 0;
+      service.updated_at = '2026-04-22T00:00:00Z';
+
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          tenant: tenantDirectory[0],
+          items: tenantServices,
+        }),
+      });
+      return;
+    }
+
+    await route.continue();
+  });
+
+  await page.route('**/api/admin/tenants/harbour-glow/services', async (route) => {
+    if (route.request().method() !== 'POST') {
+      await route.continue();
+      return;
+    }
+    const payload = route.request().postDataJSON() as Record<string, unknown>;
+    const createdService = {
+      id: 100 + tenantServices.length,
+      service_id: String(payload.service_id ?? `created-service-${tenantServices.length}`),
+      tenant_id: 'tenant-harbour-glow',
+      business_name: String(payload.business_name ?? tenantDirectory[0].name),
+      business_email: String(payload.business_email ?? ''),
+      name: String(payload.name ?? 'New Service'),
+      category: String(payload.category ?? '') || null,
+      summary: String(payload.summary ?? ''),
+      amount_aud: payload.amount_aud == null ? null : Number(payload.amount_aud),
+      currency_code: String(payload.currency_code ?? 'AUD'),
+      display_price: String(payload.display_price ?? ''),
+      duration_minutes: payload.duration_minutes == null ? null : Number(payload.duration_minutes),
+      venue_name: String(payload.venue_name ?? ''),
+      location: String(payload.location ?? ''),
+      map_url: null,
+      booking_url: String(payload.booking_url ?? ''),
+      image_url: String(payload.image_url ?? ''),
+      source_url: String(payload.source_url ?? ''),
+      tags: Array.isArray(payload.tags) ? payload.tags.map((item) => String(item)) : [],
+      featured: Boolean(payload.featured),
+      is_active: false,
+      publish_state: 'draft',
+      is_publish_ready: false,
+      is_search_ready: false,
+      quality_warnings: [],
+      updated_at: '2026-04-22T00:00:00Z',
+    };
+    tenantServices.push(createdService);
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        tenant: tenantDirectory[0],
+        items: tenantServices,
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/tenants/harbour-glow', async (route) => {
+    const method = route.request().method();
+    if (method === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildTenantDetail()),
+      });
+      return;
+    }
+    if (method === 'PATCH') {
+      const payload = route.request().postDataJSON() as Record<string, string>;
+      tenantDirectory[0].name = payload.business_name || tenantDirectory[0].name;
+      tenantDirectory[0].industry = payload.industry || tenantDirectory[0].industry;
+      tenantDirectory[0].timezone = payload.timezone || tenantDirectory[0].timezone;
+      tenantDirectory[0].locale = payload.locale || tenantDirectory[0].locale;
+      tenantDirectory[0].updated_at = '2026-04-22T00:00:00Z';
+      tenantWorkspace.logo_url = payload.logo_url || tenantWorkspace.logo_url;
+      tenantWorkspace.hero_image_url =
+        payload.hero_image_url || tenantWorkspace.hero_image_url;
+      tenantWorkspace.introduction_html =
+        payload.introduction_html || tenantWorkspace.introduction_html;
+      tenantWorkspace.guides.overview =
+        payload.guide_overview || tenantWorkspace.guides.overview;
+      tenantWorkspace.guides.team = payload.guide_team || tenantWorkspace.guides.team;
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(buildTenantDetail()),
+      });
+      return;
+    }
+    await route.continue();
   });
 }
 
@@ -747,14 +1121,84 @@ test('admin workspace navigation splits operations, catalog, and reliability vie
   await expect(page.getByText('Prompt 8 admin IA is now split by operator intent')).toBeVisible();
   await expect(page.getByText('Bookings and transactions')).toBeVisible();
 
-  await page.getByRole('button', { name: /Catalog/i }).click();
+  await page
+    .locator('button')
+    .filter({ has: page.getByText('Tenants', { exact: true }) })
+    .first()
+    .click();
+  await expect(page.getByText('Enterprise tenant workspace')).toBeVisible();
+  await expect(page.getByText('Tenant team and role controls')).toBeVisible();
+
+  await page
+    .locator('button')
+    .filter({ has: page.getByText('Catalog', { exact: true }) })
+    .first()
+    .click();
   await expect(page.getByText('Live service catalog import')).toBeVisible();
   await expect(page.getByText('Partners and customers')).toBeVisible();
 
-  await page.getByRole('button', { name: /Reliability/i }).click();
+  await page
+    .locator('button')
+    .filter({ has: page.getByText('Reliability', { exact: true }) })
+    .first()
+    .click();
   await expect(page.getByText('V1 search and trust preview')).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open live configuration' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Open API inventory' })).toBeVisible();
+});
+
+test('tenant workspace supports profile updates, member access changes, and publish/archive safeguards @admin', async ({
+  page,
+}) => {
+  await stubAdminApis(page);
+  await stubAdminPreviewV1(page);
+
+  await page.goto('/admin#tenants');
+
+  const tenantProfile = page.locator('#tenant-profile');
+  await expect(tenantProfile.getByText('Tenant workspace', { exact: true })).toBeVisible();
+  await expect(tenantProfile.getByText('Harbour Glow Spa')).toBeVisible();
+  await tenantProfile.getByLabel('Business name').fill('Harbour Glow Group');
+  await tenantProfile.getByRole('button', { name: 'Save tenant workspace' }).click();
+  await expect(page.getByText('Tenant profile updated.')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Harbour Glow Group/i }).first()).toBeVisible();
+
+  const tenantTeam = page.locator('#tenant-team');
+  await expect(tenantTeam.getByText('ops@harbourglow.example.com')).toBeVisible();
+  await tenantTeam.locator('select').nth(2).selectOption('finance_manager');
+  await tenantTeam.getByRole('button', { name: 'Save access' }).nth(1).click();
+  await expect(page.getByText('Tenant member access updated.')).toBeVisible();
+
+  const tenantServices = page.locator('#tenant-services');
+  await expect(tenantServices.getByText('Outdoor Banner Print')).toBeVisible();
+  await expect(tenantServices.getByRole('button', { name: 'Publish' }).first()).toBeDisabled();
+
+  await tenantServices.getByRole('button', { name: 'Edit' }).nth(1).click();
+  const tenantServiceForm = page.locator('#tenant-services form');
+  await tenantServiceForm.getByLabel('Publish state').selectOption('published');
+  await expect(
+    tenantServiceForm.getByText('Publish guardrails still need attention'),
+  ).toBeVisible();
+  await expect(
+    tenantServiceForm.getByRole('button', { name: 'Save service' }),
+  ).toBeDisabled();
+
+  await tenantServiceForm.getByLabel('Location').fill('Sydney NSW 2000');
+  await expect(
+    tenantServiceForm.getByText('This service is ready to publish from admin'),
+  ).toBeVisible();
+  await tenantServiceForm.getByRole('button', { name: 'Save service' }).click();
+  await expect(page.getByText('Tenant service updated.')).toBeVisible();
+
+  await expect(tenantServices.getByRole('button', { name: 'Delete' }).nth(1)).toBeDisabled();
+  await tenantServices.getByRole('button', { name: 'Archive' }).nth(1).click();
+  await expect(page.getByText('Tenant service archived.')).toBeVisible();
+
+  await tenantServices.getByRole('button', { name: 'Delete' }).nth(1).click();
+  await expect(tenantServices.getByText('Confirm delete again')).toBeVisible();
+  await tenantServices.getByRole('button', { name: 'Confirm delete' }).click();
+  await expect(page.getByText('Tenant service deleted.')).toBeVisible();
+  await expect(page.getByText('Outdoor Banner Print')).not.toBeVisible();
 });
 
 test('catalog workspace surfaces search-readiness summary and review warnings @admin', async ({

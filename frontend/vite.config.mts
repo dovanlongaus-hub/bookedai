@@ -2,6 +2,14 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 import { fileURLToPath, URL } from 'node:url';
+import path from 'node:path';
+
+const configuredOutDir = process.env.BUILD_OUT_DIR?.trim();
+const outDir = configuredOutDir
+  ? path.isAbsolute(configuredOutDir)
+    ? configuredOutDir
+    : path.resolve(fileURLToPath(new URL('.', import.meta.url)), configuredOutDir)
+  : 'dist';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
@@ -17,5 +25,8 @@ export default defineConfig({
   preview: {
     host: '0.0.0.0',
     port: 3000,
+  },
+  build: {
+    outDir,
   },
 });

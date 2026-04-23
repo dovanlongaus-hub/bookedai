@@ -1,0 +1,6 @@
+Title,Status,Phase Range,Primary Outcome,Core Docs,Sprint Range,Notion Update Note
+Program Reset and Alignment,Done,Phase 0,One aligned product pricing architecture and roadmap baseline,docs/architecture/phase-0-detailed-implementation-plan.md,Sprint 1,Keep as completed baseline
+Public Revenue-Engine Experience,Done,Phase 1-2,Premium public narrative brand system landing implementation and growth instrumentation,docs/architecture/phase-1-2-detailed-implementation-package.md,Sprint 2-3,Keep as implemented baseline with frontend/ still the production source of truth
+Commercial Platform Foundation,In progress,Phase 3-6,Search booking reporting payments recovery and commercial foundations,docs/architecture/phase-3-6-detailed-implementation-package.md,Sprint 4-10,Reflect as strong partial foundation rather than just planned work
+Operator-Facing Revenue Workspaces,In progress,Phase 7-8,Tenant revenue workspace and internal admin commercial support platform,docs/architecture/phase-7-8-detailed-implementation-package.md,Sprint 11-14,Keep active because Sprint 14 close-out remains in flight
+QA and Release Hardening,Not started,Phase 9,Regression protection telemetry release gates rollback discipline and scale readiness,docs/architecture/phase-9-detailed-implementation-package.md,Sprint 15-16,Keep future-facing but note seeded planning already exists

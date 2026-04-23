@@ -74,9 +74,13 @@ The system should treat these as separate actor types:
 ### Tenant users
 
 - Supported auth methods:
-  - email and password
-  - magic link
+  - email verification code
+  - email and password as compatibility fallback
   - optional OAuth such as Google
+- Primary product posture:
+  - email should be the main tenant identifier
+  - tenant login should prefer one-time verification code over username-first credentials
+  - Google sign-in and Google-led first workspace creation should stay on the same login surface instead of sending operators into a separate registration flow
 - Recommended architecture:
   - use a centralized auth provider such as Supabase Auth or equivalent
   - map external identity to local tenant membership records

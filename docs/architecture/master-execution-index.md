@@ -1,6 +1,6 @@
 # BookedAI Master Execution Index
 
-Date: `2026-04-21`
+Date: `2026-04-22`
 
 Document status: `active leadership index`
 
@@ -19,11 +19,18 @@ Current implementation synchronization note:
   - `docs/development/backend-boundaries.md`
   - `docs/development/env-strategy.md`
   - `docs/development/roadmap-sprint-document-register.md`
+- from `2026-04-22`, this index should also inherit:
+  - `docs/development/sprint-13-16-user-surface-delivery-package.md`
+  - `docs/development/bookedai-chatbot-landing-implementation-plan.md`
+  - `docs/development/bookedai-sample-video-brief.md`
 - current backend execution truth under that stack is:
   - top-level router ownership is already split in `backend/app.py`
   - bounded-context `/api/v1/*` routers already exist under `backend/api/v1_router.py`
   - `backend/api/v1_tenant_handlers.py` is the first live handler extraction module
   - `backend/api/v1_routes.py` remains the main legacy handler concentration point still being decomposed
+  - tenant auth is now explicitly `email-first` in the active runtime, with verification-code flows and Google continuation on the same gateway
+  - the matching lane now includes a richer Phase 2 contract with normalized `booking_fit` and `stage_counts`
+  - the first explicit admin growth module is now live at `/admin/campaigns`
 
 ## Execution truth rule
 
@@ -178,10 +185,13 @@ Core docs:
 
 The current active execution emphasis is:
 
-- finish tenant bounded-context extraction first, including portal-adjacent handlers
-- complete tenant paid-SaaS loops around onboarding, billing, team, and catalog workflow
-- keep Sprint 15 and Sprint 16 focused on release-grade hardening, especially the known public-web fallback regressions in `backend/tests/test_api_v1_routes.py`
-- defer deeper `backend/services.py` decomposition until the active `v1` ownership cleanup is safer and clearer
+- finish the Sprint 13-16 user-surface package without resetting already-implemented tenant and admin foundations back to planning-only status
+- keep tenant paid-SaaS completion moving through email-first auth, billing continuity, team posture, and publish-safe catalog workflow
+- keep Sprint 15 and Sprint 16 focused on release-grade hardening plus the current landing, pitch, and promo-video delivery cadence:
+  - freeze scope by Friday, April 24, 2026
+  - get AI end-to-end working before UI polish
+  - deliver draft, rough video, final edit, and Monday polish in the locked April 25-27 window
+- continue bounded-context cleanup only where route continuity and operator safety stay protected
 
 ## Leadership checkpoints
 
@@ -201,3 +211,5 @@ Leadership should review the program at these points:
 - `docs/architecture/implementation-phase-roadmap.md`
 - `docs/architecture/current-phase-sprint-execution-plan.md`
 - `docs/development/roadmap-sprint-document-register.md`
+- `docs/development/bookedai-chatbot-landing-implementation-plan.md`
+- `docs/development/bookedai-sample-video-brief.md`

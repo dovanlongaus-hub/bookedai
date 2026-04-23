@@ -1,0 +1,6 @@
+- Normalized the root Next.js admin scaffold to the requested folder shape instead of leaving shell logic spread across `app/` and `components/admin/`.
+- Added `features/admin/shell/{navigation,topbar,workspace-shell}.tsx` for sidebar layout and topbar composition.
+- Added `server/admin/{auth,tenant-context,rbac,workspace}.ts` so auth guard and tenant context now resolve through a server-side bootstrap layer.
+- Added base shadcn-style primitives under `components/ui/shadcn/` for button, card, input, textarea, badge, label, and separator.
+- Rewired `app/admin/layout.tsx` to use the server workspace context and the new feature-owned shell.
+- Verification: `node node_modules/next/dist/bin/next build` passed.

@@ -18,8 +18,8 @@ from api.v1_routes import (
     _query_intent_constraint_groups,
     _raw_query_intent_terms,
     _search_terms,
-    router as v1_router,
 )
+from api.v1_router import router as v1_router
 from repositories.integration_repository import IntegrationRepository
 from service_layer.prompt9_matching_service import RankedServiceMatch
 from repositories.tenant_repository import TenantRepository
@@ -34,6 +34,18 @@ def create_test_app() -> FastAPI:
         admin_password="test-admin-password",
         admin_session_ttl_hours=8,
         google_oauth_client_id="google-client-id",
+        zoho_crm_api_base_url="https://www.zohoapis.com.au/crm/v8",
+        zoho_accounts_base_url="https://accounts.zoho.com.au",
+        zoho_crm_access_token="",
+        zoho_crm_refresh_token="",
+        zoho_crm_client_id="",
+        zoho_crm_client_secret="",
+        zoho_crm_default_lead_module="Leads",
+        zoho_crm_default_contact_module="Contacts",
+        zoho_crm_default_deal_module="Deals",
+        zoho_crm_default_task_module="Tasks",
+        zoho_crm_notification_token="",
+        zoho_crm_notification_channel_id="",
     )
     app.state.email_service = SimpleNamespace(
         smtp_configured=lambda: False,
@@ -124,6 +136,696 @@ class _WritableFakeSession:
 
 
 class Apiv1IntegrationRoutes(TestCase):
+    def test_crm_sync_status_returns_record_envelope(self):
+        async def _get_latest_sync_record_for_entity(*_args, **_kwargs):
+            return {
+                "id": 88,
+                "entity_type": "contact",
+                "provider": "zoho_crm",
+                "sync_status": "failed",
+                "local_entity_id": "customer-123",
+                "external_entity_id": None,
+                "last_synced_at": None,
+                "created_at": "2026-04-22T05:55:00+00:00",
+                "latest_error_code": "provider_http_error",
+                "latest_error_message": "Zoho CRM timed out.",
+                "latest_error_retryable": True,
+                "latest_error_at": "2026-04-22T05:56:00+00:00",
+                "retry_count": 1,
+            }
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
+            _fake_get_session,
+        ), patch(
+            "api.v1_integration_handlers.CrmSyncRepository.get_latest_sync_record_for_entity",
+            _get_latest_sync_record_for_entity,
+        ):
+            client = TestClient(create_test_app())
+            response = client.get(
+                "/api/v1/integrations/crm-sync/status?entity_type=contact&local_entity_id=customer-123"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["entity_type"], "contact")
+        self.assertEqual(payload["data"]["local_entity_id"], "customer-123")
+        self.assertEqual(payload["data"]["record"]["id"], 88)
+        self.assertEqual(payload["data"]["record"]["sync_status"], "failed")
+
+    def test_crm_sync_status_requires_entity_query(self):
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub):
+            client = TestClient(create_test_app())
+            response = client.get("/api/v1/integrations/crm-sync/status")
+
+        self.assertEqual(response.status_code, 400)
+        payload = response.json()
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["error"]["code"], "crm_sync_status_query_invalid")
+
+    def test_sync_crm_contact_returns_success_envelope(self):
+        async def _orchestrate_contact_sync(*_args, **_kwargs):
+            return SimpleNamespace(
+                record_id=61,
+                sync_status="synced",
+                external_entity_id="zoho-contact-61",
+                warning_codes=[],
+            )
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
+            _fake_get_session,
+        ), patch(
+            "api.v1_integration_handlers.orchestrate_contact_sync",
+            _orchestrate_contact_sync,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/integrations/crm-sync/contact",
+                json={
+                    "contact_id": "customer-123",
+                    "full_name": "BookedAI Customer",
+                    "email": "customer@example.com",
+                    "phone": "0400111222",
+                    "actor_context": {
+                        "channel": "admin",
+                        "tenant_id": "tenant-test",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["contact_id"], "customer-123")
+        self.assertEqual(payload["data"]["sync_status"], "synced")
+        self.assertEqual(payload["data"]["external_entity_id"], "zoho-contact-61")
+
+    def test_crm_deal_outcome_feedback_returns_success_envelope(self):
+        async def _create_sync_record(*_args, **_kwargs):
+            return 91
+
+        async def _update_sync_record_status(*_args, **_kwargs):
+            return None
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
+            _fake_get_session,
+        ), patch(
+            "api.v1_integration_handlers.CrmSyncRepository.create_sync_record",
+            _create_sync_record,
+        ), patch(
+            "api.v1_integration_handlers.CrmSyncRepository.update_sync_record_status",
+            _update_sync_record_status,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/integrations/crm-feedback/deal-outcome",
+                json={
+                    "external_deal_id": "zoho-deal-91",
+                    "outcome": "won",
+                    "stage": "Closed Won",
+                    "amount_aud": 120,
+                    "actor_context": {
+                        "channel": "zoho_crm",
+                        "tenant_id": "tenant-test",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["crm_sync_record_id"], 91)
+        self.assertEqual(payload["data"]["outcome"], "won")
+
+    def test_crm_deal_outcome_summary_returns_success_envelope(self):
+        async def _get_deal_feedback_summary(*_args, **_kwargs):
+            return {
+                "summary": {
+                    "won_count": 3,
+                    "lost_count": 1,
+                    "won_revenue_cents": 45000,
+                    "feedback_count": 4,
+                    "win_rate": 0.75,
+                    "stage_signal_count": 4,
+                    "completed_task_count": 2,
+                },
+                "owner_performance": [
+                    {
+                        "owner_name": "Jamie",
+                        "total_count": 3,
+                        "won_count": 2,
+                        "lost_count": 1,
+                        "won_revenue_cents": 45000,
+                    }
+                ],
+                "lost_reasons": [
+                    {
+                        "lost_reason": "No callback response",
+                        "lost_count": 1,
+                    }
+                ],
+                "stage_breakdown": [
+                    {
+                        "stage": "Closed Won",
+                        "stage_count": 3,
+                    }
+                ],
+                "items": [
+                    {
+                        "id": 9,
+                        "local_entity_id": "deal-feedback-9",
+                        "external_entity_id": "zoho-deal-9",
+                        "sync_status": "synced",
+                        "outcome": "won",
+                        "stage": "Closed Won",
+                        "owner_name": "Jamie",
+                        "source_label": "bookedai_widget",
+                        "closed_at": "2026-04-22T08:00:00Z",
+                        "lost_reason": None,
+                        "task_completed": True,
+                        "task_completed_at": "2026-04-22T07:45:00Z",
+                        "stage_changed_at": "2026-04-22T07:30:00Z",
+                        "amount_cents": 45000,
+                        "occurred_at": "2026-04-22T08:00:00Z",
+                    }
+                ],
+            }
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
+            _fake_get_session,
+        ), patch(
+            "api.v1_integration_handlers.CrmSyncRepository.get_deal_feedback_summary",
+            _get_deal_feedback_summary,
+        ):
+            client = TestClient(create_test_app())
+            response = client.get("/api/v1/integrations/crm-feedback/deal-outcome-summary")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["summary"]["won_count"], 3)
+        self.assertEqual(payload["data"]["summary"]["win_rate"], 0.75)
+        self.assertEqual(payload["data"]["owner_performance"][0]["owner_name"], "Jamie")
+        self.assertEqual(payload["data"]["lost_reasons"][0]["lost_reason"], "No callback response")
+        self.assertEqual(payload["data"]["stage_breakdown"][0]["stage"], "Closed Won")
+        self.assertEqual(payload["data"]["items"][0]["outcome"], "won")
+        self.assertTrue(payload["data"]["items"][0]["task_completed"])
+
+    def test_poll_zoho_deal_feedback_returns_success_envelope(self):
+        async def _fetch_deal_by_id(_self, _settings, *, external_deal_id):
+            return {
+                "deal": {
+                    "id": external_deal_id,
+                    "Deal_Name": "BookedAI Demo Deal",
+                    "Stage": "Closed Won",
+                    "Owner": {"name": "Jamie Revenue"},
+                    "Amount": 180,
+                    "Closing_Date": "2026-05-07",
+                    "Modified_Time": "2026-05-07T02:00:00Z",
+                    "Lead_Source": "bookedai_widget",
+                }
+            }
+
+        async def _create_sync_record(*_args, **_kwargs):
+            return 501
+
+        async def _update_sync_record_status(*_args, **_kwargs):
+            return None
+
+        app = create_test_app()
+        app.state.settings.zoho_crm_refresh_token = "refresh-token"
+        app.state.settings.zoho_crm_client_id = "client-id"
+        app.state.settings.zoho_crm_client_secret = "client-secret"
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
+            _fake_get_session,
+        ), patch(
+            "api.v1_integration_handlers.ZohoCrmAdapter.fetch_deal_by_id",
+            _fetch_deal_by_id,
+        ), patch(
+            "api.v1_integration_handlers.CrmSyncRepository.create_sync_record",
+            _create_sync_record,
+        ), patch(
+            "api.v1_integration_handlers.CrmSyncRepository.update_sync_record_status",
+            _update_sync_record_status,
+        ):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/integrations/crm-feedback/zoho-deals/poll",
+                json={
+                    "external_deal_ids": ["zoho-deal-501"],
+                    "actor_context": {
+                        "channel": "admin",
+                        "tenant_id": "tenant-test",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["polled_count"], 1)
+        self.assertEqual(payload["data"]["ingested_count"], 1)
+        self.assertEqual(payload["data"]["items"][0]["outcome"], "won")
+
+    def test_poll_zoho_deal_feedback_skips_non_terminal_deals(self):
+        async def _fetch_deal_by_id(_self, _settings, *, external_deal_id):
+            return {
+                "deal": {
+                    "id": external_deal_id,
+                    "Deal_Name": "BookedAI Demo Deal",
+                    "Stage": "Qualification",
+                    "Owner": {"name": "Jamie Revenue"},
+                }
+            }
+
+        app = create_test_app()
+        app.state.settings.zoho_crm_refresh_token = "refresh-token"
+        app.state.settings.zoho_crm_client_id = "client-id"
+        app.state.settings.zoho_crm_client_secret = "client-secret"
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
+            _fake_get_session,
+        ), patch(
+            "api.v1_integration_handlers.ZohoCrmAdapter.fetch_deal_by_id",
+            _fetch_deal_by_id,
+        ):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/integrations/crm-feedback/zoho-deals/poll",
+                json={
+                    "external_deal_ids": ["zoho-deal-502"],
+                    "actor_context": {
+                        "channel": "admin",
+                        "tenant_id": "tenant-test",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["ingested_count"], 0)
+        self.assertEqual(payload["data"]["skipped"][0]["status"], "skipped_non_terminal")
+
+    def test_zoho_deal_feedback_webhook_returns_success_envelope(self):
+        async def _record_event(*_args, **_kwargs):
+            return 801
+
+        async def _mark_processed(*_args, **_kwargs):
+            return None
+
+        async def _fetch_deal_by_id(_self, _settings, *, external_deal_id):
+            return {
+                "deal": {
+                    "id": external_deal_id,
+                    "Deal_Name": "BookedAI Demo Deal",
+                    "Stage": "Closed Lost",
+                    "Owner": {"name": "Casey Follow-up"},
+                    "Amount": 95,
+                    "Closing_Date": "2026-05-09",
+                    "Modified_Time": "2026-05-09T05:10:00Z",
+                    "Lead_Source": "bookedai_widget",
+                    "Reason_For_Loss": "No callback response",
+                }
+            }
+
+        async def _create_sync_record(*_args, **_kwargs):
+            return 802
+
+        async def _update_sync_record_status(*_args, **_kwargs):
+            return None
+
+        app = create_test_app()
+        app.state.settings.zoho_crm_refresh_token = "refresh-token"
+        app.state.settings.zoho_crm_client_id = "client-id"
+        app.state.settings.zoho_crm_client_secret = "client-secret"
+        app.state.settings.zoho_crm_notification_token = "deals.all.notif"
+        app.state.settings.zoho_crm_notification_channel_id = "1000000068001"
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
+            _fake_get_session,
+        ), patch(
+            "api.v1_integration_handlers.WebhookEventRepository.record_event",
+            _record_event,
+        ), patch(
+            "api.v1_integration_handlers.WebhookEventRepository.mark_processed",
+            _mark_processed,
+        ), patch(
+            "api.v1_integration_handlers.ZohoCrmAdapter.fetch_deal_by_id",
+            _fetch_deal_by_id,
+        ), patch(
+            "api.v1_integration_handlers.CrmSyncRepository.create_sync_record",
+            _create_sync_record,
+        ), patch(
+            "api.v1_integration_handlers.CrmSyncRepository.update_sync_record_status",
+            _update_sync_record_status,
+        ):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/integrations/crm-feedback/zoho-webhook",
+                json={
+                    "module": "Deals",
+                    "ids": ["zoho-deal-801"],
+                    "operation": "update",
+                    "channel_id": "1000000068001",
+                    "token": "deals.all.notif",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["webhook_event_id"], 801)
+        self.assertEqual(payload["data"]["ingested_count"], 1)
+        self.assertEqual(payload["data"]["items"][0]["outcome"], "lost")
+
+    def test_zoho_deal_feedback_webhook_rejects_invalid_token(self):
+        app = create_test_app()
+        app.state.settings.zoho_crm_notification_token = "expected-token"
+        app.state.settings.zoho_crm_notification_channel_id = "1000000068001"
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/integrations/crm-feedback/zoho-webhook",
+                json={
+                    "module": "Deals",
+                    "ids": ["zoho-deal-900"],
+                    "operation": "update",
+                    "channel_id": "1000000068001",
+                    "token": "wrong-token",
+                },
+            )
+
+        self.assertEqual(response.status_code, 403)
+        payload = response.json()
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["error"]["code"], "zoho_crm_webhook_token_invalid")
+
+    def test_register_zoho_deal_feedback_webhook_returns_success_envelope(self):
+        async def _enable_notifications(
+            _self,
+            _settings,
+            *,
+            channel_id,
+            token,
+            notify_url,
+            events,
+            return_affected_field_values,
+        ):
+            return {
+                "provider": "zoho_crm",
+                "status": "success",
+                "code": "SUCCESS",
+                "message": "Successfully subscribed for actions-watch of the given module",
+                "channel_id": channel_id,
+                "token": token,
+                "notify_url": notify_url,
+                "events": events,
+                "details": {
+                    "resource_uri": "https://www.zohoapis.com.au/crm/v8/Deals",
+                    "resource_name": "Deals",
+                },
+            }
+
+        app = create_test_app()
+        app.state.settings.zoho_crm_refresh_token = "refresh-token"
+        app.state.settings.zoho_crm_client_id = "client-id"
+        app.state.settings.zoho_crm_client_secret = "client-secret"
+        app.state.settings.public_api_url = "https://api.bookedai.au"
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.ZohoCrmAdapter.enable_notifications",
+            _enable_notifications,
+        ):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/integrations/crm-feedback/zoho-webhook/register",
+                json={
+                    "module_api_name": "Deals",
+                    "channel_id": "1000000068001",
+                    "token": "deals.all.notif",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["channel_id"], "1000000068001")
+        self.assertEqual(payload["data"]["token"], "deals.all.notif")
+        self.assertEqual(
+            payload["data"]["notify_url"],
+            "https://api.bookedai.au/api/v1/integrations/crm-feedback/zoho-webhook",
+        )
+
+    def test_list_zoho_deal_feedback_webhook_returns_success_envelope(self):
+        async def _get_notification_details(_self, _settings, *, channel_id, module_api_name, page=1, per_page=200):
+            return {
+                "provider": "zoho_crm",
+                "channel_id": channel_id,
+                "items": [
+                    {
+                        "channel_id": channel_id,
+                        "resource_name": module_api_name,
+                        "notify_url": "https://api.bookedai.au/api/v1/integrations/crm-feedback/zoho-webhook",
+                        "token": "deals.all.notif",
+                        "events": ["Deals.all"],
+                    }
+                ],
+            }
+
+        app = create_test_app()
+        app.state.settings.zoho_crm_refresh_token = "refresh-token"
+        app.state.settings.zoho_crm_client_id = "client-id"
+        app.state.settings.zoho_crm_client_secret = "client-secret"
+        app.state.settings.zoho_crm_notification_channel_id = "1000000068001"
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.ZohoCrmAdapter.get_notification_details",
+            _get_notification_details,
+        ):
+            client = TestClient(app)
+            response = client.get("/api/v1/integrations/crm-feedback/zoho-webhook?channel_id=1000000068001")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["channel_id"], "1000000068001")
+        self.assertEqual(payload["data"]["items"][0]["resource_name"], "Deals")
+
+    def test_update_zoho_deal_feedback_webhook_returns_success_envelope(self):
+        async def _update_notification_details(
+            _self,
+            _settings,
+            *,
+            channel_id,
+            token,
+            notify_url,
+            events,
+            channel_expiry,
+            return_affected_field_values,
+        ):
+            return {
+                "provider": "zoho_crm",
+                "channel_id": channel_id,
+                "token": token,
+                "notify_url": notify_url,
+                "events": events,
+                "channel_expiry": channel_expiry,
+                "status": "success",
+            }
+
+        app = create_test_app()
+        app.state.settings.zoho_crm_refresh_token = "refresh-token"
+        app.state.settings.zoho_crm_client_id = "client-id"
+        app.state.settings.zoho_crm_client_secret = "client-secret"
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.ZohoCrmAdapter.update_notification_details",
+            _update_notification_details,
+        ):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/integrations/crm-feedback/zoho-webhook/renew",
+                json={
+                    "channel_id": "1000000068001",
+                    "token": "deals.all.notif",
+                    "channel_expiry": "2026-04-29T10:30:00+00:00",
+                    "events": ["Deals.all"],
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["channel_id"], "1000000068001")
+        self.assertEqual(payload["data"]["channel_expiry"], "2026-04-29T10:30:00+00:00")
+
+    def test_disable_zoho_deal_feedback_webhook_returns_success_envelope(self):
+        async def _disable_notifications(_self, _settings, *, channel_ids):
+            return {
+                "provider": "zoho_crm",
+                "channel_ids": channel_ids,
+                "items": [
+                    {
+                        "status": "success",
+                        "details": {
+                            "channel_id": channel_ids[0],
+                        },
+                    }
+                ],
+            }
+
+        app = create_test_app()
+        app.state.settings.zoho_crm_refresh_token = "refresh-token"
+        app.state.settings.zoho_crm_client_id = "client-id"
+        app.state.settings.zoho_crm_client_secret = "client-secret"
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.ZohoCrmAdapter.disable_notifications",
+            _disable_notifications,
+        ):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/integrations/crm-feedback/zoho-webhook/disable",
+                json={
+                    "channel_ids": ["1000000068001"],
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["channel_ids"][0], "1000000068001")
+
+    def test_auto_renew_zoho_deal_feedback_webhook_returns_success_envelope(self):
+        async def _get_notification_details(_self, _settings, *, channel_id, module_api_name, page=1, per_page=200):
+            return {
+                "channel_id": channel_id,
+                "items": [
+                    {
+                        "channel_id": channel_id,
+                        "resource_name": module_api_name,
+                        "channel_expiry": "2026-04-22T10:00:00+00:00",
+                    }
+                ],
+            }
+
+        async def _update_notification_details(
+            _self,
+            _settings,
+            *,
+            channel_id,
+            token,
+            notify_url,
+            events,
+            channel_expiry,
+            return_affected_field_values,
+        ):
+            return {
+                "channel_id": channel_id,
+                "status": "success",
+                "channel_expiry": channel_expiry,
+            }
+
+        async def _fake_run_tracked_job(_session, *, context, handler, detail=None):
+            result = await handler(context)
+            return SimpleNamespace(job_run_id=901, result=result)
+
+        app = create_test_app()
+        app.state.settings.zoho_crm_refresh_token = "refresh-token"
+        app.state.settings.zoho_crm_client_id = "client-id"
+        app.state.settings.zoho_crm_client_secret = "client-secret"
+        app.state.settings.zoho_crm_notification_channel_id = "1000000068001"
+        app.state.settings.zoho_crm_notification_token = "deals.all.notif"
+        app.state.settings.public_api_url = "https://api.bookedai.au"
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
+            _fake_get_session,
+        ), patch(
+            "api.v1_integration_handlers.ZohoCrmAdapter.get_notification_details",
+            _get_notification_details,
+        ), patch(
+            "api.v1_integration_handlers.ZohoCrmAdapter.update_notification_details",
+            _update_notification_details,
+        ), patch(
+            "api.v1_integration_handlers.run_tracked_job",
+            _fake_run_tracked_job,
+        ):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/integrations/crm-feedback/zoho-webhook/auto-renew",
+                json={"threshold_hours": 24},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["job_run_id"], 901)
+        self.assertTrue(payload["data"]["metadata"]["renewed"])
+
+    def test_zoho_crm_connection_test_returns_success_envelope(self):
+        async def _test_connection(*_args, **_kwargs):
+            return {
+                "provider": "zoho_crm",
+                "status": "connected",
+                "token_source": "refresh_token",
+                "api_base_url": "https://www.zohoapis.com.au/crm/v8",
+                "requested_module": "Leads",
+                "requested_module_found": True,
+                "module_count": 4,
+                "field_count": 12,
+                "modules": [{"api_name": "Leads", "module_name": "Leads"}],
+                "fields": [{"api_name": "Email", "display_label": "Email"}],
+                "safe_config": {
+                    "provider": "zoho_crm",
+                    "enabled": True,
+                    "configured_fields": ["client_id", "refresh_token"],
+                    "label": "Zoho CRM connection",
+                    "notes": [],
+                },
+            }
+
+        app = create_test_app()
+        app.state.settings.zoho_crm_refresh_token = "refresh-token"
+        app.state.settings.zoho_crm_client_id = "client-id"
+        app.state.settings.zoho_crm_client_secret = "client-secret"
+
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.ZohoCrmAdapter.test_connection",
+            _test_connection,
+        ):
+            client = TestClient(app)
+            response = client.get("/api/v1/integrations/providers/zoho-crm/connection-test?module=Leads")
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["provider"], "zoho_crm")
+        self.assertEqual(payload["data"]["requested_module"], "Leads")
+        self.assertEqual(payload["data"]["module_count"], 4)
+        self.assertEqual(payload["meta"]["tenant_id"], "tenant-test")
+
+    def test_zoho_crm_connection_test_rejects_unconfigured_runtime(self):
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub):
+            client = TestClient(create_test_app())
+            response = client.get("/api/v1/integrations/providers/zoho-crm/connection-test")
+
+        self.assertEqual(response.status_code, 409)
+        payload = response.json()
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["error"]["code"], "zoho_crm_not_configured")
+        self.assertEqual(payload["error"]["details"]["provider"], "zoho_crm")
+
     def test_integration_attention_returns_success_envelope(self):
         async def _build_integration_attention_items(*_args, **_kwargs):
             return [
@@ -137,11 +839,11 @@ class Apiv1IntegrationRoutes(TestCase):
                 }
             ]
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.build_integration_attention_items",
+            "api.v1_integration_handlers.build_integration_attention_items",
             _build_integration_attention_items,
         ):
             client = TestClient(create_test_app())
@@ -172,11 +874,11 @@ class Apiv1IntegrationRoutes(TestCase):
                 ],
             }
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.build_recent_runtime_activity",
+            "api.v1_integration_handlers.build_recent_runtime_activity",
             _build_recent_runtime_activity,
         ):
             client = TestClient(create_test_app())
@@ -206,11 +908,11 @@ class Apiv1IntegrationRoutes(TestCase):
                 ),
             )
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.run_tracked_outbox_dispatch",
+            "api.v1_integration_handlers.run_tracked_outbox_dispatch",
             _run_tracked_outbox_dispatch,
         ):
             client = TestClient(create_test_app())
@@ -248,14 +950,14 @@ class Apiv1IntegrationRoutes(TestCase):
         async def _append_entry(*_args, **_kwargs):
             return 88
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.OutboxRepository.requeue_event",
+            "api.v1_integration_handlers.OutboxRepository.requeue_event",
             _requeue_event,
         ), patch(
-            "api.v1_routes.AuditLogRepository.append_entry",
+            "api.v1_integration_handlers.AuditLogRepository.append_entry",
             _append_entry,
         ):
             client = TestClient(create_test_app())
@@ -298,11 +1000,11 @@ class Apiv1IntegrationRoutes(TestCase):
                 }
             ]
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.AuditLogRepository.list_recent_entries",
+            "api.v1_integration_handlers.AuditLogRepository.list_recent_entries",
             _list_recent_entries,
         ):
             client = TestClient(create_test_app())
@@ -344,11 +1046,11 @@ class Apiv1IntegrationRoutes(TestCase):
                 ],
             }
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.build_outbox_backlog",
+            "api.v1_integration_handlers.build_outbox_backlog",
             _build_outbox_backlog,
         ):
             client = TestClient(create_test_app())
@@ -402,11 +1104,11 @@ class Apiv1IntegrationRoutes(TestCase):
                 },
             }
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.build_attention_triage_snapshot",
+            "api.v1_integration_handlers.build_attention_triage_snapshot",
             _build_attention_triage_snapshot,
         ):
             client = TestClient(create_test_app())
@@ -452,11 +1154,11 @@ class Apiv1IntegrationRoutes(TestCase):
                 ],
             }
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.build_crm_retry_backlog",
+            "api.v1_integration_handlers.build_crm_retry_backlog",
             _build_crm_retry_backlog,
         ):
             client = TestClient(create_test_app())
@@ -493,11 +1195,11 @@ class Apiv1IntegrationRoutes(TestCase):
                 ],
             }
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.build_reconciliation_details",
+            "api.v1_integration_handlers.build_reconciliation_details",
             _build_reconciliation_details,
         ):
             client = TestClient(create_test_app())
@@ -511,19 +1213,20 @@ class Apiv1IntegrationRoutes(TestCase):
         self.assertEqual(payload["meta"]["tenant_id"], "tenant-test")
 
     def test_retry_crm_sync_returns_success_envelope(self):
-        async def _queue_crm_sync_retry(*_args, **_kwargs):
+        async def _execute_crm_sync_retry(*_args, **_kwargs):
             return SimpleNamespace(
                 record_id=42,
-                sync_status="retrying",
+                sync_status="synced",
+                external_entity_id="zoho-lead-42",
                 warning_codes=["retry_from_manual_review_required"],
             )
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.queue_crm_sync_retry",
-            _queue_crm_sync_retry,
+            "api.v1_integration_handlers.execute_crm_sync_retry",
+            _execute_crm_sync_retry,
         ):
             client = TestClient(create_test_app())
             response = client.post(
@@ -541,7 +1244,8 @@ class Apiv1IntegrationRoutes(TestCase):
         payload = response.json()
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["data"]["crm_sync_record_id"], 42)
-        self.assertEqual(payload["data"]["sync_status"], "retrying")
+        self.assertEqual(payload["data"]["sync_status"], "synced")
+        self.assertEqual(payload["data"]["external_entity_id"], "zoho-lead-42")
         self.assertEqual(payload["data"]["warnings"], ["retry_from_manual_review_required"])
 
     def test_integration_provider_statuses_returns_success_envelope(self):
@@ -562,11 +1266,11 @@ class Apiv1IntegrationRoutes(TestCase):
                 }
             ]
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.build_integration_provider_statuses",
+            "api.v1_integration_handlers.build_integration_provider_statuses",
             _build_integration_provider_statuses,
         ):
             client = TestClient(create_test_app())
@@ -587,11 +1291,11 @@ class Apiv1IntegrationRoutes(TestCase):
                 "metadata": {"total_jobs": 1},
             }
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_integration_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_integration_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.build_reconciliation_summary",
+            "api.v1_integration_handlers.build_reconciliation_summary",
             _build_reconciliation_summary,
         ):
             client = TestClient(create_test_app())
@@ -602,4 +1306,3 @@ class Apiv1IntegrationRoutes(TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["data"]["status"], "healthy")
         self.assertEqual(payload["data"]["metadata"]["total_jobs"], 1)
-

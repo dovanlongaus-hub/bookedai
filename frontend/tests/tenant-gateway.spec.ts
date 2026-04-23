@@ -20,7 +20,7 @@ test.describe('tenant gateway', () => {
     await expect(page.getByText('Create tenant account', { exact: true }).first()).toBeVisible();
     await expect(page.getByPlaceholder('Future Swim')).toBeVisible();
     await expect(page.getByPlaceholder('owner@example.com')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Create tenant account' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Email me a setup code' })).toBeVisible();
 
     await page.screenshot({
       path: testInfo.outputPath('tenant-gateway-create-account.png'),

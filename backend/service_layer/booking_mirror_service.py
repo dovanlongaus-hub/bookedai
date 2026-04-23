@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import json
 
+from sqlalchemy import text
+
 from repositories.base import RepositoryContext
 from repositories.booking_intent_repository import BookingIntentRepository
 from repositories.contact_repository import ContactRepository
@@ -16,6 +18,52 @@ from schemas import (
     PricingConsultationRequest,
     PricingConsultationResponse,
 )
+
+
+async def _resolve_service_tenant_id(session, *, service_id: str | None) -> str | None:
+    normalized_service_id = _normalized_text(service_id)
+    if not normalized_service_id:
+        return None
+
+    result = await session.execute(
+        text(
+            """
+            select tenant_id::text
+            from service_merchant_profiles
+            where service_id = :service_id
+            limit 1
+            """
+        ),
+        {"service_id": normalized_service_id},
+    )
+    return _normalized_text(result.scalar_one_or_none()) or None
+
+
+async def _resolve_booking_reference_tenant_id(
+    session,
+    *,
+    booking_reference: str | None,
+) -> str | None:
+    normalized_reference = _normalized_text(booking_reference)
+    if not normalized_reference:
+        return None
+
+    result = await session.execute(
+        text(
+            """
+            select tenant_id::text
+            from booking_intents
+            where booking_reference = :booking_reference
+            limit 1
+            """
+        ),
+        {"booking_reference": normalized_reference},
+    )
+    return _normalized_text(result.scalar_one_or_none()) or None
+
+
+async def _resolve_fallback_tenant_id(session) -> str | None:
+    return await TenantRepository(RepositoryContext(session=session)).get_default_tenant_id()
 
 
 async def _upsert_contact_and_lead(
@@ -53,7 +101,11 @@ async def dual_write_booking_assistant_session(
     payload: BookingAssistantSessionRequest,
     result: BookingAssistantSessionResponse,
 ) -> bool:
-    tenant_id = await TenantRepository(RepositoryContext(session=session)).get_default_tenant_id()
+    tenant_id = await _resolve_service_tenant_id(session, service_id=result.service.id)
+    if not tenant_id:
+        tenant_id = await _resolve_service_tenant_id(session, service_id=payload.service_id)
+    if not tenant_id:
+        tenant_id = await _resolve_fallback_tenant_id(session)
     if not tenant_id:
         return False
 
@@ -135,7 +187,7 @@ async def dual_write_pricing_consultation(
     payload: PricingConsultationRequest,
     result: PricingConsultationResponse,
 ) -> bool:
-    tenant_id = await TenantRepository(RepositoryContext(session=session)).get_default_tenant_id()
+    tenant_id = await _resolve_fallback_tenant_id(session)
     if not tenant_id:
         return False
 
@@ -237,7 +289,7 @@ async def dual_write_demo_request(
     payload: DemoBookingRequest,
     result: DemoBookingResponse,
 ) -> bool:
-    tenant_id = await TenantRepository(RepositoryContext(session=session)).get_default_tenant_id()
+    tenant_id = await _resolve_fallback_tenant_id(session)
     if not tenant_id:
         return False
 
@@ -409,7 +461,12 @@ async def sync_callback_status_to_mirrors(
     if not booking_reference:
         return False
 
-    tenant_id = await TenantRepository(RepositoryContext(session=session)).get_default_tenant_id()
+    tenant_id = await _resolve_booking_reference_tenant_id(
+        session,
+        booking_reference=booking_reference,
+    )
+    if not tenant_id:
+        tenant_id = await _resolve_fallback_tenant_id(session)
     if not tenant_id:
         return False
 

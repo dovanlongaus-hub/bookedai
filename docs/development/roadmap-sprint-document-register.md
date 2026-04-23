@@ -1,6 +1,6 @@
 # Roadmap Sprint Document Register
 
-Date: `2026-04-21`
+Date: `2026-04-22`
 
 ## Purpose
 
@@ -25,11 +25,43 @@ Current synchronization baseline from `2026-04-20`:
 
 Additional synchronization baseline from `2026-04-21`:
 
+- `docs/architecture/admin-enterprise-workspace-requirements.md`
+- `docs/development/ci-cd-deployment-runbook.md`
 - `docs/development/backend-boundaries.md`
 - `docs/development/env-strategy.md`
 - `docs/users/administrator-guide.md`
 - `backend/api/v1_router.py`
 - `backend/api/v1_tenant_handlers.py`
+
+Additional synchronization baseline from `2026-04-22`:
+
+- `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/development/implementation-progress.md`
+- `docs/development/sprint-13-16-user-surface-delivery-package.md`
+- `docs/development/bookedai-chatbot-landing-implementation-plan.md`
+- `docs/development/bookedai-sample-video-brief.md`
+- `docs/development/bookedai-investor-pitch-deck.html`
+
+Current whole-program interpretation locked from `2026-04-22`:
+
+- the planning chain should be summarized as:
+  - `Sprint 1-3 baseline lock`
+  - `Sprint 4-7 truth, reporting, and workflow foundations`
+  - `Sprint 8-10 tenant and admin implemented foundations`
+  - `Sprint 11-16 user-surface SaaS completion and release hardening`
+- current active sprint truth should be summarized as:
+  - `Sprint 13-14 active`
+  - `Sprint 15-16 planned, with some implementation overlap already present from current tenant and admin work`
+- the next-phase cadence now inherits the corrected April 2026 deadline set:
+  - freeze scope by Friday, April 24, 2026
+  - get AI end-to-end working before any UI polish pass
+  - submit draft by Saturday, April 25, 2026
+  - final edit by Sunday, April 26, 2026
+  - final polish on Monday, April 27, 2026
+- the request-facing proof-pack for that cadence should now inherit:
+  - chatbot landing implementation plan
+  - sample video brief
+  - investor pitch deck and opening-slide previews
 
 These documents now record the current code-aligned state of the program and should be consulted whenever older sprint language still reads as if an already-implemented lane were still only a planned concept.
 
@@ -39,6 +71,16 @@ Current backend modularization interpretation locked from `2026-04-21`:
 - `backend/api/v1_routes.py` should now be treated as a legacy handler concentration point under active extraction, not the sole router module
 - current extraction priority is `tenant -> portal -> integrations -> communications -> search_matching -> booking`
 - current deployed frontend source of truth remains `frontend/`, while the root Next.js tree should be treated as a parallel migration lane until deployment ownership changes explicitly
+- the active admin redesign requirement source is now `docs/architecture/admin-enterprise-workspace-requirements.md`, and later sprint execution should inherit its menu-first enterprise admin, tenant-management, HTML-content-editing, permission-management, and tenant-catalog-CRUD scope
+- the admin workspace execution order is now also locked more explicitly across the synchronized planning set:
+  - `Phase 0` runtime decision
+  - `Phase 1` auth plus tenant context plus RBAC plus immutable audit
+  - `Phase 2` Prisma and repository parity
+  - `Phase 3` tenant or users or roles or settings or audit control plane
+  - `Phase 4` customers or leads or services or bookings hardening on real data
+  - `Phase 5` payments and revenue truth
+  - `Phase 6` dashboard and reporting expansion
+  - `Phase 7` campaigns, workflows, messaging, and automation
 
 ## Documentation synchronization rule
 
@@ -321,6 +363,7 @@ Focus:
 - `docs/architecture/phase-7-8-epic-story-task-breakdown.md`
 - `docs/architecture/user-surface-saas-upgrade-plan.md`
 - `docs/architecture/internal-admin-app-strategy.md`
+- `docs/architecture/admin-enterprise-workspace-requirements.md`
 - `docs/architecture/integration-hub-sync-architecture.md`
 - `docs/development/sprint-13-owner-execution-checklist.md`
 
@@ -328,8 +371,9 @@ Focus:
 
 - unified tenant identity and onboarding completion
 - tenant login UX upgrade
-- admin login UX upgrade specification
+- admin enterprise login UX upgrade specification
 - internal admin commercial IA
+- menu-first admin navigation and operator guidance
 - tenant drill-ins
 - issue-first operational workflows
 - system-wide UX harmonization kickoff
@@ -340,6 +384,7 @@ Focus:
 - `docs/architecture/phase-7-8-epic-story-task-breakdown.md`
 - `docs/architecture/user-surface-saas-upgrade-plan.md`
 - `docs/architecture/internal-admin-app-strategy.md`
+- `docs/architecture/admin-enterprise-workspace-requirements.md`
 - `docs/development/implementation-progress.md`
 - `docs/development/backend-boundaries.md`
 - `docs/development/env-strategy.md`
@@ -348,6 +393,8 @@ Focus:
 Focus:
 
 - admin support tooling
+- tenant management inside admin
+- tenant branding, HTML content, and permission editing
 - reconciliation polish
 - rollout readiness for tenant and admin surfaces
 - portal product architecture and booking-review UX definition
@@ -364,6 +411,7 @@ Focus:
 - `docs/architecture/phase-9-epic-story-task-breakdown.md`
 - `docs/architecture/qa-testing-reliability-ai-evaluation-strategy.md`
 - `docs/architecture/user-surface-saas-upgrade-plan.md`
+- `docs/architecture/admin-enterprise-workspace-requirements.md`
 - `docs/development/release-gate-checklist.md`
 - `docs/development/backend-boundaries.md`
 - `docs/development/sprint-15-owner-execution-checklist.md`
@@ -372,6 +420,7 @@ Focus:
 
 - telemetry and replay readiness
 - commercial regression coverage
+- admin tenant catalog CRUD completion
 - cross-surface consistency validation
 - release-grade runner enforcement and failure triage workflow
 - customer portal implementation

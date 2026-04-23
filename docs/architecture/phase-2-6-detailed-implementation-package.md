@@ -117,6 +117,7 @@ Snapshot date: `2026-04-17`
 What is already implemented:
 
 - `/api/v1/matching/search` returns ranked candidates, semantic-assist metadata, booking-context hints, and trust-aware recommendations
+- the richer Phase 2 matching contract is now also in code through `backend/core/contracts/matching.py` and `backend/domain/matching/service.py`, so response shaping includes normalized `booking_fit` summaries and stage-count diagnostics instead of leaving all shortlist reasoning route-local
 - query understanding already normalizes phrase aliases, implicit budget hints, implicit location hints, and suburb-to-metro phrasing for key metros
 - retrieval now applies topic/category and location as separate truthfulness filters before rerank
 - semantic assist already exposes provider chain and fallback state, and lightweight diagnostics now surface this in admin preview and public live-read guidance

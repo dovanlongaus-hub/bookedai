@@ -7,7 +7,13 @@ import {
   type BookingAssistantContent,
 } from '../data';
 import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../../shared/config/api';
-import { getPublicBookingAssistantLiveReadRecommendation } from '../assistant/publicBookingAssistantV1';
+import { resolveApiErrorMessage } from '../../../shared/api/client';
+import { isPublicBookingAssistantV1LiveReadEnabled } from '../../../shared/config/publicBookingAssistant';
+import {
+  createPublicBookingAssistantLeadAndBookingIntent,
+  getPublicBookingAssistantLiveReadRecommendation,
+  shadowPublicBookingAssistantLeadAndBookingIntent,
+} from '../assistant/publicBookingAssistantV1';
 import {
   buildPartnerMatchActionFooterModelFromServiceItem,
   buildPartnerMatchCardModelFromServiceItem,
@@ -80,6 +86,7 @@ type BookingAssistantChatResponse = {
 type BookingAssistantSessionResponse = {
   status: string;
   booking_reference: string;
+  portal_url?: string;
   service: ServiceCatalogItem;
   amount_aud: number;
   amount_label: string;
@@ -292,6 +299,47 @@ function parsePreferredSlot(preferredSlot: string) {
   return {
     requestedDate: `${year}-${month}-${day}`,
     requestedTime: `${hours}:${minutes}`,
+  };
+}
+
+function buildAuthoritativeBookingIntentResult(params: {
+  authoritativeResult: Awaited<ReturnType<typeof createPublicBookingAssistantLeadAndBookingIntent>>;
+  selectedService: ServiceCatalogItem;
+  requestedDate: string;
+  requestedTime: string;
+  customerEmail: string;
+  nextStep: string | null;
+}): BookingAssistantSessionResponse {
+  const { authoritativeResult, selectedService, requestedDate, requestedTime, customerEmail, nextStep } = params;
+  const bookingReference =
+    authoritativeResult.bookingReference?.trim() || authoritativeResult.bookingIntentId;
+  const amountLabel =
+    typeof selectedService.amount_aud === 'number' && Number.isFinite(selectedService.amount_aud)
+      ? `A$${selectedService.amount_aud}`
+      : 'TBC';
+  const detailLine = nextStep?.trim() || authoritativeResult.warnings[0] || 'We will confirm the final slot with the provider.';
+
+  return {
+    status: 'ok',
+    booking_reference: bookingReference,
+    portal_url: `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(bookingReference)}`,
+    service: selectedService,
+    amount_aud: selectedService.amount_aud,
+    amount_label: amountLabel,
+    requested_date: requestedDate,
+    requested_time: requestedTime,
+    timezone: 'Australia/Sydney',
+    payment_status: 'payment_follow_up_required',
+    payment_url: '',
+    qr_code_url: '',
+    email_status: customerEmail.trim() ? 'sent' : 'pending_manual_followup',
+    meeting_status: 'configuration_required',
+    meeting_join_url: null,
+    meeting_event_url: null,
+    calendar_add_url: null,
+    confirmation_message: `Booking request captured in v1. ${detailLine}`,
+    contact_email: customerEmail.trim() || 'follow-up required',
+    workflow_status: authoritativeResult.trust.recommended_booking_path ?? 'request_callback',
   };
 }
 
@@ -577,6 +625,7 @@ export function BookingAssistantSection({
   content,
   onOpenAssistant,
 }: BookingAssistantSectionProps) {
+  const isLiveReadMode = isPublicBookingAssistantV1LiveReadEnabled();
   const [catalog, setCatalog] = useState<BookingAssistantCatalogResponse | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState('');
@@ -622,7 +671,8 @@ export function BookingAssistantSection({
           signal: controller.signal,
         });
         if (!response.ok) {
-          throw new Error('Unable to load service catalog.');
+          const payload = await response.json().catch(() => null);
+          throw new Error(resolveApiErrorMessage(payload, 'Unable to load service catalog.'));
         }
 
         const payload = (await response.json()) as BookingAssistantCatalogResponse;
@@ -701,7 +751,7 @@ export function BookingAssistantSection({
       detail?: string;
     };
     if (!response.ok) {
-      throw new Error(payload.detail || 'Unable to send message.');
+      throw new Error(resolveApiErrorMessage(payload, 'Unable to send message.'));
     }
 
     return payload;
@@ -973,7 +1023,55 @@ export function BookingAssistantSection({
     setBookingError('');
     setBookingResult(null);
 
+    const normalizedCustomerEmail = customerEmail.trim() ? customerEmail.trim().toLowerCase() : null;
+    const normalizedCustomerPhone = customerPhone.trim() || null;
+    const normalizedNotes = bookingNotes.trim() || latestCustomerRequirement || null;
+    const sourcePage = typeof window !== 'undefined' ? window.location.pathname || '/' : '/';
+
     try {
+      if (isLiveReadMode) {
+        const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
+          sourcePage,
+          serviceId: selectedService.id,
+          serviceName: selectedService.name,
+          serviceCategory: selectedService.category,
+          customerName,
+          customerEmail: normalizedCustomerEmail,
+          customerPhone: normalizedCustomerPhone,
+          notes: normalizedNotes,
+          requestedDate: slot.requestedDate,
+          requestedTime: slot.requestedTime,
+          timezone: 'Australia/Sydney',
+        });
+
+        setBookingResult(
+          buildAuthoritativeBookingIntentResult({
+            authoritativeResult,
+            selectedService,
+            requestedDate: slot.requestedDate,
+            requestedTime: slot.requestedTime,
+            customerEmail: normalizedCustomerEmail ?? '',
+            nextStep: selectedService.booking_url ? 'Use the provider booking path after callback confirmation.' : null,
+          }),
+        );
+        setActivePreviewTab('booking');
+        return;
+      }
+
+      void shadowPublicBookingAssistantLeadAndBookingIntent({
+        sourcePage,
+        serviceId: selectedService.id,
+        serviceName: selectedService.name,
+        serviceCategory: selectedService.category,
+        customerName,
+        customerEmail: normalizedCustomerEmail,
+        customerPhone: normalizedCustomerPhone,
+        notes: normalizedNotes,
+        requestedDate: slot.requestedDate,
+        requestedTime: slot.requestedTime,
+        timezone: 'Australia/Sydney',
+      });
+
       const response = await fetch(`${getApiBaseUrl()}/booking-assistant/session`, {
         method: 'POST',
         headers: {
@@ -982,12 +1080,12 @@ export function BookingAssistantSection({
         body: JSON.stringify({
           service_id: selectedService.id,
           customer_name: customerName.trim(),
-          customer_email: customerEmail.trim() ? customerEmail.trim().toLowerCase() : null,
-          customer_phone: customerPhone.trim() || null,
+          customer_email: normalizedCustomerEmail,
+          customer_phone: normalizedCustomerPhone,
           requested_date: slot.requestedDate,
           requested_time: slot.requestedTime,
           timezone: 'Australia/Sydney',
-          notes: bookingNotes.trim() || latestCustomerRequirement || null,
+          notes: normalizedNotes,
         }),
       });
 
@@ -995,7 +1093,7 @@ export function BookingAssistantSection({
         detail?: string;
       };
       if (!response.ok) {
-        throw new Error(payload.detail || 'Unable to create booking request.');
+        throw new Error(resolveApiErrorMessage(payload, 'Unable to create booking request.'));
       }
 
       setBookingResult(payload);

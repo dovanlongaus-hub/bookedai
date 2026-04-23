@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BookedAI Investor Pitch</title>
+  <style>
+    :root {
+      --bg: #f5fbff;
+      --bg2: #eef6ff;
+      --panel: rgba(255,255,255,0.88);
+      --panel-strong: rgba(255,255,255,0.96);
+      --line: rgba(21, 52, 86, 0.10);
+      --text: #163055;
+      --muted: #58708e;
+      --accent: #1bb8d6;
+      --accent2: #6f63ff;
+      --success: #12a56d;
+      --warn: #c58317;
+      --danger: #d55379;
+      --title-size: clamp(2.2rem, 5vw, 4.8rem);
+      --h2-size: clamp(1.55rem, 3.2vw, 3rem);
+      --h3-size: clamp(1rem, 1.6vw, 1.18rem);
+      --body-size: clamp(0.96rem, 1.2vw, 1.05rem);
+      --slide-padding: clamp(1.4rem, 4vw, 4.3rem);
+      --content-gap: clamp(0.9rem, 1.5vw, 1.4rem);
+      --radius: 24px;
+      --shadow: 0 24px 80px rgba(17,48,84,0.12);
+    }
+    * { box-sizing: border-box; }
+    html, body { height: 100%; overflow-x: hidden; margin: 0; }
+    html { scroll-snap-type: y mandatory; scroll-behavior: smooth; }
+    body {
+      background:
+        radial-gradient(circle at top left, rgba(27,184,214,0.14), transparent 28%),
+        radial-gradient(circle at top right, rgba(111,99,255,0.12), transparent 30%),
+        linear-gradient(180deg, var(--bg), var(--bg2));
+      color: var(--text);
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+    }
+    .slide {
+      width: 100vw; height: 100vh; height: 100dvh; overflow: hidden;
+      scroll-snap-align: start; display: flex; flex-direction: column; position: relative;
+    }
+    .slide-content {
+      flex: 1; display: flex; flex-direction: column; justify-content: center;
+      max-height: 100%; overflow: hidden; padding: var(--slide-padding);
+      gap: var(--content-gap); width: min(1180px, 100%); margin: 0 auto;
+    }
+    h1,h2,h3,p,ul { margin: 0; }
+    h1 { font-size: var(--title-size); line-height: 0.93; letter-spacing: -0.045em; max-width: 11ch; }
+    h2 { font-size: var(--h2-size); line-height: 1.02; letter-spacing: -0.035em; max-width: 19ch; }
+    h3 { font-size: var(--h3-size); line-height: 1.15; }
+    p, li { font-size: var(--body-size); line-height: 1.48; color: var(--muted); }
+    .eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: 0.18em; font-size: 0.8rem; font-weight: 700; }
+    .hero-grid, .split, .grid, .stats, .timeline, .compare { display: grid; gap: 1rem; }
+    .hero-grid { grid-template-columns: 1.15fr 0.85fr; align-items: end; }
+    .split, .compare { grid-template-columns: 1fr 1fr; }
+    .grid { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    .stats { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .timeline { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    .card {
+      background: var(--panel); border: 1px solid var(--line); border-radius: var(--radius);
+      padding: 1.1rem; box-shadow: 0 20px 60px rgba(17,48,84,0.10); backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    }
+    .card.strong { background: var(--panel-strong); }
+    .metric { font-size: clamp(1.65rem, 4vw, 2.7rem); font-weight: 800; color: var(--text); line-height: 1; }
+    .tag { display:inline-flex; width:fit-content; padding:0.45rem 0.75rem; border-radius:999px; background:rgba(27,184,214,0.10); border:1px solid rgba(27,184,214,0.22); color:var(--text); font-size:0.85rem; }
+    .accent { color: var(--accent); } .success { color: var(--success); } .warn { color: var(--warn); } .danger { color: var(--danger); }
+    ul { padding-left: 1.1rem; display: grid; gap: 0.5rem; }
+    .big-quote { font-size: clamp(1.4rem, 3vw, 2.3rem); line-height: 1.18; color: var(--text); max-width: 18ch; }
+    .footer { position: absolute; bottom: 1rem; right: 1.2rem; color: rgba(22,48,85,0.42); font-size: 0.82rem; }
+    .bars { display: grid; gap: 0.75rem; }
+    .bar { display: grid; grid-template-columns: 190px 1fr; gap: 0.8rem; align-items: center; }
+    .bar-track { height: 12px; border-radius: 999px; background: rgba(255,255,255,0.08); overflow: hidden; }
+    .bar-fill { height: 100%; border-radius: 999px; background: linear-gradient(90deg, var(--accent), var(--accent2)); }
+    .placeholder {
+      min-height: 220px; display:flex; align-items:center; justify-content:center; text-align:center;
+      background: linear-gradient(135deg, rgba(110,231,255,0.08), rgba(139,92,246,0.12));
+      border: 1px dashed rgba(255,255,255,0.22); border-radius: 20px; padding: 1rem;
+      color: var(--muted);
+    }
+    .media-grid { display:grid; grid-template-columns: 1.15fr 0.85fr; gap: 1rem; }
+    .media-stack { display:grid; gap: 1rem; }
+    .media-card {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 20px;
+      overflow: hidden;
+      box-shadow: var(--shadow);
+    }
+    .media-card img {
+      display: block;
+      width: 100%;
+      height: auto;
+      max-height: 48vh;
+      object-fit: cover;
+      object-position: top center;
+      background: #09121f;
+    }
+    .media-caption {
+      padding: 0.8rem 1rem 1rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+    }
+    .hero-visual-card {
+      background: rgba(255,255,255,0.94);
+      border: 1px solid rgba(21,52,86,0.10);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(17,48,84,0.12);
+    }
+    .hero-visual-card img {
+      display: block;
+      width: 100%;
+      height: 100%;
+      min-height: 360px;
+      max-height: 58vh;
+      object-fit: cover;
+      object-position: top center;
+      background: #eef6ff;
+    }
+    .hero-visual-caption {
+      padding: 0.9rem 1rem 1rem;
+      color: var(--muted);
+      font-size: 0.92rem;
+    }
+    .slide-brand {
+      display:flex;
+      align-items:center;
+      justify-content:space-between;
+      gap:1rem;
+      margin-bottom:0.5rem;
+    }
+    .slide-brand img {
+      height: 34px;
+      width: auto;
+      object-fit: contain;
+    }
+    .visual-split {
+      display:grid;
+      grid-template-columns: 0.95fr 1.05fr;
+      gap: 1rem;
+      align-items: stretch;
+    }
+    .visual-split.equal {
+      grid-template-columns: 1fr 1fr;
+    }
+    .visual-stack {
+      display:grid;
+      gap: 1rem;
+      align-content:start;
+    }
+    .hero-visual-card.contain img {
+      object-fit: contain;
+      background: linear-gradient(180deg, #ffffff, #f4f9ff);
+      padding: 0.75rem;
+    }
+    .hero-visual-card.phone img {
+      object-fit: contain;
+      background: linear-gradient(180deg, #f8fbff, #eef6ff);
+      padding: 0.75rem;
+    }
+    .light-note {
+      color: var(--muted);
+      font-size: 0.95rem;
+      line-height: 1.5;
+    }
+    @media (max-width: 960px) {
+      .hero-grid, .split, .grid, .stats, .timeline, .compare, .media-grid, .visual-split, .visual-split.equal { grid-template-columns: 1fr; }
+      .bar { grid-template-columns: 1fr; }
+    }
+    @media (max-height: 660px) {
+      :root { --slide-padding: 1rem; --title-size: clamp(1.7rem, 4vw, 2.5rem); --body-size: 0.9rem; }
+      .card { padding: 1rem; }
+    }
+  </style>
+</head>
+<body>
+  <section class="slide"><div class="slide-content hero-grid">
+    <div>
+      <div class="slide-brand">
+        <div class="eyebrow">BookedAI • investor pitch</div>
+        <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+      </div>
+      <h1>BookedAI is building the <span class="accent">AI revenue engine</span> for service businesses.</h1>
+      <p>We connect AI conversation, booking intent, CRM sync, payment posture, and operator control into one revenue workflow.</p>
+      <div style="margin-top:1rem; display:flex; gap:0.7rem; flex-wrap:wrap;">
+        <span class="tag">AI conversation</span>
+        <span class="tag">Booking flow</span>
+        <span class="tag">CRM + payments + audit</span>
+      </div>
+    </div>
+    <div class="hero-visual-card contain">
+      <img src="../../frontend/output/local-homepage-qa/homepage-desktop.png" alt="BookedAI homepage screenshot" />
+      <div class="hero-visual-caption">Real BookedAI homepage UI, used as the hero proof surface instead of a generic template visual.</div>
+    </div>
+  </div><div class="footer">01</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="slide-brand">
+      <div class="eyebrow">Problem</div>
+      <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+    </div>
+    <h2>Service businesses lose revenue between first inquiry and booked outcome.</h2>
+    <div class="visual-split equal">
+      <div class="hero-visual-card contain">
+        <img src="assets/bookedai-slide-02-problem-flow.svg" alt="BookedAI problem flow infographic" />
+        <div class="hero-visual-caption">The problem is not lack of demand. It is fragmentation across intake, operations, and operator visibility.</div>
+      </div>
+      <div class="hero-visual-card contain">
+        <img src="../../output/playwright/root-desktop.png" alt="BookedAI marketing and pricing surface" />
+        <div class="hero-visual-caption">Real product marketing surface reinforces the multi-channel demand problem and the revenue framing.</div>
+      </div>
+    </div>
+  </div><div class="footer">02</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="slide-brand">
+      <div class="eyebrow">Insight</div>
+      <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+    </div>
+    <h2>AI is not enough. Businesses need revenue continuity from question to payment truth.</h2>
+    <div class="visual-split equal">
+      <div class="hero-visual-card contain">
+        <img src="assets/bookedai-slide-03-insight-continuity.svg" alt="BookedAI continuity insight infographic" />
+        <div class="hero-visual-caption">Continuity is the wedge. The system wins by carrying context forward, not restarting at each step.</div>
+      </div>
+      <div class="card strong" style="display:flex; flex-direction:column; justify-content:center; gap:1rem; padding:1.5rem;">
+        <div class="tag">BookedAI insight</div>
+        <p class="big-quote" style="max-width:none; color:var(--text);">The moat is not just AI interaction. It is <span class="accent">context continuity</span> across the full revenue path.</p>
+        <p class="light-note">That lets BookedAI behave more like operating infrastructure than a standalone chatbot or booking widget.</p>
+      </div>
+    </div>
+  </div><div class="footer">03</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="slide-brand">
+      <div class="eyebrow">Solution</div>
+      <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+    </div>
+    <h2>BookedAI turns service intent into a managed revenue workflow.</h2>
+    <div class="visual-split equal">
+      <div class="hero-visual-card phone">
+        <img src="../../frontend/public/bookedai-ui-shot-1.jpg" alt="BookedAI available times interface" />
+        <div class="hero-visual-caption">Real booking UI: AI-qualified demand becomes available, selectable appointment inventory.</div>
+      </div>
+      <div class="hero-visual-card contain">
+        <img src="assets/bookedai-slide-04-solution-system.svg" alt="BookedAI solution system infographic" />
+        <div class="hero-visual-caption">The system connects customer-facing AI capture, the revenue-ops core, and operator control.</div>
+      </div>
+    </div>
+  </div><div class="footer">04</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="slide-brand">
+      <div class="eyebrow">Why now</div>
+      <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+    </div>
+    <h2>Service businesses are adopting AI at the front door, but most still lack the system behind it.</h2>
+    <div class="visual-split equal">
+      <div class="hero-visual-card contain">
+        <img src="assets/bookedai-slide-05-why-now-gap.svg" alt="BookedAI why now infographic" />
+        <div class="hero-visual-caption">The timing gap is the opportunity: demand for AI is moving faster than the systems behind it.</div>
+      </div>
+      <div class="hero-visual-card phone">
+        <img src="../../frontend/public/bookedai-ui-shot-3.jpg" alt="BookedAI landing and brand screen" />
+        <div class="hero-visual-caption">BookedAI already presents as a branded product surface, not just an experimental workflow.</div>
+      </div>
+    </div>
+  </div><div class="footer">05</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="slide-brand">
+      <div class="eyebrow">Product</div>
+      <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+    </div>
+    <h2>BookedAI is structured as a multi-tenant revenue operations platform.</h2>
+    <div class="visual-split equal">
+      <div class="hero-visual-card contain">
+        <img src="../../frontend/output/local-homepage-qa/homepage-desktop-after-search.png" alt="BookedAI desktop product workflow after search" />
+        <div class="hero-visual-caption">Real desktop workflow shows search, discovery, and booking as one coherent surface.</div>
+      </div>
+      <div class="hero-visual-card contain">
+        <img src="assets/bookedai-slide-06-product-platform.svg" alt="BookedAI product platform infographic" />
+        <div class="hero-visual-caption">Under the UI sits a full product stack, not a single assistant layer.</div>
+      </div>
+    </div>
+  </div><div class="footer">06</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="slide-brand">
+      <div class="eyebrow">Market thesis</div>
+      <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+    </div>
+    <h2>BookedAI fits service businesses with high-intent journeys and repeatable operations.</h2>
+    <div class="hero-visual-card contain">
+      <img src="assets/bookedai-slide-07-market-thesis.svg" alt="BookedAI market thesis infographic" />
+      <div class="hero-visual-caption">The go-to-market thesis starts with focused, high-intent service verticals, then expands through distribution and platform depth.</div>
+    </div>
+  </div><div class="footer">07</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="slide-brand">
+      <div class="eyebrow">Traction setup</div>
+      <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+    </div>
+    <h2>Current progress is product and infrastructure depth, not vanity packaging.</h2>
+    <div class="visual-split equal">
+      <div class="hero-visual-card phone">
+        <img src="../../frontend/public/bookedai-ui-shot-2.jpg" alt="BookedAI booking confirmed interface" />
+        <div class="hero-visual-caption">Real booking-confirmed UI shows the product already closes the loop, not just answers questions.</div>
+      </div>
+      <div class="hero-visual-card contain">
+        <img src="assets/bookedai-slide-08-traction-setup.svg" alt="BookedAI traction setup infographic" />
+        <div class="hero-visual-caption">Current traction is best expressed as platform foundation: AI surfaces, admin depth, sync posture, and operator workflow readiness.</div>
+      </div>
+    </div>
+  </div><div class="footer">08</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="slide-brand">
+      <div class="eyebrow">Roadmap</div>
+      <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+    </div>
+    <h2>Execution stays disciplined: trust first, monetization truth second, growth automation third.</h2>
+    <div class="timeline">
+      <div class="card"><h3>Phase 1</h3><p>auth, session trust, RBAC, audit, operator reliability</p></div>
+      <div class="card"><h3>Phase 2-3</h3><p>tenant control plane, pricing controls, payments, roles, settings</p></div>
+      <div class="card"><h3>Phase 4-5</h3><p>lead, booking, CRM hardening, payment truth, revenue visibility</p></div>
+      <div class="card"><h3>Phase 6-7</h3><p>analytics, campaigns, workflows, automation after the core economics work</p></div>
+    </div>
+  </div><div class="footer">09</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="slide-brand">
+      <div class="eyebrow">Moat</div>
+      <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+    </div>
+    <h2>BookedAI differentiates by connecting conversational AI to operator-grade revenue control.</h2>
+    <div class="compare">
+      <div class="card">
+        <h3>Typical AI assistant products</h3>
+        <ul>
+          <li class="danger">Good at answering, weak at economic follow-through</li>
+          <li class="danger">Thin booking, payment, and CRM accountability</li>
+          <li class="danger">Limited operator visibility into revenue leakage</li>
+        </ul>
+      </div>
+      <div class="card strong">
+        <h3>BookedAI</h3>
+        <ul>
+          <li class="success">AI conversation tied directly to booking and revenue logic</li>
+          <li class="success">Multi-tenant ops layer with audit, roles, and sync posture</li>
+          <li class="success">Built for compounding data, workflow, and margin visibility over time</li>
+        </ul>
+      </div>
+    </div>
+  </div><div class="footer">10</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="eyebrow">Product proof</div>
+    <h2>Real BookedAI UI already shows the conversation-to-booking workflow.</h2>
+    <div class="media-grid">
+      <div class="media-card">
+        <img src="../../frontend/output/local-homepage-qa/homepage-desktop.png" alt="BookedAI desktop workflow screenshot" />
+        <div class="media-caption">Desktop workflow showing search, category shortcuts, live results, and booking flow in one surface.</div>
+      </div>
+      <div class="media-stack">
+        <div class="media-card">
+          <img src="../../frontend/public/bookedai-ui-shot-1.jpg" alt="BookedAI available times picker screenshot" />
+          <div class="media-caption">AI-guided service request turning into bookable appointment times.</div>
+        </div>
+        <div class="media-card">
+          <img src="../../frontend/public/bookedai-ui-shot-2.jpg" alt="BookedAI booking confirmed screenshot" />
+          <div class="media-caption">Booking confirmation with appointment details and next-step actions.</div>
+        </div>
+      </div>
+    </div>
+  </div><div class="footer">11</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="eyebrow">Mobile AI surface</div>
+    <h2>BookedAI also expresses clearly on mobile, where conversational booking can feel fastest.</h2>
+    <div class="split">
+      <div class="media-card">
+        <img src="../../output/playwright/product-compact-selected-summary.png" alt="BookedAI mobile assistant screenshot" />
+        <div class="media-caption">Mobile conversational assistant view with compact booking context.</div>
+      </div>
+      <div class="card strong">
+        <h3>Why this matters</h3>
+        <ul>
+          <li>Shows the product works beyond a desktop landing experience</li>
+          <li>Supports conversational booking in the highest-friction moment</li>
+          <li>Gives the story a credible AI-first user surface</li>
+        </ul>
+      </div>
+    </div>
+  </div><div class="footer">12</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="slide-brand">
+      <div class="eyebrow">Go-to-market</div>
+      <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+    </div>
+    <h2>BookedAI can start narrow, prove conversion value fast, then widen through repeatable operator channels.</h2>
+    <div class="split">
+      <div class="media-card">
+        <img src="../../output/playwright/root-desktop.png" alt="BookedAI marketing and pricing screenshot" />
+        <div class="media-caption">Current positioning already frames BookedAI around revenue capture, multichannel intake, and performance-linked commercial logic.</div>
+      </div>
+      <div class="card">
+        <h3>Profit-first GTM motion</h3>
+        <ul>
+          <li>Start with high-intent service operators where enquiry-to-booking leakage is already expensive</li>
+          <li>Sell a measurable operational outcome: higher conversion, fewer dropped leads, tighter follow-up, better payment capture</li>
+          <li>Prioritize channels and segments with short implementation cycles and visible ROI</li>
+          <li>Expand only after proving one profitable wedge, using partner-hosted surfaces and verticalized packages</li>
+        </ul>
+      </div>
+    </div>
+  </div><div class="footer">13</div></section>
+
+  <section class="slide"><div class="slide-content">
+    <div class="slide-brand">
+      <div class="eyebrow">Market and raise framing</div>
+      <img src="../../public/branding/bookedai-logo-official.png" alt="BookedAI logo" />
+    </div>
+    <h2>BookedAI should raise around a disciplined story: profitable wedge first, scale second.</h2>
+    <div class="compare">
+      <div class="card strong">
+        <h3>What to lock next</h3>
+        <ul>
+          <li>ICP definition, market sizing, and the first high-confidence profitable segment</li>
+          <li>Live traction metrics: tenants, bookings, conversion, revenue influenced, retention signals</li>
+          <li>Pricing posture, contribution margin logic, and expected payback path</li>
+          <li>Competitive proof showing why continuity plus operator control compounds defensibility</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Raise narrative</h3>
+        <ul>
+          <li>Capital accelerates distribution and workflow depth, not basic product discovery</li>
+          <li>Use of funds should stay tied to GTM efficiency, integrations, and operator tooling</li>
+          <li>12 to 18 month plan should show revenue proof, margin discipline, and repeatable expansion</li>
+          <li>The right investor fit is aligned with durable software economics, not novelty-driven AI hype</li>
+        </ul>
+      </div>
+    </div>
+  </div><div class="footer">14</div></section>
+</body>
+</html>

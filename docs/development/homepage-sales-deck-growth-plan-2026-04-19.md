@@ -343,6 +343,7 @@ Primary goal:
 - infographic and visual proof pass
 - case-study and partner proof pass
 - stronger investor-readable commercial framing
+- executive-board polish so the homepage opens with a stronger product-system narrative instead of feeling like separate marketing blocks
 
 ### Sprint E - SME onboarding hardening
 

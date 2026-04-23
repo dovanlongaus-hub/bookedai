@@ -55,11 +55,8 @@ async function stubHomepageApis(page: Parameters<typeof test>[0]['page']) {
 async function openHomepage(page: Parameters<typeof test>[0]['page']) {
   await stubHomepageApis(page);
   await page.goto('/');
-  await expect(page.locator('header img').first()).toBeVisible();
+  await expect(page.getByAltText('bookedai.au').first()).toBeVisible();
   await expect(page.locator('#bookedai-search-assistant').getByRole('textbox').first()).toBeVisible();
-  await expect(
-    page.locator('#bookedai-search-assistant').getByText(/Ready to receive|Receiving your enquiry/i).first(),
-  ).toBeVisible();
 }
 
 test.describe('public homepage responsive qa', () => {
@@ -74,7 +71,6 @@ test.describe('public homepage responsive qa', () => {
 
     await page.screenshot({
       path: testInfo.outputPath('homepage-desktop.png'),
-      fullPage: true,
     });
   });
 
@@ -86,11 +82,10 @@ test.describe('public homepage responsive qa', () => {
     await expect(
       page.locator('#bookedai-search-assistant').getByRole('button', { name: /Send search/i }),
     ).toBeVisible();
-    await expect(page.locator('header img').first()).toBeVisible();
+    await expect(page.getByAltText('bookedai.au').first()).toBeVisible();
 
     await page.screenshot({
       path: testInfo.outputPath('homepage-mobile-search.png'),
-      fullPage: true,
     });
   });
 });

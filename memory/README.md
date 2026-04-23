@@ -6,6 +6,8 @@ Guidelines:
 
 - Append short summaries, not raw transcripts
 - Capture decisions, blockers, fixes, and next steps
+- Do not store routine command history, shell transcripts, build logs, deploy logs, or git command sequences unless a specific command exposes an important failure mode or operational requirement worth preserving
+- Prefer outcome-oriented notes such as what changed, why it changed, what is blocked, and what should happen next
 - Prefer one file per day
 - Keep entries compact; if a file gets bloated, replace detail with a tighter summary
 - Promote durable facts into `../MEMORY.md`

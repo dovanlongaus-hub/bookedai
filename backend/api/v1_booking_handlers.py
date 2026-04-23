@@ -26,12 +26,26 @@ from api.v1_routes import (
     build_booking_trust_payload,
     get_session,
     json,
+    orchestrate_booking_followup_sync,
+    orchestrate_contact_sync,
     orchestrate_lead_capture,
     resolve_booking_path_policy,
     select,
     text,
     uuid4,
 )
+
+
+async def _resolve_service_tenant_id(session, service_id: str | None) -> str | None:
+    normalized_service_id = str(service_id or "").strip()
+    if not normalized_service_id:
+        return None
+
+    statement = select(ServiceMerchantProfile.tenant_id).where(
+        ServiceMerchantProfile.service_id == normalized_service_id
+    )
+    service_tenant_id = (await session.execute(statement)).scalar_one_or_none()
+    return str(service_tenant_id or "").strip() or None
 
 
 async def create_lead(request: Request, payload: CreateLeadRequestPayload):
@@ -46,10 +60,15 @@ async def create_lead(request: Request, payload: CreateLeadRequestPayload):
             )
 
         async with get_session(request.app.state.session_factory) as session:
-            contact_repository = ContactRepository(RepositoryContext(session=session, tenant_id=tenant_id))
-            lead_repository = LeadRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+            service_tenant_id = await _resolve_service_tenant_id(
+                session,
+                payload.intent_context.requested_service_id,
+            )
+            effective_tenant_id = service_tenant_id or tenant_id
+            contact_repository = ContactRepository(RepositoryContext(session=session, tenant_id=effective_tenant_id))
+            lead_repository = LeadRepository(RepositoryContext(session=session, tenant_id=effective_tenant_id))
             contact_id = await contact_repository.upsert_contact(
-                tenant_id=tenant_id,
+                tenant_id=effective_tenant_id,
                 full_name=payload.contact.full_name,
                 email=normalized_email,
                 phone=normalized_phone,
@@ -57,21 +76,24 @@ async def create_lead(request: Request, payload: CreateLeadRequestPayload):
                 or ("email" if normalized_email else "phone"),
             )
             lead_id = await lead_repository.upsert_lead(
-                tenant_id=tenant_id,
+                tenant_id=effective_tenant_id,
                 contact_id=contact_id,
                 source=payload.attribution.source,
                 status="captured",
             )
             crm_sync_result = await orchestrate_lead_capture(
                 session,
-                tenant_id=tenant_id,
+                tenant_id=effective_tenant_id,
                 lead_id=lead_id,
                 source=payload.attribution.source,
                 contact_email=normalized_email,
+                contact_full_name=payload.contact.full_name,
+                contact_phone=normalized_phone,
+                company_name=payload.business_context.business_name,
             )
             await _record_phase2_write_activity(
                 session,
-                tenant_id=tenant_id,
+                tenant_id=effective_tenant_id,
                 actor_context=payload.actor_context,
                 audit_event_type="lead.captured",
                 entity_type="lead",
@@ -103,7 +125,7 @@ async def create_lead(request: Request, payload: CreateLeadRequestPayload):
                 "crm_sync_status": crm_sync_result.sync_status,
                 "conversation_id": None,
             },
-            tenant_id=tenant_id,
+            tenant_id=effective_tenant_id,
             actor_context=payload.actor_context,
         )
     except AppError as error:
@@ -168,27 +190,29 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
         async with get_session(request.app.state.session_factory) as session:
             service = None
             service_id = payload.service_id or payload.candidate_id
+            service_tenant_id = await _resolve_service_tenant_id(session, service_id)
+            effective_tenant_id = service_tenant_id or tenant_id
             if service_id:
                 statement = select(ServiceMerchantProfile).where(
                     ServiceMerchantProfile.service_id == service_id
                 )
-                if tenant_id:
-                    statement = statement.where(ServiceMerchantProfile.tenant_id == tenant_id)
+                if effective_tenant_id:
+                    statement = statement.where(ServiceMerchantProfile.tenant_id == effective_tenant_id)
                 service = (await session.execute(statement)).scalar_one_or_none()
 
-            contact_repository = ContactRepository(RepositoryContext(session=session, tenant_id=tenant_id))
-            lead_repository = LeadRepository(RepositoryContext(session=session, tenant_id=tenant_id))
-            booking_repository = BookingIntentRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+            contact_repository = ContactRepository(RepositoryContext(session=session, tenant_id=effective_tenant_id))
+            lead_repository = LeadRepository(RepositoryContext(session=session, tenant_id=effective_tenant_id))
+            booking_repository = BookingIntentRepository(RepositoryContext(session=session, tenant_id=effective_tenant_id))
 
             contact_id = await contact_repository.upsert_contact(
-                tenant_id=tenant_id,
+                tenant_id=effective_tenant_id,
                 full_name=payload.contact.full_name,
                 email=normalized_email,
                 phone=normalized_phone,
                 primary_channel="email" if normalized_email else "phone",
             )
-            await lead_repository.upsert_lead(
-                tenant_id=tenant_id,
+            lead_id = await lead_repository.upsert_lead(
+                tenant_id=effective_tenant_id,
                 contact_id=contact_id,
                 source=(payload.attribution.source if payload.attribution else payload.channel),
                 status="captured",
@@ -196,7 +220,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
 
             booking_reference = f"v1-{uuid4().hex[:10]}"
             booking_intent_id = await booking_repository.upsert_booking_intent(
-                tenant_id=tenant_id,
+                tenant_id=effective_tenant_id,
                 contact_id=contact_id,
                 booking_reference=booking_reference,
                 conversation_id=f"conv_{uuid4().hex[:12]}",
@@ -218,9 +242,45 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                     }
                 ),
             )
+            lead_sync_result = await orchestrate_lead_capture(
+                session,
+                tenant_id=effective_tenant_id,
+                lead_id=lead_id,
+                source=(payload.attribution.source if payload.attribution else payload.channel),
+                contact_email=normalized_email,
+                contact_full_name=payload.contact.full_name,
+                contact_phone=normalized_phone,
+                company_name=service.name if service else None,
+            )
+            contact_sync_result = await orchestrate_contact_sync(
+                session,
+                tenant_id=effective_tenant_id,
+                contact_id=contact_id,
+                full_name=payload.contact.full_name,
+                email=normalized_email,
+                phone=normalized_phone,
+            )
+            booking_crm_sync = await orchestrate_booking_followup_sync(
+                session,
+                tenant_id=effective_tenant_id,
+                booking_intent_id=booking_intent_id,
+                booking_reference=booking_reference,
+                full_name=payload.contact.full_name,
+                email=normalized_email,
+                phone=normalized_phone,
+                source=(payload.attribution.source if payload.attribution else payload.channel),
+                service_name=service.name if service else None,
+                requested_date=payload.desired_slot.date if payload.desired_slot else None,
+                requested_time=payload.desired_slot.time if payload.desired_slot else None,
+                timezone=payload.desired_slot.timezone if payload.desired_slot else None,
+                booking_path=_normalize_booking_path(service),
+                notes=payload.notes,
+                external_lead_id=lead_sync_result.external_entity_id,
+                external_contact_id=contact_sync_result.external_entity_id,
+            )
             await _record_phase2_write_activity(
                 session,
-                tenant_id=tenant_id,
+                tenant_id=effective_tenant_id,
                 actor_context=payload.actor_context,
                 audit_event_type="booking_intent.captured",
                 entity_type="booking_intent",
@@ -228,18 +288,32 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                 audit_payload={
                     "booking_reference": booking_reference,
                     "contact_id": contact_id,
+                    "lead_id": lead_id,
                     "service_id": service_id,
                     "channel": payload.channel,
                     "requested_date": payload.desired_slot.date if payload.desired_slot else None,
                     "requested_time": payload.desired_slot.time if payload.desired_slot else None,
+                    "crm_sync": {
+                        "lead": lead_sync_result.sync_status,
+                        "contact": contact_sync_result.sync_status,
+                        "deal": booking_crm_sync.deal_sync_status,
+                        "task": booking_crm_sync.task_sync_status,
+                    },
                 },
                 outbox_event_type="booking_intent.capture.recorded",
                 outbox_payload={
                     "booking_intent_id": booking_intent_id,
                     "booking_reference": booking_reference,
                     "contact_id": contact_id,
+                    "lead_id": lead_id,
                     "service_id": service_id,
                     "channel": payload.channel,
+                    "crm_sync": {
+                        "lead_record_id": lead_sync_result.record_id,
+                        "contact_record_id": contact_sync_result.record_id,
+                        "deal_record_id": booking_crm_sync.deal_record_id,
+                        "task_record_id": booking_crm_sync.task_record_id,
+                    },
                 },
                 idempotency_key=f"booking-intent:{booking_intent_id}" if booking_intent_id else None,
             )
@@ -269,8 +343,33 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                     "warnings": warnings,
                 },
                 "warnings": warnings,
+                "crm_sync": {
+                    "lead": {
+                        "record_id": lead_sync_result.record_id,
+                        "sync_status": lead_sync_result.sync_status,
+                        "external_entity_id": lead_sync_result.external_entity_id,
+                        "warning_codes": lead_sync_result.warning_codes,
+                    },
+                    "contact": {
+                        "record_id": contact_sync_result.record_id,
+                        "sync_status": contact_sync_result.sync_status,
+                        "external_entity_id": contact_sync_result.external_entity_id,
+                        "warning_codes": contact_sync_result.warning_codes,
+                    },
+                    "deal": {
+                        "record_id": booking_crm_sync.deal_record_id,
+                        "sync_status": booking_crm_sync.deal_sync_status,
+                        "external_entity_id": booking_crm_sync.deal_external_entity_id,
+                    },
+                    "task": {
+                        "record_id": booking_crm_sync.task_record_id,
+                        "sync_status": booking_crm_sync.task_sync_status,
+                        "external_entity_id": booking_crm_sync.task_external_entity_id,
+                    },
+                    "warning_codes": booking_crm_sync.warning_codes,
+                },
             },
-            tenant_id=tenant_id,
+            tenant_id=effective_tenant_id,
             actor_context=payload.actor_context,
         )
     except AppError as error:

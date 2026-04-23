@@ -18,6 +18,8 @@ This strategy inherits and aligns with:
 - Prompt 6 public growth strategy
 - Prompt 7 tenant app strategy
 - `docs/architecture/user-surface-saas-upgrade-plan.md`
+- `docs/architecture/admin-enterprise-workspace-requirements.md`
+- `docs/architecture/admin-workspace-blueprint.md`
 
 ## Section 1 — Executive summary
 
@@ -55,6 +57,29 @@ Implementation synchronization note from `2026-04-19`:
 - the current code-aligned planning baseline for this lane is `docs/architecture/current-phase-sprint-execution-plan.md`
 - admin planning should now treat the existing admin console, workspace split, diagnostics, reliability drill-ins, and support-safe preview tooling as already implemented foundations
 - the next admin strategy emphasis is completion of commercial support loops, billing and tenant investigation tooling, and release-safe operator workflows rather than creation of the first admin surface
+
+Additional requirements synchronization note from `2026-04-21`:
+
+- `docs/architecture/admin-enterprise-workspace-requirements.md` is now the request-facing source document for the next admin redesign wave
+- later admin planning should now inherit an explicit enterprise workspace target:
+  - friendlier professional login
+  - menu-first information architecture
+  - tenant list and tenant-detail operations
+  - direct tenant branding and HTML content editing
+  - tenant role and permission management from admin
+  - full tenant product and service CRUD
+- future admin implementation should therefore be interpreted as both a UI redesign and an admin capability expansion, not only a dashboard polish pass
+
+Additional blueprint synchronization note from `2026-04-22`:
+
+- `docs/architecture/admin-workspace-blueprint.md` now defines the detailed execution blueprint for the admin workspace
+- the internal admin strategy should therefore map its current platform-ops posture onto the blueprint's phased delivery model:
+  - MVP: auth, tenant core, users and roles, customers, leads, bookings, services, payments basic, dashboard, audit
+  - growth: campaigns, messaging, automations, workflow management, attribution, advanced analytics, branches
+  - scale: multi-location operations, lifecycle automation, AI recommendations, SLA monitoring, reporting, integration hub
+- future admin implementation should now be treated as both:
+  - an internal ops console
+  - a tenant-facing revenue operations control plane for BookedAI staff and authorized operators
 
 ## Section 2 — Current admin assessment
 

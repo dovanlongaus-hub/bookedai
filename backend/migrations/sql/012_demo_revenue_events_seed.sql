@@ -53,28 +53,36 @@ where not exists (
 -- Insert payment intents for the 14 confirmed sessions (avg A$30/lesson)
 insert into payment_intents (
   tenant_id,
-  booking_reference,
+  booking_intent_id,
+  payment_option,
+  external_session_id,
+  payment_url,
   amount_aud,
-  currency_code,
+  currency,
   status,
-  provider,
+  metadata_json,
   created_at
 )
 select
   t.id,
-  'demo-' || lpad((floor(random() * 90000) + 10000)::text, 5, '0'),
+  null,
+  'stripe_card',
+  'demo-pay-' || lpad(series_id::text, 3, '0'),
+  'https://bookedai.au/pay/demo-' || lpad(series_id::text, 3, '0'),
   30.00,
-  'AUD',
+  'aud',
   'paid',
-  'stripe',
+  jsonb_build_object(
+    'source', 'demo_seed',
+    'booking_reference', 'demo-' || lpad(series_id::text, 3, '0'),
+    'provider', 'stripe'
+  ),
   now() - (random() * interval '28 days')
 from tenants t
-cross join generate_series(1, 14)
+cross join generate_series(1, 14) as series_id
 where t.slug = 'future-swim'
   and not exists (
     select 1 from payment_intents
-    where provider = 'stripe'
-      and status = 'paid'
-      and booking_reference like 'demo-%'
+    where external_session_id like 'demo-pay-%'
     limit 1
   );

@@ -25,6 +25,11 @@ The first schema package focuses on:
 9. curated published pilot row for tenant-first chess search verification
 10. published AUD pricing correction for the chess pilot
 11. Zoho CRM connection blueprint seed for the official Future Swim tenant
+12. demo revenue events seed
+13. official AI Mentor tenant plus published mentoring catalog seed
+14. Future Swim CRM-linked lifecycle sample seed for full lead-to-booking demo flow
+15. tenant email-login verification-code support
+16. cross-industry simulated full-flow booking test pack for QA and operator demos
 
 ## Execution rules
 
@@ -47,6 +52,11 @@ The first schema package focuses on:
 - `sql/009_co_mai_hung_chess_published_pilot_row.sql`
 - `sql/010_co_mai_hung_chess_set_aud_30_pricing.sql`
 - `sql/011_future_swim_zoho_crm_connection_blueprint.sql`
+- `sql/012_demo_revenue_events_seed.sql`
+- `sql/013_ai_mentor_tenant_seed.sql`
+- `sql/014_future_swim_crm_linked_flow_sample.sql`
+- `sql/015_tenant_email_login_codes.sql`
+- `sql/016_cross_industry_full_flow_test_pack.sql`
 
 ## Notes
 

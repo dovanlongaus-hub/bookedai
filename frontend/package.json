@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "sync:template": "node scripts/sync-template-assets.mjs",
-    "build": "npm run sync:template && tsc && vite build && node scripts/generate-hosted-html.mjs",
+    "build": "node scripts/run-build.mjs",
     "preview": "vite preview --port 3000",
     "test:playwright": "bash scripts/run_playwright_suite.sh legacy",
     "test:playwright:admin": "bash scripts/run_playwright_suite.sh legacy --grep @admin",

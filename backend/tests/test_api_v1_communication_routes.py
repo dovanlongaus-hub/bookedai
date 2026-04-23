@@ -18,8 +18,8 @@ from api.v1_routes import (
     _query_intent_constraint_groups,
     _raw_query_intent_terms,
     _search_terms,
-    router as v1_router,
 )
+from api.v1_router import router as v1_router
 from repositories.integration_repository import IntegrationRepository
 from service_layer.prompt9_matching_service import RankedServiceMatch
 from repositories.tenant_repository import TenantRepository
@@ -131,8 +131,8 @@ class Apiv1CommunicationRoutes(TestCase):
             send_email=_async_noop,
         )
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_communication_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_communication_handlers.get_session",
             _fake_get_session,
         ):
             client = TestClient(app)
@@ -170,11 +170,11 @@ class Apiv1CommunicationRoutes(TestCase):
             ),
         )
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_communication_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_communication_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.orchestrate_communication_touch",
+            "api.v1_communication_handlers.orchestrate_communication_touch",
             _async_value_factory(
                 SimpleNamespace(
                     message_id="msg-sms-1",
@@ -218,11 +218,11 @@ class Apiv1CommunicationRoutes(TestCase):
             ),
         )
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_communication_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_communication_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.orchestrate_communication_touch",
+            "api.v1_communication_handlers.orchestrate_communication_touch",
             _async_value_factory(
                 SimpleNamespace(
                     message_id="msg-wa-1",
@@ -251,4 +251,3 @@ class Apiv1CommunicationRoutes(TestCase):
         self.assertEqual(payload["data"]["message_id"], "msg-wa-1")
         self.assertEqual(payload["data"]["delivery_status"], "queued")
         self.assertEqual(payload["data"]["provider"], "whatsapp_twilio")
-

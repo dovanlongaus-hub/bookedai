@@ -41,32 +41,32 @@ export type ConsultationFormState = {
 };
 
 export const highlightPoints = [
-  'Plans start from 49$+ for a faster first adoption',
-  'Entry package is designed for a clean, low-friction rollout',
-  'Pro and Pro Max add deeper automation while commission stays tied to real booked revenue',
+  'Commercial model stays readable from first scope call to paid rollout',
+  'Entry path is intentionally low-friction, but still framed like a serious operating decision',
+  'Higher tiers add automation, visibility, and workflow depth while commission stays tied to real booked revenue',
 ];
 
 export const topOffers = [
   {
-    eyebrow: 'Starter',
-    title: 'Launch from 49$+ before moving into deeper automation',
-    body: 'Use the starter path when you want BookedAI live quickly on a lightweight booking surface before moving into a deeper revenue workflow.',
+    eyebrow: 'Entry posture',
+    title: 'Enter cleanly, then expand only when workflow depth is justified',
+    body: 'The first package is designed to let teams prove fit and operating value before they commit to deeper automation or broader rollout scope.',
   },
   {
-    eyebrow: 'Simple pricing',
-    title: 'Keep the first buying decision readable and low-friction',
-    body: 'The public offer is designed so SMEs can understand starting price, rollout scope, and upgrade path without a pricing maze.',
+    eyebrow: 'Commercial clarity',
+    title: 'Keep the buying story legible instead of hiding it behind pricing noise',
+    body: 'The public pricing story is meant to show setup scope, monthly commitment, and performance upside in one clean sequence.',
   },
 ];
 
 export const setupOptions = [
   {
     label: 'Online setup',
-    detail: 'Fastest option for most SMEs. Starting plans can launch from 49$+, with setup quoted separately when a rollout needs more scope.',
+    detail: 'Default path for most teams. Faster to launch, easier to approve, and cleaner to scale once workflow fit is proven.',
   },
   {
     label: 'Onsite setup',
-    detail: 'Available for more complex teams, multi-location rollouts, or in-person training. Quoted after scope confirmation.',
+    detail: 'Used when operational complexity, multi-location rollout, or in-person enablement makes a higher-touch launch commercially sensible.',
   },
 ];
 
@@ -75,37 +75,37 @@ export const plans: Plan[] = [
     id: 'basic',
     name: 'Starter',
     price: '49$+',
-    subtitle: 'Best for SMEs that want BookedAI live on a light customer-facing flow before committing to a deeper rollout.',
-    badge: 'Entry plan',
-    ctaLabel: 'Choose Starter',
-    introLabel: 'Start here',
+    subtitle: 'Best for teams that want to prove demand capture and first workflow fit before expanding into a deeper operating rollout.',
+    badge: 'Entry layer',
+    ctaLabel: 'Review Starter',
+    introLabel: 'Initial deployment',
     microcopy:
-      'Use the starter plan to validate demand capture and fit before adding more automation, routing, and revenue logic.',
+      'Use Starter when the goal is to validate fit, control first response, and establish a cleaner operating path without overcommitting early.',
     supportingText:
-      'Best when you need a low-friction first step for website lead capture and a simple booking path at a clear starting price.',
+      'Strong fit when you need a credible first deployment path for website demand capture and a simple booking lane at a clear entry price.',
     features: [
       'AI website chat',
-      'basic enquiry capture',
+      'core enquiry capture',
       'simple booking handoff',
       'starter activation path',
-      '1 lightweight service workflow',
-      'best for proving demand before rollout',
+      '1 focused service workflow',
+      'best for proving operating fit before expansion',
     ],
   },
   {
     id: 'standard',
     name: 'Pro',
     price: 'A$149',
-    subtitle: 'The default paid plan for SMEs that want stronger qualification, guided booking, and a clearer conversion engine.',
-    badge: 'Most popular',
-    ctaLabel: 'Choose Pro',
-    introLabel: 'Growth plan',
+    subtitle: 'The default paid plan for teams that want stronger qualification, guided booking, and a more visible conversion engine.',
+    badge: 'Core operating plan',
+    ctaLabel: 'Review Pro',
+    introLabel: 'Growth layer',
     microcopy:
-      '1 month free after go-live, then one predictable monthly plan for SMEs that need BookedAI to convert more enquiries into bookings.',
+      'The clearest paid path for teams that want BookedAI to move from helpful surface into a repeatable revenue workflow.',
     supportingText:
-      'Strong fit for salons, clinics, tutors, swim schools, and growing service operators that need better follow-up and conversion.',
+      'Strong fit for growing operators that need more qualification discipline, follow-up control, and commercial visibility without moving into custom scope.',
     features: [
-      'everything in Freemium',
+      'everything in Starter',
       'missed call SMS auto-reply',
       'guided booking flow',
       'SMS follow-up',
@@ -118,14 +118,14 @@ export const plans: Plan[] = [
     id: 'pro',
     name: 'Pro Max',
     price: 'A$349',
-    subtitle: 'For higher-volume or more complex SMEs that need broader automation, deeper qualification, and multi-service or multi-location support.',
-    badge: 'Advanced operations',
-    ctaLabel: 'Choose Pro Max',
-    introLabel: 'Scale plan',
+    subtitle: 'For higher-volume or more complex operators that need broader automation, deeper qualification, and multi-service or multi-location support.',
+    badge: 'Scale layer',
+    ctaLabel: 'Review Pro Max',
+    introLabel: 'Scale posture',
     microcopy:
-      '1 month free after go-live, then a higher-capability plan built for service businesses with more operational depth and revenue complexity.',
+      'Built for businesses where operating depth, coordination, and commercial complexity justify a more advanced control layer.',
     supportingText:
-      'Best for multi-location clinics, hospitality groups, education operators, and service teams that need deeper automation and operational visibility.',
+      'Best for multi-location clinics, hospitality groups, education operators, and service teams that need deeper automation and more visible operating control.',
     features: [
       'everything in Pro',
       'AI answers inbound calls',
@@ -139,12 +139,12 @@ export const plans: Plan[] = [
 
 export const recommendations: Recommendation[] = [
   {
-    label: 'Freemium',
-    detail: 'Start small',
+    label: 'Starter',
+    detail: 'Validate fit',
   },
   {
     label: 'Pro',
-    detail: 'Best value',
+    detail: 'Default paid path',
     featured: true,
   },
   {
@@ -155,19 +155,19 @@ export const recommendations: Recommendation[] = [
 
 export const pricingSignals = [
   {
-    label: 'Start here',
+    label: 'Entry point',
     value: '49$+',
-    detail: 'Low-friction starting price for SMEs that want BookedAI live quickly',
+    detail: 'Clear entry path for teams that want BookedAI live quickly without obscuring rollout scope',
   },
   {
-    label: 'Entry package',
-    value: 'Starter to Pro',
-    detail: 'Start from 49$+, then move into higher-capability plans as revenue operations deepen',
+    label: 'Buying ladder',
+    value: 'Starter -> Pro -> Pro Max',
+    detail: 'Move into higher-capability plans only as operating complexity and commercial upside deepen',
   },
   {
     label: 'Commercial model',
     value: 'Setup fee + monthly + commission',
-    detail: 'Setup is quoted clearly, monthly plans stay predictable, and commission is only tied to real booked revenue',
+    detail: 'Setup is scoped clearly, monthly plans stay predictable, and commission is tied only to real booked revenue',
   },
 ];
 

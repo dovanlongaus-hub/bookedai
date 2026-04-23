@@ -31,15 +31,15 @@ type FooterProps = {
 export function Footer({
   onStartTrial,
   onBookDemo,
-  startTrialLabel = 'Claim Free Setup',
-  bookDemoLabel = 'Open Product Demo',
+  startTrialLabel = 'Open Product Trial',
+  bookDemoLabel = 'Talk to Sales',
 }: FooterProps) {
   const releaseBadgeLabel = getReleaseBadgeLabel();
   const releaseVersionLabel = getReleaseVersionLabel();
 
   return (
-    <footer className="mx-auto w-full max-w-7xl px-6 pb-12 pt-4 lg:px-8">
-      <div className="template-card overflow-hidden px-6 py-8 lg:px-8">
+    <footer className="mx-auto w-full max-w-7xl px-6 pb-12 pt-6 lg:px-8">
+      <div className="template-card overflow-hidden border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] px-6 py-8 shadow-[0_24px_64px_rgba(15,23,42,0.06)] lg:px-8">
         <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
           <div className="flex items-start gap-6">
             <div className="flex shrink-0 items-center overflow-hidden rounded-[1.25rem] border border-black/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.68)_0%,rgba(248,250,252,0.9)_100%)] px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
@@ -68,11 +68,11 @@ export function Footer({
           <div className="grid gap-4">
             <div className="grid gap-3 sm:grid-cols-3">
               {[
-                ['Launch model', 'Starter to Pro to Pro Max'],
-                ['Commercial model', 'Setup fee + monthly + commission'],
-                ['Starting price', '49$+'],
+                ['Buying ladder', 'Starter -> Pro -> Pro Max'],
+                ['Commercial model', 'Scoped setup + monthly + commission'],
+                ['Entry layer', '49$+'],
               ].map(([label, value]) => (
-                <div key={label} className="rounded-[1.25rem] bg-[#f5f5f7] px-4 py-4">
+                <div key={label} className="rounded-[1.25rem] border border-black/6 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
                   <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div>
                   <div className="mt-2 text-sm font-semibold text-slate-950">{value}</div>
                 </div>
@@ -123,7 +123,7 @@ export function Footer({
               Roadmap
             </a>
             <a href={tenantHref} className="template-link transition hover:underline">
-              Tenant
+              Tenant Workspace
             </a>
             <a href={adminHref} className="template-link transition hover:underline">
               Admin Login

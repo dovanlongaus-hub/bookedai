@@ -113,6 +113,21 @@ Before a live promotion is considered complete, confirm all of the following in 
 - the matching roadmap, sprint, plan, or phase document has been updated
 - the release should be treated as `hold` if the code is ready but the documentation write-back is still missing
 
+## Collaboration handoff gate
+
+Before another team member treats the change as ready for beta or live promotion, confirm:
+
+- the owner can point to the changed requirement-facing document
+- the owner has updated `docs/development/implementation-progress.md`
+- the matching sprint, roadmap, or phase artifact has been updated
+- the intended deploy path is clear:
+  - beta rehearsal with `bash scripts/deploy_beta.sh`
+  - production promotion with `bash scripts/deploy_live_host.sh`
+- the owner can explain the rollback boundary in one short paragraph
+- the closeout summary is ready for:
+  - Notion as full detail
+  - Discord as concise direct text
+
 ## Promote
 
 Promote the current rollout slice when all of the following are true:
@@ -162,6 +177,7 @@ Use the smallest rollback that restores operator clarity and release confidence:
 
 ## Related references
 
+- [CI/CD And Deployment Runbook](./ci-cd-deployment-runbook.md)
 - [Rollout Feature Flags](./rollout-feature-flags.md)
 - [Implementation Progress](./implementation-progress.md)
 - [Next Sprint Protected Reauth Retry Gate Plan](./next-sprint-protected-reauth-retry-gate-plan.md)

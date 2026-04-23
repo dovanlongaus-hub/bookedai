@@ -39,16 +39,16 @@ const rolloutPhases = [
 
 export function ImplementationSection({ content }: ImplementationSectionProps) {
   return (
-    <section id="implementation" className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-8 lg:py-16">
+    <section id="implementation" className="mx-auto w-full max-w-7xl px-6 py-14 lg:px-8 lg:py-18">
       <div className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr] lg:items-start">
-        <SectionCard className="p-8 lg:p-10">
+        <SectionCard className="border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-8 shadow-[0_22px_56px_rgba(15,23,42,0.05)] lg:p-10">
           <SectionHeading {...content} />
 
-            <div className="mt-8 grid gap-3">
-              {implementationSignals.map((signal, index) => (
+          <div className="mt-8 grid gap-3">
+            {implementationSignals.map((signal, index) => (
               <SectionCard
                 key={signal}
-                className="flex items-start gap-4 rounded-[1.4rem] bg-[#f5f5f7] px-5 py-4 shadow-none"
+                className="flex items-start gap-4 rounded-[1.4rem] border border-black/6 bg-white px-5 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
               >
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#1d1d1f] text-sm font-semibold text-white">
                   {index + 1}
@@ -60,7 +60,7 @@ export function ImplementationSection({ content }: ImplementationSectionProps) {
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             {rolloutPhases.map((phase, index) => (
-              <SectionCard key={phase.title} as="article" tone="subtle" className="rounded-[1.35rem] px-4 py-4">
+              <SectionCard key={phase.title} as="article" tone="subtle" className="rounded-[1.35rem] border border-black/6 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
                   Phase 0{index + 1}
                 </div>
@@ -72,7 +72,7 @@ export function ImplementationSection({ content }: ImplementationSectionProps) {
         </SectionCard>
 
         <div className="grid gap-4 md:grid-cols-2">
-          <SectionCard as="article" tone="dark" className="p-6 md:col-span-2">
+          <SectionCard as="article" tone="dark" className="border border-black/6 p-6 shadow-[0_22px_56px_rgba(15,23,42,0.12)] md:col-span-2">
             <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#7dd3fc]">
               Deployment modes
             </div>
@@ -85,7 +85,7 @@ export function ImplementationSection({ content }: ImplementationSectionProps) {
           </SectionCard>
 
           {deploymentModes.map((mode) => (
-            <SectionCard key={mode.title} as="article" tone="subtle" className="h-full p-6">
+            <SectionCard key={mode.title} as="article" tone="subtle" className="h-full border border-black/6 bg-white p-6 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
               <div className="template-kicker text-sm tracking-[0.12em]">{mode.title}</div>
               <p className="mt-3 text-sm leading-6 text-black/70">{mode.body}</p>
             </SectionCard>

@@ -8,7 +8,7 @@ Current synchronized release baseline: `1.0.1-stable`.
 
 Latest infrastructure update date: `2026-04-16`.
 
-Latest product-surface update date: `2026-04-21`.
+Latest product-surface update date: `2026-04-22`.
 
 From this point onward, it serves three purposes:
 
@@ -39,9 +39,20 @@ If any supporting document conflicts with `project.md`, treat `project.md` as au
 
 Every meaningful implementation change that affects direction, architecture, roadmap, or delivery state should update `project.md` first, then sync the downstream document set.
 
+## Memory Hygiene Rule
+
+BookedAI working memory should preserve durable project context, not execution noise.
+
+That means:
+
+- store decisions, outcomes, blockers, follow-up risks, and next steps
+- do not store routine shell history, raw command transcripts, git command sequences, or ordinary build and deploy logs in dated memory notes
+- only preserve command-level detail when it reveals a durable failure mode, environment constraint, or operator requirement that will matter later
+- prefer short outcome-oriented summaries over step-by-step execution diaries
+
 ## Latest Synced Delivery Note
 
-As of `2026-04-21`, the synchronized repo baseline now includes both product-surface continuity work and a backend ownership cleanup pass.
+As of `2026-04-21`, the synchronized repo baseline now includes both product-surface continuity work, a backend ownership cleanup pass, and a more explicit CI/CD deployment runbook.
 
 The current inherited truth is:
 
@@ -68,11 +79,213 @@ The current inherited truth is:
   - `TENANT_SESSION_SIGNING_SECRET`
   - `ADMIN_SESSION_SIGNING_SECRET`
 - legacy `ADMIN_API_TOKEN` and `ADMIN_PASSWORD` fallback still exists for compatibility, but should now be treated as migration support rather than the desired end-state
+- the next admin productization wave is now requirements-locked through `docs/architecture/admin-enterprise-workspace-requirements.md`
+- the detailed implementation blueprint for that wave now lives in `docs/architecture/admin-workspace-blueprint.md`
+- that admin wave should now be interpreted as:
+  - enterprise login and menu-first information architecture
+  - tenant management as a first-class admin lane
+  - direct tenant branding and HTML content editing
+  - tenant role and permission management from admin
+  - full tenant product or service CRUD from admin
+  - a phased revenue-engine workspace that expands from auth, tenant core, users, CRM, bookings, services, payments, dashboard, and audit into campaigns, workflows, messaging, automation, and reporting
+  - current execution order for that workspace is now locked more explicitly:
+    - `Phase 0`: runtime and ownership decision for the admin surface
+    - `Phase 1`: production auth, signed session, tenant context, RBAC, and immutable audit baseline
+    - `Phase 2`: Prisma and repository parity so current admin modules stop depending on mock-only data truth
+    - `Phase 3`: tenant, users, roles, settings, and audit control-plane completion
+    - `Phase 4`: revenue-operations module hardening across customers, leads, services, and bookings
+    - `Phase 5`: payments and revenue-truth enrichment
+    - `Phase 6`: dashboard, reporting, and operator analytics expansion
+    - `Phase 7`: growth modules such as campaigns, workflows, messaging, and automation
+  - until the runtime decision changes explicitly, the root `Next.js` admin tree should be treated as the active implementation lane for the new admin workspace, while the deployed frontend source of truth for the broader product still remains `frontend/`
+  - the first `Phase 1` code slice is now present in the root admin lane:
+    - signed admin session verification now uses `ADMIN_SESSION_SIGNING_SECRET` preference with shared fallback compatibility
+    - root admin auth now exposes `POST /api/admin/auth/login`, `POST /api/admin/auth/logout`, `GET /api/admin/auth/me`, and `POST /api/admin/auth/switch-tenant`
+    - tenant context is now filtered against the signed session's allowed tenant ids
+    - RBAC coverage now includes the broader enterprise modules required for later `tenants`, `users`, `roles`, `settings`, `payments`, and `reports` lanes
+    - auth events such as login, logout, and tenant-switch now write audit entries through the root admin repository baseline
+  - the first practical `Phase 2` data-parity slice is now also present in the root admin lane:
+    - `prisma/schema.prisma` now includes the admin fields needed by the current root modules for customer full name, source, tags, notes summary, lead pipeline and follow-up state, and payment records
+    - `prisma/seed.ts` now seeds those richer customer and lead fields so Prisma-backed admin reads stay closer to the current UI contract
+    - `lib/db/admin-repository.ts` now prefers Prisma-backed reads and writes for dashboard, customers, leads, services, bookings, payments, and audit logs when `BOOKEDAI_ENABLE_PRISMA=1`
+    - the remaining mock-store path is now a fallback instead of the only truth path for the new admin workspace
+  - that `Phase 2` slice then moved one step further:
+    - Prisma models now also exist for `permissions`, `role_permissions`, `branches`, `tenant_settings`, `subscriptions`, and `invoices`
+    - the root admin repository now also exposes preparatory Prisma-backed seams for `listUsers`, `listRoles`, `getTenantSettings`, and paginated `listPayments`
+    - a migration artifact now exists at `prisma/migrations/20260422034156_phase2_admin_prisma_parity/migration.sql`, covering both richer customer and lead columns plus the new payment and control-plane tables
+  - that `Phase 2` parity lane then moved one step further again on `2026-04-22`:
+    - the root admin repository now also exposes Prisma-backed `listBranches` and `getTenantBillingOverview` seams over the already-seeded `branches`, `subscriptions`, and `invoices` models
+    - `/admin/settings` now surfaces tenant branch footprint plus subscription and invoice posture instead of stopping at branding-only fields, so the settings lane starts reading from the same tenant-control data already present in schema and seed coverage
+    - the mock-store path now mirrors those same branch and billing records too, keeping the fallback behavior closer to the database-backed UI contract
+  - that same `Phase 2` parity lane then moved one step further again on `2026-04-22` into mutation coverage:
+    - the root admin repository now also supports `createBranch`, `updateBranch`, branch archive or reactivate state changes, and `updateTenantBillingSettings` for the current subscription baseline
+    - `/admin/settings` now supports branch add/edit/archive/reactivate actions plus billing baseline edits for provider, plan code, status, external id, and renewal date instead of leaving those controls as read-only summary cards
+    - the settings server-action layer and admin settings API now inherit the same branch and billing parity data so Phase 2 covers both read and write seams for the newly surfaced tenant-control entities
+  - that same `Phase 2` parity lane then moved one step further again on `2026-04-22` into explicit admin API parity:
+    - root admin now exposes `GET/POST /api/admin/settings/branches`, `GET/PATCH /api/admin/settings/branches/:branchId`, and `GET/PATCH /api/admin/settings/billing`
+    - the branch detail API supports both metadata edits and active-state mutation, so integrations do not need to rely on server actions to manage branch lifecycle
+    - this closes the main remaining gap between the new settings UI mutations and reusable admin API seams for the same tenant-control entities
+  - the first practical `Phase 3` control-plane slice is now also in code:
+    - root admin navigation now includes `Team`, `Payments`, and `Settings`
+    - `/admin/team` now supports team-member creation plus status and primary-role assignment, backed by `/api/admin/users`, `/api/admin/users/:id`, and `/api/admin/roles`
+    - `/admin/settings` now supports tenant profile and branding edits, including editable HTML introduction content, backed by `/api/admin/settings`
+    - `/admin/payments` now supports filtered ledger reads, payment recording, and payment status updates, backed by `/api/admin/payments` and `/api/admin/payments/:id`
+  - that same `Phase 3` settings lane then moved one step further again on `2026-04-22`:
+    - `/admin/settings` now also surfaces editable workspace operational guides for `overview`, `experience`, `catalog`, `plugin`, `bookings`, `integrations`, `billing`, and `team`, instead of leaving those tenant-runtime instruction layers writable only from the tenant side
+    - the same lane now also exposes billing-gateway controls for `merchantModeOverride`, `stripeCustomerId`, and `stripeCustomerEmail`, so admin can inspect and adjust tenant Stripe posture without leaving the control plane
+    - root admin now also exposes `GET/PATCH /api/admin/settings/guides` and `GET/PATCH /api/admin/settings/gateway`, bringing those settings slices under the same reusable API posture as the rest of the admin control plane
+  - that same `Phase 3` settings lane then moved one step further again on `2026-04-22` into plugin runtime control:
+    - `/admin/settings` now also exposes the core `partner_plugin_interface` runtime fields used by the tenant plugin workspace, including partner site URL, BookedAI host, embed path, widget script path, widget id, headline, prompt, CTA labels, support contacts, and logo URL
+    - root admin now also exposes `GET/PATCH /api/admin/settings/plugin`, so plugin runtime configuration can be managed through the same admin API posture instead of only through tenant-side controls
+    - the aggregate admin settings response now also carries `pluginRuntime`, keeping the main settings read model aligned with the new control-plane section
+  - that same `Phase 3` settings lane then moved one step further again on `2026-04-22` into integration operator posture:
+    - `/admin/settings` now also mirrors backend integration health for the active tenant, including provider posture, CRM retry backlog, reconciliation sections, Zoho CRM connection posture, outbox backlog, and recent runtime activity, so operators can inspect integration runtime state without leaving the admin control plane
+    - the same slice now also includes a provider credential-safe overview across the exposed connectors, so admin can compare configured-field coverage and readiness posture per provider without touching secrets
+    - root admin now also exposes `GET /api/admin/settings/integrations`, and the aggregate admin settings response now also carries `integrations`
+    - this slice intentionally keeps integration provider writes tenant-owned, with admin settings linking back into the tenant integrations workspace instead of bypassing the existing tenant membership boundary
+  - that `Phase 3` slice has now been extended into a fuller control plane:
+    - `/admin/roles` now exposes a permission editor so role posture can be adjusted without leaving the workspace
+    - `/admin/audit` now exposes a dedicated audit investigation surface with search, entity-type filtering, and pagination
+    - `/api/admin/roles` now supports both role catalog reads and permission-set updates, and `/api/admin/audit` now supports paginated audit log reads
+  - that `Phase 3` lane now also includes safer tenant support investigation:
+    - `/admin/tenants` now gives the root admin lane a dedicated tenant investigation workspace instead of forcing operators to infer tenant issues from unrelated pages
+    - the investigation surface now reads tenant-auth, billing, and CRM retry posture from the production tenant runtime through read-only snapshots before deeper intervention is attempted
+    - root admin session now supports audited `read_only` tenant support mode with explicit bannering, reason capture, and separate start/end audit events instead of turning normal admin tenant context switching into a write-capable impersonation flow
+    - `/admin/tenants` now also provides direct deep links into tenant runtime `overview`, `billing`, `team`, and `integrations` sections so support investigation can bridge cleanly into tenant-facing context without abandoning the safer admin investigation lane
+    - `/admin/tenants` now also merges tenant-auth, billing, CRM, integrations, and support-session audit signals into one unified investigation timeline so operators can read a tenant support case in sequence instead of stitching together separate cards by hand
+    - the same support-mode context now also follows operators into the main admin workspaces through shared inline banners with quick return-to-investigation and tenant-runtime section links, so tenant context remains visible outside `/admin/tenants`
+    - tenant runtime pages now also understand admin support-return context, so when a tenant section is opened from admin support mode the operator can jump back to the same admin investigation or admin workspace without losing the current tenant
+    - read-only support mode now also enforces mutation blocking in the root admin lane: non-`view` permissions are denied while support mode is active, and the main mutation forms surface disabled controls plus clearer write-block messaging instead of behaving like writable pages
+  - the first practical `Phase 4` hardening slice is now also in code:
+    - `/admin/leads/[leadId]` now gives leads a dedicated operational detail view with edit controls, conversion actions, and follow-up timeline
+    - customer detail now renders a unified timeline across notes, tags, bookings, payments, and customer audit events instead of separate passive blocks
+    - `/api/admin/leads/[leadId]` and `/api/admin/customers/[customerId]` now expose timeline payloads for richer client consumption
+  - that `Phase 4` lane has now moved one step further into bookings:
+    - `/admin/bookings/[bookingId]` now gives bookings a dedicated detail workspace with controls, linked payments, and booking timeline
+    - `/api/admin/bookings/[bookingId]` now exposes payments, derived payment status, and timeline payloads
+    - the bookings list now links directly into the detail workspace so schedule operations and revenue posture are connected
+  - that `Phase 4` lane now also includes the first lead-specific write seam:
+    - lead detail now supports dedicated `add note` and `schedule follow-up` actions without routing everything through the full edit form
+    - `/api/admin/leads/[leadId]/add-note` and `/api/admin/leads/[leadId]/schedule-follow-up` now expose those actions for client integrations and future React Query adoption
+  - that `Phase 4` lane now also includes the first lead-specific write seam:
+    - lead detail now supports dedicated `add note` and `schedule follow-up` actions without routing everything through the full edit form
+    - `/api/admin/leads/[leadId]/add-note` and `/api/admin/leads/[leadId]/schedule-follow-up` now expose those actions for client integrations and future React Query adoption
+  - the Zoho CRM integration lane also moved from blueprint-only to runtime foundation on `2026-04-22`:
+    - backend settings now load the `ZOHO_CRM_*` environment family alongside the existing Zoho Calendar and Zoho Bookings configuration
+    - `backend/integrations/zoho_crm/adapter.py` now implements access-token resolution through either a direct `ZOHO_CRM_ACCESS_TOKEN` or refresh-token exchange with `ZOHO_CRM_REFRESH_TOKEN`, `ZOHO_CRM_CLIENT_ID`, and `ZOHO_CRM_CLIENT_SECRET`
+    - `/api/v1/integrations/providers/zoho-crm/connection-test` now performs a safe runtime smoke test that fetches Zoho CRM module and field metadata, respects the returned `api_domain` when present, and reports the currently requested module mapping surface without exposing secrets
+    - local repo inspection at implementation time confirmed no `ZOHO_CRM_*` credentials are currently present in the checked-in `.env`, so the new runtime remains ready for activation but is not yet connected to a live Zoho CRM tenant
+  - the Zoho CRM activation lane then moved one more operator step on `2026-04-22`:
+    - backend config now auto-derives `ZOHO_ACCOUNTS_BASE_URL` from the configured Zoho API data center when the variable is left blank, preventing AU CRM setups from accidentally refreshing tokens against the default US accounts domain
+    - `scripts/zoho_crm_connect.py` now gives the repo a closed-loop operator helper for consent URL generation, auth-code exchange, optional `.env` persistence, and direct connection smoke tests
+  - the Zoho CRM lane then moved from `credentials-ready` to `connected` on `2026-04-22`:
+    - repo-local `.env` now contains a real Zoho CRM client id, client secret, access token, and refresh token for the AU tenant
+    - direct smoke testing through `python3 scripts/zoho_crm_connect.py test-connection --module Leads` returned `status: connected`
+    - the live connection confirms BookedAI can see Zoho CRM module metadata for `Leads`, `Contacts`, `Accounts`, `Deals`, and related default modules, and can read the `Leads` field contract required for the current write-back slice
+  - the Zoho CRM lane then moved from `connected` to `end-to-end write verified` on `2026-04-22`:
+    - live production deploy now passes the `ZOHO_CRM_*`, `ZOHO_CALENDAR_*`, `ZOHO_BOOKINGS_*`, and `ZOHO_ACCOUNTS_BASE_URL` family into both `backend` and `beta-backend` through `docker-compose.prod.yml`, so container runtime no longer drops provider credentials that exist in host `.env`
+    - a live `POST /api/v1/integrations/crm-sync/contact` test now succeeds against the AU Zoho tenant and returns `sync_status: synced` with external contact id `120818000000569001`
+    - follow-up `GET /api/v1/integrations/crm-sync/status?entity_type=contact&local_entity_id=zoho-test-contact-20260422081230` now returns the persisted sync row with `sync_status: synced`, `external_entity_id`, payload echo, and `last_synced_at`
+    - the live-contact verification surfaced and then resolved a repository write-back bug in `backend/repositories/crm_repository.py`, where `last_synced_at` updates used an asyncpg-incompatible parameter shape during sync completion
+  - that Zoho CRM lane then moved into the first write-back slice:
+    - BookedAI lead capture now preserves the local-first ledger posture but can also attempt a Zoho `Leads` upsert when CRM credentials are present
+    - duplicate-check ordering is now anchored to `Email` and then `Phone`, while fallback payload shaping derives `Last_Name` from the captured full name and supplies a safe default `Company` when none exists yet
+    - CRM sync rows now move more explicitly through `pending`, `manual_review_required`, `failed`, or `synced`, and successful Zoho record ids are now stored back into `external_entity_id`
+  - the next Zoho CRM recovery slice is now also in place:
+    - the adapter now includes `Contacts` upsert foundation for later customer-sync flows
+    - CRM retry no longer only marks a row as `retrying`; it can now replay stored `lead` or `contact` payloads from `crm_sync_records.payload`
+    - `/api/v1/integrations/crm-sync/retry` can now return a successful `external_entity_id` when replay succeeds instead of only echoing a queued retry state
+  - the first admin customer bridge into that Zoho lane is now also present:
+    - backend now exposes `POST /api/v1/integrations/crm-sync/contact`
+    - root admin customer create and update actions now call that backend route in a best-effort pattern after local customer mutation succeeds
+    - this keeps the root admin workspace as the user-facing mutation surface while Zoho CRM orchestration remains owned by the backend integration runtime
+  - that Zoho-connected admin lane now also exposes visible sync posture inside the root workspace:
+    - backend now exposes `GET /api/v1/integrations/crm-sync/status`, which returns the latest CRM sync row plus latest error context for a given `entity_type + local_entity_id`
+    - root admin `Customer` detail now shows Zoho CRM sync status, latest error context, and direct `sync/retry` controls
+    - root admin `Lead` detail now shows Zoho CRM sync status and retry control when a lead-side CRM sync record already exists
+    - root admin `Customers` and `Leads` list pages now also surface compact CRM status badges so operators can spot sync posture without opening each detail screen
+  - that Zoho CRM lane has now moved one step further on `2026-04-22` into booking follow-up orchestration:
+    - booking-intent creation can now run the full local-first BookedAI -> Zoho chain for `lead`, `contact`, `deal`, and `task` sync posture instead of stopping at lead/contact only
+    - both `/api/v1/bookings/intents` handlers now return a `crm_sync` summary block so callers can inspect the resulting CRM posture from one response
+    - a reusable sample data package now exists at `backend/migrations/sql/014_future_swim_crm_linked_flow_sample.sql`, giving the Future Swim tenant one linked demo chain across local contact, lead, booking intent, payment intent, and CRM sync rows
+    - the intended architecture split is now explicit across docs: `Zoho CRM` is the commercial system of record, while `BookedAI` remains the AI system of action plus operational and revenue truth
+  - the Zoho CRM lane is now also defined by a concrete event map on `2026-04-22`:
+    - `booking created -> Zoho deal/task`
+    - `call scheduled -> Zoho task/activity`
+    - `email sent -> Zoho task/note/activity mirror`
+    - `lead qualified -> Zoho lead/contact/deal update`
+    - `deal won/lost -> BookedAI dashboard/reporting feedback`
+    - the active implementation entrypoint for this map lives in `docs/architecture/bookedai-zoho-crm-integration-map.md`
+  - the next event in that map has now also started implementation on `2026-04-22`:
+    - backend now exposes `POST /api/v1/integrations/crm-sync/lead-qualification`
+    - admin lead updates now run a best-effort qualification sync into Zoho whenever a lead moves into `qualified` status or pipeline stage
+    - the current runtime now covers two active outbound event lanes from the map:
+      - `booking created`
+      - `lead qualified`
+  - the next event lane in that same map has now also started implementation on `2026-04-22`:
+    - backend now exposes `POST /api/v1/integrations/crm-sync/call-scheduled`
+    - admin lead follow-up scheduling now runs a best-effort Zoho task sync whenever an operator schedules a callback/setup call
+    - the current runtime therefore now covers three active outbound event lanes from the CRM map:
+      - `booking created`
+      - `lead qualified`
+      - `call scheduled`
+  - the next outbound event lane in that same CRM map has now also started implementation on `2026-04-22`:
+    - backend lifecycle email sends now best-effort mirror outreach into a Zoho task after local email ledger recording succeeds
+    - lifecycle email responses now include `crm_sync.task` posture for the mirror result
+    - the current runtime therefore now covers four active outbound event lanes from the CRM map:
+      - `booking created`
+      - `lead qualified`
+      - `call scheduled`
+      - `email sent`
+  - the first inbound event lane in that same CRM map has now also started implementation on `2026-04-22`:
+    - backend can now register a Zoho Notifications channel through `/api/v1/integrations/crm-feedback/zoho-webhook/register`, using BookedAI's own webhook endpoint as the notify target
+    - backend can now also inspect, auto-renew, renew, and disable that channel through `/api/v1/integrations/crm-feedback/zoho-webhook`, `/auto-renew`, `/renew`, and `/disable`
+    - repo automation now also includes a sparse cron-friendly runner for auto-renew so the notification lane can stay healthy without a resident worker loop
+  - the live webhook-ops activation pass then hardened production runtime further on `2026-04-22`:
+    - `backend/db.py` now serializes ORM bootstrap with a PostgreSQL advisory lock so `backend` and `beta-backend` can restart together without racing on `TenantEmailLoginCode` sequence creation
+    - `backend/integrations/zoho_crm/adapter.py` now prefers refresh-token exchange over stale direct access tokens, restoring durable Zoho CRM API access for the AU tenant even when an old smoke-test access token is still present in env
+    - `scripts/run_zoho_crm_webhook_auto_renew.py` now supports a host-local HTTPS target, host-header override, and optional local TLS skip so maintenance cron can bypass Cloudflare and hit local Nginx directly
+    - a fresh Zoho consent flow was then completed with `ZohoCRM.notifications.ALL`, producing a new refresh token, a live `Deals` notification channel (`1000000068001`), and a verified maintenance renewal from `2026-04-22T11:59:41+00:00` to `2026-04-29T10:01:54+00:00`
+    - `docker-compose.prod.yml` now passes `ZOHO_CRM_NOTIFICATION_TOKEN` and `ZOHO_CRM_NOTIFICATION_CHANNEL_ID` into both `backend` and `beta-backend`, closing the last runtime gap between host `.env` and live containers for the webhook lane
+    - backend ingests additive Zoho commercial outcome feedback at `/api/v1/integrations/crm-feedback/deal-outcome`
+    - backend serves BookedAI read-model summary at `/api/v1/integrations/crm-feedback/deal-outcome-summary`
+    - backend can now also pull known terminal Zoho `Deals` through `/api/v1/integrations/crm-feedback/zoho-deals/poll`, giving the repo a first practical runtime bridge from real Zoho deal ids into BookedAI feedback rows
+    - backend now also accepts Zoho CRM Notifications callbacks at `/api/v1/integrations/crm-feedback/zoho-webhook`, verifies configured token/channel values when present, logs raw webhook payloads, and reuses the same terminal feedback ingestion path
+    - root admin dashboard and reports now surface won/lost counts, owner performance, lost reasons, stage-breakdown counts, task-completion signals, and recent commercial outcomes from Zoho without replacing local booking/payment truth
+  - the first practical `Phase 5` revenue-truth slice is now also in code:
+    - root admin dashboard revenue summary now prefers `paid payments` instead of using booking value as the only revenue proxy
+    - revenue trend blocks now aggregate by payment dates when paid ledger records exist, so dashboard revenue moves closer to finance truth instead of schedule-only estimates
+    - dashboard now also exposes `outstanding revenue`, `paid bookings`, and `unpaid bookings`, and recent bookings now carry payment posture plus paid-versus-outstanding breakdowns
+    - dashboard now also includes receivables aging and a collection-priority queue so unpaid bookings can be triaged by overdue age and outstanding value
+  - the first practical `Phase 6` reporting slice is now also in code:
+    - root admin navigation now includes a dedicated `/admin/reports` workspace
+    - reports now expose `paid vs unpaid trend`, `collections aging`, `recovered revenue`, and a `collection priority report` using a dedicated report snapshot instead of reusing the operator dashboard only
+    - reporting cuts now also include `repeat revenue`, `repeat customer rate`, `retention segments`, and `source-to-revenue attribution`
+    - reports now also include a `source -> lead -> booking -> paid revenue` funnel cut so acquisition-source conversion can be read in one table
+    - reports now also support drill-down filters for `source`, `owner`, and `date range`, and the reporting read model now scopes all report cuts to the same selected filter set
+  - the first practical `Phase 7` growth slice is now also in code on `2026-04-22`:
+    - root admin navigation now includes `/admin/campaigns` as the first explicit growth-lane workspace after the revenue-core and reporting phases
+    - `Campaigns` now has a real Prisma model, seed coverage, and a migration artifact for `campaigns` with source-key and UTM metadata instead of relying only on ad-hoc source labels
+    - the root admin repository now exposes list, detail, create, update, and archive seams for campaigns, with derived attribution metrics for sourced leads, sourced customers, bookings, and paid revenue
+    - root admin now also exposes `/api/admin/campaigns` and `/api/admin/campaigns/:id`, plus a create/edit/archive UI at `/admin/campaigns`
+    - campaign reporting is intentionally tied to `sourceKey`, so the phase opens cleanly from the existing source-attribution and revenue-reporting cuts rather than creating a disconnected marketing CRUD lane
+  - that `Phase 3` slice has now been extended into a fuller control plane:
+    - `/admin/roles` now exposes a permission editor so role posture can be adjusted without leaving the workspace
+    - `/admin/audit` now exposes a dedicated audit investigation surface with search, entity-type filtering, and pagination
+    - `/api/admin/roles` now supports both role catalog reads and permission-set updates, and `/api/admin/audit` now supports paginated audit log reads
 - route-related backend verification passed after the router split, and the previously failing `matching/search public-web fallback` and tenant session-signing regressions are now restored in the backend validation pass
+- the tenant workspace hardening lane moved one step further on `2026-04-22`:
+  - tenant overview, plugin, billing, team, and integrations now expose lightweight section-level activity metadata with `last updated`, `last edited by`, and audit-derived summary context
+  - tenant-facing `Experience Studio`, plugin, billing, and team surfaces now show clearer read-only posture for restricted roles instead of only silently disabling final save buttons
+  - billing and team invite fields now respect role-based disablement directly at input level, while integrations now show an explicit access-denied notice when the session can monitor but not edit provider posture
+  - this pass verified cleanly with `python3 -m py_compile backend/service_layer/tenant_app_service.py backend/api/v1_tenant_handlers.py`, `node frontend/node_modules/typescript/bin/tsc -p frontend/tsconfig.json --noEmit`, and `npm --prefix frontend run build`
 
 This baseline is now synchronized across:
 
 - `README.md`
+- `docs/architecture/admin-workspace-blueprint.md`
+- `docs/development/ci-cd-collaboration-guide.md`
+- `docs/development/ci-cd-deployment-runbook.md`
 - `docs/development/backend-boundaries.md`
 - `docs/development/env-strategy.md`
 - `docs/development/implementation-progress.md`
@@ -129,6 +342,8 @@ Current approved surface map:
   - data, auth, storage, and operator tooling through Supabase
 - `hermes.bookedai.au`
   - knowledge or documentation service
+- `bot.bookedai.au`
+  - OpenClaw Control UI and operator-facing browser access to the gateway
 
 ### Current repo shape
 
@@ -142,6 +357,8 @@ Current checked-in repo truth:
   - FastAPI app under `backend/`
 - data and infra:
   - `supabase/`, `deploy/`, `scripts/`, `storage/`
+- Telegram/OpenClaw live deploy authority is intentionally scoped to host-level elevated execution on the Docker VPS, with `scripts/deploy_live_host.sh` as the preferred entrypoint
+- Telegram/OpenClaw elevated repo and host-maintenance control now flows through `scripts/telegram_workspace_ops.py`, with trusted actor ids and allowed actions sourced from `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` plus `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS`
 
 Future work must not assume the repo is greenfield or single-runtime.
 
@@ -214,6 +431,7 @@ Implemented or materially active:
 - portal booking detail and request-safe support actions
 - admin overview, bookings, support queue, partner management, and catalog quality flows
 - communication surfaces through email and Discord
+- Telegram or OpenClaw operator sync tooling for repo-side change summaries, Notion writeback, and Discord update mirroring
 - provider and integration support seams
 - outbox, scheduler, and release-gate foundations
 
@@ -225,6 +443,7 @@ Still active and incomplete:
 - stronger value reporting
 - release-grade auth, portal, and billing hardening
 - remaining search fallback regression fixes
+- the next search-core maturity slice should now build on the richer `backend/domain/matching/service.py` read model instead of adding more route-local shaping, because `/api/v1/matching/search` now carries normalized booking-fit summaries, stage-count diagnostics, and a fuller Phase 2 contract for query understanding, shortlist reasoning, and next-step guidance
 
 ### Current source-of-truth documents
 
@@ -239,7 +458,11 @@ Operator and repo entry:
 Primary active planning and execution docs:
 
 - `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/architecture/admin-enterprise-workspace-requirements.md`
+- `docs/architecture/admin-workspace-blueprint.md`
 - `docs/architecture/implementation-phase-roadmap.md`
+- `docs/development/ci-cd-collaboration-guide.md`
+- `docs/development/ci-cd-deployment-runbook.md`
 - `docs/development/implementation-progress.md`
 - `docs/development/backend-boundaries.md`
 - `docs/development/env-strategy.md`
@@ -355,6 +578,12 @@ If yes, sync it back into `project.md`.
 - [Demo Script Storytelling And Video Strategy](./docs/architecture/demo-script-storytelling-video-strategy.md)
 - [Change Governance](./docs/governance/change-governance.md)
 - [Project-Wide Sprint Execution Checklist](./docs/development/project-wide-sprint-execution-checklist.md)
+- [BookedAI Chatbot Landing Implementation Plan](./docs/development/bookedai-chatbot-landing-implementation-plan.md)
+- [BookedAI Sample Video Brief](./docs/development/bookedai-sample-video-brief.md)
+- [BookedAI Storyboard 8 Frame](./docs/development/bookedai-storyboard-8-frame.md)
+- [BookedAI Video Script And Shot List](./docs/development/bookedai-video-script-and-shot-list.md)
+- [BookedAI Investor Pitch Deck](./docs/development/bookedai-investor-pitch-deck.html)
+- [BookedAI Fundraising Profit-First Strategy](./docs/development/bookedai-fundraising-profit-first-strategy.md)
 
 ### Audience-specific documentation
 
@@ -442,6 +671,14 @@ Live-promotion closure rule:
 - update the corresponding sprint, requirement, or module description document in the same completion pass
 - update the matching roadmap or sprint or phase artifact in the same completion pass
 - treat `implemented + live deployed + documented` as one completion standard
+- when the operator workflow includes Telegram or bot-assisted delivery, also sync the detailed update into Notion and mirror the operator summary into Discord when the change is relevant for team visibility
+- the Discord payload should be the concise summary text itself; Notion is the full-detail payload surface
+- use the BookedAI operator entrypoints to keep this discipline consistent:
+  - `python3 scripts/telegram_workspace_ops.py sync-doc ...` for per-change closeout notes
+  - `python3 scripts/telegram_workspace_ops.py sync-repo-docs --skip-discord` for full documentation publish passes
+  - `python3 scripts/telegram_workspace_ops.py test --command "..."` for repo-scoped validation from Telegram/OpenClaw
+  - `python3 scripts/telegram_workspace_ops.py workspace-command --command "..."` for broader Telegram-authorized BookedAI refactors, file-structure changes, and whole-project rollout steps
+  - `python3 scripts/telegram_workspace_ops.py host-command --command "..."` for allowlisted host-maintenance commands such as `apt-get`, `docker`, `systemctl`, or `journalctl` without exposing a blanket root shell
 
 ### 5. Upgrade old features with full context
 
@@ -626,6 +863,12 @@ The latest structural refactor now establishes:
 - that visual-first treatment now also extends through pricing, trust, and final CTA surfaces, so the active landing path reads as one coherent premium narrative rather than mixing redesigned sections with older text-heavier sections
 - pricing plan cards and the partner trust wall are now also polished to the same premium scan-first system, so mid-page decision blocks and lower-page credibility blocks no longer feel visually behind the upper narrative sections
 - the booking assistant preview section now also uses the same visual-first framing with a proof-led intro panel and a stronger live-product shell, so the interactive demo block reads like core product storytelling rather than a standalone utility widget
+- the public booking assistant flow now also exposes a more explicit enterprise journey across `matching -> preview -> booking capture -> email -> calendar -> payment -> CRM -> thank-you -> SMS/WhatsApp follow-up`, with live `matching services` loading state, operator-facing workflow visibility, reusable customer communication drafts, and best-effort post-booking automation that now actually calls the v1 payment-intent, lifecycle-email, SMS, and WhatsApp seams after booking capture
+- the homepage runtime in `frontend/src/apps/public/HomepageSearchExperience.tsx` has now been tightened toward the same enterprise-grade booking result posture, so homepage booking confirmation no longer stops at a simple thank-you card and now includes CRM-aware result data, post-booking payment/email/SMS/WhatsApp automation, reusable communication drafts, and a delivery timeline similar to the richer assistant surface
+- the homepage confirmation path has now been hardened further so the authoritative booking write reveals the booking reference immediately, while payment/email/SMS/WhatsApp automation continues asynchronously in the background instead of blocking customer-visible success state
+- the homepage sidebar now also exposes an explicit enterprise journey rail across `search -> preview -> booking -> email -> calendar -> payment -> CRM -> messaging -> aftercare`, closing parity further with the richer dialog assistant instead of leaving homepage as a thinner branch
+- that same public booking lane now also has a reusable simulated QA or demo data pack through `backend/migrations/sql/016_cross_industry_full_flow_test_pack.sql`, with 10 synthetic cross-industry booking journeys covering swim school, chess coaching, AI mentorship, salon, physio, property, restaurant, dental, legal, and photography full-flow posture across booking, payment, email, messaging, CRM, outbox, and audit trace
+- the request-facing operator note for that seed pack now lives in `docs/development/bookedai-cross-industry-full-flow-test-pack.md`, and should be treated as the canonical quick-reference for applying and inspecting the synthetic full-lifecycle scenarios
 - backend startup separation through `main.py`, `app.py`, and `api/routes.py`
 - shared frontend API base URL logic in a single reusable utility
 - backend route separation through domain-specific router modules
@@ -833,13 +1076,22 @@ Latest confirmed tenant baseline on `2026-04-18`:
 - migration-safe rollout now also includes a repo-local verification helper that can be used after apply or wired into the release gate when database access exists
 - tenant publish rollout now also has a dedicated production-shadow rehearsal checklist so beta or shadow validation can be run as a repeatable operational sequence
 - the first official sample tenant is now a chess-class onboarding sample derived from a real uploaded PDF source, giving the tenant-catalog lane one concrete non-website onboarding baseline to inherit from
+- the current official seed set now also includes a third tenant, `ai-mentor-doer`, with published online private and group AI mentoring packages plus seeded username-password access for operator-led pilot use
+- `ai.longcare.au` is now wired as the official tenant-facing host for the AI Mentor Pro partner runtime, with a BookedAI-powered plugin interface and embed loader path for tenant-scoped chat, search, booking, payment, and follow-up
 
 Latest confirmed tenant baseline on `2026-04-19`:
 
 - the tenant portal now behaves as one unified product gateway across `sign in`, `create account`, and `accept invite or claim workspace`
-- tenant password auth is live alongside Google continuation, and tenant sessions now survive reload and tenant switching safely
+- tenant auth is now explicitly moving to an `email-first` posture:
+  - email is the primary tenant identity instead of tenant username
+  - tenant sign-in, invite acceptance, and email-led workspace creation can now run through one-time verification codes sent by email
+  - Google continuation remains on the same login form as the fastest `sign in` and `create workspace` path
+  - legacy username or password compatibility remains as a fallback seam, but it is no longer the primary tenant-login UX target
+- tenant sessions now survive reload and tenant switching safely
 - onboarding now includes business profile capture plus a visible progress model inside the tenant workspace
 - the tenant workspace now includes `billing` and `team` panels in addition to `overview`, `catalog`, `bookings`, and `integrations`
+- the tenant workspace now also includes a `plugin` panel backed by `tenant_settings`, so partner tenants can persist BookedAI embed configuration and copy inline, modal, or iframe snippets directly from `tenant.bookedai.au`
+- the next tenant experience requirement is now explicitly locked for follow-on delivery: the workspace should evolve into a clearer enterprise control surface with structured menu navigation, section-specific operator guidance, direct inline input or edit or save behavior, image-upload support, and a tenant introduction layer that can be edited in HTML and previewed safely from the tenant portal itself
 - the billing workspace now includes self-serve billing setup, plan selection, trial-start or plan-switch actions, invoice-history seam, payment-method seam, billing settings, and billing audit trail
 - the tenant team workspace now includes membership roster, invite flow, and tenant role or status updates
 - the first tenant role model is now active:
@@ -850,7 +1102,12 @@ Latest confirmed tenant baseline on `2026-04-19`:
   - only `tenant_admin` and `finance_manager` can change billing setup or plans
   - only `tenant_admin` can manage team membership and role changes
   - only `tenant_admin` and `operator` can import, edit, publish, or archive catalog records
-- invite acceptance is now handled through the existing tenant claim path, so invited members can set their first password from the tenant portal
+- tenant workspace edit scope was hardened again on `2026-04-22`:
+  - `Experience Studio` writes are now limited to `tenant_admin` and `operator`
+  - billing setup save actions now respect the existing `tenant_admin` and `finance_manager` boundary in both UI and backend
+  - plugin `tenant_ref` is now pinned to the signed-in tenant slug so a tenant session cannot repoint embeds toward another tenant workspace
+  - authenticated tenant reads and writes in the Vite tenant shell now prefer the signed session's tenant slug over stale URL context once login is established
+- invite acceptance is now handled through the tenant auth gateway with email-first verification, while the older claim-and-set-password seam remains as compatibility support during the transition
 - billing, profile, subscription, and team mutations now append tenant audit events so later support drill-ins have real evidence to inherit from
 
 ## Internal Admin Baseline

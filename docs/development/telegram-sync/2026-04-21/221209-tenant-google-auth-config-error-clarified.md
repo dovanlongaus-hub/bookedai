@@ -1,0 +1,14 @@
+# Tenant Google auth config error clarified
+
+- Timestamp: 2026-04-21T22:12:09.421876+00:00
+- Source: docs/development/tenant-billing-auth-execution-package.md
+- Category: development
+- Status: done
+
+## Summary
+
+Tenant Google login now returns one explicit setup message when Google OAuth env vars are missing, instead of generic loading or failure copy.
+
+## Details
+
+Adjusted tenant Google-auth error handling on both backend and frontend. Backend  in  now explicitly fails with the setup message to add  on the frontend and  on the backend when Google OAuth backend config is missing. Frontend  now also shows the same setup message immediately from  when  is absent, rather than incorrectly saying Google sign-in is still loading. Verified with backend py_compile and frontend TypeScript typecheck.

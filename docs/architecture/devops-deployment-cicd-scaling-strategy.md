@@ -46,6 +46,34 @@ This strategy inherits and aligns with:
   - missing backups or untested restores
   - premature infra complexity outpacing team size
 
+## Section 1A — Collaboration summary for the current CI/CD model
+
+BookedAI should currently be explained to collaborators as:
+
+- not yet a full push-to-prod CI/CD platform
+- a real release-controlled delivery system with:
+  - repo-local validation
+  - release-gate discipline
+  - beta rehearsal on `beta.bookedai.au`
+  - host-level scripted production deploys
+  - required documentation and operator write-back
+
+The short collaboration flow is:
+
+1. implement the change
+2. run the relevant local validation and release gate
+3. rehearse on beta
+4. promote from the VPS host
+5. verify production health
+6. update repo docs
+7. sync full detail to Notion
+8. post the summary text to Discord
+
+Reference handoff doc for team members:
+
+- `docs/development/ci-cd-collaboration-guide.md`
+- `docs/development/ci-cd-deployment-runbook.md`
+
 ## Section 2 — Current deployment reality assessment
 
 ### Confirmed facts

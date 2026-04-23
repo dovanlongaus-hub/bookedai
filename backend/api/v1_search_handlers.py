@@ -40,9 +40,12 @@ from api.v1_routes import (
     select,
     uuid4,
 )
+from core.contracts.matching import MatchRequestContract
+from domain.matching.service import MatchingService
 
 
 async def search_candidates(request: Request, payload: SearchCandidatesRequestPayload):
+    matching_service = MatchingService()
     actor_context = ActorContextPayload(
         channel=payload.channel_context.channel,
         tenant_id=payload.channel_context.tenant_id,
@@ -52,6 +55,7 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
     tenant_id = await _resolve_tenant_id(request, actor_context)
     strict_catalog_only = bool(actor_context.tenant_id or actor_context.tenant_ref) and (
         actor_context.channel not in {"public_web", "embedded_widget"}
+        or actor_context.deployment_mode in {"embedded_widget", "plugin_integrated"}
     )
     semantic_rollout_enabled = False
     query_understanding = build_canonical_query_understanding(
@@ -373,64 +377,85 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
         },
     )
 
-    return _success_response(
-        {
-            "request_id": f"match_{uuid4().hex[:12]}",
-            "candidates": candidates,
-            "recommendations": recommendations,
-            "confidence": confidence_payload,
-            "warnings": warnings,
-            "search_strategy": (
-                f"{search_strategy}_plus_public_web_search"
-                if public_web_fallback_candidates
-                else search_strategy
-            ),
-            "query_context": {
-                "near_me_requested": near_me,
-                "location_permission_needed": location_permission_needed,
-                "is_chat_style": chat_style,
-                "has_user_location": bool(user_location),
+    request_id = f"match_{uuid4().hex[:12]}"
+    result = matching_service.build_result(
+        request=MatchRequestContract(
+            query=payload.query,
+            location_hint=payload.location,
+            budget_hint=str((payload.budget or {}).get("max_aud") or ""),
+            tenant_id=tenant_id,
+            service_types=[
+                value
+                for value in [
+                    str((payload.preferences or {}).get("service_category") or "").strip() or None,
+                    str((payload.preferences or {}).get("requested_service_id") or "").strip() or None,
+                ]
+                if value
+            ],
+            metadata={
+                "channel": payload.channel_context.channel,
+                "deployment_mode": payload.channel_context.deployment_mode,
             },
-            "booking_context": {
-                "party_size": booking_request_context.party_size,
-                "requested_date": booking_request_context.requested_date,
-                "requested_time": booking_request_context.requested_time,
-                "schedule_hint": booking_request_context.schedule_hint,
-                "intent_label": booking_request_context.intent_label,
-                "summary": booking_request_context.summary,
-            },
-            "query_understanding": {
-                "normalized_query": query_understanding.normalized_query,
-                "inferred_location": query_understanding.inferred_location,
-                "location_terms": list(query_understanding.location_terms),
-                "core_intent_terms": list(query_understanding.core_intent_terms),
-                "expanded_intent_terms": list(query_understanding.expanded_intent_terms),
-                "constraint_terms": list(query_understanding.constraint_terms),
-                "requested_category": query_understanding.requested_category,
-                "budget_limit": query_understanding.budget_limit,
-                "near_me_requested": query_understanding.near_me_requested,
-                "is_chat_style": query_understanding.is_chat_style,
-                "requested_date": query_understanding.requested_date,
-                "requested_time": query_understanding.requested_time,
-                "schedule_hint": query_understanding.schedule_hint,
-                "party_size": query_understanding.party_size,
-                "intent_label": query_understanding.intent_label,
-                "summary": query_understanding.summary,
-            },
-            "semantic_assist": semantic_assist
-            or {
-                "applied": False,
-                "provider": None,
-                "provider_chain": [],
-                "fallback_applied": False,
-                "normalized_query": None,
-                "inferred_location": None,
-                "inferred_category": None,
-                "budget_summary": None,
-                "evidence": [],
-            },
-            "search_diagnostics": search_diagnostics,
+        ),
+        request_id=request_id,
+        candidates=candidates,
+        recommendations=recommendations,
+        confidence=confidence_payload,
+        warnings=warnings,
+        search_strategy=(
+            f"{search_strategy}_plus_public_web_search"
+            if public_web_fallback_candidates
+            else search_strategy
+        ),
+        query_context={
+            "near_me_requested": near_me,
+            "location_permission_needed": location_permission_needed,
+            "is_chat_style": chat_style,
+            "has_user_location": bool(user_location),
         },
+        booking_context={
+            "party_size": booking_request_context.party_size,
+            "requested_date": booking_request_context.requested_date,
+            "requested_time": booking_request_context.requested_time,
+            "schedule_hint": booking_request_context.schedule_hint,
+            "intent_label": booking_request_context.intent_label,
+            "summary": booking_request_context.summary,
+        },
+        query_understanding={
+            "normalized_query": query_understanding.normalized_query,
+            "inferred_location": query_understanding.inferred_location,
+            "location_terms": list(query_understanding.location_terms),
+            "core_intent_terms": list(query_understanding.core_intent_terms),
+            "expanded_intent_terms": list(query_understanding.expanded_intent_terms),
+            "constraint_terms": list(query_understanding.constraint_terms),
+            "requested_category": query_understanding.requested_category,
+            "budget_limit": query_understanding.budget_limit,
+            "near_me_requested": query_understanding.near_me_requested,
+            "is_chat_style": query_understanding.is_chat_style,
+            "requested_date": query_understanding.requested_date,
+            "requested_time": query_understanding.requested_time,
+            "schedule_hint": query_understanding.schedule_hint,
+            "party_size": query_understanding.party_size,
+            "intent_label": query_understanding.intent_label,
+            "summary": query_understanding.summary,
+        },
+        semantic_assist=semantic_assist
+        or {
+            "applied": False,
+            "provider": None,
+            "provider_chain": [],
+            "fallback_applied": False,
+            "normalized_query": None,
+            "inferred_location": None,
+            "inferred_category": None,
+            "budget_summary": None,
+            "evidence": [],
+        },
+        search_diagnostics=search_diagnostics,
+    )
+
+    return _success_response(
+        result.model_dump(mode="json"),
         tenant_id=tenant_id,
         actor_context=actor_context,
     )

@@ -239,8 +239,14 @@ Follow-up orchestration should support:
 
 Current repo reality:
 
-- current CRM orchestration exists only as a foundation seam in [backend/domain/crm/service.py](../../backend/domain/crm/service.py)
-- no full Zoho lifecycle orchestration is confirmed yet
+- current Zoho CRM orchestration is no longer only blueprint-level:
+  - live Zoho connection is confirmed for the AU tenant
+  - live `Contacts` write-back is confirmed end to end
+  - local-first `Leads` orchestration plus replayable `lead/contact` retry is now in code
+  - booking-intent follow-up orchestration now also seeds `Deals` and `Tasks` through the same ledger-first posture
+- remaining lifecycle gap is now narrower and explicit:
+  - inbound Zoho commercial feedback still needs a fuller webhook/read-model loop into BookedAI dashboards
+  - email/call activity mirroring into CRM still needs a broader activity model beyond the first task-follow-up slice
 
 ## Section 5 — Email communications architecture
 

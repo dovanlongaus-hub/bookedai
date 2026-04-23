@@ -1,0 +1,7 @@
+Title,Sprint,Phase,Focus,Owner Checklist Doc,Status,Dependencies,Notion Update Note
+Sprint 11 Execution,Sprint 11,Phase 7-8,Tenant workspace IA onboarding routes and catalog review API preparation,docs/development/sprint-11-owner-execution-checklist.md,Done,Phase 3-6 outputs plus Sprint 8 tenant foundation,Already landed in code baseline
+Sprint 12 Execution,Sprint 12,Phase 7-8,Tenant workspace onboarding flow and publish-safe catalog implementation,docs/development/sprint-12-owner-execution-checklist.md,Done,Sprint 11 complete,Already landed in code baseline
+Sprint 13 Execution,Sprint 13,Phase 7-8,Internal admin commercial IA and drill-ins,docs/development/sprint-13-owner-execution-checklist.md,Done,Tenant and admin contract alignment,Already landed in code baseline
+Sprint 14 Execution,Sprint 14,Phase 7-8,Admin support tooling rollout readiness and close-out,docs/development/sprint-14-owner-execution-checklist.md,In progress,Sprint 13 baseline,Keep active for support-flow completeness reconciliation visibility and rollout guardrails
+Sprint 15 Execution,Sprint 15,Phase 9,Telemetry replay and regression coverage,docs/development/sprint-15-owner-execution-checklist.md,Not started,Phase 7-8 complete,Carry forward release-grade hardening instead of new product-surface sprawl
+Sprint 16 Execution,Sprint 16,Phase 9,Release gates rollback discipline and scale readiness,docs/development/sprint-16-owner-execution-checklist.md,Not started,Sprint 15 coverage,Carry forward ownership closeout and promotion discipline

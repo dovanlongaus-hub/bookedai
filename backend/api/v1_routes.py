@@ -28,7 +28,13 @@ from core.session_tokens import (
     create_tenant_session_token as _create_tenant_session_token,
     verify_tenant_session_token as _verify_tenant_session_token,
 )
-from db import ServiceMerchantProfile, TenantUserCredential, TenantUserMembership, get_session
+from db import (
+    ServiceMerchantProfile,
+    TenantEmailLoginCode,
+    TenantUserCredential,
+    TenantUserMembership,
+    get_session,
+)
 from repositories.audit_repository import AuditLogRepository
 from repositories.base import RepositoryContext
 from repositories.booking_intent_repository import BookingIntentRepository
@@ -42,7 +48,10 @@ from service_layer.admin_presenters import build_service_merchant_item
 from service_layer.catalog_quality_service import apply_catalog_quality_gate
 from service_layer.email_service import EmailService
 from service_layer.lifecycle_ops_service import (
+    orchestrate_booking_followup_sync,
     orchestrate_communication_touch,
+    orchestrate_contact_sync,
+    orchestrate_email_sent_sync,
     orchestrate_lead_capture,
     orchestrate_lifecycle_email,
     queue_crm_sync_retry,
@@ -65,6 +74,7 @@ from service_layer.prompt9_matching_service import (
     is_chat_style_query,
     rank_catalog_matches,
     resolve_booking_path_policy,
+    service_is_online_friendly,
     _normalized_text,
 )
 from service_layer.prompt11_integration_service import (
@@ -86,6 +96,7 @@ from service_layer.tenant_app_service import (
     build_tenant_bookings_snapshot,
     build_tenant_integrations_snapshot,
     build_tenant_onboarding_snapshot,
+    build_tenant_plugin_interface_snapshot,
     build_tenant_team_snapshot,
     build_tenant_overview,
 )
@@ -107,6 +118,27 @@ SEMANTIC_DOMAIN_STOP_WORDS = {
     "show",
     "something",
 } | GENERIC_QUERY_STOPWORDS
+
+RESTAURANT_LIVE_SEARCH_TERMS = {
+    "restaurant",
+    "dining",
+    "dinner",
+    "lunch",
+    "brunch",
+    "table",
+    "reservation",
+    "private dining",
+    "group dining",
+    "book a table",
+    "eat",
+    "food",
+}
+
+GOOGLE_TENANT_AUTH_CONFIG_MESSAGE = (
+    "Add `VITE_GOOGLE_CLIENT_ID` in the frontend environment and "
+    "`GOOGLE_OAUTH_CLIENT_ID` in the backend to enable tenant Google login."
+)
+TENANT_EMAIL_CODE_TTL_MINUTES = 15
 
 
 class ActorContextPayload(BaseModel):
@@ -281,6 +313,27 @@ class TenantPasswordAuthRequestPayload(BaseModel):
     tenant_ref: str | None = None
 
 
+class TenantEmailCodeRequestPayload(BaseModel):
+    email: str
+    tenant_ref: str | None = None
+    auth_intent: str | None = None
+    business_name: str | None = None
+    full_name: str | None = None
+    industry: str | None = None
+    tenant_slug: str | None = None
+
+
+class TenantEmailCodeVerifyRequestPayload(BaseModel):
+    email: str
+    code: str
+    tenant_ref: str | None = None
+    auth_intent: str | None = None
+    business_name: str | None = None
+    full_name: str | None = None
+    industry: str | None = None
+    tenant_slug: str | None = None
+
+
 class TenantCreateAccountRequestPayload(BaseModel):
     business_name: str
     email: str
@@ -307,6 +360,36 @@ class TenantProfileUpdateRequestPayload(BaseModel):
     timezone: str | None = None
     locale: str | None = None
     operator_full_name: str | None = None
+    logo_url: str | None = None
+    hero_image_url: str | None = None
+    introduction_html: str | None = None
+    guide_overview: str | None = None
+    guide_experience: str | None = None
+    guide_catalog: str | None = None
+    guide_plugin: str | None = None
+    guide_bookings: str | None = None
+    guide_integrations: str | None = None
+    guide_billing: str | None = None
+    guide_team: str | None = None
+
+
+class TenantPluginInterfaceUpdateRequestPayload(BaseModel):
+    partner_name: str | None = None
+    partner_website_url: str | None = None
+    bookedai_host: str | None = None
+    embed_path: str | None = None
+    widget_script_path: str | None = None
+    tenant_ref: str | None = None
+    widget_id: str | None = None
+    accent_color: str | None = None
+    button_label: str | None = None
+    modal_title: str | None = None
+    headline: str | None = None
+    prompt: str | None = None
+    inline_target_selector: str | None = None
+    support_email: str | None = None
+    support_whatsapp: str | None = None
+    logo_url: str | None = None
 
 
 class TenantBillingAccountUpdateRequestPayload(BaseModel):
@@ -343,6 +426,12 @@ class TenantCatalogImportRequestPayload(BaseModel):
     category: str | None = None
     search_focus: str | None = None
     location_hint: str | None = None
+
+
+class TenantCatalogCreateRequestPayload(BaseModel):
+    business_name: str | None = None
+    name: str | None = None
+    category: str | None = None
 
 
 class TenantCatalogUpdateRequestPayload(BaseModel):
@@ -449,6 +538,12 @@ async def _verify_google_identity_token(
     *,
     id_token: str,
 ) -> dict[str, str | None]:
+    if not cfg.google_oauth_client_id:
+        raise ValidationAppError(
+            "google_oauth_not_configured",
+            GOOGLE_TENANT_AUTH_CONFIG_MESSAGE,
+        )
+
     async with httpx.AsyncClient(timeout=10) as client:
         response = await client.get(
             "https://oauth2.googleapis.com/tokeninfo",
@@ -644,6 +739,206 @@ async def _load_tenant_credential_by_email(
             )
         )
     ).scalar_one_or_none()
+
+
+def _normalize_tenant_email_auth_intent(value: str | None, *, default: str = "sign-in") -> str:
+    normalized = str(value or default).strip().lower()
+    if normalized not in {"sign-in", "create", "claim"}:
+        raise ValidationAppError(
+            "tenant_email_code_invalid_intent",
+            "Tenant email-code auth intent must be sign-in, create, or claim.",
+        )
+    return normalized
+
+
+def _generate_tenant_email_login_code() -> str:
+    return str(uuid4().int)[-6:]
+
+
+def _hash_tenant_email_login_code(*, email: str, code: str) -> str:
+    normalized_email = email.strip().lower()
+    normalized_code = re.sub(r"\D+", "", str(code or "").strip())
+    return hashlib.sha256(f"{normalized_email}:{normalized_code}".encode("utf-8")).hexdigest()
+
+
+async def _clear_active_tenant_email_login_codes(
+    session,
+    *,
+    email: str,
+    auth_intent: str,
+    tenant_id: str | None = None,
+) -> None:
+    normalized_email = email.strip().lower()
+    rows = list(
+        (
+            await session.execute(
+                select(TenantEmailLoginCode).where(
+                    TenantEmailLoginCode.email == normalized_email,
+                    TenantEmailLoginCode.auth_intent == auth_intent,
+                    TenantEmailLoginCode.consumed_at.is_(None),
+                )
+            )
+        ).scalars()
+    )
+    for row in rows:
+        if tenant_id and str(row.tenant_id or "").strip() not in {"", tenant_id}:
+            continue
+        row.consumed_at = datetime.now(UTC)
+
+
+async def _store_tenant_email_login_code(
+    session,
+    *,
+    email: str,
+    auth_intent: str,
+    tenant_id: str | None = None,
+    tenant_slug: str | None = None,
+    metadata: dict[str, Any] | None = None,
+) -> tuple[TenantEmailLoginCode, str]:
+    code = _generate_tenant_email_login_code()
+    expires_at = datetime.now(UTC) + timedelta(minutes=TENANT_EMAIL_CODE_TTL_MINUTES)
+    await _clear_active_tenant_email_login_codes(
+        session,
+        email=email,
+        auth_intent=auth_intent,
+        tenant_id=tenant_id,
+    )
+    row = TenantEmailLoginCode(
+        tenant_id=tenant_id,
+        tenant_slug=tenant_slug,
+        email=email.strip().lower(),
+        auth_intent=auth_intent,
+        code_hash=_hash_tenant_email_login_code(email=email, code=code),
+        code_last4=code[-4:],
+        metadata_json=metadata or {},
+        expires_at=expires_at,
+    )
+    session.add(row)
+    await session.flush()
+    return row, code
+
+
+async def _load_valid_tenant_email_login_code(
+    session,
+    *,
+    email: str,
+    auth_intent: str,
+    code: str,
+    tenant_id: str | None = None,
+) -> TenantEmailLoginCode | None:
+    normalized_email = email.strip().lower()
+    code_hash = _hash_tenant_email_login_code(email=normalized_email, code=code)
+    rows = list(
+        (
+            await session.execute(
+                select(TenantEmailLoginCode).where(
+                    TenantEmailLoginCode.email == normalized_email,
+                    TenantEmailLoginCode.auth_intent == auth_intent,
+                    TenantEmailLoginCode.code_hash == code_hash,
+                    TenantEmailLoginCode.consumed_at.is_(None),
+                )
+            )
+        ).scalars()
+    )
+    current_time = datetime.now(UTC)
+    for row in rows:
+        if tenant_id and str(row.tenant_id or "").strip() not in {"", tenant_id}:
+            continue
+        expires_at = row.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+        if expires_at < current_time:
+            row.consumed_at = current_time
+            continue
+        return row
+    return None
+
+
+def _build_tenant_email_code_payload(
+    request: Request,
+    *,
+    email: str,
+    code: str,
+    auth_intent: str,
+    tenant_name: str | None,
+    tenant_slug: str | None,
+) -> dict[str, str]:
+    workspace_url = (
+        _tenant_portal_workspace_url(request, tenant_slug=tenant_slug)
+        if tenant_slug
+        else "https://tenant.bookedai.au/"
+    )
+    subject = "Your BookedAI tenant sign-in code"
+    intent_label = {
+        "sign-in": "sign in to your tenant workspace",
+        "create": "finish creating your tenant workspace",
+        "claim": "accept your tenant invite",
+    }.get(auth_intent, "continue to your tenant workspace")
+    tenant_label = tenant_name or tenant_slug or "BookedAI"
+    text = (
+        f"Hello,\n\nUse this BookedAI verification code to {intent_label}:\n\n"
+        f"{code}\n\n"
+        f"This code expires in {TENANT_EMAIL_CODE_TTL_MINUTES} minutes.\n"
+        f"Workspace: {tenant_label}\n"
+        f"Open tenant portal: {workspace_url}\n"
+    )
+    html = (
+        "<div style=\"font-family:Arial,sans-serif;color:#0f172a;line-height:1.6\">"
+        "<p>Hello,</p>"
+        f"<p>Use this BookedAI verification code to {escape(intent_label)}.</p>"
+        f"<p style=\"font-size:32px;font-weight:700;letter-spacing:0.18em;margin:20px 0\">{escape(code)}</p>"
+        f"<p>This code expires in {TENANT_EMAIL_CODE_TTL_MINUTES} minutes.</p>"
+        f"<p style=\"font-size:13px;color:#475569\">Workspace: {escape(tenant_label)}<br>"
+        f"Open tenant portal: <a href=\"{escape(workspace_url)}\">{escape(workspace_url)}</a></p>"
+        "</div>"
+    )
+    return {
+        "subject": subject,
+        "text": text,
+        "html": html,
+        "workspace_url": workspace_url,
+    }
+
+
+async def _deliver_tenant_email_login_code(
+    request: Request,
+    *,
+    email: str,
+    code: str,
+    auth_intent: str,
+    tenant_name: str | None,
+    tenant_slug: str | None,
+) -> dict[str, str | bool]:
+    payload = _build_tenant_email_code_payload(
+        request,
+        email=email,
+        code=code,
+        auth_intent=auth_intent,
+        tenant_name=tenant_name,
+        tenant_slug=tenant_slug,
+    )
+    email_service: EmailService = request.app.state.email_service
+    smtp_configured = email_service.smtp_configured()
+    delivery_status = "queued"
+    operator_note = "SMTP is not fully configured; share the tenant login code manually."
+    if smtp_configured:
+        await email_service.send_email(
+            to=[email],
+            subject=payload["subject"],
+            text=payload["text"],
+            html=payload["html"],
+        )
+        delivery_status = "sent"
+        operator_note = "Tenant login code sent by email."
+    return {
+        "status": delivery_status,
+        "operator_note": operator_note,
+        "smtp_configured": smtp_configured,
+        "workspace_url": payload["workspace_url"],
+        "email_hint": email.strip().lower(),
+        "code_last4": code[-4:],
+        "expires_in_minutes": TENANT_EMAIL_CODE_TTL_MINUTES,
+    }
 
 
 def _normalize_tenant_slug_candidate(value: str) -> str:
@@ -1397,7 +1692,11 @@ def _build_search_filters(
     if location_terms:
         location_clauses = _build_search_clauses(location_terms, fields=LOCATION_SEARCH_FIELDS)
         if location_clauses:
-            filters.append(or_(*location_clauses))
+            online_ready_clauses = _build_search_clauses(
+                ["online", "virtual", "remote", "telehealth"],
+                fields=(cast(ServiceMerchantProfile.tags_json, String),),
+            )
+            filters.append(or_(*location_clauses, *online_ready_clauses))
 
     return filters
 
@@ -1425,6 +1724,45 @@ def _build_match_confidence_payload(ranked_matches: list[Any]) -> dict[str, Any]
         "gating_state": gating_state,
         "evidence": list(dict.fromkeys([*top_match.evidence, *(["semantic_model_rerank"] if top_match.semantic_score is not None else [])])),
     }
+
+
+def _should_force_restaurant_live_search_only(
+    *,
+    query: str,
+    preferences: dict[str, Any] | None,
+    query_understanding: Any,
+    booking_request_context: Any,
+    strict_catalog_only: bool,
+) -> bool:
+    if strict_catalog_only:
+        return False
+
+    normalized_query = " ".join(str(query or "").strip().lower().split())
+    requested_category = str((preferences or {}).get("service_category") or "").strip().lower()
+    understanding_category = str(
+        getattr(query_understanding, "requested_category", None) or ""
+    ).strip().lower()
+    intent_label = str(getattr(booking_request_context, "intent_label", None) or "").strip().lower()
+
+    if requested_category in {"restaurant", "food and beverage", "hospitality and events"}:
+        return True
+    if understanding_category in {"restaurant", "food and beverage", "hospitality and events"}:
+        return True
+    if intent_label in {"restaurant_booking", "table_booking"}:
+        return True
+
+    if any(term in normalized_query for term in RESTAURANT_LIVE_SEARCH_TERMS):
+        return True
+
+    topical_terms = {
+        str(term or "").strip().lower()
+        for term in (
+            list(getattr(query_understanding, "core_intent_terms", ()) or ())
+            + list(getattr(query_understanding, "expanded_intent_terms", ()) or ())
+        )
+        if str(term or "").strip()
+    }
+    return bool(topical_terms & {"restaurant", "dining", "table", "reservation", "food", "brunch", "dinner", "lunch"})
 
 
 def _build_candidate_source_label(*, source_type: str, trust_signal: str | None = None) -> str:
@@ -1515,6 +1853,7 @@ def _build_public_web_fallback_candidates(web_results: list[dict[str, Any]]) -> 
         service_name = str(item.get("service_name") or "").strip()
         source_url = str(item.get("source_url") or "").strip()
         booking_url = str(item.get("booking_url") or "").strip() or None
+        contact_phone = str(item.get("contact_phone") or "").strip() or None
         if not candidate_id or not provider_name or not service_name or not source_url:
             continue
 
@@ -1538,6 +1877,7 @@ def _build_public_web_fallback_candidates(web_results: list[dict[str, Any]]) -> 
                 "venue_name": provider_name,
                 "location": item.get("location"),
                 "booking_url": booking_url,
+                "contact_phone": contact_phone,
                 "map_url": None,
                 "source_url": source_url,
                 "image_url": None,
@@ -1560,11 +1900,13 @@ def _build_public_web_fallback_candidates(web_results: list[dict[str, Any]]) -> 
                 "booking_path_type": (
                     "book_on_partner_site"
                     if booking_url
-                    else "request_callback"
+                    else "call_provider" if contact_phone else "request_callback"
                 ),
                 "next_step": (
                     "Open the provider booking page to confirm details."
                     if booking_url
+                    else "Call the venue directly to confirm the table booking."
+                    if contact_phone
                     else "Open the provider website and review the service details."
                 ),
                 "availability_state": "availability_unknown",
@@ -1611,6 +1953,9 @@ async def create_lead(request: Request, payload: CreateLeadRequestPayload):
                 lead_id=lead_id,
                 source=payload.attribution.source,
                 contact_email=normalized_email,
+                contact_full_name=payload.contact.full_name,
+                contact_phone=normalized_phone,
+                company_name=payload.business_context.business_name,
             )
             await _record_phase2_write_activity(
                 session,
@@ -1683,6 +2028,7 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
     tenant_id = await _resolve_tenant_id(request, actor_context)
     strict_catalog_only = bool(actor_context.tenant_id or actor_context.tenant_ref) and (
         actor_context.channel not in {"public_web", "embedded_widget"}
+        or actor_context.deployment_mode in {"embedded_widget", "plugin_integrated"}
     )
     semantic_rollout_enabled = False
     query_understanding = build_canonical_query_understanding(
@@ -1697,44 +2043,71 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
     near_me = booking_request_context.near_me_requested or is_near_me_requested(payload.query)
     chat_style = booking_request_context.is_chat_style or is_chat_style_query(payload.query)
     user_location = payload.user_location or None
-
-    async with get_session(request.app.state.session_factory) as session:
-        search_filters = _build_search_filters(
-            payload.query,
-            effective_location_hint,
-            str((payload.preferences or {}).get("service_category") or ""),
-        )
-        statement = (
-            select(ServiceMerchantProfile)
-            .where(ServiceMerchantProfile.is_active == 1)
-            .order_by(desc(ServiceMerchantProfile.featured), ServiceMerchantProfile.name)
-            .limit(24)
-        )
-        if tenant_id:
-            statement = statement.where(ServiceMerchantProfile.tenant_id == tenant_id)
-        if search_filters:
-            statement = statement.where(and_(*search_filters))
-        services = (await session.execute(statement)).scalars().all()
-        semantic_rollout_enabled = await is_flag_enabled(
-            "semantic_matching_model_assist_v1",
-            session=session,
-            tenant_id=tenant_id,
-        )
-
-    ranked_matches = rank_catalog_matches(
+    restaurant_live_search_only = _should_force_restaurant_live_search_only(
         query=payload.query,
-        services=services,
-        location_hint=effective_location_hint,
-        requested_service_id=str((payload.preferences or {}).get("requested_service_id") or ""),
-        requested_category=str((payload.preferences or {}).get("service_category") or ""),
-        budget=payload.budget,
+        preferences=payload.preferences,
+        query_understanding=query_understanding,
+        booking_request_context=booking_request_context,
+        strict_catalog_only=strict_catalog_only,
+    )
+
+    if restaurant_live_search_only:
+        services = []
+        async with get_session(request.app.state.session_factory) as session:
+            semantic_rollout_enabled = await is_flag_enabled(
+                "semantic_matching_model_assist_v1",
+                session=session,
+                tenant_id=tenant_id,
+            )
+    else:
+        async with get_session(request.app.state.session_factory) as session:
+            search_filters = _build_search_filters(
+                payload.query,
+                effective_location_hint,
+                str((payload.preferences or {}).get("service_category") or ""),
+            )
+            statement = (
+                select(ServiceMerchantProfile)
+                .where(ServiceMerchantProfile.is_active == 1)
+                .order_by(desc(ServiceMerchantProfile.featured), ServiceMerchantProfile.name)
+                .limit(24)
+            )
+            if tenant_id:
+                statement = statement.where(ServiceMerchantProfile.tenant_id == tenant_id)
+            if search_filters:
+                statement = statement.where(and_(*search_filters))
+            services = (await session.execute(statement)).scalars().all()
+            semantic_rollout_enabled = await is_flag_enabled(
+                "semantic_matching_model_assist_v1",
+                session=session,
+                tenant_id=tenant_id,
+            )
+
+    ranked_matches = (
+        []
+        if restaurant_live_search_only
+        else rank_catalog_matches(
+            query=payload.query,
+            services=services,
+            location_hint=effective_location_hint,
+            requested_service_id=str((payload.preferences or {}).get("requested_service_id") or ""),
+            requested_category=str((payload.preferences or {}).get("service_category") or ""),
+            budget=payload.budget,
+        )
     )
     heuristic_ranked_matches = list(ranked_matches)
-    search_strategy = "catalog_term_retrieval_with_prompt9_rerank"
+    search_strategy = (
+        "public_web_live_search_restaurant_only"
+        if restaurant_live_search_only
+        else "catalog_term_retrieval_with_prompt9_rerank"
+    )
     semantic_assist: dict[str, Any] | None = None
     semantic_service = getattr(request.app.state, "semantic_search_service", None)
     location_permission_needed = False
-    if semantic_rollout_enabled and semantic_service is not None:
+    if restaurant_live_search_only:
+        if near_me and not user_location:
+            location_permission_needed = True
+    elif semantic_rollout_enabled and semantic_service is not None:
         try:
             semantic_outcome = await semantic_service.assist_catalog_ranking(
                 query=payload.query,
@@ -1782,6 +2155,25 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
         relevance_location_hint = str(semantic_assist.get("inferred_location") or "").strip() or None
 
     location_required = bool(near_me and relevance_location_hint)
+    display_location_hint = effective_location_hint
+    if near_me and user_location and not display_location_hint:
+        if semantic_assist and semantic_assist.get("inferred_location"):
+            display_location_hint = str(semantic_assist.get("inferred_location") or "").strip() or None
+        else:
+            display_location_hint = "Current location"
+    display_normalized_query = query_understanding.normalized_query
+    if (
+        near_me
+        and user_location
+        and display_location_hint
+        and display_normalized_query
+        and _normalized_text(display_location_hint) not in _normalized_text(display_normalized_query)
+    ):
+        display_normalized_query = f"{display_normalized_query} near {display_location_hint.lower()}"
+    if semantic_assist is not None and near_me and user_location:
+        semantic_assist["inferred_location"] = display_location_hint
+        if display_normalized_query:
+            semantic_assist["normalized_query"] = display_normalized_query
     pre_relevance_matches = list(ranked_matches)
     ranked_matches = filter_ranked_matches_for_relevance(
         ranked_matches,
@@ -1919,15 +2311,34 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
             ]
 
     warnings: list[str] = []
-    if not candidates:
+    if not candidates and restaurant_live_search_only and not location_permission_needed:
+        warnings.append("No live restaurant result with a direct booking or call path was found for this area yet.")
+    elif not candidates:
         warnings.append("No strong relevant catalog candidates were found.")
-    elif public_web_fallback_candidates:
+    elif public_web_fallback_candidates and not restaurant_live_search_only:
         warnings.append("No strong tenant catalog candidates were found, so BookedAI is showing sourced public web options.")
     if location_permission_needed:
-        warnings.append("Location access is needed to find services near you.")
+        warnings.append(
+            "Location access is needed to find restaurants near you."
+            if restaurant_live_search_only
+            else "Location access is needed to find services near you."
+        )
 
     confidence_payload = _build_match_confidence_payload(ranked_matches)
-    if public_web_fallback_candidates and not ranked_matches:
+    if public_web_fallback_candidates and not ranked_matches and restaurant_live_search_only:
+        confidence_payload = {
+            "score": max(
+                0.42,
+                min(
+                    max(float(item.get("match_score") or 0.0) for item in public_web_fallback_candidates),
+                    0.78,
+                ),
+            ),
+            "reason": "BookedAI used live restaurant web search and only kept venue results with a real booking page or call path.",
+            "gating_state": "medium",
+            "evidence": ["restaurant_live_web_search"],
+        }
+    elif public_web_fallback_candidates and not ranked_matches:
         confidence_payload = {
             "score": max(
                 0.38,
@@ -2013,7 +2424,7 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
             "warnings": warnings,
             "search_strategy": (
                 f"{search_strategy}_plus_public_web_search"
-                if public_web_fallback_candidates
+                if public_web_fallback_candidates and not restaurant_live_search_only
                 else search_strategy
             ),
             "query_context": {
@@ -2031,9 +2442,13 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
                 "summary": booking_request_context.summary,
             },
             "query_understanding": {
-                "normalized_query": query_understanding.normalized_query,
-                "inferred_location": query_understanding.inferred_location,
-                "location_terms": list(query_understanding.location_terms),
+                "normalized_query": display_normalized_query,
+                "inferred_location": display_location_hint,
+                "location_terms": (
+                    list(query_understanding.location_terms)
+                    if query_understanding.location_terms
+                    else (["current_location"] if near_me and user_location else [])
+                ),
                 "core_intent_terms": list(query_understanding.core_intent_terms),
                 "expanded_intent_terms": list(query_understanding.expanded_intent_terms),
                 "constraint_terms": list(query_understanding.constraint_terms),
@@ -2054,8 +2469,8 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
                 "provider": None,
                 "provider_chain": [],
                 "fallback_applied": False,
-                "normalized_query": None,
-                "inferred_location": None,
+                "normalized_query": display_normalized_query,
+                "inferred_location": display_location_hint,
                 "inferred_category": None,
                 "budget_summary": None,
                 "evidence": [],
@@ -2166,7 +2581,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                 phone=normalized_phone,
                 primary_channel="email" if normalized_email else "phone",
             )
-            await lead_repository.upsert_lead(
+            lead_id = await lead_repository.upsert_lead(
                 tenant_id=tenant_id,
                 contact_id=contact_id,
                 source=(payload.attribution.source if payload.attribution else payload.channel),
@@ -2197,6 +2612,42 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                     }
                 ),
             )
+            lead_sync_result = await orchestrate_lead_capture(
+                session,
+                tenant_id=tenant_id,
+                lead_id=lead_id,
+                source=(payload.attribution.source if payload.attribution else payload.channel),
+                contact_email=normalized_email,
+                contact_full_name=payload.contact.full_name,
+                contact_phone=normalized_phone,
+                company_name=service.name if service else None,
+            )
+            contact_sync_result = await orchestrate_contact_sync(
+                session,
+                tenant_id=tenant_id,
+                contact_id=contact_id,
+                full_name=payload.contact.full_name,
+                email=normalized_email,
+                phone=normalized_phone,
+            )
+            booking_crm_sync = await orchestrate_booking_followup_sync(
+                session,
+                tenant_id=tenant_id,
+                booking_intent_id=booking_intent_id,
+                booking_reference=booking_reference,
+                full_name=payload.contact.full_name,
+                email=normalized_email,
+                phone=normalized_phone,
+                source=(payload.attribution.source if payload.attribution else payload.channel),
+                service_name=service.name if service else None,
+                requested_date=payload.desired_slot.date if payload.desired_slot else None,
+                requested_time=payload.desired_slot.time if payload.desired_slot else None,
+                timezone=payload.desired_slot.timezone if payload.desired_slot else None,
+                booking_path=_normalize_booking_path(service),
+                notes=payload.notes,
+                external_lead_id=lead_sync_result.external_entity_id,
+                external_contact_id=contact_sync_result.external_entity_id,
+            )
             await _record_phase2_write_activity(
                 session,
                 tenant_id=tenant_id,
@@ -2207,18 +2658,32 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                 audit_payload={
                     "booking_reference": booking_reference,
                     "contact_id": contact_id,
+                    "lead_id": lead_id,
                     "service_id": service_id,
                     "channel": payload.channel,
                     "requested_date": payload.desired_slot.date if payload.desired_slot else None,
                     "requested_time": payload.desired_slot.time if payload.desired_slot else None,
+                    "crm_sync": {
+                        "lead": lead_sync_result.sync_status,
+                        "contact": contact_sync_result.sync_status,
+                        "deal": booking_crm_sync.deal_sync_status,
+                        "task": booking_crm_sync.task_sync_status,
+                    },
                 },
                 outbox_event_type="booking_intent.capture.recorded",
                 outbox_payload={
                     "booking_intent_id": booking_intent_id,
                     "booking_reference": booking_reference,
                     "contact_id": contact_id,
+                    "lead_id": lead_id,
                     "service_id": service_id,
                     "channel": payload.channel,
+                    "crm_sync": {
+                        "lead_record_id": lead_sync_result.record_id,
+                        "contact_record_id": contact_sync_result.record_id,
+                        "deal_record_id": booking_crm_sync.deal_record_id,
+                        "task_record_id": booking_crm_sync.task_record_id,
+                    },
                 },
                 idempotency_key=f"booking-intent:{booking_intent_id}" if booking_intent_id else None,
             )
@@ -2248,6 +2713,31 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                     "warnings": warnings,
                 },
                 "warnings": warnings,
+                "crm_sync": {
+                    "lead": {
+                        "record_id": lead_sync_result.record_id,
+                        "sync_status": lead_sync_result.sync_status,
+                        "external_entity_id": lead_sync_result.external_entity_id,
+                        "warning_codes": lead_sync_result.warning_codes,
+                    },
+                    "contact": {
+                        "record_id": contact_sync_result.record_id,
+                        "sync_status": contact_sync_result.sync_status,
+                        "external_entity_id": contact_sync_result.external_entity_id,
+                        "warning_codes": contact_sync_result.warning_codes,
+                    },
+                    "deal": {
+                        "record_id": booking_crm_sync.deal_record_id,
+                        "sync_status": booking_crm_sync.deal_sync_status,
+                        "external_entity_id": booking_crm_sync.deal_external_entity_id,
+                    },
+                    "task": {
+                        "record_id": booking_crm_sync.task_record_id,
+                        "sync_status": booking_crm_sync.task_sync_status,
+                        "external_entity_id": booking_crm_sync.task_external_entity_id,
+                    },
+                    "warning_codes": booking_crm_sync.warning_codes,
+                },
             },
             tenant_id=tenant_id,
             actor_context=payload.actor_context,
@@ -2391,6 +2881,16 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
                     "cc_count": len(payload.cc),
                 },
             )
+            email_crm_sync_result = await orchestrate_email_sent_sync(
+                session,
+                tenant_id=tenant_id,
+                message_id=email_result.message_id,
+                template_key=payload.template_key,
+                subject=subject,
+                recipient_email=payload.to[0] if payload.to else None,
+                provider="smtp" if smtp_configured else "unconfigured",
+                delivery_status=delivery_status,
+            )
             await _record_phase2_write_activity(
                 session,
                 tenant_id=tenant_id,
@@ -2403,6 +2903,7 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
                     "delivery_status": email_result.delivery_status,
                     "provider": email_result.provider,
                     "recipient_count": len(payload.to),
+                    "crm_task_sync_status": email_crm_sync_result.task_sync_status,
                 },
                 outbox_event_type="email.lifecycle.dispatch_recorded",
                 outbox_payload={
@@ -2410,6 +2911,7 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
                     "template_key": payload.template_key,
                     "delivery_status": email_result.delivery_status,
                     "provider": email_result.provider,
+                    "crm_task_record_id": email_crm_sync_result.task_record_id,
                 },
                 idempotency_key=f"email-message:{email_result.message_id}",
             )
@@ -2420,7 +2922,14 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
                 "message_id": email_result.message_id,
                 "delivery_status": email_result.delivery_status,
                 "provider_message_id": None,
-                "warnings": warnings,
+                "warnings": warnings + email_crm_sync_result.warning_codes,
+                "crm_sync": {
+                    "task": {
+                        "record_id": email_crm_sync_result.task_record_id,
+                        "sync_status": email_crm_sync_result.task_sync_status,
+                        "external_entity_id": email_crm_sync_result.task_external_entity_id,
+                    }
+                },
             },
             tenant_id=tenant_id,
             actor_context=payload.actor_context,
@@ -2746,7 +3255,7 @@ async def integration_outbox_backlog(request: Request):
 async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestPayload):
     cfg: Settings = request.app.state.settings
     google_identity = await _verify_google_identity_token(cfg, id_token=payload.id_token)
-    auth_intent = str(payload.auth_intent or "sign-in").strip().lower()
+    auth_intent = str(payload.auth_intent or "create").strip().lower()
     if auth_intent not in {"sign-in", "create"}:
         return _error_response(
             ValidationAppError(
@@ -2832,43 +3341,31 @@ async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestP
                         auth_provider="google",
                     )
             else:
-                if auth_intent != "create":
-                    return _error_response(
-                        AppError(
-                            code="tenant_google_auth_not_found",
-                            message="No tenant workspace is linked to this Google account yet. Create a new tenant account first.",
-                            status_code=404,
-                        ),
-                        tenant_id=None,
-                        actor_context=None,
-                    )
-
-                normalized_business_name = str(payload.business_name or "").strip()
-                if not normalized_business_name:
-                    return _error_response(
-                        ValidationAppError(
-                            "tenant_google_create_business_name_required",
-                            "Business name is required before creating a tenant account with Google.",
-                        ),
-                        tenant_id=None,
-                        actor_context=None,
-                    )
-
-                normalized_slug = _normalize_tenant_slug_candidate(
-                    str(payload.tenant_slug or normalized_business_name)
+                normalized_business_name = (
+                    str(payload.business_name or "").strip()
+                    or str(google_identity["name"] or "").strip()
+                    or " ".join(
+                        part
+                        for part in str(google_identity["email"] or "").split("@", 1)[0]
+                        .replace(".", " ")
+                        .replace("_", " ")
+                        .replace("-", " ")
+                        .split()
+                        if part
+                    ).title()
+                    or "BookedAI Tenant"
                 )
-                existing_tenant = await tenant_repository.get_tenant_profile(normalized_slug)
-                if existing_tenant:
-                    return _error_response(
-                        AppError(
-                            code="tenant_account_slug_taken",
-                            message="That tenant workspace slug already exists. Sign in instead or choose a different business name.",
-                            status_code=409,
-                            details={"tenant_slug": normalized_slug},
-                        ),
-                        tenant_id=str(existing_tenant.get("id") or ""),
-                        actor_context=None,
-                    )
+
+                base_slug = _normalize_tenant_slug_candidate(
+                    str(payload.tenant_slug or "").strip()
+                    or normalized_business_name
+                    or str(google_identity["email"] or "").split("@", 1)[0]
+                )
+                normalized_slug = base_slug
+                suffix = 2
+                while await tenant_repository.get_tenant_profile(normalized_slug):
+                    normalized_slug = _normalize_tenant_slug_candidate(f"{base_slug}-{suffix}")
+                    suffix += 1
 
                 tenant_profile = await tenant_repository.create_tenant(
                     slug=normalized_slug,
@@ -4134,6 +4631,37 @@ async def tenant_profile_update(
         if membership_record and payload.operator_full_name is not None:
             membership_record.full_name = payload.operator_full_name.strip() or membership_record.full_name
 
+        workspace_guides = {
+            "overview": payload.guide_overview,
+            "experience": payload.guide_experience,
+            "catalog": payload.guide_catalog,
+            "plugin": payload.guide_plugin,
+            "bookings": payload.guide_bookings,
+            "integrations": payload.guide_integrations,
+            "billing": payload.guide_billing,
+            "team": payload.guide_team,
+        }
+        sanitized_guides = {
+            key: str(value).strip()
+            for key, value in workspace_guides.items()
+            if value is not None and str(value).strip()
+        }
+        workspace_settings: dict[str, object] = {}
+        if payload.logo_url is not None and str(payload.logo_url).strip():
+            workspace_settings["logo_url"] = str(payload.logo_url).strip()
+        if payload.hero_image_url is not None and str(payload.hero_image_url).strip():
+            workspace_settings["hero_image_url"] = str(payload.hero_image_url).strip()
+        sanitized_intro_html = str(payload.introduction_html or "").strip()
+        if sanitized_intro_html:
+            workspace_settings["introduction_html"] = sanitized_intro_html.replace("<script", "&lt;script").replace("</script>", "&lt;/script&gt;")
+        if sanitized_guides:
+            workspace_settings["guides"] = sanitized_guides
+        if workspace_settings:
+            await tenant_repository.upsert_tenant_settings(
+                tenant_id=tenant_id,
+                settings_json={"tenant_workspace": workspace_settings},
+            )
+
         audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
         await audit_repository.append_entry(
             tenant_id=tenant_id,
@@ -4148,6 +4676,7 @@ async def tenant_profile_update(
                 "industry": tenant_profile.get("industry"),
                 "timezone": tenant_profile.get("timezone"),
                 "locale": tenant_profile.get("locale"),
+                "workspace_fields": sorted(workspace_settings.keys()),
             },
         )
 

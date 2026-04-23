@@ -11,22 +11,22 @@ const overviewStages = [
   {
     id: 'product-proof',
     eyebrow: '01',
-    title: 'How it works',
+    title: 'Product proof',
     body: 'Show buyers how BookedAI captures intent, recommends clearly, and keeps booking continuity visible.',
     tone: 'from-[#eef6ff] to-white',
   },
   {
     id: 'architecture',
     eyebrow: '02',
-    title: 'Architecture',
-    body: 'Make the platform legible: surfaces, revenue engine, integrations, and cloud + AI foundations in one view.',
+    title: 'Operating system',
+    body: 'Make the platform legible: surfaces, revenue engine, integrations, and control layers in one view.',
     tone: 'from-[#ecfeff] to-white',
   },
   {
     id: 'implementation',
     eyebrow: '03',
-    title: 'Rollout',
-    body: 'Reduce decision friction by showing how an SME can launch now and expand later without rebuilding the path.',
+    title: 'Rollout path',
+    body: 'Show how an SME can launch now, prove ROI, and expand later without rebuilding the workflow.',
     tone: 'from-[#f0fdf4] to-white',
   },
   {
@@ -39,9 +39,24 @@ const overviewStages = [
 ];
 
 const insightPoints = [
-  'Visual-first story for buyers and investors',
-  'Architecture is visible instead of hidden in technical docs',
+  'Cleaner story for SMEs, operators, and investors',
+  'Architecture is visible instead of buried in technical detail',
   'Each section answers one buying question, in order',
+];
+
+const executiveRows = [
+  {
+    label: 'Problem',
+    value: 'Many service businesses still rely on disconnected enquiry handling, weak qualification, and invisible conversion drop-off.',
+  },
+  {
+    label: 'Homepage job',
+    value: 'Win trust fast enough that serious buyers and investors understand the system before attention drops.',
+  },
+  {
+    label: 'Design response',
+    value: 'Use clearer hierarchy, simpler enterprise language, and stronger visual boards to make the operating model obvious.',
+  },
 ];
 
 const whyThisHelpsCards = [
@@ -74,11 +89,10 @@ export function HomepageOverviewSection({
               Homepage at a glance
             </SignalPill>
             <h2 className="mt-4 max-w-[12ch] text-[2rem] font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-[2.7rem] lg:text-[3.25rem]">
-              One scan should explain the whole BookedAI story.
+              One scan should explain why BookedAI can become a serious enterprise revenue layer.
             </h2>
             <p className="mt-4 max-w-[34rem] text-[1rem] leading-7 text-black/66">
-              The homepage now follows a clearer sequence: product proof first, architecture next,
-              rollout after that, then pricing and trust to close the decision.
+              The sequence is now filtered around the highest-value signals first: product proof, operating model, rollout logic, pricing posture, and trust to close the decision.
             </p>
 
             <div className="mt-6 rounded-[1.7rem] border border-black/6 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4 shadow-[0_14px_30px_rgba(15,23,42,0.04)]">
@@ -102,6 +116,25 @@ export function HomepageOverviewSection({
                       {item.label}
                     </div>
                     <div className="mt-2 text-sm font-semibold leading-6 text-slate-900">{item.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="mt-6 rounded-[1.7rem] border border-slate-200 bg-white/90 p-4 shadow-[0_16px_34px_rgba(15,23,42,0.05)]">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                Executive readout
+              </div>
+              <div className="mt-4 grid gap-3">
+                {executiveRows.map((item) => (
+                  <div
+                    key={item.label}
+                    className="rounded-[1.15rem] border border-slate-200 bg-slate-50 px-4 py-4"
+                  >
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      {item.label}
+                    </div>
+                    <div className="mt-2 text-sm font-semibold leading-6 text-slate-950">{item.value}</div>
                   </div>
                 ))}
               </div>
@@ -165,26 +198,29 @@ export function HomepageOverviewSection({
               ))}
             </div>
 
-            <SectionCard className="rounded-[1.7rem] border border-black/6 bg-[linear-gradient(135deg,#0f172a_0%,#111827_58%,#13213d_100%)] p-5 text-white shadow-[0_22px_60px_rgba(2,6,23,0.22)]">
+            <SectionCard className="rounded-[1.7rem] border border-sky-100 bg-[linear-gradient(180deg,#f6fbff_0%,#ffffff_100%)] p-5 shadow-[0_22px_60px_rgba(15,23,42,0.06)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-600">
                     Why this helps us
                   </div>
-                  <div className="mt-2 text-xl font-semibold tracking-[-0.03em]">
-                    The page now shows clearer product meaning, clearer buying logic, and a cleaner path to action.
+                  <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
+                    The page now shows clearer product meaning, stronger buying logic, and a cleaner path to action.
                   </div>
                 </div>
-                <SignalPill variant="inverse" className="px-3 py-1 text-[10px] uppercase tracking-[0.16em]">
+                <SignalPill className="px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-sky-700">
                   Visual narrative
                 </SignalPill>
               </div>
 
               <div className="mt-5 grid gap-3 md:grid-cols-3">
                 {whyThisHelpsCards.map((item) => (
-                  <div key={item.title} className="rounded-[1.2rem] border border-white/10 bg-white/8 px-4 py-4">
-                    <div className="text-sm font-semibold text-white">{item.title}</div>
-                    <div className="mt-2 text-sm leading-6 text-white/76">{item.body}</div>
+                  <div
+                    key={item.title}
+                    className="rounded-[1.2rem] border border-slate-200 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+                  >
+                    <div className="text-sm font-semibold text-slate-950">{item.title}</div>
+                    <div className="mt-2 text-sm leading-6 text-slate-600">{item.body}</div>
                   </div>
                 ))}
               </div>

@@ -330,22 +330,22 @@ export const termsHref = '/terms.html';
 
 export const brandName = 'BookedAI';
 export const brandDomainLabel = 'bookedai.au';
-export const brandDescriptor = 'AI Revenue Engine for Service Businesses';
+export const brandDescriptor = 'Enterprise-Ready AI Revenue Operating Layer for Service Businesses';
 export const brandPositioning =
-  'Multi-channel AI revenue engine that captures demand, converts it into bookings, and helps recover missed revenue.';
+  'BookedAI turns fragmented enquiries into one visible operating flow for capture, qualification, booking conversion, and follow-up so growth teams, operators, and investors can all understand the revenue path quickly.';
 export const brandHomeUrl = 'https://bookedai.au/';
-export const brandAssetVersion = '20260418-brand-system';
-export const brandUnifiedLogoPath = `/branding/bookedai-logo-light.png?v=${brandAssetVersion}`;
+export const brandAssetVersion = '20260421-branding-suite';
+export const brandUnifiedLogoPath = `/branding/bookedai-logo-light.webp?v=${brandAssetVersion}`;
 export const brandPreferredLogoPath = brandUnifiedLogoPath;
-export const brandLogoPath = `/branding/bookedai-logo-light.png?v=${brandAssetVersion}`;
-export const brandLogoOnDarkPath = `/branding/bookedai-logo-dark-badge.png?v=${brandAssetVersion}`;
-export const brandLogoBlackPath = `/branding/bookedai-logo-black.png?v=${brandAssetVersion}`;
-export const brandLogoTransparentPath = `/branding/bookedai-logo-light.png?v=${brandAssetVersion}`;
-export const brandLogoSquarePath = `/branding/bookedai-app-icon-1024.png?v=${brandAssetVersion}`;
+export const brandLogoPath = `/branding/bookedai-logo-light.webp?v=${brandAssetVersion}`;
+export const brandLogoOnDarkPath = `/branding/bookedai-logo-dark.webp?v=${brandAssetVersion}`;
+export const brandLogoBlackPath = `/branding/bookedai-logo-black.webp?v=${brandAssetVersion}`;
+export const brandLogoTransparentPath = `/branding/bookedai-logo-transparent.webp?v=${brandAssetVersion}`;
+export const brandLogoSquarePath = `/branding/bookedai-logo-square-1024.png?v=${brandAssetVersion}`;
 export const brandShortIconPath = `/branding/bookedai-mark-gradient.png?v=${brandAssetVersion}`;
 export const brandFaviconPath = `/branding/bookedai-icon-32.png?v=${brandAssetVersion}`;
 export const brandLandingDarkSurfaceLogoPath = brandLogoOnDarkPath;
-export const brandLandingLightSurfaceLogoPath = brandLogoPath;
+export const brandLandingLightSurfaceLogoPath = `/branding/bookedai-homepage-image.webp?v=${brandAssetVersion}`;
 export const brandContactEmail = 'info@bookedai.au';
 export const brandWhatsAppHref =
   'https://wa.me/14155238886?text=Hi%20BookedAI%2C%20I%20want%20to%20see%20how%20the%20AI%20Revenue%20Engine%20works.';
@@ -371,15 +371,15 @@ export const navItems: NavItem[] = publicLandingSpine
   .map((item) => ({ id: item.id, label: item.label }));
 
 export const heroContent: HeroContent = {
-  eyebrow: 'Built for service-business growth',
-  title: 'Convert more enquiries into real bookings.',
+  eyebrow: 'Enterprise revenue operations for service businesses',
+  title: 'Turn enquiries into booked revenue with one modern operating system.',
   bodyLead:
-    'BookedAI answers, qualifies, and moves customers to the next step without making your team chase every lead manually.',
+    'BookedAI helps service businesses capture demand, qualify intent, and move buyers into booking-ready action through one visible workflow.',
   bodyRest:
-    'One product handles website enquiries, calls, follow-up, and booking handoff in a cleaner revenue flow.',
-  note: 'Fast setup, clear buying path, and a launch-ready experience for modern service brands.',
-  primaryCta: 'See Live Demo',
-  secondaryCta: 'Get Early Access',
+    'Instead of stitching together chat, triage, scheduling, CRM, and follow-up manually, teams get a cleaner commercial path that feels credible to SMEs and legible to investors in the first minute.',
+  note: 'Built to look simple on the surface, while carrying the workflow depth, control, and enterprise posture serious buyers expect.',
+  primaryCta: 'Open Product Trial',
+  secondaryCta: 'Talk to Sales',
   primaryHref: productHref,
   secondaryHref: '/register-interest',
 };
@@ -444,34 +444,34 @@ export const problemContent: SectionContent = {
 
 export const proofContent: ProofContent = {
   channels: [
-    'Web chat',
-    'Phone calls',
-    'SMS follow-up',
-    'Booking handoff',
+    'Demand capture',
+    'Intent qualification',
+    'Booking conversion',
+    'Operator control',
   ],
   section: {
-    kicker: 'Solution',
+    kicker: 'Product proof',
     kickerClassName: 'text-sky-400',
-    title: 'A cleaner revenue flow for SMEs and investor conversations',
-    body: 'BookedAI makes the commercial story simple: capture demand, qualify intent, and move the right customer into a booking-ready next step.',
+    title: 'One product surface that explains the business in seconds',
+    body: 'BookedAI is easiest to trust when the product story is simple: demand enters, intent is structured, the right next action becomes obvious, and the workflow remains commercially accountable after the conversation.',
   },
 };
 
 export const proofItems: ProofItem[] = [
   {
-    eyebrow: 'Response speed',
-    title: 'Reply before the lead cools',
-    body: 'Every inbound message gets a fast first response before the lead chooses someone else.',
+    eyebrow: 'Demand control',
+    title: 'Capture high-intent enquiries before they cool down',
+    body: 'Every enquiry enters one visible lane so the business can respond faster without losing signal across channels or staff handoffs.',
   },
   {
-    eyebrow: 'Conversion quality',
-    title: 'Guide the customer to the right next step',
-    body: 'BookedAI qualifies intent early so the buyer sees a clearer recommendation instead of a generic reply.',
+    eyebrow: 'Decision quality',
+    title: 'Make fit, urgency, and next action legible early',
+    body: 'BookedAI structures the request early so buyers and operators can see the strongest next move without extra back-and-forth.',
   },
   {
-    eyebrow: 'Workflow continuity',
-    title: 'Keep booking, payment, and follow-up connected',
-    body: 'The commercial path stays attached after the conversation ends, so teams can close more without losing context.',
+    eyebrow: 'Revenue continuity',
+    title: 'Keep booking, payment, and follow-up attached to one system',
+    body: 'The workflow remains connected after the conversation, which is what makes the product feel enterprise-ready instead of demo-only.',
   },
 ];
 
@@ -528,8 +528,8 @@ export const solutionContent: SectionContent = {
 export const implementationContent: SectionContent = {
   kicker: 'Implementation',
   kickerClassName: 'text-cyan-500',
-  title: 'Launch fast on the website, then expand into tenant and operator workflows when ready',
-  body: 'Start with one clear customer-facing booking flow, then extend into the tenant workspace, admin oversight, Google sign-in, and deeper automation without rebuilding the core revenue path.',
+  title: 'Launch with one clear commercial wedge, then expand into deeper enterprise operations',
+  body: 'Start with a visible customer-facing booking flow, then extend into tenant workspaces, admin oversight, integrations, and automation without rebuilding the core revenue path.',
 };
 
 export const solutionCards: InfoCard[] = [
@@ -563,8 +563,8 @@ export const metrics: Metric[] = [
 export const pricingContent: PricingContent = {
   kicker: 'Pricing',
   kickerClassName: 'text-indigo-400',
-  title: 'Freemium first. Pro when ready. Pro Max when revenue operations need more depth.',
-  body: 'Start light, move into a paid rollout when the conversion path is proven, and keep the commercial model easy for both SME buyers and investors to understand.',
+  title: 'Simple enough for SMEs to buy, structured enough for enterprise growth.',
+  body: 'The commercial model is designed to stay easy to approve, easy to understand, and credible as the workflow deepens from demand capture into full revenue operations.',
   planLabel: 'Starting plan',
   planPrice: '49$+',
   planCaption: 'entry pricing for SMEs launching BookedAI on a clean customer flow',
@@ -581,14 +581,14 @@ export const pricingContent: PricingContent = {
 
 export const ctaContent: CallToActionContent = {
   kicker: 'Call to action',
-  title: 'Ready to launch BookedAI into your revenue flow?',
-  body: 'Open the live product trial or talk to us about a rollout that fits your service business now and scales as operations get deeper.',
+  title: 'Ready to replace fragmented enquiry handling with a cleaner revenue system?',
+  body: 'Open the live product trial or talk to us about the rollout path that best fits your operating maturity, customer volume, and growth ambition.',
   primaryCta: 'Open Product Trial',
   secondaryCta: 'Talk to Sales',
   primaryHref: productHref,
   secondaryHref: '/register-interest',
   supportingText:
-    'Prefer to start with access and account setup? Use the tenant gateway for Google register/login, or go straight to admin and roadmap from the homepage menu.',
+    'Prefer to start with access and workspace setup? Use the tenant gateway to continue with Google or password, or go straight to roadmap and operator surfaces from the homepage menu.',
 };
 
 export const trustItems: TrustItem[] = [
@@ -614,27 +614,27 @@ export const trustItems: TrustItem[] = [
 
 export const faqItems: FAQItem[] = [
   {
-    question: 'How does the freemium model work?',
+    question: 'How does the Starter entry layer work?',
     answer:
-      'Freemium is the low-friction entry point for SMEs that want to test the BookedAI flow quickly. When you need stronger automation, guided booking, and deeper revenue operations, you move up to Pro or Pro Max.',
+      'Starter is the low-friction entry layer for teams that want to validate demand capture, response quality, and booking flow fit quickly. When the operating case is proven, the path into Pro or Pro Max is already visible.',
   },
   {
-    question: 'What do I pay after the launch offer?',
+    question: 'What does the commercial model look like after the launch offer?',
     answer:
-      'After the first 10-SME free setup cohort, BookedAI charges a clear setup fee, then a monthly plan, and only adds commission when BookedAI is helping generate real booked outcomes through the installed flow.',
+      'After the first 10-SME free setup cohort, BookedAI charges a clearly scoped setup fee, then a monthly operating plan, and only adds commission when BookedAI is helping generate real booked outcomes through the installed flow.',
   },
   {
-    question: 'Can I use Google sign-in and a tenant workspace?',
+    question: 'Does this expand into a real operator and tenant workflow, or stay as a front-end widget?',
     answer:
-      'Yes. SMEs can use the tenant gateway for account creation and Google login, while operators and internal teams can continue into tenant and admin workflows as the rollout matures.',
+      'It expands into a real workflow. SMEs can use the tenant gateway for account creation and Google login, while operators and internal teams can continue into tenant and admin workflows as the rollout matures.',
   },
 ];
 
 export const teamSectionContent: SectionContent = {
   kicker: 'Team Members',
   kickerClassName: 'text-indigo-400',
-  title: 'Built by operators, engineers, and product-minded problem solvers',
-  body: 'BookedAI brings together technical depth, operational quality experience, and practical business thinking to build AI systems that work in the real world.',
+  title: 'Built by operators, engineers, and founders who care about real operating systems',
+  body: 'BookedAI combines technical depth, workflow thinking, and commercial pragmatism to build AI products that can move beyond demo novelty and survive real rollout conditions.',
 };
 
 export const teamMembers: TeamMember[] = [
@@ -1321,7 +1321,7 @@ export const roadmapContent: RoadmapContent = {
         { title: 'Turn homepage into the main public acquisition surface and route deeper app interaction into product and demo surfaces', status: 'Completed' },
         { title: 'Add launch-offer CTA for free online setup for the first 10 SME customers', status: 'Completed' },
         { title: 'Rename public package vocabulary to Freemium, Pro, and Pro Max with clearer SME benefits', status: 'Completed' },
-        { title: 'Expose direct public entry links for roadmap, tenant, admin login, and tenant Google register/login', status: 'Completed' },
+        { title: 'Expose direct public entry links for roadmap, tenant, admin login, and tenant Google auth entry', status: 'Completed' },
         { title: 'Add QR-led and email-led interested-registration flow that feeds the BookedAI setup and pricing path', status: 'Planned' },
         { title: 'Keep public, tenant, and admin entry flows simple and stable before adding more surface area', status: 'In Progress' },
         { title: 'Make search accurate enough to show the correct results and render them consistently', status: 'In Progress' },

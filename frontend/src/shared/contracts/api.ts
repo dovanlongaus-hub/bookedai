@@ -182,6 +182,7 @@ export interface MatchRecommendation {
   pathType?: V1BookingPathOption | null;
   nextStep?: string | null;
   warnings?: string[];
+  bookingFit?: import('./matching').MatchBookingFit | null;
 }
 
 export interface BookingRequestContextSummary {
@@ -223,6 +224,10 @@ export interface SearchDiagnosticsSummary {
   postDomainCandidateIds: string[];
   finalCandidateIds: string[];
   droppedCandidates: SearchDiagnosticsDropSummary[];
+  stageCounts?: Array<{
+    stage: string;
+    candidateCount: number;
+  }>;
 }
 
 export interface SearchQueryUnderstandingSummary {
@@ -408,6 +413,31 @@ export interface CreateBookingIntentResponse {
   booking_reference?: string | null;
   trust: V1BookingTrustSummary;
   warnings: string[];
+  crm_sync?: {
+    lead?: {
+      record_id?: number | null;
+      sync_status?: string | null;
+      external_entity_id?: string | null;
+      warning_codes?: string[];
+    } | null;
+    contact?: {
+      record_id?: number | null;
+      sync_status?: string | null;
+      external_entity_id?: string | null;
+      warning_codes?: string[];
+    } | null;
+    deal?: {
+      record_id?: number | null;
+      sync_status?: string | null;
+      external_entity_id?: string | null;
+    } | null;
+    task?: {
+      record_id?: number | null;
+      sync_status?: string | null;
+      external_entity_id?: string | null;
+    } | null;
+    warning_codes?: string[];
+  } | null;
 }
 
 export type V1PaymentStatus =
@@ -740,10 +770,33 @@ export interface TenantOverviewRecentBooking {
   created_at?: string | null;
 }
 
+export interface TenantSectionActivity {
+  last_updated_at?: string | null;
+  last_updated_by?: string | null;
+  last_event_type?: string | null;
+  summary: string;
+}
+
 export interface TenantOverviewResponse {
   tenant: TenantOverviewTenantProfile;
   shell: TenantOverviewShellState;
   summary: TenantOverviewSummary;
+  workspace: {
+    logo_url?: string | null;
+    hero_image_url?: string | null;
+    introduction_html?: string | null;
+    guides: {
+      overview: string;
+      experience: string;
+      catalog: string;
+      plugin: string;
+      bookings: string;
+      integrations: string;
+      billing: string;
+      team: string;
+    };
+    activity: TenantSectionActivity;
+  };
   integration_snapshot: {
     connected_count: number;
     attention_count: number;
@@ -771,6 +824,7 @@ export interface TenantIntegrationsResponse {
   attention: IntegrationAttentionItem[];
   reconciliation: IntegrationReconciliationDetailsResponse;
   crm_retry_backlog: CrmRetryBacklogResponse;
+  activity: TenantSectionActivity;
   controls?: {
     available_statuses: string[];
     available_sync_modes: string[];
@@ -786,6 +840,7 @@ export interface TenantIntegrationsResponse {
 
 export interface TenantBillingResponse {
   tenant: TenantOverviewTenantProfile;
+  activity: TenantSectionActivity;
   account: {
     id?: string | null;
     billing_email?: string | null;
@@ -835,6 +890,8 @@ export interface TenantBillingResponse {
     can_start_trial: boolean;
     can_change_plan: boolean;
     can_manage_billing: boolean;
+    can_open_billing_portal?: boolean;
+    can_start_stripe_checkout?: boolean;
   };
   payment_method: {
     status: string;
@@ -863,12 +920,22 @@ export interface TenantBillingResponse {
     period_end?: string | null;
     receipt_available: boolean;
     source: string;
+    hosted_invoice_url?: string | null;
+    receipt_url?: string | null;
+    can_mark_paid?: boolean;
   }>;
   invoice_summary: {
     total_invoices: number;
     open_invoices: number;
     paid_invoices: number;
     currency: string;
+  };
+  gateway?: {
+    provider: string;
+    checkout_enabled: boolean;
+    portal_enabled: boolean;
+    customer_id_present: boolean;
+    note: string;
   };
   audit_trail: Array<{
     id: string;
@@ -924,7 +991,7 @@ export interface TenantUserProfile {
 export interface TenantAuthSessionResponse {
   session_token: string;
   expires_at: string;
-  provider: 'google' | 'password';
+  provider: 'google' | 'password' | 'email_code';
   user: TenantUserProfile;
   tenant: TenantOverviewTenantProfile;
   capabilities: string[];
@@ -940,8 +1007,8 @@ export interface TenantAuthSessionResponse {
 export interface TenantCreateAccountRequest {
   business_name: string;
   email: string;
-  username: string;
-  password: string;
+  username?: string | null;
+  password?: string | null;
   full_name?: string | null;
   industry?: string | null;
   timezone?: string | null;
@@ -952,8 +1019,8 @@ export interface TenantCreateAccountRequest {
 export interface TenantClaimAccountRequest {
   tenant_ref: string;
   email: string;
-  username: string;
-  password: string;
+  username?: string | null;
+  password?: string | null;
   full_name?: string | null;
 }
 
@@ -991,6 +1058,7 @@ export interface TenantTeamMember {
 
 export interface TenantTeamResponse {
   tenant: TenantOverviewTenantProfile;
+  activity: TenantSectionActivity;
   summary: {
     total_members: number;
     active_members: number;
@@ -1038,11 +1106,101 @@ export interface TenantProfileUpdateRequest {
   timezone?: string | null;
   locale?: string | null;
   operator_full_name?: string | null;
+  logo_url?: string | null;
+  hero_image_url?: string | null;
+  introduction_html?: string | null;
+  guide_overview?: string | null;
+  guide_experience?: string | null;
+  guide_catalog?: string | null;
+  guide_plugin?: string | null;
+  guide_bookings?: string | null;
+  guide_integrations?: string | null;
+  guide_billing?: string | null;
+  guide_team?: string | null;
 }
 
 export interface TenantProfileUpdateResponse {
   tenant: TenantOverviewTenantProfile;
   onboarding: TenantOnboardingResponse;
+}
+
+export interface TenantPluginInterfaceExperience {
+  partner_name: string;
+  partner_website_url: string;
+  bookedai_host: string;
+  embed_path: string;
+  widget_script_path: string;
+  tenant_ref: string;
+  widget_id: string;
+  accent_color: string;
+  button_label: string;
+  modal_title: string;
+  headline: string;
+  prompt: string;
+  inline_target_selector: string;
+  support_email?: string | null;
+  support_whatsapp?: string | null;
+  logo_url?: string | null;
+}
+
+export interface TenantPluginInterfaceResponse {
+  tenant: TenantOverviewTenantProfile;
+  activity: TenantSectionActivity;
+  experience: TenantPluginInterfaceExperience;
+  features: {
+    chat: boolean;
+    search: boolean;
+    booking: boolean;
+    payment: boolean;
+    email: boolean;
+    crm: boolean;
+    whatsapp: boolean;
+  };
+  runtime: {
+    deployment_mode: string;
+    channel: string;
+    source: string;
+    widget_script_url: string;
+    embed_url: string;
+    documentation_url: string;
+  };
+  catalog_summary: {
+    published_product_count: number;
+    product_names: string[];
+  };
+  products: Array<{
+    service_id?: string | null;
+    name?: string | null;
+    category?: string | null;
+    display_price?: string | null;
+    booking_url?: string | null;
+    image_url?: string | null;
+    publish_state?: string | null;
+  }>;
+  access?: {
+    current_role: string;
+    can_manage_plugin: boolean;
+    operator_note: string;
+  };
+}
+
+export interface TenantPluginInterfaceUpdateRequest {
+  partner_name?: string | null;
+  partner_website_url?: string | null;
+  bookedai_host?: string | null;
+  embed_path?: string | null;
+  widget_script_path?: string | null;
+  tenant_ref?: string | null;
+  widget_id?: string | null;
+  accent_color?: string | null;
+  button_label?: string | null;
+  modal_title?: string | null;
+  headline?: string | null;
+  prompt?: string | null;
+  inline_target_selector?: string | null;
+  support_email?: string | null;
+  support_whatsapp?: string | null;
+  logo_url?: string | null;
 }
 
 export interface TenantBillingAccountUpdateRequest {
@@ -1059,6 +1217,8 @@ export interface TenantSubscriptionUpdateRequest {
 export interface TenantBillingWorkspaceResponse {
   billing: TenantBillingResponse;
   onboarding: TenantOnboardingResponse;
+  checkout_url?: string | null;
+  portal_url?: string | null;
 }
 
 export interface TenantInviteMemberRequest {
@@ -1141,6 +1301,43 @@ export interface TenantPasswordAuthRequest {
   tenant_ref?: string | null;
 }
 
+export interface TenantEmailCodeRequest {
+  email: string;
+  tenant_ref?: string | null;
+  auth_intent?: 'sign-in' | 'create' | 'claim' | null;
+  business_name?: string | null;
+  full_name?: string | null;
+  industry?: string | null;
+  tenant_slug?: string | null;
+}
+
+export interface TenantEmailCodeRequestResponse {
+  email: string;
+  auth_intent: 'sign-in' | 'create' | 'claim';
+  tenant_slug?: string | null;
+  tenant_name?: string | null;
+  delivery: {
+    status: string;
+    operator_note: string;
+    smtp_configured: boolean;
+    workspace_url?: string | null;
+    email_hint?: string | null;
+    code_last4?: string | null;
+    expires_in_minutes?: number | null;
+  };
+}
+
+export interface TenantEmailCodeVerifyRequest {
+  email: string;
+  code: string;
+  tenant_ref?: string | null;
+  auth_intent?: 'sign-in' | 'create' | 'claim' | null;
+  business_name?: string | null;
+  full_name?: string | null;
+  industry?: string | null;
+  tenant_slug?: string | null;
+}
+
 export interface TenantCatalogImportRequest {
   website_url: string;
   business_name?: string | null;
@@ -1148,6 +1345,12 @@ export interface TenantCatalogImportRequest {
   category?: string | null;
   search_focus?: string | null;
   location_hint?: string | null;
+}
+
+export interface TenantCatalogCreateRequest {
+  business_name?: string | null;
+  name?: string | null;
+  category?: string | null;
 }
 
 export interface TenantCatalogUpdateRequest {

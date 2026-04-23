@@ -38,26 +38,32 @@ export function HeroSection({
   ];
   const heroHighlights = [
     {
-      title: 'Respond instantly',
-      body: 'Every enquiry gets a fast first reply before the lead cools.',
+      title: 'Fast buyer understanding',
+      body: 'Serious buyers should understand the product, the workflow, and the outcome in under a minute.',
     },
     {
-      title: 'Qualify clearly',
-      body: 'The best-fit option and next step show up without extra back-and-forth.',
+      title: 'Operational credibility',
+      body: 'The best-fit option and next move surface without burying teams in manual triage or generic AI copy.',
     },
     {
-      title: 'Convert cleanly',
-      body: 'Booking handoff, payment, and follow-up stay in one path.',
+      title: 'Revenue continuity',
+      body: 'Booking, payment posture, and follow-up remain attached to one commercial path.',
     },
+  ];
+  const executiveMetrics = [
+    { label: 'Core promise', value: 'Turn fragmented enquiries into one visible revenue workflow' },
+    { label: 'Enterprise signal', value: 'Shared workflow state instead of disconnected tools and handoffs' },
+    { label: 'Buyer outcome', value: 'Fast reply, credible fit, clear next action, stronger trust' },
   ];
 
   return (
     <SectionShell
       id="hero"
-      className="pb-10 pt-1 sm:pb-12 lg:pb-20 lg:pt-3"
-      contentClassName="grid gap-4 sm:gap-5 lg:grid-cols-[0.82fr_1.18fr] lg:items-stretch lg:gap-6"
+      className="pb-8 pt-1 sm:pb-10 lg:pb-14 lg:pt-2"
+      contentClassName="grid gap-5 sm:gap-6 lg:grid-cols-[0.88fr_1.12fr] lg:items-start lg:gap-7"
+      width="wide"
     >
-      <SectionCard className="relative overflow-hidden p-5 sm:p-6 lg:p-9">
+      <SectionCard className="relative overflow-hidden border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_55%,#f3f8fd_100%)] p-5 shadow-[0_28px_80px_rgba(15,23,42,0.06)] sm:p-6 lg:p-8 xl:p-9">
         <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_62%)]" />
         <div className="absolute bottom-0 right-0 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(15,23,42,0.08),transparent_70%)]" />
 
@@ -66,11 +72,11 @@ export function HeroSection({
             {content.eyebrow}
           </SignalPill>
 
-          <h1 className="template-title mt-4 max-w-[7.1em] text-[2.2rem] font-semibold leading-[0.94] text-[#1d1d1f] sm:mt-6 sm:text-[4rem] lg:text-[4.85rem]">
+          <h1 className="template-title mt-4 max-w-[8.2em] text-[2.25rem] font-semibold leading-[0.92] tracking-[-0.055em] text-[#14233b] sm:mt-5 sm:text-[3.8rem] lg:text-[4.5rem] xl:text-[4.9rem]">
             {content.title}
           </h1>
 
-          <p className="template-body mt-4 max-w-[33rem] text-[0.98rem] leading-[1.65rem] sm:mt-5 sm:max-w-[34rem] sm:text-[1.08rem] sm:leading-8">
+          <p className="template-body mt-4 max-w-[34rem] text-[1rem] leading-[1.8rem] text-slate-600 sm:mt-5 sm:max-w-[35rem] sm:text-[1.06rem] sm:leading-8">
             <span className="font-semibold text-[#1d1d1f]">{content.bodyLead}</span>{' '}
             {content.bodyRest}
           </p>
@@ -103,13 +109,27 @@ export function HeroSection({
 
           <p className="mt-3 max-w-[33rem] text-sm leading-6 text-black/56 sm:mt-4 sm:max-w-[34rem]">{content.note}</p>
 
-          <div className="mt-6 grid gap-2.5 sm:mt-8 sm:grid-cols-3 sm:gap-3">
+          <div className="mt-6 grid gap-3 sm:mt-7">
+            {executiveMetrics.map((item) => (
+              <div
+                key={item.label}
+                className="rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 shadow-[0_12px_28px_rgba(15,23,42,0.04)]"
+              >
+                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  {item.label}
+                </div>
+                <div className="mt-2 text-sm font-semibold leading-6 text-slate-950">{item.value}</div>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-6 grid gap-2.5 sm:mt-7 sm:grid-cols-3 sm:gap-3">
             {heroHighlights.map((item) => (
               <SectionCard
                 key={item.title}
                 as="article"
                 tone="subtle"
-                className="rounded-[1.2rem] border border-white/75 bg-white/66 px-3.5 py-3.5 shadow-[0_12px_24px_rgba(15,23,42,0.04)] sm:rounded-[1.4rem] sm:px-4 sm:py-4"
+                className="rounded-[1.2rem] border border-slate-200 bg-white px-3.5 py-3.5 shadow-[0_12px_24px_rgba(15,23,42,0.04)] sm:rounded-[1.4rem] sm:px-4 sm:py-4"
               >
                 <div className="text-sm font-semibold tracking-[-0.02em] text-[#1d1d1f]">{item.title}</div>
                 <div className="mt-2 text-sm leading-6 text-black/62">{item.body}</div>
@@ -120,25 +140,40 @@ export function HeroSection({
       </SectionCard>
 
       <div className="grid gap-4 sm:gap-5">
-        <SectionCard className="relative overflow-hidden p-4 sm:p-5 lg:p-6">
+        <SectionCard className="relative overflow-hidden border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] p-4 shadow-[0_28px_80px_rgba(15,23,42,0.08)] sm:p-5 lg:p-5 xl:p-6">
           <div className="absolute inset-x-12 top-8 h-24 rounded-full bg-[radial-gradient(circle,rgba(56,189,248,0.16),transparent_72%)] blur-3xl" />
           <div className="relative flex flex-col gap-4 sm:gap-5">
-            <div className="flex flex-col gap-3 rounded-[1.45rem] border border-black/5 bg-white/64 p-3.5 shadow-[0_12px_28px_rgba(15,23,42,0.04)] sm:gap-4 sm:rounded-[1.8rem] sm:p-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="flex flex-col gap-3 rounded-[1.45rem] border border-black/5 bg-white/72 p-3.5 shadow-[0_12px_28px_rgba(15,23,42,0.04)] sm:gap-4 sm:rounded-[1.8rem] sm:p-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <SignalPill className="w-fit px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#1459c7] sm:text-[10px] sm:tracking-[0.16em]">
                   Live product proof
                 </SignalPill>
-                <div className="mt-3 max-w-[23rem] text-[1.3rem] font-semibold leading-tight tracking-[-0.04em] text-[#1d1d1f] sm:mt-4 sm:max-w-[25rem] sm:text-[2rem]">
-                  See the booking flow in one clean screen.
+                <div className="mt-3 max-w-[25rem] text-[1.3rem] font-semibold leading-tight tracking-[-0.04em] text-[#1d1d1f] sm:mt-4 sm:max-w-[28rem] sm:text-[1.85rem]">
+                  See a buyer-ready product surface, not just a widget demo.
                 </div>
-                <div className="mt-2.5 max-w-[25rem] text-sm leading-6 text-black/58 sm:mt-3 sm:max-w-[26rem] sm:text-[0.98rem]">
-                  Search comes in, the best-fit option is ranked, and the next booking step is ready without extra back-and-forth.
+                <div className="mt-2.5 max-w-[27rem] text-sm leading-6 text-black/58 sm:mt-3 sm:max-w-[30rem] sm:text-[0.98rem]">
+                  The homepage now shows the real shape of the operating model: demand enters, fit is qualified, the best option is visible, and conversion continuity remains intact from first contact to booking-ready action.
                 </div>
               </div>
               <div className="flex items-center gap-2 self-start rounded-full bg-emerald-50/90 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-700 sm:text-[10px] sm:tracking-[0.16em]">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 {demo.status}
               </div>
+            </div>
+
+            <div className="grid gap-3 lg:grid-cols-3">
+              {[
+                'Strategic framing',
+                'Decision-ready ranking',
+                'Enterprise-style workflow continuity',
+              ].map((item) => (
+                <div
+                  key={item}
+                  className="rounded-[1.15rem] border border-white/85 bg-white/74 px-4 py-3 text-sm font-semibold text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+                >
+                  {item}
+                </div>
+              ))}
             </div>
 
             <div className="grid gap-4 sm:gap-5">

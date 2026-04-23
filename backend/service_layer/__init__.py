@@ -68,6 +68,8 @@ from service_layer.geo_utils import (
     haversine_km,
 )
 from service_layer.lifecycle_ops_service import (
+    execute_crm_sync_retry,
+    orchestrate_contact_sync,
     orchestrate_lead_capture,
     orchestrate_lifecycle_email,
     queue_crm_sync_retry,
@@ -166,6 +168,8 @@ __all__ = [
     "build_integration_provider_statuses",
     "build_reconciliation_details",
     "build_reconciliation_summary",
+    "execute_crm_sync_retry",
+    "orchestrate_contact_sync",
     "orchestrate_lead_capture",
     "orchestrate_lifecycle_email",
     "queue_crm_sync_retry",

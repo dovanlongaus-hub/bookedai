@@ -5,6 +5,10 @@ type AdminWorkspaceInsightsProps = {
   activePanel: AdminWorkspacePanelId | null;
   bookingsTotal: number;
   shadowStatus: string;
+  tenantsCount: number;
+  selectedTenantName?: string | null;
+  selectedTenantMembersCount: number;
+  selectedTenantServicesCount: number;
   portalSupportQueueCount: number;
   importedServicesCount: number;
   partnersCount: number;
@@ -20,6 +24,10 @@ export function AdminWorkspaceInsights({
   activePanel,
   bookingsTotal,
   shadowStatus,
+  tenantsCount,
+  selectedTenantName,
+  selectedTenantMembersCount,
+  selectedTenantServicesCount,
   portalSupportQueueCount,
   importedServicesCount,
   partnersCount,
@@ -75,6 +83,62 @@ export function AdminWorkspaceInsights({
             label="Open recent events panel"
             isActive={activePanel === 'recent-events'}
             onClick={() => onPanelNavigate('recent-events')}
+          />
+        </div>
+      </section>
+    );
+  }
+
+  if (activeWorkspace === 'tenants') {
+    return (
+      <section
+        id="tenants-workspace"
+        className="mt-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.06)]"
+      >
+        <div className="text-xs font-semibold uppercase tracking-[0.22em] text-amber-700">
+          Tenant workspace
+        </div>
+        <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
+          Manage each enterprise tenant as a clear operating surface
+        </h2>
+        <div className="mt-5 grid gap-4 md:grid-cols-4">
+          <InsightCard label="Tenant directory" value={`${tenantsCount} tenants`} detail="Every tenant stays available from one internal control surface." />
+          <InsightCard label="Current tenant" value={selectedTenantName ?? 'No tenant selected'} detail="Profile, branding, HTML content, and access changes follow this context." />
+          <InsightCard label="Team access" value={`${selectedTenantMembersCount} members`} detail="Use role and status controls to move tenant ownership safely." />
+          <InsightCard label="Tenant catalog" value={`${selectedTenantServicesCount} services`} detail="Products and services can be edited directly without leaving admin." />
+        </div>
+        <div className="mt-5 rounded-[1.6rem] border border-amber-200 bg-amber-50 p-4">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-amber-700">
+            Workspace guideline
+          </div>
+          <h3 className="mt-2 text-lg font-semibold text-slate-950">
+            Update tenant identity first, then roles, then publishable catalog data
+          </h3>
+          <p className="mt-2 text-sm leading-6 text-slate-600">
+            This keeps branding, HTML introduction, and team permissions aligned before operators
+            change customer-facing products or services.
+          </p>
+        </div>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <PanelLink
+            label="Open tenant directory"
+            isActive={activePanel === 'tenant-directory'}
+            onClick={() => onPanelNavigate('tenant-directory')}
+          />
+          <PanelLink
+            label="Open tenant profile"
+            isActive={activePanel === 'tenant-profile'}
+            onClick={() => onPanelNavigate('tenant-profile')}
+          />
+          <PanelLink
+            label="Open tenant team"
+            isActive={activePanel === 'tenant-team'}
+            onClick={() => onPanelNavigate('tenant-team')}
+          />
+          <PanelLink
+            label="Open tenant services"
+            isActive={activePanel === 'tenant-services'}
+            onClick={() => onPanelNavigate('tenant-services')}
           />
         </div>
       </section>

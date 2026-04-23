@@ -68,12 +68,25 @@ Confirmed from the current repo:
 - `tenant.bookedai.au` is now wired as a tenant-facing production host
 - the current tenant surface includes:
   - overview summary cards
+  - business-profile and onboarding controls
   - tenant catalog workspace
+  - direct `new service draft` creation from the tenant catalog itself
   - bookings panel
   - integrations panel
+  - billing panel
+  - team panel
+  - plugin panel for tenant-managed embed configuration
   - tenant sign-in entry for password-based and Google-authenticated actions
   - AI-guided website import for booking-critical catalog extraction
   - truthful catalog pricing fields through `currency_code` and `display_price` so tenant rows can preserve brochure or source-document prices without forcing fake AUD conversion
+  - a newly locked redesign requirement for the next tenant UX wave:
+    - enterprise-style sidebar or menu navigation
+    - explicit guideline content for each major workspace area
+    - clearer function-first layout grouping
+    - inline input or edit or save behavior instead of fragmented off-surface updates
+    - direct image upload support for tenant-managed branding
+    - editable HTML introduction content for tenant-facing business summary and positioning
+    - visible tenant permission guidance so role boundaries are readable inside the workspace
 - The current admin surface includes:
   - admin login
   - overview metrics
@@ -103,18 +116,19 @@ Confirmed admin routes:
 
 The tenant app now exists, but several SME self-serve areas are still missing:
 
-- no polished tenant sign-up and onboarding gateway yet
 - no single canonical tenant account and membership UX yet
 - no lead lifecycle area
 - no conversation inbox area for SMEs
 - no booking trust dashboard
-- no full billing and subscription area
 - no CRM and lifecycle dashboard
 - no email communications workspace
 - no monthly value reporting workspace
 - no full multi-step provenance-review workflow yet
-- no invite email delivery yet
 - no complete role-aware model across every remaining tenant write surface yet
+- the remaining tenant workspace gaps are now narrower:
+  - deeper CRUD still needs to expand beyond first-pass service draft creation
+  - more write surfaces still need to inherit the same explicit permission guidance now visible in the team lane
+  - authenticated live QA should continue across the signed-in workspace, not only the shared gateway
 
 ### What can be reused
 
@@ -149,10 +163,12 @@ Current maturity should be described as:
 - internal ops visibility exists
 - first tenant self-serve product surface now exists
 - tenant write actions now include tenant-authenticated catalog import plus edit, publish, and archive actions for catalog rows
+- tenant catalog creation now also exists directly inside the tenant workspace through a first-pass `new service draft` flow
 - tenant catalog editing now also preserves non-AUD pricing truth via `currency_code` and `display_price`, which is especially important for PDF-first onboarding and the first chess-class sample tenant
 - tenant billing now includes self-serve setup, plan choice, trial posture, invoice or payment-method seams, and billing audit visibility
 - tenant team management now includes a member roster, invite seam, and first-pass role or status management
 - role-aware rules now exist for billing, team, and catalog actions
+- the tenant workspace now also exposes a permission-matrix layer so tenant admins, operators, and finance managers can see which enterprise lanes they own directly
 - the repo still needs stronger auth, onboarding, billing, ownership, editing, and publish-state hardening before broader SME rollout
 
 ### Biggest gaps

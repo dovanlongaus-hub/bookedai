@@ -35,6 +35,13 @@
     "app/**/*.tsx",
     "components/**/*.ts",
     "components/**/*.tsx",
+    "features/**/*.ts",
+    "features/**/*.tsx",
+    "lib/**/*.ts",
+    "lib/**/*.tsx",
+    "server/**/*.ts",
+    "server/**/*.tsx",
+    "prisma/**/*.ts",
     "tailwind.config.ts",
     ".next/types/**/*.ts",
     ".next/dev/types/**/*.ts"

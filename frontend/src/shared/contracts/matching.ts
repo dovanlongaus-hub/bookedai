@@ -15,6 +15,7 @@ export interface MatchCandidate {
   venueName?: string | null;
   location?: string | null;
   bookingUrl?: string | null;
+  contactPhone?: string | null;
   mapUrl?: string | null;
   sourceUrl?: string | null;
   imageUrl?: string | null;
@@ -38,6 +39,7 @@ export interface MatchCandidate {
   nextStep?: string | null;
   availabilityState?: string | null;
   bookingConfidence?: string | null;
+  bookingFit?: MatchBookingFit | null;
 }
 
 export interface MatchConfidence {
@@ -45,6 +47,15 @@ export interface MatchConfidence {
   reason?: string | null;
   evidence?: string[];
   gatingState: 'high' | 'medium' | 'low' | 'unknown';
+}
+
+export interface MatchBookingFit {
+  budgetFit: 'within_budget' | 'over_budget' | 'unknown';
+  partySizeFit: 'supported' | 'manual_review' | 'unknown';
+  scheduleFit: 'booking_ready' | 'manual_confirmation' | 'unknown';
+  locationFit: 'aligned' | 'online_flexible' | 'unknown' | 'mismatch';
+  bookingReadiness: 'instant_book' | 'partner_redirect' | 'manual_review' | 'advisory';
+  summary?: string | null;
 }
 
 export interface MatchResult {

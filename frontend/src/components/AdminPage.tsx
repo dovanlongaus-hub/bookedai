@@ -4,6 +4,7 @@ import { AdminBookingsSection } from '../features/admin/bookings-section';
 import { AdminDashboardHeader } from '../features/admin/dashboard-header';
 import { AdminEmailStatusNote } from '../features/admin/email-status-note';
 import { AdminLoginScreen } from '../features/admin/login-screen';
+import { TenantManagementSection } from '../features/admin/tenant-management-section';
 import { RecentEventsSection } from '../features/admin/recent-events-section';
 import { ServiceCatalogSection } from '../features/admin/service-catalog-section';
 import { SelectedBookingPanel } from '../features/admin/selected-booking-panel';
@@ -27,12 +28,18 @@ type ParsedAdminHash = {
 
 const workspacePanels: Record<AdminWorkspaceId, AdminWorkspacePanelId[]> = {
   operations: ['bookings', 'recent-events', 'selected-booking', 'portal-support'],
+  tenants: ['tenant-directory', 'tenant-profile', 'tenant-team', 'tenant-services'],
   catalog: ['service-catalog', 'partners'],
   reliability: ['prompt5-preview', 'live-configuration', 'api-inventory'],
 };
 
 function isWorkspaceId(value: string): value is AdminWorkspaceId {
-  return value === 'operations' || value === 'catalog' || value === 'reliability';
+  return (
+    value === 'operations' ||
+    value === 'tenants' ||
+    value === 'catalog' ||
+    value === 'reliability'
+  );
 }
 
 function parseAdminHash(hash: string): ParsedAdminHash {
@@ -89,6 +96,13 @@ export function AdminPage() {
     apiRoutes,
     partners,
     importedServices,
+    tenants,
+    selectedTenantRef,
+    selectedTenantDetail,
+    tenantProfileForm,
+    tenantServiceForm,
+    editingTenantServiceId,
+    tenantMessage,
     serviceQualityCounts,
     editingPartnerId,
     partnerForm,
@@ -100,6 +114,9 @@ export function AdminPage() {
     exportingServiceQuality,
     uploadingLogo,
     uploadingImage,
+    savingTenantProfile,
+    savingTenantMemberEmail,
+    savingTenantService,
     searchQuery,
     setSearchQuery,
     industryFilter,
@@ -138,7 +155,10 @@ export function AdminPage() {
     error,
     updateServiceImportForm,
     updatePartnerForm,
+    updateTenantProfileForm,
+    updateTenantServiceForm,
     loadBookingDetail,
+    loadTenantDetail,
     loadDashboard,
     handleLogin,
     handleLogout,
@@ -147,11 +167,20 @@ export function AdminPage() {
     editPartner,
     resetPartnerForm,
     uploadPartnerAsset,
+    uploadTenantAsset,
     savePartner,
     deletePartner,
     importServicesFromWebsite,
     deleteImportedService,
     exportServiceQualityReport,
+    saveTenantProfile,
+    saveTenantMemberAccess,
+    editTenantService,
+    transitionTenantServiceState,
+    resetTenantServiceForm,
+    saveTenantService,
+    removeTenantService,
+    setSelectedTenantRef,
   } = useAdminPageState(apiBaseUrl);
 
   async function openBookingDetailFromReview(
@@ -289,6 +318,10 @@ export function AdminPage() {
           activePanel={activePanel}
           bookingsTotal={bookingsTotal}
           shadowStatus={bookingsShadowStatus}
+          tenantsCount={tenants.length}
+          selectedTenantName={selectedTenantDetail?.tenant.name ?? null}
+          selectedTenantMembersCount={selectedTenantDetail?.members.length ?? 0}
+          selectedTenantServicesCount={selectedTenantDetail?.services.length ?? 0}
           portalSupportQueueCount={overview?.portal_support_queue?.length ?? 0}
           importedServicesCount={importedServices.length}
           partnersCount={partners.length}
@@ -386,6 +419,45 @@ export function AdminPage() {
               <AdminEmailStatusNote />
             </div>
           </section>
+        ) : null}
+
+        {activeWorkspace === 'tenants' ? (
+          <TenantManagementSection
+            tenants={tenants}
+            selectedTenantRef={selectedTenantRef}
+            selectedTenantDetail={selectedTenantDetail}
+            tenantProfileForm={tenantProfileForm}
+            tenantServiceForm={tenantServiceForm}
+            editingTenantServiceId={editingTenantServiceId}
+            tenantMessage={tenantMessage}
+            savingTenantProfile={savingTenantProfile}
+            savingTenantMemberEmail={savingTenantMemberEmail}
+            savingTenantService={savingTenantService}
+            uploadingLogo={uploadingLogo}
+            uploadingImage={uploadingImage}
+            onSelectTenant={(tenantRef) => {
+              setSelectedTenantRef(tenantRef);
+              void loadTenantDetail(tenantRef);
+            }}
+            onTenantProfileFormChange={updateTenantProfileForm}
+            onTenantServiceFormChange={updateTenantServiceForm}
+            onSaveTenantProfile={saveTenantProfile}
+            onSaveTenantMemberAccess={(memberEmail, form) => {
+              void saveTenantMemberAccess(memberEmail, form);
+            }}
+            onEditTenantService={editTenantService}
+            onTransitionTenantServiceState={(service, publishState) => {
+              void transitionTenantServiceState(service, publishState);
+            }}
+            onResetTenantServiceForm={resetTenantServiceForm}
+            onSaveTenantService={saveTenantService}
+            onDeleteTenantService={(serviceRowId) => {
+              void removeTenantService(serviceRowId);
+            }}
+            onUploadTenantAsset={(file, kind) => {
+              void uploadTenantAsset(file, kind);
+            }}
+          />
         ) : null}
 
         {activeWorkspace === 'catalog' ? (

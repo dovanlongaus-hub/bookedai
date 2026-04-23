@@ -1,3 +1,5 @@
+import { useMemo } from 'react';
+
 import { Footer } from '../../components/landing/Footer';
 import { Header } from '../../components/landing/Header';
 import {
@@ -14,16 +16,20 @@ import {
   proofItems,
   productHref,
   roadmapHref,
+  adminHref,
   teamMembers,
   teamSectionContent,
   tenantHref,
   trustItems,
   faqItems,
 } from '../../components/landing/data';
+import { HomepageSearchExperience } from './HomepageSearchExperience';
+import { getHomepageContent } from './homepageContent';
 import { CallToActionSection } from '../../components/landing/sections/CallToActionSection';
 import { ArchitectureInfographicSection } from '../../components/landing/sections/ArchitectureInfographicSection';
 import { HeroSection } from '../../components/landing/sections/HeroSection';
 import { HomepageBrandStatementSection } from '../../components/landing/sections/HomepageBrandStatementSection';
+import { HomepageExecutiveBoardSection } from '../../components/landing/sections/HomepageExecutiveBoardSection';
 import { HomepageOverviewSection } from '../../components/landing/sections/HomepageOverviewSection';
 import { ImplementationSection } from '../../components/landing/sections/ImplementationSection';
 import { PartnersSection } from '../../components/landing/sections/PartnersSection';
@@ -33,17 +39,22 @@ import { TeamSection } from '../../components/landing/sections/TeamSection';
 import { TrustSection } from '../../components/landing/sections/TrustSection';
 
 const homepageNavItems = [
-  { id: 'product-proof', label: 'How It Works' },
+  { id: 'hero', label: 'Overview' },
+  { id: 'homepage-board', label: 'Platform' },
+  { id: 'product-proof', label: 'Product Proof' },
   { id: 'architecture', label: 'Architecture' },
-  { id: 'partners', label: 'Ecosystem' },
-  { id: 'team-members', label: 'Team' },
-  { id: 'implementation', label: 'Rollout' },
   { id: 'pricing', label: 'Pricing' },
-  { id: 'trust', label: 'Proof' },
+  { id: 'trust', label: 'Trust' },
   { id: 'roadmap', label: 'Roadmap', href: roadmapHref },
 ];
 
 export function PublicApp() {
+  const homepageSearchContent = useMemo(() => getHomepageContent('en'), []);
+  const sourcePath =
+    typeof window !== 'undefined'
+      ? `${window.location.pathname}${window.location.search}`
+      : '/';
+
   function openSalesContact(sourceSection: 'header' | 'hero' | 'call_to_action' | 'footer') {
     if (typeof window === 'undefined') {
       return;
@@ -81,9 +92,17 @@ export function PublicApp() {
     document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  function scrollToLiveDemo() {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    document.getElementById('bookedai-search-assistant')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   return (
-    <main className="booked-shell min-h-screen bg-[linear-gradient(180deg,#f5f7fb_0%,#eef3f7_42%,#f7fafc_100%)] text-[#1d1d1f]">
-      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.10),transparent_22%),radial-gradient(circle_at_top_right,rgba(139,92,246,0.12),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.36)_0%,rgba(255,255,255,0)_28%,rgba(255,255,255,0.45)_100%)]" />
+    <main className="booked-shell min-h-screen bg-[linear-gradient(180deg,#f4f8fc_0%,#edf3f8_20%,#f7fafc_46%,#eef5fa_72%,#fbfdff_100%)] text-[#1d1d1f] xl:pl-[7rem]">
+      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_20%),radial-gradient(circle_at_82%_10%,rgba(14,165,233,0.12),transparent_24%),radial-gradient(circle_at_50%_42%,rgba(37,99,235,0.05),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.44)_0%,rgba(255,255,255,0.06)_32%,rgba(255,255,255,0.5)_100%)]" />
 
       <div className="relative z-10">
         <Header
@@ -94,10 +113,11 @@ export function PublicApp() {
           bookDemoLabel="Talk to Sales"
           compactMenuOnly
           utilityLinks={[
-            { label: 'Product Trial', href: productHref },
-            { label: 'Architecture', href: '#architecture' },
+            { label: 'Live Product', href: productHref },
+            { label: 'Enterprise Architecture', href: '#architecture' },
             { label: 'Roadmap', href: roadmapHref },
-            { label: 'Tenant Login', href: tenantHref },
+            { label: 'Tenant Workspace', href: tenantHref },
+            { label: 'Admin Login', href: adminHref },
           ]}
         />
 
@@ -106,18 +126,25 @@ export function PublicApp() {
           content={heroContent}
           demo={demoContent}
           onStartTrial={openProductTrial}
-          onBookDemo={() => openSalesContact('hero')}
+          onBookDemo={scrollToLiveDemo}
           onSeePricing={scrollToPricing}
         />
-        <HomepageOverviewSection
-          onStartTrial={openProductTrial}
-          onBookDemo={() => openSalesContact('hero')}
-        />
+        <HomepageExecutiveBoardSection />
         <ProductProofSection
           content={proofContent}
           items={proofItems}
           onStartTrial={openProductTrial}
           onBookDemo={() => openSalesContact('hero')}
+        />
+        <HomepageOverviewSection
+          onStartTrial={openProductTrial}
+          onBookDemo={() => openSalesContact('hero')}
+        />
+        <HomepageSearchExperience
+          content={homepageSearchContent}
+          sourcePath={sourcePath}
+          initialQuery={null}
+          initialQueryRequestId={0}
         />
         <ArchitectureInfographicSection
           onStartTrial={openProductTrial}

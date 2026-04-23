@@ -136,6 +136,27 @@ Responsibilities:
 - API and webhook access
 - partner or headless integrations
 
+## CRM intelligence loop
+
+BookedAI should treat Zoho CRM as the commercial relationship layer, not as the runtime brain.
+
+The intended split is:
+
+- `BookedAI` as system of action for capture, qualification context, booking truth, payment truth, retries, and operator orchestration
+- `Zoho CRM` as commercial system of record for leads, contacts, deals, tasks, owner assignment, and stage progression
+
+The concrete loop should be:
+
+1. `bookedai.au` captures lead, contact, attribution, and booking intent locally first
+2. backend creates local CRM ledger state in `crm_sync_records`
+3. BookedAI syncs outward to Zoho:
+   - `lead -> Leads`
+   - `contact -> Contacts`
+   - `booking intent -> Deals`
+   - `booking follow-up -> Tasks`
+4. sales or operator activity inside Zoho becomes commercial feedback such as owner assignment, deal stage, and follow-up completion
+5. BookedAI later reads that feedback back into admin and tenant dashboards as operator intelligence, without surrendering booking or revenue truth to Zoho
+
 ## Core target domains
 
 ### 1. Demand capture domain

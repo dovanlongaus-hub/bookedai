@@ -56,8 +56,8 @@ export function PricingPlanCard({
     ? 'booked-button-secondary bg-white text-slate-950 hover:bg-cyan-50'
     : 'booked-button';
   const featuredFacts = plan.featured
-    ? ['Best value', 'Higher automation', 'Commission-ready']
-    : ['Lower entry price', 'Fast launch', 'Low-friction close'];
+    ? ['Default paid layer', 'Higher automation', 'Commission-ready']
+    : ['Clear entry path', 'Fast launch', 'Fit-first rollout'];
 
   return (
     <SectionCard
@@ -108,7 +108,7 @@ export function PricingPlanCard({
               plan.featured ? 'bg-cyan-300/12 text-cyan-100 ring-1 ring-cyan-200/20' : 'bg-slate-100 text-slate-600'
             }`}
           >
-            {plan.featured ? 'Operator favorite' : 'Easy start'}
+            {plan.featured ? 'Core recommendation' : 'Entry recommendation'}
           </SignalPill>
         </div>
 
@@ -163,8 +163,8 @@ export function PricingPlanCard({
           </div>
           <div className="mt-2 text-sm leading-6">
             {plan.featured
-              ? 'Best when you want the strongest blend of automation, monthly value, and performance-based upside without jumping into custom scope.'
-              : 'Best when you want the simplest paid entry with a clean path into setup and performance-based commission later.'}
+              ? 'Best when you want the strongest blend of automation, monthly clarity, and performance upside without moving into custom scope.'
+              : 'Best when you want the cleanest initial operating layer with a visible path into deeper rollout and performance-based upside later.'}
           </div>
         </div>
 

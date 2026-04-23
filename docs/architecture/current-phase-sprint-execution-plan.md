@@ -1,6 +1,6 @@
 # BookedAI Current Phase and Sprint Execution Plan
 
-Date: `2026-04-21`
+Date: `2026-04-22`
 
 Document status: `active execution baseline`
 
@@ -38,10 +38,12 @@ This execution baseline inherits from:
 - `docs/architecture/mvp-sprint-execution-plan.md`
 - `docs/development/implementation-progress.md`
 - `docs/development/project-plan-code-audit-2026-04-19.md`
+- `docs/development/bookedai-chatbot-landing-implementation-plan.md`
+- `docs/development/bookedai-sample-video-brief.md`
 
 ## Current implementation baseline
 
-As of `2026-04-21`, the codebase already includes:
+As of `2026-04-22`, the codebase already includes:
 
 - a real public homepage sales-deck application
 - a real public search-first application still available as deeper routed runtime inventory
@@ -54,11 +56,16 @@ As of `2026-04-21`, the codebase already includes:
 - `/api/v1/*` router decomposition through `backend/api/v1_router.py` and separate booking, search, tenant, communication, and integration route modules
 - first-step tenant handler extraction through `backend/api/v1_tenant_handlers.py`
 - tenant Google and password authentication foundations
+- tenant `email-first` authentication with verification-code request and verify flows, with Google retained as the fast continuation path
 - tenant catalog import, edit, publish, and archive workflows
 - tenant overview, bookings, integrations, billing, and catalog panels
 - matching, search quality, replay, and release-gate infrastructure
+- a richer Phase 2 matching contract with normalized `booking_fit` summaries and `stage_counts` diagnostics across backend and frontend contract layers
+- a reusable `016_cross_industry_full_flow_test_pack.sql` seed plus verifier coverage for 10 synthetic enterprise booking journeys
+- a first explicit admin growth lane through `/admin/campaigns`, tied to source attribution and paid-revenue reporting
 - additive SQL migrations for tenant and commercial foundations
 - deploy wiring for public, API, admin, beta, demo, portal, and tenant hosts
+- request-facing landing, pitch, storyboard, and promo-video working docs under `docs/development/` so Sprint 15-16 narrative assets inherit the same repo-truth baseline as code delivery
 
 The main delivery problem is therefore no longer:
 
@@ -87,6 +94,140 @@ This overlay is now mandatory context for:
 - admin login upgrades
 - billing and subscription flow upgrades
 - system-wide UI and UX harmonization
+
+## Program summary snapshot
+
+Date: `2026-04-22`
+
+### Overall plan
+
+The current BookedAI program should be read as one linked delivery chain rather than as isolated greenfield projects:
+
+- Sprint 1 through Sprint 3:
+  - reset narrative, architecture, branding, and the public acquisition spine
+- Sprint 4 through Sprint 7:
+  - harden search truth, reporting semantics, lifecycle workflows, and commercial foundations
+- Sprint 8 through Sprint 10:
+  - establish tenant onboarding, tenant workspace, and admin commercial operations as real code paths
+- Sprint 11 through Sprint 16:
+  - complete the user-surface SaaS upgrade across tenant, admin, portal, billing, release discipline, and cross-surface UX consistency
+
+### Current phase status
+
+- Phase 0:
+  - `done baseline`
+- Phase 1:
+  - `implemented baseline`
+- Phase 2:
+  - `partial foundation complete`
+- Phase 3:
+  - `strongest active implementation lane`
+- Phase 4:
+  - `partial`
+- Phase 5:
+  - `partial foundation`
+- Phase 6:
+  - `partially active`
+- Phase 7:
+  - `real foundation implemented`
+- Phase 8:
+  - `real foundation implemented`
+- Phase 9:
+  - `partially active`
+
+### Sprint status summary
+
+- Sprint 1:
+  - `complete as a requirement baseline`
+- Sprint 2:
+  - `complete as an inherited baseline`
+- Sprint 3:
+  - `materially implemented in code`
+- Sprint 4:
+  - `partially implemented`
+- Sprint 5:
+  - `partially implemented`
+- Sprint 6:
+  - `substantially implemented`
+- Sprint 7:
+  - `partial foundation only`
+- Sprint 8:
+  - `materially implemented`
+- Sprint 9:
+  - `implemented foundation`
+- Sprint 10:
+  - `implemented foundation`
+- Sprint 11:
+  - `partly implemented`
+- Sprint 12:
+  - `overlapping implementation exists, completion still pending`
+- Sprint 13:
+  - `active`
+- Sprint 14:
+  - `active`
+- Sprint 15:
+  - `planned, with some implementation overlap already present`
+- Sprint 16:
+  - `planned release-hardening closeout`
+
+### Admin workspace execution order
+
+The admin workspace should now be executed in the following order from current repo reality, rather than replaying the whole blueprint as if the codebase were still greenfield:
+
+- `Phase 0`:
+  - runtime and production-ownership decision for the new root `Next.js` admin lane
+- `Phase 1`:
+  - production auth
+  - signed session
+  - tenant context
+  - RBAC parity
+  - immutable audit baseline
+- `Phase 2`:
+  - Prisma and repository parity so current admin modules stop depending on mock-only data truth
+- `Phase 3`:
+  - tenant
+  - users
+  - roles
+  - settings
+  - audit control-plane completion
+- `Phase 4`:
+  - customers
+  - leads
+  - services
+  - bookings hardening on real tenant data
+  - `Zoho CRM` seam continuation for customers and leads
+- `Phase 5`:
+  - payments and revenue-truth completion
+- `Phase 6`:
+  - dashboard
+  - reporting
+  - operator analytics expansion
+- `Phase 7`:
+  - campaigns
+  - messaging
+  - workflows
+  - automation
+
+Immediate next sequence after the current reporting baseline:
+
+- start `Campaigns` as the first explicit growth-lane workspace
+- keep `Campaigns` tied to source attribution and paid-revenue read models rather than treating it as standalone marketing CRUD
+- widen next into `Messaging`
+- then add `Workflow` definitions and execution posture
+- only then move into broader `Automation`
+
+### Next phase deadline
+
+The immediate post-Sprint-16 working cadence is now locked to:
+
+- freeze scope by Friday, April 24, 2026
+- get AI end-to-end working before any UI polish pass
+- post one one-line daily update in Discord
+- submit the draft by Saturday, April 25, 2026
+- record a rough video over the April 25-26, 2026 weekend
+- deliver the final edit by Sunday, April 26, 2026
+- use Monday, April 27, 2026 for final polish
+ 
 
 ## Program status by phase
 
@@ -526,34 +667,40 @@ Must deliver next:
 
 Theme:
 
-- monthly value reporting, regression coverage, and tenant retention loops
+- portal, tenant-value, and narrative asset production
 
 Current assessment:
 
-- pending, but public-surface regression coverage has moved ahead of this sprint in the homepage and product CTA lanes
+- planned, with execution overlap already present across portal-adjacent runtime work, homepage regression coverage, and the newly added landing/video/pitch documentation set
 
 Must deliver next:
 
+- first professional customer portal runtime and booking-review continuity
 - tenant value reporting
-- promote-or-hold checks for tenant and billing flows
+- stronger billing and retention posture for paid-product expectations
 - broader regression coverage across commercial workflows
 - add explicit browser and release checks for homepage sales-deck CTA continuity, register-interest routing, and booking-form focus behavior
+- turn the current landing and story assets into one coherent production package:
+  - `docs/development/bookedai-chatbot-landing-implementation-plan.md`
+  - `docs/development/bookedai-sample-video-brief.md`
+  - `docs/development/bookedai-investor-pitch-deck.html`
 
 ## Sprint 16
 
 Theme:
 
-- release discipline and scale readiness
+- release discipline, final polish, and publish-ready proof
 
 Current assessment:
 
-- pending final hardening
+- planned release-hardening closeout, with the final April 24-27 delivery cadence now explicitly locked in the synced plan set
 
 Must deliver next:
 
 - cross-lane release thresholds
 - rollback discipline for tenant and commercial lanes
 - scale-readiness and operational confidence review
+- final wording, visual, and proof-pack polish across homepage, pitch, and promo-video assets so the public narrative and shipped product evidence stay aligned
 
 ## Detailed next execution order
 
@@ -651,3 +798,23 @@ This plan should be considered correctly adopted when:
 - requirement docs reflect the current code baseline
 - sprint planning no longer resets already-shipped foundations back to zero
 - the next execution wave is clearly focused on tenant identity, billing posture, and release-grade hardening
+
+## Immediate next plan
+
+Current lane owner: `root Next.js admin Phase 3 tenant support`
+
+Just completed:
+
+- dedicated `/admin/tenants` investigation workspace
+- audited `read_only` tenant support mode
+- deep links from admin investigation into tenant runtime `overview`, `billing`, `team`, and `integrations`
+- unified tenant investigation timeline across auth, billing, CRM, integrations, and support-session audit events
+- regression coverage for support-mode start/end contracts and tenant investigation timeline rendering
+- support-mode banner expansion across the main admin workspaces with return-to-investigation links
+- cross-surface return-link polish so tenant runtime can jump back into the originating admin investigation or admin workspace
+
+Next recommended sequence:
+
+1. `Tenant-support lane closeout`
+   - treat the read-only tenant support loop as a usable baseline across admin and tenant runtime
+   - only add more tenant-support behavior when a later approved slice needs deeper guided actions or stricter write blocking

@@ -39,6 +39,7 @@ import type {
   StartChatSessionRequest,
   StartChatSessionResponse,
   TenantBookingsResponse,
+  TenantCatalogCreateRequest,
   TenantCatalogImportRequest,
   TenantCatalogUpdateRequest,
   TenantCatalogResponse,
@@ -50,8 +51,13 @@ import type {
   TenantBillingReceiptResponse,
   TenantClaimAccountRequest,
   TenantCreateAccountRequest,
+  TenantEmailCodeRequest,
+  TenantEmailCodeRequestResponse,
+  TenantEmailCodeVerifyRequest,
   TenantInviteMemberRequest,
   TenantPasswordAuthRequest,
+  TenantPluginInterfaceResponse,
+  TenantPluginInterfaceUpdateRequest,
   TenantProfileUpdateRequest,
   TenantProfileUpdateResponse,
   TenantSubscriptionUpdateRequest,
@@ -64,7 +70,7 @@ import type {
   TenantTeamInviteActionResponse,
   TenantUpdateMemberAccessRequest,
 } from '../contracts';
-import type { MatchCandidate, MatchConfidence } from '../contracts';
+import type { MatchBookingFit, MatchCandidate, MatchConfidence } from '../contracts';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
@@ -185,6 +191,7 @@ function normalizeMatchCandidate(value: unknown): MatchCandidate {
     venueName: readString(candidate, 'venue_name', 'venueName'),
     location: readString(candidate, 'location'),
     bookingUrl: readString(candidate, 'booking_url', 'bookingUrl'),
+    contactPhone: readString(candidate, 'contact_phone', 'contactPhone'),
     mapUrl: readString(candidate, 'map_url', 'mapUrl'),
     sourceUrl: readString(candidate, 'source_url', 'sourceUrl'),
     imageUrl: readString(candidate, 'image_url', 'imageUrl'),
@@ -208,6 +215,7 @@ function normalizeMatchCandidate(value: unknown): MatchCandidate {
     nextStep: readString(candidate, 'next_step', 'nextStep'),
     availabilityState: readString(candidate, 'availability_state', 'availabilityState'),
     bookingConfidence: readString(candidate, 'booking_confidence', 'bookingConfidence'),
+    bookingFit: normalizeBookingFit(candidate.booking_fit ?? candidate.bookingFit),
   };
 }
 
@@ -222,6 +230,43 @@ function normalizeMatchConfidence(value: unknown): MatchConfidence {
       gatingState === 'high' || gatingState === 'medium' || gatingState === 'low' || gatingState === 'unknown'
         ? gatingState
         : 'unknown',
+  };
+}
+
+function normalizeBookingFit(value: unknown): MatchBookingFit | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const budgetFit = readString(value, 'budget_fit', 'budgetFit');
+  const partySizeFit = readString(value, 'party_size_fit', 'partySizeFit');
+  const scheduleFit = readString(value, 'schedule_fit', 'scheduleFit');
+  const locationFit = readString(value, 'location_fit', 'locationFit');
+  const bookingReadiness = readString(value, 'booking_readiness', 'bookingReadiness');
+
+  if (
+    (budgetFit !== 'within_budget' && budgetFit !== 'over_budget' && budgetFit !== 'unknown') ||
+    (partySizeFit !== 'supported' && partySizeFit !== 'manual_review' && partySizeFit !== 'unknown') ||
+    (scheduleFit !== 'booking_ready' && scheduleFit !== 'manual_confirmation' && scheduleFit !== 'unknown') ||
+    (locationFit !== 'aligned' &&
+      locationFit !== 'online_flexible' &&
+      locationFit !== 'unknown' &&
+      locationFit !== 'mismatch') ||
+    (bookingReadiness !== 'instant_book' &&
+      bookingReadiness !== 'partner_redirect' &&
+      bookingReadiness !== 'manual_review' &&
+      bookingReadiness !== 'advisory')
+  ) {
+    return null;
+  }
+
+  return {
+    budgetFit,
+    partySizeFit,
+    scheduleFit,
+    locationFit,
+    bookingReadiness,
+    summary: readString(value, 'summary'),
   };
 }
 
@@ -252,6 +297,7 @@ function normalizeSearchCandidatesEnvelope(
                 ) as SearchCandidatesResponse['recommendations'][number]['pathType']) ?? null,
               nextStep: readString(recommendation, 'next_step', 'nextStep'),
               warnings: readStringList(recommendation, 'warnings'),
+              bookingFit: normalizeBookingFit(recommendation.booking_fit ?? recommendation.bookingFit),
             };
           })
         : [],
@@ -438,6 +484,14 @@ function normalizeSearchCandidatesEnvelope(
               stage: readString(item, 'stage') ?? '',
               reason: readString(item, 'reason') ?? '',
             })),
+            stageCounts: readRecordList(
+              data.search_diagnostics,
+              'stage_counts',
+              'stageCounts',
+            ).map((item: Record<string, unknown>) => ({
+              stage: readString(item, 'stage') ?? '',
+              candidateCount: readNumber(item, 'candidate_count', 'candidateCount') ?? 0,
+            })),
           }
         : null,
     },
@@ -584,6 +638,17 @@ export async function getTenantOverview(tenantRef?: string | null) {
   return requestV1Envelope<TenantOverviewResponse>(`/v1/tenant/overview${query}`);
 }
 
+export async function getTenantPluginInterface(tenantRef?: string | null, sessionToken?: string | null) {
+  const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantPluginInterfaceResponse>(`/v1/tenant/plugin-interface${query}`, {
+    headers,
+  });
+}
+
 export async function getTenantRevenueMetrics(
   tenantRef?: string | null,
   sessionToken?: string | null,
@@ -696,6 +761,20 @@ export async function tenantPasswordAuth(request: TenantPasswordAuthRequest) {
   );
 }
 
+export async function tenantEmailCodeRequest(request: TenantEmailCodeRequest) {
+  return requestV1Envelope<TenantEmailCodeRequestResponse>(
+    '/v1/tenant/auth/email-code/request',
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+export async function tenantEmailCodeVerify(request: TenantEmailCodeVerifyRequest) {
+  return requestV1Envelope<TenantAuthSessionResponse>(
+    '/v1/tenant/auth/email-code/verify',
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
 export async function tenantCreateAccount(request: TenantCreateAccountRequest) {
   return requestV1Envelope<TenantAuthSessionResponse>(
     '/v1/tenant/account/create',
@@ -722,6 +801,22 @@ export async function updateTenantProfile(
   headers.set('Authorization', `Bearer ${params.sessionToken}`);
   return requestV1Envelope<TenantProfileUpdateResponse>(
     `/v1/tenant/profile${query}`,
+    withJsonBody(request, { method: 'PATCH', headers }),
+  );
+}
+
+export async function updateTenantPluginInterface(
+  request: TenantPluginInterfaceUpdateRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantPluginInterfaceResponse>(
+    `/v1/tenant/plugin-interface${query}`,
     withJsonBody(request, { method: 'PATCH', headers }),
   );
 }
@@ -755,6 +850,35 @@ export async function updateTenantSubscription(
   return requestV1Envelope<TenantBillingWorkspaceResponse>(
     `/v1/tenant/billing/subscription${query}`,
     withJsonBody(request, { method: 'POST', headers }),
+  );
+}
+
+export async function createTenantBillingCheckoutSession(
+  request: TenantSubscriptionUpdateRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantBillingWorkspaceResponse>(
+    `/v1/tenant/billing/checkout${query}`,
+    withJsonBody(request, { method: 'POST', headers }),
+  );
+}
+
+export async function createTenantBillingPortalSession(params: {
+  tenantRef?: string | null;
+  sessionToken: string;
+}) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantBillingWorkspaceResponse>(
+    `/v1/tenant/billing/portal${query}`,
+    withJsonBody({}, { method: 'POST', headers }),
   );
 }
 
@@ -864,6 +988,22 @@ export async function importTenantCatalogFromWebsite(
   );
 }
 
+export async function createTenantCatalogService(
+  request: TenantCatalogCreateRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantCatalogResponse>(
+    `/v1/tenant/catalog${query}`,
+    withJsonBody(request, { method: 'POST', headers }),
+  );
+}
+
 export async function updateTenantCatalogService(
   serviceId: string,
   request: TenantCatalogUpdateRequest,
@@ -940,6 +1080,7 @@ export const apiV1 = {
   getTenantBillingInvoiceReceipt,
   getTenantCatalog,
   getTenantIntegrations,
+  getTenantPluginInterface,
   updateTenantIntegrationProvider,
   getTenantOnboarding,
   getTenantTeam,
@@ -948,14 +1089,20 @@ export const apiV1 = {
   requestPortalBookingReschedule,
   requestPortalBookingCancellation,
   archiveTenantCatalogService,
+  createTenantCatalogService,
   importTenantCatalogFromWebsite,
   publishTenantCatalogService,
   tenantClaimAccount,
   tenantCreateAccount,
+  tenantEmailCodeRequest,
+  tenantEmailCodeVerify,
   tenantGoogleAuth,
   tenantPasswordAuth,
   updateTenantProfile,
+  updateTenantPluginInterface,
   updateTenantBillingAccount,
+  createTenantBillingCheckoutSession,
+  createTenantBillingPortalSession,
   markTenantBillingInvoicePaid,
   updateTenantSubscription,
   inviteTenantTeamMember,

@@ -18,8 +18,8 @@ from api.v1_routes import (
     _query_intent_constraint_groups,
     _raw_query_intent_terms,
     _search_terms,
-    router as v1_router,
 )
+from api.v1_router import router as v1_router
 from repositories.integration_repository import IntegrationRepository
 from service_layer.prompt9_matching_service import RankedServiceMatch
 from repositories.tenant_repository import TenantRepository
@@ -1296,8 +1296,8 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "industry": "services",
             }
 
-        with patch("api.v1_routes.get_session", _membership_session), patch(
-            "api.v1_routes._verify_google_identity_token",
+        with patch("api.v1_tenant_handlers.get_session", _membership_session), patch(
+            "api.v1_tenant_handlers._verify_google_identity_token",
             _verify_google_identity_token,
         ), patch.object(
             TenantRepository,
@@ -1357,11 +1357,11 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "industry": "Swim School",
             }
 
-        with patch("api.v1_routes.get_session", _membership_session), patch(
-            "api.v1_routes._verify_google_identity_token",
+        with patch("api.v1_tenant_handlers.get_session", _membership_session), patch(
+            "api.v1_tenant_handlers._verify_google_identity_token",
             _verify_google_identity_token,
         ), patch(
-            "api.v1_routes._load_tenant_memberships_for_google_identity",
+            "api.v1_tenant_handlers._load_tenant_memberships_for_google_identity",
             _load_tenant_memberships_for_google_identity,
         ), patch.object(
             TenantRepository,
@@ -1419,11 +1419,11 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "status": "active",
             }
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._verify_google_identity_token",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._verify_google_identity_token",
             _verify_google_identity_token,
         ), patch(
-            "api.v1_routes._load_tenant_memberships_for_google_identity",
+            "api.v1_tenant_handlers._load_tenant_memberships_for_google_identity",
             _load_tenant_memberships_for_google_identity,
         ), patch.object(
             TenantRepository,
@@ -1434,7 +1434,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
             "create_tenant",
             _create_tenant,
         ), patch(
-            "api.v1_routes._upsert_tenant_membership",
+            "api.v1_tenant_handlers._upsert_tenant_membership",
             _upsert_tenant_membership,
         ):
             client = TestClient(create_test_app())
@@ -1485,11 +1485,11 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 },
             ]
 
-        with patch("api.v1_routes.get_session", _session), patch(
-            "api.v1_routes._verify_google_identity_token",
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._verify_google_identity_token",
             _verify_google_identity_token,
         ), patch(
-            "api.v1_routes._load_tenant_memberships_for_google_identity",
+            "api.v1_tenant_handlers._load_tenant_memberships_for_google_identity",
             _load_tenant_memberships_for_google_identity,
         ):
             client = TestClient(create_test_app())
@@ -1548,11 +1548,11 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "industry": "Kids Services",
             }
 
-        with patch("api.v1_routes.get_session", _credential_session), patch(
-            "api.v1_routes._load_tenant_credential",
+        with patch("api.v1_tenant_handlers.get_session", _credential_session), patch(
+            "api.v1_tenant_handlers._load_tenant_credential",
             _load_tenant_credential,
         ), patch(
-            "api.v1_routes._load_tenant_membership",
+            "api.v1_tenant_handlers._load_tenant_membership",
             _load_tenant_membership,
         ), patch.object(
             TenantRepository,
@@ -1575,6 +1575,141 @@ class ApiV1TenantRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["provider"], "password")
         self.assertEqual(payload["data"]["membership"]["tenant_slug"], "future-swim")
         self.assertIn("tenant_catalog_import", payload["data"]["capabilities"])
+
+    def test_tenant_email_code_request_returns_delivery_metadata(self):
+        @asynccontextmanager
+        async def _session(_session_factory):
+            yield _WritableFakeSession()
+
+        async def _resolve_tenant_id(*_args, **_kwargs):
+            return "tenant-future-swim"
+
+        async def _load_tenant_membership(*_args, **_kwargs):
+            return {
+                "tenant_id": "tenant-future-swim",
+                "tenant_slug": "future-swim",
+                "email": "owner@future.test",
+                "role": "tenant_admin",
+                "status": "active",
+            }
+
+        async def _get_tenant_profile(*_args, **_kwargs):
+            return {
+                "id": "tenant-future-swim",
+                "slug": "future-swim",
+                "name": "Future Swim",
+                "status": "active",
+            }
+
+        async def _store_tenant_email_login_code(*_args, **_kwargs):
+            return SimpleNamespace(id=1), "483920"
+
+        async def _deliver_tenant_email_login_code(*_args, **_kwargs):
+            return {
+                "status": "queued",
+                "operator_note": "SMTP is not fully configured; share the tenant login code manually.",
+                "smtp_configured": False,
+                "email_hint": "owner@future.test",
+                "code_last4": "3920",
+                "expires_in_minutes": 15,
+            }
+
+        with patch("api.v1_tenant_handlers.get_session", _session), patch.object(
+            TenantRepository,
+            "resolve_tenant_id",
+            _resolve_tenant_id,
+        ), patch.object(
+            TenantRepository,
+            "get_tenant_profile",
+            _get_tenant_profile,
+        ), patch(
+            "api.v1_tenant_handlers._load_tenant_membership",
+            _load_tenant_membership,
+        ), patch(
+            "api.v1_tenant_handlers._store_tenant_email_login_code",
+            _store_tenant_email_login_code,
+        ), patch(
+            "api.v1_tenant_handlers._deliver_tenant_email_login_code",
+            _deliver_tenant_email_login_code,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/tenant/auth/email-code/request",
+                json={"email": "owner@future.test", "tenant_ref": "future-swim", "auth_intent": "sign-in"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["delivery"]["code_last4"], "3920")
+        self.assertEqual(payload["data"]["tenant_slug"], "future-swim")
+
+    def test_tenant_email_code_verify_returns_session(self):
+        fake_code = SimpleNamespace(
+            tenant_id="tenant-future-swim",
+            tenant_slug="future-swim",
+            email="owner@future.test",
+            metadata_json={"full_name": "Future Owner"},
+            consumed_at=None,
+        )
+
+        @asynccontextmanager
+        async def _session(_session_factory):
+            yield _WritableFakeSession()
+
+        async def _resolve_memberships(*_args, **_kwargs):
+            return [
+                {
+                    "tenant_id": "tenant-future-swim",
+                    "tenant_slug": "future-swim",
+                    "email": "owner@future.test",
+                    "role": "tenant_admin",
+                    "status": "active",
+                }
+            ]
+
+        async def _load_valid_tenant_email_login_code(*_args, **_kwargs):
+            return fake_code
+
+        async def _get_tenant_profile(*_args, **_kwargs):
+            return {
+                "id": "tenant-future-swim",
+                "slug": "future-swim",
+                "name": "Future Swim",
+                "status": "active",
+                "timezone": "Australia/Sydney",
+                "locale": "en-AU",
+                "industry": "Swim School",
+            }
+
+        async def _load_tenant_credential_by_email(*_args, **_kwargs):
+            return SimpleNamespace(role="tenant_admin")
+
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._load_valid_tenant_email_login_code",
+            _load_valid_tenant_email_login_code,
+        ), patch(
+            "api.v1_tenant_handlers._resolve_tenant_memberships_for_email",
+            _resolve_memberships,
+        ), patch.object(
+            TenantRepository,
+            "get_tenant_profile",
+            _get_tenant_profile,
+        ), patch(
+            "api.v1_tenant_handlers._load_tenant_credential_by_email",
+            _load_tenant_credential_by_email,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/tenant/auth/email-code/verify",
+                json={"email": "owner@future.test", "code": "483920", "tenant_ref": "future-swim", "auth_intent": "sign-in"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["membership"]["tenant_slug"], "future-swim")
+        self.assertEqual(payload["data"]["user"]["email"], "owner@future.test")
 
     def test_tenant_create_account_returns_session(self):
         @asynccontextmanager
@@ -1610,7 +1745,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
         async def _create_or_update_tenant_credential(*_args, **_kwargs):
             return SimpleNamespace(username="owner-user")
 
-        with patch("api.v1_routes.get_session", _session), patch.object(
+        with patch("api.v1_tenant_handlers.get_session", _session), patch.object(
             TenantRepository,
             "get_tenant_profile",
             _get_tenant_profile,
@@ -1619,13 +1754,13 @@ class ApiV1TenantRoutesTestCase(TestCase):
             "create_tenant",
             _create_tenant,
         ), patch(
-            "api.v1_routes._load_tenant_credential",
+            "api.v1_tenant_handlers._load_tenant_credential",
             _load_tenant_credential,
         ), patch(
-            "api.v1_routes._upsert_tenant_membership",
+            "api.v1_tenant_handlers._upsert_tenant_membership",
             _upsert_tenant_membership,
         ), patch(
-            "api.v1_routes._create_or_update_tenant_credential",
+            "api.v1_tenant_handlers._create_or_update_tenant_credential",
             _create_or_update_tenant_credential,
         ):
             client = TestClient(create_test_app())
@@ -1687,7 +1822,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "status": "active",
             }
 
-        with patch("api.v1_routes.get_session", _session), patch.object(
+        with patch("api.v1_tenant_handlers.get_session", _session), patch.object(
             TenantRepository,
             "resolve_tenant_id",
             _resolve_tenant_id,
@@ -1700,16 +1835,16 @@ class ApiV1TenantRoutesTestCase(TestCase):
             "count_active_memberships",
             _count_active_memberships,
         ), patch(
-            "api.v1_routes._load_tenant_membership",
+            "api.v1_tenant_handlers._load_tenant_membership",
             _load_tenant_membership,
         ), patch(
-            "api.v1_routes._count_claimable_services",
+            "api.v1_tenant_handlers._count_claimable_services",
             _count_claimable_services,
         ), patch(
-            "api.v1_routes._create_or_update_tenant_credential",
+            "api.v1_tenant_handlers._create_or_update_tenant_credential",
             _create_or_update_tenant_credential,
         ), patch(
-            "api.v1_routes._upsert_tenant_membership",
+            "api.v1_tenant_handlers._upsert_tenant_membership",
             _upsert_tenant_membership,
         ):
             client = TestClient(create_test_app())
@@ -1759,7 +1894,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
         async def _create_or_update_tenant_credential(*_args, **_kwargs):
             return SimpleNamespace(username="invited-user", role="operator")
 
-        with patch("api.v1_routes.get_session", _session), patch.object(
+        with patch("api.v1_tenant_handlers.get_session", _session), patch.object(
             TenantRepository,
             "resolve_tenant_id",
             _resolve_tenant_id,
@@ -1768,7 +1903,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
             "get_tenant_profile",
             _get_tenant_profile,
         ), patch(
-            "api.v1_routes._create_or_update_tenant_credential",
+            "api.v1_tenant_handlers._create_or_update_tenant_credential",
             _create_or_update_tenant_credential,
         ):
             client = TestClient(create_test_app())
@@ -1926,6 +2061,141 @@ class ApiV1TenantRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["tenant"]["name"], "Future Swim HQ")
         self.assertEqual(payload["data"]["onboarding"]["progress"]["percent"], 67)
         self.assertEqual(fake_membership_record.full_name, "Future Owner")
+
+    def test_tenant_profile_update_rejects_finance_manager_role(self):
+        async def _resolve_tenant_request_context(*_args, **_kwargs):
+            return (
+                "future-swim",
+                "tenant-future-swim",
+                {
+                    "email": "finance@future.test",
+                    "tenant_ref": "future-swim",
+                },
+                {
+                    "email": "finance@future.test",
+                    "role": "finance_manager",
+                    "status": "active",
+                },
+            )
+
+        with patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
+            _resolve_tenant_request_context,
+        ):
+            client = TestClient(create_test_app())
+            response = client.patch(
+                "/api/v1/tenant/profile?tenant_ref=future-swim",
+                json={"business_name": "Future Swim HQ"},
+                headers={"Authorization": "Bearer fake-token"},
+            )
+
+        self.assertEqual(response.status_code, 403)
+        payload = response.json()
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["error"]["code"], "tenant_role_forbidden")
+
+    def test_tenant_plugin_interface_update_pins_tenant_ref_to_signed_tenant(self):
+        fake_session = _WritableFakeSession()
+        captured_settings: dict[str, object] = {}
+
+        @asynccontextmanager
+        async def _session(_session_factory):
+            yield fake_session
+
+        async def _resolve_tenant_request_context(*_args, **_kwargs):
+            return (
+                "future-swim",
+                "tenant-future-swim",
+                {
+                    "email": "owner@future.test",
+                    "tenant_ref": "future-swim",
+                },
+                {
+                    "email": "owner@future.test",
+                    "role": "tenant_admin",
+                    "status": "active",
+                    "tenant_slug": "future-swim",
+                },
+            )
+
+        async def _upsert_tenant_settings(*_args, **kwargs):
+            captured_settings.update(kwargs.get("settings_json") or {})
+            return {"tenant_workspace": kwargs.get("settings_json") or {}}
+
+        async def _build_tenant_plugin_interface_snapshot(*_args, **_kwargs):
+            return {
+                "tenant": {"id": "tenant-future-swim", "slug": "future-swim", "name": "Future Swim"},
+                "experience": {
+                    "partner_name": "Future Swim",
+                    "partner_website_url": "https://future.test",
+                    "bookedai_host": "https://product.bookedai.au",
+                    "embed_path": "/embed/future-swim",
+                    "widget_script_path": "/partner-plugins/ai-mentor-pro-widget.js",
+                    "tenant_ref": "future-swim",
+                    "widget_id": "future-swim-widget",
+                    "accent_color": "#1f7a6b",
+                    "button_label": "Open",
+                    "modal_title": "Future Swim",
+                    "headline": "Future Swim",
+                    "prompt": "Help families book.",
+                    "inline_target_selector": "#bookedai-partner-widget",
+                    "support_email": "owner@future.test",
+                    "support_whatsapp": None,
+                    "logo_url": None,
+                },
+                "features": {
+                    "chat": True,
+                    "search": True,
+                    "booking": True,
+                    "payment": True,
+                    "email": True,
+                    "crm": True,
+                    "whatsapp": True,
+                },
+                "runtime": {
+                    "deployment_mode": "standalone_app",
+                    "channel": "tenant_app",
+                    "source": "bookedai",
+                    "widget_script_url": "https://product.bookedai.au/partner-plugins/ai-mentor-pro-widget.js",
+                    "embed_url": "https://product.bookedai.au/embed/future-swim",
+                    "documentation_url": "https://bookedai.au/docs",
+                },
+                "catalog_summary": {"published_product_count": 1, "product_names": ["Swim lesson"]},
+                "products": [],
+                "access": {
+                    "current_role": "tenant_admin",
+                    "can_manage_plugin": True,
+                    "operator_note": "Tenant admins can manage plugin settings.",
+                },
+            }
+
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
+            _resolve_tenant_request_context,
+        ), patch.object(
+            TenantRepository,
+            "upsert_tenant_settings",
+            _upsert_tenant_settings,
+        ), patch(
+            "api.v1_tenant_handlers.build_tenant_plugin_interface_snapshot",
+            _build_tenant_plugin_interface_snapshot,
+        ):
+            client = TestClient(create_test_app())
+            response = client.patch(
+                "/api/v1/tenant/plugin-interface?tenant_ref=future-swim",
+                json={
+                    "tenant_ref": "another-tenant",
+                    "partner_name": "Future Swim",
+                    "partner_website_url": "https://future.test",
+                },
+                headers={"Authorization": "Bearer fake-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            captured_settings["partner_plugin_interface"]["tenant_ref"],
+            "future-swim",
+        )
 
     def test_tenant_catalog_publish_returns_validation_error_when_quality_warnings_exist(self):
         async def _resolve_tenant_request_context(*_args, **_kwargs):
@@ -2129,4 +2399,3 @@ class ApiV1TenantRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["items"][0]["service_id"], "svc-1")
         self.assertEqual(fake_service.currency_code, "VND")
         self.assertEqual(fake_service.display_price, "1,040,000 VND / session")
-

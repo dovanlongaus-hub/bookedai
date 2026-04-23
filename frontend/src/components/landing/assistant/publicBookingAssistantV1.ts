@@ -1,8 +1,10 @@
 import { apiV1 } from '../../../shared/api';
+import type { ApiChannel, DeploymentMode } from '../../../shared/contracts/common';
 import type {
   ApiActorContext,
   CheckAvailabilityRequest,
   CreateBookingIntentRequest,
+  CreateBookingIntentResponse,
   CreateLeadRequest,
   MatchCandidate,
   ResolveBookingPathRequest,
@@ -27,6 +29,28 @@ type PublicBookingAssistantLeadParams = {
   notes: string | null;
 };
 
+export type PublicBookingAssistantAuthoritativeBookingIntentResult = {
+  leadId: string | null;
+  contactId: string | null;
+  conversationId: string | null;
+  bookingIntentId: string;
+  bookingReference: string | null;
+  trust: CreateBookingIntentResponse['trust'];
+  warnings: string[];
+  crmSync: CreateBookingIntentResponse['crm_sync'] | null;
+};
+
+export type PublicBookingAssistantRuntimeConfig = {
+  channel?: ApiChannel;
+  tenantRef?: string | null;
+  deploymentMode?: DeploymentMode | null;
+  widgetId?: string | null;
+  source?: string;
+  medium?: string | null;
+  campaign?: string | null;
+  surface?: string | null;
+};
+
 type PublicBookingAssistantSearchParams = {
   sourcePage: string;
   query: string;
@@ -37,6 +61,7 @@ type PublicBookingAssistantSearchParams = {
     latitude: number;
     longitude: number;
   } | null;
+  runtimeConfig?: PublicBookingAssistantRuntimeConfig | null;
 };
 
 type PublicBookingAssistantShadowSearchResult = {
@@ -96,6 +121,7 @@ type PublicBookingAssistantLiveReadResult = {
 type PublicBookingAssistantSessionParams = {
   sourcePage: string;
   anonymousSessionId: string;
+  runtimeConfig?: PublicBookingAssistantRuntimeConfig | null;
 };
 
 type CandidateLike = MatchCandidate & {
@@ -110,6 +136,7 @@ type CandidateLike = MatchCandidate & {
   image_url?: string | null;
   map_url?: string | null;
   booking_url?: string | null;
+  contact_phone?: string | null;
   source_url?: string | null;
   display_summary?: string | null;
   trust_signal?: string | null;
@@ -186,14 +213,19 @@ type RecommendationLike = {
   candidate_id?: string | null;
 };
 
-function buildActorContext(): ApiActorContext {
+function buildActorContext(runtimeConfig?: PublicBookingAssistantRuntimeConfig | null): ApiActorContext {
   return {
-    channel: 'public_web',
-    deployment_mode: 'standalone_app',
+    channel: runtimeConfig?.channel ?? 'public_web',
+    tenant_ref: runtimeConfig?.tenantRef ?? null,
+    deployment_mode: runtimeConfig?.deploymentMode ?? 'standalone_app',
   };
 }
 
-function buildAttributionContext(sourcePage: string, keyword?: string | null): V1AttributionContext {
+function buildAttributionContext(
+  sourcePage: string,
+  keyword?: string | null,
+  runtimeConfig?: PublicBookingAssistantRuntimeConfig | null,
+): V1AttributionContext {
   const utm: Record<string, string> = {};
 
   if (typeof window !== 'undefined') {
@@ -206,9 +238,9 @@ function buildAttributionContext(sourcePage: string, keyword?: string | null): V
   }
 
   const attribution: V1AttributionContext = {
-    source: 'public_booking_assistant',
-    medium: 'website',
-    campaign: 'prompt_5_public_booking_assistant',
+    source: runtimeConfig?.source ?? 'public_booking_assistant',
+    medium: runtimeConfig?.medium ?? 'website',
+    campaign: runtimeConfig?.campaign ?? 'prompt_5_public_booking_assistant',
     landing_path: sourcePage,
     utm,
   };
@@ -288,6 +320,7 @@ function normalizeMatchCandidate(candidate: CandidateLike): MatchCandidate {
     imageUrl: candidate.imageUrl ?? candidate.image_url ?? null,
     mapUrl: candidate.mapUrl ?? candidate.map_url ?? null,
     bookingUrl: candidate.bookingUrl ?? candidate.booking_url ?? null,
+    contactPhone: candidate.contactPhone ?? candidate.contact_phone ?? null,
     sourceUrl: candidate.sourceUrl ?? candidate.source_url ?? null,
     displaySummary: candidate.displaySummary ?? candidate.display_summary ?? null,
     trustSignal: candidate.trustSignal ?? candidate.trust_signal ?? null,
@@ -432,6 +465,15 @@ function buildPublicWebBookingPathSummary(candidate: MatchCandidate) {
     };
   }
 
+  if (candidate.contactPhone) {
+    return {
+      pathType: 'call_provider' as const,
+      nextStep: 'Call the venue directly to confirm the booking using the listed number.',
+      paymentAllowedBeforeConfirmation: false,
+      warnings: ['BookedAI sourced this option from the public web because no strong tenant catalog match was available.'],
+    };
+  }
+
   if (candidate.sourceUrl) {
     return {
       pathType: 'request_callback' as const,
@@ -459,14 +501,14 @@ export async function primePublicBookingAssistantSession(params: PublicBookingAs
 
   try {
     await apiV1.startChatSession({
-      channel: 'public_web',
+      channel: params.runtimeConfig?.channel ?? 'public_web',
       anonymous_session_id: params.anonymousSessionId,
-      attribution: buildAttributionContext(params.sourcePage),
+      attribution: buildAttributionContext(params.sourcePage, null, params.runtimeConfig),
       context: {
         source_page: params.sourcePage,
-        surface: 'public_booking_assistant',
+        surface: params.runtimeConfig?.surface ?? 'public_booking_assistant',
       },
-      actor_context: buildActorContext(),
+      actor_context: buildActorContext(params.runtimeConfig),
     });
   } catch {
     // Shadow-only v1 setup. Legacy flow stays authoritative.
@@ -491,11 +533,12 @@ export async function shadowPublicBookingAssistantSearch(
       preferences: buildSearchPreferences(params),
       user_location: params.userLocation ?? null,
       channel_context: {
-        channel: 'public_web',
-        deployment_mode: 'standalone_app',
-        widget_id: 'public-booking-assistant',
+        channel: params.runtimeConfig?.channel ?? 'public_web',
+        tenant_ref: params.runtimeConfig?.tenantRef ?? null,
+        deployment_mode: params.runtimeConfig?.deploymentMode ?? 'standalone_app',
+        widget_id: params.runtimeConfig?.widgetId ?? 'public-booking-assistant',
       },
-      attribution: buildAttributionContext(params.sourcePage, params.query),
+      attribution: buildAttributionContext(params.sourcePage, params.query, params.runtimeConfig),
     };
 
     const response = await apiV1.searchCandidates(request);
@@ -557,11 +600,12 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
       preferences: buildSearchPreferences(params),
       user_location: params.userLocation ?? null,
       channel_context: {
-        channel: 'public_web',
-        deployment_mode: 'standalone_app',
-        widget_id: 'public-booking-assistant',
+        channel: params.runtimeConfig?.channel ?? 'public_web',
+        tenant_ref: params.runtimeConfig?.tenantRef ?? null,
+        deployment_mode: params.runtimeConfig?.deploymentMode ?? 'standalone_app',
+        widget_id: params.runtimeConfig?.widgetId ?? 'public-booking-assistant',
       },
-      attribution: buildAttributionContext(params.sourcePage, params.query),
+      attribution: buildAttributionContext(params.sourcePage, params.query, params.runtimeConfig),
     };
 
     const searchResponse = await apiV1.searchCandidates(request);
@@ -666,8 +710,8 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
         candidate_id: topCandidateId,
         desired_slot: null,
         party_size: null,
-        channel: 'public_web',
-        actor_context: buildActorContext(),
+        channel: params.runtimeConfig?.channel ?? 'public_web',
+        actor_context: buildActorContext(params.runtimeConfig),
       };
       const trustResponse = await apiV1.checkAvailability(trustRequest);
       if (!('data' in trustResponse)) {
@@ -691,8 +735,8 @@ export async function getPublicBookingAssistantLiveReadRecommendation(
         availability_state: trustResponse.data.availability_state,
         booking_confidence: trustResponse.data.booking_confidence,
         payment_option: 'invoice_after_confirmation',
-        channel: 'public_web',
-        actor_context: buildActorContext(),
+        channel: params.runtimeConfig?.channel ?? 'public_web',
+        actor_context: buildActorContext(params.runtimeConfig),
         context: {
           source_page: params.sourcePage,
         },
@@ -778,9 +822,23 @@ export async function shadowPublicBookingAssistantLeadAndBookingIntent(params: P
   requestedDate: string;
   requestedTime: string;
   timezone: string;
+  runtimeConfig?: PublicBookingAssistantRuntimeConfig | null;
 }) {
+  try {
+    await createPublicBookingAssistantLeadAndBookingIntent(params);
+  } catch {
+    // Both calls are shadow-only; the legacy booking session remains authoritative.
+  }
+}
+
+export async function createPublicBookingAssistantLeadAndBookingIntent(params: PublicBookingAssistantLeadParams & {
+  requestedDate: string;
+  requestedTime: string;
+  timezone: string;
+  runtimeConfig?: PublicBookingAssistantRuntimeConfig | null;
+}): Promise<PublicBookingAssistantAuthoritativeBookingIntentResult> {
   if (!isPublicBookingAssistantV1Enabled()) {
-    return;
+    throw new Error('Public booking assistant v1 is disabled.');
   }
 
   const contact = buildLeadContact({
@@ -788,8 +846,12 @@ export async function shadowPublicBookingAssistantLeadAndBookingIntent(params: P
     customerEmail: params.customerEmail,
     customerPhone: params.customerPhone,
   });
-  const actorContext = buildActorContext();
-  const attribution = buildAttributionContext(params.sourcePage, params.serviceName);
+  const actorContext = buildActorContext(params.runtimeConfig);
+  const attribution = buildAttributionContext(
+    params.sourcePage,
+    params.serviceName,
+    params.runtimeConfig,
+  );
 
   const leadRequest: CreateLeadRequest = {
     lead_type: 'booking_request',
@@ -817,17 +879,29 @@ export async function shadowPublicBookingAssistantLeadAndBookingIntent(params: P
     },
     contact,
     attribution,
-    channel: 'public_web',
+    channel: params.runtimeConfig?.channel ?? 'public_web',
     actor_context: actorContext,
     notes: params.notes,
   };
 
-  try {
-    await Promise.allSettled([
-      apiV1.createLead(leadRequest),
-      apiV1.createBookingIntent(bookingIntentRequest),
-    ]);
-  } catch {
-    // Both calls are shadow-only; the legacy booking session remains authoritative.
+  const [leadResponse, bookingIntentResponse] = await Promise.all([
+    apiV1.createLead(leadRequest),
+    apiV1.createBookingIntent(bookingIntentRequest),
+  ]);
+
+  if (!('data' in bookingIntentResponse)) {
+    throw new Error('Unable to create booking intent.');
   }
+
+  const leadData = 'data' in leadResponse ? leadResponse.data : null;
+  return {
+    leadId: leadData?.lead_id ?? null,
+    contactId: leadData?.contact_id ?? null,
+    conversationId: leadData?.conversation_id ?? null,
+    bookingIntentId: bookingIntentResponse.data.booking_intent_id,
+    bookingReference: bookingIntentResponse.data.booking_reference ?? null,
+    trust: bookingIntentResponse.data.trust,
+    warnings: bookingIntentResponse.data.warnings,
+    crmSync: bookingIntentResponse.data.crm_sync ?? null,
+  };
 }

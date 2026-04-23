@@ -18,8 +18,8 @@ from api.v1_routes import (
     _query_intent_constraint_groups,
     _raw_query_intent_terms,
     _search_terms,
-    router as v1_router,
 )
+from api.v1_router import router as v1_router
 from repositories.integration_repository import IntegrationRepository
 from service_layer.prompt9_matching_service import RankedServiceMatch
 from repositories.tenant_repository import TenantRepository
@@ -164,7 +164,7 @@ class ApiV1SearchRoutesTestCase(TestCase):
         )
 
     def test_start_chat_session_returns_standard_success_envelope(self):
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub):
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub):
             client = TestClient(create_test_app())
             response = client.post(
                 "/api/v1/conversations/sessions",
@@ -188,7 +188,7 @@ class ApiV1SearchRoutesTestCase(TestCase):
         self.assertEqual(payload["meta"]["tenant_id"], "tenant-test")
 
     def test_create_lead_returns_validation_error_envelope(self):
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub):
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub):
             client = TestClient(create_test_app())
             response = client.post(
                 "/api/v1/leads",
@@ -233,20 +233,20 @@ class ApiV1SearchRoutesTestCase(TestCase):
         async def _record_phase2_write_activity(_session, **kwargs):
             captured_phase2_calls.append(kwargs)
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.ContactRepository.upsert_contact",
+            "api.v1_search_handlers.ContactRepository.upsert_contact",
             _upsert_contact,
         ), patch(
-            "api.v1_routes.LeadRepository.upsert_lead",
+            "api.v1_search_handlers.LeadRepository.upsert_lead",
             _upsert_lead,
         ), patch(
-            "api.v1_routes.orchestrate_lead_capture",
+            "api.v1_search_handlers.orchestrate_lead_capture",
             _orchestrate_lead_capture,
         ), patch(
-            "api.v1_routes._record_phase2_write_activity",
+            "api.v1_search_handlers._record_phase2_write_activity",
             _record_phase2_write_activity,
         ):
             client = TestClient(create_test_app())
@@ -295,13 +295,13 @@ class ApiV1SearchRoutesTestCase(TestCase):
 
             yield SimpleNamespace(execute=_execute, commit=_async_noop)
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ):
             client = TestClient(create_test_app())
             with patch(
-                "api.v1_routes.rank_catalog_matches",
+                "api.v1_search_handlers.rank_catalog_matches",
                 lambda **_kwargs: [],
             ):
                 response = client.post(
@@ -357,11 +357,11 @@ class ApiV1SearchRoutesTestCase(TestCase):
             evidence=("exact_name_phrase", "within_budget"),
         )
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             lambda **_kwargs: [ranked_match],
         ):
             client = TestClient(create_test_app())
@@ -429,11 +429,11 @@ class ApiV1SearchRoutesTestCase(TestCase):
             evidence=("exact_name_phrase",),
         )
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             lambda **_kwargs: [ranked_match],
         ):
             client = TestClient(create_test_app())
@@ -464,9 +464,13 @@ class ApiV1SearchRoutesTestCase(TestCase):
         self.assertIn("team", payload["data"]["query_understanding"]["core_intent_terms"])
         self.assertIn("party_size:8", payload["data"]["query_understanding"]["constraint_terms"])
         self.assertEqual(payload["data"]["query_understanding"]["requested_category"], "Restaurant")
-        self.assertEqual(payload["data"]["recommendations"][0]["path_type"], "request_callback")
-        self.assertIn("operator", payload["data"]["recommendations"][0]["next_step"].lower())
-        self.assertTrue(payload["data"]["recommendations"][0]["warnings"])
+        self.assertEqual(payload["data"]["candidates"], [])
+        self.assertEqual(payload["data"]["recommendations"], [])
+        self.assertEqual(
+            payload["data"]["warnings"],
+            ["No live restaurant result with a direct booking or call path was found for this area yet."],
+        )
+        self.assertEqual(payload["data"]["search_strategy"], "public_web_live_search_restaurant_only")
 
     def test_search_candidates_returns_top_recommendations_in_deterministic_backend_order(self):
         class _FakeExecuteResult:
@@ -541,11 +545,11 @@ class ApiV1SearchRoutesTestCase(TestCase):
             evidence=("summary_overlap", "location_overlap"),
         )
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             lambda **_kwargs: [swim_noise, chess_match, tutoring_match],
         ):
             client = TestClient(create_test_app())
@@ -623,14 +627,14 @@ class ApiV1SearchRoutesTestCase(TestCase):
         app = create_test_app()
         app.state.semantic_search_service = _FakeSemanticService()
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             lambda **_kwargs: [ranked_match],
         ), patch(
-            "api.v1_routes.is_flag_enabled",
+            "api.v1_search_handlers.is_flag_enabled",
             _async_true,
         ):
             client = TestClient(app)
@@ -735,14 +739,14 @@ class ApiV1SearchRoutesTestCase(TestCase):
         app = create_test_app()
         app.state.semantic_search_service = _FakeSemanticService()
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             lambda **_kwargs: [ranked_match],
         ), patch(
-            "api.v1_routes.is_flag_enabled",
+            "api.v1_search_handlers.is_flag_enabled",
             _async_true,
         ):
             client = TestClient(app)
@@ -764,23 +768,14 @@ class ApiV1SearchRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["recommendations"], [])
         self.assertEqual(
             payload["data"]["warnings"],
-            ["No strong relevant catalog candidates were found."],
+            ["No live restaurant result with a direct booking or call path was found for this area yet."],
         )
-        self.assertTrue(payload["data"]["semantic_assist"]["applied"])
-        self.assertEqual(payload["data"]["semantic_assist"]["inferred_category"], "Restaurant")
-        self.assertEqual(payload["data"]["search_diagnostics"]["heuristic_candidate_ids"], ["svc_medical"])
+        self.assertFalse(payload["data"]["semantic_assist"]["applied"])
+        self.assertIsNone(payload["data"]["semantic_assist"]["inferred_category"])
+        self.assertEqual(payload["data"]["search_diagnostics"]["heuristic_candidate_ids"], [])
         self.assertEqual(payload["data"]["search_diagnostics"]["post_domain_candidate_ids"], [])
         self.assertEqual(payload["data"]["search_diagnostics"]["final_candidate_ids"], [])
-        self.assertEqual(
-            payload["data"]["search_diagnostics"]["dropped_candidates"],
-            [
-                {
-                    "candidate_id": "svc_medical",
-                    "stage": "semantic_domain_gate",
-                    "reason": "semantic_domain_mismatch",
-                }
-            ],
-        )
+        self.assertEqual(payload["data"]["search_diagnostics"]["dropped_candidates"], [])
 
     def test_search_candidates_hides_weak_english_match_before_display(self):
         class _FakeExecuteResult:
@@ -822,11 +817,11 @@ class ApiV1SearchRoutesTestCase(TestCase):
             evidence=("category_overlap", "featured"),
         )
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             lambda **_kwargs: [ranked_match],
         ):
             client = TestClient(create_test_app())
@@ -929,11 +924,11 @@ class ApiV1SearchRoutesTestCase(TestCase):
         app = create_test_app()
         app.state.openai_service = _FakeOpenAIService()
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             lambda **_kwargs: [],
         ):
             client = TestClient(app)
@@ -1054,11 +1049,11 @@ class ApiV1SearchRoutesTestCase(TestCase):
         app = create_test_app()
         app.state.openai_service = _FakeOpenAIService()
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             lambda **_kwargs: [ranked_match],
         ):
             client = TestClient(app)
@@ -1134,11 +1129,11 @@ class ApiV1SearchRoutesTestCase(TestCase):
         app = create_test_app()
         app.state.openai_service = _FakeOpenAIService()
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             lambda **_kwargs: [],
         ):
             client = TestClient(app)
@@ -1172,6 +1167,89 @@ class ApiV1SearchRoutesTestCase(TestCase):
             "catalog_term_retrieval_with_prompt9_rerank_plus_public_web_search",
         )
 
+    def test_search_candidates_for_restaurant_uses_live_web_only_and_exposes_call_path(self):
+        class _FakeExecuteResult:
+            def scalars(self):
+                return self
+
+            def all(self):
+                return []
+
+        @asynccontextmanager
+        async def _fake_search_session(_session_factory):
+            async def _execute(*_args, **_kwargs):
+                return _FakeExecuteResult()
+
+            yield SimpleNamespace(execute=_execute, commit=_async_noop)
+
+        web_calls = 0
+
+        class _FakeOpenAIService:
+            async def search_public_service_candidates(self, **_kwargs):
+                nonlocal web_calls
+                web_calls += 1
+                return [
+                    {
+                        "candidate_id": "web_restaurant_1",
+                        "provider_name": "Harbour Table",
+                        "service_name": "Dinner reservation",
+                        "summary": "Venue-level dinner booking near Circular Quay.",
+                        "location": "Sydney NSW",
+                        "source_url": "https://harbour.example.com/reservations",
+                        "booking_url": None,
+                        "contact_phone": "(02) 9123 4567",
+                        "match_score": 0.88,
+                        "why_this_matches": "Official venue result with a direct reservation phone path.",
+                    }
+                ]
+
+        app = create_test_app()
+        app.state.openai_service = _FakeOpenAIService()
+
+        rank_calls = 0
+
+        def _capture_rank_catalog_matches(**_kwargs):
+            nonlocal rank_calls
+            rank_calls += 1
+            return []
+
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
+            _fake_search_session,
+        ), patch(
+            "api.v1_search_handlers.rank_catalog_matches",
+            _capture_rank_catalog_matches,
+        ):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/matching/search",
+                json={
+                    "query": "restaurant near me tonight",
+                    "preferences": {"service_category": "Food and Beverage"},
+                    "user_location": {"latitude": -33.8688, "longitude": 151.2093},
+                    "channel_context": {
+                        "channel": "public_web",
+                        "tenant_id": "tenant-test",
+                        "deployment_mode": "standalone_app",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(web_calls, 1)
+        self.assertEqual(rank_calls, 0)
+        self.assertEqual(payload["data"]["candidates"][0]["source_type"], "public_web_search")
+        self.assertEqual(payload["data"]["candidates"][0]["contact_phone"], "(02) 9123 4567")
+        self.assertEqual(payload["data"]["candidates"][0]["booking_path_type"], "call_provider")
+        self.assertEqual(payload["data"]["candidates"][0]["next_step"], "Call the venue directly to confirm the table booking.")
+        self.assertEqual(payload["data"]["warnings"], [])
+        self.assertEqual(payload["data"]["search_strategy"], "public_web_live_search_restaurant_only")
+        self.assertEqual(
+            payload["data"]["confidence"]["reason"],
+            "BookedAI used live restaurant web search and only kept venue results with a real booking page or call path.",
+        )
+
     def test_search_candidates_infers_location_hint_from_query_when_payload_location_missing(self):
         class _FakeExecuteResult:
             def scalars(self):
@@ -1193,11 +1271,11 @@ class ApiV1SearchRoutesTestCase(TestCase):
             captured_kwargs.update(kwargs)
             return []
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             _capture_rank_catalog_matches,
         ):
             client = TestClient(create_test_app())
@@ -1244,11 +1322,11 @@ class ApiV1SearchRoutesTestCase(TestCase):
 
             yield SimpleNamespace(execute=_execute, commit=_async_noop)
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             lambda **_kwargs: [],
         ):
             client = TestClient(create_test_app())
@@ -1294,11 +1372,11 @@ class ApiV1SearchRoutesTestCase(TestCase):
 
             yield SimpleNamespace(execute=_execute, commit=_async_noop)
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.get_session",
             _fake_search_session,
         ), patch(
-            "api.v1_routes.rank_catalog_matches",
+            "api.v1_search_handlers.rank_catalog_matches",
             lambda **_kwargs: [],
         ):
             client = TestClient(create_test_app())
@@ -1320,4 +1398,3 @@ class ApiV1SearchRoutesTestCase(TestCase):
         self.assertIn("service_merchant_profiles.location", captured_statement["sql"])
         self.assertIn("%kids%", captured_statement["params"].values())
         self.assertIn("%haircut%", captured_statement["params"].values())
-

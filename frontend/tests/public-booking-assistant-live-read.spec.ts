@@ -2670,11 +2670,11 @@ test.describe('public assistant rollout smoke', () => {
     await expect(
       inlineAssistantPane
         .getByText(
-          'Searching for "restaurant in Sydney" using the latest live-read shortlist and trust checks.',
+          'Searching for "restaurant in Sydney" while BookedAI looks for the most suitable place and booking path.',
         )
         .first(),
     ).toBeVisible();
-    await expect(inlineAssistantPane.getByText('Checking locality').first()).toBeVisible();
+    await expect(inlineAssistantPane.getByText('Checking nearby area').first()).toBeVisible();
     await expect(page.getByText('V1 Precision Fade', { exact: true })).toHaveCount(0);
 
     await expect(
@@ -2683,7 +2683,7 @@ test.describe('public assistant rollout smoke', () => {
     expect(matchingSearchRequests).toBeGreaterThanOrEqual(2);
   });
 
-  test('booking submit still uses legacy session as the authoritative write when live-read is enabled @live-read', async ({ page }) => {
+  test('booking submit uses v1 booking intent as the authoritative write when live-read is enabled @live-read', async ({ page }) => {
     let legacySessionRequests = 0;
     let shadowLeadRequests = 0;
     let shadowBookingIntentRequests = 0;
@@ -2855,13 +2855,180 @@ test.describe('public assistant rollout smoke', () => {
     await bookingForm.locator('input[type="datetime-local"]').fill(requestedSlot);
     await bookingForm
       .getByRole('button', { name: /Create Booking Request|Continue booking/i })
+      .click({ force: true });
+
+    await expect(page.getByText('shadow-ref', { exact: true })).toBeVisible();
+    await expect(page.getByText(/Booking request captured in v1\./)).toBeVisible();
+    expect(legacySessionRequests).toBe(0);
+    await expect.poll(() => shadowLeadRequests).toBe(1);
+    await expect.poll(() => shadowBookingIntentRequests).toBe(1);
+  });
+
+  test('booking submit surfaces v1 booking intent validation details when the authoritative write fails @live-read', async ({
+    page,
+  }) => {
+    const requestedSlot = buildFutureSydneyDatetimeLocal(15, 15);
+
+    await stubAssistantApis(page);
+
+    await page.route('**/api/v1/conversations/sessions', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            conversation_id: 'conv-error',
+            channel_session_id: 'chan-error',
+            capabilities: ['matching_search'],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-error',
+            candidates: [
+              {
+                candidate_id: liveReadService.id,
+                provider_name: liveReadService.venue_name,
+                service_name: liveReadService.name,
+                source_type: 'service_catalog',
+                category: liveReadService.category,
+                location: liveReadService.location,
+                booking_url: liveReadService.booking_url,
+                map_url: liveReadService.map_url,
+                explanation: 'Prompt 5 ranked this as the strongest match.',
+              },
+            ],
+            recommendations: [
+              {
+                candidate_id: liveReadService.id,
+                reason: 'Best match',
+                path_type: 'request_callback',
+              },
+            ],
+            confidence: {
+              score: 0.91,
+              reason: 'Strong catalog match',
+              gating_state: 'high',
+            },
+            warnings: [],
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/booking-trust/checks', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            availability_state: 'available',
+            verified: true,
+            booking_confidence: 'high',
+            booking_path_options: ['request_callback'],
+            warnings: [],
+            payment_allowed_now: false,
+            recommended_booking_path: 'request_callback',
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/bookings/path/resolve', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            path_type: 'request_callback',
+            trust_confidence: 'high',
+            warnings: [],
+            next_step: 'Request callback and confirm final slot with the provider.',
+            payment_allowed_before_confirmation: false,
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/leads', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            lead_id: 'lead-error',
+            contact_id: 'contact-error',
+            status: 'captured',
+            crm_sync_status: 'pending',
+            conversation_id: null,
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/bookings/intents', async (route) => {
+      await route.fulfill({
+        status: 422,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'error',
+          error: {
+            code: 'booking_intent_invalid',
+            message: 'Provider callback windows are closed for that requested time.',
+            details: {
+              desired_slot: ['Requested time is no longer available.'],
+            },
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/session', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Legacy session should not be called in this flow.' }),
+      });
+    });
+
+    await openAssistant(page);
+    await submitAssistantQuery(page, 'Need a haircut in Sydney');
+    const topMatch = page.getByText(liveReadService.name, { exact: true }).first();
+    if (await topMatch.isVisible().catch(() => false)) {
+      await topMatch.click();
+    }
+    await openBookingComposerIfNeeded(page);
+
+    const bookingForm = getBookingForm(page);
+    await expect(bookingForm).toBeVisible();
+    await bookingForm.getByLabel('Name').fill('BookedAI Customer');
+    await bookingForm.getByLabel('Email').fill('customer@example.com');
+    await bookingForm.locator('input[type="datetime-local"]').fill(requestedSlot);
+    await bookingForm
+      .getByRole('button', { name: /Create Booking Request|Continue booking/i })
       .click();
 
-    await expect(page.getByText('BR-1001', { exact: true })).toBeVisible();
-    await expect(page.getByText('Legacy booking session completed successfully.')).toBeVisible();
-    expect(legacySessionRequests).toBe(1);
-    await expect.poll(() => shadowLeadRequests).toBeGreaterThanOrEqual(1);
-    await expect.poll(() => shadowBookingIntentRequests).toBeGreaterThanOrEqual(1);
+    await expect(
+      page.getByText('Provider callback windows are closed for that requested time.').first(),
+    ).toBeVisible();
   });
 
   test('payment and confirmation success card surfaces stripe, calendar, and email handoff states @live-read', async ({

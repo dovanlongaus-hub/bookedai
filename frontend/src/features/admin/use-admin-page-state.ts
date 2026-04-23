@@ -2,15 +2,22 @@ import { FormEvent, useEffect, useState } from 'react';
 
 import {
   applyAdminPortalSupportAction,
+  createAdminTenantService,
+  deleteAdminTenantService,
   deleteAdminPartner,
   deleteAdminService,
   downloadAdminServiceQualityExport,
   fetchAdminBookingDetail,
   fetchAdminDashboardData,
+  fetchAdminTenantDetail,
+  fetchAdminTenants,
   importAdminServicesFromWebsite,
   loginAdmin,
   saveAdminPartner,
   sendAdminConfirmationEmail,
+  updateAdminTenantMember,
+  updateAdminTenantProfile,
+  updateAdminTenantService,
   uploadAdminImage,
 } from './api';
 import {
@@ -21,11 +28,17 @@ import {
   AdminOverviewResponse,
   AdminServiceCatalogQualityCounts,
   AdminServiceMerchantItem,
+  AdminTenantDetailResponse,
+  AdminTenantListItem,
+  AdminTenantProfileFormState,
+  AdminTenantServiceFormState,
   PartnerFormState,
   PartnerProfileItem,
   ShadowDriftExample,
   ShadowDriftReference,
   ServiceImportFormState,
+  emptyAdminTenantProfileForm,
+  emptyAdminTenantServiceForm,
   emptyPartnerForm,
   emptyServiceImportForm,
 } from './types';
@@ -50,6 +63,17 @@ export function useAdminPageState(apiBaseUrl: string) {
   const [apiRoutes, setApiRoutes] = useState<AdminApiRoute[]>([]);
   const [partners, setPartners] = useState<PartnerProfileItem[]>([]);
   const [importedServices, setImportedServices] = useState<AdminServiceMerchantItem[]>([]);
+  const [tenants, setTenants] = useState<AdminTenantListItem[]>([]);
+  const [selectedTenantRef, setSelectedTenantRef] = useState('');
+  const [selectedTenantDetail, setSelectedTenantDetail] = useState<AdminTenantDetailResponse | null>(null);
+  const [tenantProfileForm, setTenantProfileForm] = useState<AdminTenantProfileFormState>(
+    emptyAdminTenantProfileForm,
+  );
+  const [editingTenantServiceId, setEditingTenantServiceId] = useState<number | null>(null);
+  const [tenantServiceForm, setTenantServiceForm] = useState<AdminTenantServiceFormState>(
+    emptyAdminTenantServiceForm,
+  );
+  const [tenantMessage, setTenantMessage] = useState('');
   const [serviceQualityCounts, setServiceQualityCounts] =
     useState<AdminServiceCatalogQualityCounts | null>(null);
   const [editingPartnerId, setEditingPartnerId] = useState<number | null>(null);
@@ -64,6 +88,9 @@ export function useAdminPageState(apiBaseUrl: string) {
   const [exportingServiceQuality, setExportingServiceQuality] = useState(false);
   const [uploadingLogo, setUploadingLogo] = useState(false);
   const [uploadingImage, setUploadingImage] = useState(false);
+  const [savingTenantProfile, setSavingTenantProfile] = useState(false);
+  const [savingTenantMemberEmail, setSavingTenantMemberEmail] = useState<string | null>(null);
+  const [savingTenantService, setSavingTenantService] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [industryFilter, setIndustryFilter] = useState('');
   const [paymentFilter, setPaymentFilter] = useState('');
@@ -108,6 +135,13 @@ export function useAdminPageState(apiBaseUrl: string) {
     setApiRoutes([]);
     setPartners([]);
     setImportedServices([]);
+    setTenants([]);
+    setSelectedTenantRef('');
+    setSelectedTenantDetail(null);
+    setTenantProfileForm(emptyAdminTenantProfileForm());
+    setEditingTenantServiceId(null);
+    setTenantServiceForm(emptyAdminTenantServiceForm());
+    setTenantMessage('');
     setServiceQualityCounts(null);
     setEditingPartnerId(null);
     setPartnerForm(emptyPartnerForm());
@@ -189,6 +223,116 @@ export function useAdminPageState(apiBaseUrl: string) {
       ...current,
       [field]: value,
     }));
+  }
+
+  function updateTenantProfileForm<K extends keyof AdminTenantProfileFormState>(
+    field: K,
+    value: AdminTenantProfileFormState[K],
+  ) {
+    setTenantProfileForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  function updateTenantServiceForm<K extends keyof AdminTenantServiceFormState>(
+    field: K,
+    value: AdminTenantServiceFormState[K],
+  ) {
+    setTenantServiceForm((current) => ({
+      ...current,
+      [field]: value,
+    }));
+  }
+
+  function applyTenantDetail(detail: AdminTenantDetailResponse) {
+    setSelectedTenantDetail(detail);
+    setSelectedTenantRef(detail.tenant.slug);
+    setTenantProfileForm({
+      business_name: detail.tenant.name ?? '',
+      industry: detail.tenant.industry ?? '',
+      timezone: detail.tenant.timezone ?? '',
+      locale: detail.tenant.locale ?? '',
+      logo_url: detail.workspace.logo_url ?? '',
+      hero_image_url: detail.workspace.hero_image_url ?? '',
+      introduction_html: detail.workspace.introduction_html ?? '',
+      guide_overview: detail.workspace.guides.overview ?? '',
+      guide_experience: detail.workspace.guides.experience ?? '',
+      guide_catalog: detail.workspace.guides.catalog ?? '',
+      guide_plugin: detail.workspace.guides.plugin ?? '',
+      guide_bookings: detail.workspace.guides.bookings ?? '',
+      guide_integrations: detail.workspace.guides.integrations ?? '',
+      guide_billing: detail.workspace.guides.billing ?? '',
+      guide_team: detail.workspace.guides.team ?? '',
+    });
+  }
+
+  async function loadTenantDetail(tenantRef: string) {
+    const payload = await fetchAdminTenantDetail(apiBaseUrl, sessionToken, tenantRef);
+    applyTenantDetail(payload);
+  }
+
+  function editTenantService(service: AdminServiceMerchantItem) {
+    setEditingTenantServiceId(service.id);
+    setTenantServiceForm({
+      name: service.name ?? '',
+      business_name: service.business_name ?? '',
+      business_email: service.business_email ?? '',
+      category: service.category ?? '',
+      summary: service.summary ?? '',
+      amount_aud: service.amount_aud == null ? '' : String(service.amount_aud),
+      currency_code: service.currency_code ?? 'AUD',
+      display_price: service.display_price ?? '',
+      duration_minutes: service.duration_minutes == null ? '' : String(service.duration_minutes),
+      venue_name: service.venue_name ?? '',
+      location: service.location ?? '',
+      map_url: service.map_url ?? '',
+      booking_url: service.booking_url ?? '',
+      image_url: service.image_url ?? '',
+      source_url: service.source_url ?? '',
+      tags: (service.tags ?? []).join(', '),
+      featured: service.featured,
+      publish_state:
+        service.publish_state === 'published' || service.publish_state === 'archived'
+          ? service.publish_state
+          : 'draft',
+    });
+  }
+
+  function buildTenantServicePayload(
+    service: AdminServiceMerchantItem,
+    publishState?: AdminTenantServiceFormState['publish_state'],
+  ) {
+    return {
+      service_id: service.service_id,
+      name: service.name ?? '',
+      business_name: service.business_name ?? '',
+      business_email: service.business_email ?? '',
+      category: service.category ?? '',
+      summary: service.summary ?? '',
+      amount_aud: service.amount_aud,
+      currency_code: service.currency_code ?? 'AUD',
+      display_price: service.display_price ?? '',
+      duration_minutes: service.duration_minutes,
+      venue_name: service.venue_name ?? '',
+      location: service.location ?? '',
+      map_url: service.map_url ?? '',
+      booking_url: service.booking_url ?? '',
+      image_url: service.image_url ?? '',
+      source_url: service.source_url ?? '',
+      tags: service.tags ?? [],
+      featured: service.featured,
+      publish_state:
+        publishState ??
+        (service.publish_state === 'published' || service.publish_state === 'archived'
+          ? service.publish_state
+          : 'draft'),
+    };
+  }
+
+  function resetTenantServiceForm() {
+    setEditingTenantServiceId(null);
+    setTenantServiceForm(emptyAdminTenantServiceForm());
   }
 
   async function loadBookingDetail(bookingReference: string) {
@@ -278,6 +422,15 @@ export function useAdminPageState(apiBaseUrl: string) {
         await loadBookingDetail(bookingsPayload.items[0].booking_reference);
       } else {
         setSelectedBooking(null);
+      }
+
+      const tenantPayload = await fetchAdminTenants(apiBaseUrl, sessionToken);
+      setTenants(tenantPayload.items);
+      const nextTenantRef = selectedTenantRef || tenantPayload.items[0]?.slug;
+      if (nextTenantRef) {
+        await loadTenantDetail(nextTenantRef);
+      } else {
+        setSelectedTenantDetail(null);
       }
     } catch (requestError) {
       const message = resolveErrorMessage(requestError, 'Could not load admin dashboard.');
@@ -426,6 +579,29 @@ export function useAdminPageState(apiBaseUrl: string) {
     }
   }
 
+  async function uploadTenantAsset(file: File, kind: 'logo' | 'image') {
+    const setUploading = kind === 'logo' ? setUploadingLogo : setUploadingImage;
+    setUploading(true);
+    setError('');
+    setTenantMessage('');
+
+    try {
+      const imagePayload = await uploadAdminImage(apiBaseUrl, file);
+      setTenantProfileForm((current) => ({
+        ...current,
+        logo_url: kind === 'logo' ? imagePayload.url : current.logo_url,
+        hero_image_url: kind === 'image' ? imagePayload.url : current.hero_image_url,
+      }));
+      setTenantMessage(
+        `${kind === 'logo' ? 'Tenant logo' : 'Tenant hero image'} uploaded successfully.`,
+      );
+    } catch (requestError) {
+      setError(resolveErrorMessage(requestError, 'Tenant image upload failed.'));
+    } finally {
+      setUploading(false);
+    }
+  }
+
   async function savePartner(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setSavingPartner(true);
@@ -557,6 +733,220 @@ export function useAdminPageState(apiBaseUrl: string) {
     }
   }
 
+  async function saveTenantProfile(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedTenantRef) {
+      return;
+    }
+
+    setSavingTenantProfile(true);
+    setTenantMessage('');
+    setError('');
+
+    try {
+      const payload = await updateAdminTenantProfile(
+        apiBaseUrl,
+        sessionToken,
+        selectedTenantRef,
+        tenantProfileForm,
+      );
+      applyTenantDetail(payload);
+      setTenants((current) =>
+        current.map((item) => (item.id === payload.tenant.id ? payload.tenant : item)),
+      );
+      setTenantMessage('Tenant profile updated.');
+    } catch (requestError) {
+      const message = resolveErrorMessage(requestError, 'Could not update tenant profile.');
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setError(message);
+    } finally {
+      setSavingTenantProfile(false);
+    }
+  }
+
+  async function saveTenantMemberAccess(
+    memberEmail: string,
+    form: { full_name?: string | null; role?: string | null; status?: string | null },
+  ) {
+    if (!selectedTenantRef) {
+      return;
+    }
+
+    setSavingTenantMemberEmail(memberEmail);
+    setTenantMessage('');
+    setError('');
+
+    try {
+      const payload = await updateAdminTenantMember(
+        apiBaseUrl,
+        sessionToken,
+        selectedTenantRef,
+        memberEmail,
+        form,
+      );
+      applyTenantDetail(payload);
+      setTenants((current) =>
+        current.map((item) => (item.id === payload.tenant.id ? payload.tenant : item)),
+      );
+      setTenantMessage('Tenant member access updated.');
+    } catch (requestError) {
+      const message = resolveErrorMessage(requestError, 'Could not update tenant member access.');
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setError(message);
+    } finally {
+      setSavingTenantMemberEmail(null);
+    }
+  }
+
+  async function saveTenantService(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!selectedTenantRef) {
+      return;
+    }
+
+    setSavingTenantService(true);
+    setTenantMessage('');
+    setError('');
+
+    try {
+      const payload = editingTenantServiceId
+        ? await updateAdminTenantService(
+            apiBaseUrl,
+            sessionToken,
+            selectedTenantRef,
+            editingTenantServiceId,
+            {
+              ...tenantServiceForm,
+              amount_aud: tenantServiceForm.amount_aud ? Number(tenantServiceForm.amount_aud) : null,
+              duration_minutes: tenantServiceForm.duration_minutes
+                ? Number(tenantServiceForm.duration_minutes)
+                : null,
+              tags: tenantServiceForm.tags
+                .split(',')
+                .map((item) => item.trim())
+                .filter(Boolean),
+            },
+          )
+        : await createAdminTenantService(apiBaseUrl, sessionToken, selectedTenantRef, {
+            ...tenantServiceForm,
+            amount_aud: tenantServiceForm.amount_aud ? Number(tenantServiceForm.amount_aud) : null,
+            duration_minutes: tenantServiceForm.duration_minutes
+              ? Number(tenantServiceForm.duration_minutes)
+              : null,
+            tags: tenantServiceForm.tags
+              .split(',')
+              .map((item) => item.trim())
+              .filter(Boolean),
+          });
+      await loadTenantDetail(payload.tenant.slug);
+      setTenants((current) =>
+        current.map((item) => (item.id === payload.tenant.id ? payload.tenant : item)),
+      );
+      setTenantMessage(editingTenantServiceId ? 'Tenant service updated.' : 'Tenant service created.');
+      resetTenantServiceForm();
+    } catch (requestError) {
+      const message = resolveErrorMessage(requestError, 'Could not save tenant service.');
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setError(message);
+    } finally {
+      setSavingTenantService(false);
+    }
+  }
+
+  async function removeTenantService(serviceRowId: number) {
+    if (!selectedTenantRef) {
+      return;
+    }
+
+    setTenantMessage('');
+    setError('');
+
+    try {
+      const payload = await deleteAdminTenantService(
+        apiBaseUrl,
+        sessionToken,
+        selectedTenantRef,
+        serviceRowId,
+      );
+      await loadTenantDetail(payload.tenant.slug);
+      setTenants((current) =>
+        current.map((item) => (item.id === payload.tenant.id ? payload.tenant : item)),
+      );
+      setTenantMessage('Tenant service deleted.');
+      if (editingTenantServiceId === serviceRowId) {
+        resetTenantServiceForm();
+      }
+    } catch (requestError) {
+      const message = resolveErrorMessage(requestError, 'Could not delete tenant service.');
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setError(message);
+    }
+  }
+
+  async function transitionTenantServiceState(
+    service: AdminServiceMerchantItem,
+    publishState: AdminTenantServiceFormState['publish_state'],
+  ) {
+    if (!selectedTenantRef) {
+      return;
+    }
+
+    setSavingTenantService(true);
+    setTenantMessage('');
+    setError('');
+
+    try {
+      const payload = await updateAdminTenantService(
+        apiBaseUrl,
+        sessionToken,
+        selectedTenantRef,
+        service.id,
+        buildTenantServicePayload(service, publishState),
+      );
+      await loadTenantDetail(payload.tenant.slug);
+      setTenants((current) =>
+        current.map((item) => (item.id === payload.tenant.id ? payload.tenant : item)),
+      );
+      setTenantMessage(
+        publishState === 'published'
+          ? 'Tenant service published.'
+          : publishState === 'archived'
+            ? 'Tenant service archived.'
+            : 'Tenant service moved to draft.',
+      );
+      if (editingTenantServiceId === service.id) {
+        setTenantServiceForm((current) => ({
+          ...current,
+          publish_state: publishState,
+        }));
+      }
+    } catch (requestError) {
+      const message = resolveErrorMessage(
+        requestError,
+        'Could not update tenant service state.',
+      );
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setError(message);
+    } finally {
+      setSavingTenantService(false);
+    }
+  }
+
   return {
     username,
     setUsername,
@@ -572,6 +962,13 @@ export function useAdminPageState(apiBaseUrl: string) {
     apiRoutes,
     partners,
     importedServices,
+    tenants,
+    selectedTenantRef,
+    selectedTenantDetail,
+    tenantProfileForm,
+    tenantServiceForm,
+    editingTenantServiceId,
+    tenantMessage,
     serviceQualityCounts,
     editingPartnerId,
     partnerForm,
@@ -583,6 +980,9 @@ export function useAdminPageState(apiBaseUrl: string) {
     exportingServiceQuality,
     uploadingLogo,
     uploadingImage,
+    savingTenantProfile,
+    savingTenantMemberEmail,
+    savingTenantService,
     searchQuery,
     setSearchQuery,
     industryFilter,
@@ -621,7 +1021,10 @@ export function useAdminPageState(apiBaseUrl: string) {
     error,
     updateServiceImportForm,
     updatePartnerForm,
+    updateTenantProfileForm,
+    updateTenantServiceForm,
     loadBookingDetail,
+    loadTenantDetail,
     loadDashboard,
     handleLogin,
     handleLogout,
@@ -630,10 +1033,19 @@ export function useAdminPageState(apiBaseUrl: string) {
     editPartner,
     resetPartnerForm,
     uploadPartnerAsset,
+    uploadTenantAsset,
     savePartner,
     deletePartner,
     importServicesFromWebsite,
     deleteImportedService,
     exportServiceQualityReport,
+    saveTenantProfile,
+    saveTenantMemberAccess,
+    editTenantService,
+    transitionTenantServiceState,
+    resetTenantServiceForm,
+    saveTenantService,
+    removeTenantService,
+    setSelectedTenantRef,
   };
 }

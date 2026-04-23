@@ -115,7 +115,6 @@ GENERIC_QUERY_STOPWORDS = {
     "ngay",
     "nha",
     "nhung",
-    "near",
     "of",
     "old",
     "o",
@@ -844,6 +843,36 @@ def _service_location_terms(match: RankedServiceMatch) -> set[str]:
     return _location_signals(location) | _location_signals(venue_name)
 
 
+def service_is_online_friendly(service: ServiceMerchantProfile | Any, query: str | None = None) -> bool:
+    tags = {
+        _normalized_text(str(tag))
+        for tag in (getattr(service, "tags_json", None) or [])
+        if _normalized_text(str(tag))
+    }
+    searchable_text = " ".join(
+        filter(
+            None,
+            [
+                _string_or_none(getattr(service, "name", None)),
+                _string_or_none(getattr(service, "summary", None)),
+                _string_or_none(getattr(service, "category", None)),
+                _string_or_none(getattr(service, "venue_name", None)),
+            ],
+        )
+    )
+    normalized_searchable_text = _normalized_text(searchable_text)
+    online_signals = {
+        "online",
+        "virtual",
+        "remote",
+        "telehealth",
+        "zoom",
+        "video call",
+        "video",
+    }
+    return bool(tags & online_signals) or any(signal in normalized_searchable_text for signal in online_signals)
+
+
 def filter_ranked_matches_for_relevance(
     ranked_matches: list[RankedServiceMatch],
     *,
@@ -860,8 +889,9 @@ def filter_ranked_matches_for_relevance(
         intent_mismatch = "intent_mismatch" in match.evidence
         topic_mismatch = "topic_mismatch" in match.evidence
         location_mismatch = "location_mismatch" in match.evidence
+        online_friendly = service_is_online_friendly(match.service)
         if location_terms:
-            location_mismatch = not bool(location_terms & _service_location_terms(match))
+            location_mismatch = not online_friendly and not bool(location_terms & _service_location_terms(match))
 
         if require_location_match and location_mismatch:
             continue
@@ -965,6 +995,8 @@ def apply_deterministic_ranking_policy(
 
     def _location_bucket(match: RankedServiceMatch) -> int:
         evidence = set(match.evidence)
+        if service_is_online_friendly(match.service):
+            return 2 if location_terms else 1
         if not location_terms:
             return 0
         service_location_terms = _service_location_terms(match)
@@ -1045,6 +1077,7 @@ def rank_catalog_matches(
         venue_name = _string_or_none(getattr(service, "venue_name", None)) or ""
         location = _string_or_none(getattr(service, "location", None)) or ""
         tags = [str(tag).strip() for tag in (getattr(service, "tags_json", None) or []) if str(tag).strip()]
+        online_friendly = service_is_online_friendly(service, query)
         service_terms = _normalized_terms(service_name)
         business_terms = _normalized_terms(business_name)
         summary_terms = _normalized_terms(summary)
@@ -1146,10 +1179,13 @@ def rank_catalog_matches(
         if overlap_location:
             reasons.append("Location hint aligns with the venue or suburb.")
             evidence.append("location_overlap")
-        elif location_terms:
+        elif location_terms and not online_friendly:
             score -= 0.12
             reasons.append("Location hint does not align with the venue or suburb.")
             evidence.append("location_mismatch")
+        elif location_terms and online_friendly:
+            reasons.append("Online-ready service stays eligible without a local venue match.")
+            evidence.append("online_location_flexible")
 
         if category_value and preference_overlap:
             reasons.append("Matches the requested service category.")

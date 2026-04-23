@@ -391,6 +391,7 @@ export function RegisterInterestApp() {
     event.preventDefault();
     setSubmitError('');
     setResult(null);
+    const normalizedPhoneDigits = formState.customerPhone.trim().replace(/\D/g, '');
 
     if (formState.customerName.trim().length < 2) {
       setSubmitError('Enter your name so we can personalise the setup path.');
@@ -402,8 +403,8 @@ export function RegisterInterestApp() {
       return;
     }
 
-    if (formState.customerPhone.trim().length < 6) {
-      setSubmitError('Enter a phone number so BookedAI can follow up for online setup.');
+    if (normalizedPhoneDigits.length < 8) {
+      setSubmitError('Enter a valid phone number with at least 8 digits.');
       return;
     }
 

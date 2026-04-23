@@ -18,8 +18,8 @@ from api.v1_routes import (
     _query_intent_constraint_groups,
     _raw_query_intent_terms,
     _search_terms,
-    router as v1_router,
 )
+from api.v1_router import router as v1_router
 from repositories.integration_repository import IntegrationRepository
 from service_layer.prompt9_matching_service import RankedServiceMatch
 from repositories.tenant_repository import TenantRepository
@@ -139,20 +139,20 @@ class Apiv1BookingRoutes(TestCase):
         async def _record_phase2_write_activity(_session, **kwargs):
             captured_phase2_calls.append(kwargs)
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_booking_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_booking_handlers.get_session",
             _fake_get_session,
         ), patch(
-            "api.v1_routes.ContactRepository.upsert_contact",
+            "api.v1_booking_handlers.ContactRepository.upsert_contact",
             _upsert_contact,
         ), patch(
-            "api.v1_routes.LeadRepository.upsert_lead",
+            "api.v1_booking_handlers.LeadRepository.upsert_lead",
             _upsert_lead,
         ), patch(
-            "api.v1_routes.BookingIntentRepository.upsert_booking_intent",
+            "api.v1_booking_handlers.BookingIntentRepository.upsert_booking_intent",
             _upsert_booking_intent,
         ), patch(
-            "api.v1_routes._record_phase2_write_activity",
+            "api.v1_booking_handlers._record_phase2_write_activity",
             _record_phase2_write_activity,
         ):
             client = TestClient(create_test_app())
@@ -192,8 +192,8 @@ class Apiv1BookingRoutes(TestCase):
         async def _fake_trust_session(_session_factory):
             yield SimpleNamespace(execute=_execute, commit=_async_noop)
 
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub), patch(
-            "api.v1_routes.get_session",
+        with patch("api.v1_booking_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_booking_handlers.get_session",
             _fake_trust_session,
         ):
             client = TestClient(create_test_app())
@@ -218,7 +218,7 @@ class Apiv1BookingRoutes(TestCase):
         self.assertIn("recommended_booking_path", payload["data"])
 
     def test_booking_path_resolve_returns_success_envelope(self):
-        with patch("api.v1_routes._resolve_tenant_id", _resolve_tenant_id_stub):
+        with patch("api.v1_booking_handlers._resolve_tenant_id", _resolve_tenant_id_stub):
             client = TestClient(create_test_app())
             response = client.post(
                 "/api/v1/bookings/path/resolve",
@@ -243,4 +243,3 @@ class Apiv1BookingRoutes(TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertIn("path_type", payload["data"])
         self.assertIn("payment_allowed_before_confirmation", payload["data"])
-

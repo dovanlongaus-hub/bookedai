@@ -27,19 +27,19 @@ type TenantInviteContext = {
 };
 
 const tenantAuthBenefits = [
-  'Save AI-imported website data into the tenant catalog',
-  'Publish or archive services for public search readiness',
-  'Keep booking and catalog review inside one authenticated workspace',
+  'Save AI-imported business data into your tenant catalog',
+  'Publish or archive services when they are ready for search',
+  'Manage bookings, catalog review, and workspace setup in one place',
 ];
 
 const tenantAuthAccessStates = [
   {
     label: 'Preview mode',
-    description: 'Overview, bookings, and catalog read models stay visible before sign-in.',
+    description: 'Overview, bookings, and catalog visibility stay available before sign-in.',
   },
   {
     label: 'Write access',
-    description: 'Catalog import, edits, and publish actions unlock only after tenant auth succeeds.',
+    description: 'Import, edits, billing updates, and publish actions unlock after sign-in.',
   },
 ];
 
@@ -112,6 +112,21 @@ export function TenantAuthWorkspace({
   inviteContext?: TenantInviteContext | null;
 }) {
   const isGateway = !tenantRef;
+  const googleActionLabel =
+    authMode === 'create'
+      ? 'Continue with Google'
+      : authMode === 'claim'
+        ? 'Accept your invite with Google'
+        : 'Continue with Google';
+  const googleHelperCopy =
+    authMode === 'create'
+      ? 'Google can create the owner account automatically. Add the business name if you want to guide the new workspace details.'
+      : authMode === 'claim'
+        ? 'Use the invited Google account to confirm ownership and activate this workspace.'
+        : 'Use Google to sign in quickly, or let BookedAI create your workspace automatically if this is your first time here.';
+  const showGoogleCreatePrimary = authMode === 'create' && googleEnabled;
+  const showGoogleSignInPrimary = authMode === 'sign-in' && googleEnabled;
+  const showGooglePrimary = showGoogleCreatePrimary || showGoogleSignInPrimary;
   const roleLabel = formatRoleLabel(session?.membership?.role ?? inviteContext?.role);
   const roleNote = session?.membership?.role === 'tenant_admin'
     ? 'This role can manage team access, billing, catalog publishing, and overall tenant setup.'
@@ -122,29 +137,29 @@ export function TenantAuthWorkspace({
         : null;
 
   return (
-    <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+    <article className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.96)_100%)] p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
       <div className="flex items-start justify-between gap-3">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
             Auth workspace
           </div>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            {isGateway ? 'Tenant login and account gateway' : 'Tenant access and publishing control'}
+            {isGateway ? 'Tenant sign in and account access' : 'Tenant access and publishing'}
           </h2>
         </div>
       </div>
 
       <p className="mt-3 text-sm leading-6 text-slate-600">
         {isGateway
-          ? 'Use one shared login portal to sign in to an existing tenant workspace or create a brand-new tenant account, then continue into the correct workspace automatically.'
-          : 'Preview stays open for this tenant workspace, while sign-in upgrades the same surface into a write-enabled operator session for catalog import, edits, and publish decisions.'}
+          ? 'Use one shared tenant portal to sign in, create a new workspace, and continue into the right tenant automatically.'
+          : 'Preview stays open here, while sign-in upgrades this workspace into a write-enabled operator session.'}
       </p>
 
-      <div className="mt-5 grid gap-3">
+      <div className="mt-6 grid gap-3 sm:grid-cols-2">
         {tenantAuthAccessStates.map((item) => (
           <div
             key={item.label}
-            className="rounded-[1.15rem] border border-slate-200 bg-slate-50 px-4 py-4"
+            className="rounded-[1.2rem] border border-slate-200 bg-white/80 px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] backdrop-blur"
           >
             <div className="text-sm font-semibold text-slate-950">{item.label}</div>
             <div className="mt-1 text-sm leading-6 text-slate-600">{item.description}</div>
@@ -152,18 +167,18 @@ export function TenantAuthWorkspace({
         ))}
       </div>
 
-      <div className="mt-5 rounded-[1.25rem] border border-sky-200 bg-[linear-gradient(180deg,#f7fbff_0%,#eef6ff_100%)] px-4 py-4">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">
+      <div className="mt-5 rounded-[1.35rem] border border-sky-200 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_30%),linear-gradient(180deg,#f8fcff_0%,#eef6ff_100%)] px-4 py-4 shadow-[0_14px_34px_rgba(59,130,246,0.10)]">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
           {isGateway ? 'Gateway scope' : 'Tenant scope'}
         </div>
         <div className="mt-2 flex flex-wrap gap-2">
-          <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-medium text-sky-700">
+          <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-semibold text-sky-700 shadow-[0_6px_16px_rgba(59,130,246,0.08)]">
             {tenantName}
           </span>
-          <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-medium text-sky-700">
+          <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-semibold text-sky-700 shadow-[0_6px_16px_rgba(59,130,246,0.08)]">
             {tenantSlug}
           </span>
-          <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-medium text-sky-700">
+          <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-semibold text-sky-700 shadow-[0_6px_16px_rgba(59,130,246,0.08)]">
             {session ? 'Authenticated write session' : 'Preview only'}
           </span>
         </div>
@@ -230,7 +245,7 @@ export function TenantAuthWorkspace({
         </>
       ) : (
         <>
-          <div className="mt-5 flex flex-wrap gap-2">
+          <div className="mt-6 flex flex-wrap gap-2 rounded-[1.2rem] border border-slate-200/80 bg-white/80 p-2 shadow-[0_10px_26px_rgba(15,23,42,0.04)]">
             {(
               tenantRef
                 ? [
@@ -239,17 +254,17 @@ export function TenantAuthWorkspace({
                   ]
                 : [
                     { key: 'sign-in' as TenantAuthMode, label: 'Sign in' },
-                    { key: 'create' as TenantAuthMode, label: 'Create account' },
+                    { key: 'create' as TenantAuthMode, label: 'New workspace' },
                   ]
             ).map((item) => (
               <button
                 key={item.key}
                 type="button"
                 onClick={() => setAuthMode(item.key)}
-                className={`rounded-full px-3.5 py-2 text-xs font-semibold transition ${
+                className={`rounded-full px-4 py-2.5 text-xs font-semibold transition ${
                   authMode === item.key
-                    ? 'bg-slate-950 text-white'
-                    : 'border border-slate-200 bg-white text-slate-600'
+                    ? 'bg-slate-950 text-white shadow-[0_12px_26px_rgba(15,23,42,0.18)]'
+                    : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
                 }`}
               >
                 {item.label}
@@ -257,22 +272,22 @@ export function TenantAuthWorkspace({
             ))}
           </div>
 
-          <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4">
+          <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-white/85 px-4 py-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)]">
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
               {authMode === 'sign-in'
                 ? 'Password sign-in'
                 : authMode === 'create'
                   ? 'Create tenant account'
-                  : 'Accept invite or claim workspace'}
+                  : 'Accept invite'}
             </div>
             <div className="mt-2 text-sm leading-6 text-slate-600">
               {authMode === 'sign-in'
                 ? isGateway
-                  ? 'Use your tenant username and password. After authentication, BookedAI will route you into the correct tenant workspace.'
-                  : 'Use a tenant-issued username and password to unlock write access for this exact tenant workspace.'
+                  ? 'Use your tenant username and password if you prefer not to use Google sign-in.'
+                  : 'Use your tenant username and password to unlock write access for this workspace.'
                 : authMode === 'create'
-                  ? 'Create one tenant account and one workspace that will become the canonical entry for onboarding, operations, and billing.'
-                  : 'Accept a pending team invite or claim this tenant workspace with your operator email, then set your first tenant password.'}
+                  ? 'Create one owner account and one workspace for onboarding, operations, and billing.'
+                  : 'Accept a pending invite with your operator email, then finish setting up access for this workspace.'}
             </div>
           </div>
 
@@ -292,50 +307,150 @@ export function TenantAuthWorkspace({
           ) : null}
 
           {authMode === 'sign-in' ? (
-            <form className="mt-5 space-y-4" onSubmit={onPasswordSignIn}>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <label className="block">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Username
+            <div className="mt-5 space-y-5">
+              {showGoogleSignInPrimary ? (
+                <div className="relative overflow-hidden rounded-[1.4rem] border border-sky-200 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.22),transparent_26%),linear-gradient(135deg,rgba(255,255,255,1)_0%,rgba(239,246,255,1)_58%,rgba(224,242,254,0.9)_100%)] px-5 py-5 shadow-[0_18px_40px_rgba(14,116,144,0.12)]">
+                  <div className="absolute right-4 top-4 rounded-full border border-sky-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700 backdrop-blur">
+                    Google-first
                   </div>
-                  <input
-                    value={passwordUsername}
-                    onChange={(event) => setPasswordUsername(event.target.value)}
-                    placeholder="Tenant username"
-                    className="booked-form-input"
-                    autoComplete="username"
-                  />
-                </label>
-                <label className="block">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Password
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                    Recommended
                   </div>
-                  <input
-                    type="password"
-                    value={passwordValue}
-                    onChange={(event) => setPasswordValue(event.target.value)}
-                    placeholder="Enter tenant password"
-                    className="booked-form-input"
-                    autoComplete="current-password"
-                  />
-                </label>
-              </div>
-              <button
-                type="submit"
-                disabled={authPending || !passwordUsername.trim() || !passwordValue.trim()}
-                className={`booked-button ${
-                  authPending || !passwordUsername.trim() || !passwordValue.trim()
-                    ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none'
-                    : ''
-                }`}
-              >
-                {isGateway ? 'Sign in to tenant workspace' : 'Sign in to unlock tenant edits'}
-              </button>
-            </form>
+                  <div className="mt-2 max-w-[20rem] text-xl font-semibold tracking-tight text-slate-950">
+                    Sign in with Google
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-700">
+                    Use the Google account linked to your tenant workspace for the fastest way back in.
+                    Username and password stay available below if you need them.
+                  </div>
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <div className="min-w-[280px] rounded-[1rem] bg-white/80 p-1 shadow-[0_10px_24px_rgba(14,116,144,0.10)]">
+                      {googleButtonSlot}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onPromptGoogle}
+                      className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-900 transition hover:border-sky-300 hover:bg-sky-50"
+                    >
+                      Use another Google account
+                    </button>
+                  </div>
+                  {!googleReady ? (
+                    <div className="mt-3 text-xs text-slate-500">
+                      Loading Google Identity Services...
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {showGoogleSignInPrimary ? (
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-slate-200" />
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    Or sign in with password
+                  </div>
+                  <div className="h-px flex-1 bg-gradient-to-l from-transparent via-slate-300 to-slate-200" />
+                </div>
+              ) : null}
+
+              <form className="rounded-[1.25rem] border border-slate-200 bg-white/80 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] space-y-4" onSubmit={onPasswordSignIn}>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <label className="block">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Username
+                    </div>
+                    <input
+                      value={passwordUsername}
+                      onChange={(event) => setPasswordUsername(event.target.value)}
+                      placeholder="Tenant username"
+                      className="booked-form-input"
+                      autoComplete="username"
+                    />
+                  </label>
+                  <label className="block">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Password
+                    </div>
+                    <input
+                      type="password"
+                      value={passwordValue}
+                      onChange={(event) => setPasswordValue(event.target.value)}
+                      placeholder="Enter tenant password"
+                      className="booked-form-input"
+                      autoComplete="current-password"
+                    />
+                  </label>
+                </div>
+                <button
+                  type="submit"
+                  disabled={authPending || !passwordUsername.trim() || !passwordValue.trim()}
+                  className={`booked-button ${
+                    authPending || !passwordUsername.trim() || !passwordValue.trim()
+                      ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none'
+                      : ''
+                  }`}
+                >
+                  {isGateway ? 'Sign in to tenant workspace' : 'Sign in to unlock tenant edits'}
+                </button>
+              </form>
+            </div>
           ) : null}
 
           {authMode === 'create' ? (
-            <form className="mt-5 space-y-4" onSubmit={onCreateAccount}>
+            <div className="mt-5 space-y-5">
+              {showGoogleCreatePrimary ? (
+                <div className="relative overflow-hidden rounded-[1.4rem] border border-sky-200 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.22),transparent_26%),linear-gradient(135deg,rgba(255,255,255,1)_0%,rgba(239,246,255,1)_58%,rgba(224,242,254,0.9)_100%)] px-5 py-5 shadow-[0_18px_40px_rgba(14,116,144,0.12)]">
+                  <div className="absolute right-4 top-4 rounded-full border border-sky-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700 backdrop-blur">
+                    Google-first
+                  </div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                    Recommended
+                  </div>
+                  <div className="mt-2 max-w-[20rem] text-xl font-semibold tracking-tight text-slate-950">
+                    Create your tenant with Google
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-700">
+                    Continue with Google and BookedAI can create the owner account automatically
+                    on first access. Add the business name first if you want to guide the initial
+                    workspace details.
+                  </div>
+                  {!createAccountForm.business_name.trim() ? (
+                    <div className="mt-3 rounded-[1rem] border border-sky-200 bg-sky-50 px-3 py-2 text-xs leading-5 text-sky-900">
+                      Business name is now optional here. If you leave it blank, BookedAI will seed
+                      the first workspace name from your Google profile.
+                    </div>
+                  ) : null}
+                  <div className="mt-4 flex flex-wrap items-center gap-3">
+                    <div className="min-w-[280px] rounded-[1rem] bg-white/80 p-1 shadow-[0_10px_24px_rgba(14,116,144,0.10)]">
+                      {googleButtonSlot}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={onPromptGoogle}
+                      className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-900 transition hover:border-sky-300 hover:bg-sky-50"
+                    >
+                      Create with another Google account
+                    </button>
+                  </div>
+                  {!googleReady ? (
+                    <div className="mt-3 text-xs text-slate-500">
+                      Loading Google Identity Services...
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
+
+              {showGoogleCreatePrimary ? (
+                <div className="flex items-center gap-3">
+                  <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-slate-200" />
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                    Or create with password
+                  </div>
+                  <div className="h-px flex-1 bg-gradient-to-l from-transparent via-slate-300 to-slate-200" />
+                </div>
+              ) : null}
+
+              <form className="rounded-[1.25rem] border border-slate-200 bg-white/80 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] space-y-4" onSubmit={onCreateAccount}>
               <div className="grid gap-4 sm:grid-cols-2">
                 <label className="block">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -445,7 +560,8 @@ export function TenantAuthWorkspace({
               >
                 Create tenant account
               </button>
-            </form>
+              </form>
+            </div>
           ) : null}
 
           {authMode === 'claim' ? (
@@ -532,9 +648,9 @@ export function TenantAuthWorkspace({
             </form>
           ) : null}
 
-          <div className="mt-5 space-y-3">
+          <div className="mt-6 grid gap-3">
             {tenantAuthBenefits.map((item) => (
-              <div key={item} className="booked-note-panel">
+              <div key={item} className="rounded-[1rem] border border-slate-200 bg-white/85 px-4 py-3 text-sm leading-6 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
                 {item}
               </div>
             ))}
@@ -542,21 +658,33 @@ export function TenantAuthWorkspace({
 
           {googleEnabled ? (
             <>
-              <div className="mt-5 flex items-center gap-3">
-                <div className="h-px flex-1 bg-slate-200" />
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                  Or continue with Google
-                </div>
-                <div className="h-px flex-1 bg-slate-200" />
-              </div>
+              {!showGooglePrimary ? (
+                <>
+                  <div className="mt-5 flex items-center gap-3">
+                    <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-slate-200" />
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
+                      Or continue with Google
+                    </div>
+                    <div className="h-px flex-1 bg-gradient-to-l from-transparent via-slate-300 to-slate-200" />
+                  </div>
+                  <div className="mt-4 rounded-[1.25rem] border border-sky-200 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_28%),linear-gradient(180deg,#f8fcff_0%,#eef6ff_100%)] px-4 py-4 shadow-[0_14px_32px_rgba(14,116,144,0.10)]">
+                    <div className="text-sm font-semibold text-sky-950">{googleActionLabel}</div>
+                    <div className="mt-1 text-sm leading-6 text-sky-900">
+                      {googleHelperCopy}
+                    </div>
+                  </div>
+                </>
+              ) : null}
               <div className="mt-5 flex flex-wrap items-center gap-3">
-                {googleButtonSlot}
+                <div className="min-w-[280px] rounded-[1rem] bg-white p-1 shadow-[0_10px_24px_rgba(14,116,144,0.10)]">
+                  {googleButtonSlot}
+                </div>
                 <button
                   type="button"
                   onClick={onPromptGoogle}
-                  className="booked-button-secondary inline-flex items-center gap-2"
+                  className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-900 transition hover:border-sky-300 hover:bg-sky-50"
                 >
-                  Use another Google account
+                  {authMode === 'create' ? 'Create with another Google account' : 'Use another Google account'}
                 </button>
               </div>
               {!googleReady ? (

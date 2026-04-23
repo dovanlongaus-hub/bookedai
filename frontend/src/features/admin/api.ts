@@ -11,6 +11,9 @@ import {
   AdminPortalSupportActionResponse,
   AdminServiceCatalogQualityResponse,
   AdminServiceMerchantListResponse,
+  AdminTenantCatalogResponse,
+  AdminTenantDetailResponse,
+  AdminTenantListResponse,
   EmailSendResponse,
   LoginResponse,
   PartnerProfileListResponse,
@@ -422,6 +425,168 @@ export async function saveAdminPartner(
     throw new Error(parseErrorMessage(payload, 'Could not save partner.'));
   }
   return payload as PartnerProfileListResponse;
+}
+
+export async function fetchAdminTenants(
+  apiBaseUrl: string,
+  sessionToken: string,
+) {
+  const response = await fetch(`${apiBaseUrl}/admin/tenants`, {
+    headers: createAdminAuthHeaders(sessionToken),
+  });
+  const payload = (await parseJsonOrNull(response)) as AdminTenantListResponse | { detail?: string } | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not load tenants.'));
+  }
+  return payload as AdminTenantListResponse;
+}
+
+export async function fetchAdminTenantDetail(
+  apiBaseUrl: string,
+  sessionToken: string,
+  tenantRef: string,
+) {
+  const response = await fetch(`${apiBaseUrl}/admin/tenants/${encodeURIComponent(tenantRef)}`, {
+    headers: createAdminAuthHeaders(sessionToken),
+  });
+  const payload = (await parseJsonOrNull(response)) as AdminTenantDetailResponse | { detail?: string } | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not load tenant detail.'));
+  }
+  return payload as AdminTenantDetailResponse;
+}
+
+export async function updateAdminTenantProfile(
+  apiBaseUrl: string,
+  sessionToken: string,
+  tenantRef: string,
+  form: unknown,
+) {
+  const response = await fetch(`${apiBaseUrl}/admin/tenants/${encodeURIComponent(tenantRef)}`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+      ...createAdminAuthHeaders(sessionToken),
+    },
+    body: JSON.stringify(form),
+  });
+  const payload = (await parseJsonOrNull(response)) as AdminTenantDetailResponse | { detail?: string } | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not update tenant profile.'));
+  }
+  return payload as AdminTenantDetailResponse;
+}
+
+export async function updateAdminTenantMember(
+  apiBaseUrl: string,
+  sessionToken: string,
+  tenantRef: string,
+  memberEmail: string,
+  form: unknown,
+) {
+  const response = await fetch(
+    `${apiBaseUrl}/admin/tenants/${encodeURIComponent(tenantRef)}/members/${encodeURIComponent(memberEmail)}`,
+    {
+      method: 'PATCH',
+      headers: {
+        'Content-Type': 'application/json',
+        ...createAdminAuthHeaders(sessionToken),
+      },
+      body: JSON.stringify(form),
+    },
+  );
+  const payload = (await parseJsonOrNull(response)) as AdminTenantDetailResponse | { detail?: string } | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not update tenant member access.'));
+  }
+  return payload as AdminTenantDetailResponse;
+}
+
+export async function createAdminTenantService(
+  apiBaseUrl: string,
+  sessionToken: string,
+  tenantRef: string,
+  form: unknown,
+) {
+  const response = await fetch(`${apiBaseUrl}/admin/tenants/${encodeURIComponent(tenantRef)}/services`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...createAdminAuthHeaders(sessionToken),
+    },
+    body: JSON.stringify(form),
+  });
+  const payload = (await parseJsonOrNull(response)) as AdminTenantCatalogResponse | { detail?: string } | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not create tenant service.'));
+  }
+  return payload as AdminTenantCatalogResponse;
+}
+
+export async function updateAdminTenantService(
+  apiBaseUrl: string,
+  sessionToken: string,
+  tenantRef: string,
+  serviceRowId: number,
+  form: unknown,
+) {
+  const response = await fetch(
+    `${apiBaseUrl}/admin/tenants/${encodeURIComponent(tenantRef)}/services/${serviceRowId}`,
+    {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        ...createAdminAuthHeaders(sessionToken),
+      },
+      body: JSON.stringify(form),
+    },
+  );
+  const payload = (await parseJsonOrNull(response)) as AdminTenantCatalogResponse | { detail?: string } | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not update tenant service.'));
+  }
+  return payload as AdminTenantCatalogResponse;
+}
+
+export async function deleteAdminTenantService(
+  apiBaseUrl: string,
+  sessionToken: string,
+  tenantRef: string,
+  serviceRowId: number,
+) {
+  const response = await fetch(
+    `${apiBaseUrl}/admin/tenants/${encodeURIComponent(tenantRef)}/services/${serviceRowId}`,
+    {
+      method: 'DELETE',
+      headers: createAdminAuthHeaders(sessionToken),
+    },
+  );
+  const payload = (await parseJsonOrNull(response)) as AdminTenantCatalogResponse | { detail?: string } | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not delete tenant service.'));
+  }
+  return payload as AdminTenantCatalogResponse;
 }
 
 export async function deleteAdminPartner(

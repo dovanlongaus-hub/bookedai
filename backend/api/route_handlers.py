@@ -18,7 +18,7 @@ from uuid import uuid4
 import httpx
 from fastapi import APIRouter, FastAPI, File, Header, HTTPException, Request, Response, UploadFile, status
 from fastapi.responses import StreamingResponse
-from sqlalchemy import desc, func, select
+from sqlalchemy import desc, func, select, text
 
 from config import Settings, get_settings
 from core.feature_flags import is_flag_enabled
@@ -32,6 +32,7 @@ from db import (
     ConversationEvent,
     PartnerProfile,
     ServiceMerchantProfile,
+    TenantUserMembership,
     create_engine,
     create_session_factory,
     get_session,
@@ -41,6 +42,7 @@ from integrations.ai_models import SemanticSearchAdapter
 from rate_limit import InMemoryRateLimiter, TooManyRequestsError
 from repositories.base import RepositoryContext
 from repositories.idempotency_repository import IdempotencyRepository
+from repositories.audit_repository import AuditLogRepository
 from repositories.tenant_repository import TenantRepository
 from repositories.webhook_repository import WebhookEventRepository
 from schemas import BookingWorkflowPayload, TawkMessage, TawkWebhookResponse
@@ -59,6 +61,12 @@ from schemas import (
     AdminServiceCatalogQualityResponse,
     AdminServiceImportRequest,
     AdminServiceMerchantListResponse,
+    AdminTenantCatalogResponse,
+    AdminTenantCatalogUpsertRequest,
+    AdminTenantDetailResponse,
+    AdminTenantListResponse,
+    AdminTenantMemberAccessUpdateRequest,
+    AdminTenantProfileUpdateRequest,
     AdminSessionResponse,
     BookingAssistantCatalogResponse,
     BookingAssistantChatRequest,
@@ -122,6 +130,8 @@ from services import (
     N8NService,
     OpenAIService,
     PricingService,
+    _curate_service_matches,
+    _rank_services,
     extract_tawk_message,
     parse_cors_origins,
     resolve_service_image_url,
@@ -133,6 +143,15 @@ from service_layer.upload_service import save_uploaded_file
 
 settings = get_settings()
 logger = get_logger("bookedai.api.route_handlers")
+
+
+def _model_dump_compat(value):
+    if hasattr(value, "model_dump"):
+        return value.model_dump()
+    if hasattr(value, "dict"):
+        return value.dict()
+    return value
+
 
 DEFAULT_PARTNER_PROFILES = [
     {
@@ -340,6 +359,142 @@ def slugify_value(value: str) -> str:
     normalized = unicodedata.normalize("NFKD", value.lower())
     ascii_value = normalized.encode("ascii", "ignore").decode("ascii")
     return re.sub(r"[^a-z0-9]+", "-", ascii_value).strip("-") or "item"
+
+
+def _sanitize_workspace_html(value: str | None) -> str | None:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return None
+    return normalized.replace("<script", "&lt;script").replace("</script>", "&lt;/script&gt;")
+
+
+def _clean_optional_text(value: object | None) -> str | None:
+    normalized = str(value or "").strip()
+    return normalized or None
+
+
+def _admin_build_tenant_list_item(row: dict[str, object | None]) -> dict[str, object | None]:
+    return {
+        "id": str(row.get("id") or ""),
+        "slug": str(row.get("slug") or ""),
+        "name": str(row.get("name") or ""),
+        "status": str(row.get("status") or "active"),
+        "timezone": _clean_optional_text(row.get("timezone")),
+        "locale": _clean_optional_text(row.get("locale")),
+        "industry": _clean_optional_text(row.get("industry")),
+        "active_memberships": int(row.get("active_memberships") or 0),
+        "total_services": int(row.get("total_services") or 0),
+        "published_services": int(row.get("published_services") or 0),
+        "updated_at": _clean_optional_text(row.get("updated_at")),
+    }
+
+
+async def _admin_list_tenants(session) -> list[dict[str, object | None]]:
+    result = await session.execute(
+        text(
+            """
+            select
+              t.id::text as id,
+              t.slug,
+              t.name,
+              t.status,
+              t.timezone,
+              t.locale,
+              t.industry,
+              t.updated_at::text as updated_at,
+              coalesce(m.active_memberships, 0) as active_memberships,
+              coalesce(s.total_services, 0) as total_services,
+              coalesce(s.published_services, 0) as published_services
+            from tenants t
+            left join lateral (
+              select count(*)::int as active_memberships
+              from tenant_user_memberships tum
+              where tum.tenant_id = t.id::text
+                and tum.status = 'active'
+            ) m on true
+            left join lateral (
+              select
+                count(*)::int as total_services,
+                count(*) filter (
+                  where coalesce(smp.publish_state, 'draft') = 'published'
+                )::int as published_services
+              from service_merchant_profiles smp
+              where smp.tenant_id = t.id::text
+            ) s on true
+            order by t.name asc, t.slug asc
+            """
+        )
+    )
+    return [_admin_build_tenant_list_item(dict(row)) for row in result.mappings().all()]
+
+
+async def _admin_get_tenant_detail_payload(session, tenant_ref: str) -> dict[str, object]:
+    tenant_repository = TenantRepository(RepositoryContext(session=session))
+    tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref)
+    if not tenant_profile:
+        raise HTTPException(status_code=404, detail="Tenant was not found")
+
+    tenant_id = str(tenant_profile.get("id") or "")
+    tenant_list_items = await _admin_list_tenants(session)
+    tenant_item = next((item for item in tenant_list_items if item["id"] == tenant_id), None)
+    if tenant_item is None:
+        tenant_item = {
+            **tenant_profile,
+            "active_memberships": 0,
+            "total_services": 0,
+            "published_services": 0,
+            "updated_at": None,
+        }
+
+    settings = await tenant_repository.get_tenant_settings(tenant_id)
+    workspace = settings.get("tenant_workspace") if isinstance(settings.get("tenant_workspace"), dict) else {}
+    guides = workspace.get("guides") if isinstance(workspace.get("guides"), dict) else {}
+    members = await tenant_repository.list_tenant_members(tenant_id)
+    services = (
+        await session.execute(
+            select(ServiceMerchantProfile)
+            .where(ServiceMerchantProfile.tenant_id == tenant_id)
+            .order_by(
+                desc(ServiceMerchantProfile.featured),
+                ServiceMerchantProfile.name.asc(),
+            )
+        )
+    ).scalars().all()
+
+    return {
+        "status": "ok",
+        "tenant": tenant_item,
+        "workspace": {
+            "logo_url": _clean_optional_text(workspace.get("logo_url")),
+            "hero_image_url": _clean_optional_text(workspace.get("hero_image_url")),
+            "introduction_html": _sanitize_workspace_html(
+                _clean_optional_text(workspace.get("introduction_html"))
+            ),
+            "guides": {
+                "overview": _clean_optional_text(guides.get("overview")),
+                "experience": _clean_optional_text(guides.get("experience")),
+                "catalog": _clean_optional_text(guides.get("catalog")),
+                "plugin": _clean_optional_text(guides.get("plugin")),
+                "bookings": _clean_optional_text(guides.get("bookings")),
+                "integrations": _clean_optional_text(guides.get("integrations")),
+                "billing": _clean_optional_text(guides.get("billing")),
+                "team": _clean_optional_text(guides.get("team")),
+            },
+        },
+        "members": [
+            {
+                "email": str(item.get("email") or ""),
+                "full_name": _clean_optional_text(item.get("full_name")),
+                "role": str(item.get("role") or "operator"),
+                "status": str(item.get("status") or "active"),
+                "auth_provider": _clean_optional_text(item.get("auth_provider")),
+                "created_at": _clean_optional_text(item.get("created_at")),
+                "updated_at": _clean_optional_text(item.get("updated_at")),
+            }
+            for item in members
+        ],
+        "services": [build_service_merchant_item(item) for item in services],
+    }
 
 
 def _normalize_whatsapp_phone(value: str | None) -> str | None:
@@ -660,16 +815,31 @@ async def seed_default_service_catalog(
 async def load_active_service_catalog(request: Request) -> list[ServiceCatalogItem]:
     booking_service: BookingAssistantService = request.app.state.booking_assistant_service
     demo_catalog = booking_service.get_catalog().services
+    tenant_ref = (request.query_params.get("tenant_ref") or "").strip()
+
     async with get_session(request.app.state.session_factory) as session:
+        query = select(ServiceMerchantProfile).where(ServiceMerchantProfile.is_active == 1)
+
+        if tenant_ref:
+            tenant_repository = TenantRepository(RepositoryContext(session=session))
+            tenant_id = await tenant_repository.resolve_tenant_id(tenant_ref)
+            if not tenant_id:
+                return []
+            query = query.where(
+                ServiceMerchantProfile.tenant_id == tenant_id,
+                ServiceMerchantProfile.publish_state == "published",
+            )
+
         imported = (
             await session.execute(
-                select(ServiceMerchantProfile)
-                .where(ServiceMerchantProfile.is_active == 1)
-                .order_by(desc(ServiceMerchantProfile.featured), ServiceMerchantProfile.updated_at.desc())
+                query.order_by(desc(ServiceMerchantProfile.featured), ServiceMerchantProfile.updated_at.desc())
             )
         ).scalars().all()
 
     imported_catalog = [build_service_catalog_item(item) for item in imported]
+    if tenant_ref:
+        return imported_catalog
+
     if not imported_catalog:
         return demo_catalog
 
@@ -856,45 +1026,70 @@ async def booking_assistant_chat_stream(
     openai_service: OpenAIService = request.app.state.openai_service
     catalog = await load_active_service_catalog(request)
 
-    ranked = booking_service._rank_services(
-        payload.message,
-        services=catalog,
-        user_latitude=payload.user_latitude,
-        user_longitude=payload.user_longitude,
-        user_locality=payload.user_locality,
-        precomputed_signals=None,
-    )
-    shortlist = booking_service._curate_service_matches(
-        [item.service for item in ranked[:12]]
-    )
-    import json as _json
+    fallback_text = "I can help you find and book the right service. What are you looking for today?"
+    fallback_headers = {
+        "Cache-Control": "no-cache",
+        "X-Accel-Buffering": "no",
+    }
+
+    try:
+        ranked = _rank_services(
+            payload.message,
+            services=catalog,
+            user_latitude=payload.user_latitude,
+            user_longitude=payload.user_longitude,
+            user_locality=payload.user_locality,
+            precomputed_signals=None,
+        )
+        shortlist = _curate_service_matches(
+            [item.service for item in ranked[:12]],
+            limit=6,
+        )
+    except Exception as exc:
+        logger.warning("booking_assistant_chat_stream_rank_failed: %s", exc)
+
+        async def fallback_stream():
+            yield f"data: {json.dumps({'type': 'token', 'text': fallback_text})}\n\n"
+            yield (
+                f"data: {json.dumps({'type': 'done', 'matched_services': [], 'suggested_service_id': None, 'should_request_location': False})}\n\n"
+            )
+
+        return StreamingResponse(
+            fallback_stream(),
+            media_type="text/event-stream",
+            headers=fallback_headers,
+        )
 
     async def event_stream():
-        matched_services_payload = [s.model_dump() for s in shortlist]
+        matched_services_payload = [_model_dump_compat(s) for s in shortlist]
         suggested_id = shortlist[0].id if shortlist else None
-        async for chunk in openai_service.booking_assistant_streaming_reply(
-            message=payload.message,
-            conversation=payload.conversation,
-            services=shortlist,
-        ):
-            if chunk.startswith("data: ") and '"type":"done"' in chunk:
-                done_payload = _json.dumps({
-                    "type": "done",
-                    "matched_services": matched_services_payload,
-                    "suggested_service_id": suggested_id,
-                    "should_request_location": False,
-                })
-                yield f"data: {done_payload}\n\n"
-            else:
-                yield chunk
+        try:
+            async for chunk in openai_service.booking_assistant_streaming_reply(
+                message=payload.message,
+                conversation=payload.conversation,
+                services=shortlist,
+            ):
+                if chunk.startswith("data: ") and '"type":"done"' in chunk:
+                    done_payload = json.dumps({
+                        "type": "done",
+                        "matched_services": matched_services_payload,
+                        "suggested_service_id": suggested_id,
+                        "should_request_location": False,
+                    })
+                    yield f"data: {done_payload}\n\n"
+                else:
+                    yield chunk
+        except Exception as exc:
+            logger.warning("booking_assistant_chat_stream_failed: %s", exc)
+            yield f"data: {json.dumps({'type': 'token', 'text': fallback_text})}\n\n"
+            yield (
+                f"data: {json.dumps({'type': 'done', 'matched_services': matched_services_payload, 'suggested_service_id': suggested_id, 'should_request_location': False})}\n\n"
+            )
 
     return StreamingResponse(
         event_stream(),
         media_type="text/event-stream",
-        headers={
-            "Cache-Control": "no-cache",
-            "X-Accel-Buffering": "no",
-        },
+        headers=fallback_headers,
     )
 
 
@@ -2154,6 +2349,444 @@ async def admin_config(
             }
             for key, value, category, is_secret in raw_items
         ],
+    )
+
+
+@api.get("/admin/tenants", response_model=AdminTenantListResponse)
+async def admin_tenants(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+) -> AdminTenantListResponse:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        items = await _admin_list_tenants(session)
+
+    return AdminTenantListResponse(status="ok", items=items)
+
+
+@api.get("/admin/tenants/{tenant_ref}", response_model=AdminTenantDetailResponse)
+async def admin_tenant_detail(
+    tenant_ref: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+) -> AdminTenantDetailResponse:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        payload = await _admin_get_tenant_detail_payload(session, tenant_ref)
+
+    return AdminTenantDetailResponse(**payload)
+
+
+@api.patch("/admin/tenants/{tenant_ref}", response_model=AdminTenantDetailResponse)
+async def admin_tenant_update(
+    tenant_ref: str,
+    payload: AdminTenantProfileUpdateRequest,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+) -> AdminTenantDetailResponse:
+    admin_actor = require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref)
+        if not tenant_profile:
+            raise HTTPException(status_code=404, detail="Tenant was not found")
+
+        tenant_id = str(tenant_profile.get("id") or "")
+        updated_profile = await tenant_repository.update_tenant_profile(
+            tenant_id=tenant_id,
+            name=_clean_optional_text(payload.business_name),
+            industry=_clean_optional_text(payload.industry),
+            timezone=_clean_optional_text(payload.timezone),
+            locale=_clean_optional_text(payload.locale),
+        )
+        if not updated_profile:
+            raise HTTPException(status_code=404, detail="Tenant was not found")
+
+        workspace_guides = {
+            "overview": payload.guide_overview,
+            "experience": payload.guide_experience,
+            "catalog": payload.guide_catalog,
+            "plugin": payload.guide_plugin,
+            "bookings": payload.guide_bookings,
+            "integrations": payload.guide_integrations,
+            "billing": payload.guide_billing,
+            "team": payload.guide_team,
+        }
+        sanitized_guides = {
+            key: str(value).strip()
+            for key, value in workspace_guides.items()
+            if value is not None and str(value).strip()
+        }
+        workspace_settings: dict[str, object] = {}
+        if _clean_optional_text(payload.logo_url):
+            workspace_settings["logo_url"] = str(payload.logo_url).strip()
+        if _clean_optional_text(payload.hero_image_url):
+            workspace_settings["hero_image_url"] = str(payload.hero_image_url).strip()
+        sanitized_intro_html = _sanitize_workspace_html(payload.introduction_html)
+        if sanitized_intro_html:
+            workspace_settings["introduction_html"] = sanitized_intro_html
+        if sanitized_guides:
+            workspace_settings["guides"] = sanitized_guides
+        if workspace_settings:
+            await tenant_repository.upsert_tenant_settings(
+                tenant_id=tenant_id,
+                settings_json={"tenant_workspace": workspace_settings},
+            )
+
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="admin.tenant.profile_updated",
+            entity_type="tenant_profile",
+            entity_id=tenant_id,
+            actor_type="admin_operator",
+            actor_id=admin_actor,
+            payload={
+                "summary": "Tenant profile updated from the admin workspace.",
+                "business_name": updated_profile.get("name"),
+                "industry": updated_profile.get("industry"),
+                "timezone": updated_profile.get("timezone"),
+                "locale": updated_profile.get("locale"),
+            },
+        )
+        await session.commit()
+        detail_payload = await _admin_get_tenant_detail_payload(session, tenant_ref)
+
+    return AdminTenantDetailResponse(**detail_payload)
+
+
+@api.patch("/admin/tenants/{tenant_ref}/members/{member_email}", response_model=AdminTenantDetailResponse)
+async def admin_tenant_member_update(
+    tenant_ref: str,
+    member_email: str,
+    payload: AdminTenantMemberAccessUpdateRequest,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+) -> AdminTenantDetailResponse:
+    admin_actor = require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref)
+        if not tenant_profile:
+            raise HTTPException(status_code=404, detail="Tenant was not found")
+
+        tenant_id = str(tenant_profile.get("id") or "")
+        normalized_email = member_email.strip().lower()
+        membership = (
+            await session.execute(
+                select(TenantUserMembership).where(
+                    TenantUserMembership.tenant_id == tenant_id,
+                    TenantUserMembership.email == normalized_email,
+                )
+            )
+        ).scalar_one_or_none()
+        if not membership:
+            raise HTTPException(status_code=404, detail="Tenant member was not found")
+
+        if payload.full_name is not None:
+            membership.full_name = payload.full_name.strip() or None
+
+        updated_member = await tenant_repository.update_tenant_member_access(
+            tenant_id=tenant_id,
+            email=normalized_email,
+            role=_clean_optional_text(payload.role),
+            status=_clean_optional_text(payload.status),
+        )
+        if not updated_member:
+            raise HTTPException(status_code=404, detail="Tenant member was not found")
+
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="admin.tenant.member_updated",
+            entity_type="tenant_member",
+            entity_id=normalized_email,
+            actor_type="admin_operator",
+            actor_id=admin_actor,
+            payload={
+                "summary": "Tenant member access updated from the admin workspace.",
+                "email": updated_member.get("email"),
+                "role": updated_member.get("role"),
+                "status": updated_member.get("status"),
+            },
+        )
+        await session.commit()
+        detail_payload = await _admin_get_tenant_detail_payload(session, tenant_ref)
+
+    return AdminTenantDetailResponse(**detail_payload)
+
+
+@api.post("/admin/tenants/{tenant_ref}/services", response_model=AdminTenantCatalogResponse)
+async def admin_tenant_service_create(
+    tenant_ref: str,
+    payload: AdminTenantCatalogUpsertRequest,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+) -> AdminTenantCatalogResponse:
+    admin_actor = require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref)
+        if not tenant_profile:
+            raise HTTPException(status_code=404, detail="Tenant was not found")
+
+        tenant_id = str(tenant_profile.get("id") or "")
+        tenant_slug = str(tenant_profile.get("slug") or "")
+        requested_service_id = _clean_optional_text(payload.service_id)
+        service_id = requested_service_id or slugify_value(f"{tenant_slug}-{payload.name}")
+        existing = (
+            await session.execute(
+                select(ServiceMerchantProfile).where(ServiceMerchantProfile.service_id == service_id)
+            )
+        ).scalar_one_or_none()
+        if existing:
+            service_id = slugify_value(f"{tenant_slug}-{payload.name}-{secrets.token_hex(2)}")
+
+        mapped_values = {
+            "service_id": service_id,
+            "tenant_id": tenant_id,
+            "business_name": _clean_optional_text(payload.business_name)
+            or str(tenant_profile.get("name") or tenant_slug),
+            "business_email": _clean_optional_text(payload.business_email),
+            "name": payload.name.strip(),
+            "category": _clean_optional_text(payload.category),
+            "summary": _clean_optional_text(payload.summary),
+            "amount_aud": payload.amount_aud,
+            "currency_code": (_clean_optional_text(payload.currency_code) or "AUD").upper(),
+            "display_price": _clean_optional_text(payload.display_price),
+            "duration_minutes": payload.duration_minutes,
+            "venue_name": _clean_optional_text(payload.venue_name),
+            "location": _clean_optional_text(payload.location),
+            "map_url": _clean_optional_text(payload.map_url),
+            "booking_url": _clean_optional_text(payload.booking_url),
+            "image_url": _clean_optional_text(payload.image_url),
+            "source_url": _clean_optional_text(payload.source_url),
+            "tags_json": [str(tag).strip() for tag in (payload.tags or []) if str(tag).strip()],
+            "featured": 1 if payload.featured else 0,
+            "is_active": 0,
+        }
+        mapped_values, quality_warnings = apply_catalog_quality_gate(mapped_values)
+        requested_publish_state = (_clean_optional_text(payload.publish_state) or "draft").lower()
+        if requested_publish_state == "published" and quality_warnings:
+            raise HTTPException(
+                status_code=422,
+                detail="This service cannot be published until booking-critical fields are complete.",
+            )
+        if requested_publish_state == "archived":
+            mapped_values["publish_state"] = "archived"
+            mapped_values["is_active"] = 0
+        elif requested_publish_state == "published":
+            mapped_values["publish_state"] = "published"
+            mapped_values["is_active"] = 1
+        else:
+            mapped_values["publish_state"] = "review" if quality_warnings else "draft"
+            mapped_values["is_active"] = 0
+
+        service = ServiceMerchantProfile(**mapped_values)
+        session.add(service)
+        await session.flush()
+
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="admin.tenant.service_created",
+            entity_type="service_catalog",
+            entity_id=service.service_id,
+            actor_type="admin_operator",
+            actor_id=admin_actor,
+            payload={
+                "summary": "Tenant service created from the admin workspace.",
+                "service_name": service.name,
+                "publish_state": service.publish_state,
+            },
+        )
+        await session.commit()
+        detail_payload = await _admin_get_tenant_detail_payload(session, tenant_ref)
+
+    return AdminTenantCatalogResponse(
+        status="ok",
+        tenant=detail_payload["tenant"],
+        items=detail_payload["services"],
+    )
+
+
+@api.put("/admin/tenants/{tenant_ref}/services/{service_row_id}", response_model=AdminTenantCatalogResponse)
+async def admin_tenant_service_update(
+    tenant_ref: str,
+    service_row_id: int,
+    payload: AdminTenantCatalogUpsertRequest,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+) -> AdminTenantCatalogResponse:
+    admin_actor = require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref)
+        if not tenant_profile:
+            raise HTTPException(status_code=404, detail="Tenant was not found")
+
+        tenant_id = str(tenant_profile.get("id") or "")
+        service = await session.get(ServiceMerchantProfile, service_row_id)
+        if not service or str(service.tenant_id or "") != tenant_id:
+            raise HTTPException(status_code=404, detail="Tenant service was not found")
+
+        service.business_name = _clean_optional_text(payload.business_name) or service.business_name
+        service.business_email = _clean_optional_text(payload.business_email)
+        service.name = payload.name.strip()
+        service.category = _clean_optional_text(payload.category)
+        service.summary = _clean_optional_text(payload.summary)
+        service.amount_aud = payload.amount_aud
+        service.currency_code = (_clean_optional_text(payload.currency_code) or service.currency_code or "AUD").upper()
+        service.display_price = _clean_optional_text(payload.display_price)
+        service.duration_minutes = payload.duration_minutes
+        service.venue_name = _clean_optional_text(payload.venue_name)
+        service.location = _clean_optional_text(payload.location)
+        service.map_url = _clean_optional_text(payload.map_url)
+        service.booking_url = _clean_optional_text(payload.booking_url)
+        service.image_url = _clean_optional_text(payload.image_url)
+        service.source_url = _clean_optional_text(payload.source_url)
+        service.tags_json = [str(tag).strip() for tag in (payload.tags or []) if str(tag).strip()]
+        service.featured = 1 if payload.featured else 0
+
+        mapped_values, quality_warnings = apply_catalog_quality_gate(
+            {
+                "name": service.name,
+                "category": service.category,
+                "summary": service.summary,
+                "amount_aud": service.amount_aud,
+                "currency_code": service.currency_code,
+                "display_price": service.display_price,
+                "duration_minutes": service.duration_minutes,
+                "venue_name": service.venue_name,
+                "location": service.location,
+                "map_url": service.map_url,
+                "booking_url": service.booking_url,
+                "image_url": service.image_url,
+                "source_url": service.source_url,
+                "tags_json": list(service.tags_json or []),
+                "featured": service.featured,
+                "business_name": service.business_name,
+                "business_email": service.business_email,
+                "tenant_id": service.tenant_id,
+                "service_id": service.service_id,
+            }
+        )
+        service.business_name = str(mapped_values.get("business_name") or service.business_name)
+        service.business_email = mapped_values.get("business_email")
+        service.category = mapped_values.get("category")
+        service.summary = mapped_values.get("summary")
+        service.amount_aud = mapped_values.get("amount_aud")
+        service.display_price = mapped_values.get("display_price")
+        service.duration_minutes = mapped_values.get("duration_minutes")
+        service.venue_name = mapped_values.get("venue_name")
+        service.location = mapped_values.get("location")
+        service.map_url = mapped_values.get("map_url")
+        service.booking_url = mapped_values.get("booking_url")
+        service.image_url = mapped_values.get("image_url")
+        service.source_url = mapped_values.get("source_url")
+        service.tags_json = list(mapped_values.get("tags_json") or [])
+
+        requested_publish_state = (_clean_optional_text(payload.publish_state) or service.publish_state or "draft").lower()
+        if requested_publish_state == "published" and quality_warnings:
+            raise HTTPException(
+                status_code=422,
+                detail="This service cannot be published until booking-critical fields are complete.",
+            )
+        if requested_publish_state == "archived":
+            service.publish_state = "archived"
+            service.is_active = 0
+        elif requested_publish_state == "published":
+            service.publish_state = "published"
+            service.is_active = 1
+        else:
+            service.publish_state = "review" if quality_warnings else "draft"
+            service.is_active = 0
+
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="admin.tenant.service_updated",
+            entity_type="service_catalog",
+            entity_id=service.service_id,
+            actor_type="admin_operator",
+            actor_id=admin_actor,
+            payload={
+                "summary": "Tenant service updated from the admin workspace.",
+                "service_name": service.name,
+                "publish_state": service.publish_state,
+            },
+        )
+        await session.commit()
+        detail_payload = await _admin_get_tenant_detail_payload(session, tenant_ref)
+
+    return AdminTenantCatalogResponse(
+        status="ok",
+        tenant=detail_payload["tenant"],
+        items=detail_payload["services"],
+    )
+
+
+@api.delete("/admin/tenants/{tenant_ref}/services/{service_row_id}", response_model=AdminTenantCatalogResponse)
+async def admin_tenant_service_delete(
+    tenant_ref: str,
+    service_row_id: int,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+) -> AdminTenantCatalogResponse:
+    admin_actor = require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_ref)
+        if not tenant_profile:
+            raise HTTPException(status_code=404, detail="Tenant was not found")
+
+        tenant_id = str(tenant_profile.get("id") or "")
+        service = await session.get(ServiceMerchantProfile, service_row_id)
+        if not service or str(service.tenant_id or "") != tenant_id:
+            raise HTTPException(status_code=404, detail="Tenant service was not found")
+        if str(service.publish_state or "draft") == "published":
+            raise HTTPException(
+                status_code=422,
+                detail="Archive the service before deleting it from the admin workspace.",
+            )
+
+        deleted_service_id = service.service_id
+        deleted_service_name = service.name
+        await session.delete(service)
+        audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+        await audit_repository.append_entry(
+            tenant_id=tenant_id,
+            event_type="admin.tenant.service_deleted",
+            entity_type="service_catalog",
+            entity_id=deleted_service_id,
+            actor_type="admin_operator",
+            actor_id=admin_actor,
+            payload={
+                "summary": "Tenant service deleted from the admin workspace.",
+                "service_name": deleted_service_name,
+            },
+        )
+        await session.commit()
+        detail_payload = await _admin_get_tenant_detail_payload(session, tenant_ref)
+
+    return AdminTenantCatalogResponse(
+        status="ok",
+        tenant=detail_payload["tenant"],
+        items=detail_payload["services"],
     )
 
 

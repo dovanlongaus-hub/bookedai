@@ -19,6 +19,7 @@ It is designed to be reused for:
 Primary inheritance:
 
 - `docs/architecture/crm-email-revenue-lifecycle-strategy.md`
+- `docs/architecture/bookedai-zoho-crm-integration-map.md`
 - `docs/development/tenant-implementation-requirements-framework.md`
 - `docs/development/tenant-onboarding-operations-checklist.md`
 
@@ -73,6 +74,11 @@ This is the default rule for all tenants unless a later architecture decision ex
 1. A user chats, submits an enquiry, or creates a booking request on a tenant website.
 2. BookedAI stores local contact, lead, booking-intent, attribution, and audit state first.
 3. BookedAI writes a CRM sync record locally before any external Zoho write is considered successful.
+4. The default outbound mapping now follows:
+   - local lead capture -> `Leads`
+   - local contact/customer profile -> `Contacts`
+   - booking intent with commercial value -> `Deals`
+   - callback or schedule-confirmation follow-up -> `Tasks`
 
 ### Qualification
 
@@ -85,6 +91,7 @@ This is the default rule for all tenants unless a later architecture decision ex
 1. Zoho pipeline stages express the commercial journey.
 2. BookedAI remains authoritative for operational facts such as chat summary, selected service, location preference, and booking reference.
 3. Zoho tasks are created only for human follow-up, callback, or scheduling confirmation.
+4. Admin and tenant dashboards should later read CRM stage, owner, and latest activity back into BookedAI as commercial intelligence rather than letting Zoho overwrite local booking truth.
 
 ### Feedback loop
 
@@ -124,6 +131,98 @@ Connection data should be stored in BookedAI as:
 - safe config summary for UI visibility
 - sensitive secrets in environment or secret manager
 - sync and retry status in `crm_sync_records` and `crm_sync_errors`
+
+### Current runtime slice
+
+The current repo now includes the first runtime activation slice for this design:
+
+- backend settings now load:
+  - `ZOHO_CRM_API_BASE_URL`
+  - `ZOHO_CRM_ACCESS_TOKEN`
+  - `ZOHO_CRM_REFRESH_TOKEN`
+  - `ZOHO_CRM_CLIENT_ID`
+  - `ZOHO_CRM_CLIENT_SECRET`
+  - `ZOHO_CRM_DEFAULT_LEAD_MODULE`
+  - `ZOHO_CRM_DEFAULT_CONTACT_MODULE`
+  - `ZOHO_CRM_DEFAULT_DEAL_MODULE`
+  - `ZOHO_CRM_DEFAULT_TASK_MODULE`
+- `backend/integrations/zoho_crm/adapter.py` now:
+  - accepts a short-lived direct access token for smoke tests
+  - prefers refresh-token exchange for durable server-side use
+  - respects `api_domain` returned by Zoho token refresh when present
+  - can fetch module metadata and field metadata for mapping validation
+- operator smoke-test route now exists at:
+  - `GET /api/v1/integrations/providers/zoho-crm/connection-test?module=Leads`
+
+This route is intended to answer three operator questions before any wider rollout:
+
+1. can BookedAI authenticate against this Zoho CRM org
+2. which modules are visible to the configured token
+3. which field API names exist on the requested module
+
+If the repo only has a direct access token, the smoke test can still work, but production posture should still move to refresh-token configuration before rollout is considered durable.
+
+The current repo now also includes the first local-first write-back slice for lead intake:
+
+- lead capture still stores BookedAI local contact and lead state first
+- `crm_sync_records` are still created before external success is assumed
+- when Zoho CRM credentials are present, BookedAI now attempts a `Leads` upsert using:
+  - `Last_Name`
+  - `Company`
+  - `Email`
+  - `Phone`
+  - `Lead_Source`
+  - `Lead_Status`
+- duplicate checking is now explicitly ordered through:
+  - `Email`
+  - `Phone`
+- if Zoho credentials are missing, sync status remains `pending`
+- if the lead has no email, sync moves to `manual_review_required`
+- if Zoho returns a retryable provider failure, sync moves to `failed`
+- if Zoho returns a non-retryable or payload-level failure, sync moves to `manual_review_required`
+- on success, the returned Zoho record id is stored as `external_entity_id` and the sync row moves to `synced`
+
+The next runtime slice is now also present:
+
+- `Contacts` upsert foundation now exists in the Zoho CRM adapter for later customer-sync and qualification flows
+- operator retry is no longer only a status toggle:
+  - retry execution can now replay a stored `lead` sync payload
+  - retry execution can now replay a stored `contact` sync payload
+  - replay reads the original payload from `crm_sync_records.payload`
+- replay updates the sync row again to `synced`, `failed`, or `manual_review_required` based on the actual Zoho result
+
+The admin workspace bridge is now also present:
+
+- root admin customer create and update actions can now call the backend CRM contact-sync lane
+- the bridge uses:
+  - `PUBLIC_API_URL`
+  - optional `ADMIN_API_TOKEN`
+- backend route now exists at:
+  - `POST /api/v1/integrations/crm-sync/contact`
+- this keeps the current architecture split intact:
+  - customer mutation still happens in the root admin workspace
+  - Zoho CRM orchestration still lives in the backend integration runtime
+
+The next write-back slice is now also in the repo:
+
+- booking-intent orchestration can now seed `Deals` and follow-up `Tasks` through the same ledger-first pattern used by lead/contact sync
+- both `/api/v1/bookings/intents` entrypoints now return a structured `crm_sync` block so the caller can see `lead`, `contact`, `deal`, and `task` posture from one response
+- a reusable linked-flow sample seed now exists at:
+  - `backend/migrations/sql/014_future_swim_crm_linked_flow_sample.sql`
+  - this gives Future Swim one end-to-end sample chain across `contacts`, `leads`, `booking_intents`, `payment_intents`, and `crm_sync_records`
+
+## 5.1 Role summary for BookedAI
+
+Use this interpretation whenever tenant rollout or operator docs need one short answer:
+
+- `Zoho CRM` manages the commercial relationship and sales follow-up
+- `BookedAI` manages AI capture, booking orchestration, attribution, lifecycle context, payment truth, retry posture, and dashboard intelligence
+
+This means:
+
+- when a user books or requests a callback in BookedAI, Zoho should receive the commercial object that sales needs
+- when sales updates owner, stage, or follow-up inside Zoho, BookedAI should later ingest that signal and reflect it in the dashboard
+- BookedAI dashboards should therefore combine local operational truth plus CRM commercial feedback instead of pretending one system alone is enough
 
 ## 6. Metadata and field strategy
 

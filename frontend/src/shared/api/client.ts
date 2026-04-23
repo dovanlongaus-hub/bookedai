@@ -6,6 +6,66 @@ function buildApiUrl(path: string) {
   return `${baseUrl}${normalizedPath}`;
 }
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function readDetailMessage(detail: unknown): string | null {
+  if (typeof detail === 'string' && detail.trim()) {
+    return detail.trim();
+  }
+
+  if (Array.isArray(detail)) {
+    const messages = detail
+      .map((item) => {
+        if (typeof item === 'string' && item.trim()) {
+          return item.trim();
+        }
+
+        if (isRecord(item) && typeof item.msg === 'string' && item.msg.trim()) {
+          return item.msg.trim();
+        }
+
+        return null;
+      })
+      .filter((message): message is string => Boolean(message));
+
+    return messages.length > 0 ? messages.join(' ') : null;
+  }
+
+  return null;
+}
+
+export function resolveApiErrorMessage(body: unknown, fallback: string): string {
+  if (isRecord(body)) {
+    const detailMessage = readDetailMessage(body.detail);
+    if (detailMessage) {
+      return detailMessage;
+    }
+
+    if (isRecord(body.error)) {
+      const errorDetailMessage = readDetailMessage(body.error.detail);
+      if (errorDetailMessage) {
+        return errorDetailMessage;
+      }
+
+      if (typeof body.error.message === 'string' && body.error.message.trim()) {
+        return body.error.message.trim();
+      }
+    }
+
+    if (typeof body.message === 'string' && body.message.trim()) {
+      return body.message.trim();
+    }
+  }
+
+  if (typeof body === 'string' && body.trim()) {
+    return body.trim();
+  }
+
+  return fallback;
+}
+
 async function parseResponseBody(response: Response) {
   if (response.status === 204) {
     return null;
@@ -41,7 +101,11 @@ export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T
   const body = await parseResponseBody(response);
 
   if (!response.ok) {
-    throw new ApiClientError(`API request failed: ${response.status}`, response.status, body);
+    throw new ApiClientError(
+      resolveApiErrorMessage(body, `API request failed: ${response.status}`),
+      response.status,
+      body,
+    );
   }
 
   return body as T;

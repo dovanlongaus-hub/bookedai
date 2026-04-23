@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>BookedAI Opening Slides Preview</title>
+  <style>
+    :root {
+      --bg: #050d18;
+      --bg2: #0b1730;
+      --panel: rgba(255,255,255,0.06);
+      --line: rgba(255,255,255,0.1);
+      --text: #f5f9ff;
+      --muted: #adc0da;
+      --accent: #6ee7ff;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      color: var(--text);
+      background:
+        radial-gradient(circle at top left, rgba(110,231,255,0.15), transparent 30%),
+        radial-gradient(circle at top right, rgba(139,92,246,0.18), transparent 32%),
+        linear-gradient(180deg, var(--bg), var(--bg2));
+      padding: 32px;
+    }
+    .wrap { max-width: 1220px; margin: 0 auto; display: grid; gap: 28px; }
+    .frame {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.35);
+    }
+    .head { padding: 18px 22px; border-bottom: 1px solid var(--line); }
+    .eyebrow { color: var(--accent); text-transform: uppercase; letter-spacing: .14em; font-size: 12px; font-weight: 700; }
+    .title { margin-top: 8px; font-size: 28px; }
+    img { display: block; width: 100%; height: auto; background: #09121f; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <section class="frame">
+      <div class="head"><div class="eyebrow">Slide 01</div><div class="title">AI revenue engine hero</div></div>
+      <img src="assets/bookedai-slide-01-infographic.svg" alt="Slide 1 preview" />
+    </section>
+    <section class="frame">
+      <div class="head"><div class="eyebrow">Slide 02</div><div class="title">Problem flow</div></div>
+      <img src="assets/bookedai-slide-02-problem-flow.svg" alt="Slide 2 preview" />
+    </section>
+    <section class="frame">
+      <div class="head"><div class="eyebrow">Slide 03</div><div class="title">Revenue continuity insight</div></div>
+      <img src="assets/bookedai-slide-03-insight-continuity.svg" alt="Slide 3 preview" />
+    </section>
+  </div>
+</body>
+</html>

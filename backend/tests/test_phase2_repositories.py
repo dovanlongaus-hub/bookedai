@@ -14,6 +14,7 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from repositories.audit_repository import AuditLogRepository
 from repositories.base import RepositoryContext
+from repositories.crm_repository import CrmSyncRepository
 from repositories.idempotency_repository import IdempotencyRepository
 from repositories.outbox_repository import OutboxRepository
 from repositories.webhook_repository import WebhookEventRepository
@@ -158,6 +159,35 @@ class IdempotencyRepositoryTestCase(IsolatedAsyncioTestCase):
         params = execute.await_args.args[1]
         self.assertIn("update idempotency_keys", str(statement).lower())
         self.assertEqual(params["response_json"], json.dumps({"status": "pending"}))
+
+
+class CrmSyncRepositoryTestCase(IsolatedAsyncioTestCase):
+    async def test_update_sync_record_status_casts_last_synced_at_before_coalesce(self):
+        execute = AsyncMock(return_value=None)
+        repository = CrmSyncRepository(
+            RepositoryContext(
+                session=SimpleNamespace(execute=execute),
+                tenant_id="default-production-tenant",
+            )
+        )
+
+        await repository.update_sync_record_status(
+            tenant_id="tenant-test",
+            crm_sync_record_id=17,
+            sync_status="synced",
+            external_entity_id="zoho-contact-123",
+            mark_synced=True,
+        )
+
+        statement = execute.await_args.args[0]
+        params = execute.await_args.args[1]
+        self.assertIn(
+            "last_synced_at = coalesce(cast(:last_synced_at as timestamptz), last_synced_at)",
+            str(statement),
+        )
+        self.assertEqual(params["sync_status"], "synced")
+        self.assertEqual(params["external_entity_id"], "zoho-contact-123")
+        self.assertIsNotNone(params["last_synced_at"])
 
 
 class WebhookEventRepositoryTestCase(IsolatedAsyncioTestCase):

@@ -20,11 +20,6 @@ export type HomepageSuggestion = {
   query: string;
 };
 
-type HomepageSuggestionPool = {
-  day: number;
-  suggestions: HomepageSuggestion[];
-};
-
 export type HomepageContent = {
   navLinks: HomepageNavLink[];
   searchSuggestions: HomepageSuggestion[];
@@ -92,114 +87,33 @@ export const languageOptions: Array<{ value: HomepageLocale; label: string }> = 
   { value: 'vi', label: 'Tiếng Việt' },
 ];
 
-function normalizeDayIndex(dayIndex?: number) {
-  if (typeof dayIndex !== 'number' || Number.isNaN(dayIndex)) {
-    return new Date().getDay();
-  }
+const hotEnglishSuggestions: HomepageSuggestion[] = [
+  { label: 'Swim', query: 'Find a kids swim class near Caringbah this weekend.' },
+  { label: 'Chess', query: 'Find a kids chess class near Sydney this week.' },
+  { label: 'AI Event', query: 'Show upcoming AI events near Western Sydney this month.' },
+  { label: 'AI Mentor 1-1', query: 'Book an AI Mentor 1-1 session for startup growth this week.' },
+  { label: 'Haircut', query: 'Find a men\'s haircut near Sydney CBD this afternoon.' },
+  { label: 'Restaurant', query: 'Find a restaurant near me tonight with live booking or call details.' },
+];
 
-  const normalized = Math.floor(dayIndex) % 7;
-  return normalized < 0 ? normalized + 7 : normalized;
-}
+const hotVietnameseSuggestions: HomepageSuggestion[] = [
+  { label: 'Swim', query: 'Tìm lớp bơi cho trẻ em gần Caringbah vào cuối tuần này.' },
+  { label: 'Chess', query: 'Tìm lớp cờ vua cho trẻ em gần Sydney trong tuần này.' },
+  { label: 'AI Event', query: 'Tìm sự kiện AI sắp diễn ra gần Western Sydney trong tháng này.' },
+  { label: 'AI Mentor 1-1', query: 'Đặt buổi AI Mentor 1-1 cho startup trong tuần này.' },
+  { label: 'Haircut', query: 'Tìm lịch cắt tóc nam gần Sydney CBD vào chiều nay.' },
+  { label: 'Restaurant', query: 'Tìm nhà hàng gần tôi tối nay có link đặt bàn hoặc số điện thoại để gọi đặt chỗ.' },
+];
 
-function getDailySuggestions(
-  pools: HomepageSuggestionPool[],
-  fallback: HomepageSuggestion[],
-  dayIndex?: number,
-) {
-  const activeDay = normalizeDayIndex(dayIndex);
-  return pools.find((pool) => pool.day === activeDay)?.suggestions ?? fallback;
-}
-
-export function getHomepageContent(locale: HomepageLocale, dayIndex?: number): HomepageContent {
+export function getHomepageContent(locale: HomepageLocale): HomepageContent {
   if (locale === 'vi') {
-    const dailySuggestionPools: HomepageSuggestionPool[] = [
-      {
-        day: 0,
-        suggestions: [
-          { label: 'Kids sport', query: 'Tìm lớp bóng đá cho trẻ em gần Melbourne cho cuối tuần này.' },
-          { label: 'Tutor', query: 'Đặt gia sư toán Year 8 cho Chủ nhật này.' },
-          { label: 'Vet care', query: 'Tìm phòng khám thú y mở Chủ nhật gần tôi.' },
-          { label: 'Dental', query: 'Tìm lịch nha khoa cuối tuần gần Parramatta.' },
-          { label: 'Hair salon', query: 'Tôi cần đặt lịch cắt tóc nam ở Sydney vào chiều nay.' },
-        ],
-      },
-      {
-        day: 1,
-        suggestions: [
-          { label: 'Healthcare', query: 'Đặt lịch bulk-billing GP gần Sydney CBD vào sáng nay.' },
-          { label: 'Physio', query: 'Tìm cho tôi lịch physio gần Parramatta trong tuần này.' },
-          { label: 'Housing', query: 'Tôi cần thợ sửa điều hòa cho căn hộ ở Brisbane vào chiều nay.' },
-          { label: 'Cleaning', query: 'Đặt dịch vụ dọn nhà đầu tuần cho townhouse ở Sydney.' },
-          { label: 'NDIS', query: 'Tôi cần dịch vụ support worker NDIS tại nhà ở Western Sydney.' },
-        ],
-      },
-      {
-        day: 2,
-        suggestions: [
-          { label: 'Childcare', query: 'Tìm daycare hoặc after-school care gần Canberra còn chỗ trong tuần này.' },
-          { label: 'Dental', query: 'Tìm lịch nha khoa gần Parramatta cho kiểm tra răng trong tuần này.' },
-          { label: 'Healthcare', query: 'Đặt lịch telehealth GP cho chiều nay.' },
-          { label: 'Housing', query: 'Tôi cần thợ điện sửa ổ cắm ở căn hộ tại Melbourne hôm nay.' },
-          { label: 'Tutor', query: 'Đặt gia sư tiếng Anh cho học sinh tiểu học vào tối nay.' },
-        ],
-      },
-      {
-        day: 3,
-        suggestions: [
-          { label: 'Physio', query: 'Tìm lịch physio cho đau lưng gần Sydney Olympic Park.' },
-          { label: 'Hair salon', query: 'Đặt lịch cắt tóc và fade gần Sydney CBD vào tối nay.' },
-          { label: 'Cleaning', query: 'Tôi cần dịch vụ end-of-lease cleaning cho căn hộ 2 phòng ở Sydney.' },
-          { label: 'Vet care', query: 'Tìm lịch tiêm vaccine cho chó trong chiều nay.' },
-          { label: 'NDIS', query: 'Tìm dịch vụ community access NDIS cho tuần này.' },
-        ],
-      },
-      {
-        day: 4,
-        suggestions: [
-          { label: 'Housing', query: 'Tôi cần thợ sửa ống nước khẩn cấp cho nhà bếp ở Brisbane tối nay.' },
-          { label: 'Healthcare', query: 'Đặt lịch bulk-billing GP gần Sydney CBD vào sáng mai.' },
-          { label: 'Kids sport', query: 'Tìm lớp bơi cho trẻ em gần Melbourne cho cuối tuần này.' },
-          { label: 'Childcare', query: 'Tìm after-school care gần Canberra cho tuần tới.' },
-          { label: 'Tutor', query: 'Đặt gia sư toán cho cuối tuần này.' },
-        ],
-      },
-      {
-        day: 5,
-        suggestions: [
-          { label: 'Hair salon', query: 'Tôi cần đặt lịch cắt tóc nam ở Sydney vào chiều mai.' },
-          { label: 'Kids sport', query: 'Tìm lớp tennis cho trẻ em gần Melbourne cho thứ Bảy.' },
-          { label: 'Dental', query: 'Đặt lịch nha khoa sáng thứ Bảy gần Parramatta.' },
-          { label: 'Cleaning', query: 'Đặt dịch vụ dọn nhà trước cuối tuần ở Sydney.' },
-          { label: 'Vet care', query: 'Tìm phòng khám thú y gần tôi cho lịch khám thứ Bảy.' },
-        ],
-      },
-      {
-        day: 6,
-        suggestions: [
-          { label: 'Healthcare', query: 'Tìm phòng khám GP mở thứ Bảy gần Sydney CBD.' },
-          { label: 'Physio', query: 'Đặt lịch physio sáng thứ Bảy gần Parramatta.' },
-          { label: 'Housing', query: 'Tôi cần thợ sửa máy nước nóng cho căn hộ ở Brisbane cuối tuần này.' },
-          { label: 'Childcare', query: 'Tìm dịch vụ babysitter tại nhà tối thứ Bảy ở Melbourne.' },
-          { label: 'Tutor', query: 'Đặt gia sư ôn bài cho kỳ thi vào Chủ nhật.' },
-        ],
-      },
-    ];
-
-    const fallbackSuggestions: HomepageSuggestion[] = [
-      { label: 'Hair salon', query: 'Tôi cần đặt lịch cắt tóc nam ở Sydney vào chiều mai.' },
-      { label: 'Kids sport', query: 'Tìm lớp bóng đá cho trẻ em gần Melbourne cho cuối tuần này.' },
-      { label: 'Housing', query: 'Tôi cần thợ sửa điều hòa cho căn hộ ở Brisbane vào ngày mai.' },
-      { label: 'Healthcare', query: 'Đặt lịch bulk-billing GP gần Sydney CBD vào sáng mai.' },
-      { label: 'Dental', query: 'Tìm lịch nha khoa gần Parramatta cho kiểm tra răng trong tuần này.' },
-    ];
-
     return {
       navLinks: [
         { label: 'pitch.bookedai.au', href: pitchDeckHref },
         { label: 'Roadmap', href: roadmapHref },
         { label: 'Video Demo', href: videoDemoHref },
       ],
-      searchSuggestions: getDailySuggestions(dailySuggestionPools, fallbackSuggestions, dayIndex),
+      searchSuggestions: hotVietnameseSuggestions,
       menuSections: [
         {
           id: 'platform',
@@ -281,7 +195,7 @@ export function getHomepageContent(locale: HomepageLocale, dayIndex?: number): H
         resultsEmptyTitle: 'Một ô search. Một hành động rõ ràng.',
         resultsEmptyBody: 'Nhập dịch vụ bạn cần và BookedAI sẽ dựng shortlist, booking path và confirmation ngay trên trang này.',
         resultsLoadingTitle: 'Đang tìm kết quả phù hợp nhất',
-        resultsLoadingBody: 'BookedAI đang đọc intent dịch vụ, locality và booking path để chuẩn bị shortlist.',
+        resultsLoadingBody: 'BookedAI đang tìm nơi phù hợp nhất, kiểm tra khu vực liên quan và mở live search khi cần.',
         resultsQueryLabel: 'Truy vấn hiện tại',
         shortlistLabel: 'Shortlist',
         shortlistBody: 'Kết quả được hiển thị như một search surface độc lập, không phải popup assistant.',
@@ -324,94 +238,13 @@ export function getHomepageContent(locale: HomepageLocale, dayIndex?: number): H
     };
   }
 
-  const dailySuggestionPools: HomepageSuggestionPool[] = [
-    {
-      day: 0,
-      suggestions: [
-        { label: 'Kids sport', query: 'Find a kids football class near Melbourne for this weekend.' },
-        { label: 'Tutor', query: 'Book a Year 8 maths tutor for Sunday.' },
-        { label: 'Vet care', query: 'Find a Sunday vet appointment near me.' },
-        { label: 'Dental', query: 'Book a weekend dental check-up near Parramatta.' },
-        { label: 'Hair salon', query: 'I need a men’s haircut in Sydney this afternoon.' },
-      ],
-    },
-    {
-      day: 1,
-      suggestions: [
-        { label: 'Healthcare', query: 'Book a bulk-billing GP near Sydney CBD this morning.' },
-        { label: 'Physio', query: 'Find me a physio appointment near Parramatta this week.' },
-        { label: 'Housing', query: 'I need an aircon repair for my Brisbane apartment this afternoon.' },
-        { label: 'Cleaning', query: 'Book a start-of-week house cleaning for a Sydney townhouse.' },
-        { label: 'NDIS', query: 'I need an in-home NDIS support worker in Western Sydney.' },
-      ],
-    },
-    {
-      day: 2,
-      suggestions: [
-        { label: 'Childcare', query: 'Find a daycare or after-school care spot near Canberra this week.' },
-        { label: 'Dental', query: 'Find a dental check-up near Parramatta this week.' },
-        { label: 'Healthcare', query: 'Book a telehealth GP appointment for this afternoon.' },
-        { label: 'Housing', query: 'I need an electrician to fix power outlets in my Melbourne apartment today.' },
-        { label: 'Tutor', query: 'Book an English tutor for a primary school student tonight.' },
-      ],
-    },
-    {
-      day: 3,
-      suggestions: [
-        { label: 'Physio', query: 'Find a back pain physio near Sydney Olympic Park.' },
-        { label: 'Hair salon', query: 'Book a haircut and fade near Sydney CBD tonight.' },
-        { label: 'Cleaning', query: 'Book an end-of-lease cleaning service for a 2-bedroom apartment in Sydney.' },
-        { label: 'Vet care', query: 'Find a dog vaccination appointment for this afternoon.' },
-        { label: 'NDIS', query: 'Find an NDIS community access support service for this week.' },
-      ],
-    },
-    {
-      day: 4,
-      suggestions: [
-        { label: 'Housing', query: 'I need an emergency plumber for my Brisbane kitchen tonight.' },
-        { label: 'Healthcare', query: 'Book a bulk-billing GP near Sydney CBD tomorrow morning.' },
-        { label: 'Kids sport', query: 'Find a kids swimming class near Melbourne for this weekend.' },
-        { label: 'Childcare', query: 'Find after-school care near Canberra for next week.' },
-        { label: 'Tutor', query: 'Book a maths tutor for this weekend.' },
-      ],
-    },
-    {
-      day: 5,
-      suggestions: [
-        { label: 'Hair salon', query: 'I need a men’s haircut in Sydney tomorrow afternoon.' },
-        { label: 'Kids sport', query: 'Find a kids tennis class near Melbourne for Saturday.' },
-        { label: 'Dental', query: 'Book a Saturday morning dental check-up near Parramatta.' },
-        { label: 'Cleaning', query: 'Book a pre-weekend house cleaning in Sydney.' },
-        { label: 'Vet care', query: 'Find a Saturday vet appointment near me.' },
-      ],
-    },
-    {
-      day: 6,
-      suggestions: [
-        { label: 'Healthcare', query: 'Find a Saturday GP clinic near Sydney CBD.' },
-        { label: 'Physio', query: 'Book a Saturday morning physio appointment near Parramatta.' },
-        { label: 'Housing', query: 'I need a hot water repair for my Brisbane apartment this weekend.' },
-        { label: 'Childcare', query: 'Find an in-home babysitter for Saturday night in Melbourne.' },
-        { label: 'Tutor', query: 'Book an exam prep tutor for Sunday.' },
-      ],
-    },
-  ];
-
-  const fallbackSuggestions: HomepageSuggestion[] = [
-    { label: 'Hair salon', query: 'I need a men’s haircut in Sydney tomorrow afternoon.' },
-    { label: 'Kids sport', query: 'Find a kids football class near Melbourne for this weekend.' },
-    { label: 'Housing', query: 'I need an aircon repair for my Brisbane apartment tomorrow.' },
-    { label: 'Healthcare', query: 'Book a bulk-billing GP near Sydney CBD tomorrow morning.' },
-    { label: 'Dental', query: 'Find a dental check-up near Parramatta this week.' },
-  ];
-
   return {
     navLinks: [
       { label: 'pitch.bookedai.au', href: pitchDeckHref },
       { label: 'Roadmap', href: roadmapHref },
       { label: 'Video Demo', href: videoDemoHref },
     ],
-    searchSuggestions: getDailySuggestions(dailySuggestionPools, fallbackSuggestions, dayIndex),
+    searchSuggestions: hotEnglishSuggestions,
     menuSections: [
       {
         id: 'platform',
@@ -493,7 +326,7 @@ export function getHomepageContent(locale: HomepageLocale, dayIndex?: number): H
       resultsEmptyTitle: 'One search box. One clear action.',
       resultsEmptyBody: 'Type the service you need and BookedAI will build the shortlist, booking path, and confirmation flow directly on this page.',
       resultsLoadingTitle: 'BookedAI is finding the best option for your request.',
-      resultsLoadingBody: 'BookedAI is checking tenant matches first, then expanding carefully when a stronger public web option is needed.',
+      resultsLoadingBody: 'BookedAI is finding the most suitable place, checking the search area, and opening live search when needed.',
       resultsQueryLabel: 'Current query',
       shortlistLabel: 'Shortlist',
       shortlistBody: 'Ranked service matches appear here with the fastest next booking step.',
