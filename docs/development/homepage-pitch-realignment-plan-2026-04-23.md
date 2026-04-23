@@ -172,4 +172,18 @@ The first realignment pass is now materially present in code:
 - the homepage search experience now also carries staged progress messaging for slower matching conditions
 - the homepage booking flow now includes a safer fallback posture when the v1 booking write lane is degraded
 
+An additional refinement pass is now also locked for the parallel root Next.js homepage shell:
+
+- the shell keeps the approved BookedAI logo and the existing top navigation
+- the hero now follows a calmer search-led directory rhythm with one dominant search bar and lighter utility/supporting cues
+- the rest of the homepage now prefers fewer cards, quieter copy, wider spacing, lighter typography weight, and a whiter Google-like visual baseline instead of a dark glass-heavy landing stack
+
 This means the realignment now has both content-IA changes and search-flow quality changes attached to it.
+
+## Additional landing on `2026-04-23`
+
+The next refinement pass for this same plan is now also landed:
+
+- homepage was redeployed first so the release order matched the operator request before pitch work resumed
+- `PitchDeckApp.tsx` now starts with a more executive decision surface instead of a softer mixed intro, tightening the first-screen narrative around revenue workflow, rollout path, and conversion posture
+- the pitch host now opts into static partner proof through `PartnersSection`, which removes the known production CORS chatter from the previous live `/api/partners` fetch attempt on `pitch.bookedai.au`

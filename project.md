@@ -128,6 +128,7 @@ The current inherited truth is:
     - the homepage search surface now also exposes a staged in-progress matching treatment, with clearer search-progress labels, richer loading explanation, and contextual prompts that ask for suburb, time window, audience, or preference detail while search is still resolving
     - `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` now mirrors that same more professional matching-state treatment so homepage, popup, and embedded assistant flows do not drift in tone
     - `frontend/src/components/landing/sections/BookingAssistantSection.tsx` now uses a richer loading message that explains intent, locality, and shortlist checks instead of only showing a generic searching bubble
+    - the root Next.js homepage shell also moved into a calmer Google-like light-theme pass: the hero now keeps the existing logo and navigation but uses a cleaner search-led above-the-fold composition, while the rest of the page now uses fewer cards, wider whitespace, lighter typography, and quieter white/pale-blue sections instead of the earlier dark glass-heavy landing treatment
   - the same `Phase 7` growth lane then moved one step further on `2026-04-23` into the first messaging foundation:
     - FastAPI admin now exposes `/api/admin/messaging` plus source-specific detail and action routes for unified operator review
     - the first messaging workspace reads from `email_messages`, `outbox_events`, and `crm_sync_records` instead of inventing a disconnected communication-only store
@@ -1149,6 +1150,7 @@ Latest confirmed tenant baseline on `2026-04-19`:
   - tenant sign-in, invite acceptance, and email-led workspace creation can now run through one-time verification codes sent by email
   - Google continuation remains on the same login form as the fastest `sign in` and `create workspace` path
   - legacy username or password compatibility remains as a fallback seam, but it is no longer the primary tenant-login UX target
+- tenant Google verification was hardened again on `2026-04-23`: malformed, expired, or rejected Google identity tokens now return a tenant-facing `google_identity_token_invalid` response with a clear re-verify prompt instead of leaking the raw Google `400` tokeninfo failure path.
 - tenant sessions now survive reload and tenant switching safely
 - onboarding now includes business profile capture plus a visible progress model inside the tenant workspace
 - the tenant workspace now includes `billing` and `team` panels in addition to `overview`, `catalog`, `bookings`, and `integrations`
@@ -1453,6 +1455,24 @@ The documentation baseline now also includes an explicit API architecture and co
 Future API evolution work should review:
 
 - `docs/architecture/api-architecture-contract-strategy.md`
+
+## 2026-04-23 QA And Go-Live Hardening
+
+The current release-hardening baseline now also includes the latest public-surface fixes from the 2026-04-23 QA pass:
+
+- `frontend/src/apps/public/HomepageSearchExperience.tsx` now submits homepage search on `Enter` while preserving `Shift+Enter` for multiline input, so the live search shell matches the browser contract used by the public assistant release tests instead of depending only on button submit
+- the same homepage live-read runtime now prefers location-specific warning copy when `near me` searches cannot rank safely, avoiding duplicate exact warning text while keeping the shortlist empty and grounded
+- homepage return handling now reads `?booking=success|cancelled&ref=...` and surfaces the corresponding payment-return banner on the public homepage, aligning the homepage runtime with the richer post-payment states already covered in pricing and assistant flows
+- the broader 2026-04-23 hardening pass also preserved the earlier public/admin fixes from the same day: `/pitch-deck` pricing return banners, `/demo?demo=open` demo-brief dialog access, and Prompt 5 admin sidecar preview resilience
+
+## 2026-04-23 Homepage Redeploy And Pitch Redesign
+
+The public-surface realignment for `2026-04-23` now also includes a second release pass focused on sequence and clarity:
+
+- homepage was redeployed first through the live operator workflow and revalidated with a passing host healthcheck before further public-surface changes continued
+- `frontend/src/apps/public/PitchDeckApp.tsx` now opens with a more executive, decision-ready framing: clearer navigation labels, a sharper revenue-ops headline, buyer or operator or investor brief cards, a launch dashboard, and a compact decision rail instead of a softer mixed landing-page intro
+- `frontend/src/components/landing/sections/PartnersSection.tsx` now supports an explicit static-data mode, and the pitch surface uses that mode so `pitch.bookedai.au` no longer attempts the cross-origin `/api/partners` fetch that previously produced production CORS noise
+- this keeps the pitch host aligned with the public split already locked in docs: homepage stays lighter, pitch carries the longer-form commercial brief, and product remains the live runtime proof host
 
 ## Phase 1.5 Persistence Package Added
 

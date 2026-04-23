@@ -29,6 +29,7 @@ type PartnersSectionProps = {
   content: PartnersSectionContent;
   onStartTrial?: () => void;
   onBookDemo?: () => void;
+  preferStaticData?: boolean;
 };
 
 function isInfrastructurePartner(item: PartnerProfileItem) {
@@ -80,6 +81,7 @@ export function PartnersSection({
   content,
   onStartTrial,
   onBookDemo,
+  preferStaticData = false,
 }: PartnersSectionProps) {
   const [items, setItems] = useState<PartnerProfileItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -89,7 +91,7 @@ export function PartnersSection({
     let cancelled = false;
 
     async function loadPartners() {
-      if (shouldUseLocalStaticPublicData()) {
+      if (preferStaticData || shouldUseLocalStaticPublicData()) {
         setLoading(false);
         setError('');
         return;
@@ -129,7 +131,7 @@ export function PartnersSection({
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [preferStaticData]);
 
   const approvedPartnerNames = useMemo(
     () => new Set(fallbackPartners.map((partner) => partner.name.trim().toLowerCase())),

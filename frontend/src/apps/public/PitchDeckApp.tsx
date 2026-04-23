@@ -10,7 +10,6 @@ import {
   ctaContent,
   demoContent,
   flowSteps,
-  heroContent,
   implementationContent,
   metrics,
   partnersSectionContent,
@@ -52,12 +51,12 @@ const demoLandingUrl = 'https://demo.bookedai.au/';
 
 const pitchNavItems = [
   { id: 'overview', label: 'Overview' },
-  { id: 'flow-map', label: 'Flow' },
-  { id: 'agent-lane', label: 'Agent' },
+  { id: 'flow-map', label: 'Revenue Path' },
+  { id: 'agent-lane', label: 'Surfaces' },
   { id: 'problem', label: 'Problem' },
   { id: 'engine', label: 'Engine' },
   { id: 'architecture', label: 'Architecture' },
-  { id: 'proof', label: 'Proof' },
+  { id: 'proof', label: 'Demo' },
   { id: 'homepage-story', label: 'Homepage Story' },
   { id: 'team-members', label: 'Team' },
   { id: 'pricing', label: 'Pricing' },
@@ -118,6 +117,48 @@ const investorSignalCards = [
     title: 'Homepage sells. Product host proves.',
     body: 'The apex domain handles acquisition while `product.bookedai.au` carries the live booking and product-trial proof.',
   },
+];
+
+const pitchAudienceCards = [
+  {
+    eyebrow: 'Buyer brief',
+    title: 'See the offer in one screen',
+    body: 'The top of the pitch now reads like an executive product brief, not a stitched-together landing page.',
+  },
+  {
+    eyebrow: 'Operator brief',
+    title: 'Understand the rollout path fast',
+    body: 'Surface split, workflow depth, pricing, and proof stay visible so teams can decide without extra calls.',
+  },
+  {
+    eyebrow: 'Investor brief',
+    title: 'Track wedge, proof, and expansion logic',
+    body: 'The commercial story stays tight enough for diligence while still pointing back to live product proof.',
+  },
+];
+
+const launchTrackCards = [
+  {
+    label: 'Acquire',
+    value: 'Homepage + pitch',
+    detail: 'Explain the commercial story, trust, and rollout offer.',
+  },
+  {
+    label: 'Prove',
+    value: 'Product host',
+    detail: 'Show the actual search, shortlist, and booking experience.',
+  },
+  {
+    label: 'Convert',
+    value: 'Registration + pricing',
+    detail: 'Carry intent into a clean paid path with fewer handoffs.',
+  },
+];
+
+const decisionRail = [
+  'One public narrative for buyers, partners, and investor conversations.',
+  'One live product surface for search, shortlist, and booking proof.',
+  'One conversion path from launch offer to paid rollout.',
 ];
 
 const agentSurfaceCards = [
@@ -246,7 +287,7 @@ export function PitchDeckApp() {
           <div className="relative grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-stretch">
             <div className="min-w-0">
               <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-                Professional landing + pitch surface
+                Executive pitch surface
               </SignalPill>
 
               <div className="mt-6 rounded-[2rem] border border-white/70 bg-white/82 p-5 shadow-[0_20px_44px_rgba(15,23,42,0.06)] backdrop-blur">
@@ -259,39 +300,27 @@ export function PitchDeckApp() {
                 />
 
                 <h1 className="mt-8 max-w-5xl text-4xl font-semibold tracking-[-0.06em] text-[#1d1d1f] sm:text-5xl lg:text-7xl">
-                  The professional landing page for BookedAI's SME revenue, booking, and marketplace story.
+                  BookedAI turns service demand into booking-ready revenue without losing the handoff.
                 </h1>
                 <p className="mt-5 max-w-3xl text-base leading-8 text-black/64 sm:text-lg">
-                  This surface is where the earlier landing-page narrative, the investor-readable pitch deck, and the more polished commercial story now live together. `bookedai.au` stays product-first. `pitch.bookedai.au` carries the deeper explanation, proof, architecture, team, and pricing story.
+                  `pitch.bookedai.au` now acts as the clear commercial brief for BookedAI: problem, workflow, proof, architecture, pricing, and rollout path in one place. `bookedai.au` stays lighter and product-first. The product host keeps the live runtime proof.
                 </p>
 
                 <div className="mt-6 grid gap-3 lg:grid-cols-3">
-                  {[
-                    {
-                      title: 'For buyers',
-                      body: 'Explain the offer, trust the flow, then move into the live product when ready.',
-                    },
-                    {
-                      title: 'For investors',
-                      body: 'See wedge, workflow, architecture, commercial model, and why this can scale beyond one category.',
-                    },
-                    {
-                      title: 'For partners',
-                      body: 'Use one polished narrative surface instead of mixing product entry with long-form positioning.',
-                    },
-                  ].map((card) => (
+                  {pitchAudienceCards.map((card) => (
                     <div key={card.title} className="rounded-[1.35rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4">
-                      <div className="text-sm font-semibold text-[#1d1d1f]">{card.title}</div>
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/42">{card.eyebrow}</div>
+                      <div className="mt-2 text-sm font-semibold text-[#1d1d1f]">{card.title}</div>
                       <div className="mt-2 text-sm leading-6 text-black/62">{card.body}</div>
                     </div>
                   ))}
                 </div>
 
                 <div className="mt-6 flex flex-wrap gap-2">
-                  <VisualChip tone="brand">Professional landing</VisualChip>
-                  <VisualChip tone="light">Investor-readable pitch</VisualChip>
+                  <VisualChip tone="brand">Revenue workflow</VisualChip>
+                  <VisualChip tone="light">Investor-readable</VisualChip>
                   <VisualChip tone="light">Product proof connected</VisualChip>
-                  <VisualChip tone="light">SME marketplace direction</VisualChip>
+                  <VisualChip tone="light">Launch-ready pricing</VisualChip>
                 </div>
 
                 <div className="mt-8 flex flex-wrap gap-3">
@@ -323,10 +352,36 @@ export function PitchDeckApp() {
               <SectionCard className="border border-black/6 bg-white/72 p-5 text-[#1d1d1f] backdrop-blur">
                 <div className="flex items-center justify-between gap-3">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
-                    Revenue snapshot
+                    Launch dashboard
                   </div>
                   <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                    Landing-grade
+                    Go-to-market ready
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                  {launchTrackCards.map((card) => (
+                    <div
+                      key={card.label}
+                      className="rounded-[1.5rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4"
+                    >
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/46">
+                        {card.label}
+                      </div>
+                      <div className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#1d1d1f]">{card.value}</div>
+                      <div className="mt-2 text-sm leading-6 text-black/60">{card.detail}</div>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+
+              <SectionCard className="border border-black/6 bg-white/72 p-5 text-[#1d1d1f] backdrop-blur">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
+                    Revenue snapshot
+                  </div>
+                  <div className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-700">
+                    Live signals
                   </div>
                 </div>
 
@@ -340,6 +395,20 @@ export function PitchDeckApp() {
                       <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
                         {metric.label}
                       </div>
+                    </div>
+                  ))}
+                </div>
+              </SectionCard>
+
+              <SectionCard className="border border-black/6 bg-white/72 p-5 text-[#1d1d1f] backdrop-blur">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
+                  Decision rail
+                </div>
+                <div className="mt-4 grid gap-3">
+                  {decisionRail.map((item, index) => (
+                    <div key={item} className="rounded-[1.2rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/40">Decision {index + 1}</div>
+                      <div className="mt-2 text-sm leading-6 text-black/62">{item}</div>
                     </div>
                   ))}
                 </div>
@@ -828,6 +897,7 @@ export function PitchDeckApp() {
         content={partnersSectionContent}
         onStartTrial={openProductDemo}
         onBookDemo={() => openRegisterInterest('call_to_action', 'pitch_migrated_homepage_partners')}
+        preferStaticData
       />
 
       <section id="team-members" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">

@@ -94,6 +94,11 @@ Expected outcomes:
   - `pitch.bookedai.au` owns deeper pitch and migrated long-form homepage story
   - `product.bookedai.au` owns deeper live product proof
 - the active `2026-04-23` public UX direction now also includes an interaction-quality rule: BookedAI should feel like it is actively working during search and matching, not passively waiting, especially on homepage and assistant entry surfaces where slower ranking can otherwise feel broken
+- the calmer Google-like light-theme direction should now also be treated as inherited homepage truth for the parallel root Next.js shell:
+  - keep the approved BookedAI logo and existing top navigation
+  - prefer one dominant search-led opening surface over stacked marketing blocks
+  - prefer fewer support cards, wider whitespace, lighter type weight, and quieter CTA copy
+  - keep deeper narrative weight out of the main homepage body whenever the same content can live on `pitch.bookedai.au`
 
 Execution guardrail:
 
@@ -939,3 +944,6 @@ This package should be considered successfully executed when:
 - `2026-04-22`: the first `Phase 7` growth slice is now live at `/admin/campaigns`, with schema, seed, migration artifact, repository, API, navigation, and create/edit/archive UI coverage for tenant-scoped campaigns
 - `2026-04-22`: the `Campaigns` slice is intentionally tied to `sourceKey` plus UTM metadata so it opens from the existing attribution and revenue-reporting lane instead of becoming a disconnected marketing CRUD surface
 - `2026-04-22`: `/admin/reports` now also supports drill-down filters for `source`, `owner`, and `date range`, and all reporting cuts now run against the same selected scope
+- `2026-04-23`: the public-surface hardening lane now also includes homepage runtime polish in `HomepageSearchExperience.tsx`: `Enter` submits the search shell, `Shift+Enter` keeps multiline input, denied-location live-read searches stay warning-led without duplicate exact warning strings, and homepage Stripe-return params now render a booking success/cancel banner instead of dropping the customer back into a neutral shell
+- `2026-04-23`: browser release verification for that lane is now locked in the correct mode split: legacy admin/public/pricing/tenant slices pass, the homepage legacy return-banner spec passes again, and the full live-read public assistant plus location-guardrails batch is green (`19 passed, 2 skipped`)
+- `2026-04-23`: the same public lane now also includes a sequence-safe homepage redeploy followed by an executive redesign of `pitch.bookedai.au`; pitch now opens with a tighter decision-oriented brief, and its partner proof layer can intentionally stay on static approved logos so production no longer emits the previous `/api/partners` CORS noise on the pitch host
