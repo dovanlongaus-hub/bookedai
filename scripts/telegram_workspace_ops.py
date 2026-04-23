@@ -22,6 +22,7 @@ DEFAULT_TELEGRAM_ALLOWED_ACTIONS = {
     "workspace_write",
     "repo_structure",
     "host_command",
+    "host_shell",
     "full_project",
 }
 HOST_COMMAND_ALLOWED_PROGRAMS = {
@@ -51,6 +52,21 @@ def run_host_command(command: list[str]) -> int:
         completed = subprocess.run(command, check=False)
     else:
         completed = subprocess.run(["sudo", "-n", *command], check=False)
+    return completed.returncode
+
+
+def run_host_shell(command: str, *, cwd: Path | None = None) -> int:
+    shell_command = command if not cwd else f"cd {shlex.quote(str(cwd))} && {command}"
+    if os.geteuid() == 0:
+        completed = subprocess.run(
+            ["/bin/bash", "-lc", shell_command],
+            check=False,
+        )
+    else:
+        completed = subprocess.run(
+            ["sudo", "-n", "/bin/bash", "-lc", shell_command],
+            check=False,
+        )
     return completed.returncode
 
 
@@ -148,6 +164,11 @@ def resolve_workspace_path(path_value: str | None) -> Path:
     except ValueError as exc:
         raise ValueError("Workspace command paths must stay inside the BookedAI repo.") from exc
     return target
+
+
+def resolve_host_path(path_value: str | None) -> Path:
+    requested = Path(path_value or "/")
+    return requested.resolve()
 
 
 def resolve_host_command(command: str) -> list[str]:
@@ -259,6 +280,11 @@ def handle_host_command(args: argparse.Namespace) -> int:
     return run_host_command(command)
 
 
+def handle_host_shell(args: argparse.Namespace) -> int:
+    cwd = resolve_host_path(args.cwd)
+    return run_host_shell(args.command, cwd=cwd)
+
+
 def handle_permissions(args: argparse.Namespace) -> int:
     actor_id = resolve_telegram_actor(args)
     snapshot = permissions_snapshot(actor_id)
@@ -352,6 +378,14 @@ def build_parser() -> argparse.ArgumentParser:
     host_parser.add_argument("--command", required=True)
     host_parser.set_defaults(handler=handle_host_command)
 
+    host_shell_parser = subparsers.add_parser(
+        "host-shell",
+        help="Run a fully elevated host shell command anywhere on the server for trusted full-project operators.",
+    )
+    host_shell_parser.add_argument("--command", required=True)
+    host_shell_parser.add_argument("--cwd", default="/")
+    host_shell_parser.set_defaults(handler=handle_host_shell)
+
     permissions_parser = subparsers.add_parser(
         "permissions",
         help="Print the resolved Telegram allowlist and action permissions for the current actor.",
@@ -371,6 +405,7 @@ def main() -> int:
         "maintenance": {"maintenance"},
         "workspace-command": {"workspace_write", "repo_structure"},
         "host-command": {"host_command"},
+        "host-shell": {"host_shell"},
     }
     required_actions = required_actions_by_command.get(args.command)
     if required_actions:

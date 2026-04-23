@@ -28,6 +28,9 @@ docker compose --env-file deploy/openclaw/.env -f deploy/openclaw/docker-compose
 - The webchat elevated-exec path was also fixed on `2026-04-22`: live OpenClaw state now allows provider `webchat` under `tools.elevated.allowFrom`, and `openclaw-cli` now runs the long-lived node host command `openclaw node run --host 127.0.0.1 --port 18789 --display-name bookedai-host-cli` instead of exiting after the CLI help screen
 - Codex credentials are reused from `${CODEX_HOME_DIR}`
 - The `openclaw-cli` service is the elevated execution surface on this host: it runs as `root`, mounts the host filesystem at `/hostfs`, and mounts `/var/run/docker.sock` so trusted OpenClaw actions can operate across the VPS when needed
+- `python3 scripts/telegram_workspace_ops.py host-shell --command "..." --cwd /` is the full host-execution lane for trusted operators when `host_shell` or `full_project` is granted; unlike `workspace-command`, it is not restricted to the repo tree
+- The live Telegram channel now runs in allowlist mode for the trusted operator instead of DM pairing mode: `channels.telegram.dmPolicy="allowlist"` with `channels.telegram.allowFrom=["8426853622"]`, so trusted Telegram control no longer blocks on pairing approval first
+- `openclaw-cli` now also uses `restart: unless-stopped` in compose so the long-lived node host reconnects automatically if it starts before the gateway is ready or exits after an early gateway race
 - The `openclaw-gateway` service stays in its standard runtime mode so the Control UI and Telegram bridge do not inherit the same broad host privileges
 - The gateway can take several minutes to complete a cold start while plugins and channels initialize, so the compose healthcheck keeps a 12 minute startup grace to avoid false `unhealthy` states during normal boot
 - Telegram defaults should stay on DM pairing for safety

@@ -9,14 +9,20 @@ type WorkspaceConfig = {
 
 const workspaceConfigs: WorkspaceConfig[] = [
   {
-    id: 'operations',
-    label: 'Operations',
-    summary: 'Bookings, triage, confirmation follow-up, and operator review.',
+    id: 'overview',
+    label: 'Overview',
+    summary: 'Ops home, booking triage, support queues, and operator entry points.',
     backendSurface: '/api/admin/overview, /api/admin/bookings, /api/admin/bookings/{id}',
   },
   {
     id: 'tenants',
     label: 'Tenants',
+    summary: 'Tenant directory, health posture, and handoff into the editing workspace.',
+    backendSurface: '/api/admin/tenants and tenant selection state',
+  },
+  {
+    id: 'tenant-workspace',
+    label: 'Tenant Workspace',
     summary: 'Tenant identity, permissions, branding, HTML intro, and tenant catalog editing.',
     backendSurface:
       '/api/admin/tenants, /api/admin/tenants/{tenant}, members, services, media upload',
@@ -28,10 +34,35 @@ const workspaceConfigs: WorkspaceConfig[] = [
     backendSurface: '/api/admin/services, /api/admin/partners, /api/admin/upload',
   },
   {
+    id: 'billing-support',
+    label: 'Billing Support',
+    summary: 'Portal requests, payment attention, and booking follow-up context.',
+    backendSurface:
+      '/api/admin/overview portal queue plus /api/admin/bookings/{id} detail review',
+  },
+  {
+    id: 'integrations',
+    label: 'Integrations',
+    summary: 'CRM, email, webhook, and provider visibility with operator guidance.',
+    backendSurface: 'Current admin overview events plus tenant and reliability surfaces',
+  },
+  {
     id: 'reliability',
     label: 'Reliability',
     summary: 'Prompt 5 or Prompt 11 preview, config visibility, and route inventory.',
     backendSurface: '/api/v1/* preview routes plus /api/admin/config and /api/admin/apis',
+  },
+  {
+    id: 'audit-activity',
+    label: 'Audit & Activity',
+    summary: 'Recent communications, handoff context, and operator review chronology.',
+    backendSurface: '/api/admin/overview recent_events and support action state',
+  },
+  {
+    id: 'platform-settings',
+    label: 'Platform Settings',
+    summary: 'Admin-visible configuration and backend surface inventory for safe rollout review.',
+    backendSurface: '/api/admin/config and /api/admin/apis',
   },
 ];
 
@@ -54,11 +85,12 @@ export function AdminWorkspaceNav({
             Admin workspaces
           </div>
           <h2 className="template-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
-            Prompt 8 admin IA is now split by operator intent
+            Enterprise admin IA is now organized by business function
           </h2>
           <p className="template-body mt-2 max-w-3xl text-sm leading-7">
-            Each workspace keeps one operational job clear instead of forcing the whole admin
-            surface into a single scrolling dashboard.
+            The shell now follows the requested menu-first control-surface model so operators can
+            move from overview, tenants, billing, integrations, reliability, audit, and platform
+            settings without treating admin like one long mixed page.
           </p>
         </div>
         <div className="booked-note-surface px-4 py-3 text-sm text-black/70">
@@ -70,7 +102,7 @@ export function AdminWorkspaceNav({
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-4">
+      <div className="mt-6 grid gap-4 xl:grid-cols-3">
         {workspaceConfigs.map((workspace) => {
           const isActive = workspace.id === activeWorkspace;
           return (

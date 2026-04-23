@@ -58,7 +58,7 @@ They should inherit:
 - existing public, tenant, admin, portal, and integration code
 - existing compatibility shims where safe
 - an active refactor lane that must improve ownership without breaking current routes
-- Telegram/OpenClaw operator control that can now validate, restructure, deploy the whole repo, and run approved host-maintenance commands through the allowlisted `telegram_workspace_ops.py` surface when trusted actor ids are configured
+- Telegram/OpenClaw operator control that can now validate, restructure, deploy the whole repo, run approved host-maintenance commands, and open a trusted full host shell through `telegram_workspace_ops.py` when trusted actor ids are configured
 - OpenClaw Control UI now has an approved browser host target at `bot.bookedai.au` when gateway access needs a first-class operator surface
 
 ## Public
@@ -189,11 +189,19 @@ Expected outcomes:
   - Prisma schema parity now covers the richer customer, lead, and payment fields already used by the root admin UI
   - seed parity now includes those richer customer and lead fields
   - the root admin repository now prefers Prisma-backed reads and writes for dashboard, customers, leads, services, bookings, payments, and audit logs when Prisma is enabled
-  - the mock-store path is now a fallback instead of the only data path for the new root admin workspace
+- the mock-store path is now a fallback instead of the only data path for the new root admin workspace
 - that `Phase 2` lane then moved one step further on the same day:
   - Prisma models now also exist for `permissions`, `role_permissions`, `branches`, `tenant_settings`, `subscriptions`, and `invoices`
   - the root admin repository now also exposes preparatory Prisma-backed seams for users, roles, settings, and paginated payments
   - migration artifact `prisma/migrations/20260422034156_phase2_admin_prisma_parity/migration.sql` now exists for this broader data-layer expansion
+- rollout reality then tightened on `2026-04-23`:
+  - live `bookedai` database inspection confirmed the production schema is still the legacy tenant/backend shape and already conflicts with the unfinished Prisma admin table set
+  - root admin auth therefore now ships with a compatibility bridge that resolves identities from `tenant_user_memberships` and persists email codes into `tenant_email_login_codes` until Prisma is deliberately enabled on a schema-aligned database
+- the shared-frontend admin shell then moved one more practical step on `2026-04-23` into the first requirement-aligned IA package:
+  - `frontend/src/` admin now exposes the requested primary sections directly in-product: `Overview`, `Tenants`, `Tenant Workspace`, `Catalog`, `Billing Support`, `Integrations`, `Reliability`, `Audit & Activity`, and `Platform Settings`
+  - the tenant lane is now explicitly split into a lighter directory-selection surface and the deeper mutable tenant workspace, so tenant scope can be confirmed before profile, role, HTML, or catalog edits
+  - billing/support, integrations, audit/activity, and platform review now have their own route homes and operator guidance inside the shared frontend shell instead of waiting on every later backend module to land first
+  - `#operations` deep links remain backward-compatible by resolving into `#overview`, so the IA broadening does not break older operator bookmarks during the transition
 
 ## Billing
 

@@ -78,7 +78,9 @@ The current inherited truth is:
   - `SESSION_SIGNING_SECRET`
   - `TENANT_SESSION_SIGNING_SECRET`
   - `ADMIN_SESSION_SIGNING_SECRET`
-- legacy `ADMIN_API_TOKEN` and `ADMIN_PASSWORD` fallback still exists for compatibility, but should now be treated as migration support rather than the desired end-state
+- session signing no longer falls back to `ADMIN_API_TOKEN` or `ADMIN_PASSWORD`; actor-specific session secrets or `SESSION_SIGNING_SECRET` are now required
+- the root `Next.js` admin auth lane now defaults to per-user email verification codes at `/admin-login`, while password bootstrap auth has been reduced to an explicitly enabled break-glass path
+- until the Prisma admin schema is actually promoted into the live database, that root admin email-code lane now resolves identities from legacy tenant memberships and stores verification codes in legacy `tenant_email_login_codes`; Prisma-backed `admin_email_login_codes` remains the preferred path only when `BOOKEDAI_ENABLE_PRISMA=1`
 - the next admin productization wave is now requirements-locked through `docs/architecture/admin-enterprise-workspace-requirements.md`
 - the detailed implementation blueprint for that wave now lives in `docs/architecture/admin-workspace-blueprint.md`
 - that admin wave should now be interpreted as:
@@ -98,6 +100,11 @@ The current inherited truth is:
     - `Phase 6`: dashboard, reporting, and operator analytics expansion
     - `Phase 7`: growth modules such as campaigns, workflows, messaging, and automation
   - until the runtime decision changes explicitly, the root `Next.js` admin tree should be treated as the active implementation lane for the new admin workspace, while the deployed frontend source of truth for the broader product still remains `frontend/`
+  - the shared frontend admin runtime then moved one more practical step on `2026-04-23` into the first enterprise IA package:
+    - `frontend/src/components/AdminPage.tsx`, `frontend/src/features/admin/workspace-nav.tsx`, and `frontend/src/features/admin/workspace-insights.tsx` now expose a menu-first shell aligned to the locked requirements baseline
+    - the active admin shell now presents `Overview`, `Tenants`, `Tenant Workspace`, `Catalog`, `Billing Support`, `Integrations`, `Reliability`, `Audit & Activity`, and `Platform Settings` as first-class workspaces instead of stopping at the earlier four-workspace split
+    - the admin tenant lane is now intentionally separated into a lightweight tenant directory plus a deeper mutable tenant workspace, so operators can confirm scope before editing branding, roles, HTML content, or services
+    - the same package also gives admin explicit section-guidance and route homes for billing/support review, integrations review, audit chronology, and platform settings without waiting for every deeper backend read model to land first
   - the first `Phase 1` code slice is now present in the root admin lane:
     - signed admin session verification now uses `ADMIN_SESSION_SIGNING_SECRET` preference with shared fallback compatibility
     - root admin auth now exposes `POST /api/admin/auth/login`, `POST /api/admin/auth/logout`, `GET /api/admin/auth/me`, and `POST /api/admin/auth/switch-tenant`
@@ -358,7 +365,7 @@ Current checked-in repo truth:
 - data and infra:
   - `supabase/`, `deploy/`, `scripts/`, `storage/`
 - Telegram/OpenClaw live deploy authority is intentionally scoped to host-level elevated execution on the Docker VPS, with `scripts/deploy_live_host.sh` as the preferred entrypoint
-- Telegram/OpenClaw elevated repo and host-maintenance control now flows through `scripts/telegram_workspace_ops.py`, with trusted actor ids and allowed actions sourced from `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` plus `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS`
+- Telegram/OpenClaw elevated repo and host control now flows through `scripts/telegram_workspace_ops.py`, with trusted actor ids and allowed actions sourced from `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` plus `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS`
 
 Future work must not assume the repo is greenfield or single-runtime.
 
@@ -679,6 +686,7 @@ Live-promotion closure rule:
   - `python3 scripts/telegram_workspace_ops.py test --command "..."` for repo-scoped validation from Telegram/OpenClaw
   - `python3 scripts/telegram_workspace_ops.py workspace-command --command "..."` for broader Telegram-authorized BookedAI refactors, file-structure changes, and whole-project rollout steps
   - `python3 scripts/telegram_workspace_ops.py host-command --command "..."` for allowlisted host-maintenance commands such as `apt-get`, `docker`, `systemctl`, or `journalctl` without exposing a blanket root shell
+  - `python3 scripts/telegram_workspace_ops.py host-shell --cwd / --command "..."` for trusted full-server host execution when OpenClaw needs unrestricted `host/elevated` access outside the repo tree
 
 ### 5. Upgrade old features with full context
 

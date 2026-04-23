@@ -4,13 +4,31 @@ import { createAdminSessionToken } from "@/lib/auth/session";
 import { getAdminRepository } from "@/lib/db/admin-repository";
 import { adminAuthLoginSchema } from "@/lib/validation/admin";
 import { adminErrorResponse, adminJson } from "@/server/admin/api-responses";
-import { isValidAdminBootstrapPassword, resolveAdminIdentity } from "@/server/admin/identity";
+import {
+  canUseAdminBootstrap,
+  isAdminBootstrapEnabled,
+  isValidAdminBootstrapPassword,
+  resolveAdminIdentity,
+} from "@/server/admin/identity";
 import { withAdminSessionCookie } from "@/server/admin/session-cookie";
 
 export async function POST(request: Request) {
   try {
     const body = await request.json();
     const payload = adminAuthLoginSchema.parse(body);
+
+    if (!isAdminBootstrapEnabled()) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: "forbidden",
+            message: "Bootstrap admin login is disabled. Request a verification code instead.",
+          },
+        },
+        { status: 403 },
+      );
+    }
 
     if (!isValidAdminBootstrapPassword(payload.password)) {
       return NextResponse.json(
@@ -24,6 +42,18 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { ok: false, error: { code: "invalid_credentials", message: "Admin account not found." } },
         { status: 401 },
+      );
+    }
+    if (!canUseAdminBootstrap(identity)) {
+      return NextResponse.json(
+        {
+          ok: false,
+          error: {
+            code: "forbidden",
+            message: "This account is not allowed to use bootstrap admin login.",
+          },
+        },
+        { status: 403 },
       );
     }
 

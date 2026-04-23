@@ -363,8 +363,8 @@ def get_settings() -> Settings:
         whatsapp_verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", ""),
         admin_username=os.getenv("ADMIN_USERNAME", "admin"),
         admin_password=os.getenv(
-            "ADMIN_PASSWORD",
-            os.getenv("ADMIN_API_TOKEN", ""),
+            "ADMIN_BOOTSTRAP_PASSWORD",
+            os.getenv("ADMIN_PASSWORD", ""),
         ),
         admin_api_token=os.getenv("ADMIN_API_TOKEN", ""),
         session_signing_secret=os.getenv("SESSION_SIGNING_SECRET", ""),

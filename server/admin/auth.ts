@@ -8,6 +8,6 @@ export async function requireAdminSession(): Promise<AdminSession> {
   try {
     return await getAdminSession();
   } catch {
-    redirect("/?admin_auth=required");
+    redirect("/admin-login?reason=required");
   }
 }

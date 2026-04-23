@@ -1,9 +1,11 @@
-import { FormEvent, Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useState } from 'react';
 
 import { AdminBookingsSection } from '../features/admin/bookings-section';
 import { AdminDashboardHeader } from '../features/admin/dashboard-header';
 import { AdminEmailStatusNote } from '../features/admin/email-status-note';
+import { ApiInventorySection } from '../features/admin/api-inventory-section';
 import { AdminLoginScreen } from '../features/admin/login-screen';
+import { LiveConfigurationSection } from '../features/admin/live-configuration-section';
 import { TenantManagementSection } from '../features/admin/tenant-management-section';
 import { RecentEventsSection } from '../features/admin/recent-events-section';
 import { ServiceCatalogSection } from '../features/admin/service-catalog-section';
@@ -27,40 +29,52 @@ type ParsedAdminHash = {
 };
 
 const workspacePanels: Record<AdminWorkspaceId, AdminWorkspacePanelId[]> = {
-  operations: ['bookings', 'recent-events', 'selected-booking', 'portal-support'],
-  tenants: ['tenant-directory', 'tenant-profile', 'tenant-team', 'tenant-services'],
+  overview: ['bookings', 'recent-events', 'selected-booking', 'portal-support'],
+  tenants: ['tenant-directory'],
+  'tenant-workspace': ['tenant-profile', 'tenant-team', 'tenant-services'],
   catalog: ['service-catalog', 'partners'],
+  'billing-support': ['portal-support', 'selected-booking'],
+  integrations: ['integrations-health', 'recent-events'],
   reliability: ['prompt5-preview', 'live-configuration', 'api-inventory'],
+  'audit-activity': ['audit-events'],
+  'platform-settings': ['live-configuration', 'api-inventory'],
 };
 
 function isWorkspaceId(value: string): value is AdminWorkspaceId {
   return (
-    value === 'operations' ||
+    value === 'overview' ||
     value === 'tenants' ||
+    value === 'tenant-workspace' ||
     value === 'catalog' ||
-    value === 'reliability'
+    value === 'billing-support' ||
+    value === 'integrations' ||
+    value === 'reliability' ||
+    value === 'audit-activity' ||
+    value === 'platform-settings'
   );
 }
 
 function parseAdminHash(hash: string): ParsedAdminHash {
   const normalizedHash = hash.replace(/^#/, '').trim();
   if (!normalizedHash) {
-    return { workspace: 'operations', panel: null };
+    return { workspace: 'overview', panel: null };
   }
 
   const [workspaceCandidate, panelCandidate] = normalizedHash.split(':');
-  if (!isWorkspaceId(workspaceCandidate)) {
-    return { workspace: 'operations', panel: null };
+  const normalizedWorkspace =
+    workspaceCandidate === 'operations' ? 'overview' : workspaceCandidate;
+  if (!isWorkspaceId(normalizedWorkspace)) {
+    return { workspace: 'overview', panel: null };
   }
 
   if (!panelCandidate) {
-    return { workspace: workspaceCandidate, panel: null };
+    return { workspace: normalizedWorkspace, panel: null };
   }
 
   return {
-    workspace: workspaceCandidate,
+    workspace: normalizedWorkspace,
     panel:
-      workspacePanels[workspaceCandidate].find((candidate) => candidate === panelCandidate) ??
+      workspacePanels[normalizedWorkspace].find((candidate) => candidate === panelCandidate) ??
       null,
   };
 }
@@ -71,7 +85,7 @@ export function AdminPage() {
   const [reviewFocusSource, setReviewFocusSource] = useState<string | null>(null);
   const [activeWorkspace, setActiveWorkspace] = useState<AdminWorkspaceId>(() => {
     if (typeof window === 'undefined') {
-      return 'operations';
+      return 'overview';
     }
     return parseAdminHash(window.location.hash).workspace;
   });
@@ -332,7 +346,7 @@ export function AdminPage() {
           onPanelNavigate={changePanel}
         />
 
-        {activeWorkspace === 'operations' ? (
+        {activeWorkspace === 'overview' ? (
           <section className="booked-page-grid xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
             <div className="space-y-6">
               <div id="bookings">
@@ -422,6 +436,132 @@ export function AdminPage() {
         ) : null}
 
         {activeWorkspace === 'tenants' ? (
+          <section className="booked-page-grid xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+            <section id="tenant-directory" className="template-card p-6">
+              <div className="template-kicker text-sm tracking-[0.14em]">Tenant directory</div>
+              <h2 className="template-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
+                Review tenant scope before opening the editable workspace
+              </h2>
+              <p className="template-body mt-2 max-w-3xl text-sm leading-7">
+                This directory keeps search and selection separate from mutation. Pick the tenant
+                you want to investigate, then jump into the dedicated workspace for branding,
+                permissions, HTML content, and catalog changes.
+              </p>
+
+              <div className="mt-6 grid gap-3">
+                {tenants.map((tenant) => {
+                  const isActive = tenant.slug === selectedTenantRef;
+                  return (
+                    <button
+                      key={tenant.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedTenantRef(tenant.slug);
+                        void loadTenantDetail(tenant.slug);
+                      }}
+                      className={`w-full rounded-[1.4rem] border p-4 text-left transition ${
+                        isActive
+                          ? 'border-slate-950 bg-slate-950 text-white shadow-[0_18px_40px_rgba(15,23,42,0.18)]'
+                          : 'border-slate-200 bg-slate-50 text-slate-900 hover:border-slate-300 hover:bg-white'
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <div className="text-base font-semibold">{tenant.name}</div>
+                          <div
+                            className={`mt-1 text-xs uppercase tracking-[0.16em] ${
+                              isActive ? 'text-white/60' : 'text-slate-500'
+                            }`}
+                          >
+                            {tenant.slug}
+                          </div>
+                        </div>
+                        <span
+                          className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                            isActive ? 'bg-white text-slate-950' : 'bg-white text-slate-600'
+                          }`}
+                        >
+                          {tenant.status}
+                        </span>
+                      </div>
+                      <div
+                        className={`mt-3 grid gap-2 text-sm ${
+                          isActive ? 'text-white/75' : 'text-slate-600'
+                        }`}
+                      >
+                        <div>{tenant.active_memberships} active members</div>
+                        <div>
+                          {tenant.published_services}/{tenant.total_services} published services
+                        </div>
+                        <div>{tenant.industry || 'Industry not set'}</div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+
+            <aside className="space-y-6">
+              <section className="template-card p-6">
+                <div className="template-kicker text-sm tracking-[0.14em]">Selected tenant</div>
+                <h2 className="template-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
+                  {selectedTenantDetail?.tenant.name ?? 'No tenant selected'}
+                </h2>
+                <p className="template-body mt-2 text-sm leading-7">
+                  Use this right-hand summary to confirm status, ownership, and catalog posture
+                  before opening the full tenant workspace.
+                </p>
+                <div className="mt-5 grid gap-3">
+                  <InfoCard
+                    label="Tenant status"
+                    value={selectedTenantDetail?.tenant.status ?? 'Not selected'}
+                  />
+                  <InfoCard
+                    label="Members"
+                    value={
+                      selectedTenantDetail
+                        ? `${selectedTenantDetail.members.length} visible`
+                        : 'No tenant loaded'
+                    }
+                  />
+                  <InfoCard
+                    label="Services"
+                    value={
+                      selectedTenantDetail
+                        ? `${selectedTenantDetail.services.length} visible`
+                        : 'No tenant loaded'
+                    }
+                  />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => changeWorkspace('tenant-workspace')}
+                  disabled={!selectedTenantDetail}
+                  className="booked-button mt-5 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Open tenant workspace
+                </button>
+              </section>
+
+              <section className="template-card p-6">
+                <div className="template-kicker text-sm tracking-[0.14em]">Operator guidance</div>
+                <div className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
+                  <p>Search and select here first so tenant scope stays obvious before mutation.</p>
+                  <p>
+                    Move into Tenant Workspace only when you need to save identity, team, content,
+                    or catalog changes.
+                  </p>
+                  <p>
+                    Use Billing Support, Integrations, or Reliability if the issue is cross-tenant
+                    before editing tenant-specific data.
+                  </p>
+                </div>
+              </section>
+            </aside>
+          </section>
+        ) : null}
+
+        {activeWorkspace === 'tenant-workspace' ? (
           <TenantManagementSection
             tenants={tenants}
             selectedTenantRef={selectedTenantRef}
@@ -509,6 +649,92 @@ export function AdminPage() {
           </section>
         ) : null}
 
+        {activeWorkspace === 'billing-support' ? (
+          <section className="booked-page-grid xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
+            <div className="space-y-6">
+              <div id="portal-support">
+                <PortalSupportQueueSection
+                  items={overview?.portal_support_queue ?? []}
+                  actionMessage={portalSupportActionMessage}
+                  actionSubmittingId={portalSupportActionSubmittingId}
+                  onSelectBooking={(bookingReference, source) => {
+                    void openBookingDetailFromReview(bookingReference, source);
+                  }}
+                  onApplyAction={(requestId, action, note) => {
+                    void applyPortalSupportAction(requestId, action, note);
+                  }}
+                />
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div id="selected-booking">
+                <SelectedBookingPanel
+                  selectedBooking={selectedBooking}
+                  confirmNote={confirmNote}
+                  confirmationMessage={confirmationMessage}
+                  sendingConfirmation={sendingConfirmation}
+                  onConfirmNoteChange={setConfirmNote}
+                  onSendConfirmation={() => {
+                    void sendConfirmationEmail();
+                  }}
+                  reviewFocusKey={reviewFocusKey}
+                  reviewFocusSource={reviewFocusSource}
+                />
+              </div>
+
+              <AdminEmailStatusNote />
+            </div>
+          </section>
+        ) : null}
+
+        {activeWorkspace === 'integrations' ? (
+          <section className="booked-page-grid xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+            <div className="space-y-6">
+              <section id="integrations-health" className="template-card p-6">
+                <div className="template-kicker text-sm tracking-[0.14em]">
+                  Integrations health
+                </div>
+                <h2 className="template-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
+                  Cross-system guidance for CRM, email, webhook, and provider review
+                </h2>
+                <p className="template-body mt-2 max-w-3xl text-sm leading-7">
+                  This lane keeps integration investigation separate from tenant mutation. Use the
+                  recent activity feed for live clues, then jump into reliability or platform
+                  settings if the issue looks like preview drift, config drift, or API mismatch.
+                </p>
+                <div className="mt-5 grid gap-4 md:grid-cols-2">
+                  <InfoCard
+                    label="Recent event feed"
+                    value={`${overview?.recent_events.length ?? 0} events`}
+                  />
+                  <InfoCard
+                    label="Portal and payment exceptions"
+                    value={`${overview?.portal_support_queue.length ?? 0} queue items`}
+                  />
+                  <InfoCard label="Config inventory" value={`${configItems.length} items`} />
+                  <InfoCard label="API inventory" value={`${apiRoutes.length} routes`} />
+                </div>
+              </section>
+
+              <div id="recent-events">
+                <RecentEventsSection recentEvents={overview?.recent_events ?? []} />
+              </div>
+            </div>
+
+            <aside className="space-y-6">
+              <section className="template-card p-6">
+                <div className="template-kicker text-sm tracking-[0.14em]">Next moves</div>
+                <div className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
+                  <p>Open Reliability when the issue looks like matching quality, prompt drift, or retry posture.</p>
+                  <p>Open Platform Settings when the issue looks like env configuration or backend contract coverage.</p>
+                  <p>Open Billing Support when the issue has already become a customer-facing payment or portal exception.</p>
+                </div>
+              </section>
+            </aside>
+          </section>
+        ) : null}
+
         {activeWorkspace === 'reliability' ? (
           <Suspense
             fallback={
@@ -537,7 +763,82 @@ export function AdminPage() {
             />
           </Suspense>
         ) : null}
+
+        {activeWorkspace === 'audit-activity' ? (
+          <section className="booked-page-grid xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+            <div className="space-y-6">
+              <div id="audit-events">
+                <RecentEventsSection recentEvents={overview?.recent_events ?? []} />
+              </div>
+            </div>
+
+            <aside className="space-y-6">
+              <section className="template-card p-6">
+                <div className="template-kicker text-sm tracking-[0.14em]">Audit posture</div>
+                <div className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
+                  <p>Use this lane to reconstruct what happened before escalating a tenant, billing, or reliability issue.</p>
+                  <p>Recent communication, support queue state, and booking detail should stay readable without opening mutation forms first.</p>
+                </div>
+              </section>
+            </aside>
+          </section>
+        ) : null}
+
+        {activeWorkspace === 'platform-settings' ? (
+          <section className="booked-page-grid xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
+            <div className="space-y-6">
+              <div id="live-configuration">
+                <section className="template-card p-6">
+                  <div className="template-kicker text-sm tracking-[0.14em]">
+                    Platform settings
+                  </div>
+                  <h2 className="template-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
+                    Admin-visible platform review surfaces
+                  </h2>
+                  <p className="template-body mt-2 max-w-3xl text-sm leading-7">
+                    Keep environment and contract review explicit here so operators can sanity-check
+                    platform posture without mixing these details into every other workspace.
+                  </p>
+                </section>
+                <div className="mt-6">
+                  <LiveConfigurationSection configItems={configItems} />
+                </div>
+              </div>
+
+              <div id="api-inventory">
+                <ApiInventorySection apiRoutes={apiRoutes} />
+              </div>
+            </div>
+
+            <aside className="space-y-6">
+              <section className="template-card p-6">
+                <div className="template-kicker text-sm tracking-[0.14em]">Review order</div>
+                <div className="mt-3 space-y-3 text-sm leading-6 text-slate-600">
+                  <p>Check live configuration when provider behavior looks wrong or incomplete.</p>
+                  <p>Check API inventory when a frontend or operator flow looks like contract drift.</p>
+                  <p>Return to Reliability when the issue is confirmed to be runtime behavior rather than platform shape.</p>
+                </div>
+              </section>
+            </aside>
+          </section>
+        ) : null}
       </div>
     </main>
+  );
+}
+
+type InfoCardProps = {
+  label: string;
+  value: string;
+};
+
+function InfoCard({ label, value }: InfoCardProps) {
+  return (
+    <article className="rounded-[1.2rem] border border-slate-200 bg-slate-50 p-4">
+      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+        {label}
+      </div>
+      <div className="mt-2 text-sm font-semibold text-slate-950">{value}</div>
+    </article>
   );
 }

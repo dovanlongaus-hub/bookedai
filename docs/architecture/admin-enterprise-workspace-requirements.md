@@ -31,6 +31,26 @@ Synchronization note from `2026-04-22`:
   - data-model and API baseline
   - sprint roadmap and definition-of-done guidance
 
+Implementation synchronization note from `2026-04-23`:
+
+- the shared frontend admin runtime under `frontend/src/` now includes the first route-and-IA package aligned to this requirements baseline
+- the shell now exposes the requested primary sections directly in-product:
+  - `Overview`
+  - `Tenants`
+  - `Tenant Workspace`
+  - `Catalog`
+  - `Billing Support`
+  - `Integrations`
+  - `Reliability`
+  - `Audit & Activity`
+  - `Platform Settings`
+- the currently implemented package should be interpreted as:
+  - menu-first navigation and hash-addressable workspace routing
+  - section-level operator guidance inside each major lane
+  - a clean split between tenant directory selection and the mutable tenant workspace
+  - explicit admin homes for billing/support review, integration review, audit chronology, and platform configuration review
+- later admin work should now deepen these sections with richer read models and workflow actions rather than re-deciding the top-level information architecture again
+
 ## Requested outcome
 
 The admin surface should be redesigned into a friendlier but clearly enterprise-grade workspace.

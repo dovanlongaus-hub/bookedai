@@ -208,10 +208,12 @@ python3 scripts/telegram_workspace_ops.py sync-repo-docs --skip-discord
 - `NOTION_API_TOKEN` plus either `NOTION_PARENT_PAGE_ID` or `NOTION_DATABASE_ID` if you want Telegram-driven change summaries written directly into Notion
 - optional `NOTION_VERSION` to override the default Notion API version used by the sync script
 - `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` with the Telegram user ids allowed to run elevated BookedAI workspace actions through `telegram_workspace_ops.py`
-- `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` to define which elevated Telegram actions are allowed, such as `build_frontend`, `deploy_live`, `test`, `workspace_write`, `repo_structure`, `host_command`, or `full_project`
+- `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` to define which elevated Telegram actions are allowed, such as `build_frontend`, `deploy_live`, `test`, `workspace_write`, `repo_structure`, `host_command`, `host_shell`, or `full_project`
 - `ADMIN_API_TOKEN` for protected email admin routes
 - `ADMIN_PASSWORD` for admin login credentials
-- optional `ADMIN_BOOTSTRAP_PASSWORD` for the root `Next.js` admin auth routes if you want a dedicated bootstrap password instead of reusing `ADMIN_PASSWORD`
+- `ADMIN_BOOTSTRAP_PASSWORD` for explicitly enabled bootstrap-style admin login routes
+- optional `ADMIN_ENABLE_BOOTSTRAP_LOGIN=1` if you need the old password-based admin login as a break-glass path
+- optional `ADMIN_BOOTSTRAP_ALLOWED_EMAILS` as a comma-separated allowlist for bootstrap-eligible admin emails
 - `TAWK_WEBHOOK_SECRET` if you enable signature verification
 - `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_SMTP_PASSWORD`, `EMAIL_SMTP_FROM`
 - `EMAIL_IMAP_HOST`, `EMAIL_IMAP_PORT`, `EMAIL_IMAP_USERNAME`, `EMAIL_IMAP_PASSWORD`
@@ -241,8 +243,10 @@ Session secret notes:
 - `ADMIN_SESSION_SIGNING_SECRET` is the preferred signing key for admin sessions.
 - `TENANT_SESSION_SIGNING_SECRET` is the preferred signing key for tenant sessions.
 - `SESSION_SIGNING_SECRET` is a shared fallback for session signing when a more specific secret is not set.
-- Current code still falls back to legacy `ADMIN_API_TOKEN` and `ADMIN_PASSWORD` to avoid breaking older environments.
-- The root `Next.js` admin auth lane now also accepts `ADMIN_BOOTSTRAP_PASSWORD` as the preferred bootstrap credential for `/api/admin/auth/login`.
+- Session signing no longer falls back to `ADMIN_API_TOKEN` or `ADMIN_PASSWORD`.
+- The root `Next.js` admin lane now defaults to email-based one-time verification codes through `/admin-login` plus `/api/admin/auth/request-code` and `/api/admin/auth/verify-code`.
+- When `BOOKEDAI_ENABLE_PRISMA=1`, those admin codes persist in Prisma-backed `admin_email_login_codes`; otherwise the root admin lane now uses the live legacy tenant membership tables plus `tenant_email_login_codes` as the compatibility persistence path.
+- Bootstrap admin login is now a break-glass path only: it must be explicitly enabled with `ADMIN_ENABLE_BOOTSTRAP_LOGIN=1`, and then uses `ADMIN_BOOTSTRAP_PASSWORD`.
 
 Zoho CRM connection helper:
 
@@ -445,6 +449,7 @@ python3 scripts/telegram_workspace_ops.py deploy-live
 python3 scripts/telegram_workspace_ops.py test --command "./scripts/run_release_gate.sh"
 python3 scripts/telegram_workspace_ops.py workspace-command --command "git mv old/path new/path"
 python3 scripts/telegram_workspace_ops.py host-command --command "apt-get update"
+python3 scripts/telegram_workspace_ops.py host-shell --cwd / --command "docker ps && systemctl status nginx"
 ```
 
 The wrapper keeps the operator path explicit:
@@ -454,8 +459,10 @@ The wrapper keeps the operator path explicit:
 - `test` runs a repo-scoped validation command such as release-gate, backend, or frontend verification
 - `workspace-command` runs a repo-scoped shell command so Telegram/OpenClaw can handle broader BookedAI changes, including file moves, refactors, and multi-surface rollout steps
 - `host-command` runs a host-level command through `sudo -n` only when the requested program is in the checked-in allowlist such as `apt-get`, `docker`, `systemctl`, `journalctl`, `service`, `timedatectl`, or `ufw`
+- `host-shell` runs a fully elevated host shell command from any server path and is the intended lane when trusted Telegram/OpenClaw operators need broad `host/elevated` access across the whole machine
 - `sync-doc` is the documentation or Notion or Discord path for Telegram change tracking
 - `host-command` intentionally does not expose `bash`, `sh`, or arbitrary executable paths, so it can support machine operations without turning the Telegram path into a general-purpose root shell
+- `host-shell` is intentionally broader and should be granted only to trusted operators through `host_shell` or `full_project`
 - on the current VPS host, Linux user `openclaw` is provisioned with ACL-based write access to the host repo path `/home/dovanlong/BookedAI`; because that path is bind-mounted into the container at `/workspace/bookedai.au`, trusted OpenClaw execution can now create, edit, rename, and delete project files there without changing the repo owner
 - that ACL posture was then re-applied recursively across the whole repo tree on `2026-04-22` so previously restricted subdirectories inherit the same write model; direct verification as `openclaw` now also covers the homepage landing files `frontend/src/components/landing/sections/HomepageExecutiveBoardSection.tsx` and `frontend/src/components/landing/sections/HomepageOverviewSection.tsx`
 - the standard OpenClaw gateway runtime writes the bind mount as container user `node` (`uid 1000`, mapped to host ACL entry `ubuntu` on this machine), so the same ACL write model is now granted to host `uid 1000` as well; this restores memory flushes and other repo writes initiated from the gateway runtime
@@ -465,7 +472,8 @@ Telegram authorization for elevated actions:
 
 - `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` is the allowlist of Telegram actor ids
 - `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` controls which elevated actions that allowlist can run
-- the default checked-in operator baseline now includes trusted operator `8426853622` with full BookedAI workspace coverage for live deploy, test, repo-structure work, safe host commands, and broader project commands
+- the default checked-in operator baseline now includes trusted operator `8426853622` with full BookedAI workspace coverage for live deploy, test, repo-structure work, safe host commands, full host shell access, and broader project commands
+- the live OpenClaw Telegram channel is now also configured with `dmPolicy: allowlist` plus `allowFrom: ["8426853622"]`, so the trusted operator path no longer stops at DM pairing before elevated repo or host actions can run
 - if your Telegram bridge can pass the actor id, use `--telegram-user-id` or set `BOOKEDAI_TELEGRAM_USER_ID` or `TELEGRAM_USER_ID`
 - inspect the current permission snapshot with:
 

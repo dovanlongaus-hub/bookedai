@@ -4,6 +4,7 @@ import {
   formatCurrency,
   formatDateTime,
 } from './types';
+import { sanitizeTenantHtml } from '../../shared/sanitizeTenantHtml';
 import type {
   AdminServiceMerchantItem,
   AdminTenantDetailResponse,
@@ -306,7 +307,7 @@ export function TenantManagementSection({
                 {tenantProfileForm.introduction_html ? (
                   <div
                     className="mt-4 rounded-[1rem] border border-slate-200 bg-white p-4 text-sm leading-7 text-slate-700"
-                    dangerouslySetInnerHTML={{ __html: tenantProfileForm.introduction_html }}
+                    dangerouslySetInnerHTML={{ __html: sanitizeTenantHtml(tenantProfileForm.introduction_html) }}
                   />
                 ) : null}
               </div>

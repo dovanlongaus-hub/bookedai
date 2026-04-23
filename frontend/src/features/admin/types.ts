@@ -340,7 +340,16 @@ export type AdminTenantServiceFormState = {
   publish_state: 'draft' | 'published' | 'archived';
 };
 
-export type AdminWorkspaceId = 'operations' | 'tenants' | 'catalog' | 'reliability';
+export type AdminWorkspaceId =
+  | 'overview'
+  | 'tenants'
+  | 'tenant-workspace'
+  | 'catalog'
+  | 'billing-support'
+  | 'integrations'
+  | 'reliability'
+  | 'audit-activity'
+  | 'platform-settings';
 
 export type AdminWorkspacePanelId =
   | 'bookings'
@@ -353,6 +362,8 @@ export type AdminWorkspacePanelId =
   | 'tenant-services'
   | 'service-catalog'
   | 'partners'
+  | 'integrations-health'
+  | 'audit-events'
   | 'prompt5-preview'
   | 'live-configuration'
   | 'api-inventory';

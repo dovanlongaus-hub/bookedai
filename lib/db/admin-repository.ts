@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
 
+import { listLegacyAdminTenants, parseLegacyAdminUserId } from "@/lib/db/legacy-admin-auth";
 import { getPrismaClient, isDatabaseConfigured } from "@/lib/db/prisma";
 
 export type TenantOption = {
@@ -1660,6 +1661,20 @@ function mapTenantOptions() {
             locale: user.tenant.locale,
           },
         ];
+      }
+    }
+
+    const legacyIdentity = parseLegacyAdminUserId(userId);
+    if (legacyIdentity) {
+      const tenants = await listLegacyAdminTenants({ email: legacyIdentity.email });
+      if (tenants.length > 0) {
+        return tenants.map((tenant) => ({
+          id: tenant.id,
+          slug: tenant.slug,
+          name: tenant.name,
+          timezone: tenant.timezone,
+          locale: tenant.locale,
+        }));
       }
     }
 

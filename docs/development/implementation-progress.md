@@ -10,7 +10,34 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 ## Status Snapshot
 
-Date: `2026-04-22`
+Date: `2026-04-23`
+
+Planning and execution synchronization update from `2026-04-23`:
+
+- the admin enterprise workspace lane moved one step further on `2026-04-23` into the first shared-frontend IA and route package aligned to the locked requirements baseline:
+  - `frontend/src/features/admin/types.ts` now widens the admin workspace model from the earlier four-way split into the requested enterprise section map:
+    - `Overview`
+    - `Tenants`
+    - `Tenant Workspace`
+    - `Catalog`
+    - `Billing Support`
+    - `Integrations`
+    - `Reliability`
+    - `Audit & Activity`
+    - `Platform Settings`
+  - `frontend/src/components/AdminPage.tsx` now keeps hash-addressable workspace routing while treating older `#operations` links as backward-compatible aliases into `#overview`
+  - `frontend/src/features/admin/workspace-nav.tsx` now presents the admin shell as a menu-first control surface organized by business function instead of a narrower four-card workspace selector
+  - `frontend/src/features/admin/workspace-insights.tsx` now gives each workspace its own operator guidance, context cards, and panel jump links so the IA is useful even before every later read model lands
+  - the admin tenant lane is now intentionally split into a lighter tenant-directory review surface plus the deeper mutable tenant workspace, which keeps tenant selection separate from branding, role, HTML, and catalog mutation
+  - the same package also creates explicit current homes for:
+    - portal/payment follow-up in `Billing Support`
+    - CRM or email or webhook review in `Integrations`
+    - event chronology in `Audit & Activity`
+    - config and route review in `Platform Settings`
+  - syntax-level verification passed through `frontend/node_modules/.bin/esbuild frontend/src/components/AdminPage.tsx --bundle --platform=browser --format=esm --outfile=/tmp/booked-admin-bundle.js`
+  - broader frontend verification remains partially constrained in this workspace:
+    - standalone `tsc --noEmit` again failed to finish before timeout without surfacing a concrete compiler error
+    - `npm --prefix frontend run build` was started but did not complete within the local wait window, so this pass should currently be treated as syntax-verified rather than full-build-verified
 
 Planning and execution synchronization update from `2026-04-22`:
 
@@ -257,6 +284,18 @@ Planning and execution synchronization update from `2026-04-22`:
   - inspection also showed `openclaw-bookedai-cli` was misconfigured with only the bare CLI entrypoint and therefore exited after printing help instead of holding the long-lived node-host process
   - live OpenClaw state at `/home/dovanlong/.openclaw-bookedai-v3/openclaw.json` now includes `tools.elevated.allowFrom.webchat=["*"]`, and `deploy/openclaw/docker-compose.yml` now runs `openclaw-cli` as `openclaw node run --host 127.0.0.1 --port 18789 --display-name bookedai-host-cli`
   - the OpenClaw stack was recreated after both fixes; `openclaw-bookedai-cli` now stays up instead of exiting immediately, and the previous webchat denial is now removed at the config gate level
+- the Telegram/OpenClaw operator lane was then widened again on `2026-04-23` from allowlisted host maintenance to true full-server `host/elevated` control for trusted actors:
+  - `scripts/telegram_workspace_ops.py` now exposes `host-shell --cwd / --command "..."`, which runs `/bin/bash -lc` through `sudo -n` and does not restrict execution to the BookedAI repo tree
+  - the existing `host-command` allowlist path remains in place for safer maintenance-only usage, but `host-shell` is now the explicit lane for unrestricted Telegram/OpenClaw work anywhere on the VPS
+  - default Telegram/OpenClaw permission vocabulary in `deploy/openclaw/docker-compose.yml` and `deploy/openclaw/.env.example` now includes `host_shell` alongside `host_command` and `full_project`
+  - `README.md`, `project.md`, `deploy/openclaw/README.md`, `docs/development/env-strategy.md`, `docs/development/ci-cd-deployment-runbook.md`, and `docs/development/sprint-13-16-user-surface-delivery-package.md` were synchronized in the same pass so the operator docs now reflect the broader host execution model
+- the Telegram lane then needed one more live runtime fix on `2026-04-23` after elevated requests still stopped at `pairing required`:
+  - runtime inspection showed the OpenClaw gateway still had `channels.telegram.dmPolicy="pairing"` and the node-host device `bookedai-host-cli` still carried only `operator.read` on its operator token, while a pending scope-upgrade request for `operator.approvals` remained stuck in `devices/pending.json`
+  - the live OpenClaw runtime state under `/home/dovanlong/.openclaw-bookedai-v3/` was updated so Telegram now runs with `channels.telegram.dmPolicy="allowlist"` plus `channels.telegram.allowFrom=["8426853622"]`, the `bookedai-host-cli` device now carries full operator scopes (`operator.admin`, `operator.approvals`, `operator.pairing`, `operator.read`, `operator.write`), and the stale pending approval request for that device was cleared
+  - after restarting `openclaw-bookedai-gateway` and `openclaw-bookedai-cli`, trusted Telegram wrapper execution succeeded again through `host-shell`, including a host-level `apt-get update` smoke run and the earlier `python3-pip` / `python3-venv` installation command
+- OpenClaw runtime verification on `2026-04-23` then surfaced one more reliability issue:
+  - `openclaw-bookedai-cli` could still exit cleanly if it attempted its first node-host connection before `openclaw-bookedai-gateway` was ready, leaving the gateway healthy but the elevated node surface down
+  - `deploy/openclaw/docker-compose.yml` now sets `restart: unless-stopped` on `openclaw-cli`, so the node host reconnects automatically after early gateway races instead of requiring manual intervention
 - production DNS origin pinning was tightened on `2026-04-23` for the new public IP `34.40.192.68`:
   - `deploy/nginx/bookedai.au.conf` now records the current production origin IP inline so the reverse-proxy config stays visually aligned with the live host move
   - `scripts/update_cloudflare_dns_records.sh` now accepts a pinned IPv4 from `CLOUDFLARE_AUTO_DNS_IPV4` or a first CLI arg, so boot-time Cloudflare reconciliation can preserve `34.40.192.68` instead of always trusting auto-detection
@@ -269,6 +308,10 @@ Planning and execution synchronization update from `2026-04-22`:
   - root `.env` and `.env.example` now align `CLOUDFLARE_AUTO_DNS_RECORDS` with the active public host set, including `product`, `demo`, `portal`, `pitch`, `calendar`, and `bot`
   - `scripts/configure_cloudflare_dns.sh` now prefers cloud instance metadata endpoints for public IPv4 discovery before falling back to external echo services
   - after the config update, the Cloudflare reconciliation run can move the remaining stale public records off the old origin IP without requiring per-host manual edits
+- the remaining Supabase public-edge failure was then narrowed and fixed on `2026-04-23`:
+  - `supabase-kong` had been exiting with code `126` because the bind-mounted `/home/kong/kong-entrypoint.sh` was invoked directly and hit a container-side execute permission denial
+  - `supabase/docker-compose.yml` now launches that same script through `/bin/bash`, avoiding exec-bit sensitivity on the mounted file while preserving the existing Kong bootstrap logic
+  - after recreating `supabase-kong`, `supabase.bookedai.au` returned the expected `401` gateway response again, `scripts/healthcheck_stack.sh` passed end-to-end, and `bot.bookedai.au` also returned `200` again once the OpenClaw gateway completed its startup warm-up
 - the planning baseline was synchronized again on `2026-04-22` around one concise whole-program summary:
   - the execution chain remains `Sprint 1-3 baseline lock -> Sprint 4-7 truth/reporting/workflow foundation -> Sprint 8-10 tenant/admin foundation -> Sprint 11-16 user-surface SaaS completion and release hardening`
   - the current phase view remains `Phase 0 done`, `Phase 1 implemented baseline`, `Phase 2 partial foundation`, `Phase 3 strongest active lane`, `Phase 4 partial`, `Phase 5 partial foundation`, `Phase 6 partially active`, `Phase 7 implemented foundation`, `Phase 8 implemented foundation`, and `Phase 9 partially active`
@@ -462,7 +505,12 @@ Planning and execution synchronization update from `2026-04-22`:
   - `SESSION_SIGNING_SECRET`
   - `TENANT_SESSION_SIGNING_SECRET`
   - `ADMIN_SESSION_SIGNING_SECRET`
-- admin and tenant sessions still preserve compatibility fallback through `ADMIN_API_TOKEN` and `ADMIN_PASSWORD`, and this compatibility posture is now documented as an intentional transition path rather than an implicit hidden dependency
+- admin and tenant sessions no longer fall back to `ADMIN_API_TOKEN` or `ADMIN_PASSWORD`; actor-specific signing secrets or `SESSION_SIGNING_SECRET` are now required for signed session flows
+- tenant workspace HTML is now sanitized through an allowlist path in both backend storage/readback and legacy frontend preview rendering, and legacy admin session persistence now prefers browser-session storage over long-lived local storage
+- the root `Next.js` admin lane now supports per-user email verification code sign-in through `/admin-login`, `/api/admin/auth/request-code`, and `/api/admin/auth/verify-code`, with signed session-cookie issuance after code verification
+- password bootstrap admin login is now break-glass only in the root `Next.js` lane and requires `ADMIN_ENABLE_BOOTSTRAP_LOGIN=1` before `/api/admin/auth/login` will accept `ADMIN_BOOTSTRAP_PASSWORD`
+- rollout strategy then tightened again on `2026-04-23`: live `bookedai` database inspection showed the current production schema is still the legacy tenant/backend shape and already conflicts with the unfinished Prisma admin table set, so root admin auth now uses a compatibility path that resolves identities from `tenant_user_memberships` and persists admin verification codes into legacy `tenant_email_login_codes` until `BOOKEDAI_ENABLE_PRISMA=1` is intentionally promoted onto a schema-aligned database
+- the same compatibility rollout was verified end-to-end against the live legacy schema on `2026-04-23`: local Next dev, pointed at the real Postgres container IP, successfully requested an admin code for `future-swim`, persisted an `admin-sign-in` row into `tenant_email_login_codes`, verified the code, issued `bookedai_admin_session`, and returned the real tenant in `/api/admin/auth/me` through the new legacy-aware tenant-resolution path
 - central project documents were synchronized again on `2026-04-21` so roadmap, sprint, environment, backend-boundary, and master-index references now reflect the actual router split, session-secret split, and current carry-forward refactor backlog
 - the active docs baseline should no longer describe backend routing as one undifferentiated `/api` monolith only, and should no longer imply one shared actor-signing secret as the target state
 - public registration and booking-submit failure handling tightened again on `2026-04-21`: `frontend/src/shared/api/client.ts` now lifts backend `detail` and validation payloads into the thrown frontend error message, so BookedAI-owned public flows no longer collapse consultation or booking-submit failures into the opaque `API request failed: <status>` text

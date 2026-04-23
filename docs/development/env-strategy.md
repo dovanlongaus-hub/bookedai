@@ -53,15 +53,13 @@ The current code uses them in this order:
 - admin sessions prefer `ADMIN_SESSION_SIGNING_SECRET`
 - shared session fallback may use `SESSION_SIGNING_SECRET`
 
-Compatibility fallback is still present through:
+Admin sign-in expectations now are:
 
-- `ADMIN_API_TOKEN`
-- `ADMIN_PASSWORD`
-- optional `ADMIN_BOOTSTRAP_PASSWORD` now exists as the preferred bootstrap credential for the root `Next.js` admin auth routes while older environments can still reuse `ADMIN_PASSWORD`
-
-That fallback exists to avoid breaking older environments during rollout.
-
-It should be treated as transitional compatibility, not the preferred long-term secret model.
+- `ADMIN_SESSION_SIGNING_SECRET` or shared `SESSION_SIGNING_SECRET` for signed admin sessions
+- `ADMIN_API_TOKEN` so the root `Next.js` auth lane can ask the backend SMTP surface to deliver one-time admin verification codes
+- `DATABASE_URL` for either Prisma-backed admin auth or the legacy compatibility path; when `BOOKEDAI_ENABLE_PRISMA=1` the root admin lane expects the Prisma schema, and when it is unset the new compatibility path can still resolve identities from legacy tenant membership tables and store codes in `tenant_email_login_codes`
+- optional `ADMIN_BOOTSTRAP_PASSWORD` plus `ADMIN_ENABLE_BOOTSTRAP_LOGIN=1` only if you want the old password bootstrap path kept as a break-glass fallback
+- optional `ADMIN_BOOTSTRAP_ALLOWED_EMAILS` if bootstrap login should be restricted to a smaller email allowlist than the normal admin identity set
 
 ## Rules
 
@@ -127,13 +125,16 @@ Current elevated action vocabulary:
 - `workspace_write`
 - `repo_structure`
 - `host_command`
+- `host_shell`
 - `sync_doc`
 - `sync_repo_docs`
 - `full_project`
 
 Use `host_command` when the trusted Telegram operator should be able to run the checked-in allowlist of host-maintenance binaries such as `apt-get`, `docker`, `systemctl`, `journalctl`, `service`, `timedatectl`, or `ufw` through `python3 scripts/telegram_workspace_ops.py host-command --command "..."`.
 
-Use `full_project` when the trusted Telegram operator should be able to test, refactor file structure, update any project area, run approved host commands, and deploy the result across the whole BookedAI repo.
+Use `host_shell` when the trusted Telegram operator should be able to run fully elevated host shell commands from any server path through `python3 scripts/telegram_workspace_ops.py host-shell --cwd / --command "..."`.
+
+Use `full_project` when the trusted Telegram operator should be able to test, refactor file structure, update any project area, run approved host commands, run full host shell commands, and deploy the result across the whole BookedAI repo and server.
 
 ## Documentation sync rule
 

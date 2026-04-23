@@ -15,21 +15,52 @@ export type StoredAdminSession = {
   expiresAt: string;
 };
 
+function readBrowserStorage(key: string) {
+  const sessionValue = window.sessionStorage.getItem(key);
+  if (sessionValue) {
+    return sessionValue;
+  }
+  return window.localStorage.getItem(key) ?? '';
+}
+
 export function loadStoredAdminSession(): StoredAdminSession {
+  const token = readBrowserStorage(ADMIN_SESSION_TOKEN_KEY);
+  const username = readBrowserStorage(ADMIN_SESSION_USERNAME_KEY);
+  const expiresAt = readBrowserStorage(ADMIN_SESSION_EXPIRY_KEY);
+
+  if (token && !window.sessionStorage.getItem(ADMIN_SESSION_TOKEN_KEY)) {
+    window.sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, token);
+    window.localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+  }
+  if (username && !window.sessionStorage.getItem(ADMIN_SESSION_USERNAME_KEY)) {
+    window.sessionStorage.setItem(ADMIN_SESSION_USERNAME_KEY, username);
+    window.localStorage.removeItem(ADMIN_SESSION_USERNAME_KEY);
+  }
+  if (expiresAt && !window.sessionStorage.getItem(ADMIN_SESSION_EXPIRY_KEY)) {
+    window.sessionStorage.setItem(ADMIN_SESSION_EXPIRY_KEY, expiresAt);
+    window.localStorage.removeItem(ADMIN_SESSION_EXPIRY_KEY);
+  }
+
   return {
-    token: window.localStorage.getItem(ADMIN_SESSION_TOKEN_KEY) ?? '',
-    username: window.localStorage.getItem(ADMIN_SESSION_USERNAME_KEY) ?? '',
-    expiresAt: window.localStorage.getItem(ADMIN_SESSION_EXPIRY_KEY) ?? '',
+    token,
+    username,
+    expiresAt,
   };
 }
 
 export function persistAdminSession(session: StoredAdminSession) {
-  window.localStorage.setItem(ADMIN_SESSION_TOKEN_KEY, session.token);
-  window.localStorage.setItem(ADMIN_SESSION_USERNAME_KEY, session.username);
-  window.localStorage.setItem(ADMIN_SESSION_EXPIRY_KEY, session.expiresAt);
+  window.sessionStorage.setItem(ADMIN_SESSION_TOKEN_KEY, session.token);
+  window.sessionStorage.setItem(ADMIN_SESSION_USERNAME_KEY, session.username);
+  window.sessionStorage.setItem(ADMIN_SESSION_EXPIRY_KEY, session.expiresAt);
+  window.localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+  window.localStorage.removeItem(ADMIN_SESSION_USERNAME_KEY);
+  window.localStorage.removeItem(ADMIN_SESSION_EXPIRY_KEY);
 }
 
 export function clearStoredAdminSession() {
+  window.sessionStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
+  window.sessionStorage.removeItem(ADMIN_SESSION_USERNAME_KEY);
+  window.sessionStorage.removeItem(ADMIN_SESSION_EXPIRY_KEY);
   window.localStorage.removeItem(ADMIN_SESSION_TOKEN_KEY);
   window.localStorage.removeItem(ADMIN_SESSION_USERNAME_KEY);
   window.localStorage.removeItem(ADMIN_SESSION_EXPIRY_KEY);

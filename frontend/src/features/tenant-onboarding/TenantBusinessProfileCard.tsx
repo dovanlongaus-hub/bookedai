@@ -1,6 +1,7 @@
 import type { ChangeEvent, Dispatch, FormEventHandler, SetStateAction } from 'react';
 
 import type { TenantSectionActivity } from '../../shared/contracts';
+import { sanitizeTenantHtml } from '../../shared/sanitizeTenantHtml';
 import { TenantSectionActivityCard } from '../tenant-shared/TenantSectionActivityCard';
 
 type TenantBusinessProfileFormState = {
@@ -21,14 +22,6 @@ type TenantBusinessProfileFormState = {
   guide_billing: string;
   guide_team: string;
 };
-
-function sanitizeTenantHtml(html: string) {
-  return html
-    .replace(/<script[\s\S]*?>[\s\S]*?<\/script>/gi, '')
-    .replace(/\son\w+="[^"]*"/gi, '')
-    .replace(/\son\w+='[^']*'/gi, '')
-    .replace(/javascript:/gi, '');
-}
 
 function AssetPreview({
   label,

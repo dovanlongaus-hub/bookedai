@@ -130,11 +130,12 @@ The system should treat these as separate actor types:
 Current repo already confirms:
 
 - a custom admin login and signed admin bearer session in [backend/api/route_handlers.py](../../backend/api/route_handlers.py)
+- a root `Next.js` admin email-code login flow now exists too, with `/admin-login`, `/api/admin/auth/request-code`, and `/api/admin/auth/verify-code`; it prefers Prisma-backed `admin_email_login_codes` when `BOOKEDAI_ENABLE_PRISMA=1`, but the current live rollout now also supports a compatibility path that resolves legacy tenant memberships and stores codes in `tenant_email_login_codes`
 - actor-specific session-signing preference in the current codebase:
   - `ADMIN_SESSION_SIGNING_SECRET`
   - `TENANT_SESSION_SIGNING_SECRET`
   - shared fallback via `SESSION_SIGNING_SECRET`
-- a static `ADMIN_API_TOKEN` fallback in [backend/config.py](../../backend/config.py)
+- a legacy static `ADMIN_API_TOKEN` path still exists for selected protected backend routes, but it is no longer used as a session-signing fallback
 - bearer-token protection for the n8n callback path
 - webhook signature verification seam for Tawk
 - Supabase environment values exist in config, and tenant auth is now partially wired end-to-end through the current tenant session model, but centralized actor claims and full multi-role closure are still incomplete

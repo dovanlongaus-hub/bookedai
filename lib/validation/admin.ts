@@ -6,6 +6,17 @@ export const adminAuthLoginSchema = z.object({
   tenantSlug: z.string().trim().optional(),
 });
 
+export const adminAuthRequestCodeSchema = z.object({
+  email: z.string().trim().email("Enter a valid work email"),
+  tenantSlug: z.string().trim().optional(),
+});
+
+export const adminAuthVerifyCodeSchema = z.object({
+  email: z.string().trim().email("Enter a valid work email"),
+  code: z.string().trim().regex(/^\d{6}$/, "Enter the 6-digit verification code"),
+  tenantSlug: z.string().trim().optional(),
+});
+
 export const adminAuthSwitchTenantSchema = z.object({
   tenantId: z.string().trim().min(1, "Tenant is required"),
 });

@@ -57,22 +57,21 @@ def verify_signed_token(token: str, *, secret: str, label: str) -> dict[str, Any
 
 
 def get_admin_session_secret(cfg: Settings) -> str:
-    return (
-        _config_value(cfg, "admin_session_signing_secret")
-        or _config_value(cfg, "session_signing_secret")
-        or _config_value(cfg, "admin_api_token")
-        or _config_value(cfg, "admin_password")
+    secret = _config_value(cfg, "admin_session_signing_secret") or _config_value(
+        cfg, "session_signing_secret"
     )
+    if not secret:
+        raise SessionTokenError("Missing admin session signing secret")
+    return secret
 
 
 def get_tenant_session_secret(cfg: Settings) -> str:
-    return (
-        _config_value(cfg, "tenant_session_signing_secret")
-        or _config_value(cfg, "session_signing_secret")
-        or _config_value(cfg, "admin_session_signing_secret")
-        or _config_value(cfg, "admin_api_token")
-        or _config_value(cfg, "admin_password")
+    secret = _config_value(cfg, "tenant_session_signing_secret") or _config_value(
+        cfg, "session_signing_secret"
     )
+    if not secret:
+        raise SessionTokenError("Missing tenant session signing secret")
+    return secret
 
 
 def create_admin_session_token(cfg: Settings, username: str) -> tuple[str, datetime]:

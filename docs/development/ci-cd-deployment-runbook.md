@@ -71,8 +71,9 @@ Telegram authorization baseline for those elevated wrappers:
 
 - trusted actor ids come from `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS`
 - allowed elevated actions come from `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS`
-- the current operator baseline can explicitly grant `build_frontend`, `deploy_live`, `test`, `workspace_write`, `repo_structure`, `host_command`, or `full_project`
+- the current operator baseline can explicitly grant `build_frontend`, `deploy_live`, `test`, `workspace_write`, `repo_structure`, `host_command`, `host_shell`, or `full_project`
 - `host-command` is intentionally limited to a checked-in allowlist of host programs and runs through `sudo -n` without a general shell
+- `host-shell` is the explicit full-server lane for trusted operators when OpenClaw needs unrestricted host execution outside the repo tree
 
 Deploy entrypoints:
 

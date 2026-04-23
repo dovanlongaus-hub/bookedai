@@ -4,12 +4,14 @@ import base64
 import csv
 import hashlib
 import hmac
+import html
 import json
 import re
 import secrets
 import unicodedata
 from contextlib import asynccontextmanager
 from datetime import UTC, datetime, timedelta
+from html.parser import HTMLParser
 from io import StringIO
 from json import JSONDecodeError
 from pathlib import Path
@@ -361,11 +363,107 @@ def slugify_value(value: str) -> str:
     return re.sub(r"[^a-z0-9]+", "-", ascii_value).strip("-") or "item"
 
 
+_WORKSPACE_ALLOWED_TAGS = {
+    "a",
+    "blockquote",
+    "br",
+    "em",
+    "h1",
+    "h2",
+    "h3",
+    "h4",
+    "li",
+    "ol",
+    "p",
+    "strong",
+    "ul",
+}
+_WORKSPACE_ALLOWED_ATTRIBUTES = {
+    "a": {"href", "title", "target"},
+}
+_WORKSPACE_BLOCKED_CONTENT_TAGS = {"embed", "iframe", "math", "noscript", "object", "script", "style", "svg"}
+_WORKSPACE_VOID_TAGS = {"br"}
+
+
+def _is_safe_workspace_href(value: str) -> bool:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        return False
+    return normalized.startswith(("http://", "https://", "mailto:", "tel:", "/", "#"))
+
+
+class _WorkspaceHTMLSanitizer(HTMLParser):
+    def __init__(self) -> None:
+        super().__init__(convert_charrefs=True)
+        self._parts: list[str] = []
+        self._blocked_depth = 0
+
+    def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
+        normalized_tag = tag.lower()
+        if normalized_tag in _WORKSPACE_BLOCKED_CONTENT_TAGS:
+            self._blocked_depth += 1
+            return
+        if self._blocked_depth:
+            return
+        if normalized_tag not in _WORKSPACE_ALLOWED_TAGS:
+            return
+
+        allowed_attributes = _WORKSPACE_ALLOWED_ATTRIBUTES.get(normalized_tag, set())
+        rendered_attributes: list[str] = []
+        target_blank = False
+        for name, value in attrs:
+            normalized_name = name.lower()
+            if normalized_name not in allowed_attributes or value is None:
+                continue
+            normalized_value = str(value).strip()
+            if not normalized_value:
+                continue
+            if normalized_name == "href" and not _is_safe_workspace_href(normalized_value):
+                continue
+            if normalized_name == "target":
+                if normalized_value not in {"_blank", "_self"}:
+                    continue
+                target_blank = normalized_value == "_blank"
+            rendered_attributes.append(
+                f' {normalized_name}="{html.escape(normalized_value, quote=True)}"'
+            )
+
+        if normalized_tag == "a":
+            if target_blank and ' target="_blank"' not in rendered_attributes:
+                rendered_attributes.append(' target="_blank"')
+            rendered_attributes.append(' rel="noopener noreferrer"')
+
+        self._parts.append(f"<{normalized_tag}{''.join(rendered_attributes)}>")
+
+    def handle_endtag(self, tag: str) -> None:
+        normalized_tag = tag.lower()
+        if normalized_tag in _WORKSPACE_BLOCKED_CONTENT_TAGS:
+            if self._blocked_depth:
+                self._blocked_depth -= 1
+            return
+        if self._blocked_depth:
+            return
+        if normalized_tag in _WORKSPACE_ALLOWED_TAGS and normalized_tag not in _WORKSPACE_VOID_TAGS:
+            self._parts.append(f"</{normalized_tag}>")
+
+    def handle_data(self, data: str) -> None:
+        if self._blocked_depth:
+            return
+        self._parts.append(html.escape(data))
+
+    def get_html(self) -> str:
+        return "".join(self._parts)
+
+
 def _sanitize_workspace_html(value: str | None) -> str | None:
     normalized = str(value or "").strip()
     if not normalized:
         return None
-    return normalized.replace("<script", "&lt;script").replace("</script>", "&lt;/script&gt;")
+    sanitizer = _WorkspaceHTMLSanitizer()
+    sanitizer.feed(normalized)
+    sanitizer.close()
+    sanitized = sanitizer.get_html().strip()
+    return sanitized or None
 
 
 def _clean_optional_text(value: object | None) -> str | None:

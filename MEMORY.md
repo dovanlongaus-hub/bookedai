@@ -16,6 +16,9 @@
 - Elevated Telegram workspace actions now run through `python3 scripts/telegram_workspace_ops.py`
 - Trusted Telegram actor ids come from `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS`
 - Allowed elevated action scope comes from `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS`
+- Full-server Telegram/OpenClaw host execution now uses `python3 scripts/telegram_workspace_ops.py host-shell --cwd / --command "..."`
+- Live Telegram DM access is now allowlist-based for trusted actor `8426853622`, not pairing-gated
+- `openclaw-cli` now auto-restarts through compose if it loses the first gateway connect race
 - Current default trusted operator id remains `8426853622`
 
 ## Memory Policy

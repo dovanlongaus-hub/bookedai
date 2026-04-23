@@ -76,11 +76,7 @@ function base64UrlDecode(value: string) {
 }
 
 function getAdminSessionSecret() {
-  const configured =
-    process.env.ADMIN_SESSION_SIGNING_SECRET ||
-    process.env.SESSION_SIGNING_SECRET ||
-    process.env.ADMIN_API_TOKEN ||
-    process.env.ADMIN_PASSWORD;
+  const configured = process.env.ADMIN_SESSION_SIGNING_SECRET || process.env.SESSION_SIGNING_SECRET;
 
   if (configured) {
     return configured;
