@@ -12,6 +12,7 @@ import type {
   TenantCatalogResponse,
   TenantIntegrationsResponse,
   TenantOnboardingResponse,
+  TenantOverviewRecentBooking,
   TenantOverviewPriority,
   TenantOverviewResponse,
   TenantPluginInterfaceResponse,
@@ -33,6 +34,8 @@ import {
   type TenantBusinessProfileFormState,
 } from '../../features/tenant-onboarding/TenantBusinessProfileCard';
 import { TenantOnboardingStatusCard } from '../../features/tenant-onboarding/TenantOnboardingStatusCard';
+import { TenantActivationChecklistCard } from '../../features/tenant-onboarding/TenantActivationChecklistCard';
+import { deriveTenantActivationState } from '../../features/tenant-onboarding/tenantActivation';
 import {
   TenantBillingWorkspace,
   type TenantBillingAccountFormState,
@@ -353,6 +356,77 @@ function metricCards(
       caption: billing.collection.recommended_action,
     },
   ];
+}
+
+function formatAud(value: number) {
+  return new Intl.NumberFormat('en-AU', {
+    style: 'currency',
+    currency: 'AUD',
+    maximumFractionDigits: 0,
+  }).format(Number.isFinite(value) ? value : 0);
+}
+
+function deriveBookingSignalLabel(booking: TenantOverviewRecentBooking) {
+  const status = (booking.status || '').toLowerCase();
+  const paymentState = (booking.payment_dependency_state || '').toLowerCase();
+
+  if (paymentState.includes('follow_up')) {
+    return 'Payment follow-up';
+  }
+  if (paymentState.includes('checkout_ready')) {
+    return 'Checkout ready';
+  }
+  if (['confirmed', 'scheduled', 'active', 'captured', 'completed', 'paid'].includes(status)) {
+    return 'Confirmed bookings';
+  }
+  if (['pending_confirmation', 'pending', 'unverified'].includes(status)) {
+    return 'Pending confirmation';
+  }
+  if (status) {
+    return status.replace(/_/g, ' ');
+  }
+  return 'Unclassified activity';
+}
+
+function deriveSourceContribution(overview: TenantOverviewResponse) {
+  const sourceBuckets = new Map<string, number>();
+  for (const booking of overview.recent_bookings) {
+    const key = deriveBookingSignalLabel(booking);
+    sourceBuckets.set(key, (sourceBuckets.get(key) ?? 0) + 1);
+  }
+  return Array.from(sourceBuckets.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
+}
+
+function derivePaidRevenueAud(billing: TenantBillingResponse, revenueMetrics: TenantRevenueMetrics | null) {
+  if (revenueMetrics) {
+    return revenueMetrics.total_revenue_aud;
+  }
+  return billing.invoices
+    .filter((invoice) => invoice.status === 'paid')
+    .reduce((sum, invoice) => sum + invoice.amount_aud, 0);
+}
+
+function deriveOutstandingRevenueAud(billing: TenantBillingResponse) {
+  return billing.invoices
+    .filter((invoice) => invoice.status !== 'paid')
+    .reduce((sum, invoice) => sum + invoice.amount_aud, 0);
+}
+
+function buildRevenueProofNarrative(
+  overview: TenantOverviewResponse,
+  billing: TenantBillingResponse,
+  revenueMetrics: TenantRevenueMetrics | null,
+) {
+  const openInvoices = billing.invoice_summary.open_invoices;
+  const paidInvoices = billing.invoice_summary.paid_invoices;
+  const attentionCount = overview.integration_snapshot.attention_count + overview.summary.lifecycle_attention_count;
+  const paidRevenueAud = derivePaidRevenueAud(billing, revenueMetrics);
+
+  if (!revenueMetrics && paidRevenueAud <= 0 && openInvoices <= 0) {
+    return 'BookedAI is still collecting enough tenant activity to generate a stronger monthly value story. Finish activation, billing, and publish posture first.';
+  }
+
+  return `BookedAI helped capture ${revenueMetrics?.sessions_started ?? overview.recent_bookings.length} sessions, convert ${revenueMetrics?.bookings_confirmed ?? overview.recent_bookings.length} bookings, and surface ${formatAud(paidRevenueAud)} in revenue${revenueMetrics ? ` over the last ${revenueMetrics.period_days} days` : ' from the current tenant billing and booking posture'}. ${openInvoices > 0 ? `${openInvoices} invoice item(s) still need follow-up. ` : ''}${paidInvoices > 0 ? `${paidInvoices} invoice item(s) are already marked paid. ` : ''}${attentionCount > 0 ? `${attentionCount} operational attention signal(s) still need review.` : 'Operational attention signals are currently under control.'}`;
 }
 
 function priorityToneClasses(priority: TenantOverviewPriority) {
@@ -2702,6 +2776,17 @@ export function TenantApp() {
   const activePanelMeta = tenantPanels.find((item) => item.key === panel) ?? tenantPanels[0];
   const activePanelGuide = overview.workspace.guides[panel === 'experience' ? 'experience' : panel];
   const introPreview = stripHtmlPreview(overview.workspace.introduction_html);
+  const activationState = useMemo(
+    () => deriveTenantActivationState({ session, onboarding, overview }),
+    [session, onboarding, overview],
+  );
+  const outstandingRevenueAud = useMemo(() => deriveOutstandingRevenueAud(billing), [billing]);
+  const paidRevenueAud = useMemo(() => derivePaidRevenueAud(billing, revenueMetrics), [billing, revenueMetrics]);
+  const sourceContribution = useMemo(() => deriveSourceContribution(overview), [overview]);
+  const revenueProofNarrative = useMemo(
+    () => buildRevenueProofNarrative(overview, billing, revenueMetrics),
+    [overview, billing, revenueMetrics],
+  );
 
   return (
     <main className="booked-admin-shell booked-page-shell text-slate-950">
@@ -2838,6 +2923,29 @@ export function TenantApp() {
           </section>
         ) : null}
 
+        <TenantActivationChecklistCard
+          activation={activationState}
+          action={
+            activationState.actionPanel ? (
+              <button
+                type="button"
+                onClick={() => setPanel(activationState.actionPanel ?? 'overview')}
+                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+              >
+                {activationState.actionLabel}
+              </button>
+            ) : !session ? (
+              <button
+                type="button"
+                onClick={() => setPanel('overview')}
+                className="rounded-full border border-sky-300 bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+              >
+                {activationState.actionLabel}
+              </button>
+            ) : null
+          }
+        />
+
         <section className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
           <aside className="space-y-4">
             <article className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
@@ -2930,81 +3038,124 @@ export function TenantApp() {
           <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-6">
 
-              {revenueMetrics && (
-                <article className="rounded-[1.75rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-600">
-                        AI Revenue Engine · Last {revenueMetrics.period_days} days
-                      </div>
-                      <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-950">
-                        Revenue Capture
-                      </h2>
+              <article className="rounded-[1.75rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-600">
+                      Revenue proof loop
                     </div>
+                    <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-950">
+                      Monthly value board
+                    </h2>
+                  </div>
+                  {revenueMetrics ? (
                     <div className="flex items-center gap-1.5 rounded-full border border-emerald-200 bg-white px-3 py-1.5">
                       <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-500" />
                       <span className="text-xs font-semibold text-emerald-700">
                         {revenueMetrics.capture_rate_pct}% captured
                       </span>
                     </div>
-                  </div>
+                  ) : null}
+                </div>
 
-                  <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Bookings confirmed
-                      </div>
-                      <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
-                        {revenueMetrics.bookings_confirmed}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-slate-500">
-                        of {revenueMetrics.sessions_started} sessions
-                      </div>
+                <p className="mt-3 text-sm leading-6 text-slate-700">{revenueProofNarrative}</p>
+
+                <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-6">
+                  <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Leads captured
                     </div>
-                    <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Revenue captured
-                      </div>
-                      <div className="mt-1.5 text-3xl font-semibold tracking-tight text-emerald-700">
-                        ${revenueMetrics.total_revenue_aud.toLocaleString('en-AU', { minimumFractionDigits: 0 })}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-slate-500">AUD</div>
+                    <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
+                      {overview.summary.total_leads}
                     </div>
-                    <div className="rounded-[1.2rem] border border-rose-100 bg-white px-4 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-rose-500">
-                        Missed revenue
-                      </div>
-                      <div className="mt-1.5 text-3xl font-semibold tracking-tight text-rose-600">
-                        ${revenueMetrics.missed_revenue_aud.toLocaleString('en-AU', { minimumFractionDigits: 0 })}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-slate-500">
-                        {revenueMetrics.missed_sessions} sessions lost
-                      </div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">{overview.summary.active_leads} active</div>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Bookings created
                     </div>
-                    <div className="rounded-[1.2rem] border border-slate-100 bg-white px-4 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                        Avg booking value
-                      </div>
-                      <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
-                        ${revenueMetrics.avg_booking_value_aud.toFixed(0)}
-                      </div>
-                      <div className="mt-0.5 text-[11px] text-slate-500">per booking</div>
+                    <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
+                      {revenueMetrics?.bookings_confirmed ?? bookings.status_summary.active + bookings.status_summary.completed}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">booking proof</div>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Paid revenue
+                    </div>
+                    <div className="mt-1.5 text-3xl font-semibold tracking-tight text-emerald-700">
+                      {formatAud(paidRevenueAud)}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">captured value</div>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-amber-100 bg-white px-4 py-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Outstanding revenue
+                    </div>
+                    <div className="mt-1.5 text-3xl font-semibold tracking-tight text-amber-700">
+                      {formatAud(outstandingRevenueAud)}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">open invoice posture</div>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-sky-100 bg-white px-4 py-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Source contribution
+                    </div>
+                    <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
+                      {sourceContribution[0]?.[1] ?? overview.recent_bookings.length}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">{sourceContribution[0]?.[0] ?? 'No dominant source yet'}</div>
+                  </div>
+                  <div className="rounded-[1.2rem] border border-rose-100 bg-white px-4 py-4">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Follow-up and CRM
+                    </div>
+                    <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
+                      {overview.summary.lifecycle_attention_count + overview.integration_snapshot.attention_count}
+                    </div>
+                    <div className="mt-0.5 text-[11px] text-slate-500">attention signals</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid gap-3 xl:grid-cols-[1.1fr_0.9fr]">
+                  <div className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Revenue proof narrative
+                    </div>
+                    <p className="mt-2 text-sm leading-6 text-slate-700">
+                      {revenueMetrics || paidRevenueAud > 0 || outstandingRevenueAud > 0
+                        ? `BookedAI is turning tenant activity into commercial proof: ${revenueMetrics?.sessions_started ?? overview.recent_bookings.length} captured sessions, ${revenueMetrics?.bookings_confirmed ?? bookings.status_summary.active + bookings.status_summary.completed} confirmed bookings, ${formatAud(paidRevenueAud)} paid revenue, and ${formatAud(outstandingRevenueAud)} still recoverable through billing follow-up.`
+                        : 'BookedAI is still building the first revenue proof sample for this tenant. Finish tenant activation, publish one offer, and attach billing posture to unlock stronger monthly reporting.'}
+                    </p>
+                  </div>
+                  <div className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Top source signals
+                    </div>
+                    <div className="mt-3 space-y-2">
+                      {sourceContribution.length ? sourceContribution.map(([label, value]) => (
+                        <div key={label} className="flex items-center justify-between rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700">
+                          <span>{label}</span>
+                          <span className="font-semibold text-slate-950">{value}</span>
+                        </div>
+                      )) : (
+                        <div className="rounded-full border border-dashed border-slate-300 px-3 py-2 text-sm text-slate-500">
+                          Source contribution will appear after more booking activity lands. For now, BookedAI is still collecting enough signals to identify the strongest booking or payment path.
+                        </div>
+                      )}
                     </div>
                   </div>
+                </div>
 
-                  {revenueMetrics.missed_revenue_aud > 0 && (
-                    <div className="mt-4 rounded-[1rem] border border-rose-100 bg-rose-50 px-4 py-3">
-                      <p className="text-xs text-rose-700">
-                        <span className="font-semibold">
-                          ${revenueMetrics.missed_revenue_aud.toLocaleString('en-AU', { minimumFractionDigits: 0 })} in potential revenue
-                        </span>{' '}
-                        walked away from {revenueMetrics.missed_sessions} incomplete sessions this month.
-                        Improving your catalog completeness and response speed recovers this.
-                      </p>
-                    </div>
-                  )}
-                </article>
-              )}
+                {revenueMetrics && revenueMetrics.missed_revenue_aud > 0 && (
+                  <div className="mt-4 rounded-[1rem] border border-rose-100 bg-rose-50 px-4 py-3">
+                    <p className="text-xs text-rose-700">
+                      <span className="font-semibold">{formatAud(revenueMetrics.missed_revenue_aud)} in potential revenue</span>{' '}
+                      walked away from {revenueMetrics.missed_sessions} incomplete sessions in this period. Improving publish posture, response speed, and billing follow-through is the fastest recovery lever.
+                    </p>
+                  </div>
+                )}
+              </article>
 
               <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
                 <div className="flex items-center justify-between gap-3">

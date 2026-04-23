@@ -64,6 +64,19 @@ export default async function LeadDetailPage({
     notFound();
   }
 
+  const [linkedCustomer, bookings] = await Promise.all([
+    lead.customerId ? repository.getCustomerById(tenant.tenantId, lead.customerId) : Promise.resolve(null),
+    repository.listBookings({
+      tenantId: tenant.tenantId,
+      page: 1,
+      pageSize: 200,
+      sortBy: "updatedAt",
+      sortOrder: "desc",
+    }),
+  ]);
+  const relatedBookings = bookings.items.filter((booking) => booking.customerId === lead.customerId);
+  const latestRelatedBooking = relatedBookings[0] ?? null;
+
   const crmSync = await getZohoCrmSyncStatus({
     tenantId: tenant.tenantId,
     entityType: "lead",
@@ -172,16 +185,74 @@ export default async function LeadDetailPage({
           />
 
           <AdminCard className="p-6">
-            <h2 className="text-lg font-semibold text-slate-950">Lead posture</h2>
+            <h2 className="text-lg font-semibold text-slate-950">Conversion aftermath</h2>
+            <p className="mt-2 text-sm leading-6 text-slate-600">
+              This card makes the downstream result explicit after qualification or conversion, so operators can see what record was created and where to continue the workflow next.
+            </p>
             <div className="mt-4 space-y-4 text-sm text-slate-700">
-              <div>
-                <div className="font-semibold text-slate-950">Customer link</div>
-                <div className="mt-1">{lead.customerName || "No customer linked yet"}</div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="font-semibold text-slate-950">Customer outcome</div>
+                {linkedCustomer ? (
+                  <>
+                    <div className="mt-1">{linkedCustomer.fullName}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Lifecycle {linkedCustomer.lifecycleStage} • {linkedCustomer.email || "No email stored yet"}
+                    </div>
+                    <div className="mt-3">
+                      <Link href={`/admin/customers/${linkedCustomer.id}`} className="text-sm font-semibold text-sky-700 hover:underline">
+                        Open customer record
+                      </Link>
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-1">No downstream customer record is linked yet.</div>
+                )}
+              </div>
+              <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                <div className="font-semibold text-slate-950">Booking outcome</div>
+                {latestRelatedBooking ? (
+                  <>
+                    <div className="mt-1">{latestRelatedBooking.serviceName} • {latestRelatedBooking.status}</div>
+                    <div className="mt-1 text-xs text-slate-500">
+                      Scheduled {latestRelatedBooking.startAt.slice(0, 16).replace("T", " ")} • {money(latestRelatedBooking.revenueCents)}
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-3">
+                      <Link href={`/admin/bookings/${latestRelatedBooking.id}`} className="text-sm font-semibold text-sky-700 hover:underline">
+                        Open booking record
+                      </Link>
+                      {relatedBookings.length > 1 ? (
+                        <Link href="/admin/bookings" className="text-sm font-semibold text-slate-700 hover:underline">
+                          View all related bookings ({relatedBookings.length})
+                        </Link>
+                      ) : null}
+                    </div>
+                  </>
+                ) : (
+                  <div className="mt-1">No downstream booking exists yet for this lead.</div>
+                )}
               </div>
               <div>
                 <div className="font-semibold text-slate-950">Status</div>
                 <div className="mt-2">
                   <LeadStageBadge status={lead.status} pipelineStage={lead.pipelineStage} />
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold text-slate-950">CRM posture</div>
+                <div className="mt-1">
+                  {crmSync.record
+                    ? `Latest CRM sync is ${crmSync.record.sync_status.replace(/_/g, " ")}.`
+                    : "No CRM sync aftermath recorded yet for this lead."}
+                </div>
+              </div>
+              <div>
+                <div className="font-semibold text-slate-950">Operator next move</div>
+                <div className="mt-1">
+                  {latestRelatedBooking
+                    ? "Continue in the booking record to confirm schedule, payment posture, and follow-up."
+                    : linkedCustomer
+                      ? "Continue in the customer record or convert this lead into a booking once the service is confirmed."
+                      : "Convert the lead into a customer first, then continue into booking or CRM follow-up."}
                 </div>
               </div>
               <div>

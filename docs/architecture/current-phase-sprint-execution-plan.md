@@ -32,6 +32,8 @@ This execution baseline inherits from:
 - `docs/architecture/implementation-phase-roadmap.md`
 - `docs/architecture/coding-implementation-phases.md`
 - `docs/architecture/user-surface-saas-upgrade-plan.md`
+- `docs/development/homepage-pitch-realignment-plan-2026-04-23.md`
+- `docs/development/public-search-booking-resilience-ux-2026-04-23.md`
 - `docs/architecture/phase-3-6-detailed-implementation-package.md`
 - `docs/architecture/phase-7-8-detailed-implementation-package.md`
 - `docs/architecture/phase-9-detailed-implementation-package.md`
@@ -43,11 +45,12 @@ This execution baseline inherits from:
 
 ## Current implementation baseline
 
-As of `2026-04-22`, the codebase already includes:
+As of `2026-04-23`, the codebase already includes:
 
-- a real public homepage sales-deck application
+- a real public homepage plus pitch application pair, now being actively re-split into a lighter product-first homepage and a deeper narrative pitch surface
 - an explicit public frontend runtime decision that the responsive web app is the current primary product surface, with native mobile deferred to a later phase
 - a real public search-first application still available as deeper routed runtime inventory
+- a public booking lane that now has to be treated as both a resilience lane and a UX lane: user-facing booking submit must survive degraded v1 writes, and slow search must still feel guided and legible instead of looking broken
 - a real admin application
 - a real tenant application
 - a production multi-surface frontend runtime still served from `frontend/`
@@ -79,6 +82,7 @@ The main delivery problem is now:
 - harden release discipline across more workflows
 - keep requirement documents aligned with the already-shipped product baseline
 - upgrade the major user surfaces so the whole system feels coherent, user-friendly, and SaaS-grade
+- keep the full BookedAI search-to-booking flow confidence-building even under slow search or partial backend degradation
 - finish the remaining bounded-context handler cleanup inside `backend/api/v1_routes.py` without breaking current public or operator paths
 
 ## User-layer upgrade overlay
@@ -137,6 +141,11 @@ The current BookedAI program should be read as one linked delivery chain rather 
   - `partially active`
 
 ### Sprint status summary
+
+Public execution note from `2026-04-23`:
+
+- homepage realignment is now active, not speculative: `bookedai.au` is the simpler product-entry surface, while `pitch.bookedai.au` is the deeper story surface
+- public search quality is now judged on interaction quality as well as correctness, which means slow matching states, result confidence, and booking-submit resilience are part of the sprint baseline
 
 - Sprint 1:
   - `complete as a requirement baseline`
@@ -211,10 +220,17 @@ The admin workspace should now be executed in the following order from current r
 
 Immediate next sequence after the current reporting baseline:
 
-- treat `Campaigns` and the first `Messaging` workspace as already-opened growth-lane foundations
-- keep `Messaging` tied to the existing email, SMS, WhatsApp, CRM-sync, and outbox ledger posture rather than inventing a disconnected communication center
-- start the next explicit implementation slice with `Workflow` definitions and execution posture on top of those now-visible message and lifecycle events
-- only then move into broader `Automation`
+- keep `Campaigns` and the first `Messaging` workspace as already-opened growth-lane foundations, but do not let them become the main breadth-expansion lane for the current phase
+- lock the next explicit execution package to `docs/development/golden-tenant-activation-revenue-proof-loop-2026-04-23.md`
+- treat the shipped responsive web app as the phase truth and keep React Native or native-mobile work deferred
+- use `Future Swim` as the primary vertical wedge for the first fully hardened commercial loop
+- use `children's chess classes` and `AI Mentor 1-1` as secondary adaptation templates after the Future Swim loop is stable
+- execute the next coding slices in this order:
+  - tenant identity and activation completion
+  - billing and commercial closure
+  - lead-to-booking and lead-to-customer aftermath visibility
+  - tenant revenue proof and monthly value reporting
+- only after that loop is commercially credible should the next explicit growth slice move into broader `Workflow` definitions and then `Automation`
 
 ### Next phase deadline
 
@@ -243,6 +259,7 @@ Delivered baseline:
 Carry-forward work:
 
 - keep later sprint docs aligned with the current shipped product baseline instead of older historical assumptions
+- keep homepage, popup assistant, and embedded booking assistant flows aligned so search-state wording, progress treatment, and booking-submit resilience do not drift apart again
 
 ### Phase 1 - Public growth and premium landing rebuild
 
@@ -252,6 +269,9 @@ Delivered baseline:
 
 - public search-first shell is live in code
 - multilingual locale switching exists
+- homepage and pitch are now explicitly being separated by role, with the current code already moving toward a shorter product-first homepage and a deeper pitch narrative surface
+- the public booking flow now has a first resilience patch for degraded v1 writes by falling back to the older booking-session lane when server or network failure would otherwise strand `Continue booking`
+- the public search experience now has a first staged-progress treatment so slower matching can explain what BookedAI is doing and invite better query detail while results are still resolving
 - BookedAI branding has a shared asset source under `frontend/public/branding/`
 - public responsive and live-read browser suites exist
 - the homepage sales-deck polish lane is now also active in code, with a cleaner CTA hierarchy, launch-offer strip, and stronger separation between homepage conversion, product demo, and deeper public runtime behavior
@@ -268,6 +288,8 @@ Carry-forward work:
 - preserve one active public spine
 - keep long-form public narrative subordinate to the sales-deck conversion path and the deeper `product/demo` runtime surfaces
 - preserve the current compact homepage section order and avoid re-expanding duplicated proof or pricing copy into the main public shell unless a later approved sprint explicitly changes that baseline
+- keep `bookedai.au` focused on first-minute product entry while `pitch.bookedai.au` absorbs the longer explanatory narrative
+- treat slow-search progress treatment and safe booking-submit fallback as active public requirements, not optional polish
 
 ### Phase 2 - Commercial data foundation
 

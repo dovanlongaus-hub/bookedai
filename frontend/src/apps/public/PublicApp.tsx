@@ -1,50 +1,18 @@
 import { useMemo } from 'react';
 
-import { Footer } from '../../components/landing/Footer';
 import { Header } from '../../components/landing/Header';
 import {
   buildPublicCtaAttribution,
   dispatchPublicCtaAttribution,
 } from '../../components/landing/attribution';
-import {
-  ctaContent,
-  demoContent,
-  heroContent,
-  implementationContent,
-  partnersSectionContent,
-  proofContent,
-  proofItems,
-  productHref,
-  roadmapHref,
-  adminHref,
-  teamMembers,
-  teamSectionContent,
-  tenantHref,
-  trustItems,
-  faqItems,
-} from '../../components/landing/data';
+import { productHref, roadmapHref, adminHref, tenantHref } from '../../components/landing/data';
 import { HomepageSearchExperience } from './HomepageSearchExperience';
-import { getHomepageContent } from './homepageContent';
-import { CallToActionSection } from '../../components/landing/sections/CallToActionSection';
-import { ArchitectureInfographicSection } from '../../components/landing/sections/ArchitectureInfographicSection';
-import { HeroSection } from '../../components/landing/sections/HeroSection';
-import { HomepageBrandStatementSection } from '../../components/landing/sections/HomepageBrandStatementSection';
-import { HomepageExecutiveBoardSection } from '../../components/landing/sections/HomepageExecutiveBoardSection';
-import { HomepageOverviewSection } from '../../components/landing/sections/HomepageOverviewSection';
-import { ImplementationSection } from '../../components/landing/sections/ImplementationSection';
-import { PartnersSection } from '../../components/landing/sections/PartnersSection';
-import { PricingSection } from '../../components/landing/sections/PricingSection';
-import { ProductProofSection } from '../../components/landing/sections/ProductProofSection';
-import { TeamSection } from '../../components/landing/sections/TeamSection';
-import { TrustSection } from '../../components/landing/sections/TrustSection';
-
+import { getHomepageContent, pitchDeckHref } from './homepageContent';
+import { BrandLockup } from '../../components/landing/ui/BrandLockup';
+import { SignalPill } from '../../components/landing/ui/SignalPill';
 const homepageNavItems = [
   { id: 'hero', label: 'Overview' },
-  { id: 'homepage-board', label: 'Web App' },
-  { id: 'product-proof', label: 'Product Proof' },
-  { id: 'architecture', label: 'Architecture' },
-  { id: 'pricing', label: 'Pricing' },
-  { id: 'trust', label: 'Trust' },
+  { id: 'bookedai-search-assistant', label: 'Live Search' },
   { id: 'roadmap', label: 'Roadmap', href: roadmapHref },
 ];
 
@@ -84,12 +52,12 @@ export function PublicApp() {
     window.location.href = productHref;
   }
 
-  function scrollToPricing() {
+  function openPitchDeck() {
     if (typeof window === 'undefined') {
       return;
     }
 
-    document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.location.href = pitchDeckHref;
   }
 
   function scrollToLiveDemo() {
@@ -113,67 +81,90 @@ export function PublicApp() {
           bookDemoLabel="Talk to Sales"
           compactMenuOnly
           utilityLinks={[
-            { label: 'Responsive Web App', href: productHref },
-            { label: 'Enterprise Architecture', href: '#architecture' },
-            { label: 'Roadmap', href: roadmapHref },
-            { label: 'Tenant Workspace', href: tenantHref },
-            { label: 'Admin Login', href: adminHref },
+            { label: 'Language: EN', href: '#hero' },
+            { label: 'Pitch', href: pitchDeckHref },
+            { label: 'Video Demo', href: '/video-demo.html' },
           ]}
         />
 
-        <HomepageBrandStatementSection />
-        <HeroSection
-          content={heroContent}
-          demo={demoContent}
-          onStartTrial={openProductTrial}
-          onBookDemo={scrollToLiveDemo}
-          onSeePricing={scrollToPricing}
-        />
-        <HomepageExecutiveBoardSection />
-        <ProductProofSection
-          content={proofContent}
-          items={proofItems}
-          onStartTrial={openProductTrial}
-          onBookDemo={() => openSalesContact('hero')}
-        />
-        <HomepageOverviewSection
-          onStartTrial={openProductTrial}
-          onBookDemo={() => openSalesContact('hero')}
-        />
+        <section id="hero" className="mx-auto w-full max-w-7xl px-4 pb-2 pt-3 sm:px-6 lg:px-8 lg:pb-3 lg:pt-5">
+          <div className="group relative overflow-hidden rounded-[1.8rem] border border-white/80 bg-[#07111f] px-4 py-5 shadow-[0_24px_90px_rgba(15,23,42,0.18)] sm:px-7 sm:py-7 lg:px-10 lg:py-8">
+            <div
+              className="absolute inset-0 scale-[1.02] bg-cover bg-center opacity-78 transition-transform duration-[1800ms] ease-out will-change-transform group-hover:scale-[1.06]"
+              style={{ backgroundImage: "url('/branding/bookedai-marketplace-strategy-bg.jpg')" }}
+              aria-hidden="true"
+            />
+            <div
+              className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,17,31,0.24)_0%,rgba(7,17,31,0.68)_32%,rgba(7,17,31,0.88)_100%)]"
+              aria-hidden="true"
+            />
+            <div
+              className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.28),transparent_24%),radial-gradient(circle_at_82%_18%,rgba(249,115,22,0.24),transparent_26%),radial-gradient(circle_at_50%_78%,rgba(59,130,246,0.16),transparent_28%)]"
+              aria-hidden="true"
+            />
+
+            <div className="relative mx-auto max-w-6xl text-center">
+              <SignalPill className="mx-auto w-fit border border-[#d9e7f6] bg-white px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
+                SME services marketplace direction
+              </SignalPill>
+
+              <div className="mt-4 flex justify-center">
+                <BrandLockup
+                  surface="dark"
+                  className="items-center"
+                  logoClassName="booked-brand-image max-w-[14rem] sm:max-w-[18rem]"
+                  descriptorClassName="hidden"
+                  eyebrowClassName="hidden"
+                />
+              </div>
+
+              <h1 className="mx-auto mt-5 max-w-4xl text-3xl font-semibold tracking-[-0.065em] text-white sm:text-5xl lg:text-6xl">
+                One chat-first surface for discovering, comparing, and booking SME business services.
+              </h1>
+              <p className="mx-auto mt-4 max-w-3xl text-sm leading-7 text-white/78 sm:text-base lg:text-lg">
+                Discover, compare, and move into booking through one chat-first workspace designed for enterprise-grade SME service search.
+              </p>
+
+              <div className="mt-6 flex flex-wrap justify-center gap-3">
+                <button
+                  type="button"
+                  onClick={openProductTrial}
+                  className="rounded-full bg-[#1d1d1f] px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+                >
+                  Open Web App
+                </button>
+                <button
+                  type="button"
+                  onClick={scrollToLiveDemo}
+                  className="rounded-full border border-white/22 bg-white/12 px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+                >
+                  See Live Search
+                </button>
+                <button
+                  type="button"
+                  onClick={openPitchDeck}
+                  className="rounded-full border border-cyan-200/30 bg-cyan-300/14 px-6 py-3 text-sm font-semibold text-cyan-100 transition hover:-translate-y-0.5"
+                >
+                  Open Pitch Deck
+                </button>
+              </div>
+
+              <div className="mt-6 flex flex-wrap justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/68 sm:text-[11px]">
+                {['Search-first discovery', 'Booking-ready workflow', 'Enterprise UI shell'].map((item) => (
+                  <span key={item} className="rounded-full border border-white/14 bg-white/10 px-3 py-2 backdrop-blur-sm">
+                    {item}
+                  </span>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
         <HomepageSearchExperience
           content={homepageSearchContent}
           sourcePath={sourcePath}
           initialQuery={null}
           initialQueryRequestId={0}
-        />
-        <ArchitectureInfographicSection
-          onStartTrial={openProductTrial}
-          onBookDemo={() => openSalesContact('hero')}
-        />
-        <ImplementationSection content={implementationContent} />
-        <TrustSection items={trustItems} faqItems={faqItems} />
-        <PartnersSection
-          content={partnersSectionContent}
-          onStartTrial={openProductTrial}
-          onBookDemo={() => openSalesContact('call_to_action')}
-        />
-        <TeamSection
-          content={teamSectionContent}
-          members={teamMembers}
-          onStartTrial={openProductTrial}
-          onBookDemo={() => openSalesContact('call_to_action')}
-        />
-        <PricingSection />
-        <CallToActionSection
-          content={ctaContent}
-          onStartTrial={openProductTrial}
-          onBookDemo={() => openSalesContact('call_to_action')}
-        />
-        <Footer
-          onStartTrial={openProductTrial}
-          onBookDemo={() => openSalesContact('footer')}
-          startTrialLabel="Open Web App"
-          bookDemoLabel="Talk to Sales"
         />
       </div>
     </main>

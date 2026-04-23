@@ -1,4 +1,5 @@
 import { apiV1 } from '../../../shared/api';
+import { ApiClientError } from '../../../shared/api/client';
 import type { ApiChannel, DeploymentMode } from '../../../shared/contracts/common';
 import type {
   ApiActorContext,
@@ -904,4 +905,12 @@ export async function createPublicBookingAssistantLeadAndBookingIntent(params: P
     warnings: bookingIntentResponse.data.warnings,
     crmSync: bookingIntentResponse.data.crm_sync ?? null,
   };
+}
+
+export function shouldFallbackToLegacyBookingSession(error: unknown) {
+  if (error instanceof ApiClientError) {
+    return error.status >= 500;
+  }
+
+  return error instanceof TypeError;
 }

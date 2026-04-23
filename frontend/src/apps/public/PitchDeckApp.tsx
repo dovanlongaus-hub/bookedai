@@ -11,6 +11,7 @@ import {
   demoContent,
   flowSteps,
   heroContent,
+  implementationContent,
   metrics,
   partnersSectionContent,
   pricingContent,
@@ -24,8 +25,19 @@ import {
   teamMembers,
   teamSectionContent,
   trustItems,
+  faqItems,
 } from '../../components/landing/data';
 import { ArchitectureInfographicSection } from '../../components/landing/sections/ArchitectureInfographicSection';
+import { CallToActionSection } from '../../components/landing/sections/CallToActionSection';
+import { HomepageBrandStatementSection } from '../../components/landing/sections/HomepageBrandStatementSection';
+import { HomepageExecutiveBoardSection } from '../../components/landing/sections/HomepageExecutiveBoardSection';
+import { HomepageOverviewSection } from '../../components/landing/sections/HomepageOverviewSection';
+import { ImplementationSection } from '../../components/landing/sections/ImplementationSection';
+import { PartnersSection } from '../../components/landing/sections/PartnersSection';
+import { PricingSection } from '../../components/landing/sections/PricingSection';
+import { ProductProofSection } from '../../components/landing/sections/ProductProofSection';
+import { TeamSection } from '../../components/landing/sections/TeamSection';
+import { TrustSection } from '../../components/landing/sections/TrustSection';
 import { BrandLockup } from '../../components/landing/ui/BrandLockup';
 import { SectionCard } from '../../components/landing/ui/SectionCard';
 import { SignalPill } from '../../components/landing/ui/SignalPill';
@@ -46,6 +58,7 @@ const pitchNavItems = [
   { id: 'engine', label: 'Engine' },
   { id: 'architecture', label: 'Architecture' },
   { id: 'proof', label: 'Proof' },
+  { id: 'homepage-story', label: 'Homepage Story' },
   { id: 'team-members', label: 'Team' },
   { id: 'pricing', label: 'Pricing' },
 ];
@@ -215,17 +228,17 @@ export function PitchDeckApp() {
         navItems={pitchNavItems}
         onStartTrial={() => openRegisterInterest('header', 'pitch_header_register')}
         onBookDemo={openProductDemo}
-        startTrialLabel="Open SME Registration"
+        startTrialLabel="Talk to Sales"
         bookDemoLabel="Open Web App"
         utilityLinks={[
-          { label: 'Responsive Web App', href: productUrl },
-          { label: 'Demo Page', href: demoLandingUrl },
+          { label: 'Product', href: productUrl },
+          { label: 'Video Demo', href: demoLandingUrl },
           { label: 'Roadmap', href: roadmapHref },
         ]}
       />
 
       <section id="overview" className="relative mx-auto w-full max-w-7xl px-6 pt-6 lg:px-8 lg:pt-8">
-        <SectionCard className="relative overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_52%,#f3f0ff_100%)] px-6 py-6 shadow-[0_32px_90px_rgba(15,23,42,0.10)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
+        <SectionCard className="relative overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#fbfdff_0%,#f6faff_42%,#eef4ff_72%,#f8f5ff_100%)] px-6 py-6 shadow-[0_32px_90px_rgba(15,23,42,0.10)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
           <div className="absolute -left-20 top-8 h-48 w-48 rounded-full bg-cyan-400/12 blur-3xl" />
           <div className="absolute right-0 top-0 h-full w-[44%] bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.10),transparent_42%)]" />
           <div className="absolute bottom-0 right-10 h-40 w-40 rounded-full bg-emerald-400/8 blur-3xl" />
@@ -233,10 +246,10 @@ export function PitchDeckApp() {
           <div className="relative grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-stretch">
             <div className="min-w-0">
               <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-                pitch.bookedai.au
+                Professional landing + pitch surface
               </SignalPill>
 
-              <div className="mt-6 rounded-[2rem] border border-black/6 bg-white/72 p-5 backdrop-blur">
+              <div className="mt-6 rounded-[2rem] border border-white/70 bg-white/82 p-5 shadow-[0_20px_44px_rgba(15,23,42,0.06)] backdrop-blur">
                 <BrandLockup
                   surface="light"
                   className="items-start"
@@ -245,18 +258,40 @@ export function PitchDeckApp() {
                   eyebrowClassName="hidden"
                 />
 
-                <h1 className="mt-8 max-w-4xl text-4xl font-semibold tracking-[-0.06em] text-[#1d1d1f] sm:text-5xl lg:text-7xl">
-                  A cleaner revenue engine story for SME buyers and investor review.
+                <h1 className="mt-8 max-w-5xl text-4xl font-semibold tracking-[-0.06em] text-[#1d1d1f] sm:text-5xl lg:text-7xl">
+                  The professional landing page for BookedAI's SME revenue, booking, and marketplace story.
                 </h1>
-                <p className="mt-5 max-w-2xl text-base leading-8 text-black/64 sm:text-lg">
-                  BookedAI captures demand, ranks intent, and moves the right customer into a booking-ready path without forcing teams to manually triage every lead.
+                <p className="mt-5 max-w-3xl text-base leading-8 text-black/64 sm:text-lg">
+                  This surface is where the earlier landing-page narrative, the investor-readable pitch deck, and the more polished commercial story now live together. `bookedai.au` stays product-first. `pitch.bookedai.au` carries the deeper explanation, proof, architecture, team, and pricing story.
                 </p>
 
+                <div className="mt-6 grid gap-3 lg:grid-cols-3">
+                  {[
+                    {
+                      title: 'For buyers',
+                      body: 'Explain the offer, trust the flow, then move into the live product when ready.',
+                    },
+                    {
+                      title: 'For investors',
+                      body: 'See wedge, workflow, architecture, commercial model, and why this can scale beyond one category.',
+                    },
+                    {
+                      title: 'For partners',
+                      body: 'Use one polished narrative surface instead of mixing product entry with long-form positioning.',
+                    },
+                  ].map((card) => (
+                    <div key={card.title} className="rounded-[1.35rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4">
+                      <div className="text-sm font-semibold text-[#1d1d1f]">{card.title}</div>
+                      <div className="mt-2 text-sm leading-6 text-black/62">{card.body}</div>
+                    </div>
+                  ))}
+                </div>
+
                 <div className="mt-6 flex flex-wrap gap-2">
-                  <VisualChip tone="brand">AI Revenue Engine</VisualChip>
-                  <VisualChip tone="light">24/7 response</VisualChip>
-                  <VisualChip tone="light">Booking-ready handoff</VisualChip>
-                  <VisualChip tone="light">Service SME fit</VisualChip>
+                  <VisualChip tone="brand">Professional landing</VisualChip>
+                  <VisualChip tone="light">Investor-readable pitch</VisualChip>
+                  <VisualChip tone="light">Product proof connected</VisualChip>
+                  <VisualChip tone="light">SME marketplace direction</VisualChip>
                 </div>
 
                 <div className="mt-8 flex flex-wrap gap-3">
@@ -271,7 +306,7 @@ export function PitchDeckApp() {
                     onClick={() => openRegisterInterest('hero', 'pitch_hero_primary')}
                     className="rounded-full border border-black/8 bg-white/72 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
                   >
-                    Open SME Registration
+                    Talk to Sales
                   </button>
                   <button
                     type="button"
@@ -291,7 +326,7 @@ export function PitchDeckApp() {
                     Revenue snapshot
                   </div>
                   <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                    Visual-first
+                    Landing-grade
                   </div>
                 </div>
 
@@ -312,7 +347,7 @@ export function PitchDeckApp() {
 
               <SectionCard className="border border-black/6 bg-white/72 p-5 text-[#1d1d1f] backdrop-blur">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
-                  Investor snapshot
+                  Executive snapshot
                 </div>
                 <div className="mt-4 grid gap-3">
                   {investorSignalCards.map((card) => (
@@ -733,6 +768,68 @@ export function PitchDeckApp() {
         </div>
       </section>
 
+      <section id="homepage-story" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+        <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_48%,#f3f7ff_100%)] px-6 py-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] sm:px-7 lg:px-8">
+          <div className="grid gap-6 xl:grid-cols-[0.78fr_1.22fr] xl:items-start">
+            <div>
+              <SignalPill className="w-fit border border-black/6 bg-white/80 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
+                Migrated from homepage
+              </SignalPill>
+              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
+                The longer-form homepage story now belongs here.
+              </h2>
+              <p className="mt-4 max-w-xl text-sm leading-7 text-black/62 sm:text-base">
+                `bookedai.au` is being simplified into a cleaner product-first landing page. The deeper narrative, board framing, architecture, broader proof, team, partner, trust, and pricing story now stay together inside `pitch.bookedai.au`.
+              </p>
+              <div className="mt-6 grid gap-3">
+                {[
+                  'Homepage stays fast, shorter, and product-entry-first.',
+                  'Pitch becomes the canonical long-form public narrative.',
+                  'The product host remains the deeper live runtime proof lane.',
+                ].map((point) => (
+                  <div key={point} className="rounded-[1.2rem] border border-black/6 bg-white/78 px-4 py-4 text-sm leading-6 text-black/68">
+                    {point}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid gap-3 md:grid-cols-3">
+              {[
+                { title: 'Brand statement', body: 'Keep the compact positioning layer here instead of crowding the homepage.' },
+                { title: 'Executive framing', body: 'Preserve investor-readable board context in the pitch, not in the first product screen.' },
+                { title: 'Architecture + proof', body: 'Let the deeper narrative live beside proof instead of splitting it across surfaces.' },
+              ].map((card) => (
+                <div key={card.title} className="rounded-[1.35rem] border border-black/6 bg-white p-4">
+                  <div className="text-sm font-semibold text-[#1d1d1f]">{card.title}</div>
+                  <p className="mt-2 text-sm leading-6 text-black/60">{card.body}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </SectionCard>
+      </section>
+
+      <HomepageBrandStatementSection />
+      <HomepageExecutiveBoardSection />
+      <ProductProofSection
+        content={proofContent}
+        items={proofItems}
+        onStartTrial={openProductDemo}
+        onBookDemo={() => openRegisterInterest('call_to_action', 'pitch_migrated_homepage_product_proof')}
+      />
+      <HomepageOverviewSection
+        onStartTrial={openProductDemo}
+        onBookDemo={() => openRegisterInterest('call_to_action', 'pitch_migrated_homepage_overview')}
+      />
+      <ImplementationSection content={implementationContent} />
+      <TrustSection items={trustItems} faqItems={faqItems} />
+      <PartnersSection
+        content={partnersSectionContent}
+        onStartTrial={openProductDemo}
+        onBookDemo={() => openRegisterInterest('call_to_action', 'pitch_migrated_homepage_partners')}
+      />
+
       <section id="team-members" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
         <SectionCard className="overflow-hidden px-6 py-6 sm:px-7 lg:px-8">
           <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
@@ -890,6 +987,19 @@ export function PitchDeckApp() {
           </div>
         </SectionCard>
       </section>
+
+      <PricingSection />
+      <CallToActionSection
+        content={{
+          ...ctaContent,
+          title: 'Use pitch for the full story, then move straight into the live product.',
+          body: 'This surface now holds the deeper homepage narrative, so the landing page can stay cleaner while buyers and investors still have one place for the full story.',
+          primaryCta: 'Open Web App',
+          secondaryCta: 'Open SME Registration',
+        }}
+        onStartTrial={openProductDemo}
+        onBookDemo={() => openRegisterInterest('call_to_action', 'pitch_migrated_homepage_cta')}
+      />
 
       <Footer
         onStartTrial={() => openRegisterInterest('footer', 'pitch_footer_register')}

@@ -4,10 +4,14 @@ import { BookingAssistantDialog } from '../../components/landing/assistant/Booki
 import type { PublicBookingAssistantRuntimeConfig } from '../../components/landing/assistant/publicBookingAssistantV1';
 import { bookingAssistantContent } from '../../components/landing/data';
 import { LogoMark } from '../../components/landing/ui/LogoMark';
+import {
+  createEmbeddedWidgetRuntimeConfig,
+  createPublicAssistantRuntimeConfig,
+} from '../../shared/runtime/publicAssistantRuntime';
 
 const AI_MENTOR_PRO_TENANT_REF = 'ai-mentor-doer';
 
-const aiMentorHostedRuntimeConfig: PublicBookingAssistantRuntimeConfig = {
+const aiMentorHostedRuntimeConfig: PublicBookingAssistantRuntimeConfig = createPublicAssistantRuntimeConfig({
   channel: 'public_web',
   tenantRef: AI_MENTOR_PRO_TENANT_REF,
   deploymentMode: 'standalone_app',
@@ -16,18 +20,16 @@ const aiMentorHostedRuntimeConfig: PublicBookingAssistantRuntimeConfig = {
   medium: 'hosted_product',
   campaign: 'ai_mentor_pro_hosted',
   surface: 'ai_mentor_pro_hosted_app',
-};
+});
 
-const aiMentorEmbedRuntimeConfig: PublicBookingAssistantRuntimeConfig = {
-  channel: 'embedded_widget',
+const aiMentorEmbedRuntimeConfig: PublicBookingAssistantRuntimeConfig = createEmbeddedWidgetRuntimeConfig({
   tenantRef: AI_MENTOR_PRO_TENANT_REF,
-  deploymentMode: 'plugin_integrated',
   widgetId: 'ai-mentor-pro-plugin',
   source: 'ai_mentor_pro_plugin',
   medium: 'partner_website',
   campaign: 'ai_mentor_pro_embed',
   surface: 'ai_mentor_pro_partner_widget',
-};
+});
 
 const quickPrompts = [
   'I want a 1-1 session to build my first AI app in one hour.',

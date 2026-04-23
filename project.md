@@ -10,6 +10,12 @@ Latest infrastructure update date: `2026-04-16`.
 
 Latest product-surface update date: `2026-04-23`.
 
+Latest public-search UX update date: `2026-04-23`.
+
+Latest public marketplace visual update date: `2026-04-23`.
+
+Latest widget/plugin architecture update date: `2026-04-23`.
+
 From this point onward, it serves three purposes:
 
 - act as the master index for all project documentation
@@ -57,7 +63,15 @@ As of `2026-04-21`, the synchronized repo baseline now includes both product-sur
 The current inherited truth is:
 
 - the production multi-surface frontend currently still runs from the React + TypeScript + Vite application under `frontend/`
+- the public booking-search lane on `2026-04-23` now carries two explicit requirements together:
+  - continue-booking must stay resilient even when the newer v1 write path is degraded, which means user-facing booking submit should fall back safely instead of leaving the UI in a loading-fail state
+  - slow search and matching phases must feel guided and professional, with visible in-progress matching states, clearer explanation of what BookedAI is doing, and lightweight prompts that invite the user to add location, timing, audience, or preference detail while ranking is still running
 - the root `app/` and `components/` Next.js subtree now exists as a parallel marketing/runtime experiment, but it is not yet the sole production web source
+- as of `2026-04-23`, the public booking/search flow must also be treated as an embeddable multi-tenant runtime, not only a BookedAI-owned page experience:
+  - the same assistant and booking lifecycle should be installable as a plugin/widget on customer-owned SME websites
+  - the widget/plugin should operate as receptionist, sales, and customer-service surface while still flowing into the shared BookedAI booking, payment, portal, and follow-up lifecycle
+  - runtime identity now needs to stay explicit through tenant, widget, deployment-mode, host-origin, source-page, and campaign context so many SME customers can share one BookedAI platform safely
+  - the managed booking portal should be treated as the persistent post-booking control surface for widget installs too, including review, edit, reschedule, cancel, and resubmit behavior
 - the backend top-level router is now mounted in `backend/app.py` through explicit modules:
   - `public_catalog_routes`
   - `upload_routes`
@@ -105,6 +119,15 @@ The current inherited truth is:
     - the active admin shell now presents `Overview`, `Tenants`, `Tenant Workspace`, `Catalog`, `Billing Support`, `Integrations`, `Messaging`, `Reliability`, `Audit & Activity`, and `Platform Settings` as first-class workspaces instead of stopping at the earlier four-workspace split
     - the admin tenant lane is now intentionally separated into a lightweight tenant directory plus a deeper mutable tenant workspace, so operators can confirm scope before editing branding, roles, HTML content, or services
     - the same package also gives admin explicit section-guidance and route homes for billing/support review, integrations review, audit chronology, and platform settings without waiting for every deeper backend read model to land first
+  - the public homepage and booking-assistant runtime also moved one more practical step on `2026-04-23`:
+    - the broader architectural requirement for that flow is now captured in `docs/development/widget-plugin-multi-tenant-booking-architecture-2026-04-23.md`, which locks BookedAI's direction as a reusable embedded runtime for many SME websites rather than only a single homepage assistant
+    - `frontend/src/apps/public/PublicApp.tsx` now uses the new marketplace strategy image as the opening-session visual backdrop, reframing the homepage hero around BookedAI's longer-term SME services marketplace direction rather than only a narrower search-assistant frame
+    - that same homepage now reuses the same visual language more lightly in secondary sections so the category-expansion message feels intentional and productized instead of like one isolated hero image drop-in
+    - the homepage opening layer now also adds subtle motion polish through a restrained hover-scale background treatment so the first-entry surface feels more premium without undermining readability or CTA focus
+    - `frontend/src/apps/public/HomepageSearchExperience.tsx` now falls back to the legacy booking-session path when the live v1 booking write fails at server or network level, preventing the `Continue booking` path from stalling when `/api/v1/leads` or `/api/v1/bookings/intents` are unhealthy
+    - the homepage search surface now also exposes a staged in-progress matching treatment, with clearer search-progress labels, richer loading explanation, and contextual prompts that ask for suburb, time window, audience, or preference detail while search is still resolving
+    - `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` now mirrors that same more professional matching-state treatment so homepage, popup, and embedded assistant flows do not drift in tone
+    - `frontend/src/components/landing/sections/BookingAssistantSection.tsx` now uses a richer loading message that explains intent, locality, and shortlist checks instead of only showing a generic searching bubble
   - the same `Phase 7` growth lane then moved one step further on `2026-04-23` into the first messaging foundation:
     - FastAPI admin now exposes `/api/admin/messaging` plus source-specific detail and action routes for unified operator review
     - the first messaging workspace reads from `email_messages`, `outbox_events`, and `crm_sync_records` instead of inventing a disconnected communication-only store
@@ -338,7 +361,9 @@ The platform should not be framed as:
 Current approved surface map:
 
 - `bookedai.au`
-  - homepage sales-deck and acquisition surface
+  - compact product-first acquisition and orientation surface
+- `pitch.bookedai.au`
+  - deeper pitch, investor-readable narrative, and migrated homepage long-form story surface
 - `product.bookedai.au`
   - deeper product demo and booking-agent proof surface
 - `demo.bookedai.au`
@@ -506,7 +531,8 @@ The currently approved upgrade direction is:
 ### Current required upgrade tracks
 
 - public:
-  - preserve compact acquisition-first homepage posture
+  - realign `bookedai.au` into a simpler modern product-first landing page with minimal narrative weight above the live product entry
+  - move the current longer-form homepage narrative inventory into `pitch.bookedai.au` instead of keeping both jobs on one page
   - preserve direct continuation into product and registration paths
 - tenant:
   - continue hardening onboarding, billing, team, and role-safe operations
@@ -1052,6 +1078,11 @@ The synchronized documentation baseline now also includes a dedicated public gro
 - attribution-aware public conversion design
 - mobile-first public UX priorities
 - safe rollout sequencing for public growth changes
+- the `2026-04-23` homepage-to-pitch realignment plan that turns `bookedai.au` into the simpler product-first surface and treats `pitch.bookedai.au` as the canonical home for the current long-form homepage narrative
+
+Additional active public execution note:
+
+- `docs/development/homepage-pitch-realignment-plan-2026-04-23.md`
 
 Future public-site work should inherit:
 
@@ -1064,6 +1095,13 @@ The current public runtime decision is now also explicit:
 - `docs/architecture/frontend-runtime-decision-record.md`
 
 That decision locks the current phase to a responsive web app primary strategy on `bookedai.au`, with native mobile deferred until a later phase.
+
+The same runtime decision now also locks the next commercial execution wave to one web-first revenue loop:
+
+- `docs/development/golden-tenant-activation-revenue-proof-loop-2026-04-23.md`
+- `Future Swim` is the primary wedge to harden first
+- `children's chess classes` and `AI Mentor 1-1` are the next adaptation templates after the Future Swim loop is stable
+- this phase should prioritize tenant activation, billing clarity, lead-to-booking or customer closure, and tenant-facing revenue proof before broader workflow automation or React Native work
 
 ## Tenant Surface Baseline
 

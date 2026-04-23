@@ -79,14 +79,35 @@ Expected outcomes:
 - the homepage-specific search runtime should stay aligned with that same journey instead of drifting into a thinner booking-only branch, so homepage confirmation now inherits CRM-aware result posture, communication drafts, and a delivery timeline too
 - homepage booking confirmation should also stay responsive under enterprise orchestration pressure, so the authoritative booking capture must surface immediately while payment/email/SMS/WhatsApp automation completes asynchronously in the background
 - homepage sidebar parity should continue to close toward the richer assistant shell, which now means exposing the explicit enterprise journey rail from search through aftercare directly on the homepage surface
+- that same homepage runtime should now also expose a smoother matching-state experience when search is slow, with staged progress language and prompts for better input instead of a thin static loading state
 - a reusable cross-industry full-flow QA pack for that same public booking journey, so operators can rehearse and validate enterprise booking posture across 10 synthetic industries without inventing ad-hoc records each time
 - stronger continuity from homepage and product proof into portal, tenant, and billing follow-up lanes
-- inherited homepage truth for later user-surface work is now the compact `SME + investor readable` acquisition surface with package vocabulary `Freemium`, `Pro`, `Pro Max`, plus registration-only `Advance Customize`
+- public search and booking submit should now explicitly tolerate partial backend degradation: if the newer v1 booking write path is unhealthy, the user-facing flow must fall back safely instead of freezing on `Continue booking`
+- slow-search behavior is now part of the product requirement, not only a visual nice-to-have:
+  - matching should expose visible in-progress stages instead of one generic loading label
+  - the runtime should explain what BookedAI is doing while ranking and trust checks are running
+  - the runtime should proactively invite extra detail like suburb, time window, audience, or preference so the user can improve match quality before results settle
+- inherited homepage truth for later user-surface work is now shifting again on `2026-04-23`: `bookedai.au` should become the simpler modern product-first landing surface, while `pitch.bookedai.au` should absorb the current homepage's long-form narrative, proof, architecture, and company-story content
 - CTA language across homepage-adjacent public surfaces should now prefer `Open Web App` or equivalent responsive-web wording over older `Product Trial` shorthand when the target is the live web runtime
+- public narrative ownership should be cleaner:
+  - `bookedai.au` owns first-minute orientation and product entry
+  - `pitch.bookedai.au` owns deeper pitch and migrated long-form homepage story
+  - `product.bookedai.au` owns deeper live product proof
+- the active `2026-04-23` public UX direction now also includes an interaction-quality rule: BookedAI should feel like it is actively working during search and matching, not passively waiting, especially on homepage and assistant entry surfaces where slower ranking can otherwise feel broken
 
 Execution guardrail:
 
 - any sprint, phase, or implementation artifact that still implies native mobile is part of the current-phase public delivery baseline should be treated as stale and updated toward the responsive-web-first decision before implementation starts
+- any public implementation that keeps both the simple product-entry job and the full pitch-deck narrative on `bookedai.au` should be treated as stale against the `2026-04-23` homepage realignment plan
+
+Immediate public implementation slice now queued:
+
+1. simplify `frontend/src/apps/public/PublicApp.tsx` into a shorter product-first composition
+2. migrate current homepage narrative inventory into `frontend/src/apps/public/PitchDeckApp.tsx`
+3. keep `bookedai.au -> pitch.bookedai.au -> product.bookedai.au` CTA hierarchy explicit and non-overlapping
+4. refactor shared homepage content sources so homepage and pitch do not drift again
+5. keep homepage and assistant search states visibly progressive and informative under slower matching conditions
+6. preserve safe booking-submit fallback behavior whenever the v1 write lane is degraded
 
 ## Portal
 

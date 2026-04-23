@@ -11,6 +11,7 @@ from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+DEFAULT_HOST_REPO_ROOT = Path("/home/dovanlong/BookedAI")
 DEFAULT_TRUSTED_TELEGRAM_USER_IDS = {"8426853622"}
 DEFAULT_TELEGRAM_ALLOWED_ACTIONS = {
     "sync_doc",
@@ -177,6 +178,17 @@ def resolve_host_path(path_value: str | None) -> Path:
     return requested.resolve()
 
 
+def resolve_host_repo_root() -> Path:
+    explicit = os.getenv("BOOKEDAI_HOST_REPO_DIR", "").strip()
+    if explicit:
+        return Path(explicit).resolve()
+
+    if Path("/hostfs").exists() and (Path("/hostfs") / DEFAULT_HOST_REPO_ROOT.relative_to("/")).exists():
+        return DEFAULT_HOST_REPO_ROOT
+
+    return REPO_ROOT
+
+
 def resolve_host_command(command: str) -> list[str]:
     try:
         argv = shlex.split(command)
@@ -245,6 +257,8 @@ def handle_build_frontend(_args: argparse.Namespace) -> int:
 
 
 def handle_deploy_live(_args: argparse.Namespace) -> int:
+    if should_use_nsenter_host_exec():
+        return run_host_shell("bash scripts/deploy_live_host.sh", cwd=resolve_host_repo_root())
     return run_command(["bash", "scripts/deploy_live_host.sh"], cwd=REPO_ROOT)
 
 

@@ -12,6 +12,7 @@ import { isPublicBookingAssistantV1LiveReadEnabled } from '../../../shared/confi
 import {
   createPublicBookingAssistantLeadAndBookingIntent,
   getPublicBookingAssistantLiveReadRecommendation,
+  shouldFallbackToLegacyBookingSession,
   shadowPublicBookingAssistantLeadAndBookingIntent,
 } from '../assistant/publicBookingAssistantV1';
 import {
@@ -158,7 +159,7 @@ const starterPrompts = [
   'Find a quick after-work facial or haircut near Sydney CBD',
   'Compare two facial options in Sydney under $150',
   'What AI events are coming up at WSTI and Western Sydney Startup Hub?',
-  'Tìm sự kiện AI tại WSTI tuần này và gợi ý bước tiếp theo',
+  'Find AI events at WSTI this week and recommend the next step',
   'Find signage or expo booth printing for an event in Sydney',
 ];
 
@@ -1030,32 +1031,38 @@ export function BookingAssistantSection({
 
     try {
       if (isLiveReadMode) {
-        const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
-          sourcePage,
-          serviceId: selectedService.id,
-          serviceName: selectedService.name,
-          serviceCategory: selectedService.category,
-          customerName,
-          customerEmail: normalizedCustomerEmail,
-          customerPhone: normalizedCustomerPhone,
-          notes: normalizedNotes,
-          requestedDate: slot.requestedDate,
-          requestedTime: slot.requestedTime,
-          timezone: 'Australia/Sydney',
-        });
-
-        setBookingResult(
-          buildAuthoritativeBookingIntentResult({
-            authoritativeResult,
-            selectedService,
+        try {
+          const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
+            sourcePage,
+            serviceId: selectedService.id,
+            serviceName: selectedService.name,
+            serviceCategory: selectedService.category,
+            customerName,
+            customerEmail: normalizedCustomerEmail,
+            customerPhone: normalizedCustomerPhone,
+            notes: normalizedNotes,
             requestedDate: slot.requestedDate,
             requestedTime: slot.requestedTime,
-            customerEmail: normalizedCustomerEmail ?? '',
-            nextStep: selectedService.booking_url ? 'Use the provider booking path after callback confirmation.' : null,
-          }),
-        );
-        setActivePreviewTab('booking');
-        return;
+            timezone: 'Australia/Sydney',
+          });
+
+          setBookingResult(
+            buildAuthoritativeBookingIntentResult({
+              authoritativeResult,
+              selectedService,
+              requestedDate: slot.requestedDate,
+              requestedTime: slot.requestedTime,
+              customerEmail: normalizedCustomerEmail ?? '',
+              nextStep: selectedService.booking_url ? 'Use the provider booking path after callback confirmation.' : null,
+            }),
+          );
+          setActivePreviewTab('booking');
+          return;
+        } catch (error) {
+          if (!shouldFallbackToLegacyBookingSession(error)) {
+            throw error;
+          }
+        }
       }
 
       void shadowPublicBookingAssistantLeadAndBookingIntent({
@@ -1577,8 +1584,11 @@ export function BookingAssistantSection({
 
                             {loading ? (
                               <div className="flex justify-start">
-                                <div className="rounded-[1.2rem] rounded-bl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
-                                  {brandName} is finding the best match...
+                                <div className="max-w-[28rem] rounded-[1.2rem] rounded-bl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-sm">
+                                  <div className="font-semibold text-slate-900">{brandName} is finding the best match...</div>
+                                  <div className="mt-1 leading-6 text-slate-600">
+                                    Checking intent, locality, and shortlist quality now. Best next input: add suburb, timing, or who this is for if you want a tighter match.
+                                  </div>
                                 </div>
                               </div>
                             ) : null}

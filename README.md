@@ -462,12 +462,12 @@ python3 scripts/telegram_workspace_ops.py host-shell --cwd / --command "docker p
 The wrapper keeps the operator path explicit:
 
 - `build-frontend` runs the BookedAI production frontend build in `frontend/`
-- `deploy-live` runs the approved VPS-host deployment wrapper `bash scripts/deploy_live_host.sh`
+- `deploy-live` runs the approved VPS-host deployment wrapper `bash scripts/deploy_live_host.sh`; when invoked from the privileged OpenClaw CLI container at `/workspace/bookedai.au`, it automatically enters the VPS host namespace before running the deploy
 - `test` runs a repo-scoped validation command such as release-gate, backend, or frontend verification
 - `workspace-command` runs a repo-scoped shell command so Telegram/OpenClaw can handle broader BookedAI changes, including file moves, refactors, and multi-surface rollout steps
 - `host-command` runs a host-level command through `sudo -n` only when the requested program is in the checked-in allowlist such as `apt-get`, `docker`, `systemctl`, `journalctl`, `service`, `timedatectl`, or `ufw`
 - `host-shell` runs a fully elevated host shell command from any server path and is the intended lane when trusted Telegram/OpenClaw operators need broad `host/elevated` access across the whole machine
-- when the wrapper is running inside the privileged OpenClaw CLI container, both `host-command` and `host-shell` now jump into the real host namespaces through `nsenter --target 1 ...`, so package managers and system binaries resolve against the VPS itself instead of the container filesystem
+- when the wrapper is running inside the privileged OpenClaw CLI container, `deploy-live`, `host-command`, and `host-shell` now jump into the real host namespaces through `nsenter --target 1 ...`, so Docker, package managers, and system binaries resolve against the VPS itself instead of the container filesystem
 - `sync-doc` is the documentation or Notion or Discord path for Telegram change tracking
 - `host-command` intentionally does not expose `bash`, `sh`, or arbitrary executable paths, so it can support machine operations without turning the Telegram path into a general-purpose root shell
 - `host-shell` is intentionally broader and should be granted only to trusted operators through `host_shell` or `full_project`

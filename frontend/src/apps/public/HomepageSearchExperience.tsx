@@ -1,4 +1,4 @@
-import { FormEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { ChangeEvent, FormEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 import {
   buildPublicCtaAttribution,
@@ -9,6 +9,10 @@ import { apiV1 } from '../../shared/api';
 import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../shared/config/api';
 import { resolveApiErrorMessage } from '../../shared/api/client';
 import { isPublicBookingAssistantV1LiveReadEnabled } from '../../shared/config/publicBookingAssistant';
+import {
+  createBookedAiHomepageRuntimeConfig,
+  getResultConfidencePresentation,
+} from '../../shared/runtime/publicAssistantRuntime';
 import {
   buildPartnerMatchActionFooterModelFromServiceItem,
   buildPartnerMatchCardModelFromServiceItem,
@@ -23,6 +27,7 @@ import {
   createPublicBookingAssistantSessionId,
   getPublicBookingAssistantLiveReadRecommendation,
   primePublicBookingAssistantSession,
+  shouldFallbackToLegacyBookingSession,
   shadowPublicBookingAssistantLeadAndBookingIntent,
 } from '../../components/landing/assistant/publicBookingAssistantV1';
 import type { HomepageContent } from './homepageContent';
@@ -163,6 +168,137 @@ type LiveReadBookingSummary = {
   paymentAllowedBeforeConfirmation: boolean;
   bookingPath: string | null;
 };
+
+const SEARCH_PROGRESS_STAGES = [
+  {
+    label: 'Understanding the request',
+    detail: 'Cleaning the search intent, service type, and timing before ranking options.',
+  },
+  {
+    label: 'Checking location and fit',
+    detail: 'Balancing suburb hints, online-ready options, and likely availability signals.',
+  },
+  {
+    label: 'Scoring the shortlist',
+    detail: 'Ranking stronger matches first so the first options are worth reviewing.',
+  },
+  {
+    label: 'Preparing booking handoff',
+    detail: 'Keeping the top match ready so you can continue straight into booking.',
+  },
+] as const;
+
+const SEARCH_PROGRESS_PROMPTS = [
+  'Best next input: add suburb or area, for example Surry Hills or near Chatswood.',
+  'Best next input: add a preferred day or time window, for example Saturday morning.',
+  'Best next input: add the person, age, or context, for example for a 7-year-old beginner.',
+  'Best next input: add a budget or preference, for example premium, fastest, or closest.',
+] as const;
+
+type FollowUpQuestion = {
+  id: string;
+  question: string;
+  suggestion: string;
+};
+
+type NoResultSuggestion = {
+  title: string;
+  query: string;
+};
+
+function deriveFollowUpQuestions(query: string, results: ServiceCatalogItem[], warnings: string[]) {
+  const normalized = query.toLowerCase();
+  const prompts: FollowUpQuestion[] = [];
+
+  const hasLocation = /\b(in|near|around|at|within)\b|\b(sydney|melbourne|brisbane|perth|adelaide|cbd|suburb|city)\b/i.test(query);
+  const hasTime = /\b(today|tomorrow|tonight|weekend|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|am|pm)\b/i.test(query);
+  const hasSpecificNeed = normalized.split(/\s+/).filter(Boolean).length >= 6;
+
+  if (!hasLocation) {
+    prompts.push({
+      id: 'location',
+      question: 'Which area should BookedAI prioritise?',
+      suggestion: 'Add your suburb, city, or nearby area so I can rank closer matches first.',
+    });
+  }
+
+  if (!hasTime) {
+    prompts.push({
+      id: 'timing',
+      question: 'When do you want this booked?',
+      suggestion: 'Add a preferred day, date, or time window so I can narrow the shortlist.',
+    });
+  }
+
+  if (!hasSpecificNeed || results.length === 0) {
+    prompts.push({
+      id: 'brief',
+      question: 'What matters most for this request?',
+      suggestion: 'Add a short brief like group size, budget, service style, or a must-have requirement.',
+    });
+  }
+
+  if (warnings.some((warning) => /location|permission|broad|refine/i.test(warning))) {
+    prompts.unshift({
+      id: 'warning-context',
+      question: 'Can you give one more detail so I can tighten the ranking?',
+      suggestion: 'The fastest refinements are area, timing, and the exact service requirement.',
+    });
+  }
+
+  return prompts.filter((item, index, array) => array.findIndex((candidate) => candidate.id === item.id) === index).slice(0, 3);
+}
+
+function deriveNoResultSuggestions(query: string, warnings: string[]) {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return [] as NoResultSuggestion[];
+  }
+
+  const suggestions: NoResultSuggestion[] = [
+    { title: 'Add location', query: `${trimmed} in Sydney` },
+    { title: 'Add timing', query: `${trimmed} this weekend` },
+    { title: 'Add clearer brief', query: `${trimmed} for 4 people with budget under 300` },
+  ];
+
+  if (/restaurant|dinner|lunch|food|cafe/i.test(trimmed)) {
+    suggestions.unshift({ title: 'Nearby dining', query: `${trimmed} near CBD` });
+  }
+
+  if (/transport|driver|airport|transfer/i.test(trimmed)) {
+    suggestions.unshift({ title: 'Airport transfer', query: `${trimmed} airport transfer tomorrow morning` });
+  }
+
+  if (warnings.some((warning) => /location/i.test(warning))) {
+    suggestions.unshift({ title: 'Location-first retry', query: `${trimmed} near my area` });
+  }
+
+  return suggestions.slice(0, 4);
+}
+
+function deriveNoResultReason(query: string, warnings: string[]) {
+  if (warnings.some((warning) => /location/i.test(warning))) {
+    return 'BookedAI could not rank a strong match because location context is still too broad.';
+  }
+  if (warnings.some((warning) => /broad|refine|specific/i.test(warning))) {
+    return 'BookedAI understood the intent, but the request is still broad enough that ranking confidence stayed low.';
+  }
+  if (query.trim().split(/\s+/).filter(Boolean).length < 4) {
+    return 'The current request is short, so there is not enough context yet to confidently rank a shortlist.';
+  }
+  return 'No strong record was found for the exact request, but BookedAI can usually get closer with one more detail or a nearby keyword variation.';
+}
+
+async function extractLightweightPdfText(file: File) {
+  const buffer = await file.arrayBuffer();
+  const decoded = new TextDecoder('latin1').decode(buffer);
+  const matches = Array.from(decoded.matchAll(/\(([^()]{4,160})\)/g))
+    .map((match) => match[1].replace(/\\[nrt]/g, ' ').replace(/\\\)/g, ')').trim())
+    .filter((value) => /[A-Za-z]{3,}/.test(value));
+  const unique = Array.from(new Set(matches));
+  const joined = unique.join(' ').replace(/\s+/g, ' ').trim();
+  return joined ? joined.slice(0, 800) : null;
+}
 const bookedAiShortIconSrc = brandShortIconPath;
 
 type BrowserSpeechRecognitionResult = {
@@ -310,6 +446,19 @@ function MicIcon({ className = 'h-5 w-5' }: { className?: string }) {
     <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
       <rect x="9" y="4" width="6" height="10" rx="3" strokeWidth="1.8" />
       <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v3M9 20h6" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function AttachmentIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
+      <path
+        d="M8.5 12.5 14.9 6.1a3.25 3.25 0 1 1 4.6 4.6l-8 8a5 5 0 0 1-7.1-7.1l8.3-8.3"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
     </svg>
   );
 }
@@ -487,10 +636,11 @@ function getEnterpriseStatusLabel(status: EnterpriseJourneyStatus) {
 }
 
 function buildV1ActorContext() {
+  const runtimeConfig = createBookedAiHomepageRuntimeConfig();
   return {
-    channel: 'public_web' as const,
-    tenant_ref: null,
-    deployment_mode: 'standalone_app' as const,
+    channel: runtimeConfig.channel ?? 'public_web',
+    tenant_ref: runtimeConfig.tenantRef ?? null,
+    deployment_mode: runtimeConfig.deploymentMode ?? 'standalone_app',
   };
 }
 
@@ -793,11 +943,19 @@ function buildEnterpriseJourneySteps(params: {
   ] satisfies EnterpriseJourneyStep[];
 }
 
-function getBookingPortalUrl(result: BookingAssistantSessionResponse) {
-  return (
-    result.portal_url?.trim() ||
-    `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(result.booking_reference)}`
-  );
+function getBookingPortalUrl(
+  result: BookingAssistantSessionResponse,
+  action?: 'edit' | 'reschedule' | 'cancel',
+) {
+  if (result.portal_url?.trim()) {
+    const url = new URL(result.portal_url.trim());
+    if (action) {
+      url.searchParams.set('action', action);
+    }
+    return url.toString();
+  }
+
+  return `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(result.booking_reference)}${action ? `&action=${encodeURIComponent(action)}` : ''}`;
 }
 
 function buildBookingFlowSteps(params: {
@@ -1349,6 +1507,7 @@ export function HomepageSearchExperience({
   initialQueryRequestId,
 }: HomepageSearchExperienceProps) {
   const isLiveReadMode = isPublicBookingAssistantV1LiveReadEnabled();
+  const homepageRuntimeConfig = useMemo(() => createBookedAiHomepageRuntimeConfig(), []);
   const [catalog, setCatalog] = useState<BookingAssistantCatalogResponse | null>(null);
   const [searchQuery, setSearchQuery] = useState(initialQuery ?? '');
   const [currentQuery, setCurrentQuery] = useState(initialQuery ?? '');
@@ -1360,6 +1519,11 @@ export function HomepageSearchExperience({
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [geoHint, setGeoHint] = useState('');
+  const [searchProgressStageIndex, setSearchProgressStageIndex] = useState(0);
+  const [showDelayedSearchNudge, setShowDelayedSearchNudge] = useState(false);
+  const [attachedReferences, setAttachedReferences] = useState<
+    Array<{ id: string; name: string; kind: 'image' | 'file'; extractedText?: string | null }>
+  >([]);
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
@@ -1382,6 +1546,7 @@ export function HomepageSearchExperience({
   const bookingPanelRef = useRef<HTMLDivElement | null>(null);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
   const customerNameInputRef = useRef<HTMLInputElement | null>(null);
+  const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const recognitionBaseQueryRef = useRef('');
   const bookingAssistantV1SessionIdRef = useRef<string | null>(null);
@@ -1519,6 +1684,31 @@ export function HomepageSearchExperience({
       setIsBottomBarVisible(true);
     }
   }, [composerCollapsed, isMobileViewport, searchLoading, voiceListening]);
+
+  useEffect(() => {
+    if (!searchLoading) {
+      setSearchProgressStageIndex(0);
+      setShowDelayedSearchNudge(false);
+      return;
+    }
+
+    setSearchProgressStageIndex(0);
+    setShowDelayedSearchNudge(false);
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      const elapsedMs = Date.now() - startedAt;
+      const nextIndex = Math.min(SEARCH_PROGRESS_STAGES.length - 1, Math.floor(elapsedMs / 1500));
+      setSearchProgressStageIndex(nextIndex);
+    }, 300);
+    const delayedNudgeTimer = window.setTimeout(() => {
+      setShowDelayedSearchNudge(true);
+    }, 4200);
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(delayedNudgeTimer);
+    };
+  }, [searchLoading]);
 
   useEffect(() => {
     if (!previewService || typeof window === 'undefined') {
@@ -1816,6 +2006,18 @@ export function HomepageSearchExperience({
       return;
     }
 
+    const attachmentContext =
+      attachedReferences.length > 0
+        ? ` Attached references: ${attachedReferences
+            .map((item) =>
+              item.extractedText
+                ? `${item.kind}:${item.name} content:${item.extractedText}`
+                : `${item.kind}:${item.name}`,
+            )
+            .join(', ')}.`
+        : '';
+    const effectiveQuery = `${trimmedQuery}${attachmentContext}`.trim();
+
     setCurrentQuery(trimmedQuery);
     setSearchLoading(true);
     setSearchError('');
@@ -1831,7 +2033,7 @@ export function HomepageSearchExperience({
     try {
       let activeGeoContext = geoContext;
       let liveRead = await getPublicBookingAssistantLiveReadRecommendation({
-        query: trimmedQuery,
+        query: effectiveQuery,
         sourcePage: sourcePath,
         locationHint: activeGeoContext?.locality ?? null,
         serviceCategory: null,
@@ -1839,6 +2041,7 @@ export function HomepageSearchExperience({
         userLocation: activeGeoContext
           ? { latitude: activeGeoContext.latitude, longitude: activeGeoContext.longitude }
           : null,
+        runtimeConfig: homepageRuntimeConfig,
       });
       if (
         liveRead.usedLiveRead &&
@@ -1849,7 +2052,7 @@ export function HomepageSearchExperience({
         if (requestedGeo) {
           activeGeoContext = requestedGeo;
           liveRead = await getPublicBookingAssistantLiveReadRecommendation({
-            query: trimmedQuery,
+            query: effectiveQuery,
             sourcePage: sourcePath,
             locationHint: requestedGeo.locality ?? null,
             serviceCategory: null,
@@ -1858,6 +2061,7 @@ export function HomepageSearchExperience({
               latitude: requestedGeo.latitude,
               longitude: requestedGeo.longitude,
             },
+            runtimeConfig: homepageRuntimeConfig,
           });
         } else {
           setGeoHint(content.ui.geoHint);
@@ -1866,11 +2070,11 @@ export function HomepageSearchExperience({
 
       let legacyPayload: BookingAssistantChatResponse | null = null;
       if (!liveRead.usedLiveRead) {
-        legacyPayload = await requestLegacySearch(trimmedQuery, activeGeoContext);
+        legacyPayload = await requestLegacySearch(effectiveQuery, activeGeoContext);
         if (legacyPayload.should_request_location && !activeGeoContext) {
           const requestedGeo = await requestGeoContext();
           if (requestedGeo) {
-            legacyPayload = await requestLegacySearch(trimmedQuery, requestedGeo);
+            legacyPayload = await requestLegacySearch(effectiveQuery, requestedGeo);
           } else {
             setGeoHint(content.ui.geoHint);
           }
@@ -1905,7 +2109,7 @@ export function HomepageSearchExperience({
         ? []
         : filterResultsByIntentTerms(
             recommendationOrderedResults,
-            trimmedQuery,
+            effectiveQuery,
             priorityIntentTerms,
           );
       const prioritizedResults =
@@ -1914,7 +2118,7 @@ export function HomepageSearchExperience({
           : prioritizeSearchResults(
               intentFilteredResults,
               activeGeoContext?.locality ?? null,
-              trimmedQuery,
+              effectiveQuery,
               priorityIntentTerms,
             );
 
@@ -2021,6 +2225,62 @@ export function HomepageSearchExperience({
     await runSearch(searchQuery);
   }
 
+  function handleAttachmentPick(event: ChangeEvent<HTMLInputElement>) {
+    const files = Array.from(event.target.files ?? []);
+    if (files.length === 0) {
+      return;
+    }
+
+    void (async () => {
+      const mapped = await Promise.all(
+        files.map(async (file) => {
+          const lowerName = file.name.toLowerCase();
+          const shouldExtractText =
+            file.type.startsWith('text/') || lowerName.endsWith('.txt') || lowerName.endsWith('.md') || lowerName.endsWith('.pdf') || file.type === 'application/pdf';
+
+          let extractedText: string | null = null;
+          if (shouldExtractText) {
+            try {
+              const rawText = file.type === 'application/pdf' || lowerName.endsWith('.pdf')
+                ? await extractLightweightPdfText(file)
+                : await file.text();
+              const normalized = (rawText ?? '').replace(/\s+/g, ' ').trim();
+              extractedText = normalized ? normalized.slice(0, 800) : null;
+            } catch {
+              extractedText = null;
+            }
+          }
+
+          return {
+            id: `${file.name}-${file.size}-${file.lastModified}`,
+            name: file.name,
+            kind: file.type.startsWith('image/') ? ('image' as const) : ('file' as const),
+            extractedText,
+          };
+        }),
+      );
+
+      setAttachedReferences((current) => {
+        const next = [...current];
+        mapped.forEach((item) => {
+          if (!next.some((existing) => existing.id === item.id)) {
+            next.push(item);
+          }
+        });
+        return next;
+      });
+
+      setComposerCollapsed(false);
+      setIsBottomBarVisible(true);
+    })();
+
+    event.target.value = '';
+  }
+
+  function removeAttachedReference(id: string) {
+    setAttachedReferences((current) => current.filter((item) => item.id !== id));
+  }
+
   async function handleBookingSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedService) {
@@ -2054,95 +2314,102 @@ export function HomepageSearchExperience({
 
     try {
       if (isLiveReadMode) {
-        const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
-          sourcePage: sourcePath,
-          serviceId: selectedService.id,
-          serviceName: selectedService.name,
-          serviceCategory: selectedService.category,
-          customerName,
-          customerEmail: normalizedCustomerEmail,
-          customerPhone: normalizedCustomerPhone,
-          notes: normalizedNotes,
-          requestedDate: slot.requestedDate,
-          requestedTime: slot.requestedTime,
-          timezone: 'Australia/Sydney',
-        });
-
-        const shouldHydrateRichBookingSession =
-          liveReadBookingSummary?.serviceId === selectedService.id &&
-          liveReadBookingSummary.paymentAllowedBeforeConfirmation;
-
-        let bookingResult: BookingAssistantSessionResponse;
-        if (shouldHydrateRichBookingSession) {
-          const payload = await requestLegacyBookingSession({
+        try {
+          const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
+            sourcePage: sourcePath,
             serviceId: selectedService.id,
+            serviceName: selectedService.name,
+            serviceCategory: selectedService.category,
             customerName,
             customerEmail: normalizedCustomerEmail,
             customerPhone: normalizedCustomerPhone,
+            notes: normalizedNotes,
             requestedDate: slot.requestedDate,
             requestedTime: slot.requestedTime,
-            notes: normalizedNotes,
+            timezone: 'Australia/Sydney',
+            runtimeConfig: homepageRuntimeConfig,
           });
-          bookingResult = payload;
-        } else {
-          bookingResult = buildAuthoritativeBookingIntentResult({
-            authoritativeResult,
+
+          const shouldHydrateRichBookingSession =
+            liveReadBookingSummary?.serviceId === selectedService.id &&
+            liveReadBookingSummary.paymentAllowedBeforeConfirmation;
+
+          let bookingResult: BookingAssistantSessionResponse;
+          if (shouldHydrateRichBookingSession) {
+            const payload = await requestLegacyBookingSession({
+              serviceId: selectedService.id,
+              customerName,
+              customerEmail: normalizedCustomerEmail,
+              customerPhone: normalizedCustomerPhone,
+              requestedDate: slot.requestedDate,
+              requestedTime: slot.requestedTime,
+              notes: normalizedNotes,
+            });
+            bookingResult = payload;
+          } else {
+            bookingResult = buildAuthoritativeBookingIntentResult({
+              authoritativeResult,
+              selectedService,
+              requestedDate: slot.requestedDate,
+              requestedTime: slot.requestedTime,
+              customerEmail: normalizedCustomerEmail ?? '',
+              nextStep:
+                liveReadBookingSummary?.serviceId === selectedService.id
+                  ? liveReadBookingSummary.nextStep
+                  : selectedService.next_step ?? null,
+            });
+          }
+
+          setResult({
+            ...bookingResult,
+            crm_sync: bookingResult.crm_sync ?? authoritativeResult.crmSync ?? null,
+          });
+          setComposerCollapsed(true);
+          void runPostBookingAutomation({
+            bookingIntentId: authoritativeResult.bookingIntentId,
+            bookingReference: bookingResult.booking_reference,
+            customerName,
+            customerEmail: normalizedCustomerEmail,
+            customerPhone: normalizedCustomerPhone,
             selectedService,
             requestedDate: slot.requestedDate,
             requestedTime: slot.requestedTime,
-            customerEmail: normalizedCustomerEmail ?? '',
-            nextStep:
+            notes: normalizedNotes,
+            paymentAllowedBeforeConfirmation:
+              shouldHydrateRichBookingSession ||
+              Boolean(
+                (liveReadBookingSummary?.serviceId === selectedService.id &&
+                  liveReadBookingSummary.paymentAllowedBeforeConfirmation) ||
+                  authoritativeResult.trust.payment_allowed_now,
+              ),
+            bookingPath:
               liveReadBookingSummary?.serviceId === selectedService.id
-                ? liveReadBookingSummary.nextStep
-                : selectedService.next_step ?? null,
-          });
-        }
-
-        setResult({
-          ...bookingResult,
-          crm_sync: bookingResult.crm_sync ?? authoritativeResult.crmSync ?? null,
-        });
-        setComposerCollapsed(true);
-        void runPostBookingAutomation({
-          bookingIntentId: authoritativeResult.bookingIntentId,
-          bookingReference: bookingResult.booking_reference,
-          customerName,
-          customerEmail: normalizedCustomerEmail,
-          customerPhone: normalizedCustomerPhone,
-          selectedService,
-          requestedDate: slot.requestedDate,
-          requestedTime: slot.requestedTime,
-          notes: normalizedNotes,
-          paymentAllowedBeforeConfirmation:
-            shouldHydrateRichBookingSession ||
-            Boolean(
-              (liveReadBookingSummary?.serviceId === selectedService.id &&
-                liveReadBookingSummary.paymentAllowedBeforeConfirmation) ||
-                authoritativeResult.trust.payment_allowed_now,
-            ),
-          bookingPath:
-            liveReadBookingSummary?.serviceId === selectedService.id
-              ? liveReadBookingSummary.bookingPath
-              : authoritativeResult.trust.recommended_booking_path ?? bookingResult.workflow_status,
-          paymentLink: bookingResult.payment_url,
-          portalUrl: getBookingPortalUrl(bookingResult),
-        })
-          .then((automation) => {
-            setResult((currentResult) => {
-              if (!currentResult || currentResult.booking_reference !== bookingResult.booking_reference) {
-                return currentResult;
-              }
-
-              return {
-                ...currentResult,
-                automation,
-              };
-            });
+                ? liveReadBookingSummary.bookingPath
+                : authoritativeResult.trust.recommended_booking_path ?? bookingResult.workflow_status,
+            paymentLink: bookingResult.payment_url,
+            portalUrl: getBookingPortalUrl(bookingResult),
           })
-          .catch(() => {
-            // Best-effort orchestration should never block the captured booking state.
-          });
-        return;
+            .then((automation) => {
+              setResult((currentResult) => {
+                if (!currentResult || currentResult.booking_reference !== bookingResult.booking_reference) {
+                  return currentResult;
+                }
+
+                return {
+                  ...currentResult,
+                  automation,
+                };
+              });
+            })
+            .catch(() => {
+              // Best-effort orchestration should never block the captured booking state.
+            });
+          return;
+        } catch (error) {
+          if (!shouldFallbackToLegacyBookingSession(error)) {
+            throw error;
+          }
+        }
       }
 
       void shadowPublicBookingAssistantLeadAndBookingIntent({
@@ -2284,10 +2551,10 @@ export function HomepageSearchExperience({
   ];
   const workspaceStatus = searchLoading
     ? {
-        label: 'Receiving your enquiry',
+        label: SEARCH_PROGRESS_STAGES[searchProgressStageIndex]?.label ?? 'Receiving your enquiry',
         detail: currentQuery
-          ? `Searching live signals for "${currentQuery}" and preparing the best-fit shortlist.`
-          : 'Receiving the request and preparing live search.',
+          ? `Searching live signals for "${currentQuery}". ${SEARCH_PROGRESS_STAGES[searchProgressStageIndex]?.detail ?? 'Preparing the best-fit shortlist.'}`
+          : SEARCH_PROGRESS_STAGES[searchProgressStageIndex]?.detail ?? 'Receiving the request and preparing live search.',
         tone: 'public-apple-toolbar-pill--accent',
       }
     : searchError
@@ -2317,10 +2584,24 @@ export function HomepageSearchExperience({
               tone: 'border-slate-900/8 bg-white/78 text-[#172033]/72',
             };
   const mobileStatusLabel = searchLoading
-    ? 'Searching'
+    ? 'Matching'
     : result
       ? 'Booked'
       : 'Ready';
+  const activeSearchProgressStage = SEARCH_PROGRESS_STAGES[searchProgressStageIndex] ?? SEARCH_PROGRESS_STAGES[0];
+  const activeSearchPrompt = SEARCH_PROGRESS_PROMPTS[searchProgressStageIndex] ?? SEARCH_PROGRESS_PROMPTS[0];
+  const followUpQuestions = useMemo(
+    () => deriveFollowUpQuestions(currentQuery || searchQuery, results, uniqueWarnings),
+    [currentQuery, searchQuery, results, uniqueWarnings],
+  );
+  const noResultSuggestions = useMemo(
+    () => deriveNoResultSuggestions(currentQuery || searchQuery, uniqueWarnings),
+    [currentQuery, searchQuery, uniqueWarnings],
+  );
+  const noResultReason = useMemo(
+    () => deriveNoResultReason(currentQuery || searchQuery, uniqueWarnings),
+    [currentQuery, searchQuery, uniqueWarnings],
+  );
   const bookingFlowSteps = buildBookingFlowSteps({
     currentQuery,
     selectedService,
@@ -2349,7 +2630,7 @@ export function HomepageSearchExperience({
       return;
     }
     window.setTimeout(() => {
-      bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      bookingFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 80);
   }
 
@@ -2434,11 +2715,11 @@ export function HomepageSearchExperience({
     <div
       id="bookedai-search-assistant"
       ref={bookingPanelRef}
-      className={`mx-auto max-w-[1280px] ${isMobileViewport ? 'pb-28' : ''}`}
+      className={`mx-auto max-w-[1440px] ${isMobileViewport ? 'pb-28' : ''}`}
     >
       <div className="public-search-results-shell grid gap-4 xl:items-start">
-        <section className="public-apple-workspace-shell min-w-0 overflow-hidden rounded-[1.5rem]">
-          <div className="px-3 py-3 sm:px-4 sm:py-4">
+        <section className="public-apple-workspace-shell min-w-0 overflow-hidden rounded-[1.5rem] border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(245,249,253,0.96)_100%)] shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
+          <div className="px-3 py-3 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
             {currentQuery ? (
               <div className="mb-3 flex flex-wrap items-center gap-2">
                 <span className="public-apple-toolbar-pill public-apple-toolbar-pill--accent px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]">
@@ -2477,8 +2758,12 @@ export function HomepageSearchExperience({
 
             <div className="space-y-3">
               {searchLoading ? (
-                <div className="rounded-[1.15rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                <div className="rounded-[1.15rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4 lg:px-5 lg:py-5">
+                  <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                    <span className="relative inline-flex h-2.5 w-2.5">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#1a73e8]/45" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#1a73e8]" />
+                    </span>
                     {content.ui.resultsLoadingTitle}
                   </div>
                   <p className="mt-2 text-sm leading-6 text-[#5f6368]">
@@ -2491,6 +2776,41 @@ export function HomepageSearchExperience({
                       <div key={label} className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-medium text-[#6d28d9]">
                         {label}
                       </div>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
+              {!searchLoading && !searchError && hasActiveQuery && !result && followUpQuestions.length > 0 ? (
+                <div className="rounded-[1.15rem] border border-[#dfe8f3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4">
+                  <div className="flex items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                        BookedAI follow-up
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-[#111827]">
+                        I can tighten the shortlist with up to three quick clarifiers.
+                      </div>
+                    </div>
+                    <div className="rounded-full bg-[#eef4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
+                      Max 3
+                    </div>
+                  </div>
+                  <div className="mt-3 grid gap-2.5 md:grid-cols-3">
+                    {followUpQuestions.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => {
+                          setSearchQuery((current) => `${current.trim()} ${item.suggestion}`.trim());
+                          setComposerCollapsed(false);
+                          setIsBottomBarVisible(true);
+                        }}
+                        className="rounded-[1rem] border border-slate-200 bg-white px-3.5 py-3 text-left transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
+                      >
+                        <div className="text-[11px] font-semibold text-slate-950">{item.question}</div>
+                        <div className="mt-1 text-[11px] leading-5 text-slate-600">{item.suggestion}</div>
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -2512,13 +2832,39 @@ export function HomepageSearchExperience({
                   resetKey={`${currentQuery}-${results.length}`}
                   buttonLabel="See more results"
                   emptyState={
-                    <div className="public-apple-empty-state rounded-[1.2rem] px-4 py-10 text-center sm:px-8">
+                    <div className="public-apple-empty-state rounded-[1.2rem] px-4 py-12 text-center sm:px-8 lg:py-16">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
                         {currentQuery ? content.ui.noMatchTitle : content.ui.resultsEmptyTitle}
                       </div>
                       <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-[#172033]/58">
                         {currentQuery ? content.ui.noMatchBody : content.ui.resultsEmptyBody}
                       </p>
+                      {currentQuery ? (
+                        <div className="mx-auto mt-4 max-w-3xl rounded-[1.1rem] border border-[#dfe8f3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4 text-left">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                            Why no result was shown
+                          </div>
+                          <p className="mt-2 text-sm leading-6 text-slate-600">{noResultReason}</p>
+                          <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                            Suggested next searches
+                          </div>
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {noResultSuggestions.map((item) => (
+                              <button
+                                key={item.title + item.query}
+                                type="button"
+                                onClick={() => {
+                                  setSearchQuery(item.query);
+                                  void runSearch(item.query);
+                                }}
+                                className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] hover:text-slate-950"
+                              >
+                                {item.title}: {item.query}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      ) : null}
                     </div>
                   }
                   renderMeta={({ visibleCount, totalCount }) => (
@@ -2544,8 +2890,9 @@ export function HomepageSearchExperience({
                     });
                     const footer = buildPartnerMatchActionFooterModelFromServiceItem(
                       service as BookingReadyServiceItem,
-                      { selected: isSelected },
+                      { selected: isSelected, includeSourceLink: true },
                     );
+                    const confidencePresentation = getResultConfidencePresentation(service);
                     return (
                       <div
                         key={service.id}
@@ -2562,7 +2909,33 @@ export function HomepageSearchExperience({
                           trailingLabel={service.category}
                           onClick={() => handleServiceSelect(service)}
                         />
+                        <div
+                          className={`mt-2 rounded-[0.95rem] border px-3 py-2.5 text-[11px] leading-5 ${
+                            confidencePresentation.tone === 'tenant'
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+                              : 'border-amber-200 bg-amber-50 text-amber-900'
+                          }`}
+                        >
+                          <div className="font-semibold">{confidencePresentation.label}</div>
+                          <div className="mt-1 opacity-90">{confidencePresentation.body}</div>
+                        </div>
                         <PartnerMatchActionFooter model={footer} tone={isSelected ? 'selected' : 'default'} />
+                        <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
+                          <button
+                            type="button"
+                            onClick={() => handleServiceSelect(service)}
+                            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3.5 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                          >
+                            View details
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => commitServiceSelection(service, { focusNameField: true })}
+                            className="inline-flex items-center rounded-full border border-[#cce0ff] bg-[#e8f0fe] px-3.5 py-2 text-[11px] font-semibold text-[#1a73e8] transition hover:bg-[#dce9ff]"
+                          >
+                            Continue to booking
+                          </button>
+                        </div>
                       </div>
                     );
                   }}
@@ -2671,7 +3044,7 @@ export function HomepageSearchExperience({
           </div>
 
           {selectedService ? (
-            <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5">
+            <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] border-[1.5px] border-emerald-200 bg-[linear-gradient(180deg,#ffffff_0%,#f6fff9_100%)] px-3.5 py-3.5 shadow-[0_16px_34px_rgba(16,185,129,0.10)]">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
@@ -2685,23 +3058,47 @@ export function HomepageSearchExperience({
                     <div className="mt-1 text-xs text-[#5f6368]">{selectedService.location}</div>
                   ) : null}
                 </div>
-                <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#e8f0fe] text-[#1a73e8]">
+                <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
                   <CheckIcon className="h-4 w-4" />
                 </div>
               </div>
 
-              <div className="mt-3 rounded-[0.95rem] border border-[#dfe8f3] bg-[#f8fbff] px-3 py-2.5">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
-                  Following your selected search match
-                </div>
-                <div className="mt-1 text-sm leading-6 text-[#31507b]">
-                  {selectedServiceFlowNote}
+              <div className="mt-3 rounded-[1rem] border border-emerald-200 bg-white px-3 py-3">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                      Selected and ready
+                    </div>
+                    <div className="mt-1 text-sm leading-6 text-emerald-900">
+                      {selectedServiceFlowNote}
+                    </div>
+                  </div>
+                  <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
+                    Primary path
+                  </div>
                 </div>
                 {currentQuery ? (
-                  <div className="mt-2 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368] ring-1 ring-slate-900/6">
+                  <div className="mt-2 inline-flex rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368] ring-1 ring-slate-900/6">
                     Search: "{currentQuery}"
                   </div>
                 ) : null}
+              </div>
+
+              <div className="mt-3 rounded-[0.95rem] border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-950">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div>
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                      Next action
+                    </div>
+                    <div className="mt-1 font-semibold">Confirm booking details for the selected match</div>
+                    <div className="mt-1 text-xs leading-5 text-emerald-800">
+                      Focus on contact details, preferred time, and any decision-critical notes. You do not need to compare more options unless priorities changed.
+                    </div>
+                  </div>
+                  <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
+                    Match locked
+                  </div>
+                </div>
               </div>
 
               {!result && !isDesktopViewport ? (
@@ -2711,7 +3108,7 @@ export function HomepageSearchExperience({
                   className="public-apple-primary-button mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold lg:hidden"
                 >
                   <SparkIcon className="h-4 w-4" />
-                  {bookingComposerOpen ? 'Hide booking form' : content.ui.bookingButton}
+                  {bookingComposerOpen ? 'Hide booking details' : 'Continue with this match'}
                 </button>
               ) : null}
             </div>
@@ -2827,10 +3224,10 @@ export function HomepageSearchExperience({
                     <p className="mt-2 text-sm leading-6 text-white/78">{result.confirmation_message}</p>
                     <div className="mt-4 rounded-[1rem] bg-white/12 px-3 py-3 ring-1 ring-white/12">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
-                        Customer portal
+                        Customer portal and edit flow
                       </div>
                       <p className="mt-1 text-xs leading-5 text-white/82">
-                        Scan the QR or open the portal to review booking details, edit, cancel, or save this booking.
+                        Scan the QR or open the portal to review booking details, edit the request, reschedule, cancel, or save this booking. The same portal link is also included in the confirmation email.
                       </p>
                       <a
                         href={getBookingPortalUrl(result)}
@@ -2845,6 +3242,13 @@ export function HomepageSearchExperience({
                           <path d="M12 9.5V12H4V4h2.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </a>
+                      <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/82">
+                        {['Review details', 'Edit and submit', 'Request reschedule', 'Request cancellation'].map((item) => (
+                          <span key={item} className="rounded-full bg-white/10 px-2.5 py-1 ring-1 ring-white/12">
+                            {item}
+                          </span>
+                        ))}
+                      </div>
                     </div>
                   </div>
                   {result.qr_code_url ? (
@@ -2884,6 +3288,49 @@ export function HomepageSearchExperience({
                 </div>
               </div>
 
+              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    {
+                      title: 'Review booking',
+                      body: 'Open the portal to review the current booking details and booking reference.',
+                      label: 'Open portal',
+                      href: getBookingPortalUrl(result),
+                    },
+                    {
+                      title: 'Edit and submit',
+                      body: 'Use the same portal flow to adjust details, then resubmit the booking request.',
+                      label: 'Edit in portal',
+                      href: getBookingPortalUrl(result, 'edit'),
+                    },
+                    {
+                      title: 'Reschedule request',
+                      body: 'If the time no longer works, request a new slot from the booking portal.',
+                      label: 'Request reschedule',
+                      href: getBookingPortalUrl(result, 'reschedule'),
+                    },
+                    {
+                      title: 'Cancel request',
+                      body: 'If plans changed, submit a cancellation request from the same managed flow.',
+                      label: 'Request cancellation',
+                      href: getBookingPortalUrl(result, 'cancel'),
+                    },
+                  ].map((item) => (
+                  <a
+                    key={item.title}
+                    href={item.href}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
+                  >
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">{item.title}</div>
+                    <div className="mt-2 text-sm leading-6 text-slate-600">{item.body}</div>
+                    <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1a73e8]">
+                      {item.label}
+                    </div>
+                  </a>
+                ))}
+              </div>
+
               <div className="public-apple-workspace-panel-soft rounded-[0.95rem] px-4 py-3">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5f6368]">
                   {content.ui.followUpLabel}
@@ -2892,6 +3339,9 @@ export function HomepageSearchExperience({
                   {result.email_status === 'sent' ? 'Email sent' : 'Manual follow-up'}
                 </div>
                 <div className="mt-0.5 text-xs text-[#5f6368]">{result.contact_email}</div>
+                <div className="mt-2 text-xs leading-5 text-[#5f6368]">
+                  The confirmation email should include the same portal link, booking reference, payment path, and calendar action so the customer can review or edit later without losing context.
+                </div>
               </div>
 
               <div className="grid gap-2 sm:grid-cols-3">
@@ -3006,6 +3456,12 @@ export function HomepageSearchExperience({
                     </span>
                   </a>
                 ) : null}
+                {result.payment_url ? (
+                  <div className="inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] border border-slate-200 bg-white px-3 py-2.5 text-[10px] font-semibold text-slate-600">
+                    <SparkIcon className="h-4 w-4" />
+                    <span>Payment</span>
+                  </div>
+                ) : null}
                 <button
                   type="button"
                   aria-label="Open contact form"
@@ -3013,7 +3469,7 @@ export function HomepageSearchExperience({
                   className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
                 >
                   <MailIcon className="h-4 w-4" />
-                  <span>Email</span>
+                  <span>Contact form</span>
                 </button>
                 {result.meeting_event_url || result.calendar_add_url ? (
                   <a
@@ -3024,7 +3480,7 @@ export function HomepageSearchExperience({
                     className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
                   >
                     <CalendarIcon className="h-4 w-4" />
-                    <span>Calendar</span>
+                    <span>Add calendar</span>
                   </a>
                 ) : null}
                 <button
@@ -3055,11 +3511,13 @@ export function HomepageSearchExperience({
 
       {previewService ? (
         <div className="fixed inset-0 z-40 flex items-end justify-center bg-[#0f172a]/52 p-3 sm:items-center sm:p-5">
-          <div className="w-full max-w-2xl rounded-[1.5rem] border border-white/60 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4 shadow-[0_28px_80px_rgba(15,23,42,0.28)] sm:p-5">
+          <div className="w-full max-w-2xl overflow-hidden rounded-[1.5rem] border border-white/60 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_28px_80px_rgba(15,23,42,0.28)] sm:p-0">
+            <div className="bg-[linear-gradient(135deg,#f8fbff_0%,#eef4ff_100%)] px-4 pb-4 pt-3.5 sm:px-5 sm:pb-5 sm:pt-4.5">
+              <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-300/70 sm:hidden" />
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="inline-flex rounded-full bg-[#e8f0fe] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
-                  Selected from BookedAI search
+                  Match details
                 </div>
                 <div className="mt-3 text-[1.2rem] font-semibold tracking-[-0.02em] text-[#111827]">
                   {previewService.name}
@@ -3078,7 +3536,28 @@ export function HomepageSearchExperience({
               </button>
             </div>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="mt-4 grid gap-2 sm:grid-cols-3">
+              <div className="rounded-[1rem] border border-white/70 bg-white/86 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">Price</div>
+                <div className="mt-1 text-sm font-semibold text-[#111827]">
+                  {`A$${previewService.amount_aud}`}
+                </div>
+              </div>
+              <div className="rounded-[1rem] border border-white/70 bg-white/86 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">Duration</div>
+                <div className="mt-1 text-sm font-semibold text-[#111827]">{previewService.duration_minutes} min</div>
+              </div>
+              <div className="rounded-[1rem] border border-white/70 bg-white/86 px-3 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">Booking path</div>
+                <div className="mt-1 text-sm font-semibold text-[#111827]">
+                  {previewService.booking_url ? 'Direct booking available' : 'BookedAI guided booking'}
+                </div>
+              </div>
+            </div>
+            </div>
+
+            <div className="px-4 py-4 sm:px-5 sm:py-5">
+            <div className="grid gap-3 sm:grid-cols-2">
               <div className="rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3.5">
                 <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
                   Tenant overview
@@ -3134,14 +3613,35 @@ export function HomepageSearchExperience({
               >
                 Back
               </button>
+              {previewService.booking_url ? (
+                <a
+                  href={previewService.booking_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="public-apple-secondary-button inline-flex h-11 items-center justify-center rounded-[1rem] px-5 text-sm font-semibold transition"
+                >
+                  Book on provider site
+                </a>
+              ) : null}
+              {previewService.map_url ? (
+                <a
+                  href={previewService.map_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="public-apple-secondary-button inline-flex h-11 items-center justify-center rounded-[1rem] px-5 text-sm font-semibold transition"
+                >
+                  Open Google Maps
+                </a>
+              ) : null}
               <button
                 type="button"
                 onClick={handlePreviewBook}
                 className="public-apple-primary-button inline-flex h-11 items-center justify-center gap-2 rounded-[1rem] px-5 text-sm font-semibold transition"
               >
                 <SparkIcon className="h-4 w-4" />
-                Book
+                Continue to booking
               </button>
+            </div>
             </div>
           </div>
         </div>
@@ -3155,11 +3655,11 @@ export function HomepageSearchExperience({
                   ? 'translate-y-0 opacity-100'
                   : 'pointer-events-none translate-y-[calc(100%+1rem)] opacity-0'
               }`
-            : 'sticky bottom-2 sm:bottom-3'
+            : 'sticky bottom-3 sm:bottom-4'
         }`}
       >
-        <form onSubmit={handleSearchSubmit} className="public-apple-workspace-shell rounded-[1.3rem] p-2.5 sm:p-3">
-          <div className={`flex flex-col ${isMobileViewport ? 'gap-2' : 'gap-2.5'}`}>
+        <form onSubmit={handleSearchSubmit} className="public-apple-workspace-shell rounded-[1.45rem] border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-2.5 shadow-[0_24px_56px_rgba(15,23,42,0.14)] backdrop-blur-md sm:p-3">
+          <div className={`flex flex-col ${isMobileViewport ? 'gap-2' : 'gap-3'}`}>
             <div className={`flex items-center justify-between gap-2 ${isMobileViewport ? 'flex-nowrap' : 'flex-wrap'}`}>
               <div
                 className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
@@ -3193,27 +3693,93 @@ export function HomepageSearchExperience({
                   <p className="text-sm leading-6 text-[#172033]/62">{workspaceStatus.detail}</p>
                 ) : null}
 
-                <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center">
-                  <div className="relative min-w-0 flex-1">
-                    <span className="pointer-events-none absolute left-4 top-1/2 -translate-y-1/2 text-[#172033]/34">
-                      <SearchIcon className="h-4.5 w-4.5" />
-                    </span>
-                    <input
-                      type="text"
-                      value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
-                      onFocus={() => {
-                        setIsBottomBarVisible(true);
-                        if (!searchQuery.trim()) {
-                          setComposerCollapsed(false);
-                        }
-                      }}
-                      placeholder={content.ui.searchPlaceholder}
-                      className="public-apple-field h-11 w-full rounded-[1rem] pl-12 pr-4 text-[15px] outline-none transition"
-                    />
-                  </div>
+                <div className="rounded-[1.3rem] border border-slate-200 bg-white shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
+                  <input
+                    ref={attachmentInputRef}
+                    type="file"
+                    multiple
+                    accept="image/*,.pdf,.doc,.docx,.txt,.md"
+                    onChange={handleAttachmentPick}
+                    className="hidden"
+                  />
+                  <div className="flex items-start gap-2 px-2.5 py-2.5">
+                    <button
+                      type="button"
+                      aria-label="Attach reference image, file, or description"
+                      title="Attach reference image, file, or description"
+                      onClick={() => attachmentInputRef.current?.click()}
+                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-slate-200 bg-[#f8fafc] text-slate-500 transition hover:border-slate-300 hover:bg-white hover:text-slate-800"
+                    >
+                      <AttachmentIcon className="h-4 w-4" />
+                    </button>
 
-                  <div className={`flex items-center gap-2 ${isMobileViewport ? 'shrink-0' : 'lg:shrink-0'}`}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start gap-3 rounded-[1rem] bg-white px-2 py-1">
+                        <span className="pointer-events-none mt-2 shrink-0 text-[#172033]/34">
+                          <SearchIcon className="h-4.5 w-4.5" />
+                        </span>
+                        <textarea
+                          value={searchQuery}
+                          onChange={(event) => setSearchQuery(event.target.value)}
+                          onFocus={() => {
+                            setIsBottomBarVisible(true);
+                            if (!searchQuery.trim()) {
+                              setComposerCollapsed(false);
+                            }
+                          }}
+                          placeholder={content.ui.searchPlaceholder}
+                          rows={isMobileViewport ? 2 : 1}
+                          className="min-h-[2.75rem] w-full resize-none bg-transparent py-1.5 text-[15px] leading-6 text-[#172033] outline-none placeholder:text-[#172033]/42"
+                        />
+                      </div>
+                      <div className="mt-1.5 flex items-center justify-between gap-2 px-2">
+                        <div className="text-[11px] leading-5 text-[#172033]/48">
+                          Attach a reference image, short brief, or similar service idea.
+                        </div>
+                        <div className="hidden items-center gap-1 md:flex">
+                          {['Image', 'File', 'Brief'].map((item) => (
+                            <span key={item} className="rounded-full border border-slate-200 bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                      {attachedReferences.length > 0 ? (
+                        <div className="mt-2 flex flex-wrap gap-2 px-2 pb-1">
+                          {attachedReferences.map((item) => (
+                            <span
+                              key={item.id}
+                              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-[#f8fafc] px-3 py-1.5 text-[11px] font-medium text-slate-700"
+                            >
+                              <span className="rounded-full bg-white px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500 ring-1 ring-slate-200">
+                                {item.kind}
+                              </span>
+                              <span className="max-w-[10rem] truncate">{item.name}</span>
+                              {item.extractedText ? (
+                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700 ring-1 ring-emerald-200">
+                                  text parsed
+                                </span>
+                              ) : null}
+                              <button
+                                type="button"
+                                onClick={() => removeAttachedReference(item.id)}
+                                className="inline-flex h-4 w-4 items-center justify-center rounded-full text-slate-400 transition hover:bg-white hover:text-slate-700"
+                                aria-label={`Remove ${item.name}`}
+                              >
+                                ×
+                              </button>
+                            </span>
+                          ))}
+                        </div>
+                      ) : null}
+                      {attachedReferences.length > 0 ? (
+                        <div className="mt-1 px-2 pb-1 text-[11px] leading-5 text-[#172033]/48">
+                          Attached references will be included as extra search context for matching. Text and markdown files also contribute extracted content.
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className={`flex items-center gap-2 ${isMobileViewport ? 'shrink-0 self-end' : 'shrink-0 self-end'}`}>
                     <button
                       type="button"
                       aria-label={voiceListening ? 'Stop voice input' : 'Start voice input'}
@@ -3243,6 +3809,57 @@ export function HomepageSearchExperience({
                     </button>
                   </div>
                 </div>
+                </div>
+
+                {searchLoading ? (
+                  <div className="rounded-[1rem] border border-sky-100 bg-[linear-gradient(135deg,rgba(232,240,254,0.88),rgba(255,255,255,0.96))] px-3.5 py-3 text-[#16324f] shadow-[0_16px_34px_rgba(26,115,232,0.08)]">
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                      <div className="min-w-0">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+                          Live matching in progress
+                        </div>
+                        <p className="mt-1 text-sm font-semibold text-slate-900">
+                          {currentQuery ? `Working on "${currentQuery}"` : 'Working on your request'}
+                        </p>
+                        <p className="mt-1 text-sm leading-6 text-[#31507b]">{activeSearchProgressStage.detail}</p>
+                      </div>
+                      <div className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-100">
+                        {activeSearchProgressStage.label}
+                      </div>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {SEARCH_PROGRESS_STAGES.map((stage, index) => (
+                        <span
+                          key={stage.label}
+                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
+                            index <= searchProgressStageIndex
+                              ? 'bg-white text-sky-700 ring-1 ring-sky-100'
+                              : 'bg-white/55 text-[#5d7597] ring-1 ring-white/60'
+                          }`}
+                        >
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${
+                              index < searchProgressStageIndex
+                                ? 'bg-emerald-500'
+                                : index === searchProgressStageIndex
+                                  ? 'animate-pulse bg-sky-500'
+                                  : 'bg-slate-300'
+                            }`}
+                          />
+                          {stage.label}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="mt-3 rounded-[0.9rem] bg-white/78 px-3 py-2.5 text-[12px] leading-5 text-[#48617f] ring-1 ring-white/70">
+                      <span className="font-semibold text-slate-900">Best next input:</span> {activeSearchPrompt.replace(/^Best next input: /, '')}
+                    </div>
+                    {showDelayedSearchNudge ? (
+                      <div className="mt-3 rounded-[0.9rem] border border-amber-200 bg-amber-50 px-3 py-2.5 text-[12px] leading-5 text-amber-900">
+                        <span className="font-semibold">Still refining the shortlist.</span> If results feel broad, add location or timing now. Those two details usually improve ranking fastest.
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
 
                 {!composerCollapsed ? (
                   <>

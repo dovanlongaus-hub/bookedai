@@ -19,6 +19,7 @@ import {
   getPublicBookingAssistantLiveReadRecommendation,
   primePublicBookingAssistantSession,
   type PublicBookingAssistantRuntimeConfig,
+  shouldFallbackToLegacyBookingSession,
   shadowPublicBookingAssistantLeadAndBookingIntent,
   shadowPublicBookingAssistantSearch,
 } from './publicBookingAssistantV1';
@@ -390,6 +391,32 @@ function getEventVisualLabel(event: AIEventItem) {
 }
 
 const CHAT_RESULT_BATCH_SIZE = 3;
+
+const SEARCH_PROGRESS_STAGES = [
+  {
+    label: 'Understanding the request',
+    detail: 'Cleaning the search intent, service type, and timing before ranking options.',
+  },
+  {
+    label: 'Checking location and fit',
+    detail: 'Balancing suburb hints, online-ready options, and likely availability signals.',
+  },
+  {
+    label: 'Scoring the shortlist',
+    detail: 'Ranking stronger matches first so the first options are worth reviewing.',
+  },
+  {
+    label: 'Preparing booking handoff',
+    detail: 'Keeping the top match ready so you can continue straight into booking.',
+  },
+] as const;
+
+const SEARCH_PROGRESS_PROMPTS = [
+  'Best next input: add suburb or area, for example Surry Hills or near Chatswood.',
+  'Best next input: add a preferred day or time window, for example Saturday morning.',
+  'Best next input: add the person, age, or context, for example for a 7-year-old beginner.',
+  'Best next input: add a budget or preference, for example premium, fastest, or closest.',
+] as const;
 
 function curateServiceMatches(
   services: ServiceCatalogItem[],
@@ -986,11 +1013,19 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
   ];
 }
 
-function getBookingPortalUrl(result: BookingAssistantSessionResponse) {
-  return (
-    result.portal_url?.trim() ||
-    `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(result.booking_reference)}`
-  );
+function getBookingPortalUrl(
+  result: BookingAssistantSessionResponse,
+  action?: 'edit' | 'reschedule' | 'cancel',
+) {
+  if (result.portal_url?.trim()) {
+    const url = new URL(result.portal_url.trim());
+    if (action) {
+      url.searchParams.set('action', action);
+    }
+    return url.toString();
+  }
+
+  return `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(result.booking_reference)}${action ? `&action=${encodeURIComponent(action)}` : ''}`;
 }
 
 function buildBookingJourneySteps(params: {
@@ -1470,6 +1505,8 @@ export function BookingAssistantDialog({
   const [chatInput, setChatInput] = useState('');
   const [chatLoading, setChatLoading] = useState(false);
   const [pendingSearchQuery, setPendingSearchQuery] = useState('');
+  const [searchProgressStageIndex, setSearchProgressStageIndex] = useState(0);
+  const [showDelayedSearchNudge, setShowDelayedSearchNudge] = useState(false);
   const [chatError, setChatError] = useState('');
   const [userGeoContext, setUserGeoContext] = useState<UserGeoContext | null>(null);
   const [geoPromptState, setGeoPromptState] = useState<'idle' | 'granted' | 'denied'>('idle');
@@ -2182,6 +2219,8 @@ export function BookingAssistantDialog({
   }, [messages]);
   const isSearchResolving = chatLoading && pendingSearchQuery.trim().length > 0;
   const visibleSuggestedServices = isSearchResolving ? [] : latestSuggestedServices;
+  const activeSearchProgressStage = SEARCH_PROGRESS_STAGES[searchProgressStageIndex] ?? SEARCH_PROGRESS_STAGES[0];
+  const activeSearchPrompt = SEARCH_PROGRESS_PROMPTS[searchProgressStageIndex] ?? SEARCH_PROGRESS_PROMPTS[0];
   const comparisonPair = useMemo(
     () => visibleSuggestedServices.slice(0, 2),
     [visibleSuggestedServices],
@@ -2296,6 +2335,31 @@ export function BookingAssistantDialog({
       setIsCompactProductBottomBarVisible(true);
     }
   }, [chatLoading, hasConversationStarted, isCompactMobileViewport, isListening, isProductAppLayout]);
+
+  useEffect(() => {
+    if (!chatLoading || !pendingSearchQuery.trim()) {
+      setSearchProgressStageIndex(0);
+      setShowDelayedSearchNudge(false);
+      return;
+    }
+
+    setSearchProgressStageIndex(0);
+    setShowDelayedSearchNudge(false);
+    const startedAt = Date.now();
+    const interval = window.setInterval(() => {
+      const elapsedMs = Date.now() - startedAt;
+      const nextIndex = Math.min(SEARCH_PROGRESS_STAGES.length - 1, Math.floor(elapsedMs / 1500));
+      setSearchProgressStageIndex(nextIndex);
+    }, 300);
+    const delayedNudgeTimer = window.setTimeout(() => {
+      setShowDelayedSearchNudge(true);
+    }, 4200);
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(delayedNudgeTimer);
+    };
+  }, [chatLoading, pendingSearchQuery]);
 
   const processSteps = useMemo(
     () =>
@@ -2489,6 +2553,17 @@ export function BookingAssistantDialog({
     }, 120);
   }
 
+  function focusBookingConfirmation() {
+    setActiveMobilePanel('booking');
+    if (isProductAppLayout) {
+      setProductSheetSnap('full');
+      setProductModuleTab('confirmed');
+    }
+    window.setTimeout(() => {
+      bookingConfirmedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 120);
+  }
+
   function focusPopupBookingDetails() {
     setActiveMobilePanel('booking');
     window.setTimeout(() => {
@@ -2550,27 +2625,46 @@ export function BookingAssistantDialog({
               Matching services now
             </div>
             <div className="mt-2 text-sm font-semibold text-slate-950">
-              BookedAI is searching for the best matching service for this request.
+              {activeSearchProgressStage.label}
             </div>
             <div className="mt-2 text-sm leading-6 text-slate-600">
               {pendingSearchQuery
-                ? `Searching for "${pendingSearchQuery}" using the latest live-read shortlist and trust checks.`
-                : 'Searching with the latest live-read shortlist and trust checks.'}
+                ? `Searching for "${pendingSearchQuery}" using the latest live-read shortlist and trust checks. ${activeSearchProgressStage.detail}`
+                : `Searching with the latest live-read shortlist and trust checks. ${activeSearchProgressStage.detail}`}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {['Checking locality', 'Verifying best fit', 'Preparing shortlist'].map((label, index) => (
+              {SEARCH_PROGRESS_STAGES.map((stage, index) => (
                 <div
-                  key={label}
-                  className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-medium text-sky-700 ring-1 ring-sky-100"
-                  style={{ animationDelay: `${index * 120}ms` }}
+                  key={stage.label}
+                  className={`rounded-full px-3 py-1.5 text-[11px] font-medium ring-1 ${
+                    index <= searchProgressStageIndex
+                      ? 'bg-white/90 text-sky-700 ring-sky-100'
+                      : 'bg-white/55 text-slate-500 ring-white/60'
+                  }`}
                 >
                   <span className="inline-flex items-center gap-2">
-                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-sky-500" />
-                    {label}
+                    <span
+                      className={`h-1.5 w-1.5 rounded-full ${
+                        index < searchProgressStageIndex
+                          ? 'bg-emerald-500'
+                          : index === searchProgressStageIndex
+                            ? 'animate-pulse bg-sky-500'
+                            : 'bg-slate-300'
+                      }`}
+                    />
+                    {stage.label}
                   </span>
                 </div>
               ))}
             </div>
+            <div className="mt-3 rounded-[1rem] bg-white/78 px-3 py-2.5 text-[12px] leading-5 text-slate-600 ring-1 ring-white/70">
+              <span className="font-semibold text-slate-950">Best next input:</span> {activeSearchPrompt.replace(/^Best next input: /, '')}
+            </div>
+            {showDelayedSearchNudge ? (
+              <div className="mt-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-2.5 text-[12px] leading-5 text-amber-900">
+                <span className="font-semibold">Still refining the shortlist.</span> Add location or preferred timing if you want the ranking to narrow faster.
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
@@ -2993,84 +3087,90 @@ export function BookingAssistantDialog({
     const normalizedNotes = notes.trim() || null;
     try {
       if (shouldUseAuthoritativeV1Booking) {
-        const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
-          sourcePage: assistantSourcePath,
-          serviceId: selectedService.id,
-          serviceName: selectedService.name,
-          serviceCategory: selectedService.category,
-          customerName,
-          customerEmail: normalizedCustomerEmail,
-          customerPhone: normalizedCustomerPhone,
-          notes: normalizedNotes,
-          requestedDate: slot.requestedDate,
-          requestedTime: slot.requestedTime,
-          timezone: 'Australia/Sydney',
-          runtimeConfig,
-        });
-
-        const shouldHydrateRichBookingSession =
-          liveReadSummary?.serviceId === selectedService.id &&
-          liveReadSummary.paymentAllowedBeforeConfirmation;
-
-        let bookingResult: BookingAssistantSessionResponse;
-
-        if (shouldHydrateRichBookingSession) {
-          const payload = await requestLegacyBookingSession({
+        try {
+          const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
+            sourcePage: assistantSourcePath,
             serviceId: selectedService.id,
+            serviceName: selectedService.name,
+            serviceCategory: selectedService.category,
             customerName,
             customerEmail: normalizedCustomerEmail,
             customerPhone: normalizedCustomerPhone,
+            notes: normalizedNotes,
             requestedDate: slot.requestedDate,
             requestedTime: slot.requestedTime,
-            notes: normalizedNotes,
+            timezone: 'Australia/Sydney',
+            runtimeConfig,
           });
-          bookingResult = {
-            ...payload,
-            crm_sync: payload.crm_sync ?? authoritativeResult.crmSync ?? null,
-          };
-        } else {
-          bookingResult = buildAuthoritativeBookingIntentResult({
-            authoritativeResult,
+
+          const shouldHydrateRichBookingSession =
+            liveReadSummary?.serviceId === selectedService.id &&
+            liveReadSummary.paymentAllowedBeforeConfirmation;
+
+          let bookingResult: BookingAssistantSessionResponse;
+
+          if (shouldHydrateRichBookingSession) {
+            const payload = await requestLegacyBookingSession({
+              serviceId: selectedService.id,
+              customerName,
+              customerEmail: normalizedCustomerEmail,
+              customerPhone: normalizedCustomerPhone,
+              requestedDate: slot.requestedDate,
+              requestedTime: slot.requestedTime,
+              notes: normalizedNotes,
+            });
+            bookingResult = {
+              ...payload,
+              crm_sync: payload.crm_sync ?? authoritativeResult.crmSync ?? null,
+            };
+          } else {
+            bookingResult = buildAuthoritativeBookingIntentResult({
+              authoritativeResult,
+              selectedService,
+              requestedDate: slot.requestedDate,
+              requestedTime: slot.requestedTime,
+              customerEmail: normalizedCustomerEmail ?? '',
+              trustWarnings: authoritativeResult.warnings,
+              nextStep: liveReadSummary?.serviceId === selectedService.id ? liveReadSummary.nextStep : null,
+            });
+          }
+
+          const automation = await runPostBookingAutomation({
+            bookingIntentId: authoritativeResult.bookingIntentId,
+            bookingReference: bookingResult.booking_reference,
+            customerName,
+            customerEmail: normalizedCustomerEmail,
+            customerPhone: normalizedCustomerPhone,
             selectedService,
             requestedDate: slot.requestedDate,
             requestedTime: slot.requestedTime,
-            customerEmail: normalizedCustomerEmail ?? '',
-            trustWarnings: authoritativeResult.warnings,
-            nextStep: liveReadSummary?.serviceId === selectedService.id ? liveReadSummary.nextStep : null,
+            notes: normalizedNotes,
+            paymentAllowedBeforeConfirmation:
+              shouldHydrateRichBookingSession ||
+              Boolean(
+                (liveReadSummary?.serviceId === selectedService.id &&
+                  liveReadSummary.paymentAllowedBeforeConfirmation) ||
+                  authoritativeResult.trust.payment_allowed_now,
+              ),
+            bookingPath:
+              liveReadSummary?.serviceId === selectedService.id
+                ? liveReadSummary.pathType
+                : authoritativeResult.trust.recommended_booking_path ?? bookingResult.workflow_status,
+            paymentLink: bookingResult.payment_url,
+            portalUrl: getBookingPortalUrl(bookingResult),
           });
+
+          setResult({
+            ...bookingResult,
+            automation,
+          });
+          setProductModuleTab('confirmed');
+          return;
+        } catch (error) {
+          if (!shouldFallbackToLegacyBookingSession(error)) {
+            throw error;
+          }
         }
-
-        const automation = await runPostBookingAutomation({
-          bookingIntentId: authoritativeResult.bookingIntentId,
-          bookingReference: bookingResult.booking_reference,
-          customerName,
-          customerEmail: normalizedCustomerEmail,
-          customerPhone: normalizedCustomerPhone,
-          selectedService,
-          requestedDate: slot.requestedDate,
-          requestedTime: slot.requestedTime,
-          notes: normalizedNotes,
-          paymentAllowedBeforeConfirmation:
-            shouldHydrateRichBookingSession ||
-            Boolean(
-              (liveReadSummary?.serviceId === selectedService.id &&
-                liveReadSummary.paymentAllowedBeforeConfirmation) ||
-                authoritativeResult.trust.payment_allowed_now,
-            ),
-          bookingPath:
-            liveReadSummary?.serviceId === selectedService.id
-              ? liveReadSummary.pathType
-              : authoritativeResult.trust.recommended_booking_path ?? bookingResult.workflow_status,
-          paymentLink: bookingResult.payment_url,
-          portalUrl: getBookingPortalUrl(bookingResult),
-        });
-
-        setResult({
-          ...bookingResult,
-          automation,
-        });
-        setProductModuleTab('confirmed');
-        return;
       }
 
       if (bookingAssistantV1Enabled) {
@@ -4607,13 +4707,13 @@ export function BookingAssistantDialog({
                     </div>
                     <div className={`mt-2 text-sm text-slate-500 ${shouldHideProductSupportCopy ? 'hidden' : ''}`}>
                       {selectedService
-                        ? `${selectedService.name} is currently selected. Review the shortlist below, then continue to booking when you are ready.`
-                        : `Review the top matched options below. ${brandName} keeps the strongest shortlist visible so users can compare before they book.`}
+                        ? `${selectedService.name} is selected. Unless priorities changed, the next best action is to continue with booking details.`
+                        : `Review the top matched options below. ${brandName} keeps the shortlist visible so the user can compare quickly, then move into booking with confidence.`}
                     </div>
                   </div>
                 </div>
                 {selectedService && isProductAppLayout ? (
-                  <div className="mt-4 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 p-4">
+                  <div className="mt-4 rounded-[1.35rem] border-[1.5px] border-emerald-300 bg-[linear-gradient(180deg,#f0fdf4_0%,#ecfdf3_100%)] p-4 shadow-[0_14px_32px_rgba(16,185,129,0.12)]">
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
@@ -4625,14 +4725,22 @@ export function BookingAssistantDialog({
                         <div className="mt-1 text-[11px] text-emerald-800">
                           {buildReadyToBookConfidence(selectedService, latestCustomerRequirement)}
                         </div>
+                        <div className="mt-2 text-[11px] leading-5 text-emerald-800">
+                          Next best action: confirm booking details and preferred timing. Return to the shortlist only if the decision criteria changed.
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={focusBookingDetails}
-                        className="rounded-full bg-slate-950 px-4 py-2 text-[11px] font-semibold text-white shadow-[0_4px_12px_rgba(15,23,42,0.18)]"
-                      >
-                        Book now →
-                      </button>
+                      <div className="flex flex-col items-end gap-2">
+                        <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
+                          Primary path
+                        </div>
+                        <button
+                          type="button"
+                          onClick={focusBookingDetails}
+                          className="rounded-full bg-slate-950 px-4 py-2 text-[11px] font-semibold text-white shadow-[0_4px_12px_rgba(15,23,42,0.18)]"
+                        >
+                          Continue to details →
+                        </button>
+                      </div>
                     </div>
                   </div>
                 ) : null}
@@ -4815,7 +4923,7 @@ export function BookingAssistantDialog({
                         Booking details
                       </div>
                       <div className="mt-1 text-[12px] font-semibold text-slate-950">
-                        Complete details after you are happy with the selected result.
+                        Complete details once the selected result looks right.
                       </div>
                     </div>
                     <button
@@ -4853,7 +4961,7 @@ export function BookingAssistantDialog({
                     ))}
                   </div>
 
-                  {content.formIntro ? (
+                  {!selectedService && content.formIntro ? (
                     <p className="mb-3 text-sm leading-6 text-slate-500">
                       {content.formIntro}
                     </p>
@@ -4869,10 +4977,13 @@ export function BookingAssistantDialog({
                         </div>
                         <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white">✓ Selected</span>
                       </div>
+                      <div className="mt-3 rounded-[1rem] bg-white/80 px-3 py-2 text-xs leading-5 text-emerald-900 ring-1 ring-emerald-200/70">
+                        <span className="font-semibold">Focus now:</span> confirm contact details, preferred timing, and anything the provider needs to action the request quickly.
+                      </div>
                     </div>
                   ) : (
                     <div className="mt-1 rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
-                      Choose a result from the search panel to continue.
+                      Select a matched result first. The booking form becomes the main task only after the shortlist decision is made.
                     </div>
                   )}
                   {selectedService && isProductAppLayout ? (
@@ -4935,36 +5046,8 @@ export function BookingAssistantDialog({
                   {selectedService && liveReadSummary?.serviceId === selectedService.id ? (
                     <div className="mt-3 rounded-[1.25rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
                       <div className="font-semibold">BookedAI v1 guidance</div>
-                      <div className="mt-1 text-xs text-sky-800">
-                        Availability: {liveReadSummary.availabilityState} • Confidence:{' '}
-                        {liveReadSummary.bookingConfidence}
-                      </div>
-                      {(liveReadSummary.semanticProvider || liveReadSummary.semanticProviderChain.length > 0) ? (
-                        <div className="mt-1 text-xs text-sky-800">
-                          AI search:{' '}
-                          {liveReadSummary.semanticFallbackApplied
-                            ? `${liveReadSummary.semanticProvider ?? 'unknown'} fallback`
-                            : liveReadSummary.semanticProvider ?? 'active'}
-                          {liveReadSummary.semanticProviderChain.length > 0
-                            ? ` • ${liveReadSummary.semanticProviderChain.join(' -> ')}`
-                            : ''}
-                        </div>
-                      ) : null}
-                      {liveReadSummary.bookingRequestSummary ? (
-                        <div className="mt-1 text-xs text-sky-800">
-                          Booking context: {liveReadSummary.bookingRequestSummary}
-                        </div>
-                      ) : null}
-                      <div className="mt-2 text-xs text-sky-800">
-                        Recommended path: {liveReadSummary.recommendedBookingPath ?? 'Not set'} •
-                        CTA path: {liveReadSummary.pathType}
-                      </div>
                       <p className="mt-2 text-sm leading-6 text-sky-900">
                         {liveReadSummary.nextStep}
-                      </p>
-                      <p className="mt-2 text-xs text-sky-800">
-                        Payment before confirmation:{' '}
-                        {liveReadSummary.paymentAllowedBeforeConfirmation ? 'Allowed' : 'Blocked'}
                       </p>
                       {liveReadSummary.warnings.length > 0 ? (
                         <div className="mt-2 space-y-1 text-xs text-sky-800">
@@ -5182,7 +5265,7 @@ export function BookingAssistantDialog({
                 </button>
 
                 {isProductAppLayout && selectedService && !result ? (
-                  <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-1 border-t border-slate-200 bg-white/92 px-5 py-2.5 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] backdrop-blur">
+                  <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-1 border-t border-slate-200 bg-white/96 px-5 py-2 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] backdrop-blur">
                     <div className="rounded-[1.15rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 py-2.5 shadow-[0_10px_22px_rgba(15,23,42,0.06)]">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
@@ -5224,35 +5307,62 @@ export function BookingAssistantDialog({
                   className="mt-5 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)]"
                 >
                   {/* Thank You hero — prominent on all layouts */}
-                  <div className="mb-5 overflow-hidden rounded-[1.5rem] bg-[linear-gradient(155deg,#052e16_0%,#064e3b_48%,#0f766e_100%)] px-5 py-5 text-white">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 ring-1 ring-emerald-400/30">
-                        <span className="text-lg">✓</span>
+                  <div className="mb-5 overflow-hidden rounded-[1.6rem] bg-[linear-gradient(155deg,#052e16_0%,#064e3b_48%,#0f766e_100%)] px-5 py-5 text-white shadow-[0_18px_44px_rgba(6,78,59,0.22)]">
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 ring-1 ring-emerald-400/30">
+                            <span className="text-lg">✓</span>
+                          </div>
+                          <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                              Booking secured
+                            </div>
+                            <div className="text-xl font-bold tracking-tight text-white">
+                              {result.booking_reference}
+                            </div>
+                          </div>
+                        </div>
+                        <p className="mt-3 max-w-lg text-sm leading-6 text-emerald-100">
+                          Your booking is confirmed. The next priority is payment or portal review, depending on the provider path below.
+                        </p>
                       </div>
-                      <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
-                          All done
-                        </div>
-                        <div className="text-xl font-bold tracking-tight text-white">
-                          Thank you!
-                        </div>
+                      <div className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/88 ring-1 ring-white/12">
+                        Confirmation ready
                       </div>
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-emerald-100">
-                      Your booking is confirmed. Check the details below and complete payment when ready.
-                    </p>
-                    {/* Primary CTA right here — most prominent spot */}
-                    <button
-                      type="button"
-                      onClick={() => {
-                        onClose();
-                        window.history.replaceState({}, '', '/');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
-                      className="mt-4 w-full rounded-[1rem] bg-white px-4 py-3 text-center text-[12px] font-semibold text-slate-950 transition hover:bg-slate-50"
-                    >
-                      ← Back to Homepage
-                    </button>
+
+                    <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                      {result.payment_url ? (
+                        <a
+                          href={result.payment_url}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center rounded-[1rem] bg-white px-4 py-3 text-center text-[12px] font-semibold text-slate-950 transition hover:bg-slate-50"
+                        >
+                          Continue to payment
+                        </a>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={focusBookingConfirmation}
+                          className="inline-flex items-center justify-center rounded-[1rem] bg-white px-4 py-3 text-center text-[12px] font-semibold text-slate-950 transition hover:bg-slate-50"
+                        >
+                          Review confirmation details
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onClose();
+                          window.history.replaceState({}, '', '/');
+                          window.scrollTo({ top: 0, behavior: 'smooth' });
+                        }}
+                        className="inline-flex items-center justify-center rounded-[1rem] bg-white/10 px-4 py-3 text-center text-[12px] font-semibold text-white transition hover:bg-white/16"
+                      >
+                        Back to homepage
+                      </button>
+                    </div>
                   </div>
 
                   <div className="overflow-hidden rounded-[1.5rem] bg-[linear-gradient(135deg,#0f172a_0%,#111827_38%,#0f766e_100%)] p-4 text-white">
@@ -5272,10 +5382,10 @@ export function BookingAssistantDialog({
                         </p>
                         <div className="mt-4 rounded-[1rem] bg-white/10 px-3 py-3 ring-1 ring-white/10">
                           <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/70">
-                            Customer portal
+                            Customer portal and edit flow
                           </div>
                           <p className="mt-1 text-[12px] leading-5 text-white/90">
-                            Scan the QR or open the portal to view booking details, edit, cancel, or save this booking.
+                            Scan the QR or open the portal to review booking details, edit the request, reschedule, cancel, or save this booking. The same portal link is also included in the confirmation email.
                           </p>
                           <a
                             href={getBookingPortalUrl(result)}
@@ -5290,6 +5400,13 @@ export function BookingAssistantDialog({
                               <path d="M12 9.5V12H4V4h2.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                           </a>
+                          <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/82">
+                            {['Review details', 'Edit and submit', 'Request reschedule', 'Request cancellation'].map((item) => (
+                              <span key={item} className="rounded-full bg-white/10 px-2.5 py-1 ring-1 ring-white/12">
+                                {item}
+                              </span>
+                            ))}
+                          </div>
                         </div>
                       </div>
                       <div className="rounded-[1.25rem] bg-white p-2 shadow-sm">
@@ -5355,7 +5472,53 @@ export function BookingAssistantDialog({
                       <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-600">
                         {result.contact_email}
                       </div>
+                      <div className="mt-2 text-[11px] leading-5 text-slate-500">
+                        Confirmation email should include the same portal link, booking reference, payment path, and calendar action for later review or edits.
+                      </div>
                     </div>
+                  </div>
+
+                  <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                    {[
+                      {
+                        title: 'Review booking',
+                        body: 'Open the portal to review the current booking details and booking reference.',
+                        label: 'Open portal',
+                        href: getBookingPortalUrl(result),
+                      },
+                      {
+                        title: 'Edit and submit',
+                        body: 'Use the managed portal workflow to adjust details, then resubmit the booking request.',
+                        label: 'Edit in portal',
+                        href: getBookingPortalUrl(result, 'edit'),
+                      },
+                      {
+                        title: 'Reschedule request',
+                        body: 'If the slot changed, request a new time from the same booking portal.',
+                        label: 'Request reschedule',
+                        href: getBookingPortalUrl(result, 'reschedule'),
+                      },
+                      {
+                        title: 'Cancel request',
+                        body: 'If plans changed, submit a cancellation request from the same managed flow.',
+                        label: 'Request cancellation',
+                        href: getBookingPortalUrl(result, 'cancel'),
+                      },
+                    ].map((item) => (
+                      <a
+                        key={item.title}
+                        href={item.href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
+                      >
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">{item.title}</div>
+                        <div className="mt-2 text-sm leading-6 text-slate-600">{item.body}</div>
+                        <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1a73e8]">
+                          {item.label}
+                        </div>
+                      </a>
+                    ))}
                   </div>
 
                   <div className="mt-4 grid gap-2 sm:grid-cols-3">

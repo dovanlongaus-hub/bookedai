@@ -254,7 +254,37 @@ export function Header({
     <header className={compactMenuOnly ? 'relative z-30 px-4 pt-4 sm:px-6' : 'sticky top-0 z-30 px-3 pt-3 sm:px-4'}>
       {compactMenuOnly ? (
         <>
-          <aside className="group fixed left-4 top-4 bottom-4 z-40 hidden w-[5.5rem] flex-col overflow-hidden rounded-[2rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,253,0.96)_100%)] p-3 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur xl:flex hover:w-[16rem] focus-within:w-[16rem]">
+          <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-[1.35rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,253,0.96)_100%)] px-3 py-2 shadow-[0_18px_50px_rgba(15,23,42,0.10)] backdrop-blur xl:hidden">
+            <a
+              href="/"
+              onClick={closeMobileMenu}
+              className="min-w-0 rounded-[1.2rem] border border-black/6 bg-white px-2.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
+            >
+              <BrandLockup
+                compact
+                surface="light"
+                className="min-w-0"
+                logoClassName="booked-brand-image booked-brand-image--landing-nav w-full max-w-[10.5rem] sm:max-w-[11.5rem]"
+                descriptorClassName="hidden"
+                eyebrowClassName="hidden"
+              />
+            </a>
+
+            <div className="flex items-center gap-2">
+              {exploreLinks.slice(0, 2).map((link) => (
+                <a
+                  key={link.href}
+                  href={link.href}
+                  className="hidden rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-950 sm:inline-flex"
+                >
+                  {link.label}
+                </a>
+              ))}
+              {menuToggleButton}
+            </div>
+          </div>
+
+          <aside className="group fixed left-4 top-4 bottom-4 z-40 hidden w-[5rem] flex-col overflow-hidden rounded-[1.75rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,253,0.96)_100%)] p-2.5 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur xl:flex hover:w-[14rem] focus-within:w-[14rem]">
             <div className="px-1">
               <div className="flex items-center justify-center rounded-full bg-slate-100/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 group-hover:justify-start group-focus-within:justify-start">
                 <span className={railLabelClass}>Navigate</span>
@@ -391,10 +421,6 @@ export function Header({
                 {startTrialLabel}
               </button>
             </div>
-          </div>
-
-          <div className="mx-auto flex w-full max-w-7xl justify-end xl:hidden">
-            {menuToggleButton}
           </div>
 
         </>

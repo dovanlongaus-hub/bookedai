@@ -8,6 +8,68 @@ export type TenantBillingAccountFormState = {
   merchant_mode: string;
 };
 
+function formatStatusLabel(value: string | null | undefined) {
+  if (!value) {
+    return 'Not set';
+  }
+  return value.replace(/_/g, ' ');
+}
+
+function deriveCommercialTruthState(billing: TenantBillingResponse) {
+  if (!billing.collection.has_billing_account) {
+    return {
+      label: 'Manual setup required',
+      tone: 'border-amber-300 bg-amber-50 text-amber-950',
+      body: 'This workspace still needs a billing identity before package changes, live charging, or renewal posture can become credible.',
+    };
+  }
+
+  if (billing.gateway?.checkout_enabled && billing.gateway?.customer_id_present) {
+    return {
+      label: 'Provider-backed billing live',
+      tone: 'border-emerald-300 bg-emerald-50 text-emerald-950',
+      body: 'This tenant has real billing-provider posture available, so package and invoice states can move through connected payment infrastructure instead of manual-only handling.',
+    };
+  }
+
+  if (billing.gateway?.portal_enabled || billing.gateway?.provider) {
+    return {
+      label: 'Connected but not fully live',
+      tone: 'border-sky-300 bg-sky-50 text-sky-950',
+      body: 'A billing provider connection exists, but this tenant still depends on additional live-mode or checkout readiness before the full self-serve loop is closed.',
+    };
+  }
+
+  return {
+    label: 'Manual or placeholder billing posture',
+    tone: 'border-slate-300 bg-slate-50 text-slate-900',
+    body: 'Billing visibility exists in the workspace, but provider-backed checkout or portal flows are not fully active yet. Keep labels and operator actions truthful.',
+  };
+}
+
+function derivePaymentMethodTruthLabel(billing: TenantBillingResponse) {
+  if (billing.payment_method.status === 'ready' || billing.payment_method.status === 'active') {
+    return 'Saved payment method available';
+  }
+  if (billing.gateway?.customer_id_present || billing.gateway?.provider) {
+    return 'Provider connected, payment method still incomplete';
+  }
+  if (billing.collection.has_billing_account) {
+    return 'Billing identity exists, payment method still manual or missing';
+  }
+  return 'No payment method posture yet';
+}
+
+function deriveInvoiceTruthLabel(billing: TenantBillingResponse) {
+  if (billing.invoice_summary.total_invoices > 0) {
+    return 'Invoice history has started';
+  }
+  if (billing.gateway?.checkout_enabled) {
+    return 'Provider-backed billing is ready, but no invoice cycle exists yet';
+  }
+  return 'Invoice seam exists, but live invoice generation is still immature for this tenant';
+}
+
 function formatDateLabel(value: string | null | undefined) {
   if (!value) {
     return 'Not scheduled';
@@ -66,6 +128,10 @@ export function TenantBillingWorkspace({
   onMarkInvoicePaid: (invoiceId: string) => void;
   onDownloadReceipt: (invoiceId: string) => void;
 }) {
+  const commercialTruth = deriveCommercialTruthState(billing);
+  const paymentMethodTruthLabel = derivePaymentMethodTruthLabel(billing);
+  const invoiceTruthLabel = deriveInvoiceTruthLabel(billing);
+
   return (
     <section className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
       <div className="space-y-6">
@@ -101,6 +167,14 @@ export function TenantBillingWorkspace({
             billing setup, and paid workspace readiness.
           </p>
 
+          <div className={`mt-5 rounded-[1.25rem] border px-4 py-4 ${commercialTruth.tone}`}>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] opacity-80">
+              Commercial truth
+            </div>
+            <div className="mt-2 text-sm font-semibold">{commercialTruth.label}</div>
+            <p className="mt-2 text-sm leading-6 opacity-90">{commercialTruth.body}</p>
+          </div>
+
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -115,7 +189,7 @@ export function TenantBillingWorkspace({
                 Status
               </div>
               <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                {billing.subscription.status.replace(/_/g, ' ')}
+                {formatStatusLabel(billing.subscription.status)}
               </div>
             </div>
             <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
@@ -123,7 +197,7 @@ export function TenantBillingWorkspace({
                 Payment posture
               </div>
               <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                {billing.self_serve.payment_method_status.replace(/_/g, ' ')}
+                {formatStatusLabel(billing.self_serve.payment_method_status)}
               </div>
             </div>
           </div>
@@ -226,6 +300,18 @@ export function TenantBillingWorkspace({
           </form>
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-[1.2rem] border border-sky-200 bg-sky-50 px-4 py-4 sm:col-span-2">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-sky-700">
+                Billing readiness cue
+              </div>
+              <div className="mt-2 text-sm font-medium text-slate-950">
+                {billing.collection.has_billing_account
+                  ? billing.self_serve.can_manage_billing
+                    ? 'Billing identity exists. Finish live commercial posture with payment method and subscription readiness.'
+                    : 'Billing identity exists, but this signed-in role cannot finish commercial setup alone.'
+                  : 'Start by saving a billing email and merchant mode so the tenant can move toward package activation.'}
+              </div>
+            </div>
             <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 Billing email
@@ -261,6 +347,10 @@ export function TenantBillingWorkspace({
             </div>
           ) : null}
 
+          <div className="mt-5 rounded-[1.1rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+            <span className="font-semibold text-slate-950">Truth label:</span> {paymentMethodTruthLabel}
+          </div>
+
           <div className="mt-5 grid gap-3 sm:grid-cols-2">
             <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
               <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -275,7 +365,7 @@ export function TenantBillingWorkspace({
                 Status
               </div>
               <div className="mt-2 text-sm font-medium text-slate-950">
-                {billing.payment_method.status.replace(/_/g, ' ')}
+                {formatStatusLabel(billing.payment_method.status)}
               </div>
             </div>
             <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
@@ -342,6 +432,10 @@ export function TenantBillingWorkspace({
             <div className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-600">
               {billing.plans.length} package option(s)
             </div>
+          </div>
+
+          <div className="mt-5 rounded-[1.1rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+            <span className="font-semibold text-slate-950">Commercial closure cue:</span> package switching is only truly self-serve when billing identity exists, provider-backed checkout is live, and the tenant can move from trial to paid without manual ambiguity.
           </div>
 
           <div className="mt-5 grid gap-4 xl:grid-cols-3">
@@ -435,6 +529,10 @@ export function TenantBillingWorkspace({
             </div>
           </div>
 
+          <div className="mt-5 rounded-[1.1rem] border border-slate-200 bg-slate-50 px-4 py-4 text-sm text-slate-700">
+            <span className="font-semibold text-slate-950">Truth label:</span> {invoiceTruthLabel}
+          </div>
+
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -483,7 +581,7 @@ export function TenantBillingWorkspace({
                       <div className="text-sm font-semibold text-slate-950">
                         {formatMoney(invoice.amount_aud, invoice.currency)}
                       </div>
-                      <div className="mt-1 text-xs text-slate-600">{invoice.status.replace(/_/g, ' ')}</div>
+                      <div className="mt-1 text-xs text-slate-600">{formatStatusLabel(invoice.status)}</div>
                       <div className="mt-1 text-xs text-slate-500">
                         {invoice.receipt_available
                           ? invoice.source === 'stripe'

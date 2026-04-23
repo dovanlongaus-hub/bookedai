@@ -429,6 +429,13 @@ export default async function LeadsPage({
                         <div className="mt-2">
                           <CrmSyncBadge status={crmStatusByLeadId.get(lead.id)} />
                         </div>
+                        <div className="mt-2 text-xs text-slate-500">
+                          {lead.pipelineStage === "booked"
+                            ? "Downstream booking likely exists. Open detail to continue in booking workflow."
+                            : lead.customerName
+                              ? "Customer link exists. Open detail to continue from the linked customer record."
+                              : "No downstream conversion artifact linked yet."}
+                        </div>
                       </td>
                       <td className="px-4 py-4">
                         <LeadStageBadge status={lead.status} pipelineStage={lead.pipelineStage} />
@@ -527,6 +534,13 @@ function LeadCard({
       </div>
       <div className="mt-3 text-sm text-slate-700">
         Owner: {lead.ownerName || "Unassigned"}
+      </div>
+      <div className="mt-1 text-xs text-slate-500">
+        {lead.pipelineStage === "booked"
+          ? "Booking aftermath available in lead detail."
+          : lead.customerName
+            ? "Customer aftermath available in lead detail."
+            : "No downstream conversion artifact yet."}
       </div>
       <div className="mt-1 text-sm text-slate-700">
         Follow-up: {lead.nextFollowUpAt ? lead.nextFollowUpAt.slice(0, 16).replace("T", " ") : "Not set"}

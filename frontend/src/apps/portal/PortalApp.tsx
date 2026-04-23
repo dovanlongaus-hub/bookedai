@@ -13,6 +13,8 @@ type PortalLoadState =
 
 type PortalRequestMode = 'reschedule' | 'cancel' | null;
 
+type PortalViewMode = 'overview' | 'edit' | 'reschedule' | 'cancel';
+
 function readPortalReferenceFromUrl() {
   if (typeof window === 'undefined') {
     return '';
@@ -26,6 +28,19 @@ function readPortalReferenceFromUrl() {
   ).trim();
 }
 
+function readPortalViewFromUrl(): PortalViewMode {
+  if (typeof window === 'undefined') {
+    return 'overview';
+  }
+
+  const url = new URL(window.location.href);
+  const action = (url.searchParams.get('action') || url.searchParams.get('view') || 'overview').trim().toLowerCase();
+  if (action === 'edit') return 'edit';
+  if (action === 'reschedule') return 'reschedule';
+  if (action === 'cancel') return 'cancel';
+  return 'overview';
+}
+
 function syncPortalReferenceToUrl(bookingReference: string) {
   if (typeof window === 'undefined') {
     return;
@@ -37,6 +52,27 @@ function syncPortalReferenceToUrl(bookingReference: string) {
   } else {
     url.searchParams.delete('booking_reference');
   }
+  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function syncPortalRouteState(bookingReference: string, viewMode: PortalViewMode) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const url = new URL(window.location.href);
+  if (bookingReference.trim()) {
+    url.searchParams.set('booking_reference', bookingReference.trim());
+  } else {
+    url.searchParams.delete('booking_reference');
+  }
+
+  if (viewMode === 'overview') {
+    url.searchParams.delete('action');
+  } else {
+    url.searchParams.set('action', viewMode);
+  }
+
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
@@ -121,8 +157,10 @@ function formatCreatedAt(value?: string | null) {
 
 export function PortalApp() {
   const initialReference = useMemo(() => readPortalReferenceFromUrl(), []);
+  const initialViewMode = useMemo(() => readPortalViewFromUrl(), []);
   const [lookupReference, setLookupReference] = useState(initialReference);
   const [requestMode, setRequestMode] = useState<PortalRequestMode>(null);
+  const [viewMode, setViewMode] = useState<PortalViewMode>(initialViewMode);
   const [requestNote, setRequestNote] = useState('');
   const [requestPreferredDate, setRequestPreferredDate] = useState('');
   const [requestPreferredTime, setRequestPreferredTime] = useState('');
@@ -177,7 +215,7 @@ export function PortalApp() {
   async function handleLookup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedReference = lookupReference.trim();
-    syncPortalReferenceToUrl(normalizedReference);
+    syncPortalRouteState(normalizedReference, viewMode);
 
     if (!normalizedReference) {
       setLoadState({ status: 'idle' });
@@ -214,6 +252,10 @@ export function PortalApp() {
 
   function openRequestComposer(mode: PortalRequestMode) {
     setRequestMode(mode);
+    setViewMode(mode === 'reschedule' ? 'reschedule' : 'cancel');
+    if (detail?.booking.booking_reference) {
+      syncPortalRouteState(detail.booking.booking_reference, mode === 'reschedule' ? 'reschedule' : 'cancel');
+    }
     setRequestMessage(null);
     setRequestError(null);
     setRequestNote('');
@@ -251,6 +293,8 @@ export function PortalApp() {
 
       setRequestMessage(envelope.data.message);
       setRequestMode(null);
+      setViewMode('overview');
+      syncPortalRouteState(detail.booking.booking_reference, 'overview');
     } catch (error) {
       setRequestError(
         error instanceof Error ? error.message : 'We could not submit that portal request right now.',
@@ -260,29 +304,71 @@ export function PortalApp() {
     }
   }
 
+  useEffect(() => {
+    if (!detail) {
+      return;
+    }
+
+    if (initialViewMode === 'reschedule') {
+      openRequestComposer('reschedule');
+      return;
+    }
+
+    if (initialViewMode === 'cancel') {
+      openRequestComposer('cancel');
+      return;
+    }
+
+    setViewMode(initialViewMode);
+    syncPortalRouteState(detail.booking.booking_reference, initialViewMode);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [detail?.booking.booking_reference]);
+
   return (
     <main className="public-apple-shell min-h-screen text-[#172033]">
-      <section className="border-b border-slate-200 bg-white px-4 py-5 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-[1180px] flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
+      <section className="px-4 pt-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex max-w-[1240px] items-center justify-between gap-3 rounded-[1.4rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,253,0.96)_100%)] px-3 py-2 shadow-[0_18px_50px_rgba(15,23,42,0.10)] backdrop-blur">
+          <a href="/" className="min-w-0 rounded-[1.1rem] border border-black/6 bg-white px-2.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
             <BrandLockup
               logoSrc={brandPreferredLogoPath}
               compact={false}
               surface="light"
               className="min-w-0"
-              logoClassName="booked-brand-image h-[2.5rem] w-[8.75rem] sm:h-[2.75rem] sm:w-[9.5rem]"
+              logoClassName="booked-brand-image h-[2.35rem] w-[8.35rem] sm:h-[2.55rem] sm:w-[9rem]"
               descriptorClassName="hidden"
               eyebrowClassName="hidden"
             />
-            <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#172033]/45">
-              Customer portal
+          </a>
+
+          <div className="flex items-center gap-2">
+            {[
+              { label: 'Language: EN', href: '#portal-top' },
+              { label: 'Homepage', href: '/' },
+              { label: 'Pitch', href: 'https://pitch.bookedai.au' },
+            ].map((item) => (
+              <a
+                key={item.label}
+                href={item.href}
+                className="hidden rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-950 sm:inline-flex"
+              >
+                {item.label}
+              </a>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      <section id="portal-top" className="px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
+        <div className="mx-auto flex max-w-[1240px] flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#172033]/45">
+              Manage booking workspace
             </div>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-[2rem]">
-              Review your booking, payment status, and next steps in one place.
+              Review, edit, reschedule, or cancel your booking from one professional portal.
             </h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-[#172033]/62">
-              Open a booking reference to confirm the requested service, schedule details, payment
-              state, and the support actions currently available from the portal.
+              This portal keeps booking reference, payment path, support actions, and customer-managed updates in one place. You can also return to the homepage to search and book something else when needed.
             </p>
           </div>
 
@@ -353,6 +439,62 @@ export function PortalApp() {
 
             {detail ? (
               <>
+                <section className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_16px_44px_rgba(15,23,42,0.05)]">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                        Portal mode
+                      </div>
+                      <div className="mt-1 text-sm font-semibold text-slate-900">
+                        {viewMode === 'overview'
+                          ? 'Booking overview'
+                          : viewMode === 'edit'
+                            ? 'Edit booking request'
+                            : viewMode === 'reschedule'
+                              ? 'Reschedule request'
+                              : 'Cancellation request'}
+                      </div>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {[
+                        { id: 'overview', label: 'Overview' },
+                        { id: 'edit', label: 'Edit' },
+                        { id: 'reschedule', label: 'Reschedule' },
+                        { id: 'cancel', label: 'Cancel' },
+                      ].map((item) => {
+                        const active = viewMode === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              const nextView = item.id as PortalViewMode;
+                              setViewMode(nextView);
+                              if (nextView === 'reschedule') {
+                                openRequestComposer('reschedule');
+                                return;
+                              }
+                              if (nextView === 'cancel') {
+                                openRequestComposer('cancel');
+                                return;
+                              }
+                              setRequestMode(null);
+                              syncPortalRouteState(detail.booking.booking_reference, nextView);
+                            }}
+                            className={`rounded-full px-3 py-2 text-[11px] font-semibold transition ${
+                              active
+                                ? 'bg-[#0f62fe] text-white'
+                                : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
+                            }`}
+                          >
+                            {item.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </section>
+
                 <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
@@ -420,6 +562,20 @@ export function PortalApp() {
                     <div className="text-sm font-semibold">{detail.status_summary.title}</div>
                     <div className="mt-1 text-sm leading-6 opacity-90">{detail.status_summary.body}</div>
                   </div>
+
+                  {viewMode === 'edit' ? (
+                    <div className="mt-6 rounded-[1.4rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                        Edit workflow
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-slate-900">
+                        Review current booking details, then use reschedule or cancellation when you need to submit a managed change.
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-600">
+                        This portal keeps one enterprise-safe workflow: review first, then submit the right managed request instead of losing context over email or chat.
+                      </div>
+                    </div>
+                  ) : null}
                 </section>
 
                 <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
@@ -533,7 +689,69 @@ export function PortalApp() {
               <>
                 <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                    Manage booking workspace
+                  </div>
+                  <div className="mt-3 grid gap-3">
+                    {[
+                      {
+                        title: 'Overview',
+                        body: 'Review booking reference, payment, provider details, and timeline.',
+                        mode: 'overview' as const,
+                      },
+                      {
+                        title: 'Edit flow',
+                        body: 'Use the managed portal workflow before you submit any booking change.',
+                        mode: 'edit' as const,
+                      },
+                      {
+                        title: 'Reschedule',
+                        body: 'Request a new time without losing the booking reference and support context.',
+                        mode: 'reschedule' as const,
+                      },
+                      {
+                        title: 'Cancel',
+                        body: 'Submit a cancellation request from the same controlled portal path.',
+                        mode: 'cancel' as const,
+                      },
+                    ].map((item) => {
+                      const active = viewMode === item.mode;
+                      return (
+                        <button
+                          key={item.title}
+                          type="button"
+                          onClick={() => {
+                            setViewMode(item.mode);
+                            if (item.mode === 'reschedule') {
+                              openRequestComposer('reschedule');
+                              return;
+                            }
+                            if (item.mode === 'cancel') {
+                              openRequestComposer('cancel');
+                              return;
+                            }
+                            setRequestMode(null);
+                            syncPortalRouteState(detail.booking.booking_reference, item.mode);
+                          }}
+                          className={`rounded-[1.2rem] border px-4 py-3 text-left transition ${
+                            active
+                              ? 'border-[#d2e3fc] bg-[#eef4ff]'
+                              : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'
+                          }`}
+                        >
+                          <div className="text-sm font-semibold text-slate-900">{item.title}</div>
+                          <div className="mt-1 text-xs leading-5 text-slate-600">{item.body}</div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                     Available actions
+                  </div>
+                  <div className="mt-3 rounded-[1.15rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">
+                    Portal deep links supported: overview, edit, reschedule, and cancel. These modes should also be reachable from QR, email, and managed support flows.
                   </div>
                   <div className="mt-4 grid gap-3">
                     {detail.allowed_actions.map((action) => {
@@ -684,6 +902,21 @@ export function PortalApp() {
                     </a>
                     <div>{detail.support.contact_phone || 'Phone support details will be confirmed directly if needed.'}</div>
                   </div>
+                </section>
+
+                <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                    Need another booking?
+                  </div>
+                  <div className="mt-3 text-lg font-semibold text-slate-900">
+                    Go back to homepage search
+                  </div>
+                  <p className="mt-3 text-sm leading-7 text-[#172033]/62">
+                    If you need to find another venue, provider, or service, return to the BookedAI homepage and start a new search without losing this booking reference.
+                  </p>
+                  <a href="/" className="booked-button mt-4 inline-flex">
+                    Search again on homepage
+                  </a>
                 </section>
 
                 {detail.booking.notes ? (
