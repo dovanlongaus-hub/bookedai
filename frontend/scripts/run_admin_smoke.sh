@@ -17,3 +17,4 @@ run_case() {
 run_case "tests/admin-prompt5-preview.spec.ts" "admin workspace deep-link opens reliability triage workspace directly"
 run_case "tests/admin-session-regression.spec.ts" "admin refresh keeps stored session visible and logout returns to sign-in"
 run_case "tests/admin-session-regression.spec.ts" "partner create expiry returns to sign-in and allows protected mutation retry after re-auth"
+run_case "tests/admin-workspace-upgrade.spec.ts" "trusted workspace-settings handoff CTA"

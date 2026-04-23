@@ -40,7 +40,7 @@ import { TrustSection } from '../../components/landing/sections/TrustSection';
 
 const homepageNavItems = [
   { id: 'hero', label: 'Overview' },
-  { id: 'homepage-board', label: 'Platform' },
+  { id: 'homepage-board', label: 'Web App' },
   { id: 'product-proof', label: 'Product Proof' },
   { id: 'architecture', label: 'Architecture' },
   { id: 'pricing', label: 'Pricing' },
@@ -109,11 +109,11 @@ export function PublicApp() {
           navItems={homepageNavItems}
           onStartTrial={openProductTrial}
           onBookDemo={() => openSalesContact('header')}
-          startTrialLabel="Start Product Trial"
+          startTrialLabel="Open Web App"
           bookDemoLabel="Talk to Sales"
           compactMenuOnly
           utilityLinks={[
-            { label: 'Live Product', href: productHref },
+            { label: 'Responsive Web App', href: productHref },
             { label: 'Enterprise Architecture', href: '#architecture' },
             { label: 'Roadmap', href: roadmapHref },
             { label: 'Tenant Workspace', href: tenantHref },
@@ -172,7 +172,7 @@ export function PublicApp() {
         <Footer
           onStartTrial={openProductTrial}
           onBookDemo={() => openSalesContact('footer')}
-          startTrialLabel="Start Product Trial"
+          startTrialLabel="Open Web App"
           bookDemoLabel="Talk to Sales"
         />
       </div>

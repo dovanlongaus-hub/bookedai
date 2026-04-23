@@ -51,6 +51,13 @@ Implementation synchronization note from `2026-04-23`:
   - explicit admin homes for billing/support review, integration review, audit chronology, and platform configuration review
 - later admin work should now deepen these sections with richer read models and workflow actions rather than re-deciding the top-level information architecture again
 
+Implementation synchronization note from `2026-04-23`:
+
+- the shared frontend admin shell now also deepens the new non-mutation lanes with practical read-model summaries instead of leaving them as guidance-only route homes
+- `Billing Support` now includes queue-level summary cards for portal requests, payment attention, unresolved items, escalations, and reviewed cases before operators open the full queue
+- `Integrations` now derives CRM, messaging, payment, and webhook attention panels from the existing admin event feed and support queue so cross-system review becomes usable before later backend-specific dashboards land
+- `Audit & Activity` now behaves more explicitly as a chronology workspace by combining recent provider or communication events with queue posture into one replay-oriented timeline
+
 ## Requested outcome
 
 The admin surface should be redesigned into a friendlier but clearly enterprise-grade workspace.

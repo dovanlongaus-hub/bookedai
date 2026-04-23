@@ -14,6 +14,8 @@ type AdminWorkspaceInsightsProps = {
   partnersCount: number;
   configItemsCount: number;
   apiRoutesCount: number;
+  messagingCount: number;
+  messagingAttentionCount: number;
   selectedBookingReference?: string | null;
   selectedServiceId?: string | null;
   onPanelNavigate: (panel: AdminWorkspacePanelId) => void;
@@ -33,6 +35,8 @@ export function AdminWorkspaceInsights({
   partnersCount,
   configItemsCount,
   apiRoutesCount,
+  messagingCount,
+  messagingAttentionCount,
   selectedBookingReference,
   selectedServiceId,
   onPanelNavigate,
@@ -367,6 +371,40 @@ export function AdminWorkspaceInsights({
             label="Open API inventory panel"
             isActive={activePanel === 'api-inventory'}
             onClick={() => onPanelNavigate('api-inventory')}
+          />
+        </div>
+      </section>
+    );
+  }
+
+  if (activeWorkspace === 'messaging') {
+    return (
+      <section
+        id="messaging-workspace"
+        className="mt-6 rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.06)]"
+      >
+        <div className="text-xs font-semibold uppercase tracking-[0.22em] text-fuchsia-700">
+          Messaging workspace
+        </div>
+        <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
+          Review communication posture before operators retry or escalate
+        </h2>
+        <div className="mt-5 grid gap-4 md:grid-cols-4">
+          <InsightCard label="Visible messages" value={`${messagingCount}`} detail="Cross-channel items loaded into the current admin workspace." />
+          <InsightCard label="Needs attention" value={`${messagingAttentionCount}`} detail="Failed, retrying, pending, or manual-review communication posture." />
+          <InsightCard label="Tenant linkage" value={selectedTenantName ?? 'Platform-wide'} detail="Tenant selection can narrow operator review without hiding cross-tenant issues." />
+          <InsightCard label="Action posture" value="Read-first" detail="Open detail first, then retry or mark manual follow-up when the record is eligible." />
+        </div>
+        <div className="mt-5 flex flex-wrap gap-3">
+          <PanelLink
+            label="Open messaging list"
+            isActive={activePanel === 'messaging-list'}
+            onClick={() => onPanelNavigate('messaging-list')}
+          />
+          <PanelLink
+            label="Open message detail"
+            isActive={activePanel === 'message-detail'}
+            onClick={() => onPanelNavigate('message-detail')}
           />
         </div>
       </section>

@@ -4,6 +4,9 @@ from api import route_handlers as handlers
 from schemas import (
     AdminApiInventoryResponse,
     AdminBookingDetailResponse,
+    AdminMessagingActionResponse,
+    AdminMessagingDetailResponse,
+    AdminMessagingListResponse,
     AdminPortalSupportActionResponse,
     AdminBookingsResponse,
     AdminConfigResponse,
@@ -69,6 +72,24 @@ router.add_api_route(
     handlers.admin_api_inventory,
     methods=["GET"],
     response_model=AdminApiInventoryResponse,
+)
+router.add_api_route(
+    "/admin/messaging",
+    handlers.admin_messaging,
+    methods=["GET"],
+    response_model=AdminMessagingListResponse,
+)
+router.add_api_route(
+    "/admin/messaging/{source_kind}/{item_id}",
+    handlers.admin_message_detail,
+    methods=["GET"],
+    response_model=AdminMessagingDetailResponse,
+)
+router.add_api_route(
+    "/admin/messaging/{source_kind}/{item_id}/{action}",
+    handlers.admin_message_action,
+    methods=["POST"],
+    response_model=AdminMessagingActionResponse,
 )
 router.add_api_route(
     "/admin/services",

@@ -132,6 +132,57 @@ export type AdminApiInventoryResponse = {
   items: AdminApiRoute[];
 };
 
+export type AdminMessagingItem = {
+  message_key: string;
+  source_kind: 'email_messages' | 'outbox_events' | 'crm_sync_records' | string;
+  item_id: string;
+  channel: string;
+  delivery_status: string;
+  title: string;
+  provider?: string | null;
+  template_key?: string | null;
+  tenant_id?: string | null;
+  tenant_ref?: string | null;
+  tenant_name?: string | null;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  entity_label?: string | null;
+  occurred_at: string;
+  latest_event_type?: string | null;
+  latest_event_at?: string | null;
+  retry_eligible: boolean;
+  manual_follow_up: boolean;
+  needs_attention: boolean;
+  last_error?: string | null;
+  attempt_count: number;
+  summary?: string | null;
+};
+
+export type AdminMessagingEvent = {
+  event_id: string;
+  event_type: string;
+  occurred_at: string;
+  detail?: string | null;
+  payload: Record<string, unknown>;
+};
+
+export type AdminMessagingListResponse = {
+  status: string;
+  items: AdminMessagingItem[];
+};
+
+export type AdminMessagingDetailResponse = {
+  status: string;
+  item: AdminMessagingItem;
+  events: AdminMessagingEvent[];
+};
+
+export type AdminMessagingActionResponse = {
+  status: string;
+  action: string;
+  message: string;
+};
+
 export type LoginResponse = {
   status: string;
   username: string;
@@ -347,6 +398,7 @@ export type AdminWorkspaceId =
   | 'catalog'
   | 'billing-support'
   | 'integrations'
+  | 'messaging'
   | 'reliability'
   | 'audit-activity'
   | 'platform-settings';
@@ -363,6 +415,8 @@ export type AdminWorkspacePanelId =
   | 'service-catalog'
   | 'partners'
   | 'integrations-health'
+  | 'messaging-list'
+  | 'message-detail'
   | 'audit-events'
   | 'prompt5-preview'
   | 'live-configuration'

@@ -7,6 +7,9 @@ import {
   AdminBookingDetailResponse,
   AdminBookingsResponse,
   AdminConfigResponse,
+  AdminMessagingActionResponse,
+  AdminMessagingDetailResponse,
+  AdminMessagingListResponse,
   AdminOverviewResponse,
   AdminPortalSupportActionResponse,
   AdminServiceCatalogQualityResponse,
@@ -166,6 +169,86 @@ export async function fetchAdminBookingDetail(
   return payload as AdminBookingDetailResponse;
 }
 
+export async function fetchAdminMessaging(
+  apiBaseUrl: string,
+  sessionToken: string,
+  limit = 60,
+) {
+  const response = await fetch(`${apiBaseUrl}/admin/messaging?limit=${limit}`, {
+    headers: createAdminAuthHeaders(sessionToken),
+  });
+  const payload = (await parseJsonOrNull(response)) as
+    | AdminMessagingListResponse
+    | { detail?: string }
+    | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not load messaging workspace.'));
+  }
+  return payload as AdminMessagingListResponse;
+}
+
+export async function fetchAdminMessageDetail(
+  apiBaseUrl: string,
+  sessionToken: string,
+  sourceKind: string,
+  itemId: string,
+) {
+  const response = await fetch(
+    `${apiBaseUrl}/admin/messaging/${encodeURIComponent(sourceKind)}/${encodeURIComponent(itemId)}`,
+    {
+      headers: createAdminAuthHeaders(sessionToken),
+    },
+  );
+  const payload = (await parseJsonOrNull(response)) as
+    | AdminMessagingDetailResponse
+    | { detail?: string }
+    | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not load message detail.'));
+  }
+  return payload as AdminMessagingDetailResponse;
+}
+
+export async function applyAdminMessageAction(
+  apiBaseUrl: string,
+  sessionToken: string,
+  sourceKind: string,
+  itemId: string,
+  action: 'retry' | 'mark_manual_follow_up',
+  note?: string | null,
+) {
+  const response = await fetch(
+    `${apiBaseUrl}/admin/messaging/${encodeURIComponent(sourceKind)}/${encodeURIComponent(itemId)}/${encodeURIComponent(action)}`,
+    {
+      method: 'POST',
+      headers: {
+        ...createAdminAuthHeaders(sessionToken),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        note: note ?? null,
+      }),
+    },
+  );
+  const payload = (await parseJsonOrNull(response)) as
+    | AdminMessagingActionResponse
+    | { detail?: string }
+    | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not update the message.'));
+  }
+  return payload as AdminMessagingActionResponse;
+}
+
 export async function fetchAdminDashboardData(
   apiBaseUrl: string,
   sessionToken: string,
@@ -180,6 +263,7 @@ export async function fetchAdminDashboardData(
     fetch(`${apiBaseUrl}/admin/partners`, { headers }),
     fetch(`${apiBaseUrl}/admin/services`, { headers }),
     fetch(`${apiBaseUrl}/admin/services/quality`, { headers }),
+    fetch(`${apiBaseUrl}/admin/messaging?limit=60`, { headers }),
   ]);
 
   const payloads = await Promise.all(responses.map((response) => parseJsonOrNull(response)));
@@ -201,6 +285,7 @@ export async function fetchAdminDashboardData(
     partners: payloads[4] as PartnerProfileListResponse,
     services: payloads[5] as AdminServiceMerchantListResponse,
     serviceQuality: payloads[6] as AdminServiceCatalogQualityResponse,
+    messaging: payloads[7] as AdminMessagingListResponse,
     bookingsViewEnabled:
       responses[1].headers.get('X-BookedAI-Admin-Bookings-View') === 'enhanced',
     bookingsShadowStatus: responses[1].headers.get('X-BookedAI-Admin-Bookings-Shadow') ?? 'disabled',

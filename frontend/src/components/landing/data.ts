@@ -371,14 +371,14 @@ export const navItems: NavItem[] = publicLandingSpine
   .map((item) => ({ id: item.id, label: item.label }));
 
 export const heroContent: HeroContent = {
-  eyebrow: 'Enterprise revenue operations for service businesses',
+  eyebrow: 'Responsive web revenue operations for service businesses',
   title: 'Turn enquiries into booked revenue with one modern operating system.',
   bodyLead:
     'BookedAI helps service businesses capture demand, qualify intent, and move buyers into booking-ready action through one visible workflow.',
   bodyRest:
-    'Instead of stitching together chat, triage, scheduling, CRM, and follow-up manually, teams get a cleaner commercial path that feels credible to SMEs and legible to investors in the first minute.',
-  note: 'Built to look simple on the surface, while carrying the workflow depth, control, and enterprise posture serious buyers expect.',
-  primaryCta: 'Open Product Trial',
+    'Instead of stitching together chat, triage, scheduling, CRM, and follow-up manually, teams get one responsive web app path that stays credible on desktop, tablet, and mobile while remaining legible to buyers and investors in the first minute.',
+  note: 'Responsive web app first on bookedai.au. Native mobile can follow later once the core web conversion and operations loop is fully hardened.',
+  primaryCta: 'Open Web App',
   secondaryCta: 'Talk to Sales',
   primaryHref: productHref,
   secondaryHref: '/register-interest',
@@ -386,7 +386,7 @@ export const heroContent: HeroContent = {
 
 export const demoContent: DemoContent = {
   title: 'BookedAI revenue-engine preview',
-  subtitle: 'Live capture, ranking, and booking handoff in a mobile-first UI',
+  subtitle: 'Live capture, ranking, and booking handoff in one responsive web app',
   status: 'Online',
   query: 'Swimming lessons for a 7-year-old near Caringbah',
   messages: [
@@ -575,15 +575,15 @@ export const pricingContent: PricingContent = {
     'Setup fee quoted clearly when rollout scope needs it',
     'Commission charged only on successful BookedAI-attributed bookings',
   ],
-  primaryCta: 'Open Product Trial',
+  primaryCta: 'Open Web App',
   primaryHref: productHref,
 };
 
 export const ctaContent: CallToActionContent = {
   kicker: 'Call to action',
   title: 'Ready to replace fragmented enquiry handling with a cleaner revenue system?',
-  body: 'Open the live product trial or talk to us about the rollout path that best fits your operating maturity, customer volume, and growth ambition.',
-  primaryCta: 'Open Product Trial',
+  body: 'Open the live responsive web app or talk to us about the rollout path that best fits your operating maturity, customer volume, and growth ambition.',
+  primaryCta: 'Open Web App',
   secondaryCta: 'Talk to Sales',
   primaryHref: productHref,
   secondaryHref: '/register-interest',

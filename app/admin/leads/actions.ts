@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 
+import { assertLeadsMutationAllowed } from "@/app/admin/leads/action-guard";
 import { getAdminRepository } from "@/lib/db/admin-repository";
 import { syncAdminCallScheduledToZoho } from "@/lib/integrations/zoho-call-scheduled-sync";
 import { syncAdminLeadQualificationToZoho } from "@/lib/integrations/zoho-lead-qualification-sync";
@@ -32,6 +33,12 @@ function toPayload(formData: FormData) {
 export async function createLeadAction(formData: FormData) {
   const session = await requirePermission("leads:create");
   const tenant = await getTenantContext();
+  assertLeadsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const payload = toPayload(formData);
   await getAdminRepository().createLead(tenant.tenantId, payload, session.userId);
   revalidatePath("/admin/leads");
@@ -40,6 +47,12 @@ export async function createLeadAction(formData: FormData) {
 export async function updateLeadAction(leadId: string, formData: FormData) {
   const session = await requirePermission("leads:update");
   const tenant = await getTenantContext();
+  assertLeadsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const payload = toPayload(formData);
   const repository = getAdminRepository();
   const updatedLead = await repository.updateLead(tenant.tenantId, leadId, payload, session.userId);
@@ -72,18 +85,30 @@ export async function updateLeadAction(leadId: string, formData: FormData) {
   revalidatePath(`/admin/leads/${leadId}`);
 }
 
-export async function archiveLeadAction(leadId: string) {
+export async function archiveLeadAction(leadId: string, formData: FormData) {
   const session = await requirePermission("leads:delete");
   const tenant = await getTenantContext();
+  assertLeadsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   await getAdminRepository().softDeleteLead(tenant.tenantId, leadId, session.userId);
   revalidatePath("/admin/leads");
   revalidatePath(`/admin/leads/${leadId}`);
 }
 
-export async function convertLeadToCustomerAction(leadId: string) {
-  await requirePermission("leads:update");
+export async function convertLeadToCustomerAction(leadId: string, formData: FormData) {
+  const leadSession = await requirePermission("leads:update");
   const session = await requirePermission("customers:create");
   const tenant = await getTenantContext();
+  assertLeadsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(leadSession.impersonation || session.impersonation),
+  });
   await getAdminRepository().convertLeadToCustomer(tenant.tenantId, leadId, session.userId);
   revalidatePath("/admin/leads");
   revalidatePath(`/admin/leads/${leadId}`);
@@ -91,9 +116,15 @@ export async function convertLeadToCustomerAction(leadId: string) {
 }
 
 export async function convertLeadToBookingAction(leadId: string, formData: FormData) {
-  await requirePermission("leads:update");
+  const leadSession = await requirePermission("leads:update");
   const session = await requirePermission("bookings:create");
   const tenant = await getTenantContext();
+  assertLeadsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(leadSession.impersonation || session.impersonation),
+  });
   const serviceId = String(formData.get("serviceId") ?? "").trim();
   if (!serviceId) {
     throw new Error("Service is required for lead-to-booking conversion.");
@@ -108,6 +139,12 @@ export async function convertLeadToBookingAction(leadId: string, formData: FormD
 export async function addLeadNoteAction(leadId: string, formData: FormData) {
   const session = await requirePermission("leads:update");
   const tenant = await getTenantContext();
+  assertLeadsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const payload = leadNoteMutationSchema.parse({
     note: formData.get("note"),
     contactAt: formData.get("contactAt"),
@@ -128,6 +165,12 @@ export async function addLeadNoteAction(leadId: string, formData: FormData) {
 export async function scheduleLeadFollowUpAction(leadId: string, formData: FormData) {
   const session = await requirePermission("leads:update");
   const tenant = await getTenantContext();
+  assertLeadsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const repository = getAdminRepository();
   const payload = leadFollowUpMutationSchema.parse({
     nextFollowUpAt: formData.get("nextFollowUpAt"),
@@ -168,9 +211,15 @@ export async function scheduleLeadFollowUpAction(leadId: string, formData: FormD
   revalidatePath(`/admin/leads/${leadId}`);
 }
 
-export async function retryLeadCrmSyncAction(leadId: string, crmSyncRecordId: number) {
+export async function retryLeadCrmSyncAction(leadId: string, crmSyncRecordId: number, formData: FormData) {
   const session = await requirePermission("leads:update");
   const tenant = await getTenantContext();
+  assertLeadsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
 
   await retryZohoCrmSyncRecord({
     tenantId: tenant.tenantId,

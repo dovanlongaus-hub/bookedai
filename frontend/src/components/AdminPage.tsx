@@ -4,8 +4,13 @@ import { AdminBookingsSection } from '../features/admin/bookings-section';
 import { AdminDashboardHeader } from '../features/admin/dashboard-header';
 import { AdminEmailStatusNote } from '../features/admin/email-status-note';
 import { ApiInventorySection } from '../features/admin/api-inventory-section';
+import { AuditActivitySection } from '../features/admin/audit-activity-section';
 import { AdminLoginScreen } from '../features/admin/login-screen';
+import { BillingSupportSummarySection } from '../features/admin/billing-support-summary-section';
+import { IntegrationHealthSection } from '../features/admin/integration-health-section';
 import { LiveConfigurationSection } from '../features/admin/live-configuration-section';
+import { MessagingWorkspace } from '../features/admin/messaging-workspace';
+import { WorkspaceSettingsSummarySection } from '../features/admin/workspace-settings-summary-section';
 import { TenantManagementSection } from '../features/admin/tenant-management-section';
 import { RecentEventsSection } from '../features/admin/recent-events-section';
 import { ServiceCatalogSection } from '../features/admin/service-catalog-section';
@@ -35,6 +40,7 @@ const workspacePanels: Record<AdminWorkspaceId, AdminWorkspacePanelId[]> = {
   catalog: ['service-catalog', 'partners'],
   'billing-support': ['portal-support', 'selected-booking'],
   integrations: ['integrations-health', 'recent-events'],
+  messaging: ['messaging-list', 'message-detail'],
   reliability: ['prompt5-preview', 'live-configuration', 'api-inventory'],
   'audit-activity': ['audit-events'],
   'platform-settings': ['live-configuration', 'api-inventory'],
@@ -48,6 +54,7 @@ function isWorkspaceId(value: string): value is AdminWorkspaceId {
     value === 'catalog' ||
     value === 'billing-support' ||
     value === 'integrations' ||
+    value === 'messaging' ||
     value === 'reliability' ||
     value === 'audit-activity' ||
     value === 'platform-settings'
@@ -108,6 +115,10 @@ export function AdminPage() {
     selectedBooking,
     configItems,
     apiRoutes,
+    messagingItems,
+    selectedMessageDetail,
+    messagingActionMessage,
+    messagingActionSubmittingKey,
     partners,
     importedServices,
     tenants,
@@ -172,12 +183,15 @@ export function AdminPage() {
     updateTenantProfileForm,
     updateTenantServiceForm,
     loadBookingDetail,
+    loadMessageDetail,
     loadTenantDetail,
     loadDashboard,
     handleLogin,
     handleLogout,
     sendConfirmationEmail,
     applyPortalSupportAction,
+    retryMessage,
+    markMessageManualFollowUp,
     editPartner,
     resetPartnerForm,
     uploadPartnerAsset,
@@ -341,6 +355,8 @@ export function AdminPage() {
           partnersCount={partners.length}
           configItemsCount={configItems.length}
           apiRoutesCount={apiRoutes.length}
+          messagingCount={messagingItems.length}
+          messagingAttentionCount={messagingItems.filter((item) => item.needs_attention).length}
           selectedBookingReference={selectedBooking?.booking.booking_reference ?? null}
           selectedServiceId={selectedBooking?.booking.service_id ?? null}
           onPanelNavigate={changePanel}
@@ -652,6 +668,12 @@ export function AdminPage() {
         {activeWorkspace === 'billing-support' ? (
           <section className="booked-page-grid xl:grid-cols-[minmax(0,1.1fr)_minmax(320px,0.9fr)]">
             <div className="space-y-6">
+              <BillingSupportSummarySection
+                items={overview?.portal_support_queue ?? []}
+                selectedTenantName={selectedTenantDetail?.tenant.name ?? null}
+                selectedBookingReference={selectedBooking?.booking.booking_reference ?? null}
+              />
+
               <div id="portal-support">
                 <PortalSupportQueueSection
                   items={overview?.portal_support_queue ?? []}
@@ -691,31 +713,11 @@ export function AdminPage() {
         {activeWorkspace === 'integrations' ? (
           <section className="booked-page-grid xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
             <div className="space-y-6">
-              <section id="integrations-health" className="template-card p-6">
-                <div className="template-kicker text-sm tracking-[0.14em]">
-                  Integrations health
-                </div>
-                <h2 className="template-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
-                  Cross-system guidance for CRM, email, webhook, and provider review
-                </h2>
-                <p className="template-body mt-2 max-w-3xl text-sm leading-7">
-                  This lane keeps integration investigation separate from tenant mutation. Use the
-                  recent activity feed for live clues, then jump into reliability or platform
-                  settings if the issue looks like preview drift, config drift, or API mismatch.
-                </p>
-                <div className="mt-5 grid gap-4 md:grid-cols-2">
-                  <InfoCard
-                    label="Recent event feed"
-                    value={`${overview?.recent_events.length ?? 0} events`}
-                  />
-                  <InfoCard
-                    label="Portal and payment exceptions"
-                    value={`${overview?.portal_support_queue.length ?? 0} queue items`}
-                  />
-                  <InfoCard label="Config inventory" value={`${configItems.length} items`} />
-                  <InfoCard label="API inventory" value={`${apiRoutes.length} routes`} />
-                </div>
-              </section>
+              <IntegrationHealthSection
+                recentEvents={overview?.recent_events ?? []}
+                queueItems={overview?.portal_support_queue ?? []}
+                selectedTenantName={selectedTenantDetail?.tenant.name ?? null}
+              />
 
               <div id="recent-events">
                 <RecentEventsSection recentEvents={overview?.recent_events ?? []} />
@@ -733,6 +735,26 @@ export function AdminPage() {
               </section>
             </aside>
           </section>
+        ) : null}
+
+        {activeWorkspace === 'messaging' ? (
+          <MessagingWorkspace
+            items={messagingItems}
+            selectedDetail={selectedMessageDetail}
+            selectedTenantRef={selectedTenantRef || null}
+            selectedTenantName={selectedTenantDetail?.tenant.name ?? null}
+            actionMessage={messagingActionMessage}
+            actionSubmittingKey={messagingActionSubmittingKey}
+            onSelectMessage={(sourceKind, itemId) => {
+              void loadMessageDetail(sourceKind, itemId);
+            }}
+            onRetryMessage={(sourceKind, itemId, note) => {
+              void retryMessage(sourceKind, itemId, note);
+            }}
+            onMarkManualFollowUp={(sourceKind, itemId, note) => {
+              void markMessageManualFollowUp(sourceKind, itemId, note);
+            }}
+          />
         ) : null}
 
         {activeWorkspace === 'reliability' ? (
@@ -767,9 +789,12 @@ export function AdminPage() {
         {activeWorkspace === 'audit-activity' ? (
           <section className="booked-page-grid xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
             <div className="space-y-6">
-              <div id="audit-events">
-                <RecentEventsSection recentEvents={overview?.recent_events ?? []} />
-              </div>
+              <AuditActivitySection
+                recentEvents={overview?.recent_events ?? []}
+                queueItems={overview?.portal_support_queue ?? []}
+                selectedTenantName={selectedTenantDetail?.tenant.name ?? null}
+                selectedBookingReference={selectedBooking?.booking.booking_reference ?? null}
+              />
             </div>
 
             <aside className="space-y-6">
@@ -800,6 +825,9 @@ export function AdminPage() {
                     platform posture without mixing these details into every other workspace.
                   </p>
                 </section>
+                <div className="mt-6">
+                  <WorkspaceSettingsSummarySection selectedTenantDetail={selectedTenantDetail} />
+                </div>
                 <div className="mt-6">
                   <LiveConfigurationSection configItems={configItems} />
                 </div>

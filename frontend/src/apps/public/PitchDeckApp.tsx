@@ -216,9 +216,9 @@ export function PitchDeckApp() {
         onStartTrial={() => openRegisterInterest('header', 'pitch_header_register')}
         onBookDemo={openProductDemo}
         startTrialLabel="Open SME Registration"
-        bookDemoLabel="Open Product Trial"
+        bookDemoLabel="Open Web App"
         utilityLinks={[
-          { label: 'Product Trial', href: productUrl },
+          { label: 'Responsive Web App', href: productUrl },
           { label: 'Demo Page', href: demoLandingUrl },
           { label: 'Roadmap', href: roadmapHref },
         ]}
@@ -264,7 +264,7 @@ export function PitchDeckApp() {
                     href={productUrl}
                     className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#101828] transition hover:-translate-y-0.5"
                   >
-                    Open Product Trial
+                    Open Web App
                   </a>
                   <button
                     type="button"
@@ -413,7 +413,7 @@ export function PitchDeckApp() {
                   Open SME Registration
                 </button>
                 <a href={productUrl} className="booked-button-secondary justify-center text-center">
-                  Open Product Trial
+                  Open Web App
                 </a>
               </div>
             </div>
@@ -439,7 +439,7 @@ export function PitchDeckApp() {
 
               <div className="mt-6 flex flex-wrap gap-3">
                 <a href={productUrl} className="booked-button">
-                  Open Product Trial
+                  Open Web App
                 </a>
                 <button
                   type="button"
@@ -835,7 +835,7 @@ export function PitchDeckApp() {
                   href={productUrl}
                   className="rounded-full border border-black/8 bg-white/72 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
                 >
-                  Open Product Trial
+                  Open Web App
                 </a>
               </div>
             </div>
@@ -895,7 +895,7 @@ export function PitchDeckApp() {
         onStartTrial={() => openRegisterInterest('footer', 'pitch_footer_register')}
         onBookDemo={openProductDemo}
         startTrialLabel="Open SME Registration"
-        bookDemoLabel="Open Product Trial"
+        bookDemoLabel="Open Web App"
       />
     </main>
   );

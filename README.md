@@ -4,6 +4,13 @@ BookedAI is a Docker-based full-stack application for the `bookedai.au` domain, 
 
 Current application release baseline: `1.0.1-stable`.
 
+Current public runtime decision:
+
+- BookedAI is shipping the responsive web app as the primary current-phase product surface.
+- `bookedai.au` is the acquisition and orientation surface for that web runtime.
+- `product.bookedai.au` is the deeper live product web runtime.
+- native mobile is intentionally deferred to a later phase.
+
 ## Repository structure
 
 - `frontend/`: active React + TypeScript + Vite multi-surface frontend used by the current Docker/Nginx production runtime
@@ -71,10 +78,10 @@ Implementation rules:
 
 Production traffic is expected to follow this path:
 
-- `https://bookedai.au/` -> homepage sales deck frontend
+- `https://bookedai.au/` -> homepage acquisition surface for the responsive web app
 - `https://api.bookedai.au/*` -> FastAPI backend
 - `https://admin.bookedai.au/` -> admin-facing frontend routes behind the same proxy
-- `https://product.bookedai.au/` -> live product demo and booking-agent frontend
+- `https://product.bookedai.au/` -> live product web runtime and booking-agent frontend
 - `https://demo.bookedai.au/` -> minimal conversational landing page for the AI revenue engine demo
 - `https://portal.bookedai.au/` -> customer booking portal routes on the shared frontend plus backend proxy
 - `https://tenant.bookedai.au/` -> tenant auth gateway with email-first sign-in, email verification code flow, Google continuation, workspace creation, and catalog workspace on the shared frontend plus backend proxy
@@ -460,6 +467,7 @@ The wrapper keeps the operator path explicit:
 - `workspace-command` runs a repo-scoped shell command so Telegram/OpenClaw can handle broader BookedAI changes, including file moves, refactors, and multi-surface rollout steps
 - `host-command` runs a host-level command through `sudo -n` only when the requested program is in the checked-in allowlist such as `apt-get`, `docker`, `systemctl`, `journalctl`, `service`, `timedatectl`, or `ufw`
 - `host-shell` runs a fully elevated host shell command from any server path and is the intended lane when trusted Telegram/OpenClaw operators need broad `host/elevated` access across the whole machine
+- when the wrapper is running inside the privileged OpenClaw CLI container, both `host-command` and `host-shell` now jump into the real host namespaces through `nsenter --target 1 ...`, so package managers and system binaries resolve against the VPS itself instead of the container filesystem
 - `sync-doc` is the documentation or Notion or Discord path for Telegram change tracking
 - `host-command` intentionally does not expose `bash`, `sh`, or arbitrary executable paths, so it can support machine operations without turning the Telegram path into a general-purpose root shell
 - `host-shell` is intentionally broader and should be granted only to trusted operators through `host_shell` or `full_project`

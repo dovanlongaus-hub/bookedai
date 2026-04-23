@@ -52,7 +52,7 @@ All remaining roadmap sequencing should now be interpreted through these priorit
 1. `Priority 1 - Core journey stability first`
    Public user, tenant, and admin flows must be simple, understandable, and stable before deeper expansion. The highest-priority paths are accurate search results, booking handoff, payment completion, confirmation email, and QR-enabled portal revisit.
    This priority still includes keeping the public brand attractive to investors and end users so the stable journey is also commercially convincing, not merely operationally correct.
-   The homepage itself should now be treated as a `sales deck and acquisition surface first`, while deeper app runtime behavior should increasingly live under `product/demo`.
+   The homepage itself should now be treated as a `sales deck and acquisition surface first` for the responsive web app, while deeper app runtime behavior should increasingly live under `product/demo`.
 2. `Priority 2 - Module-by-module refinement second`
    After the core journeys are stable, each module should be upgraded in detail: tenant workspace, admin diagnostics, catalog workflows, portal UX, payment recovery, lifecycle communication, and reporting slices.
 3. `Priority 3 - Advanced, legal, and role-shaped data last`
@@ -219,6 +219,7 @@ Current execution interpretation now locked from `2026-04-20`:
 - the active delivery emphasis after this date is stable completion of the core public, tenant, admin, payment, email-confirmation, and portal revisit journeys before broadening scope
 - the public-facing layer must still preserve premium branding, investor-facing credibility, and user attraction while those core flows are being hardened
 - the public homepage should now prioritize compact revenue-engine storytelling, launch-offer conversion, and clear runtime entrypoints instead of acting like the full live runtime
+- the active frontend runtime decision is now explicit: responsive web app first, native mobile later
 - the current approved public pricing vocabulary is now locked as `Freemium`, `Pro`, and `Pro Max`, with the higher-touch registration-only lane allowed to expose `Advance Customize` as the custom commercial path
 - `bookedai.au` is now live on that tighter homepage posture, with primary trial CTA routing centered on `product.bookedai.au`, direct menu entry into `roadmap`, `tenant`, and `admin`, and tenant Google auth entry routed through `tenant.bookedai.au`
 - the whole product app experience should still be framed more clearly under `product/demo`, with homepage previews pointing into that deeper lane

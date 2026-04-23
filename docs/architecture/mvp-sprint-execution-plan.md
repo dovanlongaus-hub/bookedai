@@ -72,7 +72,7 @@ The MVP target for this cycle is:
 ## MVP scope excluded
 
 - full tenant self-serve maturity across every module
-- native mobile apps
+- native mobile apps in the MVP window; responsive web remains the primary release path
 - large-scale microservice separation
 - unsupported public metrics or fabricated ROI claims
 

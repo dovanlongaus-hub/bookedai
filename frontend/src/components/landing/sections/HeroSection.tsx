@@ -51,9 +51,23 @@ export function HeroSection({
     },
   ];
   const executiveMetrics = [
-    { label: 'Core promise', value: 'Turn fragmented enquiries into one visible revenue workflow' },
+    { label: 'Primary surface', value: 'Responsive web app on bookedai.au and product.bookedai.au' },
     { label: 'Enterprise signal', value: 'Shared workflow state instead of disconnected tools and handoffs' },
-    { label: 'Buyer outcome', value: 'Fast reply, credible fit, clear next action, stronger trust' },
+    { label: 'Phase posture', value: 'Desktop and mobile web first now, native app later' },
+  ];
+  const deliveryPriorityRows = [
+    {
+      label: 'Web app first',
+      value: 'The current release focuses on one responsive product journey that works cleanly across desktop, tablet, and mobile browsers.',
+    },
+    {
+      label: 'Conversion before channels',
+      value: 'Homepage and product proof now optimize for fast web conversion and booking continuity before any native packaging work.',
+    },
+    {
+      label: 'Native later',
+      value: 'iOS and Android are deferred until the web flow, operator controls, and release gates are more mature.',
+    },
   ];
 
   return (
@@ -121,6 +135,25 @@ export function HeroSection({
                 <div className="mt-2 text-sm font-semibold leading-6 text-slate-950">{item.value}</div>
               </div>
             ))}
+          </div>
+
+          <div className="mt-6 rounded-[1.4rem] border border-sky-100 bg-[linear-gradient(180deg,#f5fbff_0%,#ffffff_100%)] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)] sm:mt-7 sm:p-5">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+              Frontend delivery priority
+            </div>
+            <div className="mt-4 grid gap-3">
+              {deliveryPriorityRows.map((item) => (
+                <div
+                  key={item.label}
+                  className="rounded-[1.1rem] border border-slate-200 bg-white px-4 py-3 shadow-[0_8px_18px_rgba(15,23,42,0.03)]"
+                >
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    {item.label}
+                  </div>
+                  <div className="mt-2 text-sm font-semibold leading-6 text-slate-900">{item.value}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="mt-6 grid gap-2.5 sm:mt-7 sm:grid-cols-3 sm:gap-3">

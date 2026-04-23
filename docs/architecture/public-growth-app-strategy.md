@@ -23,6 +23,7 @@ This strategy inherits and aligns with:
 - Prompt 4 data architecture direction
 - Prompt 5 API and contract strategy
 - the Phase 0 landing-page system requirements baseline in `docs/architecture/landing-page-system-requirements.md`
+- `docs/architecture/frontend-runtime-decision-record.md`
 
 ## Section 1 — Executive summary
 
@@ -46,6 +47,10 @@ This strategy inherits and aligns with:
     - industry and intent-based page families
     - deployment-mode pages
     - trust and commercial explanation pages
+  - keep the current runtime decision explicit:
+    - `bookedai.au` is the acquisition and orientation surface for the responsive web app
+    - `product.bookedai.au` is the deeper live product web runtime
+    - native mobile is deferred to a later phase
 - Biggest public-site opportunities:
   - upgrade existing homepage messaging from "AI receptionist" toward "search + booking trust + revenue lifecycle"
   - create new SEO page families without breaking the current homepage
@@ -84,22 +89,22 @@ See:
 
 ### Confirmed homepage structure today
 
-The homepage currently behaves as a search-first public shell with:
+The homepage currently behaves as a responsive acquisition shell with live on-page product proof:
 
 - sticky header
-- search-led hero
-- minimal top-of-page commercial framing
-- embedded live assistant runtime on the same page
+- top-of-page commercial framing and runtime direction
+- embedded live search and booking runtime on the same page
 - menu-driven supporting narrative sections
 - bottom-bar and footer close
 
 The current conversion interpretation should be treated as:
 
-- user enters a service request from the homepage hero
-- the homepage itself renders shortlist, booking, and confirmation states through the embedded assistant
+- user understands the BookedAI web runtime quickly from the homepage
+- the homepage itself can still render shortlist, booking, and confirmation states through the embedded assistant
+- deeper product interaction should continue cleanly into `product.bookedai.au` when that is the clearer runtime path
 - the public shell remains English by default
 - the header and menu expose locale switching for `English` and `Tiếng Việt`
-- the homepage body should reserve maximum practical space for the live assistant results and booking flow, while longer trust or education content is accessed through menu, top-bar, or bottom-bar surfaces
+- the homepage body should still protect practical space for the live assistant results and booking flow, while longer trust or education content is accessed through menu, top-bar, or bottom-bar surfaces
 
 Current public content/data is mainly driven by:
 
@@ -109,7 +114,7 @@ Current public content/data is mainly driven by:
 
 Current public CTAs are concentrated around:
 
-- `Start Free Trial`
+- `Open Web App`
 - `Book a Demo`
 - `Book Now` in pricing
 - floating `AI Booking Agent`
@@ -180,6 +185,7 @@ Current interaction endpoints live behind:
 The public growth app should now inherit these rules across homepage, landing experiments, SEO pages, and future surface extensions:
 
 - the public homepage is a live revenue-capture surface first and a narrative surface second
+- the public homepage is also the acquisition and orientation surface for the current responsive web app strategy
 - high-intent visitors should reach search, shortlist, booking, and confirmation with as little friction and as few competing elements as possible
 - supporting information should be distributed into menu layers, top-bar actions, bottom-bar support, and dedicated secondary pages when that preserves conversion focus
 - mobile-first responsive behavior is mandatory for any route or component that can influence search, booking, payment, or lead recovery
@@ -224,6 +230,7 @@ The public app should convert by matching visitor intent to the right CTA, not b
 Current homepage conversion rule:
 
 - the search box and inline assistant are now the primary on-page conversion system for high-intent visitors
+- public CTA language should stay consistent with the current runtime decision by pointing toward the live web app instead of implying a native-app-first product path
 - future public-growth work must not regress the homepage back into a popup-first assistant assumption unless the requirement-side architecture docs are explicitly revised
 - future public-growth work must not crowd the homepage body with secondary content that weakens the live search and booking area without an explicit source-of-truth update
 

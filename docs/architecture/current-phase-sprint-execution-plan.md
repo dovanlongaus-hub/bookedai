@@ -1,6 +1,6 @@
 # BookedAI Current Phase and Sprint Execution Plan
 
-Date: `2026-04-22`
+Date: `2026-04-23`
 
 Document status: `active execution baseline`
 
@@ -46,6 +46,7 @@ This execution baseline inherits from:
 As of `2026-04-22`, the codebase already includes:
 
 - a real public homepage sales-deck application
+- an explicit public frontend runtime decision that the responsive web app is the current primary product surface, with native mobile deferred to a later phase
 - a real public search-first application still available as deeper routed runtime inventory
 - a real admin application
 - a real tenant application
@@ -210,10 +211,9 @@ The admin workspace should now be executed in the following order from current r
 
 Immediate next sequence after the current reporting baseline:
 
-- start `Campaigns` as the first explicit growth-lane workspace
-- keep `Campaigns` tied to source attribution and paid-revenue read models rather than treating it as standalone marketing CRUD
-- widen next into `Messaging`
-- then add `Workflow` definitions and execution posture
+- treat `Campaigns` and the first `Messaging` workspace as already-opened growth-lane foundations
+- keep `Messaging` tied to the existing email, SMS, WhatsApp, CRM-sync, and outbox ledger posture rather than inventing a disconnected communication center
+- start the next explicit implementation slice with `Workflow` definitions and execution posture on top of those now-visible message and lifecycle events
 - only then move into broader `Automation`
 
 ### Next phase deadline

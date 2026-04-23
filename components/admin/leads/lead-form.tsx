@@ -17,16 +17,33 @@ export function LeadForm({
   action,
   lead,
   submitLabel,
+  tenantId,
+  tenantSlug,
   disabled = false,
+  readOnlyReason,
 }: {
   action: (formData: FormData) => void | Promise<void>;
   lead?: LeadRecord | null;
   submitLabel: string;
+  tenantId: string;
+  tenantSlug: string;
   disabled?: boolean;
+  readOnlyReason?: string | null;
 }) {
   return (
     <form action={action} className="space-y-4">
       <fieldset disabled={disabled} className="space-y-4">
+        <input type="hidden" name="expectedTenantId" value={tenantId} />
+        <input type="hidden" name="expectedTenantSlug" value={tenantSlug} />
+        <input type="hidden" name="admin_return" value="1" />
+        <input type="hidden" name="admin_scope" value="/admin#overview" />
+        <input type="hidden" name="admin_scope_label" value="Overview" />
+        {disabled && readOnlyReason ? (
+          <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+            <div className="font-semibold">Leads is read-only right now.</div>
+            <div className="mt-1 text-amber-900">{readOnlyReason}</div>
+          </div>
+        ) : null}
       <Field label="Title">
         <AdminInput name="title" required defaultValue={lead?.title} />
       </Field>

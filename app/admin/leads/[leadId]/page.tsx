@@ -32,6 +32,18 @@ function money(value: number) {
   });
 }
 
+function LeadsMutationHiddenFields({ tenantId, tenantSlug }: { tenantId: string; tenantSlug: string }) {
+  return (
+    <>
+      <input type="hidden" name="expectedTenantId" value={tenantId} />
+      <input type="hidden" name="expectedTenantSlug" value={tenantSlug} />
+      <input type="hidden" name="admin_return" value="1" />
+      <input type="hidden" name="admin_scope" value="/admin#overview" />
+      <input type="hidden" name="admin_scope_label" value="Overview" />
+    </>
+  );
+}
+
 export default async function LeadDetailPage({
   params,
 }: {
@@ -71,9 +83,11 @@ export default async function LeadDetailPage({
               <AdminButton variant="secondary">Back to leads</AdminButton>
             </Link>
             <form action={convertLeadToCustomerAction.bind(null, lead.id)}>
+              <LeadsMutationHiddenFields tenantId={tenant.tenantId} tenantSlug={tenant.tenantSlug} />
               <AdminButton type="submit" variant="secondary" disabled={supportModeActive}>Convert to customer</AdminButton>
             </form>
             <form action={archiveLeadAction.bind(null, lead.id)}>
+              <LeadsMutationHiddenFields tenantId={tenant.tenantId} tenantSlug={tenant.tenantSlug} />
               <AdminButton type="submit" variant="danger" disabled={supportModeActive}>Archive lead</AdminButton>
             </form>
           </div>
@@ -103,6 +117,8 @@ export default async function LeadDetailPage({
               action={updateLeadAction.bind(null, lead.id)}
               lead={lead}
               submitLabel="Save lead"
+              tenantId={tenant.tenantId}
+              tenantSlug={tenant.tenantSlug}
               disabled={supportModeActive}
             />
           </div>
@@ -114,6 +130,7 @@ export default async function LeadDetailPage({
             </div>
             <form action={convertLeadToBookingAction.bind(null, lead.id)} className="mt-4 flex flex-col gap-3 md:flex-row">
               <fieldset disabled={supportModeActive} className="contents">
+              <LeadsMutationHiddenFields tenantId={tenant.tenantId} tenantSlug={tenant.tenantSlug} />
               <select
                 name="serviceId"
                 className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
@@ -145,6 +162,7 @@ export default async function LeadDetailPage({
             actions={
               !crmSync.enabled || !crmSync.record ? null : (
                 <form action={retryLeadCrmSyncAction.bind(null, lead.id, crmSync.record.id)}>
+                  <LeadsMutationHiddenFields tenantId={tenant.tenantId} tenantSlug={tenant.tenantSlug} />
                   <AdminButton type="submit" variant="secondary" disabled={supportModeActive}>
                     Retry Zoho sync
                   </AdminButton>
@@ -178,6 +196,7 @@ export default async function LeadDetailPage({
             <div className="mt-4 space-y-6">
               <form action={addLeadNoteAction.bind(null, lead.id)} className="space-y-3">
                 <fieldset disabled={supportModeActive} className="space-y-3">
+                <LeadsMutationHiddenFields tenantId={tenant.tenantId} tenantSlug={tenant.tenantSlug} />
                 <div className="text-sm font-semibold text-slate-950">Add note</div>
                 <AdminTextarea name="note" rows={4} placeholder="Log the latest customer conversation, objection, or next-step detail." />
                 <AdminInput name="contactAt" type="datetime-local" defaultValue={new Date().toISOString().slice(0, 16)} />
@@ -187,6 +206,7 @@ export default async function LeadDetailPage({
 
               <form action={scheduleLeadFollowUpAction.bind(null, lead.id)} className="space-y-3">
                 <fieldset disabled={supportModeActive} className="space-y-3">
+                <LeadsMutationHiddenFields tenantId={tenant.tenantId} tenantSlug={tenant.tenantSlug} />
                 <div className="text-sm font-semibold text-slate-950">Schedule follow-up</div>
                 <AdminInput
                   name="nextFollowUpAt"

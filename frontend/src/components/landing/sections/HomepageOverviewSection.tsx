@@ -11,8 +11,8 @@ const overviewStages = [
   {
     id: 'product-proof',
     eyebrow: '01',
-    title: 'Product proof',
-    body: 'Show buyers how BookedAI captures intent, recommends clearly, and keeps booking continuity visible.',
+    title: 'Responsive product proof',
+    body: 'Show buyers how BookedAI captures intent, recommends clearly, and keeps booking continuity visible in one browser-based flow.',
     tone: 'from-[#eef6ff] to-white',
   },
   {
@@ -26,7 +26,7 @@ const overviewStages = [
     id: 'implementation',
     eyebrow: '03',
     title: 'Rollout path',
-    body: 'Show how an SME can launch now, prove ROI, and expand later without rebuilding the workflow.',
+    body: 'Show how an SME can launch on the web now, prove ROI, and expand into native later without rebuilding the workflow.',
     tone: 'from-[#f0fdf4] to-white',
   },
   {
@@ -39,8 +39,8 @@ const overviewStages = [
 ];
 
 const insightPoints = [
-  'Cleaner story for SMEs, operators, and investors',
-  'Architecture is visible instead of buried in technical detail',
+  'Cleaner story for SMEs, operators, and investors around the live web app',
+  'Architecture is visible instead of buried in technical detail or native-app speculation',
   'Each section answers one buying question, in order',
 ];
 
@@ -51,26 +51,26 @@ const executiveRows = [
   },
   {
     label: 'Homepage job',
-    value: 'Win trust fast enough that serious buyers and investors understand the system before attention drops.',
+    value: 'Win trust fast enough that serious buyers and investors understand the live responsive product before attention drops.',
   },
   {
     label: 'Design response',
-    value: 'Use clearer hierarchy, simpler enterprise language, and stronger visual boards to make the operating model obvious.',
+    value: 'Use clearer hierarchy, simpler enterprise language, and stronger visual boards to make the responsive web strategy obvious.',
   },
 ];
 
 const whyThisHelpsCards = [
   {
     title: 'Quicker buyer understanding',
-    body: 'The homepage explains product, rollout, and trust in one pass instead of forcing visitors to piece it together.',
+    body: 'The homepage explains product, rollout, and trust in one pass instead of forcing visitors to guess whether web or native is the real focus.',
   },
   {
     title: 'Stronger sales conversations',
-    body: 'The structure gives founders and operators a cleaner narrative to present in demos, decks, and live calls.',
+    body: 'The structure gives founders and operators a cleaner narrative to present in demos, decks, and live calls around the web app that exists today.',
   },
   {
     title: 'Lower decision friction',
-    body: 'Visitors can see what BookedAI does, how it fits operations, and what to do next without getting lost.',
+    body: 'Visitors can see what BookedAI does, how it fits operations, and what to do next without getting lost in phase-later platform questions.',
   },
 ];
 
@@ -89,10 +89,10 @@ export function HomepageOverviewSection({
               Homepage at a glance
             </SignalPill>
             <h2 className="mt-4 max-w-[12ch] text-[2rem] font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-[2.7rem] lg:text-[3.25rem]">
-              One scan should explain why BookedAI can become a serious enterprise revenue layer.
+              One scan should explain why BookedAI can win as a responsive web revenue layer first.
             </h2>
             <p className="mt-4 max-w-[34rem] text-[1rem] leading-7 text-black/66">
-              The sequence is now filtered around the highest-value signals first: product proof, operating model, rollout logic, pricing posture, and trust to close the decision.
+              The sequence is now filtered around the highest-value signals first: responsive product proof, operating model, rollout logic, pricing posture, and trust to close the decision.
             </p>
 
             <div className="mt-6 rounded-[1.7rem] border border-black/6 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4 shadow-[0_14px_30px_rgba(15,23,42,0.04)]">
@@ -100,15 +100,15 @@ export function HomepageOverviewSection({
                 {[
                   {
                     label: 'Buyer question',
-                    value: 'What does BookedAI actually do?',
+                    value: 'What does the live web app actually do?',
                   },
                   {
                     label: 'Operational question',
-                    value: 'How does it fit the business workflow?',
+                    value: 'How does it fit the business workflow across desktop and mobile web?',
                   },
                   {
                     label: 'Decision question',
-                    value: 'What is the next step from here?',
+                    value: 'What is the next step now, before native later?',
                   },
                 ].map((item) => (
                   <div key={item.label} className="rounded-[1.2rem] border border-white/80 bg-white px-4 py-4">
@@ -155,7 +155,7 @@ export function HomepageOverviewSection({
               <div className="mt-6 flex flex-wrap gap-3">
                 {onStartTrial ? (
                   <button type="button" onClick={onStartTrial} className="booked-button">
-                    Open Product Trial
+                    Open Web App
                   </button>
                 ) : null}
                 {onBookDemo ? (

@@ -13,6 +13,7 @@ It exists to turn the Phase 0 public-experience workstream into a concrete build
 This document should be read together with:
 
 - `docs/architecture/bookedai-master-prd.md`
+- `docs/architecture/frontend-runtime-decision-record.md`
 - `docs/architecture/phase-0-detailed-implementation-plan.md`
 - `docs/architecture/public-growth-app-strategy.md`
 - `docs/architecture/pricing-packaging-monetization-strategy.md`
@@ -38,8 +39,9 @@ It must do five jobs at the same time:
 
 Current inherited public-shell baseline:
 
-- the live homepage is now `search-first` instead of section-first
-- the live homepage uses a standalone homepage search runtime as the primary conversion surface instead of relying on a popup-first or embedded-assistant handoff
+- the live homepage is now a responsive acquisition surface first, not a generic brochure
+- the live homepage still uses a standalone homepage search runtime for on-page product proof and conversion instead of relying on a popup-first or embedded-assistant handoff
+- the current runtime decision is `responsive web app first`, with homepage guiding buyers into the live web runtime and native mobile deferred to a later phase
 - the public-shell copy baseline is now `English by default`
 - the top navigation must allow visible language switching, with the current approved options `English` and `Tiếng Việt`
 - the homepage should keep only the essential top-level commercial signals in the main body: approved logo, short revenue-engine positioning for service SMEs, and the primary search box
@@ -71,6 +73,7 @@ Interpretation rule:
 The page must consistently frame BookedAI as:
 
 - the AI revenue engine for service businesses
+- a responsive web product surface in the current phase
 - a multi-channel system across website, chat, calls, email, follow-up, and payment moments
 - a product that helps capture demand, convert it into bookings, and reduce missed revenue
 - a system sold through setup fee plus performance-aligned commission

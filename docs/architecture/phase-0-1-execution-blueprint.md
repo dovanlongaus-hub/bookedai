@@ -69,7 +69,7 @@ The following are explicitly out of scope for Phase 0 and Phase 1:
 - replacing current payment flow wholesale
 - replacing current admin auth wholesale
 - introducing full microservices
-- launching native mobile apps
+- launching native mobile apps in the current phase
 - aggressive data model replacement in one cutover
 
 ## Required execution posture

@@ -47,6 +47,12 @@ const workspaceConfigs: WorkspaceConfig[] = [
     backendSurface: 'Current admin overview events plus tenant and reliability surfaces',
   },
   {
+    id: 'messaging',
+    label: 'Messaging',
+    summary: 'Delivery posture, retry review, and manual follow-up across email, CRM, and outbox.',
+    backendSurface: '/api/admin/messaging plus source-specific detail and action routes',
+  },
+  {
     id: 'reliability',
     label: 'Reliability',
     summary: 'Prompt 5 or Prompt 11 preview, config visibility, and route inventory.',

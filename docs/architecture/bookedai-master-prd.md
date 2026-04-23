@@ -708,7 +708,7 @@ The public design system must follow these rules:
 
 The current strategic scope does not require:
 
-- native mobile apps in the immediate phase
+- native mobile apps in the immediate phase; the responsive web app remains the primary current-phase product surface
 - a microservices rewrite
 - generic AI tooling without revenue linkage
 - pricing anchored to token counts or raw message volume

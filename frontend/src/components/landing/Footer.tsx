@@ -31,7 +31,7 @@ type FooterProps = {
 export function Footer({
   onStartTrial,
   onBookDemo,
-  startTrialLabel = 'Open Product Trial',
+  startTrialLabel = 'Open Web App',
   bookDemoLabel = 'Talk to Sales',
 }: FooterProps) {
   const releaseBadgeLabel = getReleaseBadgeLabel();
@@ -117,7 +117,7 @@ export function Footer({
           </div>
           <div className="flex flex-wrap gap-4">
             <a href={productHref} className="template-link transition hover:underline">
-              Product Trial
+              Web App
             </a>
             <a href={roadmapHref} className="template-link transition hover:underline">
               Roadmap

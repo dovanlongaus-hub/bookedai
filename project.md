@@ -8,7 +8,7 @@ Current synchronized release baseline: `1.0.1-stable`.
 
 Latest infrastructure update date: `2026-04-16`.
 
-Latest product-surface update date: `2026-04-22`.
+Latest product-surface update date: `2026-04-23`.
 
 From this point onward, it serves three purposes:
 
@@ -99,12 +99,21 @@ The current inherited truth is:
     - `Phase 5`: payments and revenue-truth enrichment
     - `Phase 6`: dashboard, reporting, and operator analytics expansion
     - `Phase 7`: growth modules such as campaigns, workflows, messaging, and automation
-  - until the runtime decision changes explicitly, the root `Next.js` admin tree should be treated as the active implementation lane for the new admin workspace, while the deployed frontend source of truth for the broader product still remains `frontend/`
+- until the runtime decision changes explicitly, the deployed and operator-facing admin productization lane should be treated as the shared `frontend/src` admin shell, while the root `Next.js` admin tree remains the parallel foundation lane for auth, repository, and future ownership promotion work
   - the shared frontend admin runtime then moved one more practical step on `2026-04-23` into the first enterprise IA package:
     - `frontend/src/components/AdminPage.tsx`, `frontend/src/features/admin/workspace-nav.tsx`, and `frontend/src/features/admin/workspace-insights.tsx` now expose a menu-first shell aligned to the locked requirements baseline
-    - the active admin shell now presents `Overview`, `Tenants`, `Tenant Workspace`, `Catalog`, `Billing Support`, `Integrations`, `Reliability`, `Audit & Activity`, and `Platform Settings` as first-class workspaces instead of stopping at the earlier four-workspace split
+    - the active admin shell now presents `Overview`, `Tenants`, `Tenant Workspace`, `Catalog`, `Billing Support`, `Integrations`, `Messaging`, `Reliability`, `Audit & Activity`, and `Platform Settings` as first-class workspaces instead of stopping at the earlier four-workspace split
     - the admin tenant lane is now intentionally separated into a lightweight tenant directory plus a deeper mutable tenant workspace, so operators can confirm scope before editing branding, roles, HTML content, or services
     - the same package also gives admin explicit section-guidance and route homes for billing/support review, integrations review, audit chronology, and platform settings without waiting for every deeper backend read model to land first
+  - the same `Phase 7` growth lane then moved one step further on `2026-04-23` into the first messaging foundation:
+    - FastAPI admin now exposes `/api/admin/messaging` plus source-specific detail and action routes for unified operator review
+    - the first messaging workspace reads from `email_messages`, `outbox_events`, and `crm_sync_records` instead of inventing a disconnected communication-only store
+    - the shared admin shell now gives operators one place to filter delivery posture by channel, status, tenant, or entity before opening payload and event detail
+    - the first low-risk messaging actions now exist for outbox retry, CRM retry, and lifecycle email manual-follow-up marking
+  - that same shared frontend admin runtime then moved one more practical step again on `2026-04-23` from route homes into usable read-model workspaces:
+    - `Billing Support` now opens with queue-level summary cards for portal requests, payment-attention items, unresolved work, escalations, and reviewed cases before operators drop into the full support queue
+    - `Integrations` now derives CRM, messaging, payment, and webhook attention panels from the current admin event feed plus support queue so cross-system review is useful without waiting for a dedicated backend dashboard
+    - `Audit & Activity` now combines recent provider or communication events with queue posture into one chronology-oriented replay surface instead of staying a thinner generic event list
   - the first `Phase 1` code slice is now present in the root admin lane:
     - signed admin session verification now uses `ADMIN_SESSION_SIGNING_SECRET` preference with shared fallback compatibility
     - root admin auth now exposes `POST /api/admin/auth/login`, `POST /api/admin/auth/logout`, `GET /api/admin/auth/me`, and `POST /api/admin/auth/switch-tenant`
@@ -276,6 +285,7 @@ The current inherited truth is:
     - the root admin repository now exposes list, detail, create, update, and archive seams for campaigns, with derived attribution metrics for sourced leads, sourced customers, bookings, and paid revenue
     - root admin now also exposes `/api/admin/campaigns` and `/api/admin/campaigns/:id`, plus a create/edit/archive UI at `/admin/campaigns`
     - campaign reporting is intentionally tied to `sourceKey`, so the phase opens cleanly from the existing source-attribution and revenue-reporting cuts rather than creating a disconnected marketing CRUD lane
+    - the next growth-lane slice then started on `2026-04-23` with `Messaging`, giving the active shared admin shell a first read-first communication and retry workspace before later workflow authoring begins
   - that `Phase 3` slice has now been extended into a fuller control plane:
     - `/admin/roles` now exposes a permission editor so role posture can be adjusted without leaving the workspace
     - `/admin/audit` now exposes a dedicated audit investigation surface with search, entity-type filtering, and pagination
@@ -413,10 +423,10 @@ Approved session-signing baseline:
 - `TENANT_SESSION_SIGNING_SECRET`
 - `ADMIN_SESSION_SIGNING_SECRET`
 
-Current compatibility fallback still accepted by code:
+Current compatibility baseline:
 
-- `ADMIN_API_TOKEN`
-- `ADMIN_PASSWORD`
+- admin and tenant signed sessions must use actor-specific session secrets or the shared `SESSION_SIGNING_SECRET`
+- `ADMIN_API_TOKEN` and `ADMIN_PASSWORD` should not be treated as accepted session-signing fallbacks in current planning or future implementation work
 
 Rule for future upgrades:
 
@@ -1048,6 +1058,12 @@ Future public-site work should inherit:
 - `docs/architecture/public-growth-app-strategy.md`
 
 This is intended to keep the current production site stable while evolving the public app into a stronger acquisition, SEO, conversion, and trust surface.
+
+The current public runtime decision is now also explicit:
+
+- `docs/architecture/frontend-runtime-decision-record.md`
+
+That decision locks the current phase to a responsive web app primary strategy on `bookedai.au`, with native mobile deferred until a later phase.
 
 ## Tenant Surface Baseline
 

@@ -245,6 +245,61 @@ class AdminApiInventoryResponse(BaseModel):
     items: list[AdminApiRoute]
 
 
+class AdminMessagingItem(BaseModel):
+    message_key: str
+    source_kind: str
+    item_id: str
+    channel: str
+    delivery_status: str
+    title: str
+    provider: str | None = None
+    template_key: str | None = None
+    tenant_id: str | None = None
+    tenant_ref: str | None = None
+    tenant_name: str | None = None
+    entity_type: str | None = None
+    entity_id: str | None = None
+    entity_label: str | None = None
+    occurred_at: str
+    latest_event_type: str | None = None
+    latest_event_at: str | None = None
+    retry_eligible: bool = False
+    manual_follow_up: bool = False
+    needs_attention: bool = False
+    last_error: str | None = None
+    attempt_count: int = 0
+    summary: str | None = None
+
+
+class AdminMessagingEvent(BaseModel):
+    event_id: str
+    event_type: str
+    occurred_at: str
+    detail: str | None = None
+    payload: dict[str, Any] = Field(default_factory=dict)
+
+
+class AdminMessagingListResponse(BaseModel):
+    status: str
+    items: list[AdminMessagingItem]
+
+
+class AdminMessagingDetailResponse(BaseModel):
+    status: str
+    item: AdminMessagingItem
+    events: list[AdminMessagingEvent] = Field(default_factory=list)
+
+
+class AdminMessagingActionRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=1000)
+
+
+class AdminMessagingActionResponse(BaseModel):
+    status: str
+    action: str
+    message: str
+
+
 class PartnerProfileItem(BaseModel):
     id: int
     name: str

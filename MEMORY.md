@@ -19,6 +19,7 @@
 - Full-server Telegram/OpenClaw host execution now uses `python3 scripts/telegram_workspace_ops.py host-shell --cwd / --command "..."`
 - Live Telegram DM access is now allowlist-based for trusted actor `8426853622`, not pairing-gated
 - `openclaw-cli` now auto-restarts through compose if it loses the first gateway connect race
+- Host execution from the OpenClaw CLI container now enters the real VPS namespaces through `nsenter --target 1 ...`
 - Current default trusted operator id remains `8426853622`
 
 ## Memory Policy

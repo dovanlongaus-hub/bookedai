@@ -61,7 +61,7 @@ At the end of Phase 7-8:
 
 ### Out of scope
 
-- full native mobile tenant app
+- full native mobile tenant app in the current execution wave
 - full enterprise role and permissions matrix across every internal tool
 - deep white-label theming for tenant surfaces
 - advanced BI or finance exports beyond the operational scope

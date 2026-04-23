@@ -42,31 +42,37 @@ class TelegramAuthorizationError(RuntimeError):
     """Raised when a Telegram actor is not allowed to run an operation."""
 
 
+def should_use_nsenter_host_exec() -> bool:
+    return Path("/hostfs").exists() and shutil.which("nsenter") is not None
+
+
+def build_host_exec_prefix() -> list[str]:
+    if should_use_nsenter_host_exec():
+        return ["nsenter", "--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid"]
+    return []
+
+
 def run_command(command: list[str], *, cwd: Path | None = None) -> int:
     completed = subprocess.run(command, cwd=cwd or REPO_ROOT, check=False)
     return completed.returncode
 
 
 def run_host_command(command: list[str]) -> int:
+    host_command = [*build_host_exec_prefix(), *command]
     if os.geteuid() == 0:
-        completed = subprocess.run(command, check=False)
+        completed = subprocess.run(host_command, check=False)
     else:
-        completed = subprocess.run(["sudo", "-n", *command], check=False)
+        completed = subprocess.run(["sudo", "-n", *host_command], check=False)
     return completed.returncode
 
 
 def run_host_shell(command: str, *, cwd: Path | None = None) -> int:
     shell_command = command if not cwd else f"cd {shlex.quote(str(cwd))} && {command}"
+    host_command = [*build_host_exec_prefix(), "/bin/bash", "-lc", shell_command]
     if os.geteuid() == 0:
-        completed = subprocess.run(
-            ["/bin/bash", "-lc", shell_command],
-            check=False,
-        )
+        completed = subprocess.run(host_command, check=False)
     else:
-        completed = subprocess.run(
-            ["sudo", "-n", "/bin/bash", "-lc", shell_command],
-            check=False,
-        )
+        completed = subprocess.run(["sudo", "-n", *host_command], check=False)
     return completed.returncode
 
 
@@ -289,6 +295,7 @@ def handle_permissions(args: argparse.Namespace) -> int:
     actor_id = resolve_telegram_actor(args)
     snapshot = permissions_snapshot(actor_id)
     snapshot["allowed_host_programs"] = sorted(HOST_COMMAND_ALLOWED_PROGRAMS)
+    snapshot["host_exec_mode"] = "nsenter-host" if should_use_nsenter_host_exec() else "sudo-shell"
     print(json.dumps(snapshot, indent=2, sort_keys=True))
     return 0
 

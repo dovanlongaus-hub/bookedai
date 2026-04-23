@@ -1,11 +1,14 @@
 import { FormEvent, useEffect, useState } from 'react';
 
 import {
+  applyAdminMessageAction,
   applyAdminPortalSupportAction,
   createAdminTenantService,
   deleteAdminTenantService,
   deleteAdminPartner,
   deleteAdminService,
+  fetchAdminMessageDetail,
+  fetchAdminMessaging,
   downloadAdminServiceQualityExport,
   fetchAdminBookingDetail,
   fetchAdminDashboardData,
@@ -25,6 +28,8 @@ import {
   AdminBookingDetailResponse,
   AdminBookingRecord,
   AdminConfigEntry,
+  AdminMessagingDetailResponse,
+  AdminMessagingItem,
   AdminOverviewResponse,
   AdminServiceCatalogQualityCounts,
   AdminServiceMerchantItem,
@@ -61,6 +66,10 @@ export function useAdminPageState(apiBaseUrl: string) {
   const [selectedBooking, setSelectedBooking] = useState<AdminBookingDetailResponse | null>(null);
   const [configItems, setConfigItems] = useState<AdminConfigEntry[]>([]);
   const [apiRoutes, setApiRoutes] = useState<AdminApiRoute[]>([]);
+  const [messagingItems, setMessagingItems] = useState<AdminMessagingItem[]>([]);
+  const [selectedMessageDetail, setSelectedMessageDetail] = useState<AdminMessagingDetailResponse | null>(null);
+  const [messagingActionMessage, setMessagingActionMessage] = useState('');
+  const [messagingActionSubmittingKey, setMessagingActionSubmittingKey] = useState<string | null>(null);
   const [partners, setPartners] = useState<PartnerProfileItem[]>([]);
   const [importedServices, setImportedServices] = useState<AdminServiceMerchantItem[]>([]);
   const [tenants, setTenants] = useState<AdminTenantListItem[]>([]);
@@ -133,6 +142,10 @@ export function useAdminPageState(apiBaseUrl: string) {
     setSelectedBooking(null);
     setConfigItems([]);
     setApiRoutes([]);
+    setMessagingItems([]);
+    setSelectedMessageDetail(null);
+    setMessagingActionMessage('');
+    setMessagingActionSubmittingKey(null);
     setPartners([]);
     setImportedServices([]);
     setTenants([]);
@@ -340,6 +353,11 @@ export function useAdminPageState(apiBaseUrl: string) {
     setSelectedBooking(payload);
   }
 
+  async function loadMessageDetail(sourceKind: string, itemId: string) {
+    const payload = await fetchAdminMessageDetail(apiBaseUrl, sessionToken, sourceKind, itemId);
+    setSelectedMessageDetail(payload);
+  }
+
   async function loadDashboard(query?: string) {
     if (!sessionToken) {
       return;
@@ -378,6 +396,7 @@ export function useAdminPageState(apiBaseUrl: string) {
         bookings: bookingsPayload,
         config: configPayload,
         apiInventory: apiInventoryPayload,
+        messaging: messagingPayload,
         partners: partnersPayload,
         services: servicesPayload,
         serviceQuality: serviceQualityPayload,
@@ -401,6 +420,7 @@ export function useAdminPageState(apiBaseUrl: string) {
       setBookingsTotal(bookingsPayload.total);
       setConfigItems(configPayload.items);
       setApiRoutes(apiInventoryPayload.items);
+      setMessagingItems(messagingPayload.items);
       setPartners(partnersPayload.items);
       setImportedServices(servicesPayload.items);
       setServiceQualityCounts(serviceQualityPayload.counts);
@@ -422,6 +442,13 @@ export function useAdminPageState(apiBaseUrl: string) {
         await loadBookingDetail(bookingsPayload.items[0].booking_reference);
       } else {
         setSelectedBooking(null);
+      }
+
+      if (messagingPayload.items.length > 0) {
+        const firstItem = messagingPayload.items[0];
+        await loadMessageDetail(firstItem.source_kind, firstItem.item_id);
+      } else {
+        setSelectedMessageDetail(null);
       }
 
       const tenantPayload = await fetchAdminTenants(apiBaseUrl, sessionToken);
@@ -478,6 +505,83 @@ export function useAdminPageState(apiBaseUrl: string) {
       setError(message);
     } finally {
       setPortalSupportActionSubmittingId(null);
+    }
+  }
+
+  async function retryMessage(
+    sourceKind: string,
+    itemId: string,
+    note?: string | null,
+  ) {
+    if (!sessionToken) {
+      return;
+    }
+    const actionKey = `${sourceKind}:${itemId}:retry`;
+    setMessagingActionSubmittingKey(actionKey);
+    setMessagingActionMessage('');
+    setError('');
+    try {
+      const response = await applyAdminMessageAction(
+        apiBaseUrl,
+        sessionToken,
+        sourceKind,
+        itemId,
+        'retry',
+        note ?? null,
+      );
+      setMessagingActionMessage(response.message);
+      const messagingPayload = await fetchAdminMessaging(apiBaseUrl, sessionToken, 60);
+      setMessagingItems(messagingPayload.items);
+      await loadMessageDetail(sourceKind, itemId);
+    } catch (requestError) {
+      const message = resolveErrorMessage(requestError, 'Could not retry the message.');
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setError(message);
+    } finally {
+      setMessagingActionSubmittingKey(null);
+    }
+  }
+
+  async function markMessageManualFollowUp(
+    sourceKind: string,
+    itemId: string,
+    note?: string | null,
+  ) {
+    if (!sessionToken) {
+      return;
+    }
+    const actionKey = `${sourceKind}:${itemId}:manual`;
+    setMessagingActionSubmittingKey(actionKey);
+    setMessagingActionMessage('');
+    setError('');
+    try {
+      const response = await applyAdminMessageAction(
+        apiBaseUrl,
+        sessionToken,
+        sourceKind,
+        itemId,
+        'mark_manual_follow_up',
+        note ?? null,
+      );
+      setMessagingActionMessage(response.message);
+      const messagingPayload = await fetchAdminMessaging(apiBaseUrl, sessionToken, 60);
+      setMessagingItems(messagingPayload.items);
+      await loadMessageDetail(sourceKind, itemId);
+    } catch (requestError) {
+      const message = resolveErrorMessage(
+        requestError,
+        'Could not mark the message for manual follow-up.',
+      );
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setError(message);
+    } finally {
+      setMessagingActionSubmittingKey(null);
     }
   }
 
@@ -960,6 +1064,10 @@ export function useAdminPageState(apiBaseUrl: string) {
     selectedBooking,
     configItems,
     apiRoutes,
+    messagingItems,
+    selectedMessageDetail,
+    messagingActionMessage,
+    messagingActionSubmittingKey,
     partners,
     importedServices,
     tenants,
@@ -1024,12 +1132,15 @@ export function useAdminPageState(apiBaseUrl: string) {
     updateTenantProfileForm,
     updateTenantServiceForm,
     loadBookingDetail,
+    loadMessageDetail,
     loadTenantDetail,
     loadDashboard,
     handleLogin,
     handleLogout,
     sendConfirmationEmail,
     applyPortalSupportAction,
+    retryMessage,
+    markMessageManualFollowUp,
     editPartner,
     resetPartnerForm,
     uploadPartnerAsset,

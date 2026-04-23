@@ -38,7 +38,7 @@ export function TeamSection({
                 <div className="flex flex-wrap gap-3">
                   {onStartTrial ? (
                     <button type="button" onClick={onStartTrial} className="booked-button">
-                      Open Product Trial
+                      Open Web App
                     </button>
                   ) : null}
                   {onBookDemo ? (

@@ -79,7 +79,7 @@ At the end of Phase 3-6, BookedAI should be able to:
 - full multi-service enterprise workflow depth for every vertical
 - full marketplace-scale ecosystem integrations
 - advanced BI warehouse migration
-- native mobile apps
+- native mobile apps in the current phase, while the responsive web runtime is still the active delivery surface
 
 ## 5. Success criteria
 

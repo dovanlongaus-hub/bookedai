@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { getAdminRepository } from "@/lib/db/admin-repository";
 import { requirePermission } from "@/lib/rbac/policies";
 import { getTenantContext } from "@/lib/tenant/context";
+import { assertSettingsMutationAllowed } from "@/app/admin/settings/action-guard";
 import {
   billingSettingsMutationSchema,
   billingGatewayControlsMutationSchema,
@@ -36,6 +37,12 @@ function parseSettingsPayload(formData: FormData) {
 export async function updateWorkspaceSettingsAction(formData: FormData) {
   const session = await requirePermission("settings:update");
   const tenant = await getTenantContext();
+  assertSettingsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const repository = getAdminRepository();
   await repository.updateTenantWorkspaceSettings(
     tenant.tenantId,
@@ -137,6 +144,12 @@ function parsePluginRuntimeControlsPayload(formData: FormData) {
 export async function createBranchAction(formData: FormData) {
   const session = await requirePermission("settings:update");
   const tenant = await getTenantContext();
+  assertSettingsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const repository = getAdminRepository();
   await repository.createBranch(tenant.tenantId, parseBranchPayload(formData), session.userId);
   revalidatePath("/admin/settings");
@@ -146,6 +159,12 @@ export async function createBranchAction(formData: FormData) {
 export async function updateBranchAction(formData: FormData) {
   const session = await requirePermission("settings:update");
   const tenant = await getTenantContext();
+  assertSettingsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const repository = getAdminRepository();
   const { branchId } = branchRouteIdSchema.parse({
     branchId: formData.get("branchId"),
@@ -158,6 +177,12 @@ export async function updateBranchAction(formData: FormData) {
 export async function archiveBranchAction(formData: FormData) {
   const session = await requirePermission("settings:update");
   const tenant = await getTenantContext();
+  assertSettingsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const repository = getAdminRepository();
   const { branchId } = branchRouteIdSchema.parse({
     branchId: formData.get("branchId"),
@@ -170,6 +195,12 @@ export async function archiveBranchAction(formData: FormData) {
 export async function reactivateBranchAction(formData: FormData) {
   const session = await requirePermission("settings:update");
   const tenant = await getTenantContext();
+  assertSettingsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const repository = getAdminRepository();
   const { branchId } = branchRouteIdSchema.parse({
     branchId: formData.get("branchId"),
@@ -182,6 +213,12 @@ export async function reactivateBranchAction(formData: FormData) {
 export async function updateBillingSettingsAction(formData: FormData) {
   const session = await requirePermission("settings:update");
   const tenant = await getTenantContext();
+  assertSettingsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const repository = getAdminRepository();
   await repository.updateTenantBillingSettings(
     tenant.tenantId,
@@ -196,6 +233,12 @@ export async function updateBillingSettingsAction(formData: FormData) {
 export async function updateWorkspaceGuidesAction(formData: FormData) {
   const session = await requirePermission("settings:update");
   const tenant = await getTenantContext();
+  assertSettingsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const repository = getAdminRepository();
   await repository.updateWorkspaceGuides(
     tenant.tenantId,
@@ -210,6 +253,12 @@ export async function updateWorkspaceGuidesAction(formData: FormData) {
 export async function updateBillingGatewayControlsAction(formData: FormData) {
   const session = await requirePermission("settings:update");
   const tenant = await getTenantContext();
+  assertSettingsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const repository = getAdminRepository();
   await repository.updateBillingGatewayControls(
     tenant.tenantId,
@@ -224,6 +273,12 @@ export async function updateBillingGatewayControlsAction(formData: FormData) {
 export async function updatePluginRuntimeControlsAction(formData: FormData) {
   const session = await requirePermission("settings:update");
   const tenant = await getTenantContext();
+  assertSettingsMutationAllowed({
+    formData,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive: Boolean(session.impersonation),
+  });
   const repository = getAdminRepository();
   await repository.updatePluginRuntimeControls(
     tenant.tenantId,

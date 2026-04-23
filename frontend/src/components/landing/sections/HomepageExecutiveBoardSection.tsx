@@ -4,21 +4,21 @@ import { SignalPill } from '../ui/SignalPill';
 
 const summarySignals = [
   {
-    label: 'Enterprise read',
-    title: 'Reads like a serious operating layer, not a generic AI surface',
-    body: 'The page now shows one commercial machine: demand capture, qualification, conversion, and operational continuity in a single narrative.',
+    label: 'Web-first delivery',
+    title: 'The homepage now sells one responsive web product instead of implying a native-first roadmap',
+    body: 'The story is anchored to the live web runtime already running on bookedai.au, so what buyers see matches what the team can ship and improve now.',
     tone: 'from-[#eef6ff] to-white',
   },
   {
     label: 'SME clarity',
-    title: 'The value proposition lands in business language, not product jargon',
-    body: 'The strongest cues now focus on conversion, control, and commercial visibility so buyers understand the outcome quickly.',
+    title: 'The value proposition lands as one browser-based workflow teams can deploy immediately',
+    body: 'The strongest cues now focus on responsive access, conversion continuity, and commercial visibility rather than app-format ambiguity.',
     tone: 'from-[#effcf5] to-white',
   },
   {
-    label: 'Investor confidence',
-    title: 'The opening minute now signals workflow depth and scale potential',
-    body: 'What BookedAI is, why it matters, and why it can compound into a durable software business are easier to parse in sequence.',
+    label: 'Phase discipline',
+    title: 'Native mobile is framed as later expansion, not current execution noise',
+    body: 'The first minute now signals that BookedAI is focusing on the responsive web path that already connects acquisition, product proof, and booking operations.',
     tone: 'from-[#fff7ed] to-white',
   },
 ];
@@ -27,8 +27,8 @@ const workflowColumns = [
   {
     step: '01',
     title: 'Capture demand',
-    body: 'Website, chat, demo, and search feed one visible intent lane.',
-    chips: ['Website', 'Search', 'Chat'],
+    body: 'Homepage, product runtime, chat, and search feed one visible intent lane across desktop and mobile web.',
+    chips: ['Homepage', 'Mobile web', 'Desktop web'],
   },
   {
     step: '02',
@@ -45,7 +45,7 @@ const workflowColumns = [
   {
     step: '04',
     title: 'Operate with control',
-    body: 'Teams share tenant state, audit visibility, and workflow control in one system.',
+    body: 'Teams share tenant state, audit visibility, and workflow control in one system before native channels are added.',
     chips: ['Tenant', 'Admin', 'Audit'],
   },
 ];
@@ -53,15 +53,15 @@ const workflowColumns = [
 const boardStats = [
   {
     value: '1',
-    label: 'connected path from enquiry to booked outcome',
+    label: 'responsive web app strategy for the current phase',
   },
   {
     value: '3',
-    label: 'core messages buyers should understand immediately',
+    label: 'screen classes covered first: desktop, tablet, mobile web',
   },
   {
-    value: '60s',
-    label: 'to communicate product value, workflow depth, and next action',
+    value: 'Later',
+    label: 'native mobile phase after the core web loop is stable',
   },
 ];
 
@@ -75,13 +75,13 @@ export function HomepageExecutiveBoardSection() {
         <div className="relative grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
           <div>
             <SignalPill variant="soft" className="w-fit px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-sky-700">
-              Executive homepage board
+              Responsive product board
             </SignalPill>
             <h2 className="mt-4 max-w-[12ch] font-['Space_Grotesk'] text-[2.15rem] font-semibold tracking-[-0.05em] text-slate-950 sm:text-[2.85rem] lg:text-[3.45rem]">
-              A homepage that feels simple, modern, and enterprise-ready in the first minute.
+              A homepage that makes the responsive web app the clear product, right away.
             </h2>
             <p className="mt-4 max-w-[35rem] text-[1rem] leading-7 text-slate-600">
-              The opening experience is now filtered around the signals that matter most to SMEs and investors: what problem BookedAI solves, how value moves through the system, and why the workflow can scale beyond a single assistant surface.
+              The opening experience is now filtered around the signals that matter most to SMEs and investors: the live web runtime is the real product, it works responsively across screen sizes, and native mobile is a later phase rather than a distracting parallel promise.
             </p>
 
             <div className="mt-6 grid gap-3">
@@ -110,11 +110,11 @@ export function HomepageExecutiveBoardSection() {
                     Visual workflow
                   </div>
                   <div className="mt-2 text-[1.35rem] font-semibold tracking-[-0.04em] text-slate-950">
-                    BookedAI in one scan
+                    BookedAI web app in one scan
                   </div>
                 </div>
                 <SignalPill className="px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-700">
-                  Product + operations + revenue
+                  Responsive web first
                 </SignalPill>
               </div>
 

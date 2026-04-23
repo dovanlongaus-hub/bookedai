@@ -50,6 +50,10 @@ from repositories.webhook_repository import WebhookEventRepository
 from schemas import BookingWorkflowPayload, TawkMessage, TawkWebhookResponse
 from schemas import (
     AdminConfigResponse,
+    AdminMessagingActionRequest,
+    AdminMessagingActionResponse,
+    AdminMessagingDetailResponse,
+    AdminMessagingListResponse,
     AdminPortalSupportActionRequest,
     AdminPortalSupportActionResponse,
     AdminBookingDetailResponse,
@@ -111,6 +115,11 @@ from service_layer.admin_dashboard_service import (
     build_admin_bookings_shadow_summary,
     build_admin_overview_payload,
     send_admin_booking_confirmation_email,
+)
+from service_layer.admin_messaging_service import (
+    apply_admin_message_action,
+    build_admin_message_detail_payload,
+    build_admin_messaging_payload,
 )
 from service_layer.communication_service import CommunicationService
 from service_layer.discord_bot_service import DiscordBotService
@@ -1981,6 +1990,78 @@ async def admin_api_inventory(
 
     items.sort(key=lambda item: str(item["path"]))
     return AdminApiInventoryResponse(status="ok", items=items)
+
+
+@api.get("/admin/messaging", response_model=AdminMessagingListResponse)
+async def admin_messaging(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+    limit: int = 60,
+) -> AdminMessagingListResponse:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        payload = await build_admin_messaging_payload(session, limit=limit)
+
+    return AdminMessagingListResponse(**payload)
+
+
+@api.get("/admin/messaging/{source_kind}/{item_id}", response_model=AdminMessagingDetailResponse)
+async def admin_message_detail(
+    source_kind: str,
+    item_id: str,
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+) -> AdminMessagingDetailResponse:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        try:
+            payload = await build_admin_message_detail_payload(
+                session,
+                source_kind=source_kind,
+                item_id=item_id,
+            )
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return AdminMessagingDetailResponse(**payload)
+
+
+@api.post(
+    "/admin/messaging/{source_kind}/{item_id}/{action}",
+    response_model=AdminMessagingActionResponse,
+)
+async def admin_message_action(
+    source_kind: str,
+    item_id: str,
+    action: str,
+    request: Request,
+    payload: AdminMessagingActionRequest,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+) -> AdminMessagingActionResponse:
+    admin_actor = require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        try:
+            result = await apply_admin_message_action(
+                session,
+                source_kind=source_kind,
+                item_id=item_id,
+                action=action,
+                actor_id=admin_actor,
+                note=payload.note,
+            )
+            await session.commit()
+        except LookupError as exc:
+            raise HTTPException(status_code=404, detail=str(exc)) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    return AdminMessagingActionResponse(**result)
 
 
 @api.get("/admin/services", response_model=AdminServiceMerchantListResponse)

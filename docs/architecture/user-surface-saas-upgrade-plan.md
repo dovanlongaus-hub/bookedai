@@ -14,6 +14,7 @@ This plan should now be read together with:
 
 - `docs/architecture/bookedai-master-prd.md`
 - `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/architecture/frontend-runtime-decision-record.md`
 - `docs/architecture/public-growth-app-strategy.md`
 - `docs/architecture/tenant-app-strategy.md`
 - `docs/architecture/internal-admin-app-strategy.md`
@@ -70,6 +71,7 @@ Current baseline:
 - a real public search-first shell already exists
 - shortlist and booking-ready progression already exist
 - responsive smoke coverage already exists
+- the current approved runtime direction is now `responsive web app first`, with homepage as acquisition or orientation surface and deeper live product interaction routed into the web runtime
 
 Main gaps:
 
@@ -81,6 +83,7 @@ Upgrade scope:
 - simplify and strengthen homepage information hierarchy
 - improve result-card scanability and side-panel decision support
 - improve query refinement, empty states, near-me guidance, and recovery states
+- keep the public story aligned to one responsive web product path rather than implying a parallel native-mobile-first rollout
 - make the public surface feel closer to a "Google for service booking intent" standard:
   - prominent search box
   - fast result comprehension
@@ -137,6 +140,11 @@ Upgrade scope:
 Definition of done:
 
 - customers can open the portal and clearly understand their booking state and allowed next actions without needing staff help
+
+Cross-lane execution note:
+
+- for the current phase, public, portal, tenant, and admin surface planning should all assume the responsive web runtime is the active product baseline
+- native mobile remains a later expansion path, not a current user-surface delivery assumption
 
 ## Lane 3 - Tenant login and tenant workspace experience upgrade
 

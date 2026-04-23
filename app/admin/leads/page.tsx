@@ -24,6 +24,11 @@ import {
 import { getZohoCrmSyncStatus } from "@/lib/integrations/zoho-crm-sync";
 import { requirePermission } from "@/lib/rbac/policies";
 import { getTenantContext } from "@/lib/tenant/context";
+import {
+  buildLeadsHandoffReturnHref,
+  getLeadsHandoffGuardState,
+  parseLeadsHandoff,
+} from "@/server/admin/leads-handoff";
 
 type SearchParams =
   | Promise<Record<string, string | string[] | undefined>>
@@ -44,6 +49,55 @@ function money(value: number) {
   });
 }
 
+function getLeadsReadOnlyReason(options: {
+  supportModeActive: boolean;
+  tenantMismatch: boolean;
+  handoffRequiresReentry: boolean;
+  invalidAdminScope: boolean;
+  missingTenantHint: boolean;
+}) {
+  if (options.supportModeActive) {
+    return "Support mode keeps this workspace investigation-first, so lead writes and conversions stay blocked until support mode ends.";
+  }
+
+  if (options.handoffRequiresReentry) {
+    if (options.invalidAdminScope) {
+      return "The return path in this handoff was not trusted. Re-open leads from the canonical shipped admin CTA before editing anything.";
+    }
+
+    if (options.missingTenantHint) {
+      return "This handoff did not include a tenant hint. Go back to the shipped admin shell, select the tenant there, and open Leads again.";
+    }
+  }
+
+  if (options.tenantMismatch) {
+    return "The tenant requested by the handoff no longer matches the tenant resolved in root admin. Re-enter from the shipped admin shell to realign the workspace context.";
+  }
+
+  return null;
+}
+
+function LeadsMutationHiddenFields({ tenantId, tenantSlug }: { tenantId: string; tenantSlug: string }) {
+  return (
+    <>
+      <input type="hidden" name="expectedTenantId" value={tenantId} />
+      <input type="hidden" name="expectedTenantSlug" value={tenantSlug} />
+      <input type="hidden" name="admin_return" value="1" />
+      <input type="hidden" name="admin_scope" value="/admin#overview" />
+      <input type="hidden" name="admin_scope_label" value="Overview" />
+    </>
+  );
+}
+
+function LeadsReadOnlyNotice({ reason }: { reason: string }) {
+  return (
+    <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm leading-6 text-amber-950">
+      <div className="font-semibold">Leads is read-only right now.</div>
+      <div className="mt-1 text-amber-900">{reason}</div>
+    </div>
+  );
+}
+
 export default async function LeadsPage({
   searchParams,
 }: {
@@ -52,7 +106,8 @@ export default async function LeadsPage({
   await requirePermission("leads:view");
   const session = await getAdminSession();
   const params = await Promise.resolve(searchParams ?? {});
-  const tenant = await getTenantContext();
+  const handoff = parseLeadsHandoff(params);
+  const tenant = await getTenantContext(handoff.requestedTenantSlug ?? undefined);
   const repository = getAdminRepository();
   const page = Number(params.page ?? "1");
   const query = typeof params.q === "string" ? params.q : "";
@@ -108,6 +163,20 @@ export default async function LeadsPage({
     crmStatuses.map(({ leadId, result }) => [leadId, result.record?.sync_status || null]),
   );
   const supportModeActive = Boolean(session.impersonation);
+  const { tenantMismatch, handoffRequiresReentry, leadsReadOnly } = getLeadsHandoffGuardState({
+    handoff,
+    resolvedTenantId: tenant.tenantId,
+    resolvedTenantSlug: tenant.tenantSlug,
+    supportModeActive,
+  });
+  const returnHref = buildLeadsHandoffReturnHref(handoff);
+  const readOnlyReason = getLeadsReadOnlyReason({
+    supportModeActive,
+    tenantMismatch,
+    handoffRequiresReentry,
+    invalidAdminScope: handoff.invalidAdminScope,
+    missingTenantHint: handoff.missingTenantHint,
+  });
   const baseQuery = new URLSearchParams({
     q: query,
     status,
@@ -130,6 +199,70 @@ export default async function LeadsPage({
         tenantPanel="overview"
         adminPath="/admin/leads"
       />
+
+      {handoff.adminReturn || tenantMismatch || supportModeActive ? (
+        <AdminCard className="border-violet-200 bg-[linear-gradient(135deg,rgba(245,243,255,0.9)_0%,rgba(255,255,255,0.96)_100%)] p-6">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div className="space-y-2">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">
+                {supportModeActive
+                  ? "Read-only support mode"
+                  : tenantMismatch || handoffRequiresReentry
+                  ? "Handoff requires review"
+                  : "Opened from admin shell"}
+              </div>
+              <h2 className="text-lg font-semibold text-slate-950">
+                {supportModeActive
+                  ? "Investigate safely before changing lead workflow"
+                  : handoffRequiresReentry
+                  ? "Re-enter Leads from the shipped admin shell"
+                  : tenantMismatch
+                  ? "Tenant context did not match the requested leads workspace"
+                  : "Leads is acting as the deep workflow surface"}
+              </h2>
+              <p className="text-sm leading-6 text-slate-600">
+                {supportModeActive
+                  ? "Support mode keeps this page read-only so operators can inspect pipeline, follow-up posture, and CRM state without mutating the tenant while an investigation is active."
+                  : handoffRequiresReentry
+                  ? handoff.invalidAdminScope
+                    ? "The return path in this handoff was not trusted, so the page is locked to read-only. Go back to the shipped admin shell and open Leads again from the canonical CTA."
+                    : "This handoff did not include a tenant hint, so the page is locked to read-only until you re-enter from the shipped admin shell with a selected tenant."
+                  : tenantMismatch
+                  ? "This page is locked to read-only until the requested tenant and the resolved admin tenant align again. Use the return path to re-enter with the correct workspace context."
+                  : "You came here from the shipped admin shell. Keep cross-workspace framing there, then do lead triage, follow-up, and conversion work here."}
+              </p>
+              <div className="text-xs text-slate-500">
+                Resolved tenant <span className="font-semibold text-slate-700">{tenant.tenantName}</span> ({tenant.tenantSlug})
+                {handoff.requestedTenantSlug ? (
+                  <>
+                    {" "}• requested <span className="font-semibold text-slate-700">{handoff.requestedTenantSlug}</span>
+                  </>
+                ) : null}
+                {handoff.missingTenantHint ? <> • tenant hint missing</> : null}
+                {handoff.invalidAdminScope ? <> • return path rejected</> : null}
+                {supportModeActive ? <> • writes blocked while support mode is active</> : null}
+              </div>
+            </div>
+
+            {returnHref ? (
+              <a
+                href={returnHref}
+                className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+              >
+                Return to {handoff.adminScopeLabel}
+              </a>
+            ) : supportModeActive ? (
+              <div className="rounded-2xl border border-dashed border-violet-300 bg-white/80 px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
+                End support mode or return to tenant investigation before attempting lead changes.
+              </div>
+            ) : handoff.adminReturn ? (
+              <div className="rounded-2xl border border-dashed border-violet-300 bg-white/80 px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
+                No trusted return path was preserved for this handoff. Re-open Leads from the shipped admin shell.
+              </div>
+            ) : null}
+          </div>
+        </AdminCard>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-4">
         <MetricCard label="Leads in view" value={String(leads.total)} hint="Filtered and paginated lead set." />
@@ -251,6 +384,10 @@ export default async function LeadsPage({
                           lead={lead}
                           services={services.items}
                           crmStatus={crmStatusByLeadId.get(lead.id)}
+                          tenantId={tenant.tenantId}
+                          tenantSlug={tenant.tenantSlug}
+                          disabled={leadsReadOnly}
+                          readOnlyReason={readOnlyReason}
                         />
                       ))}
                       {columnLeads.length === 0 ? (
@@ -302,7 +439,14 @@ export default async function LeadsPage({
                       </td>
                       <td className="px-4 py-4 text-slate-700">{money(lead.estimatedValueCents)}</td>
                       <td className="px-4 py-4">
-                        <LeadRowActions lead={lead} services={services.items} />
+                        <LeadRowActions
+                          lead={lead}
+                          services={services.items}
+                          tenantId={tenant.tenantId}
+                          tenantSlug={tenant.tenantSlug}
+                          disabled={leadsReadOnly}
+                          readOnlyReason={readOnlyReason}
+                        />
                       </td>
                     </tr>
                   ))}
@@ -335,7 +479,10 @@ export default async function LeadsPage({
             <LeadForm
               action={createLeadAction}
               submitLabel="Create lead"
-              disabled={supportModeActive}
+              tenantId={tenant.tenantId}
+              tenantSlug={tenant.tenantSlug}
+              disabled={leadsReadOnly}
+              readOnlyReason={readOnlyReason}
             />
           </div>
         </AdminCard>
@@ -348,10 +495,18 @@ function LeadCard({
   lead,
   services,
   crmStatus,
+  tenantId,
+  tenantSlug,
+  disabled = false,
+  readOnlyReason,
 }: {
   lead: LeadRecord;
   services: ServiceRecord[];
   crmStatus?: string | null;
+  tenantId: string;
+  tenantSlug: string;
+  disabled?: boolean;
+  readOnlyReason?: string | null;
 }) {
   return (
     <div className="rounded-2xl border border-slate-200 bg-white p-4">
@@ -378,7 +533,15 @@ function LeadCard({
       </div>
       <div className="mt-1 text-sm text-slate-700">Value: {money(lead.estimatedValueCents)}</div>
       <div className="mt-4">
-        <LeadRowActions lead={lead} services={services} compact />
+        <LeadRowActions
+          lead={lead}
+          services={services}
+          compact
+          tenantId={tenantId}
+          tenantSlug={tenantSlug}
+          disabled={disabled}
+          readOnlyReason={readOnlyReason}
+        />
       </div>
     </div>
   );
@@ -388,6 +551,10 @@ function LeadRowActions({
   lead,
   services,
   compact = false,
+  tenantId,
+  tenantSlug,
+  disabled = false,
+  readOnlyReason,
 }: {
   lead: {
     id: string;
@@ -404,10 +571,17 @@ function LeadRowActions({
   };
   services: Array<{ id: string; name: string }>;
   compact?: boolean;
+  tenantId: string;
+  tenantSlug: string;
+  disabled?: boolean;
+  readOnlyReason?: string | null;
 }) {
   return (
     <div className={compact ? "space-y-3" : "min-w-[280px] space-y-3"}>
+      {disabled && readOnlyReason ? <LeadsReadOnlyNotice reason={readOnlyReason} /> : null}
       <form action={updateLeadAction.bind(null, lead.id)} className="space-y-3">
+        <fieldset disabled={disabled} className="space-y-3">
+        <LeadsMutationHiddenFields tenantId={tenantId} tenantSlug={tenantSlug} />
         <input type="hidden" name="title" value={lead.title} />
         <input type="hidden" name="source" value={lead.source} />
         <input type="hidden" name="score" value={String(lead.score)} />
@@ -442,18 +616,27 @@ function LeadRowActions({
         <AdminInput name="ownerName" defaultValue={lead.ownerName} placeholder="Assign owner" />
         <AdminInput name="nextFollowUpAt" type="datetime-local" defaultValue={lead.nextFollowUpAt?.slice(0, 16)} />
         <AdminButton type="submit" variant="secondary">Update lead</AdminButton>
+        </fieldset>
       </form>
 
       <div className="flex flex-wrap gap-2">
         <form action={convertLeadToCustomerAction.bind(null, lead.id)}>
-          <AdminButton type="submit" variant="ghost">Convert to customer</AdminButton>
+          <fieldset disabled={disabled}>
+            <LeadsMutationHiddenFields tenantId={tenantId} tenantSlug={tenantSlug} />
+            <AdminButton type="submit" variant="ghost">Convert to customer</AdminButton>
+          </fieldset>
         </form>
         <form action={archiveLeadAction.bind(null, lead.id)}>
-          <AdminButton type="submit" variant="danger">Archive</AdminButton>
+          <fieldset disabled={disabled}>
+            <LeadsMutationHiddenFields tenantId={tenantId} tenantSlug={tenantSlug} />
+            <AdminButton type="submit" variant="danger">Archive</AdminButton>
+          </fieldset>
         </form>
       </div>
 
       <form action={convertLeadToBookingAction.bind(null, lead.id)} className="space-y-2">
+        <fieldset disabled={disabled} className="space-y-2">
+        <LeadsMutationHiddenFields tenantId={tenantId} tenantSlug={tenantSlug} />
         <select
           name="serviceId"
           defaultValue={services[0]?.id}
@@ -466,6 +649,7 @@ function LeadRowActions({
           ))}
         </select>
         <AdminButton type="submit">Convert to booking</AdminButton>
+        </fieldset>
       </form>
     </div>
   );

@@ -20,6 +20,7 @@ It answers four questions for the next execution wave:
 This package should now be read together with:
 
 - `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/architecture/frontend-runtime-decision-record.md`
 - `docs/architecture/admin-workspace-blueprint.md`
 - `docs/architecture/user-surface-saas-upgrade-plan.md`
 - `docs/development/tenant-billing-auth-execution-package.md`
@@ -71,6 +72,7 @@ Upgrade targets:
 Expected outcomes:
 
 - cleaner sales-deck versus product-runtime hierarchy
+- explicit responsive-web-first public runtime direction, with native mobile deferred to a later phase
 - stronger continuity from homepage CTA into the approved product and registration paths
 - more consistent result, decision, and booking-entry states on the product route
 - a more enterprise-grade public booking journey where search visibly communicates `matching services`, selected results move through preview into booking capture, and confirmation state makes email, calendar, payment, CRM, thank-you, and SMS/WhatsApp follow-up steps legible and executable through the current v1 seams
@@ -80,6 +82,11 @@ Expected outcomes:
 - a reusable cross-industry full-flow QA pack for that same public booking journey, so operators can rehearse and validate enterprise booking posture across 10 synthetic industries without inventing ad-hoc records each time
 - stronger continuity from homepage and product proof into portal, tenant, and billing follow-up lanes
 - inherited homepage truth for later user-surface work is now the compact `SME + investor readable` acquisition surface with package vocabulary `Freemium`, `Pro`, `Pro Max`, plus registration-only `Advance Customize`
+- CTA language across homepage-adjacent public surfaces should now prefer `Open Web App` or equivalent responsive-web wording over older `Product Trial` shorthand when the target is the live web runtime
+
+Execution guardrail:
+
+- any sprint, phase, or implementation artifact that still implies native mobile is part of the current-phase public delivery baseline should be treated as stale and updated toward the responsive-web-first decision before implementation starts
 
 ## Portal
 
@@ -202,6 +209,10 @@ Expected outcomes:
   - the tenant lane is now explicitly split into a lighter directory-selection surface and the deeper mutable tenant workspace, so tenant scope can be confirmed before profile, role, HTML, or catalog edits
   - billing/support, integrations, audit/activity, and platform review now have their own route homes and operator guidance inside the shared frontend shell instead of waiting on every later backend module to land first
   - `#operations` deep links remain backward-compatible by resolving into `#overview`, so the IA broadening does not break older operator bookmarks during the transition
+- that same shared-frontend admin lane then moved one more practical step on `2026-04-23` from guidance-only homes into read-model-backed operator lanes:
+  - `Billing Support` now opens with a queue summary layer for portal requests, payment attention, unresolved work, escalations, and reviewed items before the operator drops into full queue detail
+  - `Integrations` now derives CRM, messaging, payment, and webhook attention panels from the current admin event feed plus support queue so cross-system review becomes useful without waiting for a dedicated backend dashboard
+  - `Audit & Activity` now combines recent provider or communication events with queue posture into one chronology surface, which better matches the requirement that operators reconstruct what happened before escalation or mutation
 
 ## Billing
 
@@ -742,6 +753,54 @@ Immediate working plan for the phase after Sprint 16:
 - record a rough video over the April 25-26, 2026 weekend
 - deliver the final edit on Sunday, April 26, 2026
 - use Monday, April 27, 2026 for the final polish pass
+
+Immediate implementation slice after the current admin `Campaigns` foundation:
+
+1. `Messaging foundation`
+   - add a first-class admin `Messaging` workspace in the active shared frontend admin shell under `frontend/src`
+   - present one operator investigation surface across email, SMS, WhatsApp, CRM-mirrored outreach, and queued communication jobs
+   - keep this lane read-heavy first:
+     - channel filter
+     - delivery-status filter
+     - tenant filter
+     - entity-context filter such as customer, lead, or booking
+     - timeline or detail drawer for payload, provider response, retry posture, and related audit context
+2. `Messaging data seams`
+   - expose one additive messaging read model from current backend truth instead of creating a disconnected store
+   - prefer existing lifecycle, outbox, communication-log, and CRM mirror records as the initial source package
+   - recommended first contract:
+     - `GET /api/admin/messaging`
+     - returns paginated message rows with channel, status, tenant, entity reference, sent-at or queued-at, latest provider posture, and retry eligibility
+   - recommended detail contract:
+     - `GET /api/admin/messaging/:messageId`
+     - returns rendered content, provider payload summary, related entity links, audit context, and retry notes
+3. `Messaging actions`
+   - only add low-risk operator actions in the first slice:
+     - retry eligible sends
+     - mark manual follow-up required
+     - jump to related lead, customer, booking, or CRM-support surface
+   - do not start with template authoring or campaign broadcasting in this pass
+4. `Recommended build order`
+   - lock navigation slot and empty state in the shared admin shell
+   - land repository or API read model over current message truth
+   - render list plus filters
+   - add detail drawer or detail page
+   - add retry and manual-review actions
+   - add targeted regression coverage for delivery-status visibility and retry safety
+5. `Execution guardrail`
+   - this slice should stay aligned to the already-implemented `Campaigns` attribution lane and the current CRM lifecycle map
+   - `Workflows` should only start after the `Messaging` workspace makes communication events and retry posture visible in-product
+
+Implementation movement on `2026-04-23`:
+
+- the first code slice for this `Messaging` lane is now in motion inside the active shared admin shell:
+  - shared frontend admin now exposes a first-class `Messaging` workspace with list filters and a detail panel
+  - backend admin now exposes unified messaging read and action seams over `email_messages`, `outbox_events`, and `crm_sync_records`
+  - the first low-risk operator actions are now:
+    - retry eligible outbox delivery records
+    - retry eligible CRM sync records
+    - mark lifecycle email rows for manual follow-up
+- the next explicit growth-lane slice after this messaging foundation should now move into `Workflows`
 
 ## Cross-surface UX inventory
 

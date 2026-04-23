@@ -55,8 +55,8 @@ async function stubHomepageApis(page: Parameters<typeof test>[0]['page']) {
 async function openHomepage(page: Parameters<typeof test>[0]['page']) {
   await stubHomepageApis(page);
   await page.goto('/');
-  await expect(page.getByAltText('bookedai.au').first()).toBeVisible();
   await expect(page.locator('#bookedai-search-assistant').getByRole('textbox').first()).toBeVisible();
+  await expect(page.getByRole('button', { name: /Open Web App/i }).first()).toBeVisible();
 }
 
 test.describe('public homepage responsive qa', () => {
@@ -82,7 +82,7 @@ test.describe('public homepage responsive qa', () => {
     await expect(
       page.locator('#bookedai-search-assistant').getByRole('button', { name: /Send search/i }),
     ).toBeVisible();
-    await expect(page.getByAltText('bookedai.au').first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Open Web App/i }).first()).toBeVisible();
 
     await page.screenshot({
       path: testInfo.outputPath('homepage-mobile-search.png'),
