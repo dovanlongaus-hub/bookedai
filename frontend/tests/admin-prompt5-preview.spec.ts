@@ -420,6 +420,17 @@ async function stubAdminApis(page: Parameters<typeof test>[0]['page']) {
     });
   });
 
+  await page.route('**/api/admin/messaging?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        items: [],
+      }),
+    });
+  });
+
   await page.route('**/api/admin/tenants', async (route) => {
     if (route.request().method() !== 'GET') {
       await route.continue();

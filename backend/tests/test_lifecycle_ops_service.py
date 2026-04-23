@@ -92,6 +92,9 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
         with patch(
             "service_layer.lifecycle_ops_service.CrmSyncRepository",
             _FakeCrmSyncRepository,
+        ), patch(
+            "service_layer.lifecycle_ops_service.get_settings",
+            lambda: _build_test_settings(access_token=""),
         ):
             result = await orchestrate_lead_capture(
                 object(),
@@ -109,7 +112,7 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
         self.assertIsNone(repository.error_logged)
 
     async def test_orchestrate_lead_capture_marks_synced_when_zoho_upsert_succeeds(self):
-        async def _upsert_lead(_settings, *, lead):
+        async def _upsert_lead(_self, _settings, *, lead):
             self.assertEqual(lead.email, "hello@example.com")
             return {
                 "status": "success",
@@ -174,6 +177,8 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
                 zoho_crm_refresh_token="",
                 zoho_crm_client_id="",
                 zoho_crm_client_secret="",
+                zoho_crm_notification_token="",
+                zoho_crm_notification_channel_id="",
                 zoho_crm_default_lead_module="Leads",
                 zoho_crm_default_contact_module="Contacts",
                 zoho_crm_default_deal_module="Deals",
@@ -272,14 +277,14 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
 
         repository = _FakeCrmSyncRepository.instances[-1]
         self.assertEqual(result.sync_status, "manual_review_required")
-        self.assertIn("missing_contact_email", result.warning_codes)
+        self.assertIn("missing_contact_method", result.warning_codes)
         self.assertIsNotNone(repository.updated)
         self.assertEqual(repository.updated["sync_status"], "manual_review_required")
         self.assertIsNotNone(repository.error_logged)
         self.assertFalse(repository.error_logged["retryable"])
 
     async def test_orchestrate_contact_sync_marks_synced_when_zoho_upsert_succeeds(self):
-        async def _upsert_contact(_settings, *, lead):
+        async def _upsert_contact(_self, _settings, *, lead):
             self.assertEqual(lead.email, "customer@example.com")
             return {
                 "status": "success",
@@ -312,7 +317,7 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
         self.assertEqual(repository.updated["sync_status"], "synced")
 
     async def test_orchestrate_booking_followup_sync_marks_deal_and_task_synced_when_zoho_calls_succeed(self):
-        async def _upsert_deal(_settings, *, lead):
+        async def _upsert_deal(_self, _settings, *, lead):
             self.assertEqual(lead.metadata["booking_reference"], "BK-123")
             self.assertEqual(lead.metadata["external_contact_id"], "zoho-contact-123")
             return {
@@ -320,7 +325,7 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
                 "external_id": "zoho-deal-123",
             }
 
-        async def _create_follow_up_task(_settings, *, lead):
+        async def _create_follow_up_task(_self, _settings, *, lead):
             self.assertEqual(lead.metadata["external_deal_id"], "zoho-deal-123")
             return {
                 "status": "success",
@@ -373,21 +378,21 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
         self.assertFalse(repository.error_logs)
 
     async def test_orchestrate_lead_qualification_sync_marks_lead_contact_and_deal_synced(self):
-        async def _upsert_lead(_settings, *, lead):
+        async def _upsert_lead(_self, _settings, *, lead):
             self.assertEqual(lead.lead_status, "qualified")
             return {
                 "status": "success",
                 "external_id": "zoho-lead-qualified-123",
             }
 
-        async def _upsert_contact(_settings, *, lead):
+        async def _upsert_contact(_self, _settings, *, lead):
             self.assertEqual(lead.email, "qualified@example.com")
             return {
                 "status": "success",
                 "external_id": "zoho-contact-qualified-123",
             }
 
-        async def _upsert_deal(_settings, *, lead):
+        async def _upsert_deal(_self, _settings, *, lead):
             self.assertEqual(lead.metadata["external_contact_id"], "zoho-contact-qualified-123")
             return {
                 "status": "success",
@@ -424,18 +429,22 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
                 estimated_value_aud=30.0,
             )
 
-        repository = _FakeCrmSyncRepository.instances[-1]
+        created_records = [
+            record
+            for repository in _FakeCrmSyncRepository.instances
+            for record in repository.created_records
+        ]
         self.assertEqual(result.lead_sync_status, "synced")
         self.assertEqual(result.contact_sync_status, "synced")
         self.assertEqual(result.deal_sync_status, "synced")
         self.assertEqual(result.deal_external_entity_id, "zoho-deal-qualified-123")
-        self.assertEqual(len(repository.created_records), 3)
-        self.assertEqual(repository.created_records[0]["entity_type"], "lead")
-        self.assertEqual(repository.created_records[1]["entity_type"], "contact")
-        self.assertEqual(repository.created_records[2]["entity_type"], "deal")
+        self.assertEqual(len(created_records), 3)
+        self.assertEqual(created_records[0]["entity_type"], "lead")
+        self.assertEqual(created_records[1]["entity_type"], "contact")
+        self.assertEqual(created_records[2]["entity_type"], "deal")
 
     async def test_orchestrate_call_scheduled_sync_marks_task_synced(self):
-        async def _create_follow_up_task(_settings, *, lead):
+        async def _create_follow_up_task(_self, _settings, *, lead):
             self.assertEqual(lead.lead_status, "call_scheduled")
             self.assertEqual(lead.metadata["owner_name"], "Jamie")
             return {
@@ -474,7 +483,7 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
         self.assertEqual(repository.created_records[0]["entity_type"], "task")
 
     async def test_orchestrate_email_sent_sync_marks_task_synced(self):
-        async def _create_follow_up_task(_settings, *, lead):
+        async def _create_follow_up_task(_self, _settings, *, lead):
             self.assertEqual(lead.lead_status, "email_sent")
             self.assertEqual(lead.email, "customer@example.com")
             return {
@@ -510,7 +519,7 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
         self.assertEqual(repository.created_records[0]["entity_type"], "task")
 
     async def test_execute_crm_sync_retry_replays_lead_record(self):
-        async def _upsert_lead(_settings, *, lead):
+        async def _upsert_lead(_self, _settings, *, lead):
             self.assertEqual(lead.email, "retry@example.com")
             return {
                 "status": "success",
@@ -686,6 +695,8 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
             zoho_crm_refresh_token="",
             zoho_crm_client_id="",
             zoho_crm_client_secret="",
+            zoho_crm_notification_token="",
+            zoho_crm_notification_channel_id="",
             zoho_crm_default_lead_module="Leads",
             zoho_crm_default_contact_module="Contacts",
             zoho_crm_default_deal_module="Deals",
@@ -838,6 +849,8 @@ def _build_test_settings(*, access_token: str = "") -> Settings:
         zoho_crm_refresh_token="",
         zoho_crm_client_id="",
         zoho_crm_client_secret="",
+        zoho_crm_notification_token="",
+        zoho_crm_notification_channel_id="",
         zoho_crm_default_lead_module="Leads",
         zoho_crm_default_contact_module="Contacts",
         zoho_crm_default_deal_module="Deals",

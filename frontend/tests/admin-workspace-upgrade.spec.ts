@@ -307,6 +307,14 @@ async function stubAdminWorkspaceUpgrade(page: Parameters<typeof test>[0]['page'
       body: JSON.stringify({ status: 'ok', items: [] }),
     });
   });
+
+  await page.route('**/api/admin/messaging?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', items: [] }),
+    });
+  });
 }
 
 test.describe('admin workspace upgrade lanes', () => {
@@ -317,7 +325,7 @@ test.describe('admin workspace upgrade lanes', () => {
 
     await page.goto('/admin#platform-settings');
     const settingsSummary = page.locator('section').filter({ hasText: 'Keep tenant-facing configuration in one trusted workspace' }).first();
-    await expect(settingsSummary.getByText('Workspace settings')).toBeVisible();
+    await expect(settingsSummary.getByText('Workspace settings', { exact: true })).toBeVisible();
     await expect(settingsSummary.getByText('Harbour Glow Spa')).toBeVisible();
 
     const handoffCta = settingsSummary.getByRole('link', { name: 'Open workspace settings' });

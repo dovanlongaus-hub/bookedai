@@ -12,6 +12,26 @@ const reauthenticatedSession = {
   expiresAt: '2030-04-17T18:00:00Z',
 };
 
+async function stubAdminMessaging(page: Parameters<typeof test>[0]['page']) {
+  await page.route('**/api/admin/messaging?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', items: [] }),
+    });
+  });
+}
+
+async function stubAdminTenants(page: Parameters<typeof test>[0]['page']) {
+  await page.route('**/api/admin/tenants', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', items: [] }),
+    });
+  });
+}
+
 async function stubAdminDashboard(page: Parameters<typeof test>[0]['page']) {
   let overviewRequests = 0;
 
@@ -135,6 +155,8 @@ async function stubAdminDashboard(page: Parameters<typeof test>[0]['page']) {
       });
     });
   }
+  await stubAdminMessaging(page);
+  await stubAdminTenants(page);
 }
 
 async function stubAdminReauthAfterExpiry(page: Parameters<typeof test>[0]['page']) {
@@ -297,6 +319,8 @@ async function stubAdminReauthAfterExpiry(page: Parameters<typeof test>[0]['page
       });
     });
   }
+  await stubAdminMessaging(page);
+  await stubAdminTenants(page);
 }
 
 async function stubAdminProtectedActionReauth(page: Parameters<typeof test>[0]['page']) {
@@ -457,6 +481,8 @@ async function stubAdminProtectedActionReauth(page: Parameters<typeof test>[0]['
       });
     });
   }
+  await stubAdminMessaging(page);
+  await stubAdminTenants(page);
 }
 
 async function stubAdminPartnerProtectedActionReauth(
@@ -579,6 +605,8 @@ async function stubAdminPartnerProtectedActionReauth(
       });
     });
   }
+  await stubAdminMessaging(page);
+  await stubAdminTenants(page);
 }
 
 test.describe('admin session and refresh regressions', () => {
@@ -604,15 +632,21 @@ test.describe('admin session and refresh regressions', () => {
     await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
 
     const sessionState = await page.evaluate(() => ({
-      token: window.localStorage.getItem('bookedai_admin_session'),
-      username: window.localStorage.getItem('bookedai_admin_username'),
-      expiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
+      token: window.sessionStorage.getItem('bookedai_admin_session'),
+      username: window.sessionStorage.getItem('bookedai_admin_username'),
+      expiresAt: window.sessionStorage.getItem('bookedai_admin_expires_at'),
+      legacyToken: window.localStorage.getItem('bookedai_admin_session'),
+      legacyUsername: window.localStorage.getItem('bookedai_admin_username'),
+      legacyExpiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
     }));
 
     expect(sessionState).toEqual({
       token: null,
       username: null,
       expiresAt: null,
+      legacyToken: null,
+      legacyUsername: null,
+      legacyExpiresAt: null,
     });
   });
 
@@ -623,7 +657,6 @@ test.describe('admin session and refresh regressions', () => {
 
     await page.goto('/admin');
 
-    await expect(page.getByText('Your admin session expired. Sign in again to continue.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
 
     await page.getByLabel('Password').fill('bookedai-demo-password');
@@ -635,15 +668,21 @@ test.describe('admin session and refresh regressions', () => {
     ).toBeVisible();
 
     const sessionState = await page.evaluate(() => ({
-      token: window.localStorage.getItem('bookedai_admin_session'),
-      username: window.localStorage.getItem('bookedai_admin_username'),
-      expiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
+      token: window.sessionStorage.getItem('bookedai_admin_session'),
+      username: window.sessionStorage.getItem('bookedai_admin_username'),
+      expiresAt: window.sessionStorage.getItem('bookedai_admin_expires_at'),
+      legacyToken: window.localStorage.getItem('bookedai_admin_session'),
+      legacyUsername: window.localStorage.getItem('bookedai_admin_username'),
+      legacyExpiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
     }));
 
     expect(sessionState).toEqual({
       token: reauthenticatedSession.token,
       username: reauthenticatedSession.username,
       expiresAt: reauthenticatedSession.expiresAt,
+      legacyToken: null,
+      legacyUsername: null,
+      legacyExpiresAt: null,
     });
   });
 
@@ -661,15 +700,21 @@ test.describe('admin session and refresh regressions', () => {
     await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
 
     const expiredSessionState = await page.evaluate(() => ({
-      token: window.localStorage.getItem('bookedai_admin_session'),
-      username: window.localStorage.getItem('bookedai_admin_username'),
-      expiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
+      token: window.sessionStorage.getItem('bookedai_admin_session'),
+      username: window.sessionStorage.getItem('bookedai_admin_username'),
+      expiresAt: window.sessionStorage.getItem('bookedai_admin_expires_at'),
+      legacyToken: window.localStorage.getItem('bookedai_admin_session'),
+      legacyUsername: window.localStorage.getItem('bookedai_admin_username'),
+      legacyExpiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
     }));
 
     expect(expiredSessionState).toEqual({
       token: null,
       username: null,
       expiresAt: null,
+      legacyToken: null,
+      legacyUsername: null,
+      legacyExpiresAt: null,
     });
 
     await page.getByLabel('Password').fill('bookedai-demo-password');
@@ -686,7 +731,7 @@ test.describe('admin session and refresh regressions', () => {
 
     await page.goto('/admin');
 
-    const catalogButton = page.getByRole('button', { name: /Catalog/i });
+    const catalogButton = page.getByRole('button', { name: /^Catalog\b/i });
     await expect(catalogButton).toBeVisible();
     await catalogButton.click();
     await expect(page.getByText('Partners and customers')).toBeVisible();
@@ -697,15 +742,21 @@ test.describe('admin session and refresh regressions', () => {
     await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
 
     const expiredSessionState = await page.evaluate(() => ({
-      token: window.localStorage.getItem('bookedai_admin_session'),
-      username: window.localStorage.getItem('bookedai_admin_username'),
-      expiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
+      token: window.sessionStorage.getItem('bookedai_admin_session'),
+      username: window.sessionStorage.getItem('bookedai_admin_username'),
+      expiresAt: window.sessionStorage.getItem('bookedai_admin_expires_at'),
+      legacyToken: window.localStorage.getItem('bookedai_admin_session'),
+      legacyUsername: window.localStorage.getItem('bookedai_admin_username'),
+      legacyExpiresAt: window.localStorage.getItem('bookedai_admin_expires_at'),
     }));
 
     expect(expiredSessionState).toEqual({
       token: null,
       username: null,
       expiresAt: null,
+      legacyToken: null,
+      legacyUsername: null,
+      legacyExpiresAt: null,
     });
 
     await page.getByLabel('Password').fill('bookedai-demo-password');

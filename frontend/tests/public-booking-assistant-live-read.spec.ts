@@ -316,6 +316,16 @@ async function submitAssistantQuery(
   page: Parameters<typeof test>[0]['page'],
   query: string,
 ) {
+  const homepageAssistantPane = page.locator('#bookedai-search-assistant').first();
+  if (await isVisible(homepageAssistantPane, 500)) {
+    const homepageSearchInput = homepageAssistantPane
+      .getByPlaceholder(/What service do you want to book today\?/i)
+      .first();
+    await homepageSearchInput.fill(query);
+    await homepageAssistantPane.getByRole('button', { name: /Send search|Try Now/i }).first().click();
+    return;
+  }
+
   const assistantInput = await getActiveAssistantInput(page);
   await assistantInput.fill(query);
   await assistantInput.press('Enter');
@@ -341,6 +351,13 @@ async function openBookingComposerIfNeeded(page: Parameters<typeof test>[0]['pag
 
 function getBookingForm(page: Parameters<typeof test>[0]['page']) {
   return page.locator('input[type="datetime-local"]').first().locator('xpath=ancestor::form[1]');
+}
+
+async function selectLiveReadServiceForBooking(page: Parameters<typeof test>[0]['page']) {
+  const topMatch = page.getByText(liveReadService.name, { exact: true }).first();
+  await expect(topMatch).toBeVisible();
+
+  await page.getByRole('button', { name: /Continue to booking/i }).first().click();
 }
 
 test.describe('public assistant rollout smoke', () => {
@@ -2842,10 +2859,7 @@ test.describe('public assistant rollout smoke', () => {
 
     await openAssistant(page);
     await submitAssistantQuery(page, 'Need a haircut in Sydney');
-    const topMatch = page.getByText(liveReadService.name, { exact: true }).first();
-    if (await topMatch.isVisible().catch(() => false)) {
-      await topMatch.click();
-    }
+    await selectLiveReadServiceForBooking(page);
     await openBookingComposerIfNeeded(page);
 
     const bookingForm = getBookingForm(page);
@@ -3011,10 +3025,7 @@ test.describe('public assistant rollout smoke', () => {
 
     await openAssistant(page);
     await submitAssistantQuery(page, 'Need a haircut in Sydney');
-    const topMatch = page.getByText(liveReadService.name, { exact: true }).first();
-    if (await topMatch.isVisible().catch(() => false)) {
-      await topMatch.click();
-    }
+    await selectLiveReadServiceForBooking(page);
     await openBookingComposerIfNeeded(page);
 
     const bookingForm = getBookingForm(page);
