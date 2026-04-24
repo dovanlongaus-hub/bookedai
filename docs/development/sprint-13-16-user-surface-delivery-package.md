@@ -103,6 +103,10 @@ Expected outcomes:
   - `frontend/src/apps/public/PublicApp.tsx` is now the shipped homepage implementation for that calmer search-first light layout on `bookedai.au`
   - the production surface keeps the existing logo and navigation while moving the rest of the homepage toward a blue search-led hero, quieter support sections, and a lighter product-first public narrative
   - live release verification for that surface now includes `artifacts/screenshots/publicapp-live-2026-04-24.png`
+- the active follow-on priority for the same surface is now stricter:
+  - homepage should be refined as a responsive web-app shell first, not widened back into a multi-section marketing page
+  - the target interaction model is closer to current ChatGPT search UX, with one dominant composer, same-page ranked results, and the BookedAI booking flow living beside the results on desktop and below on mobile
+  - public UX polish should now prioritize spacing, hierarchy, copy, and responsive app behavior before reintroducing any deeper homepage narrative layers
 
 Execution guardrail:
 
@@ -123,6 +127,7 @@ Completion update on `2026-04-24`:
 - items `1`, `3`, `5`, and `6` are now reflected in the shipped `frontend/src/apps/public/PublicApp.tsx` runtime on `bookedai.au`
 - the live homepage now uses the calmer search-first light composition instead of the earlier heavier marketplace-image landing treatment
 - production deploy and health verification passed, and a live screenshot proof now exists at `artifacts/screenshots/publicapp-live-2026-04-24.png`
+- the next execution pass is now locked more tightly to homepage app-shell polish: make `PublicApp.tsx` feel like the real product workspace, keep results and booking flow within one responsive environment, and keep all supporting design choices subordinate to that interaction model
 
 ## Portal
 
@@ -671,6 +676,7 @@ Must verify:
 
 - portal loads from booking reference
 - portal no-result and invalid-reference states are clean
+- portal ignores generic tracking-style `ref` query params so external tokens are not mistaken for booking references
 - billing screens handle missing data safely
 - tenant value messages do not overstate financial truth
 - portal actions stay request-safe and auditable

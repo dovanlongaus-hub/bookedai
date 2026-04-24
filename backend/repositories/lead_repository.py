@@ -31,7 +31,7 @@ class LeadRepository(BaseRepository):
                     from leads
                     where tenant_id = :tenant_id
                       and contact_id = cast(:contact_id as uuid)
-                      and coalesce(source, '') = coalesce(:source, '')
+                      and coalesce(source, '') = coalesce(cast(:source as text), '')
                     order by created_at desc
                     limit 1
                     """
@@ -121,8 +121,8 @@ class LeadRepository(BaseRepository):
                   where tenant_id = :tenant_id
                     and contact_id = cast(:contact_id as uuid)
                     and (
-                      :source is null
-                      or coalesce(source, '') = coalesce(:source, '')
+                      cast(:source as text) is null
+                      or coalesce(source, '') = coalesce(cast(:source as text), '')
                     )
                   order by created_at desc
                   limit 1

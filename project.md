@@ -12,6 +12,8 @@ Latest product-surface update date: `2026-04-24`.
 
 Latest public-search UX update date: `2026-04-24`.
 
+Current top product-surface priority: `responsive homepage web-app UX`.
+
 Latest public marketplace visual update date: `2026-04-24`.
 
 Latest widget/plugin architecture update date: `2026-04-23`.
@@ -125,6 +127,7 @@ The current inherited truth is:
     - that same homepage now reuses the same visual language more lightly in secondary sections so the category-expansion message feels intentional and productized instead of like one isolated hero image drop-in
     - the homepage opening layer now also adds subtle motion polish through a restrained hover-scale background treatment so the first-entry surface feels more premium without undermining readability or CTA focus
     - `frontend/src/apps/public/HomepageSearchExperience.tsx` now falls back to the legacy booking-session path when the live v1 booking write fails at server or network level, preventing the `Continue booking` path from stalling when `/api/v1/leads` or `/api/v1/bookings/intents` are unhealthy
+    - as of `2026-04-24`, the homepage live-read happy path no longer tries to hydrate shortlist bookings back through the legacy catalog session flow, so non-catalog or live-read matches stay on the authoritative v1 booking-intent lane instead of surfacing `Selected service was not found`
     - the homepage search surface now also exposes a staged in-progress matching treatment, with clearer search-progress labels, richer loading explanation, and contextual prompts that ask for suburb, time window, audience, or preference detail while search is still resolving
     - `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` now mirrors that same more professional matching-state treatment so homepage, popup, and embedded assistant flows do not drift in tone
     - `frontend/src/components/landing/sections/BookingAssistantSection.tsx` now uses a richer loading message that explains intent, locality, and shortlist checks instead of only showing a generic searching bubble
@@ -133,6 +136,10 @@ The current inherited truth is:
     - `bookedai.au` now serves the calmer search-first light homepage directly from `frontend/src/apps/public/PublicApp.tsx`, rather than leaving that direction only in the parallel root Next.js shell
     - the shipped homepage now keeps the current logo and navigation while presenting a blue search-led hero, quieter white/pale-blue support sections, lighter pricing and FAQ treatment, and the existing live `HomepageSearchExperience` lower on the page
     - production deployment completed through `python3 scripts/telegram_workspace_ops.py deploy-live`, host health passed via `bash scripts/healthcheck_stack.sh`, and a live proof screenshot now exists at `artifacts/screenshots/publicapp-live-2026-04-24.png`
+  - the active homepage UX priority then shifted again later on `2026-04-24`:
+    - the homepage should now be treated as a responsive web-app workspace first, not a marketing page with extra narrative sections
+    - the desired interaction model is closer to current ChatGPT search UX than a stacked landing page: one primary search surface, same-page results, and one adjacent BookedAI booking rail on desktop
+    - future homepage work should prefer calmer app-shell structure, tighter copy, stronger responsive behavior, and fewer decorative sections until the core search workspace feels premium enough to stand on its own
   - the same `Phase 7` growth lane then moved one step further on `2026-04-23` into the first messaging foundation:
     - FastAPI admin now exposes `/api/admin/messaging` plus source-specific detail and action routes for unified operator review
     - the first messaging workspace reads from `email_messages`, `outbox_events`, and `crm_sync_records` instead of inventing a disconnected communication-only store

@@ -14,8 +14,10 @@ if str(BACKEND_ROOT) not in sys.path:
 
 from repositories.audit_repository import AuditLogRepository
 from repositories.base import RepositoryContext
+from repositories.contact_repository import ContactRepository
 from repositories.crm_repository import CrmSyncRepository
 from repositories.idempotency_repository import IdempotencyRepository
+from repositories.lead_repository import LeadRepository
 from repositories.outbox_repository import OutboxRepository
 from repositories.webhook_repository import WebhookEventRepository
 
@@ -188,6 +190,72 @@ class CrmSyncRepositoryTestCase(IsolatedAsyncioTestCase):
         self.assertEqual(params["sync_status"], "synced")
         self.assertEqual(params["external_entity_id"], "zoho-contact-123")
         self.assertIsNotNone(params["last_synced_at"])
+
+
+class ContactAndLeadRepositoryTestCase(IsolatedAsyncioTestCase):
+    async def test_contact_lookup_casts_nullable_email_and_phone_params(self):
+        execute = AsyncMock(
+            return_value=SimpleNamespace(
+                scalar_one_or_none=lambda: None,
+            )
+        )
+        repository = ContactRepository(
+            RepositoryContext(
+                session=SimpleNamespace(execute=execute),
+                tenant_id="tenant-test",
+            )
+        )
+
+        await repository.upsert_contact(
+            full_name="Smoke Test User",
+            email="smoke@example.com",
+            phone="0400000000",
+            primary_channel="email",
+        )
+
+        lookup_statement = execute.await_args_list[0].args[0]
+        lookup_params = execute.await_args_list[0].args[1]
+        self.assertIn("cast(:email as text) is not null", str(lookup_statement).lower())
+        self.assertIn("phone = cast(:phone as text)", str(lookup_statement).lower())
+        self.assertEqual(lookup_params["email"], "smoke@example.com")
+        self.assertEqual(lookup_params["phone"], "0400000000")
+
+    async def test_lead_queries_cast_nullable_source_param(self):
+        execute = AsyncMock(
+            side_effect=[
+                SimpleNamespace(
+                    scalar_one_or_none=lambda: None,
+                ),
+                SimpleNamespace(
+                    scalar_one_or_none=lambda: "lead_123",
+                ),
+                SimpleNamespace(
+                    scalar_one_or_none=lambda: "lead_123",
+                ),
+            ]
+        )
+        repository = LeadRepository(
+            RepositoryContext(
+                session=SimpleNamespace(execute=execute),
+                tenant_id="tenant-test",
+            )
+        )
+
+        await repository.upsert_lead(
+            contact_id="00000000-0000-0000-0000-000000000001",
+            source=None,
+            status="captured",
+        )
+        await repository.update_lead_status(
+            contact_id="00000000-0000-0000-0000-000000000001",
+            source=None,
+            status="qualified",
+        )
+
+        lookup_statement = execute.await_args_list[0].args[0]
+        update_statement = execute.await_args_list[2].args[0]
+        self.assertIn("coalesce(cast(:source as text), '')", str(lookup_statement).lower())
+        self.assertIn("cast(:source as text) is null", str(update_statement).lower())
 
 
 class WebhookEventRepositoryTestCase(IsolatedAsyncioTestCase):

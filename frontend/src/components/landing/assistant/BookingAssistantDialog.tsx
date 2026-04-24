@@ -33,6 +33,7 @@ import {
 import { PartnerMatchCard } from '../../../shared/components/PartnerMatchCard';
 import { PartnerMatchActionFooter } from '../../../shared/components/PartnerMatchActionFooter';
 import { PartnerMatchShortlist } from '../../../shared/components/PartnerMatchShortlist';
+import { normalizePhoneForMessaging } from '../../../shared/utils/phone';
 
 type ServiceCatalogItem = {
   id: string;
@@ -1397,7 +1398,7 @@ function buildCommunicationPreviewCards(params: {
   const { result, customerName, customerEmail, customerPhone } = params;
   const displayName = customerName.trim() || 'Customer';
   const normalizedEmail = customerEmail.trim().toLowerCase();
-  const normalizedPhone = customerPhone.trim();
+  const normalizedPhone = normalizePhoneForMessaging(customerPhone) ?? customerPhone.trim();
   const slotLine = `${result.requested_date} at ${result.requested_time} ${result.timezone}`;
   const serviceLabel = result.service.name;
   const paymentLine =
@@ -1740,7 +1741,23 @@ export function BookingAssistantDialog({
     }
 
     if (params.customerPhone?.trim()) {
-      const phone = params.customerPhone.trim();
+      const phone = normalizePhoneForMessaging(params.customerPhone);
+
+      if (!phone) {
+        automation.sms = {
+          status: 'skipped',
+          messageId: null,
+          provider: null,
+          warnings: ['SMS follow-up requires an international-format phone number such as +61400000000.'],
+        };
+        automation.whatsapp = {
+          status: 'skipped',
+          messageId: null,
+          provider: null,
+          warnings: ['WhatsApp follow-up requires an international-format phone number such as +61400000000.'],
+        };
+        return automation;
+      }
 
       try {
         const smsResponse = await apiV1.sendSmsMessage({

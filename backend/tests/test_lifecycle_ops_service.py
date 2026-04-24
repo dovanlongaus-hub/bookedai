@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from dataclasses import replace
 from pathlib import Path
 import sys
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import patch
+
+import httpx
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
@@ -912,3 +915,81 @@ def _build_test_settings(*, access_token: str = "") -> Settings:
         tenant_session_signing_secret="",
         admin_session_signing_secret="",
     )
+
+
+class CommunicationServiceDeliveryFallbackTestCase(IsolatedAsyncioTestCase):
+    async def test_send_sms_downgrades_provider_auth_failure_to_queued_warning(self):
+        settings = replace(
+            _build_test_settings(),
+            sms_twilio_account_sid="AC123",
+            sms_twilio_api_key_sid="SK123",
+            sms_twilio_api_key_secret="secret",
+            sms_from_number="+10000000000",
+        )
+        service = CommunicationService(settings)
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                return None
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, **_kwargs):
+                return httpx.Response(
+                    401,
+                    request=httpx.Request("POST", url),
+                    text="Unauthorized",
+                )
+
+        with patch("service_layer.communication_service.httpx.AsyncClient", _FakeAsyncClient):
+            result = await service.send_sms(
+                to="+61400000000",
+                body="Hello from BookedAI",
+            )
+
+        self.assertEqual(result.delivery_status, "queued")
+        self.assertIsNone(result.provider_message_id)
+        self.assertTrue(result.warnings)
+        self.assertIn("manual review", result.warnings[0].lower())
+
+    async def test_send_whatsapp_downgrades_provider_auth_failure_to_queued_warning(self):
+        settings = replace(
+            _build_test_settings(),
+            whatsapp_twilio_account_sid="AC123",
+            whatsapp_twilio_api_key_sid="SK123",
+            whatsapp_twilio_api_key_secret="secret",
+            whatsapp_from_number="whatsapp:+14155238886",
+        )
+        service = CommunicationService(settings)
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                return None
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, **_kwargs):
+                return httpx.Response(
+                    401,
+                    request=httpx.Request("POST", url),
+                    text="Unauthorized",
+                )
+
+        with patch("service_layer.communication_service.httpx.AsyncClient", _FakeAsyncClient):
+            result = await service.send_whatsapp(
+                to="+61400000000",
+                body="Hello from BookedAI on WhatsApp",
+            )
+
+        self.assertEqual(result.delivery_status, "queued")
+        self.assertIsNone(result.provider_message_id)
+        self.assertTrue(result.warnings)
+        self.assertIn("manual review", result.warnings[0].lower())

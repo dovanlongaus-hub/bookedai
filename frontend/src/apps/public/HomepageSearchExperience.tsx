@@ -30,12 +30,12 @@ import { PartnerMatchActionFooter } from '../../shared/components/PartnerMatchAc
 import { PartnerMatchCard } from '../../shared/components/PartnerMatchCard';
 import { PartnerMatchShortlist } from '../../shared/components/PartnerMatchShortlist';
 import type { MatchCandidate } from '../../shared/contracts';
+import { normalizePhoneForMessaging } from '../../shared/utils/phone';
 import {
   createPublicBookingAssistantLeadAndBookingIntent,
   createPublicBookingAssistantSessionId,
   getPublicBookingAssistantLiveReadRecommendation,
   primePublicBookingAssistantSession,
-  shouldFallbackToLegacyBookingSession,
   shadowPublicBookingAssistantLeadAndBookingIntent,
 } from '../../components/landing/assistant/publicBookingAssistantV1';
 import type { HomepageContent } from './homepageContent';
@@ -220,6 +220,11 @@ type NoResultSuggestion = {
   query: string;
 };
 
+type IntentSuggestion = {
+  label: string;
+  query: string;
+};
+
 function deriveFollowUpQuestions(query: string, results: ServiceCatalogItem[], warnings: string[]) {
   const normalized = query.toLowerCase();
   const prompts: FollowUpQuestion[] = [];
@@ -290,6 +295,37 @@ function deriveNoResultSuggestions(query: string, warnings: string[]) {
   return suggestions.slice(0, 4);
 }
 
+function deriveIntentSuggestions(query: string) {
+  const trimmed = query.trim();
+  if (!trimmed) {
+    return [] as IntentSuggestion[];
+  }
+
+  const suggestions: IntentSuggestion[] = [
+    { label: 'Add location', query: `${trimmed} near Sydney CBD` },
+    { label: 'Add timing', query: `${trimmed} this weekend` },
+    { label: 'Add preference', query: `${trimmed} premium and closest option` },
+  ];
+
+  if (/swim|class|lesson|coach/i.test(trimmed)) {
+    suggestions.unshift({ label: 'Kids beginner option', query: `${trimmed} for a beginner child after school` });
+  }
+
+  if (/hair|salon|barber|cut/i.test(trimmed)) {
+    suggestions.unshift({ label: 'Same-day nearby', query: `${trimmed} near Sydney CBD this afternoon` });
+  }
+
+  if (/restaurant|dining|lunch|dinner|cafe/i.test(trimmed)) {
+    suggestions.unshift({ label: 'Tonight nearby', query: `${trimmed} near me tonight with booking` });
+  }
+
+  if (/mentor|consult|ai|coach/i.test(trimmed)) {
+    suggestions.unshift({ label: 'Business goal', query: `${trimmed} for startup growth this week` });
+  }
+
+  return suggestions.filter((item, index, array) => array.findIndex((candidate) => candidate.query === item.query) === index).slice(0, 4);
+}
+
 function deriveNoResultReason(query: string, warnings: string[]) {
   if (warnings.some((warning) => /location/i.test(warning))) {
     return 'BookedAI could not rank a strong match because location context is still too broad.';
@@ -301,6 +337,13 @@ function deriveNoResultReason(query: string, warnings: string[]) {
     return 'The current request is short, so there is not enough context yet to confidently rank a shortlist.';
   }
   return 'No strong record was found for the exact request, but BookedAI can usually get closer with one more detail or a nearby keyword variation.';
+}
+
+function getResultEntryStyle(index: number) {
+  return {
+    animation: `homepage-result-entry 360ms cubic-bezier(0.16, 1, 0.3, 1) both`,
+    animationDelay: `${Math.max(0, index) * 55}ms`,
+  };
 }
 
 async function extractLightweightPdfText(file: File) {
@@ -777,7 +820,7 @@ function buildCommunicationPreviewCards(params: {
   const { result, customerName, customerEmail, customerPhone } = params;
   const displayName = customerName.trim() || 'Customer';
   const normalizedEmail = customerEmail.trim().toLowerCase();
-  const normalizedPhone = customerPhone.trim();
+  const normalizedPhone = normalizePhoneForMessaging(customerPhone) ?? customerPhone.trim();
   const slotLine = `${result.requested_date} at ${result.requested_time} ${result.timezone}`;
   const serviceLabel = result.service.name;
   const paymentLine =
@@ -1786,14 +1829,6 @@ export function HomepageSearchExperience({
     () => results.find((service) => service.id === selectedServiceId) ?? null,
     [results, selectedServiceId],
   );
-  const isSelectedServiceCatalogBacked = useMemo(() => {
-    if (!selectedService) {
-      return false;
-    }
-
-    return catalog?.services.some((service) => service.id === selectedService.id) ?? false;
-  }, [catalog?.services, selectedService]);
-
   async function handleSearchComposerKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
       return;
@@ -1866,53 +1901,6 @@ export function HomepageSearchExperience({
 
     if (!payload) {
       throw new Error('Unable to search services right now.');
-    }
-
-    return payload;
-  }
-
-  async function requestLegacyBookingSession(params: {
-    serviceId: string;
-    customerName: string;
-    customerEmail: string | null;
-    customerPhone: string | null;
-    requestedDate: string;
-    requestedTime: string;
-    notes: string | null;
-  }) {
-    const response = await fetch(`${getApiBaseUrl()}/booking-assistant/session`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        service_id: params.serviceId,
-        customer_name: params.customerName.trim(),
-        customer_email: params.customerEmail,
-        customer_phone: params.customerPhone,
-        requested_date: params.requestedDate,
-        requested_time: params.requestedTime,
-        timezone: 'Australia/Sydney',
-        notes: params.notes,
-      }),
-    });
-
-    const rawResponseText = await response.text();
-    let payload: (BookingAssistantSessionResponse & { detail?: string }) | null = null;
-    if (rawResponseText) {
-      try {
-        payload = JSON.parse(rawResponseText) as BookingAssistantSessionResponse & { detail?: string };
-      } catch {
-        payload = null;
-      }
-    }
-
-    if (!response.ok) {
-      throw new Error(payload?.detail || 'Unable to create booking session right now.');
-    }
-
-    if (!payload) {
-      throw new Error('Unable to create booking session right now.');
     }
 
     return payload;
@@ -2011,7 +1999,23 @@ export function HomepageSearchExperience({
     }
 
     if (params.customerPhone?.trim()) {
-      const phone = params.customerPhone.trim();
+      const phone = normalizePhoneForMessaging(params.customerPhone);
+
+      if (!phone) {
+        automation.sms = {
+          status: 'skipped',
+          messageId: null,
+          provider: null,
+          warnings: ['SMS follow-up requires an international-format phone number such as +61400000000.'],
+        };
+        automation.whatsapp = {
+          status: 'skipped',
+          messageId: null,
+          provider: null,
+          warnings: ['WhatsApp follow-up requires an international-format phone number such as +61400000000.'],
+        };
+        return automation;
+      }
 
       try {
         const smsResponse = await apiV1.sendSmsMessage({
@@ -2406,35 +2410,17 @@ export function HomepageSearchExperience({
           runtimeConfig: homepageRuntimeConfig,
         });
 
-        const shouldHydrateRichBookingSession =
-          isSelectedServiceCatalogBacked &&
-          liveReadBookingSummary?.serviceId === selectedService.id &&
-          liveReadBookingSummary.paymentAllowedBeforeConfirmation;
-
-        let bookingResult: BookingAssistantSessionResponse;
-        if (shouldHydrateRichBookingSession) {
-          bookingResult = await requestLegacyBookingSession({
-            serviceId: selectedService.id,
-            customerName,
-            customerEmail: normalizedCustomerEmail,
-            customerPhone: normalizedCustomerPhone,
-            requestedDate: slot.requestedDate,
-            requestedTime: slot.requestedTime,
-            notes: normalizedNotes,
-          });
-        } else {
-          bookingResult = buildAuthoritativeBookingIntentResult({
-            authoritativeResult,
-            selectedService,
-            requestedDate: slot.requestedDate,
-            requestedTime: slot.requestedTime,
-            customerEmail: normalizedCustomerEmail ?? '',
-            nextStep:
-              liveReadBookingSummary?.serviceId === selectedService.id
-                ? liveReadBookingSummary.nextStep
-                : selectedService.next_step ?? null,
-          });
-        }
+        const bookingResult = buildAuthoritativeBookingIntentResult({
+          authoritativeResult,
+          selectedService,
+          requestedDate: slot.requestedDate,
+          requestedTime: slot.requestedTime,
+          customerEmail: normalizedCustomerEmail ?? '',
+          nextStep:
+            liveReadBookingSummary?.serviceId === selectedService.id
+              ? liveReadBookingSummary.nextStep
+              : selectedService.next_step ?? null,
+        });
 
         setResult({
           ...bookingResult,
@@ -2452,7 +2438,6 @@ export function HomepageSearchExperience({
           requestedTime: slot.requestedTime,
           notes: normalizedNotes,
           paymentAllowedBeforeConfirmation:
-            shouldHydrateRichBookingSession ||
             Boolean(
               (liveReadBookingSummary?.serviceId === selectedService.id &&
                 liveReadBookingSummary.paymentAllowedBeforeConfirmation) ||
@@ -2483,17 +2468,6 @@ export function HomepageSearchExperience({
       };
 
       if (isLiveReadMode) {
-        try {
-          await finalizeAuthoritativeBookingIntent();
-          return;
-        } catch (error) {
-          if (!isSelectedServiceCatalogBacked || !shouldFallbackToLegacyBookingSession(error)) {
-            throw error;
-          }
-        }
-      }
-
-      if (!isSelectedServiceCatalogBacked) {
         await finalizeAuthoritativeBookingIntent();
         return;
       }
@@ -2686,6 +2660,10 @@ export function HomepageSearchExperience({
     () => deriveNoResultSuggestions(currentQuery || searchQuery, uniqueWarnings),
     [currentQuery, searchQuery, uniqueWarnings],
   );
+  const intentSuggestions = useMemo(
+    () => deriveIntentSuggestions(currentQuery || searchQuery),
+    [currentQuery, searchQuery],
+  );
   const noResultReason = useMemo(
     () => deriveNoResultReason(currentQuery || searchQuery, uniqueWarnings),
     [currentQuery, searchQuery, uniqueWarnings],
@@ -2805,6 +2783,26 @@ export function HomepageSearchExperience({
       ref={bookingPanelRef}
       className={`mx-auto max-w-[1440px] ${isMobileViewport ? 'pb-28' : ''}`}
     >
+      <style>
+        {`
+          @keyframes homepage-result-entry {
+            0% {
+              opacity: 0;
+              transform: translateY(12px) scale(0.985);
+            }
+            100% {
+              opacity: 1;
+              transform: translateY(0) scale(1);
+            }
+          }
+
+          @media (prefers-reduced-motion: reduce) {
+            [data-homepage-result-entry="true"] {
+              animation: none !important;
+            }
+          }
+        `}
+      </style>
       <div className="public-search-results-shell grid gap-5 xl:grid-cols-[minmax(0,1fr)_368px] xl:items-start">
         <section className="min-w-0 overflow-hidden rounded-[1.75rem] border border-[#e0e6ef] bg-white shadow-[0_20px_56px_rgba(60,64,67,0.08)]">
           <div className="px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
@@ -2815,9 +2813,6 @@ export function HomepageSearchExperience({
                 </span>
                 <span className="rounded-full border border-[#e5e9f0] bg-[#f8fafc] px-3 py-1 text-[10px] font-medium text-[#5f6368]">
                   {resultCountLabel}
-                </span>
-                <span className="rounded-full border border-[#e5e9f0] bg-white px-3 py-1 text-[10px] font-medium text-[#5f6368]">
-                  Ranked results
                 </span>
               </div>
             ) : null}
@@ -2863,6 +2858,48 @@ export function HomepageSearchExperience({
                       ? `Searching for "${currentQuery}" while BookedAI looks for the most suitable place and booking path.`
                       : content.ui.resultsLoadingBody}
                   </p>
+                  <div className="mt-4 space-y-3">
+                    <div className="flex items-start gap-3">
+                      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1a73e8] text-white shadow-[0_10px_24px_rgba(26,115,232,0.16)]">
+                        <SparkIcon className="h-4 w-4" />
+                      </div>
+                      <div className="max-w-[44rem] rounded-[1.2rem] rounded-tl-[0.45rem] border border-[#dbe7fb] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(60,64,67,0.05)]">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                          BookedAI is refining the brief
+                        </div>
+                        <p className="mt-1 text-sm leading-6 text-slate-700">
+                          I am ranking options now. If you add area, timing, or one stronger preference, I can tighten the shortlist while search is still running.
+                        </p>
+                      </div>
+                    </div>
+                    <div className="ml-11 space-y-2">
+                      {followUpQuestions.slice(0, 3).map((item) => (
+                        <button
+                          key={item.id}
+                          type="button"
+                          onClick={() => {
+                            setSearchQuery((current) => `${current.trim()} ${item.suggestion}`.trim());
+                            setComposerCollapsed(false);
+                            setIsBottomBarVisible(true);
+                          }}
+                          className="flex w-full items-start justify-between gap-3 rounded-[1rem] border border-[#e6edf8] bg-[#fbfdff] px-3 py-3 text-left transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
+                        >
+                          <div className="min-w-0">
+                            <div className="text-[11px] font-semibold text-slate-950">{item.question}</div>
+                            <div className="mt-1 text-[11px] leading-5 text-slate-600">{item.suggestion}</div>
+                          </div>
+                          <span className="shrink-0 rounded-full bg-[#eef4ff] px-2 py-1 text-[10px] font-semibold text-[#1a73e8]">
+                            Add
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                    {[0, 1, 2].map((item) => (
+                      <div key={item} className="h-20 rounded-[1rem] bg-[linear-gradient(180deg,#edf4ff_0%,#ffffff_100%)] ring-1 ring-[#dbe7fb]" />
+                    ))}
+                  </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {['Checking nearby area', 'Opening live search', 'Preparing booking options'].map((label) => (
                       <div key={label} className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-medium text-[#6d28d9]">
@@ -2870,28 +2907,51 @@ export function HomepageSearchExperience({
                       </div>
                     ))}
                   </div>
+                  {(showDelayedSearchNudge || intentSuggestions.length > 0) ? (
+                    <div className="mt-4 rounded-[1.1rem] border border-[#e6edf8] bg-[#fbfdff] px-4 py-4">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                        Similar searches you can try now
+                      </div>
+                      <p className="mt-1 text-[11px] leading-5 text-slate-600">{activeSearchPrompt}</p>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {intentSuggestions.slice(0, 4).map((item) => (
+                          <button
+                            key={item.query}
+                            type="button"
+                            onClick={() => {
+                              setSearchQuery(item.query);
+                              void runSearch(item.query);
+                            }}
+                            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] hover:text-slate-950"
+                          >
+                            {item.label}: {item.query}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
               {!searchLoading && !searchError && hasActiveQuery && !result && followUpQuestions.length > 0 ? (
                 <div className="rounded-[1.3rem] border border-[#dfe8f3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-5 py-5">
-                  <div className="flex items-center justify-between gap-3">
-                    <div>
+                  <div className="flex items-start gap-3">
+                    <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1a73e8] text-white shadow-[0_10px_24px_rgba(26,115,232,0.16)]">
+                      <SparkIcon className="h-4 w-4" />
+                    </div>
+                    <div className="max-w-[44rem] rounded-[1.2rem] rounded-tl-[0.45rem] border border-[#dbe7fb] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(60,64,67,0.05)]">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
                         Refinement prompts
                       </div>
-                      <div className="mt-1 text-sm font-semibold text-[#111827]">
+                      <div className="mt-1 text-sm leading-6 text-slate-700">
                         Add one more signal and BookedAI can rank the shortlist with higher confidence.
                       </div>
                     </div>
-                    <div className="rounded-full bg-[#eef4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
-                      Max 3
-                    </div>
                   </div>
-                  <div className="mt-3 grid gap-2.5 md:grid-cols-3">
-                    {followUpQuestions.map((item) => (
-                      <button
-                        key={item.id}
+                  <div className="mt-3 ml-11 grid gap-2.5 md:grid-cols-3">
+                      {followUpQuestions.map((item) => (
+                        <button
+                          key={item.id}
                         type="button"
                         onClick={() => {
                           setSearchQuery((current) => `${current.trim()} ${item.suggestion}`.trim());
@@ -2905,6 +2965,28 @@ export function HomepageSearchExperience({
                       </button>
                     ))}
                   </div>
+                  {intentSuggestions.length > 0 ? (
+                    <div className="mt-4 ml-11 border-t border-[#e6edf8] pt-4">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                        Similar intent searches
+                      </div>
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {intentSuggestions.slice(0, 4).map((item) => (
+                          <button
+                            key={item.query}
+                            type="button"
+                            onClick={() => {
+                              setSearchQuery(item.query);
+                              void runSearch(item.query);
+                            }}
+                            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] hover:text-slate-950"
+                          >
+                            {item.label}: {item.query}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
               ) : null}
 
@@ -2955,6 +3037,28 @@ export function HomepageSearchExperience({
                               </button>
                             ))}
                           </div>
+                          {intentSuggestions.length > 0 ? (
+                            <>
+                              <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                                Similar intent searches
+                              </div>
+                              <div className="mt-3 flex flex-wrap gap-2">
+                                {intentSuggestions.slice(0, 4).map((item) => (
+                                  <button
+                                    key={item.query}
+                                    type="button"
+                                    onClick={() => {
+                                      setSearchQuery(item.query);
+                                      void runSearch(item.query);
+                                    }}
+                                    className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] hover:text-slate-950"
+                                  >
+                                    {item.label}: {item.query}
+                                  </button>
+                                ))}
+                              </div>
+                            </>
+                          ) : null}
                         </div>
                       ) : null}
                     </div>
@@ -2975,6 +3079,7 @@ export function HomepageSearchExperience({
                     </div>
                   )}
                   renderItem={(service) => {
+                    const resultIndex = Math.max(0, results.findIndex((item) => item.id === service.id));
                     const isSelected =
                       service.id === selectedServiceId || service.id === previewService?.id;
                     const card = buildPartnerMatchCardModelFromServiceItem(service as BookingReadyServiceItem, {
@@ -2988,7 +3093,9 @@ export function HomepageSearchExperience({
                     return (
                       <div
                         key={service.id}
-                        className={`rounded-[1.4rem] border px-3 py-3 shadow-[0_12px_30px_rgba(60,64,67,0.06)] transition ${
+                        data-homepage-result-entry="true"
+                        style={getResultEntryStyle(resultIndex)}
+                        className={`rounded-[1.4rem] border px-3 py-3 shadow-[0_12px_30px_rgba(60,64,67,0.06)] transition duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                           isSelected
                             ? 'border-[#d2e3fc] bg-[linear-gradient(180deg,#ffffff_0%,#f6faff_100%)] shadow-[0_16px_34px_rgba(26,115,232,0.10)]'
                             : 'border-[#e8edf3] bg-white hover:border-[#d7e3f7]'
@@ -3037,7 +3144,19 @@ export function HomepageSearchExperience({
           </div>
         </section>
 
-        <aside className="public-booking-sidebar min-w-0 rounded-[1.75rem] border border-[#e0e6ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4 shadow-[0_20px_56px_rgba(60,64,67,0.08)] xl:sticky xl:self-start">
+        <aside className="public-booking-sidebar min-w-0 rounded-[1.75rem] border border-[#e0e6ef] bg-[linear-gradient(180deg,#fdfefe_0%,#f6f9fe_100%)] p-4 shadow-[0_20px_56px_rgba(60,64,67,0.08)] xl:sticky xl:self-start">
+          <div className="mb-3 rounded-[1.2rem] border border-[#dbe7fb] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.95)]">
+            <div className="text-base font-semibold text-[#202124]">
+              Keep search, selection, and booking in one place.
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {['Search', 'Select', 'Book'].map((item) => (
+                <div key={item} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#35507a] ring-1 ring-[#e3ecf9]">
+                  {item}
+                </div>
+              ))}
+            </div>
+          </div>
           <div className="public-apple-workspace-panel rounded-[1.15rem] px-3.5 py-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -3057,7 +3176,7 @@ export function HomepageSearchExperience({
             </div>
           </div>
 
-          <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5">
+          <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-[0_10px_28px_rgba(60,64,67,0.05)]">
             <div className="flex items-center justify-between gap-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
                 Booking workflow
@@ -3100,33 +3219,19 @@ export function HomepageSearchExperience({
             </div>
           </div>
 
-          <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5">
-            <div className="flex items-center justify-between gap-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
-                Revenue journey
-              </div>
-              <div className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-semibold">
-                Search to aftercare
-              </div>
+          <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-[0_10px_28px_rgba(60,64,67,0.05)]">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
+              Follow-up flow
             </div>
-
             <div className="mt-3 space-y-2.5">
-              {enterpriseJourneySteps.map((step) => (
-                <div
-                  key={step.id}
-                  className="rounded-[0.95rem] border border-slate-200 bg-white px-3 py-3"
-                >
+              {enterpriseJourneySteps.slice(0, 3).map((step) => (
+                <div key={step.id} className="rounded-[0.95rem] border border-slate-200 bg-white px-3 py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5f6368]">
-                        {step.channel}
-                      </div>
                       <div className="mt-1 text-sm font-semibold text-[#202124]">{step.title}</div>
                       <div className="mt-1 text-[12px] leading-5 text-[#5f6368]">{step.description}</div>
                     </div>
-                    <div
-                      className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getEnterpriseStatusTone(step.status)}`}
-                    >
+                    <div className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getEnterpriseStatusTone(step.status)}`}>
                       {getEnterpriseStatusLabel(step.status)}
                     </div>
                   </div>
@@ -3138,14 +3243,11 @@ export function HomepageSearchExperience({
           {selectedService ? (
             <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] border-[1.5px] border-emerald-200 bg-[linear-gradient(180deg,#ffffff_0%,#f6fff9_100%)] px-3.5 py-3.5 shadow-[0_16px_34px_rgba(16,185,129,0.10)]">
               <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                    Match selected
-                  </div>
-                  <div className="mt-2 text-sm font-semibold text-[#202124]">{selectedService.name}</div>
-                  <div className="mt-1 text-xs text-[#5f6368]">
-                    {selectedService.category} • A${selectedService.amount_aud} • {selectedService.duration_minutes} min
-                  </div>
+                  <div>
+                    <div className="mt-2 text-sm font-semibold text-[#202124]">{selectedService.name}</div>
+                    <div className="mt-1 text-xs text-[#5f6368]">
+                      {selectedService.category} • A${selectedService.amount_aud} • {selectedService.duration_minutes} min
+                    </div>
                   {selectedService.location ? (
                     <div className="mt-1 text-xs text-[#5f6368]">{selectedService.location}</div>
                   ) : null}
@@ -3157,13 +3259,8 @@ export function HomepageSearchExperience({
 
               <div className="mt-3 rounded-[1rem] border border-emerald-200 bg-white px-3 py-3">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                      Primary match locked
-                    </div>
-                    <div className="mt-1 text-sm leading-6 text-emerald-900">
-                      {selectedServiceFlowNote}
-                    </div>
+                  <div className="text-sm leading-6 text-emerald-900">
+                    {selectedServiceFlowNote}
                   </div>
                   <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
                     Preferred path
@@ -3209,7 +3306,7 @@ export function HomepageSearchExperience({
           {!result ? (
             <div
               ref={bookingFormRef}
-              className={`public-apple-workspace-panel mt-3 rounded-[1.1rem] p-3.5 ${
+              className={`public-apple-workspace-panel mt-3 rounded-[1.1rem] p-3.5 shadow-[0_10px_28px_rgba(60,64,67,0.05)] ${
                 selectedService && !bookingComposerOpen && !isDesktopViewport ? 'hidden' : ''
               }`}
             >
@@ -3608,10 +3705,7 @@ export function HomepageSearchExperience({
               <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-300/70 sm:hidden" />
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="inline-flex rounded-full bg-[#e8f0fe] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
-                  Match details
-                </div>
-                <div className="mt-3 text-[1.2rem] font-semibold tracking-[-0.02em] text-[#111827]">
+                <div className="text-[1.2rem] font-semibold tracking-[-0.02em] text-[#111827]">
                   {previewService.name}
                 </div>
                 <p className="mt-1 text-sm text-[#5f6368]">
@@ -3628,67 +3722,34 @@ export function HomepageSearchExperience({
               </button>
             </div>
 
-            <div className="mt-4 grid gap-2 sm:grid-cols-3">
-              <div className="rounded-[1rem] border border-white/70 bg-white/86 px-3 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">Price</div>
-                <div className="mt-1 text-sm font-semibold text-[#111827]">
-                  {`A$${previewService.amount_aud}`}
-                </div>
-              </div>
-              <div className="rounded-[1rem] border border-white/70 bg-white/86 px-3 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">Duration</div>
-                <div className="mt-1 text-sm font-semibold text-[#111827]">{previewService.duration_minutes} min</div>
-              </div>
-              <div className="rounded-[1rem] border border-white/70 bg-white/86 px-3 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">Booking path</div>
-                <div className="mt-1 text-sm font-semibold text-[#111827]">
-                  {previewService.booking_url ? 'Direct booking available' : 'BookedAI guided booking'}
-                </div>
-              </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <span className="rounded-full bg-white/86 px-3 py-1.5 text-[11px] font-semibold text-[#1a73e8] ring-1 ring-white/70">{`A$${previewService.amount_aud}`}</span>
+              <span className="rounded-full bg-white/86 px-3 py-1.5 text-[11px] font-semibold text-[#5f6368] ring-1 ring-white/70">{previewService.duration_minutes} min</span>
+              <span className="rounded-full bg-white/86 px-3 py-1.5 text-[11px] font-semibold text-[#5f6368] ring-1 ring-white/70">
+                {previewService.booking_url ? 'Direct booking available' : 'BookedAI guided booking'}
+              </span>
             </div>
             </div>
 
             <div className="px-4 py-4 sm:px-5 sm:py-5">
-            <div className="grid gap-3 sm:grid-cols-2">
-              <div className="rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3.5">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
-                  Tenant overview
-                </div>
-                <div className="mt-2 text-sm font-semibold text-[#111827]">
-                  {previewService.venue_name || previewService.source_label || previewService.name}
-                </div>
-                <p className="mt-1 text-sm leading-6 text-[#5f6368]">
-                  {previewService.location || 'Location details are confirmed during booking handoff.'}
-                </p>
-                {previewService.source_label ? (
-                  <div className="mt-3 inline-flex rounded-full bg-[#f5f7fb] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368]">
-                    Source: {previewService.source_label}
-                  </div>
-                ) : null}
+            <div className="rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3.5">
+              <div className="text-sm font-semibold text-[#111827]">
+                {previewService.venue_name || previewService.source_label || previewService.name}
               </div>
-
-              <div className="rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3.5">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
-                  Service snapshot
+              <p className="mt-1 text-sm leading-6 text-[#5f6368]">
+                {previewService.location || 'Location details are confirmed during booking handoff.'}
+              </p>
+              <p className="mt-3 text-sm leading-6 text-[#5f6368]">
+                {previewService.summary || 'BookedAI matched this option as a relevant next step for the enquiry.'}
+              </p>
+              {previewService.source_label ? (
+                <div className="mt-3 inline-flex rounded-full bg-[#f5f7fb] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368]">
+                  Source: {previewService.source_label}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2">
-                  <span className="rounded-full bg-[#eef4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1a73e8]">
-                    A${previewService.amount_aud}
-                  </span>
-                  <span className="rounded-full bg-[#f5f7fb] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368]">
-                    {previewService.duration_minutes} min
-                  </span>
-                </div>
-                <p className="mt-3 text-sm leading-6 text-[#5f6368]">
-                  {previewService.summary || 'BookedAI matched this option as a relevant next step for the enquiry.'}
-                </p>
-              </div>
+              ) : null}
             </div>
 
             <div className="mt-3 rounded-[1.15rem] border border-[#dfe8f3] bg-[#f8fbff] px-4 py-3.5">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
-                Why BookedAI surfaced this
-              </div>
               <p className="mt-2 text-sm leading-6 text-[#31507b]">
                 {previewService.why_this_matches ||
                   previewService.next_step ||

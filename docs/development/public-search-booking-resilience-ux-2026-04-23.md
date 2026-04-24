@@ -34,6 +34,7 @@ Required behavior:
 
 - user can still continue through the booking flow
 - degraded v1 write behavior should fall back safely to the legacy booking-session path where possible
+- that fallback should stay recovery-only: when the authoritative live-read booking-intent write succeeds, the homepage should not bounce the user back through the legacy catalog session flow just to hydrate a richer result
 - the UI should not strand the user in an indefinite `Continue booking` failure state
 
 ### 2. Slow search must stay legible
@@ -144,6 +145,7 @@ This public-flow update should now be treated as complete only when:
 - popup assistant uses the same quality bar for progress and guidance states
 - embedded assistant does not regress to thin generic loading language
 - `Continue booking` remains usable when the v1 write lane is degraded but legacy session creation is still available
+- the normal live-read success path should remain authoritative end to end, so shortlist matches returned from live-read do not fail later with catalog-only errors such as `Selected service was not found`
 - future public-surface work does not reintroduce drift between homepage and assistant matching-state behavior
 
 ## Follow-up recommendations

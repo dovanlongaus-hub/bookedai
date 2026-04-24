@@ -30,8 +30,8 @@ class ContactRepository(BaseRepository):
                 from contacts
                 where tenant_id = :tenant_id
                   and (
-                    (:email is not null and lower(coalesce(email, '')) = :email)
-                    or (:phone is not null and phone = :phone)
+                    (cast(:email as text) is not null and lower(coalesce(email, '')) = cast(:email as text))
+                    or (cast(:phone as text) is not null and phone = cast(:phone as text))
                   )
                 order by created_at asc
                 limit 1

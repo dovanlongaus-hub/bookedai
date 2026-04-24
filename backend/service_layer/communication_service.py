@@ -375,12 +375,25 @@ class CommunicationService:
             raise ValueError("Twilio requires a sender number or messaging service SID.")
 
         async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.post(
-                f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json",
-                data=payload,
-                auth=(auth_username, auth_secret),
-            )
-            response.raise_for_status()
+            try:
+                response = await client.post(
+                    f"https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json",
+                    data=payload,
+                    auth=(auth_username, auth_secret),
+                )
+                response.raise_for_status()
+            except httpx.HTTPStatusError as error:
+                status_code = error.response.status_code if error.response is not None else None
+                if status_code in {401, 403} or (status_code is not None and status_code >= 500):
+                    return CommunicationSendResult(
+                        provider=provider_label,
+                        delivery_status="queued",
+                        provider_message_id=None,
+                        warnings=[
+                            "Messaging provider delivery is unavailable right now; the message was recorded for manual review."
+                        ],
+                    )
+                raise
             data = response.json()
         return CommunicationSendResult(
             provider=provider_label,
@@ -392,20 +405,33 @@ class CommunicationService:
     async def _send_meta_whatsapp_message(self, *, to: str, body: str) -> CommunicationSendResult:
         recipient = to.lstrip("+")
         async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.post(
-                f"https://graph.facebook.com/v19.0/{self.settings.whatsapp_meta_phone_number_id}/messages",
-                headers={
-                    "Authorization": f"Bearer {self.settings.whatsapp_meta_access_token}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "messaging_product": "whatsapp",
-                    "to": recipient,
-                    "type": "text",
-                    "text": {"body": body},
-                },
-            )
-            response.raise_for_status()
+            try:
+                response = await client.post(
+                    f"https://graph.facebook.com/v19.0/{self.settings.whatsapp_meta_phone_number_id}/messages",
+                    headers={
+                        "Authorization": f"Bearer {self.settings.whatsapp_meta_access_token}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "messaging_product": "whatsapp",
+                        "to": recipient,
+                        "type": "text",
+                        "text": {"body": body},
+                    },
+                )
+                response.raise_for_status()
+            except httpx.HTTPStatusError as error:
+                status_code = error.response.status_code if error.response is not None else None
+                if status_code in {401, 403} or (status_code is not None and status_code >= 500):
+                    return CommunicationSendResult(
+                        provider=self.whatsapp_adapter.provider_name,
+                        delivery_status="queued",
+                        provider_message_id=None,
+                        warnings=[
+                            "Messaging provider delivery is unavailable right now; the message was recorded for manual review."
+                        ],
+                    )
+                raise
             data = response.json()
         messages = data.get("messages") or []
         first_message = messages[0] if messages else {}

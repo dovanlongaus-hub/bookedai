@@ -23,7 +23,7 @@ function readPortalReferenceFromUrl() {
   const url = new URL(window.location.href);
   return (
     url.searchParams.get('booking_reference') ||
-    url.searchParams.get('ref') ||
+    url.searchParams.get('bookingReference') ||
     ''
   ).trim();
 }

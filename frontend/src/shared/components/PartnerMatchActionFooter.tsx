@@ -26,14 +26,14 @@ export function PartnerMatchActionFooter({
               target="_blank"
               rel="noreferrer"
               onClick={onActionClick}
-              className={`inline-flex items-center rounded-full px-3.5 py-2 text-[11px] font-semibold ${
+              className={`inline-flex items-center rounded-full px-3.5 py-2 text-[11px] font-semibold transition ${
                 selected
                   ? link.tone === 'accent'
-                    ? 'border border-[#cfe1ff] bg-[#1a73e8] text-white'
-                    : 'border border-[#cfe1ff] bg-white text-[#1a73e8]'
+                    ? 'border border-[#cfe1ff] bg-[#1a73e8] text-white hover:bg-[#1558b0]'
+                    : 'border border-[#cfe1ff] bg-white text-[#1a73e8] hover:bg-[#f8fbff]'
                   : link.tone === 'accent'
-                    ? 'border border-[#cce0ff] bg-[#e8f0fe] text-[#1a73e8]'
-                    : 'border border-slate-200 bg-slate-50 text-slate-700'
+                    ? 'border border-[#cce0ff] bg-[#e8f0fe] text-[#1a73e8] hover:bg-[#dce9ff]'
+                    : 'border border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
               }`}
             >
               {link.label}
@@ -42,8 +42,8 @@ export function PartnerMatchActionFooter({
         </div>
       ) : null}
       <div
-        className={`mt-3 rounded-[1rem] border px-3 py-2.5 ${
-          selected ? 'border-[#d7e7ff] bg-white' : 'border-transparent bg-slate-50'
+        className={`mt-3 rounded-[1rem] border px-3 py-3 ${
+          selected ? 'border-[#d7e7ff] bg-white shadow-[0_10px_24px_rgba(26,115,232,0.08)]' : 'border-[#eef2f7] bg-[#fbfcfe]'
         }`}
       >
         <div className="flex flex-wrap items-center justify-between gap-3">
@@ -56,7 +56,7 @@ export function PartnerMatchActionFooter({
               {model.title}
             </div>
             <div
-              className={`mt-1 text-[11px] font-medium ${
+              className={`mt-1 text-[11px] leading-5 font-medium ${
                 selected ? 'text-slate-700' : 'text-slate-700'
               }`}
             >
