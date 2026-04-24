@@ -35,6 +35,24 @@ export function getApiBaseUrl() {
   return '/api';
 }
 
+/**
+ * Base URL for public booking-assistant endpoints (catalog, chat, session, stream).
+ * When `VITE_OPENCLAW_PUBLIC_CHAT_URL` is set (e.g. `http://127.0.0.1:18810/public`), the UI
+ * sends main chat traffic through the OpenClaw internal-api-bridge, which proxies to
+ * `BOOKEDAI_PUBLIC_API_BASE_URL` on the BookedAI backend. Must be reachable from the browser.
+ */
+export function getBookingAssistantPublicApiBaseUrl() {
+  const openclaw = import.meta.env.VITE_OPENCLAW_PUBLIC_CHAT_URL?.trim().replace(/^['"]|['"]$/g, '');
+  if (openclaw) {
+    try {
+      return new URL(openclaw).toString().replace(/\/$/, '');
+    } catch {
+      return getApiBaseUrl();
+    }
+  }
+  return getApiBaseUrl();
+}
+
 export function shouldUseLocalStaticPublicData() {
   if (typeof window === 'undefined') {
     return false;

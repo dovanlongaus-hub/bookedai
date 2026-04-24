@@ -3,6 +3,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from api.admin_routes import router as admin_router
 from api.communication_routes import router as communication_router
+from api.internal_routes import router as internal_router
 from api.public_catalog_routes import router as public_catalog_router
 from api.route_handlers import lifespan, settings
 from api.upload_routes import router as upload_router
@@ -39,6 +40,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(communication_router)
     app.include_router(v1_router)
+    app.include_router(internal_router)
     return app
 
 

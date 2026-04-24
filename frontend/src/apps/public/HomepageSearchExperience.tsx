@@ -14,7 +14,10 @@ import {
 } from '../../components/landing/attribution';
 import { brandShortIconPath, demoContent } from '../../components/landing/data';
 import { apiV1 } from '../../shared/api';
-import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../shared/config/api';
+import {
+  getBookingAssistantPublicApiBaseUrl,
+  shouldUseLocalStaticPublicData,
+} from '../../shared/config/api';
 import { resolveApiErrorMessage } from '../../shared/api/client';
 import { isPublicBookingAssistantV1LiveReadEnabled } from '../../shared/config/publicBookingAssistant';
 import {
@@ -1662,7 +1665,7 @@ export function HomepageSearchExperience({
       }
 
       try {
-        const response = await fetch(`${getApiBaseUrl()}/booking-assistant/catalog`, {
+        const response = await fetch(`${getBookingAssistantPublicApiBaseUrl()}/booking-assistant/catalog`, {
           signal: controller.signal,
         });
         if (!response.ok) {
@@ -1872,7 +1875,7 @@ export function HomepageSearchExperience({
   }
 
   async function requestLegacySearch(query: string, nextGeoContext?: UserGeoContext | null) {
-    const response = await fetch(`${getApiBaseUrl()}/booking-assistant/chat`, {
+    const response = await fetch(`${getBookingAssistantPublicApiBaseUrl()}/booking-assistant/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2486,7 +2489,7 @@ export function HomepageSearchExperience({
         timezone: 'Australia/Sydney',
       });
 
-      const response = await fetch(`${getApiBaseUrl()}/booking-assistant/session`, {
+      const response = await fetch(`${getBookingAssistantPublicApiBaseUrl()}/booking-assistant/session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

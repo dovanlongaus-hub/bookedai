@@ -6,7 +6,9 @@ import hashlib
 import hmac
 import json
 import logging
+import os
 import re
+import time
 import unicodedata
 from datetime import datetime, timedelta
 from typing import Any
@@ -115,6 +117,7 @@ class AIProviderConfig:
     api_key: str
     base_url: str
     model: str
+    provider_name: str = "compatible"
 
     @property
     def responses_endpoint(self) -> str:
@@ -1382,6 +1385,7 @@ class AIEventSearchService:
 @dataclass
 class OpenAIService:
     settings: Settings
+    RETRYABLE_STATUS_CODES = {408, 409, 425, 429, 500, 502, 503, 504}
 
     @staticmethod
     def _is_hospitality_booking_query(
@@ -2001,53 +2005,68 @@ class OpenAIService:
             yield f"data: {json.dumps({'type': 'done', 'matched_service_ids': []})}\n\n"
             return
 
-        provider = providers[0]
-        chat_completions_url = f"{provider.base_url.rstrip('/')}/chat/completions"
-        headers = {
-            "Authorization": f"Bearer {provider.api_key}",
-            "Content-Type": "application/json",
-            "Accept": "text/event-stream",
-        }
         request_payload = {
-            "model": provider.model,
             "messages": messages,
             "stream": True,
             "max_tokens": 400,
         }
 
         collected_text = ""
-        try:
-            async with httpx.AsyncClient(timeout=self.settings.openai_timeout_seconds) as client:
-                async with client.stream(
-                    "POST",
-                    chat_completions_url,
-                    headers=headers,
-                    json=request_payload,
-                ) as response:
-                    response.raise_for_status()
-                    async for line in response.aiter_lines():
-                        if not line.startswith("data: "):
-                            continue
-                        chunk_data = line[6:]
-                        if chunk_data.strip() == "[DONE]":
-                            break
-                        try:
-                            chunk = json.loads(chunk_data)
-                        except json.JSONDecodeError:
-                            continue
-                        delta_content = (
-                            chunk.get("choices", [{}])[0]
-                            .get("delta", {})
-                            .get("content")
-                        )
-                        if delta_content:
-                            collected_text += delta_content
-                            yield f"data: {json.dumps({'type': 'token', 'text': delta_content})}\n\n"
-        except Exception as exc:
-            logger.warning("streaming_reply_error: %s", exc)
-            if not collected_text:
-                fallback = "I can help you find and book the right service. What are you looking for today?"
-                yield f"data: {json.dumps({'type': 'token', 'text': fallback})}\n\n"
+        last_error: Exception | None = None
+        for provider in providers:
+            chat_completions_url = f"{provider.base_url.rstrip('/')}/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {provider.api_key}",
+                "Content-Type": "application/json",
+                "Accept": "text/event-stream",
+            }
+            try:
+                async with httpx.AsyncClient(timeout=self.settings.openai_timeout_seconds) as client:
+                    self._mark_provider_used(provider)
+                    async with client.stream(
+                        "POST",
+                        chat_completions_url,
+                        headers=headers,
+                        json={**request_payload, "model": provider.model},
+                    ) as response:
+                        response.raise_for_status()
+                        async for line in response.aiter_lines():
+                            if not line.startswith("data: "):
+                                continue
+                            chunk_data = line[6:]
+                            if chunk_data.strip() == "[DONE]":
+                                break
+                            try:
+                                chunk = json.loads(chunk_data)
+                            except json.JSONDecodeError:
+                                continue
+                            delta_content = (
+                                chunk.get("choices", [{}])[0]
+                                .get("delta", {})
+                                .get("content")
+                            )
+                            if delta_content:
+                                collected_text += delta_content
+                                yield f"data: {json.dumps({'type': 'token', 'text': delta_content})}\n\n"
+                break
+            except httpx.HTTPStatusError as exc:
+                retryable = exc.response.status_code in self.RETRYABLE_STATUS_CODES
+                self._mark_provider_failure(provider, retryable=retryable)
+                last_error = exc
+                continue
+            except httpx.HTTPError as exc:
+                self._mark_provider_failure(provider, retryable=True)
+                last_error = exc
+                continue
+            except Exception as exc:
+                self._mark_provider_failure(provider, retryable=True)
+                last_error = exc
+                continue
+
+        if not collected_text and last_error is not None:
+            logger.warning("streaming_reply_error: %s", last_error)
+            fallback = "I can help you find and book the right service. What are you looking for today?"
+            yield f"data: {json.dumps({'type': 'token', 'text': fallback})}\n\n"
 
         yield f"data: {json.dumps({'type': 'done', 'matched_service_ids': []})}\n\n"
 
@@ -2362,27 +2381,67 @@ class OpenAIService:
 
     def _provider_configs(self) -> list[AIProviderConfig]:
         providers: list[AIProviderConfig] = []
-        primary = self._build_provider_config(
-            label=self.settings.ai_provider or "primary",
-            api_key=self.settings.ai_api_key,
-            base_url=self.settings.ai_base_url,
-            model=self.settings.ai_model,
+        groq_primary_keys = self._parse_api_keys(os.getenv("GROQ_API_KEYS", ""))
+        groq_fallback_keys = self._parse_api_keys(os.getenv("GROQ_FALLBACK_API_KEYS", ""))
+        groq_base_url = os.getenv("GROQ_BASE_URL", "").strip() or "https://api.groq.com/openai/v1"
+        groq_model = os.getenv("GROQ_MODEL", "").strip() or self.settings.ai_model
+
+        providers.extend(
+            self._build_provider_configs(
+                label="groq-primary",
+                provider_name="groq",
+                api_keys=groq_primary_keys,
+                base_url=groq_base_url,
+                model=groq_model,
+            )
         )
-        fallback = self._build_provider_config(
-            label=self.settings.ai_fallback_provider or "fallback",
-            api_key=self.settings.ai_fallback_api_key,
-            base_url=self.settings.ai_fallback_base_url,
-            model=self.settings.ai_fallback_model,
+        providers.extend(
+            self._build_provider_configs(
+                label="primary",
+                provider_name=self.settings.ai_provider or "primary",
+                api_keys=self._parse_api_keys(self.settings.ai_api_key),
+                base_url=self.settings.ai_base_url,
+                model=self.settings.ai_model,
+            )
         )
-        for provider in (primary, fallback):
-            if provider and provider.api_key:
-                providers.append(provider)
-        return providers
+        providers.extend(
+            self._build_provider_configs(
+                label="groq-fallback",
+                provider_name="groq",
+                api_keys=groq_fallback_keys,
+                base_url=groq_base_url,
+                model=groq_model,
+            )
+        )
+        providers.extend(
+            self._build_provider_configs(
+                label="fallback",
+                provider_name=self.settings.ai_fallback_provider or "fallback",
+                api_keys=self._parse_api_keys(self.settings.ai_fallback_api_key),
+                base_url=self.settings.ai_fallback_base_url,
+                model=self.settings.ai_fallback_model,
+            )
+        )
+        if not providers:
+            return []
+
+        key_state = self._provider_key_state()
+        now = time.monotonic()
+
+        def provider_sort_key(provider: AIProviderConfig) -> tuple[float, float, str]:
+            state = key_state.get(provider.api_key, {})
+            cooldown_until = float(state.get("cooldown_until", 0.0))
+            in_cooldown = 1.0 if cooldown_until > now else 0.0
+            last_used = float(state.get("last_used_at", 0.0))
+            return (in_cooldown, last_used, provider.label)
+
+        return sorted(providers, key=provider_sort_key)
 
     @staticmethod
     def _build_provider_config(
         *,
         label: str,
+        provider_name: str,
         api_key: str,
         base_url: str,
         model: str,
@@ -2395,7 +2454,56 @@ class OpenAIService:
             api_key=normalized_key,
             base_url=base_url.strip() or "https://api.openai.com/v1",
             model=model.strip() or "gpt-5-mini",
+            provider_name=provider_name.strip() or "compatible",
         )
+
+    @classmethod
+    def _parse_api_keys(cls, raw_value: str) -> list[str]:
+        if not raw_value:
+            return []
+        values = re.split(r"[\n,;]+", raw_value)
+        return [value.strip() for value in values if value.strip()]
+
+    def _build_provider_configs(
+        self,
+        *,
+        label: str,
+        provider_name: str,
+        api_keys: list[str],
+        base_url: str,
+        model: str,
+    ) -> list[AIProviderConfig]:
+        providers: list[AIProviderConfig] = []
+        for index, key in enumerate(api_keys):
+            provider = self._build_provider_config(
+                label=f"{label}-{index + 1}",
+                provider_name=provider_name,
+                api_key=key,
+                base_url=base_url,
+                model=model,
+            )
+            if provider:
+                providers.append(provider)
+        return providers
+
+    def _provider_key_state(self) -> dict[str, dict[str, float]]:
+        state = getattr(self, "_key_state", None)
+        if state is None:
+            state = {}
+            setattr(self, "_key_state", state)
+        return state
+
+    def _mark_provider_used(self, provider: AIProviderConfig) -> None:
+        state = self._provider_key_state().setdefault(provider.api_key, {})
+        state["last_used_at"] = time.monotonic()
+
+    def _mark_provider_failure(self, provider: AIProviderConfig, *, retryable: bool) -> None:
+        state = self._provider_key_state().setdefault(provider.api_key, {})
+        failures = int(state.get("failure_count", 0.0)) + 1
+        state["failure_count"] = float(failures)
+        now = time.monotonic()
+        cooldown_seconds = min(1.0 * failures, 8.0) if retryable else 30.0
+        state["cooldown_until"] = now + cooldown_seconds
 
     async def _generate_provider_structured_json(
         self,
@@ -2440,12 +2548,21 @@ class OpenAIService:
         }
 
         async with httpx.AsyncClient(timeout=self.settings.openai_timeout_seconds) as client:
-            response = await client.post(
-                provider.responses_endpoint,
-                headers=headers,
-                json=request_payload,
-            )
-            response.raise_for_status()
+            try:
+                self._mark_provider_used(provider)
+                response = await client.post(
+                    provider.responses_endpoint,
+                    headers=headers,
+                    json=request_payload,
+                )
+                response.raise_for_status()
+            except httpx.HTTPStatusError as exc:
+                retryable = exc.response.status_code in self.RETRYABLE_STATUS_CODES
+                self._mark_provider_failure(provider, retryable=retryable)
+                raise
+            except httpx.HTTPError:
+                self._mark_provider_failure(provider, retryable=True)
+                raise
             data = response.json()
 
         return self._extract_openai_output_text(data)

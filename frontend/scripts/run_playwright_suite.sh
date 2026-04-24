@@ -23,6 +23,11 @@ else
   export VITE_PUBLIC_BOOKING_ASSISTANT_V1_LIVE_READ=0
 fi
 
+# Caller already has a dev/preview server (e.g. docker compose frontend on :3000).
+if [[ "${PLAYWRIGHT_EXTERNAL_SERVER:-}" == "1" ]]; then
+  exec npx playwright test "$@"
+fi
+
 bash scripts/kill_playwright_preview.sh 3100 3101
 
 if [[ "${PLAYWRIGHT_SKIP_BUILD:-0}" != "1" ]]; then
@@ -55,4 +60,4 @@ if ! curl -fsS "${SERVER_URL}" >/dev/null 2>&1; then
   exit 1
 fi
 
-PLAYWRIGHT_EXTERNAL_SERVER=1 npx playwright test "$@"
+npx playwright test "$@"

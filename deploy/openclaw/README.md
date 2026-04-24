@@ -22,6 +22,18 @@ docker compose --env-file deploy/openclaw/.env -f deploy/openclaw/docker-compose
 
 - OpenClaw state lives in `${OPENCLAW_CONFIG_DIR}`
 - The BookedAI repo is mounted read-write at `/workspace/bookedai.au`
+- `openclaw-internal-api-bridge` exposes a tool-friendly bridge at `http://openclaw-internal-api-bridge:18810`
+  (host port `${OPENCLAW_INTERNAL_API_BRIDGE_PORT:-18810}`), forwarding calls to
+  `${BOOKEDAI_INTERNAL_API_BASE_URL}` with `BOOKEDAI_INTERNAL_TOKEN` automatically attached.
+- Bridge auth accepts either `Authorization: Bearer <OPENCLAW_BRIDGE_SHARED_TOKEN>` or
+  `X-OpenClaw-Bridge-Token: <OPENCLAW_BRIDGE_SHARED_TOKEN>`.
+- Allowed upstream path roots are constrained by `OPENCLAW_BRIDGE_ALLOWED_PREFIXES`
+  (default: `booking,search,communications,integrations`).
+- **Main booking-assistant UI (browser)** can go through the bridge: `GET|POST /public/booking-assistant/*`
+  proxies to `${BOOKEDAI_PUBLIC_API_BASE_URL}` (default `http://backend:8000/api`) with CORS from
+  `OPENCLAW_BRIDGE_CORS_ORIGINS`. In the Vite app, set `VITE_OPENCLAW_PUBLIC_CHAT_URL` to the browser-reachable
+  bridge prefix, e.g. `http://127.0.0.1:18810/public`, so catalog, chat, session, and chat stream traffic
+  hits the OpenClaw stack first, then the BookedAI backend.
 - On the current VPS host, that mount source is `/home/dovanlong/BookedAI`; Linux user `openclaw` now has ACL-based write access on the repo tree plus traverse access on `/home/dovanlong`, so file edits made through `/workspace/bookedai.au` can persist cleanly without re-owning the repository
 - The repo ACL was re-applied recursively on `2026-04-22` so the permission model now covers the full BookedAI tree, including the landing-page sections `HomepageExecutiveBoardSection.tsx` and `HomepageOverviewSection.tsx`
 - The standard `openclaw-gateway` container runs as `node` (`uid 1000`), so the host bind source now also grants ACL write access to host `uid 1000`; without that extra ACL entry, gateway-side memory flushes and repo updates can still fail with `EACCES`
@@ -37,3 +49,17 @@ docker compose --env-file deploy/openclaw/.env -f deploy/openclaw/docker-compose
 - OpenClaw Control UI is served directly by the Gateway on port `18789`
 - The intended public reverse-proxy host for that UI is `https://bot.bookedai.au/`
 - Optional Anthropic-native Claude access can be injected at runtime with `ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL`; the compose stack forwards both into the gateway and CLI without requiring secrets in tracked docs.
+
+## Internal API bridge quick test
+
+With the stack running:
+
+```bash
+curl -sS http://127.0.0.1:${OPENCLAW_INTERNAL_API_BRIDGE_PORT:-18810}/healthz
+```
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer ${OPENCLAW_BRIDGE_SHARED_TOKEN}" \
+  "http://127.0.0.1:${OPENCLAW_INTERNAL_API_BRIDGE_PORT:-18810}/bookedai/integrations/providers/status"
+```

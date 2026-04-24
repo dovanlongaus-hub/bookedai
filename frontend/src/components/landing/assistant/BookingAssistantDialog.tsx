@@ -7,7 +7,11 @@ import {
   type BookingAssistantContent,
 } from '../data';
 import { apiV1 } from '../../../shared/api';
-import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../../shared/config/api';
+import {
+  getApiBaseUrl,
+  getBookingAssistantPublicApiBaseUrl,
+  shouldUseLocalStaticPublicData,
+} from '../../../shared/config/api';
 import { resolveApiErrorMessage } from '../../../shared/api/client';
 import {
   isPublicBookingAssistantV1Enabled,
@@ -1586,7 +1590,10 @@ export function BookingAssistantDialog({
   const assistantSourcePath = resolveAssistantEntrySourcePath(entrySourcePath);
 
   function buildAssistantApiUrl(pathname: string) {
-    const url = new URL(`${getApiBaseUrl()}${pathname}`, window.location.origin);
+    const base = pathname.startsWith('/booking-assistant')
+      ? getBookingAssistantPublicApiBaseUrl()
+      : getApiBaseUrl();
+    const url = new URL(`${base}${pathname}`, window.location.origin);
     if (runtimeConfig?.tenantRef) {
       url.searchParams.set('tenant_ref', runtimeConfig.tenantRef);
     }

@@ -1,4 +1,25 @@
 services:
+  openclaw-internal-api-bridge:
+    build:
+      context: ./internal-api-bridge
+    container_name: openclaw-bookedai-internal-api-bridge
+    environment:
+      BOOKEDAI_INTERNAL_API_BASE_URL: ${BOOKEDAI_INTERNAL_API_BASE_URL:-http://backend:8000/api/internal/v1}
+      BOOKEDAI_INTERNAL_TOKEN: ${BOOKEDAI_INTERNAL_TOKEN:-bookedai-mvp-internal-dummy}
+      BOOKEDAI_PUBLIC_API_BASE_URL: ${BOOKEDAI_PUBLIC_API_BASE_URL:-http://backend:8000/api}
+      OPENCLAW_BRIDGE_SHARED_TOKEN: ${OPENCLAW_BRIDGE_SHARED_TOKEN:-bookedai-openclaw-bridge-dummy}
+      OPENCLAW_BRIDGE_REQUEST_TIMEOUT_SECONDS: ${OPENCLAW_BRIDGE_REQUEST_TIMEOUT_SECONDS:-25}
+      OPENCLAW_BRIDGE_ALLOWED_PREFIXES: ${OPENCLAW_BRIDGE_ALLOWED_PREFIXES:-booking,search,communications,integrations}
+      OPENCLAW_BRIDGE_CORS_ORIGINS: ${OPENCLAW_BRIDGE_CORS_ORIGINS:-http://localhost:3000,http://127.0.0.1:3000,http://localhost:5173,http://127.0.0.1:5173}
+      OPENCLAW_BRIDGE_PUBLIC_STREAM_TIMEOUT_SECONDS: ${OPENCLAW_BRIDGE_PUBLIC_STREAM_TIMEOUT_SECONDS:-300}
+    ports:
+      - "${OPENCLAW_INTERNAL_API_BRIDGE_PORT:-18810}:18810"
+    networks:
+      - default
+      - bookedai_internal
+    init: true
+    restart: unless-stopped
+
   openclaw-gateway:
     image: ${OPENCLAW_IMAGE:-ghcr.io/openclaw/openclaw:2026.3.12}
     container_name: openclaw-bookedai-gateway
@@ -92,6 +113,7 @@ services:
         "bookedai-host-cli"
       ]
     depends_on:
+      - openclaw-internal-api-bridge
       - openclaw-gateway
 
 networks:

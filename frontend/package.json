@@ -12,6 +12,8 @@
     "test:playwright:admin-smoke": "bash scripts/run_admin_smoke.sh",
     "test:playwright:legacy": "bash scripts/run_legacy_smoke.sh",
     "test:playwright:live-read": "bash scripts/run_live_read_smoke.sh",
+    "test:playwright:examples": "bash scripts/run_playwright_suite.sh legacy tests/example-orchestration-flows.spec.ts",
+    "test:playwright:basic-workflows": "bash scripts/run_basic_workflows.sh",
     "test:playwright:smoke": "npm run test:playwright:legacy && npm run test:playwright:live-read && npm run test:playwright:admin-smoke",
     "test:release-gate": "npm run build && PLAYWRIGHT_SKIP_BUILD=1 npm run test:playwright:smoke"
   },

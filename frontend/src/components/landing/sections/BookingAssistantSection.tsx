@@ -6,7 +6,10 @@ import {
   demoContent,
   type BookingAssistantContent,
 } from '../data';
-import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../../shared/config/api';
+import {
+  getBookingAssistantPublicApiBaseUrl,
+  shouldUseLocalStaticPublicData,
+} from '../../../shared/config/api';
 import { resolveApiErrorMessage } from '../../../shared/api/client';
 import { isPublicBookingAssistantV1LiveReadEnabled } from '../../../shared/config/publicBookingAssistant';
 import {
@@ -668,7 +671,7 @@ export function BookingAssistantSection({
       }
 
       try {
-        const response = await fetch(`${getApiBaseUrl()}/booking-assistant/catalog`, {
+        const response = await fetch(`${getBookingAssistantPublicApiBaseUrl()}/booking-assistant/catalog`, {
           signal: controller.signal,
         });
         if (!response.ok) {
@@ -731,7 +734,7 @@ export function BookingAssistantSection({
     nextMessages: ChatMessage[],
     geoContext?: UserGeoContext | null,
   ) {
-    const response = await fetch(`${getApiBaseUrl()}/booking-assistant/chat`, {
+    const response = await fetch(`${getBookingAssistantPublicApiBaseUrl()}/booking-assistant/chat`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1079,7 +1082,7 @@ export function BookingAssistantSection({
         timezone: 'Australia/Sydney',
       });
 
-      const response = await fetch(`${getApiBaseUrl()}/booking-assistant/session`, {
+      const response = await fetch(`${getBookingAssistantPublicApiBaseUrl()}/booking-assistant/session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

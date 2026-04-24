@@ -91,6 +91,8 @@ services:
       - "3000:3000"
     environment:
       VITE_API_BASE_URL: ${VITE_API_BASE_URL:-http://localhost:8000/api}
+      # Browser must reach this host:port; default routes main booking-assistant via OpenClaw bridge :18810
+      VITE_OPENCLAW_PUBLIC_CHAT_URL: ${VITE_OPENCLAW_PUBLIC_CHAT_URL:-http://127.0.0.1:18810/public}
     depends_on:
       - backend
 
