@@ -99,6 +99,10 @@ Expected outcomes:
   - prefer one dominant search-led opening surface over stacked marketing blocks
   - prefer fewer support cards, wider whitespace, lighter type weight, and quieter CTA copy
   - keep deeper narrative weight out of the main homepage body whenever the same content can live on `pitch.bookedai.au`
+- that homepage direction is no longer only a parallel-shell instruction as of `2026-04-24`:
+  - `frontend/src/apps/public/PublicApp.tsx` is now the shipped homepage implementation for that calmer search-first light layout on `bookedai.au`
+  - the production surface keeps the existing logo and navigation while moving the rest of the homepage toward a blue search-led hero, quieter support sections, and a lighter product-first public narrative
+  - live release verification for that surface now includes `artifacts/screenshots/publicapp-live-2026-04-24.png`
 
 Execution guardrail:
 
@@ -113,6 +117,12 @@ Immediate public implementation slice now queued:
 4. refactor shared homepage content sources so homepage and pitch do not drift again
 5. keep homepage and assistant search states visibly progressive and informative under slower matching conditions
 6. preserve safe booking-submit fallback behavior whenever the v1 write lane is degraded
+
+Completion update on `2026-04-24`:
+
+- items `1`, `3`, `5`, and `6` are now reflected in the shipped `frontend/src/apps/public/PublicApp.tsx` runtime on `bookedai.au`
+- the live homepage now uses the calmer search-first light composition instead of the earlier heavier marketplace-image landing treatment
+- production deploy and health verification passed, and a live screenshot proof now exists at `artifacts/screenshots/publicapp-live-2026-04-24.png`
 
 ## Portal
 

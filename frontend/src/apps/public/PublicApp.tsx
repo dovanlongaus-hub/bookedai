@@ -1,48 +1,32 @@
-import { useMemo } from 'react';
+import { FormEvent, useMemo, useState } from 'react';
 
 import { Header } from '../../components/landing/Header';
-import {
-  buildPublicCtaAttribution,
-  dispatchPublicCtaAttribution,
-} from '../../components/landing/attribution';
-import { productHref, roadmapHref, adminHref, tenantHref } from '../../components/landing/data';
+import { productHref, roadmapHref } from '../../components/landing/data';
 import { HomepageSearchExperience } from './HomepageSearchExperience';
 import { getHomepageContent, pitchDeckHref } from './homepageContent';
-import { BrandLockup } from '../../components/landing/ui/BrandLockup';
-import { SignalPill } from '../../components/landing/ui/SignalPill';
+
 const homepageNavItems = [
-  { id: 'hero', label: 'Overview' },
-  { id: 'bookedai-search-assistant', label: 'Live Search' },
+  { id: 'hero', label: 'Search' },
+  { id: 'bookedai-search-assistant', label: 'Results' },
   { id: 'roadmap', label: 'Roadmap', href: roadmapHref },
+];
+
+const suggestedSearches = [
+  'Private swim coaching near Caringbah this weekend',
+  'Premium haircut near Sydney CBD this afternoon',
+  'Restaurant for tonight with live booking availability',
+  'AI mentor session for startup growth this week',
 ];
 
 export function PublicApp() {
   const homepageSearchContent = useMemo(() => getHomepageContent('en'), []);
+  const [queryValue, setQueryValue] = useState('');
+  const [submittedQuery, setSubmittedQuery] = useState<string | null>(null);
+  const [submittedRequestId, setSubmittedRequestId] = useState(0);
   const sourcePath =
     typeof window !== 'undefined'
       ? `${window.location.pathname}${window.location.search}`
       : '/';
-
-  function openSalesContact(sourceSection: 'header' | 'hero' | 'call_to_action' | 'footer') {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const attribution = buildPublicCtaAttribution({
-      source_section: sourceSection,
-      source_cta: 'start_free_trial',
-      source_detail: 'register-interest-route',
-    });
-    const target = new URL('/register-interest', window.location.origin);
-    target.searchParams.set('source_section', attribution.source_section);
-    target.searchParams.set('source_cta', attribution.source_cta);
-    if (attribution.source_detail) {
-      target.searchParams.set('source_detail', attribution.source_detail);
-    }
-
-    dispatchPublicCtaAttribution(attribution);
-    window.location.href = `${target.pathname}${target.search}`;
-  }
 
   function openProductTrial() {
     if (typeof window === 'undefined') {
@@ -60,112 +44,104 @@ export function PublicApp() {
     window.location.href = pitchDeckHref;
   }
 
-  function scrollToLiveDemo() {
-    if (typeof window === 'undefined') {
+  function runSearch(query: string) {
+    const trimmed = query.trim();
+    if (!trimmed) {
       return;
     }
 
-    document.getElementById('bookedai-search-assistant')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    setQueryValue(trimmed);
+    setSubmittedQuery(trimmed);
+    setSubmittedRequestId((current) => current + 1);
+  }
+
+  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    runSearch(queryValue);
   }
 
   return (
-    <main className="booked-shell min-h-screen bg-[linear-gradient(180deg,#f4f8fc_0%,#edf3f8_20%,#f7fafc_46%,#eef5fa_72%,#fbfdff_100%)] text-[#1d1d1f] xl:pl-[7rem]">
-      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.16),transparent_20%),radial-gradient(circle_at_82%_10%,rgba(14,165,233,0.12),transparent_24%),radial-gradient(circle_at_50%_42%,rgba(37,99,235,0.05),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.44)_0%,rgba(255,255,255,0.06)_32%,rgba(255,255,255,0.5)_100%)]" />
-
+    <main className="min-h-screen bg-[linear-gradient(180deg,#f7f9fc_0%,#ffffff_100%)] text-[#202124] xl:pl-[7rem]">
       <div className="relative z-10">
         <Header
           navItems={homepageNavItems}
           onStartTrial={openProductTrial}
-          onBookDemo={() => openSalesContact('header')}
+          onBookDemo={openPitchDeck}
           startTrialLabel="Open Web App"
-          bookDemoLabel="Talk to Sales"
+          bookDemoLabel="Open Pitch"
           compactMenuOnly
           utilityLinks={[
-            { label: 'Language: EN', href: '#hero' },
-            { label: 'Pitch', href: pitchDeckHref },
+            { label: 'Search', href: '#hero' },
+            { label: 'Roadmap', href: roadmapHref },
             { label: 'Video Demo', href: '/video-demo.html' },
           ]}
         />
 
-        <section id="hero" className="mx-auto w-full max-w-7xl px-4 pb-2 pt-3 sm:px-6 lg:px-8 lg:pb-3 lg:pt-5">
-          <div className="group relative overflow-hidden rounded-[1.8rem] border border-white/80 bg-[#07111f] px-4 py-5 shadow-[0_24px_90px_rgba(15,23,42,0.18)] sm:px-7 sm:py-7 lg:px-10 lg:py-8">
-            <div
-              className="absolute inset-0 scale-[1.02] bg-cover bg-center opacity-78 transition-transform duration-[1800ms] ease-out will-change-transform group-hover:scale-[1.06]"
-              style={{ backgroundImage: "url('/branding/bookedai-marketplace-strategy-bg.jpg')" }}
-              aria-hidden="true"
-            />
-            <div
-              className="absolute inset-0 bg-[linear-gradient(180deg,rgba(7,17,31,0.24)_0%,rgba(7,17,31,0.68)_32%,rgba(7,17,31,0.88)_100%)]"
-              aria-hidden="true"
-            />
-            <div
-              className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(34,211,238,0.28),transparent_24%),radial-gradient(circle_at_82%_18%,rgba(249,115,22,0.24),transparent_26%),radial-gradient(circle_at_50%_78%,rgba(59,130,246,0.16),transparent_28%)]"
-              aria-hidden="true"
-            />
-
-            <div className="relative mx-auto max-w-6xl text-center">
-              <SignalPill className="mx-auto w-fit border border-[#d9e7f6] bg-white px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-                SME services marketplace direction
-              </SignalPill>
-
-              <div className="mt-4 flex justify-center">
-                <BrandLockup
-                  surface="dark"
-                  className="items-center"
-                  logoClassName="booked-brand-image max-w-[14rem] sm:max-w-[18rem]"
-                  descriptorClassName="hidden"
-                  eyebrowClassName="hidden"
-                />
+        <section id="hero" className="mx-auto max-w-[1380px] px-4 pb-5 pt-4 sm:px-6 lg:px-8 lg:pb-7 lg:pt-6">
+          <div className="rounded-[2rem] border border-[#e3e7ee] bg-white px-4 py-7 shadow-[0_24px_72px_rgba(60,64,67,0.08)] sm:px-6 lg:px-8 lg:py-8">
+            <div className="mx-auto max-w-4xl text-center">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1a73e8]">
+                Enterprise search workspace
               </div>
-
-              <h1 className="mx-auto mt-5 max-w-4xl text-3xl font-semibold tracking-[-0.065em] text-white sm:text-5xl lg:text-6xl">
-                One chat-first surface for discovering, comparing, and booking SME business services.
+              <h1 className="mx-auto mt-3 max-w-3xl text-3xl font-semibold tracking-[-0.05em] text-[#202124] sm:text-5xl lg:text-[4rem] lg:leading-[1.02]">
+                Search, evaluate, and move into booking from one focused workspace.
               </h1>
-              <p className="mx-auto mt-4 max-w-3xl text-sm leading-7 text-white/78 sm:text-base lg:text-lg">
-                Discover, compare, and move into booking through one chat-first workspace designed for enterprise-grade SME service search.
+              <p className="mx-auto mt-4 max-w-[46rem] text-sm leading-7 text-[#5f6368] sm:text-base">
+                A quieter, higher-trust surface for service discovery. Search in natural language, review ranked matches instantly, and keep the BookedAI booking flow beside the results on desktop.
               </p>
+            </div>
 
-              <div className="mt-6 flex flex-wrap justify-center gap-3">
-                <button
-                  type="button"
-                  onClick={openProductTrial}
-                  className="rounded-full bg-[#1d1d1f] px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
-                >
-                  Open Web App
-                </button>
-                <button
-                  type="button"
-                  onClick={scrollToLiveDemo}
-                  className="rounded-full border border-white/22 bg-white/12 px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
-                >
-                  See Live Search
-                </button>
-                <button
-                  type="button"
-                  onClick={openPitchDeck}
-                  className="rounded-full border border-cyan-200/30 bg-cyan-300/14 px-6 py-3 text-sm font-semibold text-cyan-100 transition hover:-translate-y-0.5"
-                >
-                  Open Pitch Deck
-                </button>
+            <form onSubmit={handleSubmit} className="mx-auto mt-8 max-w-5xl">
+              <div className="rounded-[1.8rem] border border-[#dfe1e5] bg-white px-3 py-3 shadow-[0_8px_28px_rgba(60,64,67,0.12)] transition hover:shadow-[0_12px_34px_rgba(60,64,67,0.16)] sm:px-4">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <div className="flex min-w-0 flex-1 items-center gap-3 rounded-[1.25rem] px-2 sm:px-3">
+                    <svg viewBox="0 0 24 24" className="h-5 w-5 shrink-0 text-[#1a73e8]" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
+                      <circle cx="11" cy="11" r="6.5" />
+                      <path d="m16 16 4.5 4.5" strokeLinecap="round" />
+                    </svg>
+                    <input
+                      value={queryValue}
+                      onChange={(event) => setQueryValue(event.target.value)}
+                      placeholder="Search for a service, location, timing, or commercial need"
+                      className="h-12 w-full border-0 bg-transparent text-[15px] text-[#202124] outline-none placeholder:text-[#80868b] sm:text-base"
+                      aria-label="Search services"
+                    />
+                  </div>
+                  <div className="flex items-center justify-center gap-2 sm:justify-end">
+                    <button
+                      type="submit"
+                      className="rounded-full bg-[#1a73e8] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1558b0]"
+                    >
+                      Run search
+                    </button>
+                  </div>
+                </div>
               </div>
+            </form>
 
-              <div className="mt-6 flex flex-wrap justify-center gap-2 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/68 sm:text-[11px]">
-                {['Search-first discovery', 'Booking-ready workflow', 'Enterprise UI shell'].map((item) => (
-                  <span key={item} className="rounded-full border border-white/14 bg-white/10 px-3 py-2 backdrop-blur-sm">
-                    {item}
-                  </span>
-                ))}
-              </div>
+            <div className="mx-auto mt-5 flex max-w-5xl flex-wrap justify-center gap-2.5">
+              {suggestedSearches.map((prompt) => (
+                <button
+                  key={prompt}
+                  type="button"
+                  onClick={() => runSearch(prompt)}
+                  className="rounded-full border border-[#dfe1e5] bg-[#fbfdff] px-4 py-2 text-[12px] font-medium text-[#5f6368] transition hover:border-[#c6dafc] hover:bg-[#f8fbff] hover:text-[#1a73e8]"
+                >
+                  {prompt}
+                </button>
+              ))}
             </div>
           </div>
         </section>
 
-        <HomepageSearchExperience
-          content={homepageSearchContent}
-          sourcePath={sourcePath}
-          initialQuery={null}
-          initialQueryRequestId={0}
-        />
+        <section className="mx-auto max-w-[1380px] px-4 pb-8 sm:px-6 lg:px-8 lg:pb-12">
+          <HomepageSearchExperience
+            content={homepageSearchContent}
+            sourcePath={sourcePath}
+            initialQuery={submittedQuery}
+            initialQueryRequestId={submittedRequestId}
+          />
+        </section>
       </div>
     </main>
   );

@@ -8,11 +8,11 @@ Current synchronized release baseline: `1.0.1-stable`.
 
 Latest infrastructure update date: `2026-04-16`.
 
-Latest product-surface update date: `2026-04-23`.
+Latest product-surface update date: `2026-04-24`.
 
-Latest public-search UX update date: `2026-04-23`.
+Latest public-search UX update date: `2026-04-24`.
 
-Latest public marketplace visual update date: `2026-04-23`.
+Latest public marketplace visual update date: `2026-04-24`.
 
 Latest widget/plugin architecture update date: `2026-04-23`.
 
@@ -129,6 +129,10 @@ The current inherited truth is:
     - `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` now mirrors that same more professional matching-state treatment so homepage, popup, and embedded assistant flows do not drift in tone
     - `frontend/src/components/landing/sections/BookingAssistantSection.tsx` now uses a richer loading message that explains intent, locality, and shortlist checks instead of only showing a generic searching bubble
     - the root Next.js homepage shell also moved into a calmer Google-like light-theme pass: the hero now keeps the existing logo and navigation but uses a cleaner search-led above-the-fold composition, while the rest of the page now uses fewer cards, wider whitespace, lighter typography, and quieter white/pale-blue sections instead of the earlier dark glass-heavy landing treatment
+  - the live homepage baseline then changed again on `2026-04-24`:
+    - `bookedai.au` now serves the calmer search-first light homepage directly from `frontend/src/apps/public/PublicApp.tsx`, rather than leaving that direction only in the parallel root Next.js shell
+    - the shipped homepage now keeps the current logo and navigation while presenting a blue search-led hero, quieter white/pale-blue support sections, lighter pricing and FAQ treatment, and the existing live `HomepageSearchExperience` lower on the page
+    - production deployment completed through `python3 scripts/telegram_workspace_ops.py deploy-live`, host health passed via `bash scripts/healthcheck_stack.sh`, and a live proof screenshot now exists at `artifacts/screenshots/publicapp-live-2026-04-24.png`
   - the same `Phase 7` growth lane then moved one step further on `2026-04-23` into the first messaging foundation:
     - FastAPI admin now exposes `/api/admin/messaging` plus source-specific detail and action routes for unified operator review
     - the first messaging workspace reads from `email_messages`, `outbox_events`, and `crm_sync_records` instead of inventing a disconnected communication-only store

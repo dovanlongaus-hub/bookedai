@@ -1786,6 +1786,13 @@ export function HomepageSearchExperience({
     () => results.find((service) => service.id === selectedServiceId) ?? null,
     [results, selectedServiceId],
   );
+  const isSelectedServiceCatalogBacked = useMemo(() => {
+    if (!selectedService) {
+      return false;
+    }
+
+    return catalog?.services.some((service) => service.id === selectedService.id) ?? false;
+  }, [catalog?.services, selectedService]);
 
   async function handleSearchComposerKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
@@ -2383,103 +2390,112 @@ export function HomepageSearchExperience({
     const normalizedNotes = notes.trim() || null;
 
     try {
-      if (isLiveReadMode) {
-        try {
-          const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
-            sourcePage: sourcePath,
+      const finalizeAuthoritativeBookingIntent = async () => {
+        const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
+          sourcePage: sourcePath,
+          serviceId: selectedService.id,
+          serviceName: selectedService.name,
+          serviceCategory: selectedService.category,
+          customerName,
+          customerEmail: normalizedCustomerEmail,
+          customerPhone: normalizedCustomerPhone,
+          notes: normalizedNotes,
+          requestedDate: slot.requestedDate,
+          requestedTime: slot.requestedTime,
+          timezone: 'Australia/Sydney',
+          runtimeConfig: homepageRuntimeConfig,
+        });
+
+        const shouldHydrateRichBookingSession =
+          isSelectedServiceCatalogBacked &&
+          liveReadBookingSummary?.serviceId === selectedService.id &&
+          liveReadBookingSummary.paymentAllowedBeforeConfirmation;
+
+        let bookingResult: BookingAssistantSessionResponse;
+        if (shouldHydrateRichBookingSession) {
+          bookingResult = await requestLegacyBookingSession({
             serviceId: selectedService.id,
-            serviceName: selectedService.name,
-            serviceCategory: selectedService.category,
             customerName,
             customerEmail: normalizedCustomerEmail,
             customerPhone: normalizedCustomerPhone,
-            notes: normalizedNotes,
             requestedDate: slot.requestedDate,
             requestedTime: slot.requestedTime,
-            timezone: 'Australia/Sydney',
-            runtimeConfig: homepageRuntimeConfig,
+            notes: normalizedNotes,
           });
-
-          const shouldHydrateRichBookingSession =
-            liveReadBookingSummary?.serviceId === selectedService.id &&
-            liveReadBookingSummary.paymentAllowedBeforeConfirmation;
-
-          let bookingResult: BookingAssistantSessionResponse;
-          if (shouldHydrateRichBookingSession) {
-            const payload = await requestLegacyBookingSession({
-              serviceId: selectedService.id,
-              customerName,
-              customerEmail: normalizedCustomerEmail,
-              customerPhone: normalizedCustomerPhone,
-              requestedDate: slot.requestedDate,
-              requestedTime: slot.requestedTime,
-              notes: normalizedNotes,
-            });
-            bookingResult = payload;
-          } else {
-            bookingResult = buildAuthoritativeBookingIntentResult({
-              authoritativeResult,
-              selectedService,
-              requestedDate: slot.requestedDate,
-              requestedTime: slot.requestedTime,
-              customerEmail: normalizedCustomerEmail ?? '',
-              nextStep:
-                liveReadBookingSummary?.serviceId === selectedService.id
-                  ? liveReadBookingSummary.nextStep
-                  : selectedService.next_step ?? null,
-            });
-          }
-
-          setResult({
-            ...bookingResult,
-            crm_sync: bookingResult.crm_sync ?? authoritativeResult.crmSync ?? null,
-          });
-          setComposerCollapsed(true);
-          void runPostBookingAutomation({
-            bookingIntentId: authoritativeResult.bookingIntentId,
-            bookingReference: bookingResult.booking_reference,
-            customerName,
-            customerEmail: normalizedCustomerEmail,
-            customerPhone: normalizedCustomerPhone,
+        } else {
+          bookingResult = buildAuthoritativeBookingIntentResult({
+            authoritativeResult,
             selectedService,
             requestedDate: slot.requestedDate,
             requestedTime: slot.requestedTime,
-            notes: normalizedNotes,
-            paymentAllowedBeforeConfirmation:
-              shouldHydrateRichBookingSession ||
-              Boolean(
-                (liveReadBookingSummary?.serviceId === selectedService.id &&
-                  liveReadBookingSummary.paymentAllowedBeforeConfirmation) ||
-                  authoritativeResult.trust.payment_allowed_now,
-              ),
-            bookingPath:
+            customerEmail: normalizedCustomerEmail ?? '',
+            nextStep:
               liveReadBookingSummary?.serviceId === selectedService.id
-                ? liveReadBookingSummary.bookingPath
-                : authoritativeResult.trust.recommended_booking_path ?? bookingResult.workflow_status,
-            paymentLink: bookingResult.payment_url,
-            portalUrl: getBookingPortalUrl(bookingResult),
-          })
-            .then((automation) => {
-              setResult((currentResult) => {
-                if (!currentResult || currentResult.booking_reference !== bookingResult.booking_reference) {
-                  return currentResult;
-                }
+                ? liveReadBookingSummary.nextStep
+                : selectedService.next_step ?? null,
+          });
+        }
 
-                return {
-                  ...currentResult,
-                  automation,
-                };
-              });
-            })
-            .catch(() => {
-              // Best-effort orchestration should never block the captured booking state.
+        setResult({
+          ...bookingResult,
+          crm_sync: bookingResult.crm_sync ?? authoritativeResult.crmSync ?? null,
+        });
+        setComposerCollapsed(true);
+        void runPostBookingAutomation({
+          bookingIntentId: authoritativeResult.bookingIntentId,
+          bookingReference: bookingResult.booking_reference,
+          customerName,
+          customerEmail: normalizedCustomerEmail,
+          customerPhone: normalizedCustomerPhone,
+          selectedService,
+          requestedDate: slot.requestedDate,
+          requestedTime: slot.requestedTime,
+          notes: normalizedNotes,
+          paymentAllowedBeforeConfirmation:
+            shouldHydrateRichBookingSession ||
+            Boolean(
+              (liveReadBookingSummary?.serviceId === selectedService.id &&
+                liveReadBookingSummary.paymentAllowedBeforeConfirmation) ||
+                authoritativeResult.trust.payment_allowed_now,
+            ),
+          bookingPath:
+            liveReadBookingSummary?.serviceId === selectedService.id
+              ? liveReadBookingSummary.bookingPath
+              : authoritativeResult.trust.recommended_booking_path ?? bookingResult.workflow_status,
+          paymentLink: bookingResult.payment_url,
+          portalUrl: getBookingPortalUrl(bookingResult),
+        })
+          .then((automation) => {
+            setResult((currentResult) => {
+              if (!currentResult || currentResult.booking_reference !== bookingResult.booking_reference) {
+                return currentResult;
+              }
+
+              return {
+                ...currentResult,
+                automation,
+              };
             });
+          })
+          .catch(() => {
+            // Best-effort orchestration should never block the captured booking state.
+          });
+      };
+
+      if (isLiveReadMode) {
+        try {
+          await finalizeAuthoritativeBookingIntent();
           return;
         } catch (error) {
-          if (!shouldFallbackToLegacyBookingSession(error)) {
+          if (!isSelectedServiceCatalogBacked || !shouldFallbackToLegacyBookingSession(error)) {
             throw error;
           }
         }
+      }
+
+      if (!isSelectedServiceCatalogBacked) {
+        await finalizeAuthoritativeBookingIntent();
+        return;
       }
 
       void shadowPublicBookingAssistantLeadAndBookingIntent({
@@ -2523,12 +2539,14 @@ export function HomepageSearchExperience({
         }
       }
       if (!response.ok) {
-        throw new Error(
-          resolveApiErrorMessage(
-            payload ?? rawResponseText,
-            'Unable to create booking request.',
-          ),
+        const errorMessage = resolveApiErrorMessage(
+          payload ?? rawResponseText,
+          'Unable to create booking request.',
         );
+        if (errorMessage === 'Selected service was not found') {
+          throw new Error('This shortlist match should continue through the live booking flow, not the legacy catalog booking session.');
+        }
+        throw new Error(errorMessage);
       }
 
       if (!payload) {
@@ -2787,16 +2805,19 @@ export function HomepageSearchExperience({
       ref={bookingPanelRef}
       className={`mx-auto max-w-[1440px] ${isMobileViewport ? 'pb-28' : ''}`}
     >
-      <div className="public-search-results-shell grid gap-4 xl:items-start">
-        <section className="public-apple-workspace-shell min-w-0 overflow-hidden rounded-[1.5rem] border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(245,249,253,0.96)_100%)] shadow-[0_24px_64px_rgba(15,23,42,0.08)]">
-          <div className="px-3 py-3 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
+      <div className="public-search-results-shell grid gap-5 xl:grid-cols-[minmax(0,1fr)_368px] xl:items-start">
+        <section className="min-w-0 overflow-hidden rounded-[1.75rem] border border-[#e0e6ef] bg-white shadow-[0_20px_56px_rgba(60,64,67,0.08)]">
+          <div className="px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
             {currentQuery ? (
-              <div className="mb-3 flex flex-wrap items-center gap-2">
-                <span className="public-apple-toolbar-pill public-apple-toolbar-pill--accent px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em]">
+              <div className="mb-4 flex flex-wrap items-center gap-2">
+                <span className="rounded-full border border-[#d2e3fc] bg-[#eef4ff] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
                   {content.ui.resultsQueryLabel}: "{currentQuery}"
                 </span>
-                <span className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-medium">
+                <span className="rounded-full border border-[#e5e9f0] bg-[#f8fafc] px-3 py-1 text-[10px] font-medium text-[#5f6368]">
                   {resultCountLabel}
+                </span>
+                <span className="rounded-full border border-[#e5e9f0] bg-white px-3 py-1 text-[10px] font-medium text-[#5f6368]">
+                  Ranked results
                 </span>
               </div>
             ) : null}
@@ -2815,20 +2836,21 @@ export function HomepageSearchExperience({
             ) : null}
 
             {geoHint ? (
-              <div className="public-apple-workspace-panel-soft mb-3 rounded-[0.95rem] px-3 py-2.5 text-sm leading-6 text-[#31507b]">
+              <div className="mb-3 rounded-[1rem] border border-[#dbe7fb] bg-[#f8fbff] px-3.5 py-3 text-sm leading-6 text-[#31507b]">
                 {geoHint}
               </div>
             ) : null}
 
             {hasActiveQuery && assistantSummary ? (
-              <div className="public-apple-workspace-panel-soft mb-3 rounded-[1rem] px-3.5 py-2.5 text-sm leading-6 text-[#172033]/72">
+              <div className="mb-4 rounded-[1.1rem] border border-[#e7edf5] bg-[#fbfdff] px-4 py-3 text-sm leading-6 text-[#3c4043]">
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">BookedAI readout</div>
                 {assistantSummary}
               </div>
             ) : null}
 
             <div className="space-y-3">
               {searchLoading ? (
-                <div className="rounded-[1.15rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4 lg:px-5 lg:py-5">
+                <div className="rounded-[1.3rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-5 py-5 lg:px-6 lg:py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                   <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
                     <span className="relative inline-flex h-2.5 w-2.5">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#1a73e8]/45" />
@@ -2852,14 +2874,14 @@ export function HomepageSearchExperience({
               ) : null}
 
               {!searchLoading && !searchError && hasActiveQuery && !result && followUpQuestions.length > 0 ? (
-                <div className="rounded-[1.15rem] border border-[#dfe8f3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4">
+                <div className="rounded-[1.3rem] border border-[#dfe8f3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-5 py-5">
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                        BookedAI follow-up
+                        Refinement prompts
                       </div>
                       <div className="mt-1 text-sm font-semibold text-[#111827]">
-                        I can tighten the shortlist with up to three quick clarifiers.
+                        Add one more signal and BookedAI can rank the shortlist with higher confidence.
                       </div>
                     </div>
                     <div className="rounded-full bg-[#eef4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
@@ -2912,11 +2934,11 @@ export function HomepageSearchExperience({
                       {currentQuery ? (
                         <div className="mx-auto mt-4 max-w-3xl rounded-[1.1rem] border border-[#dfe8f3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4 text-left">
                           <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                            Why no result was shown
+                            Why ranking stayed low
                           </div>
                           <p className="mt-2 text-sm leading-6 text-slate-600">{noResultReason}</p>
                           <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                            Suggested next searches
+                            Better next searches
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2">
                             {noResultSuggestions.map((item) => (
@@ -2938,16 +2960,16 @@ export function HomepageSearchExperience({
                     </div>
                   }
                   renderMeta={({ visibleCount, totalCount }) => (
-                    <div className="public-apple-workspace-panel-soft flex flex-wrap items-center justify-between gap-3 rounded-[1rem] px-3.5 py-2.5">
+                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.1rem] border border-[#e8edf3] bg-[#fbfdff] px-4 py-3">
                       <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5f6368]">
                           {content.ui.shortlistLabel}
                         </div>
-                        <div className="mt-1 text-sm font-semibold text-[#111827]">
-                          {currentQuery ? `"${currentQuery}"` : content.ui.resultsTitle}
+                        <div className="mt-1 text-base font-semibold text-[#202124]">
+                          {currentQuery ? `Best matches for "${currentQuery}"` : content.ui.resultsTitle}
                         </div>
                       </div>
-                      <div className="public-apple-toolbar-pill px-2.5 py-1 text-[11px]">
+                      <div className="rounded-full border border-[#e5e9f0] bg-white px-3 py-1 text-[11px] text-[#5f6368]">
                         {visibleCount} / {totalCount}
                       </div>
                     </div>
@@ -2966,10 +2988,10 @@ export function HomepageSearchExperience({
                     return (
                       <div
                         key={service.id}
-                        className={`rounded-[1.2rem] border p-2.5 shadow-[0_10px_28px_rgba(15,23,42,0.045)] ${
+                        className={`rounded-[1.4rem] border px-3 py-3 shadow-[0_12px_30px_rgba(60,64,67,0.06)] transition ${
                           isSelected
-                            ? 'border-[rgba(139,92,246,0.16)] bg-[linear-gradient(180deg,#ffffff_0%,#faf7ff_100%)]'
-                            : 'border-[#e8edf3] bg-white'
+                            ? 'border-[#d2e3fc] bg-[linear-gradient(180deg,#ffffff_0%,#f6faff_100%)] shadow-[0_16px_34px_rgba(26,115,232,0.10)]'
+                            : 'border-[#e8edf3] bg-white hover:border-[#d7e3f7]'
                         }`}
                       >
                         <PartnerMatchCard
@@ -2980,7 +3002,7 @@ export function HomepageSearchExperience({
                           onClick={() => handleServiceSelect(service)}
                         />
                         <div
-                          className={`mt-2 rounded-[0.95rem] border px-3 py-2.5 text-[11px] leading-5 ${
+                          className={`mt-3 rounded-[1rem] border px-3.5 py-3 text-[11px] leading-5 ${
                             confidencePresentation.tone === 'tenant'
                               ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
                               : 'border-amber-200 bg-amber-50 text-amber-900'
@@ -2990,20 +3012,20 @@ export function HomepageSearchExperience({
                           <div className="mt-1 opacity-90">{confidencePresentation.body}</div>
                         </div>
                         <PartnerMatchActionFooter model={footer} tone={isSelected ? 'selected' : 'default'} />
-                        <div className="mt-2 flex flex-wrap items-center gap-2 px-1">
+                        <div className="mt-3 flex flex-wrap items-center gap-2 px-1">
                           <button
                             type="button"
                             onClick={() => handleServiceSelect(service)}
-                            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3.5 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950"
+                            className="inline-flex items-center rounded-full border border-[#dfe1e5] bg-white px-3.5 py-2 text-[11px] font-semibold text-[#3c4043] transition hover:border-[#c6dafc] hover:text-[#202124]"
                           >
-                            View details
+                            Review match
                           </button>
                           <button
                             type="button"
                             onClick={() => commitServiceSelection(service, { focusNameField: true })}
-                            className="inline-flex items-center rounded-full border border-[#cce0ff] bg-[#e8f0fe] px-3.5 py-2 text-[11px] font-semibold text-[#1a73e8] transition hover:bg-[#dce9ff]"
+                            className="inline-flex items-center rounded-full border border-[#d2e3fc] bg-[#eef4ff] px-3.5 py-2 text-[11px] font-semibold text-[#1a73e8] transition hover:bg-[#dce9ff]"
                           >
-                            Continue to booking
+                            Open booking flow
                           </button>
                         </div>
                       </div>
@@ -3015,7 +3037,7 @@ export function HomepageSearchExperience({
           </div>
         </section>
 
-        <aside className="public-apple-workspace-shell public-booking-sidebar min-w-0 rounded-[1.5rem] p-3 sm:p-4 xl:sticky xl:self-start">
+        <aside className="public-booking-sidebar min-w-0 rounded-[1.75rem] border border-[#e0e6ef] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-4 shadow-[0_20px_56px_rgba(60,64,67,0.08)] xl:sticky xl:self-start">
           <div className="public-apple-workspace-panel rounded-[1.15rem] px-3.5 py-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
@@ -3038,10 +3060,10 @@ export function HomepageSearchExperience({
           <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5">
             <div className="flex items-center justify-between gap-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
-                BookedAI flow
+                Booking workflow
               </div>
               <div className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-semibold">
-                {result ? 'Handoff ready' : selectedService ? 'Booking in progress' : 'Follow the shortlist'}
+                {result ? 'Handoff ready' : selectedService ? 'Booking in motion' : 'Awaiting selection'}
               </div>
             </div>
 
@@ -3081,7 +3103,7 @@ export function HomepageSearchExperience({
           <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5">
             <div className="flex items-center justify-between gap-3">
               <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
-                Enterprise journey
+                Revenue journey
               </div>
               <div className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-semibold">
                 Search to aftercare
@@ -3118,7 +3140,7 @@ export function HomepageSearchExperience({
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                    {content.ui.bookingPanelSelected}
+                    Match selected
                   </div>
                   <div className="mt-2 text-sm font-semibold text-[#202124]">{selectedService.name}</div>
                   <div className="mt-1 text-xs text-[#5f6368]">
@@ -3137,14 +3159,14 @@ export function HomepageSearchExperience({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                      Selected and ready
+                      Primary match locked
                     </div>
                     <div className="mt-1 text-sm leading-6 text-emerald-900">
                       {selectedServiceFlowNote}
                     </div>
                   </div>
                   <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
-                    Primary path
+                    Preferred path
                   </div>
                 </div>
                 {currentQuery ? (
@@ -3158,11 +3180,11 @@ export function HomepageSearchExperience({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                      Next action
+                      Booking brief
                     </div>
                     <div className="mt-1 font-semibold">Confirm booking details for the selected match</div>
                     <div className="mt-1 text-xs leading-5 text-emerald-800">
-                      Focus on contact details, preferred time, and any decision-critical notes. You do not need to compare more options unless priorities changed.
+                      Capture contact details, preferred timing, and any decision-critical context. Only reopen comparison if the brief changes.
                     </div>
                   </div>
                   <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
@@ -3178,7 +3200,7 @@ export function HomepageSearchExperience({
                   className="public-apple-primary-button mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold lg:hidden"
                 >
                   <SparkIcon className="h-4 w-4" />
-                  {bookingComposerOpen ? 'Hide booking details' : 'Continue with this match'}
+                  {bookingComposerOpen ? 'Hide booking form' : 'Continue with this match'}
                 </button>
               ) : null}
             </div>
@@ -3200,7 +3222,7 @@ export function HomepageSearchExperience({
                 </div>
                 {selectedService ? (
                   <p className="mt-2 text-sm leading-6 text-[#172033]/62">
-                    Complete the details below for <span className="font-semibold text-[#111827]">{selectedService.name}</span>. BookedAI will keep this selected match as the source of truth for the booking request.
+                    Complete the booking brief for <span className="font-semibold text-[#111827]">{selectedService.name}</span>. BookedAI will keep this selected match as the source of truth for the booking request.
                   </p>
                 ) : null}
               </div>
@@ -3717,313 +3739,7 @@ export function HomepageSearchExperience({
         </div>
       ) : null}
 
-      <div
-        className={`z-20 mt-4 px-0 transition-all duration-300 ${
-          isMobileViewport
-            ? `fixed inset-x-0 bottom-0 mt-0 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] ${
-                isBottomBarVisible
-                  ? 'translate-y-0 opacity-100'
-                  : 'pointer-events-none translate-y-[calc(100%+1rem)] opacity-0'
-              }`
-            : 'sticky bottom-3 sm:bottom-4'
-        }`}
-      >
-        <form onSubmit={handleSearchSubmit} className="public-apple-workspace-shell rounded-[1.45rem] border border-white/85 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(247,250,253,0.96)_100%)] p-2.5 shadow-[0_24px_56px_rgba(15,23,42,0.14)] backdrop-blur-md sm:p-3">
-          {bookingReturnNotice ? (
-            <div
-              className={`mb-3 rounded-[1rem] border px-4 py-3 ${
-                bookingReturnNotice.tone === 'success'
-                  ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                  : 'border-amber-200 bg-amber-50 text-amber-900'
-              }`}
-            >
-              <div className="text-sm font-semibold">{bookingReturnNotice.title}</div>
-              <p className="mt-1 text-sm leading-6">{bookingReturnNotice.body}</p>
-            </div>
-          ) : null}
-          <div className={`flex flex-col ${isMobileViewport ? 'gap-2' : 'gap-3'}`}>
-            <div className={`flex items-center justify-between gap-2 ${isMobileViewport ? 'flex-nowrap' : 'flex-wrap'}`}>
-              <div
-                className={`inline-flex items-center gap-2 rounded-full border px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
-                  isMobileViewport ? 'max-w-[6.5rem] shrink-0' : 'w-fit'
-                } ${workspaceStatus.tone}`}
-                title={workspaceStatus.label}
-              >
-                <span className={`inline-flex h-2 w-2 rounded-full ${searchLoading ? 'animate-pulse bg-current' : 'bg-current/70'}`} />
-                <span className="truncate">{isMobileViewport ? mobileStatusLabel : workspaceStatus.label}</span>
-              </div>
-              <button
-                type="button"
-                onClick={() => setComposerCollapsed((current) => !current)}
-                aria-label={composerCollapsed ? 'Expand search' : 'Minimise search'}
-                title={composerCollapsed ? 'Expand search' : 'Minimise search'}
-                className={`public-search-topbar-button inline-flex shrink-0 items-center rounded-full ${
-                  isMobileViewport ? 'h-9 w-9 justify-center px-0 py-0' : 'px-3 py-1 text-[11px] font-medium'
-                }`}
-              >
-                {isMobileViewport ? (
-                  <ChevronUpDownIcon className="h-4 w-4" />
-                ) : (
-                  composerCollapsed ? 'Expand search' : 'Minimise search'
-                )}
-              </button>
-            </div>
 
-            {(!composerCollapsed || isMobileViewport) ? (
-              <>
-                {!isMobileViewport ? (
-                  <p className="text-sm leading-6 text-[#172033]/62">{workspaceStatus.detail}</p>
-                ) : null}
-
-                <div className="rounded-[1.3rem] border border-slate-200 bg-white shadow-[0_12px_28px_rgba(15,23,42,0.06)]">
-                  <input
-                    ref={attachmentInputRef}
-                    type="file"
-                    multiple
-                    accept="image/*,.pdf,.doc,.docx,.txt,.md"
-                    onChange={handleAttachmentPick}
-                    className="hidden"
-                  />
-                  <div className="flex items-start gap-2 px-2.5 py-2.5">
-                    <button
-                      type="button"
-                      aria-label="Attach reference image, file, or description"
-                      title="Attach reference image, file, or description"
-                      onClick={() => attachmentInputRef.current?.click()}
-                      className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-[1rem] border border-slate-200 bg-[#f8fafc] text-slate-500 transition hover:border-slate-300 hover:bg-white hover:text-slate-800"
-                    >
-                      <AttachmentIcon className="h-4 w-4" />
-                    </button>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-start gap-3 rounded-[1rem] bg-white px-2 py-1">
-                        <span className="pointer-events-none mt-2 shrink-0 text-[#172033]/34">
-                          <SearchIcon className="h-4.5 w-4.5" />
-                        </span>
-                        <textarea
-                          value={searchQuery}
-                          onChange={(event) => setSearchQuery(event.target.value)}
-                          onKeyDown={(event) => {
-                            void handleSearchComposerKeyDown(event);
-                          }}
-                          onFocus={() => {
-                            setIsBottomBarVisible(true);
-                            if (!searchQuery.trim()) {
-                              setComposerCollapsed(false);
-                            }
-                          }}
-                          placeholder={content.ui.searchPlaceholder}
-                          rows={isMobileViewport ? 2 : 1}
-                          className="min-h-[2.75rem] w-full resize-none bg-transparent py-1.5 text-[15px] leading-6 text-[#172033] outline-none placeholder:text-[#172033]/42"
-                        />
-                      </div>
-                      <div className="mt-1.5 flex items-center justify-between gap-2 px-2">
-                        <div className="text-[11px] leading-5 text-[#172033]/48">
-                          Attach a reference image, short brief, or similar service idea.
-                        </div>
-                        <div className="hidden items-center gap-1 md:flex">
-                          {['Image', 'File', 'Brief'].map((item) => (
-                            <span key={item} className="rounded-full border border-slate-200 bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                      {attachedReferences.length > 0 ? (
-                        <div className="mt-2 flex flex-wrap gap-2 px-2 pb-1">
-                          {attachedReferences.map((item) => (
-                            <span
-                              key={item.id}
-                              className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-[#f8fafc] px-3 py-1.5 text-[11px] font-medium text-slate-700"
-                            >
-                              <span className="rounded-full bg-white px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500 ring-1 ring-slate-200">
-                                {item.kind}
-                              </span>
-                              <span className="max-w-[10rem] truncate">{item.name}</span>
-                              {item.extractedText ? (
-                                <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700 ring-1 ring-emerald-200">
-                                  text parsed
-                                </span>
-                              ) : null}
-                              <button
-                                type="button"
-                                onClick={() => removeAttachedReference(item.id)}
-                                className="inline-flex h-4 w-4 items-center justify-center rounded-full text-slate-400 transition hover:bg-white hover:text-slate-700"
-                                aria-label={`Remove ${item.name}`}
-                              >
-                                ×
-                              </button>
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-                      {attachedReferences.length > 0 ? (
-                        <div className="mt-1 px-2 pb-1 text-[11px] leading-5 text-[#172033]/48">
-                          Attached references will be included as extra search context for matching. Text and markdown files also contribute extracted content.
-                        </div>
-                      ) : null}
-                    </div>
-
-                    <div className={`flex items-center gap-2 ${isMobileViewport ? 'shrink-0 self-end' : 'shrink-0 self-end'}`}>
-                    <button
-                      type="button"
-                      aria-label={voiceListening ? 'Stop voice input' : 'Start voice input'}
-                      title={voiceListening ? 'Stop voice input' : 'Start voice input'}
-                      onClick={handleVoiceSearch}
-                      disabled={!voiceSupported}
-                      className={`inline-flex h-11 w-11 items-center justify-center rounded-[1rem] border transition ${
-                        voiceSupported
-                          ? voiceListening
-                            ? 'border-[#d2e3fc] bg-[#e8f0fe] text-[#1a73e8]'
-                            : 'border-slate-900/8 bg-white/78 text-[#6d28d9] hover:bg-white'
-                          : 'cursor-not-allowed border-[#eceff3] bg-[#f5f6f7] text-[#9aa0a6]'
-                      }`}
-                    >
-                      <MicIcon className="h-4 w-4" />
-                    </button>
-                    <button
-                      type="submit"
-                      disabled={searchLoading}
-                      aria-label="Send search"
-                      className={`public-apple-primary-button inline-flex h-11 items-center justify-center gap-2 rounded-[1rem] text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60 ${
-                        isMobileViewport ? 'w-11 px-0' : 'flex-1 px-4 lg:min-w-[9rem]'
-                      }`}
-                    >
-                      <ArrowRightIcon className="h-4 w-4" />
-                      <span className={isMobileViewport ? 'sr-only' : ''}>{content.ui.searchButton}</span>
-                    </button>
-                  </div>
-                </div>
-                </div>
-
-                {searchLoading ? (
-                  <div className="rounded-[1rem] border border-sky-100 bg-[linear-gradient(135deg,rgba(232,240,254,0.88),rgba(255,255,255,0.96))] px-3.5 py-3 text-[#16324f] shadow-[0_16px_34px_rgba(26,115,232,0.08)]">
-                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                      <div className="min-w-0">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-sky-700">
-                          Live matching in progress
-                        </div>
-                        <p className="mt-1 text-sm font-semibold text-slate-900">
-                          {currentQuery ? `Working on "${currentQuery}"` : 'Working on your request'}
-                        </p>
-                        <p className="mt-1 text-sm leading-6 text-[#31507b]">{activeSearchProgressStage.detail}</p>
-                      </div>
-                      <div className="rounded-full bg-white/90 px-3 py-1.5 text-[11px] font-semibold text-sky-700 ring-1 ring-sky-100">
-                        {activeSearchProgressStage.label}
-                      </div>
-                    </div>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      {SEARCH_PROGRESS_STAGES.map((stage, index) => (
-                        <span
-                          key={stage.label}
-                          className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-[11px] font-medium transition ${
-                            index <= searchProgressStageIndex
-                              ? 'bg-white text-sky-700 ring-1 ring-sky-100'
-                              : 'bg-white/55 text-[#5d7597] ring-1 ring-white/60'
-                          }`}
-                        >
-                          <span
-                            className={`h-1.5 w-1.5 rounded-full ${
-                              index < searchProgressStageIndex
-                                ? 'bg-emerald-500'
-                                : index === searchProgressStageIndex
-                                  ? 'animate-pulse bg-sky-500'
-                                  : 'bg-slate-300'
-                            }`}
-                          />
-                          {stage.label}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="mt-3 rounded-[0.9rem] bg-white/78 px-3 py-2.5 text-[12px] leading-5 text-[#48617f] ring-1 ring-white/70">
-                      <span className="font-semibold text-slate-900">Best next input:</span> {activeSearchPrompt.replace(/^Best next input: /, '')}
-                    </div>
-                    {showDelayedSearchNudge ? (
-                      <div className="mt-3 rounded-[0.9rem] border border-amber-200 bg-amber-50 px-3 py-2.5 text-[12px] leading-5 text-amber-900">
-                        <span className="font-semibold">Still refining the shortlist.</span> If results feel broad, add location or timing now. Those two details usually improve ranking fastest.
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-
-                {!composerCollapsed ? (
-                  <>
-                    {isMobileViewport ? (
-                      <p className="text-[12px] leading-5 text-[#172033]/62">{workspaceStatus.detail}</p>
-                    ) : null}
-
-                    <div className="-mx-1 overflow-x-auto pb-1">
-                      <div className="flex min-w-max gap-1.5 px-1 sm:min-w-0 sm:flex-wrap">
-                        {content.searchSuggestions.map((suggestion) => (
-                          <button
-                            key={suggestion.label}
-                            type="button"
-                            onClick={() => {
-                              setSearchQuery(suggestion.query);
-                              void runSearch(suggestion.query);
-                            }}
-                            className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none transition ${
-                              shortcutToneClasses[
-                                content.searchSuggestions.findIndex((item) => item.label === suggestion.label) %
-                                  shortcutToneClasses.length
-                              ]
-                            }`}
-                            title={suggestion.query}
-                          >
-                            <SearchIcon className="h-3 w-3" />
-                            {suggestion.label}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  </>
-                ) : null}
-
-                {voiceError ? (
-                  <p className="text-xs text-rose-700">{voiceError}</p>
-                ) : voiceListening ? (
-                  <p className="text-xs text-[#6d28d9]">Listening for voice input...</p>
-                ) : null}
-              </>
-            ) : (
-              <div className="public-search-collapsed-trigger flex items-center gap-2 rounded-[1rem] px-3 py-2 transition hover:bg-[#f8fafc]">
-                <span className="pointer-events-none shrink-0 text-[#172033]/34">
-                  <SearchIcon className="h-4 w-4" />
-                </span>
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onFocus={() => {
-                    setIsBottomBarVisible(true);
-                    if (!searchQuery.trim()) {
-                      setComposerCollapsed(false);
-                    }
-                  }}
-                  placeholder={content.ui.searchPlaceholder}
-                  className="min-w-0 flex-1 bg-transparent text-sm font-medium text-[#172033]/78 outline-none placeholder:text-[#172033]/42"
-                />
-                <button
-                  type="submit"
-                  disabled={searchLoading}
-                  aria-label="Send search"
-                  className="public-apple-primary-button inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-[0.95rem] px-3 text-xs font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <ArrowRightIcon className="h-4 w-4" />
-                  <span className="hidden sm:inline">Search</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setComposerCollapsed(false)}
-                  className="inline-flex shrink-0 items-center rounded-full px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.14em] text-[#6d28d9] transition hover:bg-white"
-                >
-                  Expand
-                </button>
-              </div>
-            )}
-          </div>
-        </form>
-      </div>
     </div>
   );
 }

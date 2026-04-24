@@ -10,9 +10,14 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 ## Status Snapshot
 
-Date: `2026-04-23`
+Date: `2026-04-24`
 
 Planning and execution synchronization update from `2026-04-23`:
+
+- fixed a live homepage booking regression on `2026-04-24`: `frontend/src/apps/public/HomepageSearchExperience.tsx` no longer forces non-catalog shortlist matches through the legacy `/booking-assistant/session` path, so live-read and public-web results now stay on the authoritative v1 booking-intent flow instead of failing with `Selected service was not found`
+- redeployed that homepage booking fix through `python3 scripts/telegram_workspace_ops.py deploy-live`, and production health passed again via `bash scripts/healthcheck_stack.sh`
+- completed the homepage runtime handoff on `2026-04-24`: the real production `bookedai.au` surface now serves the calmer Google-like search-first layout from `frontend/src/apps/public/PublicApp.tsx` instead of leaving that direction only in the parallel root Next.js shell, while still keeping the approved logo, existing navigation, live `HomepageSearchExperience`, and the shorter product-first `bookedai.au / pitch.bookedai.au / product.bookedai.au` split
+- verification for that runtime move passed through `npm --prefix frontend run build`, `cd frontend && npx tsc --noEmit`, `python3 scripts/telegram_workspace_ops.py deploy-live`, and `bash scripts/healthcheck_stack.sh`; live proof was also captured in `artifacts/screenshots/publicapp-live-2026-04-24.png`
 
 - added `docs/development/golden-tenant-activation-revenue-proof-loop-2026-04-23.md`, locking the next phase to a web-first `Golden Tenant Activation + Revenue Proof Loop`, with `Future Swim` as the primary wedge, `children's chess classes` and `AI Mentor 1-1` as follow-on adaptation templates, `frontend/` as the shipped truth, root Next.js as the controlled admin hardening lane, and React Native explicitly deferred until after the first repeatable tenant activation, billing, conversion, and revenue-proof loop is complete
 - started implementation of `Slice 1` for that loop in the shipped tenant runtime: added `frontend/src/features/tenant-onboarding/tenantActivation.ts` to derive a tenant activation state from session plus onboarding plus workspace truth, added `frontend/src/features/tenant-onboarding/TenantActivationChecklistCard.tsx`, and wired the card into `frontend/src/apps/tenant/TenantApp.tsx` so tenants now see a clearer activation control tower with checkpoint status, vertical-aware guidance, and direct CTA routing into `Experience Studio`, `Catalog`, or `Billing` instead of only a generic progress bar
