@@ -62,6 +62,34 @@ The workspace should help each tenant:
 - forward-compatible seams for webhooks, queues, automation runners, and AI orchestration
 - CRM-aware integration boundaries so customer and lead modules can sync with `Zoho CRM` without collapsing BookedAI operational truth into an external provider
 
+### 3.3 Current enterprise shell implementation baseline
+
+As of `2026-04-25`, the deployed shared-frontend admin runtime has a first enterprise workspace shell that should be treated as the current UI baseline for later admin work.
+
+The baseline includes:
+
+- sticky top bar for brand, admin session, profile, settings, notifications, refresh, logout, and compact metrics
+- grouped workspace navigation by operator intent:
+  - `Operate`
+  - `Tenants`
+  - `Revenue`
+  - `Platform`
+- expandable/collapsible menu groups with active-group auto-open behavior
+- desktop sidebar collapse for dense operator review
+- responsive admin canvas that keeps overview, billing support, messaging, tenant management, catalog, integrations, reliability, audit, and platform settings in one coherent workspace
+- accessibility guardrails for icon-led commands so automation and keyboard/screen-reader flows keep stable names
+
+Later admin modules should build into this shell instead of reintroducing a flat dashboard or a separate one-off navigation pattern.
+
+This shell is part of the `Sprint 13-16` admin productization track and contributes to the `Phase 17` stabilization baseline because it was shipped together with the admin login/API routing hardening. Future roadmap phases should inherit it as follows:
+
+- `Phase 18`: expose revenue-ops action state inside the same grouped admin workspace rather than a detached ledger
+- `Phase 19`: route customer-care/support cases into `Billing Support` and `Audit & Activity`
+- `Phase 20`: show widget/plugin runtime posture in `Integrations` and `Platform Settings`
+- `Phase 21`: enrich `Revenue` and billing support surfaces with receivable/subscription/commission truth
+- `Phase 22`: reuse the shell for multi-tenant template administration
+- `Phase 23`: keep the same shell under release governance, regression, and scale-hardening checks
+
 ## 4. Workspace scope
 
 ### 4.1 MVP phase

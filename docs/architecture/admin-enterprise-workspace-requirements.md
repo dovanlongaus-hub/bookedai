@@ -58,6 +58,20 @@ Implementation synchronization note from `2026-04-23`:
 - `Integrations` now derives CRM, messaging, payment, and webhook attention panels from the existing admin event feed and support queue so cross-system review becomes usable before later backend-specific dashboards land
 - `Audit & Activity` now behaves more explicitly as a chronology workspace by combining recent provider or communication events with queue posture into one replay-oriented timeline
 
+Implementation synchronization note from `2026-04-25`:
+
+- `admin.bookedai.au` now has the first shipped enterprise workspace shell aligned to this requirements baseline
+- the login failure path was hardened before the UI pass: the admin host proxies `/api/` to FastAPI before SPA fallback, and the admin frontend resolves runtime API calls to same-origin `/api` even when a global API base URL exists
+- the admin top bar is now the primary session and command surface, with profile/session status, settings, notification affordance, refresh, and logout actions visible without leaving the workspace
+- the sidebar is now grouped by operator intent:
+  - `Operate`
+  - `Tenants`
+  - `Revenue`
+  - `Platform`
+- grouped navigation supports expand/collapse behavior, automatically opens the active group, and preserves a compact desktop collapsed mode for dense operator work
+- the main admin canvas now follows a control-plane layout with sticky shell surfaces, compact metric strip, grouped navigation, and responsive no-overflow behavior
+- QA baseline for this slice includes frontend typecheck, production build, local desktop/mobile Playwright layout checks, the full admin smoke suite, live stack health, live admin API health, and live login-page render verification
+
 ## Requested outcome
 
 The admin surface should be redesigned into a friendlier but clearly enterprise-grade workspace.
@@ -104,6 +118,36 @@ The login surface must:
 - explain what the admin console controls
 - present clearer invalid-credential, expired-session, and restricted-access states
 - set expectations that this is the BookedAI internal enterprise workspace
+
+### 1.1 Enterprise workspace shell
+
+The authenticated admin surface must now follow an enterprise workspace pattern rather than a loose dashboard stack.
+
+Required shell behavior:
+
+- sticky top bar containing brand identity, current admin session, profile affordance, settings shortcut, notification affordance, refresh, and logout
+- compact metric strip near the top bar for the highest-signal platform metrics
+- left workspace navigation grouped by business intent instead of a flat page list
+- grouped menu sections that can expand and collapse with smooth state transitions
+- automatic opening of the currently active group
+- desktop collapsed-sidebar mode for dense review work
+- mobile/tablet fallback that keeps the navigation usable without horizontal overflow
+- main canvas that separates workspace insights, active panels, editable forms, support queues, and reliability surfaces without nesting cards inside cards
+
+Required interaction qualities:
+
+- all command buttons need accessible names even when visual labels are hidden on compact screens
+- refresh and logout must stay available from the top bar
+- settings/profile/session state must remain visible enough for operators to understand who is acting
+- active workspace state must be obvious in both expanded and collapsed navigation modes
+- menu motion should be subtle and fast; it should clarify hierarchy, not become a decorative animation
+
+Required visual qualities:
+
+- professional enterprise control-plane posture, closer to SaaS admin workspaces such as ChatGPT Enterprise admin than to a marketing page
+- restrained white/slate surfaces, crisp borders, compact radii, useful shadows, and minimal decorative imagery
+- enough depth to feel premium while keeping dense information easy to scan
+- no horizontal overflow on mobile or desktop
 
 ### 2. Primary navigation
 
