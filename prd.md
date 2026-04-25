@@ -169,11 +169,14 @@ The public experience must convert demand into shortlist, booking, and payment m
 ### Public search and booking requirements
 
 - the user can enter a natural-language service request from the public surface
-- the system must return a shortlist with decision-ready metadata
+- the system must return a shortlist with decision-ready metadata; when live ranking is slow, the UI should show first likely matches from available local/catalog context while authoritative live checks continue
 - the same session must support search, shortlist review, booking continuation, and confirmation
 - the UX must show professional in-progress states during matching
 - when confidence is low or context is missing, the product should ask short follow-up questions or suggest nearby query refinements
-- booking confirmation should expose durable booking references and next-step visibility
+- selecting a result should not force a detail popup or immediately jump the customer into a form; compact result actions should support provider link, detail popup, contact, phone/SMS where available, and an explicit `book this` action on one responsive row
+- the customer detail form should appear only after the customer explicitly commits to book a selected result
+- booking confirmation should expose durable booking references, a scan-ready QR code that opens `portal.bookedai.au` with the booking reference, and next-step visibility
+- the Thank You state should remain visible long enough for the customer to act, currently `16s`, while offering compact email, calendar, portal, and continue-chat actions before returning to the main search screen
 - payment, email, SMS, WhatsApp, and CRM follow-up should run as best-effort post-booking automation without hiding customer-visible success
 
 ### Customer-facing agent requirements
@@ -213,7 +216,7 @@ BookedAI search must behave like a real booking engine, not a generic recommenda
 - weak tenant matches must not be shown only to avoid an empty state
 - public internet fallback may use grounded web search only after tenant retrieval fails quality gates
 - sourced public results must not be treated as tenant-trusted catalog truth
-- search loading states should explain progress and invite missing context when useful
+- search loading states should explain progress, invite missing context when useful, and keep useful interim results visible instead of leaving the customer waiting on a blank search state
 
 ### Search agent scope
 

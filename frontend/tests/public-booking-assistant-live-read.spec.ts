@@ -343,7 +343,7 @@ async function openBookingComposerIfNeeded(page: Parameters<typeof test>[0]['pag
     return;
   }
 
-  const progressiveButton = page.getByRole('button', { name: /Continue booking/i }).first();
+  const progressiveButton = page.getByRole('button', { name: /Continue booking|Book this match|Book\b/i }).first();
   if (await progressiveButton.isVisible().catch(() => false)) {
     await progressiveButton.click();
   }
@@ -357,7 +357,15 @@ async function selectLiveReadServiceForBooking(page: Parameters<typeof test>[0][
   const topMatch = page.getByText(liveReadService.name, { exact: true }).first();
   await expect(topMatch).toBeVisible();
 
-  await page.getByRole('button', { name: /Continue to booking/i }).first().click();
+  const explicitBookButton = page
+    .getByRole('button', { name: new RegExp(`Book ${liveReadService.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i') })
+    .first();
+  if (await explicitBookButton.isVisible().catch(() => false)) {
+    await explicitBookButton.click();
+    return;
+  }
+
+  await page.getByRole('button', { name: /Continue to booking|Book this match|Book\b/i }).first().click();
 }
 
 test.describe('public assistant rollout smoke', () => {

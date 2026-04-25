@@ -8,10 +8,6 @@ import {
   useState,
 } from 'react';
 
-import {
-  buildPublicCtaAttribution,
-  dispatchPublicCtaAttribution,
-} from '../../components/landing/attribution';
 import { brandShortIconPath, demoContent } from '../../components/landing/data';
 import { apiV1 } from '../../shared/api';
 import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../shared/config/api';
@@ -26,7 +22,6 @@ import {
   buildPartnerMatchCardModelFromServiceItem,
   type BookingReadyServiceItem,
 } from '../../shared/presenters/partnerMatch';
-import { PartnerMatchActionFooter } from '../../shared/components/PartnerMatchActionFooter';
 import { PartnerMatchCard } from '../../shared/components/PartnerMatchCard';
 import { PartnerMatchShortlist } from '../../shared/components/PartnerMatchShortlist';
 import type { MatchCandidate } from '../../shared/contracts';
@@ -521,6 +516,48 @@ function QrIcon({ className = 'h-5 w-5' }: { className?: string }) {
     <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
       <path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4z" strokeWidth="1.8" />
       <path d="M15 15h2v2h-2zM18 14h2v2h-2zM16 18h4v2h-4zM14 16h2v4h-2z" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function LinkIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
+      <path d="M10.5 13.5 13.5 10.5" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M8.8 16.2 7.5 17.5a4 4 0 0 1-5.7-5.7l2.6-2.6a4 4 0 0 1 5.7 0" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="m15.2 7.8 1.3-1.3a4 4 0 0 1 5.7 5.7l-2.6 2.6a4 4 0 0 1-5.7 0" strokeWidth="1.8" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function InfoIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
+      <circle cx="12" cy="12" r="8" strokeWidth="1.8" />
+      <path d="M12 11v5" strokeWidth="1.8" strokeLinecap="round" />
+      <path d="M12 8h.01" strokeWidth="2.4" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PhoneIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
+      <path
+        d="M7.5 5.5 9 4a1.8 1.8 0 0 1 2.7.35l1 1.75a1.8 1.8 0 0 1-.35 2.15l-.9.9a9.5 9.5 0 0 0 3.4 3.4l.9-.9a1.8 1.8 0 0 1 2.15-.35l1.75 1a1.8 1.8 0 0 1 .35 2.7l-1.5 1.5c-.65.65-1.62.9-2.5.62C10.8 15.55 8.45 13.2 6.88 8c-.28-.88-.03-1.85.62-2.5Z"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function MessageIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
+      <path d="M5 6.5h14v9H9l-4 3v-12Z" strokeWidth="1.8" strokeLinejoin="round" />
+      <path d="M8 10h8M8 13h5" strokeWidth="1.8" strokeLinecap="round" />
     </svg>
   );
 }
@@ -1095,7 +1132,7 @@ function getBookingQrCodeUrl(result: BookingAssistantSessionResponse) {
     return result.qr_code_url.trim();
   }
 
-  const targetUrl = result.payment_url?.trim() || getBookingPortalUrl(result);
+  const targetUrl = getBookingPortalUrl(result);
   return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(targetUrl)}`;
 }
 
@@ -1686,11 +1723,9 @@ export function HomepageSearchExperience({
   const [submitError, setSubmitError] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [result, setResult] = useState<BookingAssistantSessionResponse | null>(null);
-  const [thankYouReturnCountdown, setThankYouReturnCountdown] = useState(5);
+  const [thankYouReturnCountdown, setThankYouReturnCountdown] = useState(16);
   const [bookingComposerOpen, setBookingComposerOpen] = useState(false);
-  const [composerCollapsed, setComposerCollapsed] = useState(false);
-  const [isDesktopViewport, setIsDesktopViewport] = useState(false);
-  const [isMobileViewport, setIsMobileViewport] = useState(false);
+  const [, setComposerCollapsed] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
   const [voiceError, setVoiceError] = useState('');
@@ -1701,12 +1736,13 @@ export function HomepageSearchExperience({
   const [clarificationStepIndex, setClarificationStepIndex] = useState(0);
   const bookingPanelRef = useRef<HTMLDivElement | null>(null);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
+  const searchComposerRef = useRef<HTMLTextAreaElement | null>(null);
   const customerNameInputRef = useRef<HTMLInputElement | null>(null);
   const attachmentInputRef = useRef<HTMLInputElement | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const recognitionBaseQueryRef = useRef('');
   const bookingAssistantV1SessionIdRef = useRef<string | null>(null);
-  const lastScrollYRef = useRef(0);
+  const announcedBookingReferenceRef = useRef<string | null>(null);
 
   function returnToHomepageSearch() {
     setResult(null);
@@ -1811,17 +1847,17 @@ export function HomepageSearchExperience({
 
   useEffect(() => {
     if (!result) {
-      setThankYouReturnCountdown(5);
+      setThankYouReturnCountdown(16);
       return;
     }
 
-    setThankYouReturnCountdown(5);
+    setThankYouReturnCountdown(16);
     const countdownInterval = window.setInterval(() => {
       setThankYouReturnCountdown((current) => Math.max(0, current - 1));
     }, 1000);
     const returnTimer = window.setTimeout(() => {
       returnToHomepageSearch();
-    }, 5000);
+    }, 16000);
 
     return () => {
       window.clearInterval(countdownInterval);
@@ -1830,44 +1866,28 @@ export function HomepageSearchExperience({
   }, [result?.booking_reference]);
 
   useEffect(() => {
+    if (!result || announcedBookingReferenceRef.current === result.booking_reference) {
+      return;
+    }
+
+    announcedBookingReferenceRef.current = result.booking_reference;
+    setAgentChatMessages((current) => [
+      ...current,
+      {
+        id: createAgentChatMessageId('assistant'),
+        role: 'assistant',
+        content: `Thanks, your booking is captured. Reference ${result.booking_reference}. You can scan the QR or open the portal, and I can keep helping with another search here.`,
+        suggestions: [
+          { label: 'Search again', query: currentQuery || 'Find another nearby service this week' },
+          { label: 'Need help', query: `Help me with booking ${result.booking_reference}` },
+        ],
+      },
+    ]);
+  }, [currentQuery, result]);
+
+  useEffect(() => {
     setClarificationStepIndex(0);
   }, [currentQuery]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia('(min-width: 1024px)');
-    const syncViewport = () => setIsDesktopViewport(mediaQuery.matches);
-    syncViewport();
-
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', syncViewport);
-      return () => mediaQuery.removeEventListener('change', syncViewport);
-    }
-
-    mediaQuery.addListener(syncViewport);
-    return () => mediaQuery.removeListener(syncViewport);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
-      return;
-    }
-
-    const mediaQuery = window.matchMedia('(max-width: 767px)');
-    const syncViewport = () => setIsMobileViewport(mediaQuery.matches);
-    syncViewport();
-
-    if (typeof mediaQuery.addEventListener === 'function') {
-      mediaQuery.addEventListener('change', syncViewport);
-      return () => mediaQuery.removeEventListener('change', syncViewport);
-    }
-
-    mediaQuery.addListener(syncViewport);
-    return () => mediaQuery.removeListener(syncViewport);
-  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -1938,6 +1958,14 @@ export function HomepageSearchExperience({
     () => new Map(results.map((service) => [service.id, service])),
     [results],
   );
+
+  function focusSearchComposer() {
+    window.setTimeout(() => {
+      bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      searchComposerRef.current?.focus();
+    }, 80);
+  }
+
   async function handleSearchComposerKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
       return;
@@ -2281,6 +2309,39 @@ export function HomepageSearchExperience({
     setBookingComposerOpen(false);
     setComposerCollapsed(false);
 
+    if (catalog?.services.length) {
+      const initialResults = prioritizeSearchResults(
+        filterResultsByIntentTerms(
+          catalog.services,
+          effectiveQuery,
+        ),
+        geoContext?.locality ?? null,
+        effectiveQuery,
+      ).slice(0, 3);
+
+      if (initialResults.length > 0) {
+        setResults(initialResults);
+        setSelectedServiceId('');
+        setAssistantSummary('I am showing the first likely matches while live ranking, location, and booking-path checks continue.');
+        setAgentChatMessages((current) => [
+          ...current,
+          {
+            id: createAgentChatMessageId('assistant'),
+            role: 'assistant',
+            content: 'I am showing the first likely matches while live ranking continues. Add area, time, or a preference if you want me to tighten the search.',
+            resultIds: initialResults.map((item) => item.id),
+            suggestions: deriveIntentSuggestions(trimmedQuery).slice(0, 3),
+          },
+        ]);
+      } else {
+        setResults([]);
+        setSelectedServiceId('');
+      }
+    } else {
+      setResults([]);
+      setSelectedServiceId('');
+    }
+
     async function requestCustomerAgentTurn(nextGeoContext?: UserGeoContext | null) {
       try {
         const response = await apiV1.createCustomerAgentTurn({
@@ -2504,7 +2565,9 @@ export function HomepageSearchExperience({
         ? agentTurn.suggestions.slice(0, 3)
         : deriveIntentSuggestions(trimmedQuery).slice(0, 3);
       setResults(prioritizedResults);
-      setSelectedServiceId(nextSuggestedId);
+      setSelectedServiceId((current) =>
+        current && prioritizedResults.some((service) => service.id === current) ? current : '',
+      );
       const agentSummary =
         prioritizedResults.length > 0 && (activeGeoContext?.locality || prioritizedResults.some((item) => isOnlineFriendlyService(item, trimmedQuery)))
           ? `${nextAssistantSummary} Prioritising nearby services and online-ready options first.`
@@ -2528,7 +2591,7 @@ export function HomepageSearchExperience({
       setLiveReadBookingSummary(
         liveRead.usedLiveRead
           ? {
-              serviceId: liveRead.suggestedServiceId,
+              serviceId: nextSuggestedId || liveRead.suggestedServiceId,
               nextStep: liveRead.bookingPathSummary?.nextStep ?? null,
               paymentAllowedBeforeConfirmation: Boolean(
                 liveRead.bookingPathSummary?.paymentAllowedBeforeConfirmation,
@@ -2824,32 +2887,6 @@ export function HomepageSearchExperience({
     }
   }
 
-  function openBookingSuccessContactForm() {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    const attribution = buildPublicCtaAttribution({
-      source_section: 'booking_assistant',
-      source_cta: 'book_demo',
-      source_detail: result?.service.id
-        ? `homepage_booking_success_contact:${result.service.id}`
-        : 'homepage_booking_success_contact',
-      source_flow_mode: 'guided',
-    });
-    const target = new URL('/register-interest', window.location.origin);
-    target.searchParams.set('source_section', attribution.source_section);
-    target.searchParams.set('source_cta', attribution.source_cta);
-    target.searchParams.set(
-      'source_detail',
-      attribution.source_detail ?? 'homepage_booking_success_contact',
-    );
-    target.searchParams.set('source_path', sourcePath);
-
-    dispatchPublicCtaAttribution(attribution);
-    window.location.href = `${target.pathname}${target.search}`;
-  }
-
   const uniqueWarnings = Array.from(new Set(searchWarnings));
   const resultCountLabel =
     results.length === 1 ? '1 ranked option' : `${results.length} ranked options`;
@@ -2967,25 +3004,19 @@ export function HomepageSearchExperience({
     }, 120);
   }
 
-  function commitServiceSelection(service: ServiceCatalogItem, options?: { focusNameField?: boolean }) {
+  function commitServiceSelection(service: ServiceCatalogItem, options?: { openBooking?: boolean; focusNameField?: boolean }) {
     setSelectedServiceId(service.id);
     setResult(null);
     setSubmitError('');
-    setBookingComposerOpen(true);
-    if (!isDesktopViewport) {
-      setComposerCollapsed(true);
-    }
+    setBookingComposerOpen(Boolean(options?.openBooking));
     if (options?.focusNameField) {
       focusBookingNameField();
       return;
     }
-    window.setTimeout(() => {
-      bookingFormRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    }, 80);
   }
 
   function handleServiceSelect(service: ServiceCatalogItem) {
-    setPreviewService(service);
+    commitServiceSelection(service);
   }
 
   function handlePreviewBook() {
@@ -2993,7 +3024,7 @@ export function HomepageSearchExperience({
       return;
     }
 
-    commitServiceSelection(previewService, { focusNameField: true });
+    commitServiceSelection(previewService, { openBooking: true, focusNameField: true });
     setPreviewService(null);
   }
 
@@ -3114,6 +3145,7 @@ export function HomepageSearchExperience({
                 <div className="min-w-0 flex-1">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b7280]">Message BookedAI</div>
                   <textarea
+                    ref={searchComposerRef}
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     onKeyDown={handleSearchComposerKeyDown}
@@ -3222,7 +3254,7 @@ export function HomepageSearchExperience({
                               <button
                                 key={`${message.id}-${service.id}`}
                                 type="button"
-                                onClick={() => commitServiceSelection(service, { focusNameField: true })}
+                                onClick={() => commitServiceSelection(service)}
                                 className="rounded-[1rem] border border-[#e6edf8] bg-white px-3 py-3 text-left transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
                               >
                                 <div className="flex items-start justify-between gap-3">
@@ -3235,7 +3267,7 @@ export function HomepageSearchExperience({
                                     </div>
                                   </div>
                                   <span className="shrink-0 rounded-full bg-[#111827] px-2.5 py-1 text-[10px] font-semibold text-white">
-                                    Book
+                                    Select
                                   </span>
                                 </div>
                               </button>
@@ -3457,7 +3489,7 @@ export function HomepageSearchExperience({
                 </div>
               ) : null}
 
-              {!searchLoading && !searchError ? (
+              {!searchError && (!searchLoading || results.length > 0) ? (
                 <PartnerMatchShortlist
                   items={results}
                   batchSize={3}
@@ -3552,6 +3584,15 @@ export function HomepageSearchExperience({
                       { selected: isSelected, includeSourceLink: true },
                     );
                     const confidencePresentation = getResultConfidencePresentation(service);
+                    const providerUrl = service.source_url || service.booking_url || footer.links[0]?.href || null;
+                    const phoneHref = service.contact_phone
+                      ? `tel:${service.contact_phone.replace(/[^\d+]/g, '')}`
+                      : null;
+                    const smsHref = service.contact_phone
+                      ? `sms:${service.contact_phone.replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(`Hi, I am interested in ${service.name}.`)}`
+                      : null;
+                    const compactActionClass =
+                      'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#dedee3] bg-white text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff] hover:text-[#111827] disabled:cursor-not-allowed disabled:opacity-40';
                     return (
                       <div
                         key={service.id}
@@ -3580,6 +3621,76 @@ export function HomepageSearchExperience({
                           trailingLabel={service.category}
                           onClick={() => handleServiceSelect(service)}
                         />
+                        <div className="mt-3 flex min-w-0 items-center gap-2 overflow-x-auto border-t border-[#edf1f7] px-1 pt-3">
+                          <button
+                            type="button"
+                            onClick={() => commitServiceSelection(service)}
+                            aria-label={`Select ${service.name}`}
+                            title="Select result"
+                            className={`${compactActionClass} ${isSelected ? 'border-[#1a73e8] bg-[#eef4ff] text-[#1a73e8]' : ''}`}
+                          >
+                            <CheckIcon className="h-4 w-4" />
+                          </button>
+                          {providerUrl ? (
+                            <a
+                              href={providerUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={`Open provider website for ${service.name}`}
+                              title="Provider website"
+                              className={compactActionClass}
+                            >
+                              <LinkIcon className="h-4 w-4" />
+                            </a>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => setPreviewService(service)}
+                            aria-label={`View details for ${service.name}`}
+                            title="View details"
+                            className={compactActionClass}
+                          >
+                            <InfoIcon className="h-4 w-4" />
+                          </button>
+                          <a
+                            href={`mailto:info@bookedai.au?subject=${encodeURIComponent(`Booking enquiry: ${service.name}`)}`}
+                            aria-label={`Contact BookedAI about ${service.name}`}
+                            title="Contact"
+                            className={compactActionClass}
+                          >
+                            <MailIcon className="h-4 w-4" />
+                          </a>
+                          {phoneHref ? (
+                            <a
+                              href={phoneHref}
+                              aria-label={`Call ${service.name}`}
+                              title="Phone"
+                              className={compactActionClass}
+                            >
+                              <PhoneIcon className="h-4 w-4" />
+                            </a>
+                          ) : null}
+                          {smsHref ? (
+                            <a
+                              href={smsHref}
+                              aria-label={`Send SMS about ${service.name}`}
+                              title="SMS"
+                              className={compactActionClass}
+                            >
+                              <MessageIcon className="h-4 w-4" />
+                            </a>
+                          ) : null}
+                          <button
+                            type="button"
+                            onClick={() => commitServiceSelection(service, { openBooking: true, focusNameField: true })}
+                            aria-label={`Book ${service.name}`}
+                            title="Book this"
+                            className="inline-flex h-9 min-w-[6.5rem] shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#111827] bg-[#111827] px-3 text-[11px] font-semibold text-white transition hover:bg-[#1f2937]"
+                          >
+                            <SparkIcon className="h-4 w-4" />
+                            Book
+                          </button>
+                        </div>
                         <div
                           className={`mt-3 rounded-[1rem] border px-3.5 py-3 text-[11px] leading-5 ${
                             confidencePresentation.tone === 'tenant'
@@ -3589,23 +3700,6 @@ export function HomepageSearchExperience({
                         >
                           <div className="font-semibold">{confidencePresentation.label}</div>
                           <div className="mt-1 opacity-90">{confidencePresentation.body}</div>
-                        </div>
-                        <PartnerMatchActionFooter model={footer} tone={isSelected ? 'selected' : 'default'} />
-                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#edf1f7] px-1 pt-3">
-                          <button
-                            type="button"
-                            onClick={() => handleServiceSelect(service)}
-                            className="inline-flex items-center rounded-xl border border-[#dedee3] bg-white px-3.5 py-2 text-[11px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:text-[#202124]"
-                          >
-                            View
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => commitServiceSelection(service, { focusNameField: true })}
-                            className="inline-flex items-center rounded-xl border border-[#111827] bg-[#111827] px-3.5 py-2 text-[11px] font-semibold text-white transition hover:bg-[#1f2937]"
-                          >
-                            Continue to booking
-                          </button>
                         </div>
                       </div>
                     );
@@ -3759,14 +3853,14 @@ export function HomepageSearchExperience({
                 </div>
               </div>
 
-              {!result && !isDesktopViewport ? (
+              {!result ? (
                 <button
                   type="button"
                   onClick={() => setBookingComposerOpen((current) => !current)}
-                  className="public-apple-primary-button mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold lg:hidden"
+                  className="public-apple-primary-button mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold"
                 >
                   <SparkIcon className="h-4 w-4" />
-                  {bookingComposerOpen ? 'Hide form' : 'Book this match'}
+                  {bookingComposerOpen ? 'Hide booking form' : 'Book this match'}
                 </button>
               ) : null}
             </div>
@@ -3798,7 +3892,7 @@ export function HomepageSearchExperience({
             <div
               ref={bookingFormRef}
               className={`public-apple-workspace-panel mt-3 rounded-[1.1rem] p-3.5 shadow-[0_10px_28px_rgba(60,64,67,0.05)] ${
-                selectedService && !bookingComposerOpen && !isDesktopViewport ? 'hidden' : ''
+                selectedService && !bookingComposerOpen ? 'hidden' : ''
               }`}
             >
               <div className="mb-3">
@@ -3903,6 +3997,9 @@ export function HomepageSearchExperience({
                     <p className="mt-2 max-w-md text-sm leading-6 text-white/86">
                       {content.ui.thankYouBody}
                     </p>
+                    <p className="mt-2 max-w-md text-sm leading-6 text-white/86">
+                      Thank you for booking with BookedAI. Your booking code and portal QR are ready, and I can keep helping with another search while this confirmation remains on screen.
+                    </p>
                     <p className="mt-2 text-sm leading-6 text-white/78">{result.confirmation_message}</p>
                     <div className="mt-3 inline-flex rounded-full bg-white/14 px-3 py-1.5 text-[11px] font-semibold text-white/90 ring-1 ring-white/14">
                       Returning to the main BookedAI screen in {thankYouReturnCountdown}s
@@ -3939,7 +4036,7 @@ export function HomepageSearchExperience({
                   <div className="rounded-[1.25rem] bg-white p-2.5 text-[#202124] shadow-sm">
                     <img
                       src={getBookingQrCodeUrl(result)}
-                      alt={`${content.ui.qrLabel} ${result.booking_reference}`}
+                      alt={`${content.ui.qrLabel} ${result.booking_reference} portal link`}
                       className="h-32 w-32 rounded-[1rem] bg-white object-cover"
                     />
                     <div className="mt-2 rounded-[0.85rem] bg-[#f8f9fa] px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368]">
@@ -4117,6 +4214,17 @@ export function HomepageSearchExperience({
               </div>
 
               <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                <a
+                  href={getBookingPortalUrl(result)}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open booking portal"
+                  title="Portal"
+                  className="public-apple-primary-button inline-flex min-w-[4.5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
+                >
+                  <QrIcon className="h-4 w-4" />
+                  <span>Portal</span>
+                </a>
                 {result.payment_url ? (
                   <a
                     href={result.payment_url}
@@ -4141,15 +4249,15 @@ export function HomepageSearchExperience({
                     <span>Payment</span>
                   </div>
                 ) : null}
-                <button
-                  type="button"
-                  aria-label="Open contact form"
-                  onClick={openBookingSuccessContactForm}
+                <a
+                  href={`mailto:${result.contact_email && result.contact_email.includes('@') ? result.contact_email : 'info@bookedai.au'}?subject=${encodeURIComponent(`BookedAI booking ${result.booking_reference}`)}`}
+                  aria-label="Email booking confirmation"
+                  title="Email"
                   className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
                 >
                   <MailIcon className="h-4 w-4" />
-                  <span>Contact form</span>
-                </button>
+                  <span>Email</span>
+                </a>
                 {result.meeting_event_url || result.calendar_add_url ? (
                   <a
                     href={result.meeting_event_url ?? result.calendar_add_url ?? '#'}
@@ -4162,6 +4270,15 @@ export function HomepageSearchExperience({
                     <span>Add calendar</span>
                   </a>
                 ) : null}
+                <button
+                  type="button"
+                  aria-label="Continue in chat"
+                  onClick={focusSearchComposer}
+                  className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
+                >
+                  <MessageIcon className="h-4 w-4" />
+                  <span>Chat</span>
+                </button>
                 <button
                   type="button"
                   aria-label="Return home"
