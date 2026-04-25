@@ -22,6 +22,7 @@ from api.v1_routes import (
 from api.v1_router import router as v1_router
 from repositories.integration_repository import IntegrationRepository
 from service_layer.prompt9_matching_service import RankedServiceMatch
+from service_layer.tenant_app_service import build_portal_booking_snapshot
 from repositories.tenant_repository import TenantRepository
 
 
@@ -253,3 +254,107 @@ class ApiV1PortalRoutesTestCase(TestCase):
         payload = response.json()
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["error"]["code"], "validation_error")
+
+    def test_portal_pause_request_returns_success_envelope(self):
+        async def _queue_portal_booking_request(*_args, **_kwargs):
+            return {
+                "request_status": "queued",
+                "request_type": "pause_request",
+                "booking_reference": "BR-PORTAL-4",
+                "message": "Your pause request has been recorded for academy review.",
+                "support_email": "support@example.com",
+                "outbox_event_id": 43,
+            }
+
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.queue_portal_booking_request",
+            _queue_portal_booking_request,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/portal/bookings/BR-PORTAL-4/pause-request",
+                json={"customer_note": "We have exams for the next three weeks."},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["request_type"], "pause_request")
+
+    def test_portal_downgrade_request_returns_success_envelope(self):
+        async def _queue_portal_booking_request(*_args, **_kwargs):
+            return {
+                "request_status": "queued",
+                "request_type": "downgrade_request",
+                "booking_reference": "BR-PORTAL-5",
+                "message": "Your downgrade request has been recorded for academy review.",
+                "support_email": "support@example.com",
+                "outbox_event_id": 44,
+            }
+
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.queue_portal_booking_request",
+            _queue_portal_booking_request,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/portal/bookings/BR-PORTAL-5/downgrade-request",
+                json={"customer_note": "Please move us to one class per week for now."},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["request_type"], "downgrade_request")
+
+    def test_build_portal_booking_snapshot_tolerates_legacy_non_uuid_booking_ids(self):
+        class _PortalSnapshotSession:
+            def __init__(self):
+                self.calls = 0
+
+            async def execute(self, *_args, **_kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    return _FakeExecuteResult(
+                        {
+                            "booking_intent_id": "123",
+                            "tenant_id": "tenant-1",
+                            "booking_reference": "v1-cb79f8e371",
+                            "service_name": "Portal Test Service",
+                            "service_id": "svc-1",
+                            "requested_date": "2026-04-24",
+                            "requested_time": "10:00",
+                            "timezone": "Australia/Sydney",
+                            "booking_path": "request_callback",
+                            "confidence_level": "high",
+                            "status": "captured",
+                            "payment_dependency_state": "pending",
+                            "metadata_json": None,
+                            "created_at": "2026-04-24T03:00:00Z",
+                            "customer_name": "Aus",
+                            "customer_email": "aus@example.com",
+                            "customer_phone": "+61400000000",
+                            "business_name": "BookedAI",
+                            "business_email": "support@bookedai.au",
+                            "owner_email": None,
+                            "category": "Service",
+                            "summary": "Summary",
+                            "service_amount_aud": 120.0,
+                            "currency_code": "AUD",
+                            "display_price": None,
+                            "duration_minutes": 60,
+                            "venue_name": "Venue",
+                            "location": "Sydney",
+                            "map_url": None,
+                            "booking_url": None,
+                            "image_url": None,
+                        }
+                    )
+                raise AssertionError(f"Unexpected execute call {self.calls}")
+
+        snapshot = __import__('asyncio').run(
+            build_portal_booking_snapshot(_PortalSnapshotSession(), booking_reference="v1-cb79f8e371")
+        )
+
+        self.assertEqual(snapshot["booking"]["booking_reference"], "v1-cb79f8e371")
+        self.assertEqual(snapshot["payment"]["status"], "pending")

@@ -44,6 +44,26 @@ They should be treated as one coordinated productization wave across:
 - billing and subscription flows
 - operator-facing OpenClaw control access
 
+This package now also inherits one explicit AI-agent execution rule:
+
+- `customer-facing search and conversation agent` owns need capture, clarification, shortlist, and booking handoff
+- `revenue operations agent` owns follow-up, reminders, CRM/webhook actions, payment rescue, tenant billing posture, and retention tasks after the first lead or booking event
+
+Latest implementation continuation from `2026-04-25`:
+
+- the public customer-facing agent now has a backend turn contract at `POST /api/v1/agents/customer-turn`, returning reply, phase, missing context, suggestions, grounded search payload, and next-agent handoff metadata
+- the public homepage agent now renders an explicit chat thread with user turns, assistant replies, inline top-result cards, and quick suggestions that continue the search inside the conversation
+- the homepage live-read path now consumes that backend customer-turn contract before falling back to the earlier public assistant helper, so UI copy and result payloads come from one reusable agent contract
+- clarification chips now rerun the search with added context, so the visible flow behaves more like a live agent than a static helper panel
+- `POST /api/v1/revenue-ops/handoffs` now lets a customer-facing booking lifecycle spawn queued SME revenue-ops work in `agent_action_runs`
+- the queued revenue-ops handoff currently covers lead follow-up, payment reminder, CRM sync, customer-care status monitoring, and webhook callback, is called by homepage post-booking automation after the best-effort payment and communication steps, and is visible through the admin Reliability ledger filters
+
+Next phase carry-forward from `2026-04-25`:
+
+- `docs/development/next-phase-implementation-plan-2026-04-25.md` is now the implementation bridge after Sprint 16
+- Sprint 13-16 completion should hand directly into `Phase 17` full-flow stabilization closeout, then `Phase 18` revenue-ops ledger control, `Phase 19` customer-care/status agent, `Phase 20` widget/plugin runtime, `Phase 21` billing and receivables truth, `Phase 22` reusable templates, and `Phase 23` release governance
+- every user-surface phase must preserve the verified booking success behavior: show a Thank You state after booking, keep downstream automation best-effort, and return to the main BookedAI screen after `5s`
+
 ## Surface inventory to build or upgrade
 
 Current repo reality from `2026-04-21`:
@@ -82,15 +102,22 @@ Expected outcomes:
 - that same homepage runtime should now also expose a smoother matching-state experience when search is slow, with staged progress language and prompts for better input instead of a thin static loading state
 - a reusable cross-industry full-flow QA pack for that same public booking journey, so operators can rehearse and validate enterprise booking posture across 10 synthetic industries without inventing ad-hoc records each time
 - stronger continuity from homepage and product proof into portal, tenant, and billing follow-up lanes
+- the public assistant should no longer stop conceptually at booking:
+  - it must hand structured lead context into the revenue operations layer
+  - it must create the downstream state needed for reminder, CRM, payment, and retention automation
 - public search and booking submit should now explicitly tolerate partial backend degradation: if the newer v1 booking write path is unhealthy, the user-facing flow must fall back safely instead of freezing on `Continue booking`
 - slow-search behavior is now part of the product requirement, not only a visual nice-to-have:
   - matching should expose visible in-progress stages instead of one generic loading label
   - the runtime should explain what BookedAI is doing while ranking and trust checks are running
   - the runtime should proactively invite extra detail like suburb, time window, audience, or preference so the user can improve match quality before results settle
-- inherited homepage truth for later user-surface work is now shifting again on `2026-04-23`: `bookedai.au` should become the simpler modern product-first landing surface, while `pitch.bookedai.au` should absorb the current homepage's long-form narrative, proof, architecture, and company-story content
+- inherited public-entry truth for later user-surface work shifted again on `2026-04-24`: public internet entry should now land on `pitch.bookedai.au`, with `bookedai.au` retained as the canonical redirect host rather than a separately served homepage runtime
+- pitch package registration is now part of that inherited public-entry truth: `pitch.bookedai.au` pricing CTAs must complete through `/register-interest` on the same host, production CORS must allow `https://pitch.bookedai.au` when the frontend API base is `api.bookedai.au`, and package registration should degrade provider side-effect failures into manual follow-up rather than customer-visible load failure
+- product runtime QA is now part of that inherited public-entry truth: `product.bookedai.au` must complete the live `search -> match -> booking -> payment-intent -> follow-up` smoke without browser console errors, and payment intent lookup must support both booking UUIDs and `v1-*` booking references across mixed tenant/service key types
+- production deploy verification is also part of this inherited truth: the live deploy path must tolerate transient Docker Compose recreate/orphan cleanup around companion services such as `hermes`, and health checks should validate Compose service status plus HTTPS probes rather than only fixed container names
+- `RegisterInterestApp` package-selection UI should stay compact and icon-led on mobile, with constrained text blocks and no horizontal overflow, so Freemium, Free Setup, Pro, Pro Max, and Advance Customize remain scannable without consuming the whole viewport
 - CTA language across homepage-adjacent public surfaces should now prefer `Open Web App` or equivalent responsive-web wording over older `Product Trial` shorthand when the target is the live web runtime
 - public narrative ownership should be cleaner:
-  - `bookedai.au` owns first-minute orientation and product entry
+  - `demo.bookedai.au` owns first-minute orientation and product entry
   - `pitch.bookedai.au` owns deeper pitch and migrated long-form homepage story
   - `product.bookedai.au` owns deeper live product proof
 - the active `2026-04-23` public UX direction now also includes an interaction-quality rule: BookedAI should feel like it is actively working during search and matching, not passively waiting, especially on homepage and assistant entry surfaces where slower ranking can otherwise feel broken
@@ -107,6 +134,33 @@ Expected outcomes:
   - homepage should be refined as a responsive web-app shell first, not widened back into a multi-section marketing page
   - the target interaction model is closer to current ChatGPT search UX, with one dominant composer, same-page ranked results, and the BookedAI booking flow living beside the results on desktop and below on mobile
   - public UX polish should now prioritize spacing, hierarchy, copy, and responsive app behavior before reintroducing any deeper homepage narrative layers
+- that same priority now also applies directly to `demo.bookedai.au` as of `2026-04-24`:
+  - the demo host should no longer behave like a lighter story-led landing page; it should act as a premium chat-first booking workspace
+  - the visible product contract is now `chat = input`, `booking = output`, `revenue = outcome`, with booking cards and payment action kept inline rather than pushed behind modal or CTA jumps
+  - the demo surface should stay grounded to the real BookedAI public v1 stack so shortlist generation, booking-intent capture, and payment-intent preparation all remain product-truth instead of mock-only proof
+  - the preferred opening composition for that host is now more explicitly ChatGPT-like: minimal logo-only nav, one dominant centered composer, quick suggestion chips that fire the flow immediately, and restrained ambient gradient motion rather than a heavier multi-block hero
+  - the next sprint inheritance for that same host is now locked through `docs/architecture/demo-grandmaster-chess-revenue-engine-blueprint.md`: the chess use case should upgrade the demo from `search -> booking` into `assessment -> placement -> subscription -> coach report -> parent report -> retention`, while preserving tenant-safe API contracts so the same runtime can later serve many academies or other recurring-service businesses
+  - sprint implementation for that academy layer should prioritize:
+    - assessment and placement API seams
+    - academy student, enrollment, report, and portal-request snapshot read models
+    - timetable and subscription recommendation states in the demo runtime
+    - parent portal report preview and request actions
+    - tenant and admin reporting cuts for MRR, paid/unpaid posture, and churn-risk visibility
+  - that portal requirement is now more explicit from current code truth:
+    - academy bookings should reopen in `portal.bookedai.au` with the stored parent report preview
+    - parent-safe request actions should cover `reschedule`, `pause`, `downgrade`, and `cancel`
+  - latest UI inheritance for `demo.bookedai.au` on `2026-04-24`:
+    - the surface now presents the chess proof as one professional workspace with a header status bar, horizontal/side flow rail, intake composer, academy matches panel, and revenue workflow panel
+    - booking CTAs must stay locked behind assessment and placement, with explicit `Assess first` state instead of visually suggesting booking is available too early
+    - desktop should keep chat, matches, and revenue workflow visible together; mobile should stack the same flow clearly without relying on a hidden bottom sheet as the primary path
+    - the visual hierarchy should continue to emphasize the full connected flow: `intent -> assessment -> placement -> booking -> payment truth -> parent report/retention`
+  - latest connected-agent implementation inheritance on `2026-04-24`:
+    - subscription handoff now has a real v1 seam at `POST /api/v1/subscriptions/intents`
+    - academy subscription intent state is persisted in `academy_subscription_intents`
+    - revenue-ops action visibility now starts in `agent_action_runs`, with subscription confirmation, payment reminder, CRM sync, report-generation, and retention-evaluation actions queued from the chess handoff
+    - report generation and retention evaluation can also be queued directly through `POST /api/v1/reports/generate` and `POST /api/v1/retention/evaluate`
+    - `demo.bookedai.au` should show those queued actions after booking/report preview so the product proof no longer stops at booking confirmation
+    - those actions must stay audit-backed and outbox-backed so the future customer-care/status agent can answer from real lifecycle state
 
 Execution guardrail:
 
@@ -128,6 +182,13 @@ Completion update on `2026-04-24`:
 - the live homepage now uses the calmer search-first light composition instead of the earlier heavier marketplace-image landing treatment
 - production deploy and health verification passed, and a live screenshot proof now exists at `artifacts/screenshots/publicapp-live-2026-04-24.png`
 - the next execution pass is now locked more tightly to homepage app-shell polish: make `PublicApp.tsx` feel like the real product workspace, keep results and booking flow within one responsive environment, and keep all supporting design choices subordinate to that interaction model
+
+Follow-up completion update on `2026-04-24`:
+
+- `PublicApp.tsx` now implements that app-shell polish as a ChatGPT-like public homepage: desktop sidebar, compact top bar, short `bookedai.au` banner, centered prompt chips, and immediate handoff into the live BookedAI chat workspace
+- `HomepageSearchExperience.tsx` now carries the calmer visual treatment into the main interaction surface, keeping chat, shortlist, and booking side-by-side on desktop and stacked cleanly on mobile
+- this is the current homepage inheritance for the next sprint pass: keep public homepage work simple, chat-first, and booking-visible rather than returning to a multi-section marketing page
+- the immediate continuation now also locks the booking form behind match selection, with the empty booking panel explaining the `send request -> review matches -> choose option` sequence; this keeps the first screen conversational while still showing where booking will happen
 
 ## Portal
 
@@ -169,10 +230,14 @@ Expected outcomes:
     - `tenant_admin` and `operator` own branding, HTML introduction, plugin, and catalog changes
     - `tenant_admin` and `finance_manager` own billing setup and plan posture
     - tenant-controlled embed settings must never be able to repoint another tenant workspace
-  - tenant-side audit visibility and safer read-only UX:
+- tenant-side audit visibility and safer read-only UX:
     - section-level `last updated` and `last edited by` context for experience, plugin, billing, team, and integrations
     - explicit read-only messaging when a signed-in tenant role can inspect a section but cannot mutate it
     - input-level disablement for billing and team controls so restricted roles do not appear to have write access until final submit
+- tenant-facing revenue-ops surfaces now also need to become first-class execution targets:
+  - action queue for new leads, unpaid bookings, overdue invoices, renewals due, and churn-risk customers
+  - communication timeline across email, SMS, WhatsApp, CRM-linked activity, and webhook-triggered automations
+  - AI-suggested next actions with tenant-safe approve, reject, or auto-run policy posture
 
 ## Admin
 
@@ -247,6 +312,10 @@ Expected outcomes:
   - root admin auth therefore now ships with a compatibility bridge that resolves identities from `tenant_user_memberships` and persists email codes into `tenant_email_login_codes` until Prisma is deliberately enabled on a schema-aligned database
 - the shared-frontend admin shell then moved one more practical step on `2026-04-23` into the first requirement-aligned IA package:
   - `frontend/src/` admin now exposes the requested primary sections directly in-product: `Overview`, `Tenants`, `Tenant Workspace`, `Catalog`, `Billing Support`, `Integrations`, `Reliability`, `Audit & Activity`, and `Platform Settings`
+- the next admin execution interpretation should now also include AI-action oversight:
+  - review queue for agent-triggered reminders, CRM sync attempts, webhook actions, and escalations
+  - tenant receivable and renewal risk overview
+  - current-customer status support context when chats or service requests come back in through email or phone-linked identity
   - the tenant lane is now explicitly split into a lighter directory-selection surface and the deeper mutable tenant workspace, so tenant scope can be confirmed before profile, role, HTML, or catalog edits
   - billing/support, integrations, audit/activity, and platform review now have their own route homes and operator guidance inside the shared frontend shell instead of waiting on every later backend module to land first
   - `#operations` deep links remain backward-compatible by resolving into `#overview`, so the IA broadening does not break older operator bookmarks during the transition
@@ -677,6 +746,7 @@ Must verify:
 - portal loads from booking reference
 - portal no-result and invalid-reference states are clean
 - portal ignores generic tracking-style `ref` query params so external tokens are not mistaken for booking references
+- portal must reopen authoritative `v1-*` live booking references created from the homepage booking flow without UUID-cast or mixed-type join failures
 - billing screens handle missing data safely
 - tenant value messages do not overstate financial truth
 - portal actions stay request-safe and auditable
@@ -963,3 +1033,12 @@ This package should be considered successfully executed when:
 - `2026-04-23`: the public-surface hardening lane now also includes homepage runtime polish in `HomepageSearchExperience.tsx`: `Enter` submits the search shell, `Shift+Enter` keeps multiline input, denied-location live-read searches stay warning-led without duplicate exact warning strings, and homepage Stripe-return params now render a booking success/cancel banner instead of dropping the customer back into a neutral shell
 - `2026-04-23`: browser release verification for that lane is now locked in the correct mode split: legacy admin/public/pricing/tenant slices pass, the homepage legacy return-banner spec passes again, and the full live-read public assistant plus location-guardrails batch is green (`19 passed, 2 skipped`)
 - `2026-04-23`: the same public lane now also includes a sequence-safe homepage redeploy followed by an executive redesign of `pitch.bookedai.au`; pitch now opens with a tighter decision-oriented brief, and its partner proof layer can intentionally stay on static approved logos so production no longer emits the previous `/api/partners` CORS noise on the pitch host
+- `2026-04-24`: the Grandmaster Chess connected-agent slice now has first operator-grade revenue-ops ledger control: `agent_action_runs` can be listed, inspected, and transitioned through real statuses with audit/outbox evidence, and the frontend v1 client exposes matching helpers for the upcoming tenant/admin UI surfaces
+- `2026-04-24`: that same revenue-ops ledger now has first tracked worker execution through `POST /api/v1/agent-actions/dispatch`, so queued chess actions can move into provider-ready `sent`, internal-trigger `completed`, policy `manual_review`, or `failed` states with `job_runs` evidence before the dedicated operator UI lands
+- `2026-04-24`: the first dedicated admin UI for that ledger now lives inside Reliability as `RevenueOpsActionLedger`, with tenant-scoped filtering, status/action filters, dispatch control, manual-review/complete transitions, and summary counts for queued/manual-review/failed/completed posture
+- `2026-04-24`: `demo.bookedai.au` also received a quality pass for the same connected-agent proof: desktop result content no longer clips, the booking modal scrolls safely in small viewports, missing result images render a branded chess fallback, revenue-agent actions read as a clearer status timeline, and assessment failures are isolated from search failures so partial live-read state remains truthful
+- `2026-04-24`: the demo connected-agent proof now has live-read Playwright regression coverage for partial assessment failure and mobile search-to-revenue-handoff completion. The QA pass fixed assessment/placement envelope tolerance, placement slot conversion into valid booking input values, a fast-answer shortlist race, and payment copy that previously implied checkout opened without a real checkout URL.
+- `2026-04-24`: the full go-live gate passed for the active public/admin proof surfaces after fixing demo CORS and chess DNS. Verification covered backend booking/payment, portal, pricing/register, academy/revenue-ops tests, frontend build, demo Playwright regression, live deploy, stack healthcheck, API health, demo CORS preflight, revenue-ops API, and browser smoke across demo, pitch/register, product, admin, and chess with no horizontal overflow or non-ignorable console/network errors.
+- `2026-04-24`: `pitch.bookedai.au` package booking received a live deep-QA closeout: pricing CTAs route to the pitch-host registration app, the package form submits through production pricing consultation without load failure, and mobile layout polish removed the fixed CTA overlay plus tightened package-card/footer wrapping. Verification included frontend build, pricing resilience test, live deploy, stack healthcheck, pitch-origin CORS preflight, desktop/tablet/mobile Playwright screenshots, and mobile confirmation `CONS-022CCEA9`.
+- `2026-04-24`: the admin Reliability revenue-ops ledger received the next operator polish pass: tenant-wide summary counts are separated from active filters, operators can search by student or booking reference, action cards can expand input/result evidence, and compact icon-led controls now cover refresh, dispatch, complete, and manual review. Live API probing also found and fixed a migration grant gap for `agent_action_runs` / `academy_subscription_intents`, so `GET /api/v1/agent-actions` and `POST /api/v1/agent-actions/dispatch` now return success envelopes in production.
+- `2026-04-24`: the full BookedAI booking flow now includes the requested post-booking Thank You handoff. Homepage search, product/embedded assistant, Future Swim, and Grandmaster Chess booking surfaces show a confirmation screen with a 5-second countdown, then return to the main screen automatically. Live product QA created booking `v1-ce0d20a95d`, confirmed lead/booking/payment/email/SMS/WhatsApp APIs all returned `200`, and verified the countdown plus auto-return behavior with Playwright.

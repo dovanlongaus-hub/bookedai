@@ -1,4 +1,12 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import {
+  BadgeCheck,
+  Building2,
+  Check,
+  CircleDollarSign,
+  Rocket,
+  Sparkles,
+} from 'lucide-react';
 
 import { Footer } from '../../components/landing/Footer';
 import { Header } from '../../components/landing/Header';
@@ -112,6 +120,7 @@ const offerPackages: Array<{
   title: string;
   badge: string;
   backendPlanId: PlanId;
+  icon: typeof Rocket;
   headline: string;
   body: string;
   commissionNote: string;
@@ -122,6 +131,7 @@ const offerPackages: Array<{
     title: 'Freemium',
     badge: 'Entry',
     backendPlanId: 'basic',
+    icon: Sparkles,
     headline: 'Best for first activation, plugin, popup, or website booking assistant.',
     body: 'A light entry path for SMEs that want BookedAI live on web or app surfaces first, then upgrade once real usage and booking patterns are visible.',
     commissionNote:
@@ -132,6 +142,7 @@ const offerPackages: Array<{
     title: 'Free Setup for First 10 SMEs',
     badge: 'Priority',
     backendPlanId: 'standard',
+    icon: BadgeCheck,
     headline: 'Online setup is waived for the first 10 qualified SME customers.',
     body: 'Requires enough business detail for BookedAI to review the SME quickly and begin online setup follow-up right away.',
     commissionNote:
@@ -143,6 +154,7 @@ const offerPackages: Array<{
     title: 'Pro',
     badge: 'Scale',
     backendPlanId: 'standard',
+    icon: Rocket,
     headline: 'Best for SMEs ready to move from freemium into a stronger commercial rollout.',
     body: 'Ideal when you want a cleaner installed booking flow, better follow-up, and a more conversion-focused BookedAI setup after the first activation stage.',
     commissionNote:
@@ -153,6 +165,7 @@ const offerPackages: Array<{
     title: 'Pro Max',
     badge: 'Growth',
     backendPlanId: 'pro',
+    icon: CircleDollarSign,
     headline: 'Recommended for stronger booking, follow-up, automation, and conversion workflows.',
     body: 'Adds broader service journeys, deeper SME automation, and more operational depth once the initial proof-of-demand stage is passed.',
     commissionNote:
@@ -163,6 +176,7 @@ const offerPackages: Array<{
     title: 'Advance Customize',
     badge: 'Advanced',
     backendPlanId: 'pro',
+    icon: Building2,
     headline: 'Best for broader automation, multi-location logic, and deeper portal or workflow customization.',
     body: 'For SMEs and operators who need a more tailored BookedAI package after the early launch stage is working.',
     commissionNote:
@@ -503,7 +517,7 @@ export function RegisterInterestApp() {
   }
 
   return (
-    <main className="booked-shell min-h-screen bg-[linear-gradient(180deg,#f7fbff_0%,#eef4f8_38%,#fbfcfd_100%)] pb-24 text-[#1d1d1f] md:pb-0">
+    <main className="booked-shell min-h-screen bg-[linear-gradient(180deg,#f7fbff_0%,#eef4f8_38%,#fbfcfd_100%)] pb-10 text-[#1d1d1f]">
       <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.11),transparent_24%),radial-gradient(circle_at_top_right,rgba(249,115,22,0.12),transparent_26%),linear-gradient(180deg,rgba(255,255,255,0.30)_0%,rgba(255,255,255,0)_30%,rgba(255,255,255,0.44)_100%)]" />
 
       <div className="relative z-10">
@@ -719,45 +733,59 @@ export function RegisterInterestApp() {
 
                 <div className="sm:col-span-2">
                   <div className="text-sm font-medium text-slate-700">BookedAI packages</div>
-                  <div className="mt-3 grid gap-3">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {offerPackages.map((offer) => {
                       const isSelected = selectedOfferId === offer.id;
+                      const OfferIcon = offer.icon;
                       return (
                         <button
                           key={offer.id}
                           type="button"
                           onClick={() => updateSelectedOffer(offer.id)}
                           className={[
-                            'rounded-[1.55rem] border px-5 py-4 text-left transition',
+                            'group min-w-0 rounded-[1.15rem] border px-3.5 py-3 text-left transition sm:px-4',
                             isSelected
-                              ? 'border-[#1459c7] bg-[#eff6ff] shadow-[0_12px_30px_rgba(37,99,235,0.10)]'
+                              ? 'border-[#1459c7] bg-[#eff6ff] shadow-[0_10px_24px_rgba(37,99,235,0.10)]'
                               : 'border-black/8 bg-white hover:border-[#1459c7]/35 hover:bg-slate-50',
                           ].join(' ')}
+                          aria-pressed={isSelected}
                         >
-                          <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div>
-                              <div className="text-base font-semibold text-slate-950">
-                                {offer.title}
-                              </div>
-                              <div className="mt-1 text-sm font-medium text-[#1459c7]">
-                                {offer.headline}
-                              </div>
-                            </div>
-                            <SignalPill
+                          <div className="flex min-w-0 items-start gap-3">
+                            <span
                               className={[
-                                'px-3 py-1 text-[10px] uppercase tracking-[0.14em]',
-                                offer.highlighted
-                                  ? 'bg-emerald-50 text-emerald-700'
-                                  : 'bg-slate-100 text-slate-700',
+                                'flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.85rem]',
+                                isSelected ? 'bg-[#1459c7] text-white' : 'bg-slate-100 text-slate-600',
                               ].join(' ')}
                             >
-                              {offer.badge}
-                            </SignalPill>
+                              {isSelected ? <Check className="h-4 w-4" /> : <OfferIcon className="h-4 w-4" />}
+                            </span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex min-w-0 items-center justify-between gap-2">
+                                <span className="line-clamp-2 min-w-0 text-sm font-semibold leading-5 text-slate-950">
+                                  {offer.title}
+                                </span>
+                                <span
+                                  className={[
+                                    'shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em]',
+                                    offer.highlighted
+                                      ? 'bg-emerald-50 text-emerald-700'
+                                      : 'bg-slate-100 text-slate-600',
+                                  ].join(' ')}
+                                >
+                                  {offer.badge}
+                                </span>
+                              </span>
+                              <span className="mt-1 line-clamp-2 block text-xs font-medium leading-5 text-[#1459c7]">
+                                {offer.headline}
+                              </span>
+                            </span>
                           </div>
-                          <p className="mt-3 text-sm leading-6 text-black/66">{offer.body}</p>
-                          <p className="mt-2 text-sm leading-6 text-[#1459c7]">
+                          <div className="mt-2 line-clamp-2 text-xs leading-5 text-black/60">
+                            {offer.body}
+                          </div>
+                          <div className="mt-2 line-clamp-2 text-[11px] leading-5 text-[#1459c7]">
                             {offer.commissionNote}
-                          </p>
+                          </div>
                         </button>
                       );
                     })}
@@ -1092,26 +1120,6 @@ export function RegisterInterestApp() {
         </SectionShell>
 
         <Footer onStartTrial={scrollToForm} onBookDemo={openProductDemo} />
-
-        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-black/8 bg-white/92 px-4 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur md:hidden">
-          <div className="mx-auto flex max-w-7xl items-center gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Ready to launch
-              </div>
-              <div className="truncate text-sm font-semibold text-slate-950">
-                Claim the free SME setup spot
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={scrollToForm}
-              className="booked-button inline-flex min-h-11 shrink-0 items-center justify-center px-4 text-sm font-semibold"
-            >
-              Register
-            </button>
-          </div>
-        </div>
       </div>
     </main>
   );

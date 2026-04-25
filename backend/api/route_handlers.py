@@ -1365,68 +1365,72 @@ async def pricing_consultation(
             payload,
             email_service=email_service,
         )
-        async with get_session(request.app.state.session_factory) as session:
-            await store_event(
-                session,
-                source="pricing",
-                event_type="pricing_consultation_created",
-                message=TawkMessage(
-                    conversation_id=result.consultation_reference,
-                    message_id=result.consultation_reference,
-                    text=payload.notes or f"{result.plan_name} package consultation",
-                    sender_name=payload.customer_name,
-                    sender_email=payload.customer_email.strip().lower(),
-                    sender_phone=payload.customer_phone,
-                ),
-                ai_intent="pricing_consultation",
-                ai_reply=(
-                    "Package booking created with onboarding scheduling, trial offer, and Stripe checkout."
-                ),
-                workflow_status=result.payment_status,
-                metadata={
-                    "consultation_reference": result.consultation_reference,
-                    "plan_id": result.plan_id,
-                    "plan_name": result.plan_name,
-                    "package_name": result.plan_name,
-                    "business_name": payload.business_name,
-                    "business_type": payload.business_type,
-                    "onboarding_mode": result.onboarding_mode,
-                    "trial_days": result.trial_days,
-                    "trial_summary": result.trial_summary,
-                    "startup_offer_applied": result.startup_offer_applied,
-                    "startup_offer_summary": result.startup_offer_summary,
-                    "onsite_travel_fee_note": result.onsite_travel_fee_note,
-                    "referral_partner": payload.referral_partner,
-                    "referral_location": payload.referral_location,
-                    "preferred_date": result.preferred_date,
-                    "preferred_time": result.preferred_time,
-                    "timezone": result.timezone,
-                    "source_page": payload.source_page,
-                    "source_section": payload.source_section,
-                    "source_cta": payload.source_cta,
-                    "source_detail": payload.source_detail,
-                    "source_plan_id": payload.source_plan_id,
-                    "source_flow_mode": payload.source_flow_mode,
-                    "source_path": payload.source_path,
-                    "source_referrer": payload.source_referrer,
-                    "meeting_status": result.meeting_status,
-                    "meeting_join_url": result.meeting_join_url,
-                    "meeting_event_url": result.meeting_event_url,
-                    "payment_status": result.payment_status,
-                    "payment_url": result.payment_url,
-                    "email_status": result.email_status,
-                },
-            )
-            if await is_flag_enabled("new_booking_domain_dual_write", session=session):
-                try:
-                    await dual_write_pricing_consultation(
-                        session,
-                        payload=payload,
-                        result=result,
-                    )
-                    await session.commit()
-                except Exception:
-                    await session.rollback()
+        try:
+            async with get_session(request.app.state.session_factory) as session:
+                await store_event(
+                    session,
+                    source="pricing",
+                    event_type="pricing_consultation_created",
+                    message=TawkMessage(
+                        conversation_id=result.consultation_reference,
+                        message_id=result.consultation_reference,
+                        text=payload.notes or f"{result.plan_name} package consultation",
+                        sender_name=payload.customer_name,
+                        sender_email=payload.customer_email.strip().lower(),
+                        sender_phone=payload.customer_phone,
+                    ),
+                    ai_intent="pricing_consultation",
+                    ai_reply=(
+                        "Package booking created with onboarding scheduling, trial offer, and Stripe checkout."
+                    ),
+                    workflow_status=result.payment_status,
+                    metadata={
+                        "consultation_reference": result.consultation_reference,
+                        "plan_id": result.plan_id,
+                        "plan_name": result.plan_name,
+                        "package_name": result.plan_name,
+                        "business_name": payload.business_name,
+                        "business_type": payload.business_type,
+                        "onboarding_mode": result.onboarding_mode,
+                        "trial_days": result.trial_days,
+                        "trial_summary": result.trial_summary,
+                        "startup_offer_applied": result.startup_offer_applied,
+                        "startup_offer_summary": result.startup_offer_summary,
+                        "onsite_travel_fee_note": result.onsite_travel_fee_note,
+                        "referral_partner": payload.referral_partner,
+                        "referral_location": payload.referral_location,
+                        "preferred_date": result.preferred_date,
+                        "preferred_time": result.preferred_time,
+                        "timezone": result.timezone,
+                        "source_page": payload.source_page,
+                        "source_section": payload.source_section,
+                        "source_cta": payload.source_cta,
+                        "source_detail": payload.source_detail,
+                        "source_plan_id": payload.source_plan_id,
+                        "source_flow_mode": payload.source_flow_mode,
+                        "source_path": payload.source_path,
+                        "source_referrer": payload.source_referrer,
+                        "meeting_status": result.meeting_status,
+                        "meeting_join_url": result.meeting_join_url,
+                        "meeting_event_url": result.meeting_event_url,
+                        "payment_status": result.payment_status,
+                        "payment_url": result.payment_url,
+                        "email_status": result.email_status,
+                    },
+                )
+                if await is_flag_enabled("new_booking_domain_dual_write", session=session):
+                    try:
+                        await dual_write_pricing_consultation(
+                            session,
+                            payload=payload,
+                            result=result,
+                        )
+                        await session.commit()
+                    except Exception:
+                        await session.rollback()
+                        logger.exception("pricing_consultation_dual_write_failed")
+        except Exception:
+            logger.exception("pricing_consultation_event_store_failed")
         return result
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc

@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from urllib.parse import urlencode
+from uuid import UUID
 
 import httpx
 from sqlalchemy import desc, select, text
 
 from db import ServiceMerchantProfile
+from repositories.academy_repository import AcademyRepository
 from repositories.audit_repository import AuditLogRepository
 from repositories.base import RepositoryContext
 from repositories.feature_flag_repository import FeatureFlagRepository
@@ -295,6 +297,46 @@ async def build_tenant_bookings_snapshot(session, *, tenant_ref: str | None = No
         "tenant": tenant_profile,
         "status_summary": status_summary,
         "items": recent_bookings,
+    }
+
+
+async def build_tenant_leads_snapshot(
+    session, *, tenant_ref: str | None = None, status_filter: str | None = None
+) -> dict:
+    tenant_profile, tenant_id = await _load_tenant_context(session, tenant_ref=tenant_ref)
+    if not tenant_profile or not tenant_id:
+        return {}
+
+    reporting_repository = ReportingRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    leads = await reporting_repository.list_tenant_leads(
+        tenant_id, limit=30, status_filter=status_filter
+    )
+    summary = await reporting_repository.summarize_tenant_overview(tenant_id)
+
+    needs_follow_up = [
+        lead for lead in leads
+        if lead.get("status") in {"new", "captured", "contacted", "engaged"}
+        and not lead.get("follow_up_at")
+    ]
+    converted = [
+        lead for lead in leads
+        if lead.get("status") in {"converted", "booked", "customer"}
+    ]
+    crm_attention = [
+        lead for lead in leads
+        if lead.get("crm_sync_status") in {"failed", "manual_review_required", "retrying"}
+    ]
+
+    return {
+        "tenant": tenant_profile,
+        "summary": {
+            "total": summary.get("total_leads", 0),
+            "active": summary.get("active_leads", 0),
+            "needs_follow_up": len(needs_follow_up),
+            "converted": len(converted),
+            "crm_attention": len(crm_attention),
+        },
+        "items": leads,
     }
 
 
@@ -1074,8 +1116,8 @@ async def _load_portal_booking_row(session, *, booking_reference: str):
             left join contacts c
               on c.id = bi.contact_id
             left join service_merchant_profiles sm
-              on sm.service_id = bi.service_id
-             and sm.tenant_id = bi.tenant_id
+              on sm.service_id::text = bi.service_id::text
+             and sm.tenant_id::text = bi.tenant_id::text
             where bi.booking_reference = :booking_reference
             limit 1
             """
@@ -1083,6 +1125,25 @@ async def _load_portal_booking_row(session, *, booking_reference: str):
         {"booking_reference": normalized_reference},
     )
     return booking_result.mappings().first()
+
+
+def _is_uuid_like(value: object) -> bool:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return False
+
+    try:
+        UUID(normalized)
+    except (TypeError, ValueError, AttributeError):
+        return False
+
+    return True
+
+
+def _coerce_json_object(value: object) -> dict:
+    if isinstance(value, dict):
+        return dict(value)
+    return {}
 
 
 async def build_portal_booking_snapshot(session, *, booking_reference: str) -> dict:
@@ -1097,31 +1158,54 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
     if not booking_row:
         return {}
 
-    payment_result = await session.execute(
-        text(
-            """
-            select
-              pi.id::text as payment_intent_id,
-              pi.payment_option,
-              pi.status,
-              pi.amount_aud,
-              pi.currency,
-              pi.payment_url,
-              pi.external_session_id,
-              pi.metadata_json,
-              pi.created_at::text as created_at
-            from payment_intents pi
-            where pi.booking_intent_id = cast(:booking_intent_id as uuid)
-            order by pi.created_at desc
-            limit 1
-            """
-        ),
-        {"booking_intent_id": booking_row.get("booking_intent_id")},
-    )
-    payment_row = payment_result.mappings().first()
+    booking_intent_id = str(booking_row.get("booking_intent_id") or "").strip()
+    payment_row = None
+    if _is_uuid_like(booking_intent_id):
+        payment_result = await session.execute(
+            text(
+                """
+                select
+                  pi.id::text as payment_intent_id,
+                  pi.payment_option,
+                  pi.status,
+                  pi.amount_aud,
+                  pi.currency,
+                  pi.payment_url,
+                  pi.external_session_id,
+                  pi.metadata_json,
+                  pi.created_at::text as created_at
+                from payment_intents pi
+                where pi.booking_intent_id = cast(:booking_intent_id as uuid)
+                order by pi.created_at desc
+                limit 1
+                """
+            ),
+            {"booking_intent_id": booking_intent_id},
+        )
+        payment_row = payment_result.mappings().first()
+    payment_row = payment_row or {}
 
-    booking_metadata = dict(booking_row.get("metadata_json") or {})
+    booking_metadata = _coerce_json_object(booking_row.get("metadata_json"))
     notes = str(booking_metadata.get("notes") or "").strip() or None
+    academy_student_row = None
+    academy_report_row = None
+    try:
+        academy_repository = AcademyRepository(
+            RepositoryContext(
+                session=session,
+                tenant_id=str(booking_row.get("tenant_id") or "").strip() or None,
+            )
+        )
+        academy_student_row = await academy_repository.get_student_by_booking_reference(
+            booking_reference=normalized_reference,
+            tenant_id=str(booking_row.get("tenant_id") or "").strip() or None,
+        )
+        academy_report_row = await academy_repository.get_latest_report_preview(
+            booking_reference=normalized_reference,
+        )
+    except Exception:
+        academy_student_row = None
+        academy_report_row = None
 
     payment_status = (
         str(payment_row.get("status") or booking_row.get("payment_dependency_state") or "pending").strip()
@@ -1138,6 +1222,9 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
     }
     can_request_reschedule = booking_status.lower() not in {"cancelled", "completed"}
     can_request_cancel = booking_status.lower() not in {"cancelled", "completed"}
+    has_academy_report_preview = isinstance(booking_metadata.get("academy_report_preview"), dict)
+    can_request_pause = has_academy_report_preview and booking_status.lower() not in {"cancelled", "completed"}
+    can_request_downgrade = has_academy_report_preview and booking_status.lower() not in {"cancelled", "completed"}
 
     support_email = (
         str(booking_row.get("business_email") or "").strip().lower()
@@ -1172,6 +1259,26 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
             "enabled": can_request_cancel,
             "href": None,
             "note": None if can_request_cancel else "This booking can no longer be cancelled from the portal.",
+        },
+        {
+            "id": "request_pause",
+            "label": "Pause learning",
+            "description": "Ask the academy to hold the current learning plan without losing student context.",
+            "enabled": can_request_pause,
+            "href": None,
+            "note": None
+            if can_request_pause
+            else "Pause requests are available after the academy learning plan is active in the portal.",
+        },
+        {
+            "id": "request_downgrade",
+            "label": "Request plan downgrade",
+            "description": "Ask for a lighter subscription plan or frequency change for the current student.",
+            "enabled": can_request_downgrade,
+            "href": None,
+            "note": None
+            if can_request_downgrade
+            else "Plan downgrade requests become available once the academy pathway is active.",
         },
         {
             "id": "contact_support",
@@ -1246,8 +1353,7 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
             }
         )
 
-    booking_intent_id = str(booking_row.get("booking_intent_id") or "").strip()
-    if booking_intent_id:
+    if _is_uuid_like(booking_intent_id):
         audit_result = await session.execute(
             text(
                 """
@@ -1269,12 +1375,16 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
         for item in reversed(audit_rows):
             event_type = str(item.get("event_type") or "").strip()
             created_at = str(item.get("created_at") or "").strip()
-            payload = dict(item.get("payload") or {})
+            payload = _coerce_json_object(item.get("payload"))
             event_label = (
                 "Reschedule request submitted"
                 if event_type == "portal.reschedule_request.requested"
                 else "Cancellation request submitted"
                 if event_type == "portal.cancel_request.requested"
+                else "Pause request submitted"
+                if event_type == "portal.pause_request.requested"
+                else "Downgrade request submitted"
+                if event_type == "portal.downgrade_request.requested"
                 else "Portal request submitted"
             )
             detail_parts = [f"Recorded at {created_at}."] if created_at else []
@@ -1344,6 +1454,22 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
             "contact_phone": None,
             "contact_label": booking_row.get("business_name") or "BookedAI support",
         },
+        "academy_report_preview": booking_metadata.get("academy_report_preview")
+        if isinstance(booking_metadata.get("academy_report_preview"), dict)
+        else academy_report_row.get("report_json")
+        if isinstance((academy_report_row or {}).get("report_json"), dict)
+        else None,
+        "academy_student": {
+            "student_ref": academy_student_row.get("student_ref"),
+            "student_name": academy_student_row.get("student_name"),
+            "student_age": academy_student_row.get("student_age"),
+            "guardian_name": academy_student_row.get("guardian_name"),
+            "guardian_email": academy_student_row.get("guardian_email"),
+            "guardian_phone": academy_student_row.get("guardian_phone"),
+            "current_level": academy_student_row.get("current_level"),
+        }
+        if academy_student_row
+        else None,
         "status_timeline": timeline,
     }
 
@@ -1412,6 +1538,10 @@ async def queue_portal_booking_request(
         "Your reschedule request has been recorded for manual review."
         if safe_request_type == "reschedule_request"
         else "Your cancellation request has been recorded for manual review."
+        if safe_request_type == "cancel_request"
+        else "Your pause request has been recorded for academy review."
+        if safe_request_type == "pause_request"
+        else "Your downgrade request has been recorded for academy review."
     )
 
     return {

@@ -6,6 +6,7 @@ import type {
   TenantAuthSessionResponse,
   TenantBillingResponse,
   TenantBookingsResponse,
+  TenantLeadsResponse,
   TenantCatalogCreateRequest,
   TenantCatalogImportRequest,
   TenantCatalogItem,
@@ -56,7 +57,7 @@ import {
 } from '../../shared/presenters/partnerMatch';
 import { getApiBaseUrl } from '../../shared/config/api';
 
-type TenantPanel = 'overview' | 'experience' | 'catalog' | 'plugin' | 'bookings' | 'integrations' | 'billing' | 'team';
+type TenantPanel = 'overview' | 'experience' | 'catalog' | 'plugin' | 'bookings' | 'leads' | 'integrations' | 'billing' | 'team';
 type CatalogStatusFilter = 'all' | 'search-ready' | 'needs-review' | 'inactive';
 
 type TenantLoadState =
@@ -72,6 +73,7 @@ type TenantLoadState =
       onboarding: TenantOnboardingResponse;
       team: TenantTeamResponse;
       catalog: TenantCatalogResponse;
+      leads: TenantLeadsResponse | null;
     };
 
 type StoredTenantSession = TenantAuthSessionResponse;
@@ -762,6 +764,8 @@ export function TenantApp() {
   );
   const [state, setState] = useState<TenantLoadState>({ status: 'loading' });
   const [revenueMetrics, setRevenueMetrics] = useState<TenantRevenueMetrics | null>(null);
+  const [leadsLoading, setLeadsLoading] = useState(false);
+  const [leadsStatusFilter, setLeadsStatusFilter] = useState<string>('all');
   const [session, setSession] = useState<StoredTenantSession | null>(() => readStoredTenantSession(tenantRef));
   const [googleReady, setGoogleReady] = useState(false);
   const [authPending, setAuthPending] = useState(false);
@@ -980,6 +984,7 @@ export function TenantApp() {
           onboarding: onboardingEnvelope.data,
           team: teamEnvelope.data,
           catalog: catalogEnvelope.data,
+          leads: null,
         });
 
         apiV1
@@ -1082,6 +1087,30 @@ export function TenantApp() {
   useEffect(() => {
     syncPanelHash(panel);
   }, [panel]);
+
+  useEffect(() => {
+    if (panel !== 'leads' || state.status !== 'ready') return;
+    setState((current) => current.status === 'ready' ? { ...current, leads: null } : current);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [leadsStatusFilter]);
+
+  useEffect(() => {
+    if (panel !== 'leads' || state.status !== 'ready' || state.leads !== null) return;
+    const tenantSlug =
+      session?.membership?.tenant_slug ?? session?.tenant?.slug ?? tenantRef ?? null;
+    setLeadsLoading(true);
+    apiV1
+      .getTenantLeads(tenantSlug, leadsStatusFilter === 'all' ? null : leadsStatusFilter, session?.session_token ?? null)
+      .then((env) => {
+        if (env.status === 'ok') {
+          setState((current) =>
+            current.status === 'ready' ? { ...current, leads: env.data } : current,
+          );
+        }
+      })
+      .finally(() => setLeadsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panel, state.status, 'leads' in state ? state.leads : null]);
 
   useEffect(() => {
     if (!googleClientId || typeof window === 'undefined') {
@@ -1370,6 +1399,7 @@ export function TenantApp() {
       onboarding: onboardingEnvelope.data,
       team: teamEnvelope.data,
       catalog: catalogEnvelope.data,
+      leads: null,
     });
   }
 
@@ -2769,6 +2799,14 @@ export function TenantApp() {
       icon: <CalendarIcon className="h-4 w-4" />,
     },
     {
+      key: 'leads',
+      label: isFutureSwimTenant(overview.tenant) ? 'Enquiries' : 'Leads',
+      description: isFutureSwimTenant(overview.tenant)
+        ? 'Parent enquiries, follow-up state, and conversion posture.'
+        : 'Lead enquiries, pipeline stage, and CRM sync posture.',
+      icon: <SearchIcon className="h-4 w-4" />,
+    },
+    {
       key: 'integrations',
       label: 'Integrations',
       description: 'Provider posture, alerts, and retry signals.',
@@ -2788,7 +2826,9 @@ export function TenantApp() {
     },
   ];
   const activePanelMeta = tenantPanels.find((item) => item.key === panel) ?? tenantPanels[0];
-  const activePanelGuide = overview.workspace.guides[panel === 'experience' ? 'experience' : panel];
+  const activePanelGuide = panel !== 'leads'
+    ? overview.workspace.guides[panel === 'experience' ? 'experience' : panel as Exclude<typeof panel, 'leads'>]
+    : undefined;
   const introPreview = stripHtmlPreview(overview.workspace.introduction_html);
   const activationState = useMemo(
     () => deriveTenantActivationState({ session, onboarding, overview }),
@@ -4186,6 +4226,163 @@ export function TenantApp() {
                     </div>
                   </div>
                 ))}
+              </div>
+            </article>
+          </section>
+        ) : null}
+
+        {panel === 'leads' ? (
+          <section className="grid gap-6 xl:grid-cols-[0.9fr_1.1fr]">
+            <div className="space-y-6">
+              {/* Summary stat cards */}
+              <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  {state.leads?.tenant && isFutureSwimTenant(state.leads.tenant) ? 'Parent enquiries' : 'Lead pipeline'}
+                </div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  {state.leads?.tenant && isFutureSwimTenant(state.leads.tenant) ? 'Enquiries' : 'Leads'}
+                </h2>
+                <p className="mt-1 text-sm leading-6 text-slate-600">
+                  Manage and track{' '}
+                  {state.leads?.tenant && isFutureSwimTenant(state.leads.tenant)
+                    ? 'parent enquiries and lesson sign-up interest'
+                    : 'prospect conversations and conversions'}
+                  .
+                </p>
+                {leadsLoading ? (
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    {[...Array(5)].map((_, i) => (
+                      <div key={i} className="h-14 animate-pulse rounded-[1rem] bg-slate-100" />
+                    ))}
+                  </div>
+                ) : state.leads?.summary ? (
+                  <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <div className="rounded-[1rem] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
+                      <div className="text-2xl font-semibold text-slate-950">{state.leads.summary.total ?? 0}</div>
+                      <div className="mt-0.5 text-[11px] text-slate-500">Total</div>
+                    </div>
+                    <div className="rounded-[1rem] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
+                      <div className="text-2xl font-semibold text-slate-950">{state.leads.summary.active ?? 0}</div>
+                      <div className="mt-0.5 text-[11px] text-slate-500">Active</div>
+                    </div>
+                    <div className="rounded-[1rem] border border-amber-100 bg-amber-50 px-3 py-3 text-center">
+                      <div className="text-2xl font-semibold text-amber-700">{state.leads.summary.needs_follow_up ?? 0}</div>
+                      <div className="mt-0.5 text-[11px] text-amber-600">Needs follow-up</div>
+                    </div>
+                    <div className="rounded-[1rem] border border-emerald-100 bg-emerald-50 px-3 py-3 text-center">
+                      <div className="text-2xl font-semibold text-emerald-700">{state.leads.summary.converted ?? 0}</div>
+                      <div className="mt-0.5 text-[11px] text-emerald-600">Converted</div>
+                    </div>
+                    {(state.leads.summary.crm_attention ?? 0) > 0 ? (
+                      <div className="rounded-[1rem] border border-rose-100 bg-rose-50 px-3 py-3 text-center">
+                        <div className="text-2xl font-semibold text-rose-700">{state.leads.summary.crm_attention}</div>
+                        <div className="mt-0.5 text-[11px] text-rose-600">CRM attention</div>
+                      </div>
+                    ) : null}
+                  </div>
+                ) : null}
+              </article>
+
+              {/* Status filter tabs */}
+              <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                {(['all', 'new', 'active', 'converted'] as const).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    onClick={() => setLeadsStatusFilter(f)}
+                    className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${
+                      f === leadsStatusFilter || (f === 'all' && leadsStatusFilter === 'all')
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1)}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Leads list */}
+            <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                {state.leads?.tenant && isFutureSwimTenant(state.leads.tenant) ? 'Enquiry list' : 'Lead list'}
+              </div>
+              <h3 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+                {leadsStatusFilter && leadsStatusFilter !== 'all'
+                  ? `${leadsStatusFilter.charAt(0).toUpperCase()}${leadsStatusFilter.slice(1)}`
+                  : 'All'}{' '}
+                {state.leads?.tenant && isFutureSwimTenant(state.leads.tenant) ? 'enquiries' : 'leads'}
+              </h3>
+
+              <div className="mt-4 space-y-3">
+                {leadsLoading ? (
+                  [...Array(4)].map((_, i) => (
+                    <div key={i} className="h-16 animate-pulse rounded-[1rem] bg-slate-100" />
+                  ))
+                ) : !state.leads?.items?.length ? (
+                  <div className="rounded-[1rem] border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+                    No {state.leads?.tenant && isFutureSwimTenant(state.leads.tenant) ? 'enquiries' : 'leads'} yet.
+                  </div>
+                ) : (
+                  state.leads.items.map((lead) => {
+                    const statusColors: Record<string, string> = {
+                      new: 'bg-sky-50 text-sky-700 border-sky-100',
+                      captured: 'bg-sky-50 text-sky-700 border-sky-100',
+                      contacted: 'bg-violet-50 text-violet-700 border-violet-100',
+                      engaged: 'bg-amber-50 text-amber-700 border-amber-100',
+                      converted: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+                      booked: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+                      customer: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+                      lost: 'bg-slate-100 text-slate-500 border-slate-200',
+                    };
+                    const crmColors: Record<string, string> = {
+                      synced: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+                      failed: 'bg-rose-50 text-rose-700 border-rose-100',
+                      retrying: 'bg-amber-50 text-amber-700 border-amber-100',
+                      manual_review_required: 'bg-rose-50 text-rose-700 border-rose-100',
+                      not_synced: 'bg-slate-100 text-slate-500 border-slate-200',
+                    };
+                    const statusClass = statusColors[lead.status ?? ''] ?? 'bg-slate-100 text-slate-500 border-slate-200';
+                    const crmClass = crmColors[lead.crm_sync_status ?? ''] ?? 'bg-slate-100 text-slate-500 border-slate-200';
+                    return (
+                      <div
+                        key={lead.id}
+                        className="rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4"
+                      >
+                        <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                          <div className="min-w-0">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="text-sm font-semibold text-slate-950">{lead.name || 'Unknown'}</span>
+                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusClass}`}>
+                                {lead.status ?? 'unknown'}
+                              </span>
+                              {lead.crm_sync_status && lead.crm_sync_status !== 'not_synced' ? (
+                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${crmClass}`}>
+                                  CRM {lead.crm_sync_status.replace(/_/g, ' ')}
+                                </span>
+                              ) : null}
+                              {lead.status && ['new', 'captured', 'contacted', 'engaged'].includes(lead.status) && !lead.follow_up_at ? (
+                                <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                  Follow-up needed
+                                </span>
+                              ) : null}
+                            </div>
+                            <div className="mt-1 text-xs text-slate-500">
+                              {lead.email ?? lead.phone ?? 'No contact'}
+                              {lead.service_name ? ` · ${lead.service_name}` : ''}
+                            </div>
+                          </div>
+                          <div className="text-xs text-slate-400 sm:text-right sm:shrink-0">
+                            {lead.created_at ? new Date(lead.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' }) : ''}
+                          </div>
+                        </div>
+                        {lead.notes ? (
+                          <div className="mt-2 text-xs leading-5 text-slate-500 line-clamp-2">{lead.notes}</div>
+                        ) : null}
+                      </div>
+                    );
+                  })
+                )}
               </div>
             </article>
           </section>

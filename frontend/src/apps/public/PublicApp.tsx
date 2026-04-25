@@ -1,15 +1,9 @@
-import { FormEvent, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
-import { Header } from '../../components/landing/Header';
-import { productHref, roadmapHref } from '../../components/landing/data';
+import { brandUploadedLogoPath, productHref, roadmapHref } from '../../components/landing/data';
+import { LogoMark } from '../../components/landing/ui/LogoMark';
 import { HomepageSearchExperience } from './HomepageSearchExperience';
 import { getHomepageContent, pitchDeckHref } from './homepageContent';
-
-const homepageNavItems = [
-  { id: 'hero', label: 'Workspace' },
-  { id: 'bookedai-search-assistant', label: 'Results' },
-  { id: 'roadmap', label: 'Roadmap', href: roadmapHref },
-];
 
 const suggestedSearches = [
   'Private swim coaching near Caringbah this weekend',
@@ -18,11 +12,35 @@ const suggestedSearches = [
   'AI mentor session for startup growth this week',
 ];
 
-const workspaceSignals = ['Search-first workspace', 'AI-guided booking'] as const;
+const topMenuLinks = [
+  { label: 'Chat', href: '#bookedai-search-assistant' },
+  { label: 'Product', href: productHref },
+  { label: 'Pitch', href: pitchDeckHref },
+] as const;
+const sidebarItems = [
+  'Search',
+  'Shortlist',
+  'Booking',
+  'Payment',
+  'Follow-up',
+] as const;
+const flowCards = [
+  {
+    title: 'Chat',
+    body: 'Describe the booking in plain language.',
+  },
+  {
+    title: 'Match',
+    body: 'BookedAI ranks options and asks for missing details.',
+  },
+  {
+    title: 'Book',
+    body: 'Confirm the match, then hand off payment and follow-up.',
+  },
+] as const;
 
 export function PublicApp() {
   const homepageSearchContent = useMemo(() => getHomepageContent('en'), []);
-  const [queryValue, setQueryValue] = useState('');
   const [submittedQuery, setSubmittedQuery] = useState<string | null>(null);
   const [submittedRequestId, setSubmittedRequestId] = useState(0);
   const sourcePath =
@@ -52,128 +70,143 @@ export function PublicApp() {
       return;
     }
 
-    setQueryValue(trimmed);
     setSubmittedQuery(trimmed);
     setSubmittedRequestId((current) => current + 1);
   }
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    runSearch(queryValue);
-  }
-
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top,rgba(26,115,232,0.10),transparent_22%),linear-gradient(180deg,#f6f8fc_0%,#ffffff_100%)] text-[#202124] xl:pl-[7rem]">
-      <div className="relative z-10">
-        <Header
-          navItems={homepageNavItems}
-          onStartTrial={openProductTrial}
-          onBookDemo={openPitchDeck}
-          startTrialLabel="Open Web App"
-          bookDemoLabel="Open Pitch"
-          compactMenuOnly
-          utilityLinks={[
-            { label: 'Workspace', href: '#hero' },
-            { label: 'Roadmap', href: roadmapHref },
-            { label: 'Video Demo', href: '/video-demo.html' },
-          ]}
-        />
+    <main className="min-h-screen bg-[#f7f7f8] text-[#202124]">
+      <div className="grid min-h-screen lg:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="border-r border-[#e3e3e7] bg-[#f0f0f2] px-3 py-3 max-[1023px]:hidden">
+          <div className="sticky top-3 flex h-[calc(100vh-1.5rem)] flex-col">
+            <a href="#hero" className="flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-semibold text-[#202124] transition hover:bg-white/70">
+              <LogoMark
+                src={brandUploadedLogoPath}
+                alt="BookedAI"
+                className="h-11 w-[10.5rem] max-w-full object-cover object-center"
+              />
+            </a>
 
-        <section id="hero" className="mx-auto max-w-[1380px] px-4 pb-5 pt-4 sm:px-6 lg:px-8 lg:pb-6 lg:pt-6">
-          <div className="rounded-[2rem] border border-[#e3e7ee] bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(248,250,255,0.94)_100%)] px-4 py-5 shadow-[0_24px_72px_rgba(60,64,67,0.08)] sm:px-6 lg:px-8 lg:py-6">
-            <div className="mx-auto max-w-5xl">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                <div className="max-w-3xl">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1a73e8]">
-                    BookedAI workspace
-                  </div>
-                  <h1 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-[#202124] sm:text-5xl lg:text-[3.6rem] lg:leading-[1.02]">
-                    Search, refine, and continue booking in one calm workspace.
-                  </h1>
-                  <p className="mt-4 max-w-[44rem] text-sm leading-7 text-[#5f6368] sm:text-base">
-                    Start with a natural-language request. BookedAI keeps the shortlist, follow-up questions, and booking flow together instead of sending people across separate landing sections.
-                  </p>
-                </div>
+            <div className="mt-4 space-y-1">
+              {sidebarItems.map((item, index) => (
+                <a
+                  key={item}
+                  href="#bookedai-search-assistant"
+                  className={`flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm transition ${
+                    index === 0
+                      ? 'bg-white text-[#111827] shadow-[0_1px_2px_rgba(15,23,42,0.04)]'
+                      : 'text-[#5f6368] hover:bg-white/70 hover:text-[#202124]'
+                  }`}
+                >
+                  <span className="h-1.5 w-1.5 rounded-full bg-current opacity-50" />
+                  {item}
+                </a>
+              ))}
+            </div>
 
-                <div className="flex flex-wrap gap-2 lg:max-w-[22rem] lg:justify-end">
-                  {workspaceSignals.map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full border border-[#d7e3f7] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#35507a] shadow-[0_8px_20px_rgba(60,64,67,0.05)]"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
+            <div className="mt-auto rounded-2xl border border-[#dedee3] bg-white px-3 py-3">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b7280]">bookedai.au</div>
+              <p className="mt-2 text-sm leading-6 text-[#4b5563]">
+                Chat first. Book next. Follow-up handled in one web workspace.
+              </p>
+              <button
+                type="button"
+                onClick={openProductTrial}
+                className="mt-3 inline-flex w-full items-center justify-center rounded-xl bg-[#111827] px-3 py-2 text-sm font-semibold text-white transition hover:bg-[#1f2937]"
+              >
+                Open web app
+              </button>
+            </div>
+          </div>
+        </aside>
+
+        <div className="min-w-0">
+          <header className="sticky top-0 z-30 border-b border-[#e8e8ec] bg-[#f7f7f8]/86 px-4 py-3 backdrop-blur sm:px-6 lg:px-8">
+            <div className="mx-auto flex max-w-[1380px] items-center justify-between gap-3">
+              <a href="#hero" className="inline-flex items-center gap-2 rounded-xl px-1 py-1 text-sm font-semibold text-[#202124] min-[1024px]:hidden">
+                <LogoMark
+                  src={brandUploadedLogoPath}
+                  alt="BookedAI"
+                  className="h-10 w-[9.5rem] max-w-[calc(100vw-7rem)] object-cover object-center sm:w-[10.5rem]"
+                />
+              </a>
+              <nav className="flex items-center gap-1 max-[767px]:hidden">
+                {topMenuLinks.map((item) => (
+                  <a
+                    key={item.label}
+                    href={item.href}
+                    className="rounded-xl px-3 py-2 text-sm font-medium text-[#5f6368] transition hover:bg-white hover:text-[#202124]"
+                  >
+                    {item.label}
+                  </a>
+                ))}
+              </nav>
+              <div className="ml-auto flex items-center gap-2">
+                <a href={roadmapHref} className="inline-flex rounded-xl px-3 py-2 text-sm font-medium text-[#5f6368] transition hover:bg-white hover:text-[#202124] max-[639px]:hidden">
+                  Roadmap
+                </a>
+                <button
+                  type="button"
+                  onClick={openProductTrial}
+                  className="rounded-xl border border-[#dedee3] bg-white px-3 py-2 text-sm font-medium text-[#202124] transition hover:border-[#c9c9d1]"
+                >
+                  Open Web App
+                </button>
+                <button
+                  type="button"
+                  onClick={openPitchDeck}
+                  className="hidden rounded-xl border border-[#dedee3] bg-white px-3 py-2 text-sm font-medium text-[#202124] transition hover:border-[#c9c9d1] sm:inline-flex"
+                >
+                  Pitch
+                </button>
               </div>
+            </div>
+          </header>
 
-              <form onSubmit={handleSubmit} className="mx-auto mt-7 max-w-5xl">
-                <div className="rounded-[2rem] border border-[#dfe6f2] bg-white/96 px-3 py-3 shadow-[0_18px_48px_rgba(60,64,67,0.12)] transition hover:shadow-[0_22px_56px_rgba(60,64,67,0.15)] sm:px-4 sm:py-4">
-                  <div className="flex flex-col gap-4">
-                    <div className="flex min-w-0 items-start gap-3 rounded-[1.35rem] px-2 py-1 sm:px-3">
-                      <svg viewBox="0 0 24 24" className="mt-3 h-5 w-5 shrink-0 text-[#1a73e8]" fill="none" stroke="currentColor" strokeWidth="1.9" aria-hidden="true">
-                        <circle cx="11" cy="11" r="6.5" />
-                        <path d="m16 16 4.5 4.5" strokeLinecap="round" />
-                      </svg>
-                      <div className="min-w-0 flex-1">
-                        <input
-                          value={queryValue}
-                          onChange={(event) => setQueryValue(event.target.value)}
-                          placeholder="Ask for a service, place, date, or booking need"
-                          className="h-12 w-full border-0 bg-transparent text-[15px] text-[#202124] outline-none placeholder:text-[#80868b] sm:text-[1.02rem]"
-                          aria-label="Search services"
-                        />
-                        <div className="mt-1 text-[12px] text-[#5f6368]">
-                          Try area, timing, or one strong preference. BookedAI will ask for the missing details while searching.
-                        </div>
-                      </div>
-                    </div>
-                    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#edf1f7] px-2 pt-3 sm:px-3">
-                      <div className="flex flex-wrap gap-2">
-                        {['Area', 'Timing', 'Preference'].map((item) => (
-                          <span
-                            key={item}
-                            className="rounded-full border border-[#e2e8f3] bg-[#fbfdff] px-3 py-1.5 text-[11px] font-medium text-[#5f6368]"
-                          >
-                            {item}
-                          </span>
-                        ))}
-                      </div>
-                      <button
-                        type="submit"
-                        className="rounded-full bg-[#1a73e8] px-5 py-3 text-sm font-semibold text-white transition hover:bg-[#1558b0]"
-                      >
-                        Search now
-                      </button>
-                    </div>
-                  </div>
-                </div>
-              </form>
-
-              <div className="mx-auto mt-4 flex max-w-5xl flex-wrap gap-2.5">
+          <div className="mx-auto max-w-[1380px] px-4 pb-8 pt-6 sm:px-6 lg:px-8 lg:pb-12">
+            <section id="hero" className="mx-auto max-w-[980px] text-center">
+              <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#e3e3e7] bg-white px-3 py-1.5 text-xs font-semibold text-[#5f6368] shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                bookedai.au public app
+              </div>
+              <h1 className="mx-auto mt-5 max-w-[12ch] text-[2.65rem] font-semibold leading-[0.96] tracking-[-0.055em] text-[#111827] sm:text-[4.5rem] lg:text-[5.2rem]">
+                What can we book for you?
+              </h1>
+              <p className="mx-auto mt-4 max-w-2xl text-[1rem] leading-7 text-[#5f6368] sm:text-[1.1rem]">
+                Ask naturally. BookedAI turns the chat into ranked options, captures the booking, and prepares payment, portal, and follow-up.
+              </p>
+              <div className="mx-auto mt-6 flex max-w-[860px] gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:justify-center sm:overflow-x-visible sm:pb-0 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
                 {suggestedSearches.map((prompt) => (
                   <button
                     key={prompt}
                     type="button"
                     onClick={() => runSearch(prompt)}
-                    className="rounded-full border border-[#dfe1e5] bg-[#fbfdff] px-4 py-2 text-left text-[12px] font-medium text-[#5f6368] transition hover:border-[#c6dafc] hover:bg-[#f8fbff] hover:text-[#1a73e8]"
+                    className="max-w-[calc(100vw-2rem)] shrink-0 whitespace-normal rounded-2xl border border-[#dedee3] bg-white px-4 py-2.5 text-left text-[13px] font-medium text-[#4b5563] shadow-[0_1px_2px_rgba(15,23,42,0.04)] transition hover:border-[#c9c9d1] hover:text-[#111827] sm:whitespace-nowrap"
                   >
                     {prompt}
                   </button>
                 ))}
               </div>
-            </div>
-          </div>
-        </section>
+              <div className="mx-auto mt-5 grid max-w-[760px] gap-2 sm:grid-cols-3">
+                {flowCards.map((item) => (
+                  <div key={item.title} className="rounded-2xl border border-[#e3e3e7] bg-white/72 px-4 py-3 text-left shadow-[0_1px_2px_rgba(15,23,42,0.03)]">
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b7280]">{item.title}</div>
+                    <div className="mt-1 text-sm leading-6 text-[#4b5563]">{item.body}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
 
-        <section className="mx-auto max-w-[1380px] px-4 pb-8 sm:px-6 lg:px-8 lg:pb-12">
-          <HomepageSearchExperience
-            content={homepageSearchContent}
-            sourcePath={sourcePath}
-            initialQuery={submittedQuery}
-            initialQueryRequestId={submittedRequestId}
-          />
-        </section>
+            <section className="mt-7">
+              <HomepageSearchExperience
+                content={homepageSearchContent}
+                sourcePath={sourcePath}
+                initialQuery={submittedQuery}
+                initialQueryRequestId={submittedRequestId}
+              />
+            </section>
+          </div>
+        </div>
       </div>
     </main>
   );

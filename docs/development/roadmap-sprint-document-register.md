@@ -2,6 +2,28 @@
 
 Date: `2026-04-22`
 
+Latest register update: `2026-04-25`.
+
+Additional synchronization baseline from `2026-04-25`:
+
+- `prd.md`
+- `project.md`
+- `docs/architecture/implementation-phase-roadmap.md`
+- `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/development/implementation-progress.md`
+- `docs/development/sprint-13-16-user-surface-delivery-package.md`
+- `docs/development/next-phase-implementation-plan-2026-04-25.md`
+
+Current post-Sprint-16 phase map:
+
+- `Phase 17`: full-flow stabilization
+- `Phase 18`: revenue-ops ledger control
+- `Phase 19`: customer-care and status agent
+- `Phase 20`: widget and plugin runtime
+- `Phase 21`: billing, receivables, subscriptions, and commission truth
+- `Phase 22`: reusable multi-tenant templates
+- `Phase 23`: release governance and scale hardening
+
 ## Purpose
 
 This register maps each active roadmap sprint to the source documents that define the current BookedAI delivery plan.
@@ -41,6 +63,21 @@ Additional synchronization baseline from `2026-04-22`:
 - `docs/development/bookedai-chatbot-landing-implementation-plan.md`
 - `docs/development/bookedai-sample-video-brief.md`
 - `docs/development/bookedai-investor-pitch-deck.html`
+
+Additional synchronization baseline from `2026-04-24`:
+
+- `prd.md`
+- `project.md`
+- `docs/architecture/bookedai-master-prd.md`
+- `docs/architecture/landing-page-system-requirements.md`
+- `docs/architecture/admin-enterprise-workspace-requirements.md`
+- `docs/development/intelligent-search-booking-engine-rd-spec.md`
+- `docs/development/openai-official-search-engine-requirements-plan.md`
+- `backend/migrations/sql/017_academy_snapshot_read_models.sql`
+- `backend/api/v1_academy_routes.py`
+- `backend/api/v1_academy_handlers.py`
+- `backend/repositories/academy_repository.py`
+- `backend/service_layer/academy_service.py`
 
 Current whole-program interpretation locked from `2026-04-22`:
 
@@ -88,6 +125,7 @@ For any meaningful product or architecture change:
 
 - re-read the existing source document first
 - update the requirement-side source document
+- update `prd.md` when the change affects the consolidated product baseline
 - update the execution-side implementation document
 - update the relevant roadmap or sprint document
 - if the change affects the public narrative, update the PRD and public-growth planning docs in the same pass

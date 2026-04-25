@@ -78,6 +78,20 @@ const variants = [
     ],
   },
   {
+    filename: 'chess.html',
+    replacements: [
+      [
+        'BookedAI | The AI Revenue Engine for Service Businesses',
+        'GM Mai Hung Chess Academy | Premium Chess Programs on BookedAI',
+      ],
+      [
+        'BookedAI captures demand across website, calls, chat, email, and follow-up, then converts it into bookings, revenue, and recovery opportunities for service businesses.',
+        'Premium grandmaster-led chess academy tenant on BookedAI with tenant-scoped search, qualified lead capture, booking-intent flow, and academy-grade enquiry handling.',
+      ],
+      ['https://bookedai.au/', 'https://chess.bookedai.au/'],
+    ],
+  },
+  {
     filename: 'ai-mentor-pro.html',
     replacements: [
       [

@@ -1,7 +1,22 @@
 import { useEffect, useState } from 'react';
-import { roadmapHref, videoDemoHref, type NavItem } from './data';
+import {
+  Building2,
+  CheckCircle2,
+  Clock3,
+  DollarSign,
+  Grid2X2,
+  LayoutDashboard,
+  LogIn,
+  Mail,
+  Map,
+  MonitorPlay,
+  Network,
+  PlusCircle,
+  Rocket,
+  Users,
+} from 'lucide-react';
+import { demoAppHref, googleLoginHref, productHref, roadmapHref, type NavItem } from './data';
 import { BrandLockup } from './ui/BrandLockup';
-import { LogoMark } from './ui/LogoMark';
 import { SignalPill } from './ui/SignalPill';
 
 type HeaderProps = {
@@ -45,94 +60,25 @@ function getCompactItemLabel(label: string) {
 }
 
 function MenuGlyph({ kind }: { kind: string }) {
-  const classes = 'h-4 w-4';
+  const iconMap = {
+    how: Clock3,
+    arch: Network,
+    logos: Grid2X2,
+    team: Users,
+    launch: Rocket,
+    price: DollarSign,
+    proof: CheckCircle2,
+    map: Map,
+    trial: PlusCircle,
+    tenant: Building2,
+    sales: Mail,
+    product: LayoutDashboard,
+    demo: MonitorPlay,
+    login: LogIn,
+  } as const;
+  const Icon = iconMap[kind as keyof typeof iconMap] ?? CheckCircle2;
 
-  switch (kind) {
-    case 'how':
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <circle cx="12" cy="12" r="8" />
-          <path d="M12 8v4l2.5 2.5" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
-    case 'arch':
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <rect x="4" y="5" width="6" height="6" rx="1.4" />
-          <rect x="14" y="5" width="6" height="6" rx="1.4" />
-          <rect x="9" y="14" width="6" height="6" rx="1.4" />
-          <path d="M10 8h4M12 10v4" strokeLinecap="round" />
-        </svg>
-      );
-    case 'logos':
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d="M4 8h16M4 16h16M8 4v16M16 4v16" strokeLinecap="round" />
-        </svg>
-      );
-    case 'team':
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <circle cx="9" cy="9" r="3" />
-          <circle cx="17" cy="10" r="2.5" />
-          <path d="M4.5 18c.7-2.2 2.7-3.5 5-3.5s4.3 1.3 5 3.5M14.5 18c.45-1.54 1.7-2.53 3.5-2.8" strokeLinecap="round" />
-        </svg>
-      );
-    case 'launch':
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d="M6 18c3-1 6-4 7-7 1-3 3.5-5 5-5-1 1.5-2 4-5 5-3 1-6 4-7 7Z" strokeLinejoin="round" />
-          <path d="M5 19h4" strokeLinecap="round" />
-        </svg>
-      );
-    case 'price':
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d="M12 4v16M16 7.5c0-1.4-1.57-2.5-3.5-2.5S9 6.1 9 7.5 10.57 10 12.5 10 16 11.1 16 12.5 14.43 15 12.5 15 9 13.9 9 12.5" strokeLinecap="round" />
-        </svg>
-      );
-    case 'proof':
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d="M7 12.5 10 15l7-7" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="12" cy="12" r="8" />
-        </svg>
-      );
-    case 'map':
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d="m4 7 5-2 6 2 5-2v12l-5 2-6-2-5 2V7Z" strokeLinejoin="round" />
-          <path d="M9 5v12M15 7v12" strokeLinecap="round" />
-        </svg>
-      );
-    case 'trial':
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-          <circle cx="12" cy="12" r="8" />
-        </svg>
-      );
-    case 'tenant':
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d="M5 19V9l7-4 7 4v10H5Z" strokeLinejoin="round" />
-          <path d="M9 19v-5h6v5" strokeLinejoin="round" />
-        </svg>
-      );
-    case 'sales':
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <path d="M5 7h14v10H5z" rx="2" />
-          <path d="m7 9 5 4 5-4" strokeLinecap="round" strokeLinejoin="round" />
-        </svg>
-      );
-    default:
-      return (
-        <svg viewBox="0 0 24 24" className={classes} fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
-          <circle cx="12" cy="12" r="8" />
-        </svg>
-      );
-  }
+  return <Icon className="h-4 w-4" strokeWidth={1.9} aria-hidden="true" />;
 }
 
 function getMenuGlyphKind(label: string) {
@@ -146,6 +92,9 @@ function getMenuGlyphKind(label: string) {
   if (normalized.includes('pricing')) return 'price';
   if (normalized.includes('proof')) return 'proof';
   if (normalized.includes('roadmap')) return 'map';
+  if (normalized.includes('product')) return 'product';
+  if (normalized.includes('demo')) return 'demo';
+  if (normalized.includes('login') || normalized.includes('workspace access')) return 'login';
   if (normalized.includes('product trial')) return 'trial';
   if (normalized.includes('tenant')) return 'tenant';
   if (normalized.includes('sales')) return 'sales';
@@ -166,8 +115,10 @@ export function Header({
   const resolvedNavItems = navItems.map(getNavItemModel);
   const resolvedUtilityLinks =
     utilityLinks ?? [
+        { label: 'Product', href: productHref },
+        { label: 'Live Demo', href: demoAppHref },
+        { label: 'Tenant Login', href: googleLoginHref },
         { label: 'Roadmap', href: roadmapHref },
-        { label: 'Watch Demo', href: videoDemoHref },
       ];
   const workspaceAccessLinks = resolvedUtilityLinks.filter((link) =>
     link.label.toLowerCase().includes('login'),
@@ -264,7 +215,7 @@ export function Header({
                 compact
                 surface="light"
                 className="min-w-0"
-                logoClassName="booked-brand-image booked-brand-image--landing-nav w-full max-w-[10.5rem] sm:max-w-[11.5rem]"
+                logoClassName="booked-brand-image booked-brand-image--landing-nav max-w-[10.5rem] sm:max-w-[11.5rem]"
                 descriptorClassName="hidden"
                 eyebrowClassName="hidden"
               />
@@ -436,7 +387,7 @@ export function Header({
                 compact
                 surface="dark"
                 className="min-w-0"
-                logoClassName="booked-brand-image booked-brand-image--landing-nav w-full max-w-[10.75rem] opacity-95 sm:max-w-[11rem] lg:max-w-[14.5rem]"
+                logoClassName="booked-brand-image booked-brand-image--landing-nav max-w-[10.75rem] opacity-95 sm:max-w-[11rem] lg:max-w-[14.5rem]"
                 descriptorClassName="hidden lg:inline"
                 eyebrowClassName="hidden lg:inline-flex"
               />

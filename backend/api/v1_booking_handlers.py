@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from urllib.parse import quote, urlencode
+
+import httpx
 from fastapi import Request
 
 from api.v1_routes import (
@@ -34,6 +37,73 @@ from api.v1_routes import (
     text,
     uuid4,
 )
+
+
+def _normalize_text(value: object | None) -> str | None:
+    normalized = str(value or "").strip()
+    return normalized or None
+
+
+def _build_payment_return_url(request: Request, booking_reference: str, status: str) -> str:
+    origin = _normalize_text(request.headers.get("origin"))
+    if origin:
+        return f"{origin.rstrip('/')}/?booking={quote(status)}&ref={quote(booking_reference)}"
+
+    return (
+        "https://portal.bookedai.au/"
+        f"?booking_reference={quote(booking_reference)}&payment={quote(status)}"
+    )
+
+
+async def _create_public_stripe_checkout_session(
+    *,
+    stripe_secret_key: str,
+    stripe_currency: str,
+    booking_reference: str,
+    service_name: str,
+    amount_aud: float,
+    customer_email: str | None,
+    success_url: str,
+    cancel_url: str,
+) -> dict[str, object]:
+    amount_cents = int(round(float(amount_aud) * 100))
+    form_data: list[tuple[str, str]] = [
+        ("mode", "payment"),
+        ("success_url", success_url),
+        ("cancel_url", cancel_url),
+        ("payment_method_types[]", "card"),
+        ("line_items[0][quantity]", "1"),
+        ("line_items[0][price_data][currency]", stripe_currency.lower()),
+        ("line_items[0][price_data][unit_amount]", str(amount_cents)),
+        ("line_items[0][price_data][product_data][name]", service_name),
+        ("client_reference_id", booking_reference),
+        ("metadata[booking_reference]", booking_reference),
+        ("metadata[service_name]", service_name),
+    ]
+    normalized_email = _normalize_text(customer_email)
+    if normalized_email:
+        form_data.append(("customer_email", normalized_email.lower()))
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.post(
+            "https://api.stripe.com/v1/checkout/sessions",
+            headers={
+                "Authorization": f"Bearer {stripe_secret_key}",
+                "Content-Type": "application/x-www-form-urlencoded",
+            },
+            content=urlencode(form_data).encode(),
+        )
+        response.raise_for_status()
+        payload = response.json()
+
+    checkout_url = _normalize_text(payload.get("url"))
+    if not checkout_url:
+        raise PaymentAppError("Stripe checkout did not return a checkout URL.")
+
+    return {
+        "checkout_url": checkout_url,
+        "external_session_id": _normalize_text(payload.get("id")),
+    }
 
 
 async def _resolve_service_tenant_id(session, service_id: str | None) -> str | None:
@@ -380,56 +450,141 @@ async def create_payment_intent(request: Request, payload: CreatePaymentIntentRe
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     try:
         async with get_session(request.app.state.session_factory) as session:
+            normalized_booking_intent_id = _normalize_text(payload.booking_intent_id)
             booking_lookup = await session.execute(
                 text(
                     """
-                    select id::text as booking_intent_id
-                    from booking_intents
-                    where tenant_id = :tenant_id
-                      and id = cast(:booking_intent_id as uuid)
+                    select
+                      bi.id::text as booking_intent_id,
+                      bi.tenant_id::text as booking_tenant_id,
+                      bi.booking_reference,
+                      bi.service_name,
+                      bi.service_id,
+                      c.email as customer_email,
+                      sm.amount_aud,
+                      sm.booking_url
+                    from booking_intents bi
+                    left join contacts c
+                      on c.id = bi.contact_id
+                    left join service_merchant_profiles sm
+                      on sm.service_id::text = bi.service_id::text
+                     and sm.tenant_id::text = bi.tenant_id::text
+                    where bi.id::text = cast(:booking_intent_id as text)
+                       or bi.booking_reference = cast(:booking_intent_id as text)
                     limit 1
                     """
                 ),
                 {
                     "tenant_id": tenant_id,
-                    "booking_intent_id": payload.booking_intent_id,
+                    "booking_intent_id": normalized_booking_intent_id,
                 },
             )
             booking_row = booking_lookup.mappings().first()
             if not booking_row:
                 raise PaymentAppError(
                     "Booking intent not found for payment creation.",
-                    details={"booking_intent_id": payload.booking_intent_id},
+                    details={"booking_intent_id": normalized_booking_intent_id},
                 )
 
-            payment_repository = PaymentIntentRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+            effective_tenant_id = _normalize_text(booking_row.get("booking_tenant_id")) or tenant_id
+            resolved_booking_intent_id = (
+                _normalize_text(booking_row.get("booking_intent_id"))
+                or normalized_booking_intent_id
+                or payload.booking_intent_id
+            )
+            payment_option = _normalize_text(payload.selected_payment_option) or "invoice_after_confirmation"
+            checkout_url: str | None = None
+            external_session_id: str | None = None
+            amount_aud = booking_row.get("amount_aud")
+            payment_status = "pending"
+            warnings: list[str] = []
+            booking_reference = _normalize_text(booking_row.get("booking_reference")) or payload.booking_intent_id
+            service_name = (
+                _normalize_text(booking_row.get("service_name"))
+                or "BookedAI service"
+            )
+
+            if payment_option == "stripe_card":
+                stripe_secret_key = _normalize_text(getattr(request.app.state.settings, "stripe_secret_key", ""))
+                stripe_currency = _normalize_text(getattr(request.app.state.settings, "stripe_currency", "aud")) or "aud"
+                if not stripe_secret_key:
+                    warnings.append("Stripe is not configured for this environment yet.")
+                elif amount_aud is None or float(amount_aud) <= 0:
+                    warnings.append("This booking does not have a payable amount yet, so checkout is waiting for confirmation.")
+                else:
+                    stripe_session = await _create_public_stripe_checkout_session(
+                        stripe_secret_key=stripe_secret_key,
+                        stripe_currency=stripe_currency,
+                        booking_reference=booking_reference,
+                        service_name=service_name,
+                        amount_aud=float(amount_aud),
+                        customer_email=_normalize_text(booking_row.get("customer_email")),
+                        success_url=_build_payment_return_url(request, booking_reference, "success"),
+                        cancel_url=_build_payment_return_url(request, booking_reference, "cancelled"),
+                    )
+                    checkout_url = _normalize_text(stripe_session.get("checkout_url"))
+                    external_session_id = _normalize_text(stripe_session.get("external_session_id"))
+                    payment_status = "requires_action"
+            elif payment_option == "partner_checkout":
+                checkout_url = _normalize_text(booking_row.get("booking_url"))
+                if checkout_url:
+                    payment_status = "requires_action"
+                else:
+                    warnings.append("Partner checkout is not available for this service yet.")
+            elif payment_option == "invoice_after_confirmation":
+                warnings.append("Provider confirmation is required before payment is collected.")
+            else:
+                warnings.append("Payment intent was created. The next checkout step depends on provider follow-up.")
+
+            payment_repository = PaymentIntentRepository(RepositoryContext(session=session, tenant_id=effective_tenant_id))
             payment_intent_id = await payment_repository.upsert_payment_intent(
-                tenant_id=tenant_id,
-                booking_intent_id=payload.booking_intent_id,
-                payment_option=payload.selected_payment_option,
-                status="pending",
-                amount_aud=None,
+                tenant_id=effective_tenant_id,
+                booking_intent_id=resolved_booking_intent_id,
+                payment_option=payment_option,
+                status=payment_status,
+                amount_aud=float(amount_aud) if amount_aud is not None else None,
                 currency="aud",
-                external_session_id=None,
-                payment_url=None,
-                metadata_json=json.dumps({"created_by": payload.actor_context.channel}),
+                external_session_id=external_session_id,
+                payment_url=checkout_url,
+                metadata_json=json.dumps(
+                    {
+                        "created_by": payload.actor_context.channel,
+                        "booking_reference": booking_reference,
+                        "requested_booking_intent_id": normalized_booking_intent_id,
+                        "service_name": service_name,
+                    }
+                ),
+            )
+            booking_repository = BookingIntentRepository(RepositoryContext(session=session, tenant_id=effective_tenant_id))
+            await booking_repository.sync_callback_status(
+                tenant_id=effective_tenant_id,
+                booking_reference=booking_reference,
+                payment_dependency_state="stripe_checkout_ready" if checkout_url else "payment_follow_up_required",
+                metadata_updates={
+                    "payment_option": payment_option,
+                    "payment_url": checkout_url,
+                    "payment_external_session_id": external_session_id,
+                },
             )
             await _record_phase2_write_activity(
                 session,
-                tenant_id=tenant_id,
+                tenant_id=effective_tenant_id,
                 actor_context=payload.actor_context,
                 audit_event_type="payment_intent.created",
                 entity_type="payment_intent",
                 entity_id=payment_intent_id,
                 audit_payload={
                     "booking_intent_id": payload.booking_intent_id,
+                    "resolved_booking_intent_id": resolved_booking_intent_id,
                     "selected_payment_option": payload.selected_payment_option,
                 },
                 outbox_event_type="payment_intent.created",
                 outbox_payload={
                     "payment_intent_id": payment_intent_id,
-                    "booking_intent_id": payload.booking_intent_id,
-                    "selected_payment_option": payload.selected_payment_option,
+                    "booking_intent_id": resolved_booking_intent_id,
+                    "selected_payment_option": payment_option,
+                    "payment_status": payment_status,
+                    "checkout_url": checkout_url,
                 },
                 idempotency_key=f"payment-intent:{payment_intent_id}" if payment_intent_id else None,
             )
@@ -438,15 +593,13 @@ async def create_payment_intent(request: Request, payload: CreatePaymentIntentRe
         return _success_response(
             {
                 "payment_intent_id": payment_intent_id,
-                "payment_status": "pending",
-                "checkout_url": None,
+                "payment_status": payment_status,
+                "checkout_url": checkout_url,
                 "bank_transfer_instruction_id": None,
                 "invoice_id": None,
-                "warnings": [
-                    "Payment intent contract is ready, but provider-specific checkout orchestration is still additive."
-                ],
+                "warnings": warnings,
             },
-            tenant_id=tenant_id,
+            tenant_id=effective_tenant_id,
             actor_context=payload.actor_context,
         )
     except AppError as error:

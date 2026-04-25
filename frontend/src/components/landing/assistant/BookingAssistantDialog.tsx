@@ -296,24 +296,29 @@ function buildFallbackCatalog(): BookingAssistantCatalogResponse {
 
 const popupShortcutTopics = [
   {
-    label: 'Swim',
+    label: 'Swim lessons',
+    description: 'Find swim lessons for a 7-year-old near Caringbah this weekend.',
     prompt: 'Find the best swim lesson for a 7-year-old near Caringbah this weekend.',
   },
   {
-    label: 'Housing',
+    label: 'Housing consult',
+    description: 'Book a call about apartments or townhouses in Sydney.',
     prompt:
       'I want a housing consultation about apartment or townhouse projects in Sydney and would like to book a call.',
   },
   {
-    label: 'Salon',
+    label: 'Salon booking',
+    description: 'Book a haircut and colour for Friday afternoon near me.',
     prompt: 'Book a haircut and colour consultation for Friday afternoon near me.',
   },
   {
-    label: 'Clinic',
+    label: 'Clinic visit',
+    description: 'Find a physio or skin clinic with weekend availability near me.',
     prompt: 'I need a physio or skin clinic with weekend availability near me.',
   },
   {
-    label: 'Restaurant',
+    label: 'Restaurant table',
+    description: 'Find the best table for 6 people tonight.',
     prompt: 'Find the best restaurant booking option for 6 people tonight.',
   },
 ];
@@ -407,16 +412,16 @@ const SEARCH_PROGRESS_STAGES = [
     detail: 'Ranking stronger matches first so the first options are worth reviewing.',
   },
   {
-    label: 'Preparing booking handoff',
+    label: 'Getting your results ready',
     detail: 'Keeping the top match ready so you can continue straight into booking.',
   },
 ] as const;
 
 const SEARCH_PROGRESS_PROMPTS = [
-  'Best next input: add suburb or area, for example Surry Hills or near Chatswood.',
-  'Best next input: add a preferred day or time window, for example Saturday morning.',
-  'Best next input: add the person, age, or context, for example for a 7-year-old beginner.',
-  'Best next input: add a budget or preference, for example premium, fastest, or closest.',
+  'Tip: add a suburb or area to narrow results, e.g. Surry Hills or near Chatswood.',
+  'Tip: add a preferred day or time, e.g. Saturday morning or this week.',
+  'Tip: add the person or context, e.g. for a 7-year-old beginner.',
+  'Tip: add a budget or preference, e.g. premium, fastest, or closest.',
 ] as const;
 
 function curateServiceMatches(
@@ -733,10 +738,10 @@ function buildProcessSteps(params: {
   return [
     {
       id: 'intent',
-      title: 'Understand the request',
+      title: 'Understand your request',
       detail: hasCustomerMessage
-        ? `${brandName} captured the customer need and context.`
-        : 'Waiting for a customer message or voice note.',
+        ? `We understood your request and found relevant services.`
+        : 'Describe what you need to get started.',
       status: hasCustomerMessage ? 'completed' : 'in_progress',
     },
     {
@@ -744,7 +749,7 @@ function buildProcessSteps(params: {
       title: 'Match services',
       detail: selectedService
         ? `${selectedService.name} is ready for booking.`
-        : 'Relevant services will appear here after the chat starts.',
+        : 'Matching services will appear once your search is sent.',
       status: selectedService
         ? 'completed'
         : hasCustomerMessage
@@ -753,10 +758,10 @@ function buildProcessSteps(params: {
     },
     {
       id: 'details',
-      title: 'Prepare booking details',
+      title: 'Your booking details',
       detail: hasBookingDetails
-        ? 'Customer identity and preferred slot are complete.'
-        : 'Collecting contact info, date, and time.',
+        ? 'Your details and preferred time are ready.'
+        : 'Fill in your contact info, preferred date, and time.',
       status: hasBookingDetails
         ? 'completed'
         : selectedService
@@ -765,12 +770,12 @@ function buildProcessSteps(params: {
     },
     {
       id: 'confirm',
-      title: 'Create booking outcome',
+      title: 'Confirm booking',
       detail: result
-        ? `Booking ${result.booking_reference} is ready with payment and follow-up.`
+        ? `Booking ${result.booking_reference} is confirmed — follow-up is underway.`
         : loading
-          ? 'Generating booking reference, payment link, and workflow handoff.'
-          : `${brandName} will generate the booking package after submission.`,
+          ? 'Generating your booking reference and payment details.'
+          : `Your booking confirmation will be created on submission.`,
       status: result ? 'completed' : loading ? 'in_progress' : 'pending',
     },
   ];
@@ -959,12 +964,12 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
       label: 'Confirmation email',
       value:
         lifecycleEmailStatus === 'sent' || lifecycleEmailStatus === 'delivered'
-          ? 'Sent to customer'
+          ? 'Sent to you'
           : lifecycleEmailStatus === 'queued'
-            ? 'Queued for follow-up'
+            ? 'On its way'
             : result.email_status === 'sent'
-          ? 'Sent to customer'
-          : `Handled by ${result.contact_email}`,
+          ? 'Sent to you'
+          : `Via ${result.contact_email}`,
       tone:
         lifecycleEmailStatus === 'sent' || lifecycleEmailStatus === 'delivered' || result.email_status === 'sent'
           ? 'bg-emerald-50 text-emerald-700'
@@ -982,15 +987,15 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
           : 'bg-amber-50 text-amber-800',
     },
     {
-      label: 'Calendar and workflow',
+      label: 'Calendar',
       value:
         result.meeting_status === 'scheduled'
-          ? 'Calendar event sent'
+          ? 'Event scheduled'
           : result.calendar_add_url
             ? 'Calendar link ready'
           : result.workflow_status
-            ? 'Sent into ops workflow'
-            : 'Queued for handoff',
+            ? 'Scheduled'
+            : 'Being confirmed',
       tone:
         result.meeting_status === 'scheduled' || result.workflow_status
           ? 'bg-emerald-50 text-emerald-700'
@@ -1003,7 +1008,7 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
           ? 'Messaging sent'
           : smsStatus === 'queued' || whatsappStatus === 'queued'
             ? 'Messaging queued'
-            : 'Awaiting phone-based follow-up',
+            : 'Add a phone number to receive updates',
       tone:
         smsStatus === 'sent' || whatsappStatus === 'sent' || smsStatus === 'delivered' || whatsappStatus === 'delivered'
           ? 'bg-emerald-50 text-emerald-700'
@@ -1135,13 +1140,13 @@ function buildOperationTimeline(result: BookingAssistantSessionResponse): Operat
     },
     {
       id: 'payment-intent',
-      title: 'Payment intent',
+      title: 'Payment',
       detail:
         paymentStatus === 'pending'
-          ? 'Payment intent is recorded and awaiting downstream checkout orchestration.'
+          ? 'Payment details are confirmed — checkout link is being prepared.'
           : paymentStatus
-            ? `Payment intent returned status ${paymentStatus}.`
-            : 'Payment automation has not returned a payment intent state yet.',
+            ? `Payment status: ${paymentStatus}.`
+            : 'Payment details will appear once the booking is fully confirmed.',
       status:
         result.payment_status === 'stripe_checkout_ready'
           ? 'completed'
@@ -1155,48 +1160,48 @@ function buildOperationTimeline(result: BookingAssistantSessionResponse): Operat
       title: 'Confirmation email',
       detail:
         emailStatus === 'sent' || emailStatus === 'delivered'
-          ? 'Lifecycle confirmation email completed successfully.'
+          ? 'Confirmation email sent successfully.'
           : emailStatus === 'queued'
-            ? 'Lifecycle email is queued or recorded for follow-up.'
+            ? 'Confirmation email is on its way.'
             : result.contact_email
-              ? `Email handoff remains tied to ${result.contact_email}.`
-              : 'No email recipient was supplied for this flow.',
+              ? `Confirmation email will be sent to ${result.contact_email}.`
+              : 'No email address was provided.',
       status: deriveCommunicationLaneStatus(result.automation?.lifecycleEmail),
       reference: result.automation?.lifecycleEmail?.messageId ?? null,
     },
     {
       id: 'sms-dispatch',
-      title: 'SMS handoff',
+      title: 'SMS confirmation',
       detail:
         smsStatus === 'sent' || smsStatus === 'delivered'
-          ? 'SMS confirmation was sent successfully.'
+          ? 'SMS confirmation sent successfully.'
           : smsStatus === 'queued'
-            ? 'SMS was queued or recorded for operator follow-up.'
-            : 'SMS is optional and only runs when a valid phone number is supplied.',
+            ? 'SMS is on its way.'
+            : 'Add a phone number to receive SMS updates.',
       status: deriveCommunicationLaneStatus(result.automation?.sms),
       reference: result.automation?.sms?.messageId ?? null,
     },
     {
       id: 'whatsapp-dispatch',
-      title: 'WhatsApp handoff',
+      title: 'WhatsApp confirmation',
       detail:
         whatsappStatus === 'sent' || whatsappStatus === 'delivered'
-          ? 'WhatsApp confirmation was sent successfully.'
+          ? 'WhatsApp confirmation sent successfully.'
           : whatsappStatus === 'queued'
-            ? 'WhatsApp was queued or recorded for operator follow-up.'
-            : 'WhatsApp is optional and only runs when a valid phone number is supplied.',
+            ? 'WhatsApp message is on its way.'
+            : 'Add a phone number to receive WhatsApp updates.',
       status: deriveCommunicationLaneStatus(result.automation?.whatsapp),
       reference: result.automation?.whatsapp?.messageId ?? null,
     },
     {
       id: 'crm-sync',
-      title: 'CRM linkage',
+      title: 'Business sync',
       detail:
         crmStatus === 'completed'
-          ? 'CRM sync completed across lead, contact, deal, and task records.'
+          ? 'Your booking details have been synced successfully.'
           : crmStatus === 'attention'
-            ? 'CRM sync needs operator review or retry attention.'
-            : 'CRM sync is still in progress or pending reconciliation.',
+            ? 'Business sync needs a brief review.'
+            : 'Business sync is in progress.',
       status: crmStatus,
       reference:
         result.crm_sync?.deal?.external_entity_id ??
@@ -1283,26 +1288,26 @@ function buildEnterpriseJourneySteps(params: {
       id: 'match',
       title: 'Search and matching',
       description: selectedService
-        ? `${selectedService.name} is selected from the matched shortlist.`
-        : 'BookedAI is still turning the request into a ranked shortlist.',
+        ? `${selectedService.name} has been selected from your shortlist.`
+        : 'Searching for your best matches.',
       status: selectedService ? 'completed' : 'in_progress',
       channel: 'Search',
     },
     {
       id: 'preview',
-      title: 'Preview and decision',
+      title: 'Review and select',
       description: selectedService
-        ? 'Price, duration, location, and trust signals are ready before checkout.'
-        : 'Preview opens once a service is selected.',
+        ? 'Price, duration, and location confirmed before booking.'
+        : 'Select a service from the shortlist to continue.',
       status: selectedService ? 'completed' : 'pending',
-      channel: 'Preview',
+      channel: 'Review',
     },
     {
       id: 'booking',
-      title: 'Booking capture',
+      title: 'Booking confirmed',
       description: result
-        ? `Booking reference ${result.booking_reference} is stored and ready for downstream automation.`
-        : 'Contact, preferred slot, and notes will create the booking record.',
+        ? `Booking ${result.booking_reference} is confirmed — follow-up is underway.`
+        : 'Your name, preferred time, and notes will be used for your booking.',
       status: result ? 'completed' : selectedService ? 'in_progress' : 'pending',
       channel: 'Booking',
     },
@@ -1311,59 +1316,59 @@ function buildEnterpriseJourneySteps(params: {
       title: 'Email confirmation',
       description: hasEmail
         ? emailLaneStatus === 'completed'
-          ? `Confirmation email has been sent for ${customerEmail.trim().toLowerCase()}.`
+          ? `Confirmation email has been sent to ${customerEmail.trim().toLowerCase()}.`
           : emailLaneStatus === 'in_progress'
-            ? `Confirmation email is queued for ${customerEmail.trim().toLowerCase()}.`
-            : `Email follow-up requires operator review for ${customerEmail.trim().toLowerCase()}.`
-        : 'Email remains optional until the customer provides an address.',
+            ? `Confirmation email is on its way to ${customerEmail.trim().toLowerCase()}.`
+            : `Confirmation email will follow for ${customerEmail.trim().toLowerCase()}.`
+        : 'Add an email address to receive your booking confirmation.',
       status: !hasEmail ? 'pending' : result ? emailLaneStatus : 'pending',
       channel: 'Email',
     },
     {
       id: 'calendar',
-      title: 'Calendar handoff',
+      title: 'Calendar event',
       description: calendarReady
-        ? 'Calendar action is ready for the customer and ops team.'
+        ? 'Calendar event is ready for you and the provider.'
         : result
-          ? 'Calendar follow-up is still required from ops.'
-          : 'Calendar event will be prepared after the booking request is created.',
+          ? 'Calendar invite will be sent separately.'
+          : 'A calendar event will be prepared after your booking is confirmed.',
       status: calendarReady ? 'completed' : result ? 'attention' : 'pending',
       channel: 'Calendar',
     },
     {
       id: 'payment',
-      title: 'Payment readiness',
+      title: 'Payment',
       description: paymentReady
-        ? 'Checkout link is ready for immediate payment.'
+        ? 'Your payment link is ready — tap "Continue to payment" above.'
         : paymentIntentStatus
           ? paymentWarnings.length
-            ? `Payment intent is recorded, but provider checkout still needs additive orchestration.`
-            : 'Payment intent is recorded and waiting on the next provider step.'
+            ? `Payment link will be available shortly.`
+            : 'Payment details are logged — confirmation is coming.'
         : result
-          ? 'Payment follow-up stays under operator control before confirmation.'
-          : 'Payment step activates after the booking request is accepted.',
+          ? 'Payment instructions will follow from the provider.'
+          : 'Payment instructions will be provided once the booking is accepted.',
       status: paymentReady ? 'completed' : paymentIntentStatus ? 'in_progress' : result ? 'attention' : 'pending',
       channel: 'Payment',
     },
     {
       id: 'crm',
-      title: 'CRM sync',
+      title: 'Business sync',
       description: result?.crm_sync
-        ? 'Lead, contact, deal, and follow-up task sync are tracked from the booking write path.'
-        : 'CRM linkage begins once the booking intent is written.',
+        ? 'Your booking details have been synced with the business system.'
+        : 'Business sync will begin once your booking is confirmed.',
       status: result ? crmStatus : 'pending',
-      channel: 'CRM',
+      channel: 'Sync',
     },
     {
       id: 'messaging',
-      title: 'SMS and WhatsApp follow-up',
+      title: 'SMS and WhatsApp',
       description: hasPhone
         ? smsLaneStatus === 'completed' || whatsappLaneStatus === 'completed'
-          ? 'SMS and WhatsApp follow-up have usable outbound status for the same booking reference.'
+          ? 'SMS and WhatsApp follow-up have been sent to your number.'
           : smsLaneStatus === 'in_progress' || whatsappLaneStatus === 'in_progress'
-            ? 'SMS and WhatsApp are queued or prepared from the provided phone number.'
-            : 'Phone-provided follow-up can continue over SMS or WhatsApp with the same booking reference.'
-        : 'SMS and WhatsApp stay on hold until the customer shares a valid phone number.',
+            ? 'SMS and WhatsApp messages are being prepared for your number.'
+            : 'You may receive SMS and WhatsApp follow-up on the number provided.'
+        : 'Add a phone number to receive SMS and WhatsApp updates.',
       status: !hasPhone
         ? 'pending'
         : result
@@ -1379,12 +1384,12 @@ function buildEnterpriseJourneySteps(params: {
     },
     {
       id: 'thank-you',
-      title: 'Thank-you and aftercare',
+      title: 'What to do next',
       description: result
-        ? 'Thank-you state, portal access, and next-step guidance are ready immediately.'
-        : 'Thank-you and aftercare content unlock after booking submission.',
+        ? 'Your booking portal, payment link, and support details are all ready above.'
+        : 'Next steps and portal access will appear after your booking is confirmed.',
       status: result ? 'completed' : 'pending',
-      channel: 'Aftercare',
+      channel: 'Next steps',
     },
   ] satisfies EnterpriseJourneyStep[];
 }
@@ -1419,8 +1424,8 @@ function buildCommunicationPreviewCards(params: {
       channel: 'Email',
       tone: 'dark',
       recipient: normalizedEmail,
-      summary: 'Enterprise-format confirmation with booking reference, payment, and calendar next step.',
-      body: `Subject: Your ${serviceLabel} booking is in progress\n\nHi ${displayName},\n\nThanks for choosing ${serviceLabel}. Your booking reference is ${result.booking_reference}.\nRequested slot: ${slotLine}.\n${paymentLine}\n${calendarLine}\nPortal: ${getBookingPortalUrl(result)}\n\nBookedAI Revenue Ops`,
+      summary: 'Your booking confirmation with reference, payment status, and calendar link.',
+      body: `Subject: Your ${serviceLabel} booking is confirmed\n\nHi ${displayName},\n\nThanks for choosing ${serviceLabel}. Your booking reference is ${result.booking_reference}.\nRequested slot: ${slotLine}.\n${paymentLine}\n${calendarLine}\nPortal: ${getBookingPortalUrl(result)}\n\nThe BookedAI team`,
     });
   }
 
@@ -1431,16 +1436,16 @@ function buildCommunicationPreviewCards(params: {
       channel: 'SMS',
       tone: 'light',
       recipient: normalizedPhone,
-      summary: 'Short-form operational reminder designed for high open rates.',
+      summary: 'A short reminder with your booking reference and portal link.',
       body: `${displayName}, your ${serviceLabel} booking ref is ${result.booking_reference}. Slot: ${slotLine}. ${paymentReadyCopy(result)} Portal: ${getBookingPortalUrl(result)}`,
     });
     cards.push({
       id: 'whatsapp',
-      title: 'WhatsApp handoff',
+      title: 'WhatsApp confirmation',
       channel: 'WhatsApp',
       tone: 'success',
       recipient: normalizedPhone,
-      summary: 'Richer channel for payment nudges, reschedule help, and concierge follow-up.',
+      summary: 'A richer channel for payment reminders, reschedule help, and follow-up questions.',
       body: `Hi ${displayName}, thanks for booking ${serviceLabel} with BookedAI.\nBooking reference: ${result.booking_reference}\nRequested slot: ${slotLine}\n${paymentLine}\nIf you need to reschedule or ask a question, reply here and our team will continue the conversation.`,
     });
   }
@@ -1456,16 +1461,16 @@ function paymentReadyCopy(result: BookingAssistantSessionResponse) {
 
 const productWelcomeSignals = [
   {
-    label: 'V1 search',
-    value: 'Turns a natural message into a ranked shortlist with the current BookedAI flow config.',
+    label: 'Smart search',
+    value: 'Describe what you need in plain language and get a ranked shortlist in seconds.',
   },
   {
-    label: 'Trust layer',
-    value: 'Shows price, duration, location, and next-step cues before booking details are filled.',
+    label: 'Verified providers',
+    value: 'See price, duration, and location before you commit — no hidden surprises.',
   },
   {
-    label: 'Booking intent',
-    value: 'Moves the selected result into the current write path without losing search context.',
+    label: 'Easy booking',
+    value: 'Confirm your details once and your booking request is sent immediately.',
   },
 ];
 
@@ -1522,6 +1527,7 @@ export function BookingAssistantDialog({
   const [catalogError, setCatalogError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [result, setResult] = useState<BookingAssistantSessionResponse | null>(null);
+  const [thankYouReturnCountdown, setThankYouReturnCountdown] = useState(5);
   const [isListening, setIsListening] = useState(false);
   const [voiceError, setVoiceError] = useState('');
   const [voiceRepliesEnabled, setVoiceRepliesEnabled] = useState(false);
@@ -1584,6 +1590,22 @@ export function BookingAssistantDialog({
     bookingAssistantV1SessionIdRef.current ?? createPublicBookingAssistantSessionId();
   bookingAssistantV1SessionIdRef.current = bookingAssistantV1SessionId;
   const assistantSourcePath = resolveAssistantEntrySourcePath(entrySourcePath);
+
+  function returnToMainBookedAiScreen() {
+    setResult(null);
+    setSubmitError('');
+    setLoading(false);
+    setActiveMobilePanel('chat');
+    setProductSheetSnap('peek');
+    setProductModuleTab('overview');
+    setIsCompactProductBottomBarVisible(true);
+    onClose();
+
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', '/');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
 
   function buildAssistantApiUrl(pathname: string) {
     const url = new URL(`${getApiBaseUrl()}${pathname}`, window.location.origin);
@@ -2278,10 +2300,10 @@ export function BookingAssistantDialog({
       ? 'BookedAI live booking flow'
       : 'BookedAI booking flow';
   const productFlowSupportCopy = !bookingAssistantV1Enabled
-    ? 'Search stays visible here, but booking confirmation still falls back to the legacy session path until the v1 runtime is fully active.'
+    ? 'Search and results are active. Booking confirmation will be enabled shortly.'
     : bookingAssistantV1LiveReadEnabled
-      ? 'This runtime is following the visible BookedAI shortlist, trust, booking, and follow-up flow.'
-      : 'This runtime already writes through the BookedAI v1 booking path while shortlist guidance stays on the safer transition lane.';
+      ? 'Full booking flow is live — search, match, book, and follow-up all in one place.'
+      : 'Search, shortlist, and booking are all active on this product.';
   const shouldHideProductSupportCopy =
     isProductAppLayout && (isCompactMobileViewport || hasConversationStarted);
   const shouldUseProductBottomNav = isProductAppLayout && isCompactMobileViewport;
@@ -2526,6 +2548,7 @@ export function BookingAssistantDialog({
 
   useEffect(() => {
     if (!result) {
+      setThankYouReturnCountdown(5);
       return;
     }
 
@@ -2539,6 +2562,26 @@ export function BookingAssistantDialog({
       bookingConfirmedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 140);
   }, [isProductAppLayout, result]);
+
+  useEffect(() => {
+    if (!result) {
+      setThankYouReturnCountdown(5);
+      return;
+    }
+
+    setThankYouReturnCountdown(5);
+    const countdownInterval = window.setInterval(() => {
+      setThankYouReturnCountdown((current) => Math.max(0, current - 1));
+    }, 1000);
+    const returnTimer = window.setTimeout(() => {
+      returnToMainBookedAiScreen();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(countdownInterval);
+      window.clearTimeout(returnTimer);
+    };
+  }, [result?.booking_reference]);
 
   function scrollToProductSection(tab: ProductModuleTab) {
     const sectionMap = {
@@ -2646,8 +2689,8 @@ export function BookingAssistantDialog({
             </div>
             <div className="mt-2 text-sm leading-6 text-slate-600">
               {pendingSearchQuery
-                ? `Searching for "${pendingSearchQuery}" using the latest live-read shortlist and trust checks. ${activeSearchProgressStage.detail}`
-                : `Searching with the latest live-read shortlist and trust checks. ${activeSearchProgressStage.detail}`}
+                ? `Matching results for "${pendingSearchQuery}" and checking availability. ${activeSearchProgressStage.detail}`
+                : `Matching results and checking availability. ${activeSearchProgressStage.detail}`}
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {SEARCH_PROGRESS_STAGES.map((stage, index) => (
@@ -2675,7 +2718,7 @@ export function BookingAssistantDialog({
               ))}
             </div>
             <div className="mt-3 rounded-[1rem] bg-white/78 px-3 py-2.5 text-[12px] leading-5 text-slate-600 ring-1 ring-white/70">
-              <span className="font-semibold text-slate-950">Best next input:</span> {activeSearchPrompt.replace(/^Best next input: /, '')}
+              {activeSearchPrompt}
             </div>
             {showDelayedSearchNudge ? (
               <div className="mt-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-2.5 text-[12px] leading-5 text-amber-900">
@@ -3074,7 +3117,7 @@ export function BookingAssistantDialog({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedService) {
-      setSubmitError('Select a service before creating the booking request.');
+      setSubmitError('Please select a service from the search results before confirming your booking.');
       return;
     }
 
@@ -3343,10 +3386,10 @@ export function BookingAssistantDialog({
         }
       >
         <div
-          className={`relative flex w-full flex-col overflow-hidden ${
+          className={`relative flex w-full flex-col ${
             standalone
               ? isProductAppLayout
-                ? 'h-full min-h-0 bg-transparent shadow-none sm:h-[min(84dvh,46rem)] sm:w-[min(100%,32rem)] lg:h-[min(82dvh,48rem)] lg:w-[min(100%,36rem)] xl:w-[min(100%,40rem)]'
+                ? 'w-full bg-transparent shadow-none sm:w-[min(100%,42rem)] lg:w-[min(100%,54rem)] xl:w-[min(100%,60rem)]'
                 : isEmbeddedStandaloneLayout
                   ? isHomepageSearchSurface
                     ? 'bg-transparent shadow-none sm:rounded-none sm:border-0'
@@ -3358,7 +3401,7 @@ export function BookingAssistantDialog({
           <div
                 className={
                   isProductAppLayout
-                    ? 'relative mx-auto flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden border-0 border-slate-900/10 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] shadow-none sm:max-w-[31rem] sm:border sm:border-white/40 sm:rounded-[2rem] sm:shadow-[0_35px_120px_rgba(15,23,42,0.18)] sm:ring-1 sm:ring-black/5 lg:max-w-[34rem]'
+                    ? 'relative mx-auto flex w-full max-w-full flex-col border-0 border-slate-900/10 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] shadow-none sm:border sm:border-white/40 sm:rounded-[2rem] sm:shadow-[0_35px_120px_rgba(15,23,42,0.18)] sm:ring-1 sm:ring-black/5'
                     : 'relative flex min-h-0 flex-1 flex-col'
                 }
           >
@@ -3682,39 +3725,20 @@ export function BookingAssistantDialog({
             <div
               className={
                 isProductAppLayout
-                  ? 'flex min-h-0 flex-1 flex-col'
+                  ? 'flex flex-col'
                   : 'grid min-h-0 flex-1 gap-0 lg:grid-cols-[minmax(0,1.45fr)_minmax(22rem,0.7fr)]'
               }
             >
-            {isProductAppLayout ? (
-              <div
-                aria-hidden="true"
-                className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_center,rgba(15,23,42,0.06),rgba(15,23,42,0.18))] transition-opacity duration-300"
-                style={{ opacity: shouldUseProductBottomNav ? productSheetOpenRatio * 0.22 : productSheetOpenRatio * 0.5 }}
-              />
-            ) : null}
             <div
               className={`min-h-0 flex-col bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] ${
                 isProductAppLayout
-                  ? 'relative z-0 flex flex-1'
+                  ? 'relative flex flex-col'
                   : isDefaultPopupLayout
                     ? `${isDefaultPopupMobileViewport && activeMobilePanel === 'booking' ? 'hidden' : 'flex'} border-b border-slate-200 lg:border-b-0 lg:border-r`
                     : `border-b border-slate-200 lg:flex lg:border-b-0 lg:border-r ${
                         activeMobilePanel === 'chat' ? 'flex' : 'hidden'
                     }`
               }`}
-              style={
-                isProductAppLayout
-                  ? {
-                      filter: `blur(${productSheetOpenRatio * 0.35}px)`,
-                      transform: `scale(${1 - productSheetOpenRatio * 0.004})`,
-                      transition:
-                        productSheetDragOffset !== 0
-                          ? 'none'
-                          : 'filter 220ms ease, transform 220ms ease',
-                    }
-                  : undefined
-              }
             >
               <div
                 className={`border-b border-slate-200 px-4 transition-all sm:px-6 ${
@@ -3824,7 +3848,7 @@ export function BookingAssistantDialog({
                         </button>
                       ) : (
                         <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold text-emerald-700">
-                          Revenue flow
+                          Ready to book
                         </div>
                       )}
                     </div>
@@ -3834,24 +3858,19 @@ export function BookingAssistantDialog({
 
               <div
                 ref={dialogBodyRef}
-                className={`min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 sm:px-6 sm:py-5 ${
+                className={`${isProductAppLayout ? 'space-y-4 px-4 py-3 sm:px-5 sm:py-4' : `min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 sm:px-6 sm:py-5 ${
                   hasConversationStarted
                     ? isCompactMobileViewport
                       ? 'py-2 sm:py-5'
                       : 'py-2.5 sm:py-5'
                     : 'py-3 sm:py-5'
-                } ${isProductAppLayout ? 'px-4 py-3 sm:px-5' : ''} ${
+                }`} ${
                   showProductWelcomeState
                     ? isCompactMobileViewport
                       ? 'flex flex-col justify-start space-y-3'
-                      : 'flex flex-col justify-center space-y-5'
+                      : 'flex flex-col justify-start space-y-5'
                     : ''
                 }`}
-                style={
-                  isProductAppLayout
-                    ? { paddingBottom: `${compactProductFooterOffset}px` }
-                    : undefined
-                }
               >
                 {showProductWelcomeState ? (
                   <div className={isCompactMobileViewport ? 'space-y-2.5' : 'space-y-3'}>
@@ -3863,11 +3882,11 @@ export function BookingAssistantDialog({
                               {productFlowModeLabel}
                             </div>
                             <div className="mt-1 text-[12px] font-semibold leading-4 text-slate-950">
-                              Ask naturally. The mobile shell keeps search and booking in one v1 flow.
+                              Ask naturally — search, shortlist, and book in one flow.
                             </div>
                           </div>
                           <div className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                            V1
+                            Live
                           </div>
                         </div>
                       </div>
@@ -3877,13 +3896,13 @@ export function BookingAssistantDialog({
                           {productFlowModeLabel}
                         </div>
                         <div className="mt-3 text-[1.1rem] font-semibold leading-7 tracking-tight">
-                          One message in. Best result out. Booking next.
+                          Describe what you need. Get matched. Book in seconds.
                         </div>
                         <p className="mt-2 max-w-xs text-[12px] leading-5 text-slate-200">
-                          Ask like a customer and let {brandName} keep the top result ready for booking.
+                          Type naturally — {brandName} finds the right option and walks you through booking without the back-and-forth.
                         </p>
 
-                        <div className="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2">
+                        <div className="mt-3 grid grid-cols-1 gap-2 min-[360px]:grid-cols-2 sm:grid-cols-3">
                           {productWelcomeSignals.map((signal) => (
                             <div
                               key={signal.label}
@@ -3903,7 +3922,7 @@ export function BookingAssistantDialog({
 
                     <div className={`rounded-[1.45rem] border border-slate-200 bg-white shadow-[0_12px_32px_rgba(15,23,42,0.05)] ${
                       isCompactMobileViewport ? 'p-3' : 'p-3.5'
-                    } ${shouldUseProductBottomNav ? 'hidden' : ''}`}>
+                    }`}>
                       <div className="flex items-center justify-between gap-3">
                         <div>
                           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
@@ -3937,13 +3956,13 @@ export function BookingAssistantDialog({
                             <div className="flex items-center justify-between gap-2">
                               <div className="min-w-0 text-sm font-semibold text-slate-950">{topic.label}</div>
                               <div className="rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-                                Search
+                                Try
                               </div>
                             </div>
-                            <div className={`mt-2 text-[11px] text-slate-500 ${
-                              isCompactMobileViewport ? 'line-clamp-2 leading-4' : 'line-clamp-3 leading-4'
+                            <div className={`mt-1.5 text-[11px] text-slate-500 ${
+                              isCompactMobileViewport ? 'line-clamp-2 leading-4' : 'line-clamp-2 leading-4'
                             }`}>
-                              {topic.prompt}
+                              {topic.description}
                             </div>
                           </button>
                         ))}
@@ -3960,11 +3979,11 @@ export function BookingAssistantDialog({
                       }`}
                     >
                       <div
-                        className={`max-w-[90vw] break-words rounded-[1.5rem] px-4 py-3 text-sm leading-6 whitespace-pre-line sm:max-w-[88%] ${
+                        className={`max-w-[82%] break-words rounded-[1.5rem] px-4 py-3 text-sm leading-6 whitespace-pre-line sm:max-w-[85%] ${
                           message.role === 'user'
-                            ? 'rounded-br-md bg-slate-950 text-white'
-                            : 'rounded-bl-md border border-slate-200 bg-white text-slate-700'
-                        } ${isProductAppLayout ? 'px-3 py-2.5 text-[13px] leading-5' : ''}`}
+                            ? 'rounded-br-[0.35rem] bg-slate-950 text-white shadow-[0_6px_18px_rgba(15,23,42,0.18)]'
+                            : 'rounded-bl-[0.35rem] border border-slate-200 bg-white text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.04)]'
+                        } ${isProductAppLayout ? 'px-3.5 py-2.5 text-[13px] leading-5' : ''}`}
                       >
                         {message.content}
                       </div>
@@ -3989,7 +4008,7 @@ export function BookingAssistantDialog({
                           const bestForLabel = buildBestForLabel(service, latestCustomerRequirement);
                           const shortlistCard = buildPartnerMatchCardModelFromServiceItem(service, {
                             providerNameOverride: service.venue_name,
-                            explanation: `Why it matches: ${bestForLabel}`,
+                            explanation: bestForLabel,
                           });
                           const actionFooter = buildPartnerMatchActionFooterModelFromServiceItem(service, {
                             selected: isSelected,
@@ -4162,108 +4181,38 @@ export function BookingAssistantDialog({
 
                 {chatLoading && !isSearchResolving ? (
                   <div className="flex justify-start">
-                    <div className="rounded-[1.5rem] rounded-bl-md border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500">
-                      {brandName} is matching the best service...
+                    <div className="rounded-[1.5rem] rounded-bl-[0.35rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-500 shadow-[0_4px_12px_rgba(15,23,42,0.04)]">
+                      {brandName} is matching the best service for you...
                     </div>
                   </div>
                 ) : null}
               </div>
 
               <div
-                className={`border-t border-slate-200 bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] transition-transform duration-300 sm:px-6 sm:py-4 ${
+                className={`border-t border-slate-200 bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-6 sm:py-4 ${
                   isProductAppLayout
-                    ? activeMobilePanel === 'booking'
-                      ? 'sticky bottom-0 z-10 px-4 py-2.5 sm:px-5 sm:py-3'
-                      : 'sticky bottom-0 z-10 px-4 py-2.5 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-5 sm:py-3'
+                    ? 'sticky bottom-0 z-10 px-4 py-2.5 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-5 sm:py-3'
                     : ''
-                } ${
-                  isProductAppLayout && isCompactMobileViewport && !isCompactProductBottomBarVisible
-                    ? 'translate-y-[calc(100%+1rem)]'
-                    : 'translate-y-0'
                 }`}
               >
-                {isProductAppLayout && isCompactMobileViewport ? (
-                  <div className="mb-2 flex items-center gap-2">
-                    <div className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
-                      chatLoading
-                        ? 'bg-sky-50 text-sky-700'
-                        : hasConversationStarted
-                          ? 'bg-emerald-50 text-emerald-700'
-                          : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      <span className={`h-1.5 w-1.5 rounded-full ${chatLoading ? 'animate-pulse bg-current' : 'bg-current/80'}`} />
-                      {chatLoading ? 'Matching services' : hasConversationStarted ? 'Ready' : 'Receive'}
+                {isProductAppLayout && hasSelectionReadyForBooking && selectedService ? (
+                  <div className="mb-2.5 flex items-center gap-2 rounded-[1.15rem] border border-emerald-200 bg-emerald-50 px-3 py-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="line-clamp-1 text-[11px] font-semibold text-slate-950">
+                        {selectedService.name}
+                      </div>
+                      <div className="text-[10px] text-emerald-700">
+                        {formatPrice(selectedService.amount_aud)} · {selectedService.duration_minutes} min — scroll down to book
+                      </div>
                     </div>
                     <button
                       type="button"
-                      onClick={focusCompactSearchComposer}
-                      className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-950"
-                      aria-label="Expand search"
-                      title="Expand search"
+                      onClick={focusBookingDetails}
+                      className="shrink-0 rounded-full bg-slate-950 px-3 py-1.5 text-[10px] font-semibold text-white transition hover:bg-slate-800"
                     >
-                      <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current">
-                        <circle cx="7" cy="7" r="3.25" strokeWidth="1.3" />
-                        <path d="m10.5 10.5 2.75 2.75" strokeWidth="1.3" strokeLinecap="round" />
-                      </svg>
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setProductSheetSnap(hasSelectionReadyForBooking ? 'full' : 'half');
-                        setProductModuleTab(hasSelectionReadyForBooking ? 'details' : 'overview');
-                        setActiveMobilePanel('booking');
-                        setIsCompactProductBottomBarVisible(true);
-                      }}
-                      className={`ml-auto inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-semibold transition ${
-                        hasSelectionReadyForBooking
-                          ? 'border-slate-950 bg-slate-950 text-white'
-                          : 'border-slate-200 bg-white text-slate-600'
-                      }`}
-                    >
-                      <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current">
-                        <path d="M3.25 4.25h9.5" strokeWidth="1.4" strokeLinecap="round" />
-                        <path d="M4.5 2.75v3" strokeWidth="1.4" strokeLinecap="round" />
-                        <path d="M11.5 2.75v3" strokeWidth="1.4" strokeLinecap="round" />
-                        <rect x="3" y="4.75" width="10" height="8" rx="2" strokeWidth="1.4" />
-                      </svg>
-                      <span>Booking</span>
+                      Book →
                     </button>
                   </div>
-                ) : null}
-                {isProductAppLayout && isCompactMobileViewport && hasSelectionReadyForBooking && selectedService ? (
-                  <button
-                    type="button"
-                    onClick={focusBookingDetails}
-                    className="mb-2.5 block w-full rounded-[1.15rem] border border-slate-200 bg-slate-50 px-3 py-2.5 text-left shadow-[0_8px_22px_rgba(15,23,42,0.04)] transition hover:border-slate-300 hover:bg-white"
-                  >
-                    <div className="flex items-start justify-between gap-3">
-                      <div className="min-w-0">
-                        <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Booking summary
-                        </div>
-                        <div className="mt-1 line-clamp-1 text-[12px] font-semibold text-slate-950">
-                          {selectedService.name}
-                        </div>
-                      </div>
-                      <div className="shrink-0 rounded-full bg-slate-950 px-2.5 py-1 text-[9px] font-semibold text-white">
-                        Open
-                      </div>
-                    </div>
-                    <div className="mt-2 flex flex-wrap gap-1.5">
-                      {[
-                        formatPrice(selectedService.amount_aud),
-                        `${selectedService.duration_minutes} min`,
-                        buildServiceDistanceLabel(selectedService),
-                      ].map((fact) => (
-                        <span
-                          key={`${selectedService.id}-${fact}`}
-                          className="rounded-full bg-white px-2.5 py-1 text-[10px] font-medium text-slate-600 ring-1 ring-slate-200"
-                        >
-                          {fact}
-                        </span>
-                      ))}
-                    </div>
-                  </button>
                 ) : null}
                 {isDefaultPopupMobileViewport && hasSelectionReadyForBooking ? (
                   <div className="mb-2 rounded-[999px] border border-emerald-200 bg-emerald-50 px-2.5 py-2">
@@ -4369,12 +4318,30 @@ export function BookingAssistantDialog({
 
                 {chatError ? (
                   <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                    {chatError}
+                    <div>{chatError}</div>
+                    {latestCustomerRequirement ? (
+                      <button
+                        type="button"
+                        onClick={() => { setChatError(''); setChatInput(latestCustomerRequirement); }}
+                        className="mt-2 inline-flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-900 transition hover:bg-rose-200"
+                      >
+                        Retry last search
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
                 {voiceError ? (
                   <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
-                    {voiceError}
+                    <div>{voiceError}</div>
+                    {!voiceError.includes('not supported') ? (
+                      <button
+                        type="button"
+                        onClick={() => { setVoiceError(''); toggleVoiceCapture(); }}
+                        className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-200"
+                      >
+                        Try again
+                      </button>
+                    ) : null}
                   </div>
                 ) : null}
                 {catalogError ? (
@@ -4387,29 +4354,15 @@ export function BookingAssistantDialog({
 
             <div
               ref={bookingScrollRef}
-                className={`min-h-0 overflow-y-auto overscroll-contain bg-[#f8fafc] px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-6 sm:py-5 ${
+                className={`bg-[#f8fafc] px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] sm:px-6 sm:py-5 ${
                 isProductAppLayout
-                  ? `absolute inset-x-0 bottom-0 z-20 flex max-h-[82%] w-full max-w-full flex-col overflow-hidden rounded-t-[1.35rem] border border-slate-200 bg-[#f8fafc] shadow-[0_-24px_60px_rgba(15,23,42,0.16)] ${
-                      productSheetDragOffset !== 0 ? '' : 'transition-transform duration-300 ease-out'
-                    } ${isCompactMobileViewport ? 'max-h-[72%] px-2 py-1.5' : ''} ${
-                      shouldUseProductBottomNav ? 'pb-[calc(env(safe-area-inset-bottom)+4.5rem)]' : ''
-                    } sm:left-3 sm:right-3 sm:mx-auto sm:max-h-[88%] sm:max-w-[calc(100%_-_1.5rem)] sm:rounded-t-[1.85rem] ${
-                      isCompactMobileViewport ? '' : ''
-                    }`
+                  ? `rounded-t-[1.5rem] border-t border-slate-200 ${isCompactMobileViewport ? 'px-3 py-3' : ''} ${!hasConversationStarted ? 'hidden' : ''}`
                   : isDefaultPopupLayout
-                    ? `${isDefaultPopupMobileViewport && activeMobilePanel !== 'booking' ? 'hidden' : 'block'} border-t border-slate-200 lg:border-t-0`
-                    : `lg:block ${activeMobilePanel === 'booking' ? 'block' : 'hidden'}`
+                    ? `${isDefaultPopupMobileViewport && activeMobilePanel !== 'booking' ? 'hidden' : 'block'} min-h-0 overflow-y-auto overscroll-contain border-t border-slate-200 lg:border-t-0`
+                    : `min-h-0 overflow-y-auto overscroll-contain lg:block ${activeMobilePanel === 'booking' ? 'block' : 'hidden'}`
               }`}
-              style={
-                isProductAppLayout
-                  ? {
-                      transform: `${productSheetSnap === 'full' ? 'translateY(0)' : `translateY(calc(100% - ${productSheetSnap === 'half' ? productBookingSheetHalf : productBookingSheetPeek}px))`} translateY(${productSheetDragOffset}px)`,
-                      boxShadow: `0 -24px 60px rgba(15,23,42,${0.12 + productSheetOpenRatio * 0.16})`,
-                    }
-                  : undefined
-              }
             >
-              {isProductAppLayout && isCompactMobileViewport ? (
+              {false ? (
                 <div className="sticky top-0 z-10 -mx-2 mb-1.5 border-b border-slate-200 bg-[#f8fafc]/96 px-2 pb-1.5 pt-1 backdrop-blur">
                   <div className="flex gap-1.5 overflow-x-auto pb-1">
                     {productModuleTabs.map((tab) => (
@@ -4450,37 +4403,10 @@ export function BookingAssistantDialog({
               ) : null}
               {isProductAppLayout ? (
                 <div
-                  className={`mb-2 rounded-[1.25rem] border border-slate-200 bg-white/92 p-3.5 shadow-[0_12px_28px_rgba(15,23,42,0.05)] ${
+                  className={`mb-3 rounded-[1.25rem] border border-slate-200 bg-white/92 p-3.5 shadow-[0_8px_20px_rgba(15,23,42,0.04)] ${
                     isCompactMobileViewport ? 'p-2.5' : ''
                   }`}
-                  role="button"
-                  tabIndex={0}
-                  onClick={() => {
-                    setProductSheetSnap((current) =>
-                      current === 'peek' ? 'half' : 'full',
-                    );
-                    setActiveMobilePanel('booking');
-                  }}
-                  onPointerDown={handleProductSheetPointerDown}
-                  onPointerMove={handleProductSheetPointerMove}
-                  onPointerUp={handleProductSheetPointerEnd}
-                  onPointerCancel={handleProductSheetPointerEnd}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      setActiveMobilePanel('booking');
-                    }
-                  }}
                   >
-                  {/* Drag handle + swipe hint */}
-                  <div className="mb-2 flex flex-col items-center gap-1">
-                    <div className="h-1.5 w-12 rounded-full bg-slate-900/12" />
-                    {productSheetSnap === 'peek' && !hasSelectionReadyForBooking ? (
-                      <div className="text-[9px] font-semibold uppercase tracking-[0.16em] text-slate-400">
-                        Swipe up when you are ready to book
-                      </div>
-                    ) : null}
-                  </div>
                   <div className={`flex items-center justify-between gap-3 ${
                     isCompactMobileViewport ? 'flex-wrap' : ''
                   }`}>
@@ -4499,32 +4425,18 @@ export function BookingAssistantDialog({
                         </div>
                       ) : null}
                     </div>
-                    <div className={`flex shrink-0 items-center gap-2 ${isCompactMobileViewport ? 'w-full justify-between' : ''}`}>
-                      <button
-                        type="button"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          setProductSheetSnap('peek');
-                          setActiveMobilePanel('chat');
-                        }}
-                        className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-slate-50"
-                      >
-                        ← Chat
-                      </button>
+                    <div className="flex shrink-0 items-center gap-2">
                       {hasSelectionReadyForBooking ? (
                         <button
                           type="button"
-                          onClick={(event) => {
-                            event.stopPropagation();
-                            focusBookingDetails();
-                          }}
+                          onClick={focusBookingDetails}
                           className="rounded-full bg-slate-950 px-3 py-1.5 text-[10px] font-semibold text-white transition hover:bg-slate-800"
                         >
                           Book now →
                         </button>
                       ) : (
-                        <div className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold text-slate-500">
-                          Waiting
+                        <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold text-emerald-700">
+                          Select a result above
                         </div>
                       )}
                     </div>
@@ -4607,19 +4519,19 @@ export function BookingAssistantDialog({
               <div
                 key={`workflow-panel-${selectedServiceId || selectedEvent?.url || 'idle'}-${workflowHandoffKey}`}
                 ref={bookingWorkflowSectionRef}
-                className="booking-handoff rounded-[1.75rem] border border-slate-200 bg-white p-5"
+                className={`booking-handoff rounded-[1.75rem] border border-slate-200 bg-white p-5 ${isProductAppLayout && !result ? 'hidden' : ''}`}
               >
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-semibold text-slate-950">
-                      {brandName} workflow
+                      Booking progress
                     </div>
                     <div className="mt-1 text-sm text-slate-500">
-                      A visible process view of what the agent has already handled.
+                      What's been handled so far in your booking flow.
                     </div>
                   </div>
                   <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    {catalog?.stripe_enabled ? 'Stripe Ready' : 'Manual Payment'}
+                    {catalog?.stripe_enabled ? 'Card payments on' : 'Manual payment'}
                   </div>
                 </div>
 
@@ -4714,7 +4626,7 @@ export function BookingAssistantDialog({
               <div
                 key={`booking-panel-${selectedServiceId || selectedEvent?.url || 'empty'}-${selectionAnimationKey}`}
                 ref={bookingPanelRef}
-                className="booking-focus-in mt-5 rounded-[1.75rem] border border-slate-200 bg-white p-5"
+                className={`booking-focus-in mt-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 ${isProductAppLayout && !hasSelectionReadyForBooking && !result ? 'hidden' : ''}`}
               >
                 <div ref={bookingOptionsSectionRef} className="h-0 w-0 overflow-hidden" aria-hidden="true" />
                 <div className="flex items-start justify-between gap-3">
@@ -4724,8 +4636,8 @@ export function BookingAssistantDialog({
                     </div>
                     <div className={`mt-2 text-sm text-slate-500 ${shouldHideProductSupportCopy ? 'hidden' : ''}`}>
                       {selectedService
-                        ? `${selectedService.name} is selected. Unless priorities changed, the next best action is to continue with booking details.`
-                        : `Review the top matched options below. ${brandName} keeps the shortlist visible so the user can compare quickly, then move into booking with confidence.`}
+                        ? `${selectedService.name} is selected. Continue below to confirm your booking details.`
+                        : `Review your top matches below, then select one to move straight into booking.`}
                     </div>
                   </div>
                 </div>
@@ -4743,12 +4655,12 @@ export function BookingAssistantDialog({
                           {buildReadyToBookConfidence(selectedService, latestCustomerRequirement)}
                         </div>
                         <div className="mt-2 text-[11px] leading-5 text-emerald-800">
-                          Next best action: confirm booking details and preferred timing. Return to the shortlist only if the decision criteria changed.
+                          Fill in your details and preferred time below to confirm this booking.
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">
                         <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
-                          Primary path
+                          Top match
                         </div>
                         <button
                           type="button"
@@ -4771,7 +4683,12 @@ export function BookingAssistantDialog({
                     resetKey={visibleSuggestedServices.map((service) => service.id).join('|')}
                     className="mt-4"
                     listClassName="grid gap-3"
-                    emptyState={null}
+                    emptyState={
+                      <div className="mt-4 rounded-[1.15rem] border border-dashed border-slate-200 bg-[#fbfbfd] px-4 py-5 text-center">
+                        <div className="text-[12px] font-semibold text-slate-950">No results to show</div>
+                        <div className="mt-1 text-[11px] leading-5 text-slate-500">Refine your search above — try adding location or more detail.</div>
+                      </div>
+                    }
                     renderMeta={({ visibleCount, totalCount }) =>
                       totalCount > CHAT_RESULT_BATCH_SIZE ? (
                         <div className="mb-3 flex justify-end">
@@ -4848,7 +4765,7 @@ export function BookingAssistantDialog({
                               <div className={`mt-2.5 rounded-2xl px-3 py-2 text-xs ${
                                 isSelected ? 'bg-white/10 text-white/85' : 'bg-amber-50 text-amber-900'
                               }`}>
-                                <span className="font-semibold">Why it matches:</span> {bestForLabel}
+                                {bestForLabel}
                               </div>
                               <div className="mt-2.5 flex flex-wrap gap-2">
                                 {buildServiceConfidenceNotes(service).slice(0, 2).map((note) => (
@@ -4921,6 +4838,20 @@ export function BookingAssistantDialog({
                     </div>
                   </div>
                 ) : null}
+
+                {!isSearchResolving && !visibleSuggestedServices.length && hasFirstSearchResult ? (
+                  <div className="mt-4 rounded-[1.25rem] border border-dashed border-slate-200 bg-[#fbfbfd] px-4 py-5 text-center">
+                    <div className="text-[12px] font-semibold text-slate-950">No matches found</div>
+                    <div className="mt-1 text-[11px] leading-5 text-slate-500">Try narrowing with a suburb, budget, or specific requirement.</div>
+                    <button
+                      type="button"
+                      onClick={focusCompactSearchComposer}
+                      className="mt-3 inline-flex items-center gap-1 rounded-full bg-slate-950 px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-slate-800"
+                    >
+                      Refine search
+                    </button>
+                  </div>
+                ) : null}
               </div>
 
               <form
@@ -4931,6 +4862,8 @@ export function BookingAssistantDialog({
                     ? 'space-y-3 rounded-[1.35rem] p-3.5'
                     : 'space-y-4 rounded-[1.6rem] p-4.5 sm:p-5'
                 }`}
+                aria-hidden={isProductAppLayout && !hasSelectionReadyForBooking ? true : undefined}
+                noValidate
                 onSubmit={handleSubmit}
               >
                 {isDefaultPopupMobileViewport ? (
@@ -5062,7 +4995,7 @@ export function BookingAssistantDialog({
                   ) : null}
                   {selectedService && liveReadSummary?.serviceId === selectedService.id ? (
                     <div className="mt-3 rounded-[1.25rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
-                      <div className="font-semibold">BookedAI v1 guidance</div>
+                      <div className="font-semibold">Booking guidance</div>
                       <p className="mt-2 text-sm leading-6 text-sky-900">
                         {liveReadSummary.nextStep}
                       </p>
@@ -5079,14 +5012,14 @@ export function BookingAssistantDialog({
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Enterprise journey
+                          Your booking journey
                         </div>
                         <div className="mt-1 text-sm font-semibold text-slate-950">
-                          Search to booking, payment, CRM, and follow-up
+                          From search to booking, payment, and follow-up
                         </div>
                       </div>
                       <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600 ring-1 ring-slate-200">
-                        Ops-ready
+                        Active
                       </div>
                     </div>
                     <div className="mt-3 grid grid-cols-1 gap-2">
@@ -5143,10 +5076,8 @@ export function BookingAssistantDialog({
                   ) : null}
                 </div>
 
-                {isProductAppLayout ? (
-                  <div className={`rounded-[1.25rem] border border-slate-200 bg-[#fbfbfd] ${
-                    isCompactMobileViewport ? 'p-3' : 'p-4'
-                  }`}>
+                {isProductAppLayout && !isCompactMobileViewport ? (
+                  <div className="rounded-[1.25rem] border border-slate-200 bg-[#fbfbfd] p-4">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Booking journey
                     </div>
@@ -5176,11 +5107,12 @@ export function BookingAssistantDialog({
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block text-sm text-slate-600">
-                    <span className="mb-2 block font-medium text-slate-700">Name</span>
+                    <span className="mb-2 block font-medium text-slate-700">Name <span className="text-rose-500">*</span></span>
                     <input
                       ref={customerNameInputRef}
                       required
                       type="text"
+                      autoComplete="name"
                       value={customerName}
                       onChange={(event) => setCustomerName(event.target.value)}
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
@@ -5190,9 +5122,10 @@ export function BookingAssistantDialog({
                     <span className="mb-2 block font-medium text-slate-700">Email</span>
                     <input
                       type="email"
+                      autoComplete="email"
                       value={customerEmail}
                       onChange={(event) => setCustomerEmail(event.target.value)}
-                      placeholder="Email address"
+                      placeholder="your@email.com"
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
                     />
                   </label>
@@ -5202,18 +5135,19 @@ export function BookingAssistantDialog({
                   <span className="mb-2 block font-medium text-slate-700">Phone</span>
                   <input
                     type="tel"
+                    autoComplete="tel"
                     value={customerPhone}
                     onChange={(event) => setCustomerPhone(event.target.value)}
-                    placeholder="Phone number"
+                    placeholder="+61 4xx xxx xxx"
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
                   />
                   <span className="mt-2 block text-xs text-slate-500">
-                    Enter either email or phone. If a phone number is provided, BookedAI can prepare SMS and WhatsApp follow-up.
+                    At least one of email or phone is required. Add a phone number to also receive SMS and WhatsApp updates.
                   </span>
                 </label>
 
                 <label className="block text-sm text-slate-600">
-                  <span className="mb-2 block font-medium text-slate-700">Preferred time</span>
+                  <span className="mb-2 block font-medium text-slate-700">Preferred time <span className="text-rose-500">*</span></span>
                   <input
                     required
                     type="datetime-local"
@@ -5224,7 +5158,7 @@ export function BookingAssistantDialog({
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
                   />
                   <span className="mt-2 block text-xs text-slate-500">
-                    Auto-filled from the event when available, otherwise defaults to 2 hours from now.
+                    Choose your preferred date and time. The provider will confirm the final slot with you.
                   </span>
                 </label>
 
@@ -5233,7 +5167,7 @@ export function BookingAssistantDialog({
                     {bookingRequirementConfig.label}
                   </span>
                   <textarea
-                    rows={4}
+                    rows={isCompactMobileViewport ? 3 : 4}
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                     placeholder={bookingRequirementConfig.placeholder}
@@ -5243,7 +5177,23 @@ export function BookingAssistantDialog({
 
                 {submitError ? (
                   <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                    {submitError}
+                    <div>{submitError}</div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSubmitError('');
+                        if (isProductAppLayout) {
+                          setProductSheetSnap('half');
+                          setProductModuleTab('options');
+                          scrollToProductSection('options');
+                        } else {
+                          setActiveMobilePanel('chat');
+                        }
+                      }}
+                      className="mt-2 inline-flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-900 transition hover:bg-rose-200"
+                    >
+                      ← Back to results
+                    </button>
                   </div>
                 ) : null}
 
@@ -5261,7 +5211,7 @@ export function BookingAssistantDialog({
                       <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
                         selectedService.booking_url ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
                       }`}>
-                        {selectedService.booking_url ? 'Direct booking' : 'Chat confirm'}
+                        {selectedService.booking_url ? 'Book directly' : 'Request booking'}
                       </span>
                     </div>
                   </div>
@@ -5281,7 +5231,7 @@ export function BookingAssistantDialog({
                   {loading ? 'Preparing your booking...' : content.submitLabel}
                 </button>
 
-                {isProductAppLayout && selectedService && !result ? (
+                {isProductAppLayout && !isCompactMobileViewport && selectedService && !result ? (
                   <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-1 border-t border-slate-200 bg-white/96 px-5 py-2 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] backdrop-blur">
                     <div className="rounded-[1.15rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 py-2.5 shadow-[0_10px_22px_rgba(15,23,42,0.06)]">
                       <div className="flex items-center justify-between gap-3">
@@ -5341,8 +5291,11 @@ export function BookingAssistantDialog({
                           </div>
                         </div>
                         <p className="mt-3 max-w-lg text-sm leading-6 text-emerald-100">
-                          Your booking is confirmed. The next priority is payment or portal review, depending on the provider path below.
+                          Your booking request is confirmed. Complete payment if required, or review your details in the portal below.
                         </p>
+                        <div className="mt-3 inline-flex rounded-full bg-white/12 px-3 py-1.5 text-[11px] font-semibold text-emerald-50 ring-1 ring-white/12">
+                          Returning to the main BookedAI screen in {thankYouReturnCountdown}s
+                        </div>
                       </div>
                       <div className="rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white/88 ring-1 ring-white/12">
                         Confirmation ready
@@ -5370,11 +5323,7 @@ export function BookingAssistantDialog({
                       )}
                       <button
                         type="button"
-                        onClick={() => {
-                          onClose();
-                          window.history.replaceState({}, '', '/');
-                          window.scrollTo({ top: 0, behavior: 'smooth' });
-                        }}
+                        onClick={returnToMainBookedAiScreen}
                         className="inline-flex items-center justify-center rounded-[1rem] bg-white/10 px-4 py-3 text-center text-[12px] font-semibold text-white transition hover:bg-white/16"
                       >
                         Back to homepage
@@ -5399,7 +5348,7 @@ export function BookingAssistantDialog({
                         </p>
                         <div className="mt-4 rounded-[1rem] bg-white/10 px-3 py-3 ring-1 ring-white/10">
                           <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/70">
-                            Customer portal and edit flow
+                            Your booking portal
                           </div>
                           <p className="mt-1 text-[12px] leading-5 text-white/90">
                             Scan the QR or open the portal to review booking details, edit the request, reschedule, cancel, or save this booking. The same portal link is also included in the confirmation email.
@@ -5427,11 +5376,17 @@ export function BookingAssistantDialog({
                         </div>
                       </div>
                       <div className="rounded-[1.25rem] bg-white p-2 shadow-sm">
-                        <img
-                          src={result.qr_code_url}
-                          alt={`QR code for ${result.booking_reference}`}
-                          className="h-24 w-24 rounded-xl bg-white object-cover"
-                        />
+                        {result.qr_code_url ? (
+                          <img
+                            src={result.qr_code_url}
+                            alt={`QR code for ${result.booking_reference}`}
+                            className="h-24 w-24 rounded-xl bg-white object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-24 w-24 items-center justify-center rounded-xl bg-slate-100 text-center text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                            QR via portal
+                          </div>
+                        )}
                         <div className="mt-2 rounded-[0.9rem] bg-slate-100 px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
                           Scan to open booking
                         </div>
@@ -5484,13 +5439,13 @@ export function BookingAssistantDialog({
                         Follow-up
                       </div>
                       <div className="mt-1 text-[12px] font-semibold text-slate-950">
-                        {result.email_status === 'sent' ? 'Email sent' : 'Manual follow-up'}
+                        {result.email_status === 'sent' ? 'Email sent' : 'Follow-up pending'}
                       </div>
                       <div className="mt-0.5 line-clamp-1 text-[11px] text-slate-600">
                         {result.contact_email}
                       </div>
                       <div className="mt-2 text-[11px] leading-5 text-slate-500">
-                        Confirmation email should include the same portal link, booking reference, payment path, and calendar action for later review or edits.
+                        Your confirmation email includes the portal link, booking reference, and calendar event for easy access later.
                       </div>
                     </div>
                   </div>
@@ -5504,8 +5459,8 @@ export function BookingAssistantDialog({
                         href: getBookingPortalUrl(result),
                       },
                       {
-                        title: 'Edit and submit',
-                        body: 'Use the managed portal workflow to adjust details, then resubmit the booking request.',
+                        title: 'Edit booking',
+                        body: 'Change your details or preferred time and resubmit directly from the portal.',
                         label: 'Edit in portal',
                         href: getBookingPortalUrl(result, 'edit'),
                       },
@@ -5516,8 +5471,8 @@ export function BookingAssistantDialog({
                         href: getBookingPortalUrl(result, 'reschedule'),
                       },
                       {
-                        title: 'Cancel request',
-                        body: 'If plans changed, submit a cancellation request from the same managed flow.',
+                        title: 'Cancel booking',
+                        body: 'If your plans have changed, submit a cancellation request through the portal.',
                         label: 'Request cancellation',
                         href: getBookingPortalUrl(result, 'cancel'),
                       },
@@ -5553,14 +5508,14 @@ export function BookingAssistantDialog({
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Enterprise workflow lane
+                          What happens next
                         </div>
                         <div className="mt-1 text-sm font-semibold text-slate-950">
-                          Operational status from capture to follow-up
+                          Booking, follow-up, and confirmation status
                         </div>
                       </div>
                       <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600 ring-1 ring-slate-200">
-                        Live state
+                        Current
                       </div>
                     </div>
                     <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
@@ -5596,7 +5551,7 @@ export function BookingAssistantDialog({
                       result.automation?.whatsapp?.warnings?.length) ? (
                       <div className="mt-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-3">
                         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700">
-                          Operator attention
+                          Action may be required
                         </div>
                         <div className="mt-2 space-y-1 text-[11px] leading-5 text-amber-900">
                           {[
@@ -5616,14 +5571,14 @@ export function BookingAssistantDialog({
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Communication design
+                          Confirmation messages
                         </div>
                         <div className="mt-1 text-sm font-semibold text-slate-950">
-                          Customer-facing email, SMS, and WhatsApp drafts
+                          Email, SMS, and WhatsApp sent to the customer
                         </div>
                       </div>
                       <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                        Ready to reuse
+                        Sent
                       </div>
                     </div>
                     {communicationPreviewCards.length ? (
@@ -5680,14 +5635,14 @@ export function BookingAssistantDialog({
                     <div className="flex items-start justify-between gap-3">
                       <div>
                         <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Delivery timeline
+                          Confirmation timeline
                         </div>
                         <div className="mt-1 text-sm font-semibold text-slate-950">
-                          Traceable operations after booking capture
+                          What happened after your booking was confirmed
                         </div>
                       </div>
                       <div className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
-                        Ops trace
+                        Timeline
                       </div>
                     </div>
                     <div className="mt-3 space-y-2">
@@ -5718,23 +5673,25 @@ export function BookingAssistantDialog({
                   </div>
 
                   <div className="mt-5 flex items-center gap-2 overflow-x-auto pb-1">
-                    <a
-                      href={result.payment_url}
-                      target="_blank"
-                      rel="noreferrer"
-                      aria-label={
-                        result.payment_status === 'stripe_checkout_ready'
-                          ? 'Open payment'
-                          : 'Open payment follow-up'
-                      }
-                      className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] bg-slate-950 px-3 py-2.5 text-[10px] font-semibold text-white transition hover:bg-slate-800"
-                    >
-                      <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current">
-                        <path d="M4 7.5h16v9H4z" strokeWidth="1.8" rx="2" />
-                        <path d="M4 10.5h16" strokeWidth="1.8" strokeLinecap="round" />
-                      </svg>
-                      <span>Payment</span>
-                    </a>
+                    {result.payment_url ? (
+                      <a
+                        href={result.payment_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={
+                          result.payment_status === 'stripe_checkout_ready'
+                            ? 'Open payment'
+                            : 'Open payment follow-up'
+                        }
+                        className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] bg-slate-950 px-3 py-2.5 text-[10px] font-semibold text-white transition hover:bg-slate-800"
+                      >
+                        <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current">
+                          <path d="M4 7.5h16v9H4z" strokeWidth="1.8" rx="2" />
+                          <path d="M4 10.5h16" strokeWidth="1.8" strokeLinecap="round" />
+                        </svg>
+                        <span>Payment</span>
+                      </a>
+                    ) : null}
                     {(result.meeting_event_url || result.calendar_add_url) ? (
                       <a
                         href={result.meeting_event_url ?? result.calendar_add_url ?? '#'}
@@ -5752,11 +5709,7 @@ export function BookingAssistantDialog({
                     <button
                       type="button"
                       aria-label="Return home"
-                      onClick={() => {
-                        onClose();
-                        window.history.replaceState({}, '', '/');
-                        window.scrollTo({ top: 0, behavior: 'smooth' });
-                      }}
+                      onClick={returnToMainBookedAiScreen}
                       className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] border border-black/10 bg-white px-3 py-2.5 text-[10px] font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
                     >
                       <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current">
@@ -5855,11 +5808,11 @@ export function BookingAssistantDialog({
 
                       <div className="rounded-[1rem] border border-slate-200 bg-white px-3 py-3">
                         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Tenant info
+                          Provider details
                         </div>
                         <div className="mt-2 space-y-1.5 text-sm text-slate-600">
                           <div>
-                            <span className="font-semibold text-slate-900">Tenant:</span>{' '}
+                            <span className="font-semibold text-slate-900">Provider:</span>{' '}
                             {previewService.venue_name ?? previewService.source_label ?? 'BookedAI partner'}
                           </div>
                           {previewService.location ? (
@@ -5870,13 +5823,13 @@ export function BookingAssistantDialog({
                           ) : null}
                           {previewService.trust_signal ? (
                             <div>
-                              <span className="font-semibold text-slate-900">Trust:</span>{' '}
+                              <span className="font-semibold text-slate-900">Verified:</span>{' '}
                               {previewService.trust_signal}
                             </div>
                           ) : null}
                           {previewService.next_step ? (
                             <div>
-                              <span className="font-semibold text-slate-900">Next step:</span>{' '}
+                              <span className="font-semibold text-slate-900">What happens next:</span>{' '}
                               {previewService.next_step}
                             </div>
                           ) : null}

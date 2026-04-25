@@ -3,9 +3,12 @@ from __future__ import annotations
 from typing import Any
 
 from fastapi import Request
+from pydantic import BaseModel, Field
 
 from api.v1_routes import (
     ActorContextPayload,
+    AttributionContextPayload,
+    BookingChannelContextPayload,
     CheckAvailabilityRequestPayload,
     SearchCandidatesRequestPayload,
     ServiceMerchantProfile,
@@ -42,6 +45,207 @@ from api.v1_routes import (
 )
 from core.contracts.matching import MatchRequestContract
 from domain.matching.service import MatchingService
+
+
+class CustomerAgentMessagePayload(BaseModel):
+    role: str
+    content: str
+
+
+class CustomerAgentTurnRequestPayload(BaseModel):
+    message: str
+    conversation_id: str | None = None
+    messages: list[CustomerAgentMessagePayload] = Field(default_factory=list, max_length=12)
+    location: str | None = None
+    preferences: dict[str, Any] | None = None
+    budget: dict[str, Any] | None = None
+    time_window: dict[str, Any] | None = None
+    channel_context: BookingChannelContextPayload
+    attribution: AttributionContextPayload | None = None
+    user_location: dict[str, Any] | None = None
+    context: dict[str, Any] = Field(default_factory=dict)
+
+
+def _agent_clean_text(value: object) -> str:
+    return str(value or "").strip()
+
+
+def _agent_missing_context(query: str, search_data: dict[str, Any]) -> list[str]:
+    normalized = query.lower()
+    query_context = search_data.get("query_context") if isinstance(search_data.get("query_context"), dict) else {}
+    query_understanding = (
+        search_data.get("query_understanding")
+        if isinstance(search_data.get("query_understanding"), dict)
+        else {}
+    )
+    missing: list[str] = []
+    has_location = bool(
+        _agent_clean_text(query_understanding.get("inferred_location"))
+        or _agent_clean_text(query_understanding.get("location_terms"))
+        or any(token in normalized for token in (" near ", " in ", " around ", " sydney", "melbourne", "brisbane"))
+    )
+    has_timing = bool(
+        _agent_clean_text(query_understanding.get("requested_date"))
+        or _agent_clean_text(query_understanding.get("requested_time"))
+        or any(token in normalized for token in ("today", "tomorrow", "weekend", "morning", "afternoon", "tonight"))
+    )
+    has_brief = len([part for part in normalized.split() if part]) >= 6
+    if not has_location or query_context.get("location_permission_needed"):
+        missing.append("location")
+    if not has_timing:
+        missing.append("timing")
+    if not has_brief:
+        missing.append("brief")
+    return missing
+
+
+def _agent_suggestions(query: str, missing_context: list[str]) -> list[dict[str, str]]:
+    normalized = query.strip()
+    service_hint = normalized or "service"
+    suggestions: list[dict[str, str]] = []
+    if "location" in missing_context:
+        suggestions.append(
+            {
+                "label": "Add area",
+                "query": f"{service_hint} near Sydney CBD".strip(),
+            }
+        )
+    if "timing" in missing_context:
+        suggestions.append(
+            {
+                "label": "Add timing",
+                "query": f"{service_hint} this weekend".strip(),
+            }
+        )
+    if "brief" in missing_context:
+        suggestions.append(
+            {
+                "label": "Add brief",
+                "query": f"{service_hint} for a first booking with clear pricing".strip(),
+            }
+        )
+    if not suggestions:
+        suggestions.extend(
+            [
+                {"label": "Closest option", "query": f"{service_hint} closest available".strip()},
+                {"label": "Premium option", "query": f"{service_hint} premium provider".strip()},
+                {"label": "Fastest booking", "query": f"{service_hint} earliest available".strip()},
+            ]
+        )
+    return suggestions[:4]
+
+
+def _build_customer_agent_reply(
+    *,
+    query: str,
+    search_data: dict[str, Any],
+    missing_context: list[str],
+) -> str:
+    candidates = search_data.get("candidates") if isinstance(search_data.get("candidates"), list) else []
+    warnings = search_data.get("warnings") if isinstance(search_data.get("warnings"), list) else []
+    query_understanding = (
+        search_data.get("query_understanding")
+        if isinstance(search_data.get("query_understanding"), dict)
+        else {}
+    )
+    normalized_query = _agent_clean_text(query_understanding.get("normalized_query")) or query.strip()
+    location = _agent_clean_text(query_understanding.get("inferred_location"))
+    if candidates:
+        lead = candidates[0] if isinstance(candidates[0], dict) else {}
+        provider = _agent_clean_text(lead.get("provider_name"))
+        service = _agent_clean_text(lead.get("service_name"))
+        location_line = f" around {location}" if location else ""
+        warning_line = f" I also found {len(warnings)} trust note{'s' if len(warnings) != 1 else ''} to keep visible." if warnings else ""
+        return (
+            f"I found {len(candidates)} ranked option{'s' if len(candidates) != 1 else ''}{location_line} for "
+            f"\"{normalized_query}\". The strongest first match is {service or 'this service'}"
+            f"{f' from {provider}' if provider else ''}. Review the shortlist, then choose one and I will carry the context into booking."
+            f"{warning_line}"
+        )
+    if missing_context:
+        if "location" in missing_context and "timing" in missing_context:
+            return "I can help, but I need the area and preferred timing before ranking the shortlist safely."
+        if "location" in missing_context:
+            return "I can help, but I need the area before ranking nearby or online-ready options."
+        if "timing" in missing_context:
+            return "I can help, but I need the preferred day or time window before ranking booking-ready options."
+        return "I can help. Add one more detail about who this is for or what matters most, then I can rank stronger matches."
+    return "I could not find a strong display-safe match yet. Try a nearby service phrase, area, or timing and I will search again."
+
+
+async def customer_agent_turn(request: Request, payload: CustomerAgentTurnRequestPayload):
+    trimmed_message = payload.message.strip()
+    actor_context = ActorContextPayload(
+        channel=payload.channel_context.channel,
+        tenant_id=payload.channel_context.tenant_id,
+        tenant_ref=payload.channel_context.tenant_ref,
+        deployment_mode=payload.channel_context.deployment_mode,
+    )
+    tenant_id = await _resolve_tenant_id(request, actor_context)
+    if not trimmed_message:
+        return _success_response(
+            {
+                "agent_turn_id": f"agent_turn_{uuid4().hex[:12]}",
+                "conversation_id": payload.conversation_id or f"conv_{uuid4().hex[:12]}",
+                "reply": "Send me what you want to book and I will search, clarify, then hand the right context into booking.",
+                "phase": "clarify",
+                "missing_context": ["brief"],
+                "suggestions": [{"label": "Start", "query": "kids activity near me this weekend"}],
+                "search": None,
+                "handoff": {
+                    "next_agent": "search_and_conversation",
+                    "revenue_ops_ready": False,
+                    "reason": "No customer intent has been supplied yet.",
+                },
+            },
+            tenant_id=tenant_id,
+            actor_context=actor_context,
+        )
+
+    search_payload = SearchCandidatesRequestPayload(
+        query=trimmed_message,
+        location=payload.location,
+        preferences=payload.preferences,
+        budget=payload.budget,
+        time_window=payload.time_window,
+        channel_context=payload.channel_context,
+        attribution=payload.attribution,
+        user_location=payload.user_location,
+        chat_context=[message.model_dump(mode="json") for message in payload.messages],
+    )
+    search_envelope = await search_candidates(request, search_payload)
+    search_data = dict(getattr(search_envelope, "data", {}) or {})
+    missing_context = _agent_missing_context(trimmed_message, search_data)
+    candidates = search_data.get("candidates") if isinstance(search_data.get("candidates"), list) else []
+    phase = "match" if candidates else ("clarify" if missing_context else "no_match")
+    reply = _build_customer_agent_reply(
+        query=trimmed_message,
+        search_data=search_data,
+        missing_context=missing_context,
+    )
+
+    return _success_response(
+        {
+            "agent_turn_id": f"agent_turn_{uuid4().hex[:12]}",
+            "conversation_id": payload.conversation_id or f"conv_{uuid4().hex[:12]}",
+            "reply": reply,
+            "phase": phase,
+            "missing_context": missing_context,
+            "suggestions": _agent_suggestions(trimmed_message, missing_context),
+            "search": search_data,
+            "handoff": {
+                "next_agent": "revenue_operations" if candidates else "search_and_conversation",
+                "revenue_ops_ready": bool(candidates),
+                "reason": (
+                    "A shortlist is ready; revenue operations can be queued after booking confirmation."
+                    if candidates
+                    else "The customer-facing agent still needs enough context before booking or revenue handoff."
+                ),
+            },
+        },
+        tenant_id=tenant_id,
+        actor_context=actor_context,
+    )
 
 
 async def search_candidates(request: Request, payload: SearchCandidatesRequestPayload):

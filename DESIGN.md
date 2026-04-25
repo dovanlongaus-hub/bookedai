@@ -1,5 +1,15 @@
 # Design System Inspired by Apple
 
+## 2026-04-24 Demo Workspace Override
+
+`demo.bookedai.au` currently follows a SaaS product-proof direction rather than a pure Apple-style marketing page. The active demo design rule is:
+
+- show the connected workflow in one professional workspace: intake, assessment, placement, booking, payment truth, parent report, and retention
+- keep desktop chat, matches, and revenue workflow visible together whenever space allows
+- keep mobile as a clear stacked flow with a compact horizontal flow rail
+- lock booking CTAs behind assessment and placement, and make unavailable states explicit
+- use restrained dark glass surfaces, cyan/green accent only for active state and primary action, and avoid decorative panels that do not explain the product flow
+
 ## 1. Visual Theme & Atmosphere
 
 Apple's website is a masterclass in controlled drama — vast expanses of pure black and near-white serve as cinematic backdrops for products that are photographed as if they were sculptures in a gallery. The design philosophy is reductive to its core: every pixel exists in service of the product, and the interface itself retreats until it becomes invisible. This is not minimalism as aesthetic preference; it is minimalism as reverence for the object.

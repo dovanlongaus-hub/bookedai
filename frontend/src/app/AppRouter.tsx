@@ -24,6 +24,10 @@ const FutureSwimApp = lazy(async () => {
   const module = await import('../apps/public/FutureSwimApp');
   return { default: module.FutureSwimApp };
 });
+const ChessGrandmasterApp = lazy(async () => {
+  const module = await import('../apps/public/ChessGrandmasterApp');
+  return { default: module.ChessGrandmasterApp };
+});
 const AIMentorProApp = lazy(async () => {
   const module = await import('../apps/public/AIMentorProApp');
   return { default: module.AIMentorProApp };
@@ -139,6 +143,21 @@ function isAIMentorProRuntime() {
   );
 }
 
+function isChessGrandmasterRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname, pathname } = window.location;
+  return (
+    hostname === 'chess.bookedai.au' ||
+    pathname === '/chess-grandmaster' ||
+    pathname === '/chess-grandmaster/' ||
+    pathname === '/tenant1-chess' ||
+    pathname === '/tenant1-chess/'
+  );
+}
+
 function isTenantRuntime() {
   if (typeof window === 'undefined') {
     return false;
@@ -183,18 +202,34 @@ export function AppRouter() {
     );
   }
 
-  if (isProductRuntime()) {
-    return (
-      <Suspense fallback={fallback}>
-        <ProductApp />
-      </Suspense>
-    );
-  }
-
   if (isRegisterInterestRuntime()) {
     return (
       <Suspense fallback={fallback}>
         <RegisterInterestApp />
+      </Suspense>
+    );
+  }
+
+  if (isRoadmapRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <RoadmapApp
+          onStartTrial={() => {
+            window.location.href =
+              '/register-interest?source_section=call_to_action&source_cta=start_free_trial&source_detail=roadmap_runtime&offer=launch10&deployment=standalone_website&setup=online';
+          }}
+          onBookDemo={() => {
+            window.location.href = 'https://product.bookedai.au/';
+          }}
+        />
+      </Suspense>
+    );
+  }
+
+  if (isProductRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <ProductApp />
       </Suspense>
     );
   }
@@ -215,26 +250,18 @@ export function AppRouter() {
     );
   }
 
-  if (isAIMentorProRuntime()) {
+  if (isChessGrandmasterRuntime()) {
     return (
       <Suspense fallback={fallback}>
-        <AIMentorProApp />
+        <ChessGrandmasterApp />
       </Suspense>
     );
   }
 
-  if (isRoadmapRuntime()) {
+  if (isAIMentorProRuntime()) {
     return (
       <Suspense fallback={fallback}>
-        <RoadmapApp
-          onStartTrial={() => {
-            window.location.href =
-              '/register-interest?source_section=call_to_action&source_cta=start_free_trial&source_detail=roadmap_runtime&offer=launch10&deployment=standalone_website&setup=online';
-          }}
-          onBookDemo={() => {
-            window.location.href = 'https://product.bookedai.au/';
-          }}
-        />
+        <AIMentorProApp />
       </Suspense>
     );
   }

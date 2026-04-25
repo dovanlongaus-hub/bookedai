@@ -233,7 +233,7 @@ def get_settings() -> Settings:
         public_api_url=os.getenv("PUBLIC_API_URL", "https://api.bookedai.au"),
         cors_allow_origins=os.getenv(
             "CORS_ALLOW_ORIGINS",
-            "http://localhost:3000,http://localhost:5173,https://bookedai.au,https://www.bookedai.au,https://admin.bookedai.au,https://product.bookedai.au,https://portal.bookedai.au,https://tenant.bookedai.au,https://upload.bookedai.au",
+            "http://localhost:3000,http://localhost:5173,https://bookedai.au,https://www.bookedai.au,https://admin.bookedai.au,https://beta.bookedai.au,https://product.bookedai.au,https://demo.bookedai.au,https://pitch.bookedai.au,https://portal.bookedai.au,https://tenant.bookedai.au,https://futureswim.bookedai.au,https://chess.bookedai.au,https://upload.bookedai.au",
         ),
         supabase_url=os.getenv("SUPABASE_URL", "https://supabase.bookedai.au"),
         supabase_anon_key=os.getenv("SUPABASE_ANON_KEY", ""),

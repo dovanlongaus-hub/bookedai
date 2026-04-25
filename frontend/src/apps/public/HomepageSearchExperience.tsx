@@ -61,6 +61,7 @@ type ServiceCatalogItem = {
   source_type?: string | null;
   source_label?: string | null;
   why_this_matches?: string | null;
+  display_price?: string | null;
   price_posture?: string | null;
   booking_path_type?: string | null;
   next_step?: string | null;
@@ -154,6 +155,12 @@ type BookingAssistantSessionResponse = {
       provider?: string | null;
       warnings: string[];
     } | null;
+    revenueOps?: {
+      status: string;
+      actionCount: number;
+      actionTypes: string[];
+      warnings: string[];
+    } | null;
   } | null;
 };
 
@@ -197,7 +204,7 @@ const SEARCH_PROGRESS_STAGES = [
     detail: 'Ranking stronger matches first so the first options are worth reviewing.',
   },
   {
-    label: 'Preparing booking handoff',
+    label: 'Getting your results ready',
     detail: 'Keeping the top match ready so you can continue straight into booking.',
   },
 ] as const;
@@ -208,11 +215,17 @@ const SEARCH_PROGRESS_PROMPTS = [
   'Best next input: add the person, age, or context, for example for a 7-year-old beginner.',
   'Best next input: add a budget or preference, for example premium, fastest, or closest.',
 ] as const;
+const BOOKING_EMPTY_STEPS = [
+  'Send a booking request',
+  'Review ranked matches',
+  'Choose one option to unlock booking',
+] as const;
 
 type FollowUpQuestion = {
   id: string;
   question: string;
   suggestion: string;
+  quickAnswers?: string[];
 };
 
 type NoResultSuggestion = {
@@ -225,35 +238,67 @@ type IntentSuggestion = {
   query: string;
 };
 
-function deriveFollowUpQuestions(query: string, results: ServiceCatalogItem[], warnings: string[]) {
-  const normalized = query.toLowerCase();
-  const prompts: FollowUpQuestion[] = [];
+type AgentChatMessage = {
+  id: string;
+  role: 'user' | 'assistant';
+  content: string;
+  resultIds?: string[];
+  suggestions?: IntentSuggestion[];
+};
 
+type ClarificationNeed = 'location' | 'timing' | 'brief';
+
+function deriveClarificationNeeds(query: string): ClarificationNeed[] {
+  const normalized = query.toLowerCase();
+  const needs: ClarificationNeed[] = [];
   const hasLocation = /\b(in|near|around|at|within)\b|\b(sydney|melbourne|brisbane|perth|adelaide|cbd|suburb|city)\b/i.test(query);
   const hasTime = /\b(today|tomorrow|tonight|weekend|morning|afternoon|evening|monday|tuesday|wednesday|thursday|friday|saturday|sunday|am|pm)\b/i.test(query);
   const hasSpecificNeed = normalized.split(/\s+/).filter(Boolean).length >= 6;
 
-  if (!hasLocation) {
+  if (!hasLocation) needs.push('location');
+  if (!hasTime) needs.push('timing');
+  if (!hasSpecificNeed) needs.push('brief');
+
+  return needs;
+}
+
+function shouldHoldResultsForClarification(query: string) {
+  const needs = deriveClarificationNeeds(query);
+  return {
+    needs,
+    hold: needs.length >= 2,
+  };
+}
+
+function deriveFollowUpQuestions(query: string, results: ServiceCatalogItem[], warnings: string[]) {
+  const normalized = query.toLowerCase();
+  const prompts: FollowUpQuestion[] = [];
+  const needs = deriveClarificationNeeds(query);
+
+  if (needs.includes('location')) {
     prompts.push({
       id: 'location',
       question: 'Which area should BookedAI prioritise?',
       suggestion: 'Add your suburb, city, or nearby area so I can rank closer matches first.',
+      quickAnswers: ['Near Sydney CBD', 'In Chatswood', 'Around Parramatta'],
     });
   }
 
-  if (!hasTime) {
+  if (needs.includes('timing')) {
     prompts.push({
       id: 'timing',
       question: 'When do you want this booked?',
       suggestion: 'Add a preferred day, date, or time window so I can narrow the shortlist.',
+      quickAnswers: ['Today after 5pm', 'This weekend', 'Tomorrow morning'],
     });
   }
 
-  if (!hasSpecificNeed || results.length === 0) {
+  if (needs.includes('brief') || results.length === 0) {
     prompts.push({
       id: 'brief',
       question: 'What matters most for this request?',
       suggestion: 'Add a short brief like group size, budget, service style, or a must-have requirement.',
+      quickAnswers: ['Premium option', 'Fastest available', 'Beginner-friendly'],
     });
   }
 
@@ -575,8 +620,8 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse): Book
           : result.calendar_add_url
             ? 'Calendar link ready'
             : result.workflow_status
-              ? 'Sent into ops workflow'
-              : 'Queued for handoff',
+              ? 'Follow-up scheduled'
+              : 'Pending confirmation',
       tone:
         result.meeting_status === 'scheduled' || result.workflow_status
           ? 'bg-emerald-50 text-emerald-700'
@@ -701,6 +746,22 @@ function buildV1ActorContext() {
   };
 }
 
+function createAgentChatMessageId(prefix: string) {
+  return `${prefix}-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function formatCurrencyAud(amount: number | null | undefined) {
+  if (typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0) {
+    return null;
+  }
+
+  return new Intl.NumberFormat('en-AU', {
+    style: 'currency',
+    currency: 'AUD',
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
 function derivePaymentOptionForAutomation(params: {
   paymentAllowedBeforeConfirmation: boolean;
   bookingPath: string | null;
@@ -733,13 +794,13 @@ function buildOperationTimeline(result: BookingAssistantSessionResponse): Operat
     },
     {
       id: 'payment-intent',
-      title: 'Payment intent',
+      title: 'Payment',
       detail:
         paymentStatus === 'pending'
-          ? 'Payment intent is recorded and awaiting downstream checkout orchestration.'
+          ? 'Payment is recorded and a checkout link will be prepared shortly.'
           : paymentStatus
-            ? `Payment intent returned status ${paymentStatus}.`
-            : 'Payment automation has not returned a payment intent state yet.',
+            ? `Payment status: ${paymentStatus.replace(/_/g, ' ')}.`
+            : 'Payment details will appear once the booking is confirmed.',
       status:
         result.payment_status === 'stripe_checkout_ready'
           ? 'completed'
@@ -753,54 +814,68 @@ function buildOperationTimeline(result: BookingAssistantSessionResponse): Operat
       title: 'Confirmation email',
       detail:
         emailStatus === 'sent' || emailStatus === 'delivered'
-          ? 'Lifecycle confirmation email completed successfully.'
+          ? 'Confirmation email was sent successfully.'
           : emailStatus === 'queued'
-            ? 'Lifecycle email is queued or recorded for follow-up.'
+            ? 'Confirmation email is queued and will be sent shortly.'
             : result.contact_email
-              ? `Email handoff remains tied to ${result.contact_email}.`
-              : 'No email recipient was supplied for this flow.',
+              ? `Confirmation email will be sent to ${result.contact_email}.`
+              : 'No email address was provided for this booking.',
       status: deriveCommunicationLaneStatus(result.automation?.lifecycleEmail),
       reference: result.automation?.lifecycleEmail?.messageId ?? null,
     },
     {
       id: 'sms-dispatch',
-      title: 'SMS handoff',
+      title: 'SMS confirmation',
       detail:
         smsStatus === 'sent' || smsStatus === 'delivered'
           ? 'SMS confirmation was sent successfully.'
           : smsStatus === 'queued'
-            ? 'SMS was queued or recorded for operator follow-up.'
-            : 'SMS is optional and only runs when a valid phone number is supplied.',
+            ? 'SMS confirmation is queued and will be sent shortly.'
+            : 'Add a phone number to receive an SMS confirmation for this booking.',
       status: deriveCommunicationLaneStatus(result.automation?.sms),
       reference: result.automation?.sms?.messageId ?? null,
     },
     {
       id: 'whatsapp-dispatch',
-      title: 'WhatsApp handoff',
+      title: 'WhatsApp confirmation',
       detail:
         whatsappStatus === 'sent' || whatsappStatus === 'delivered'
           ? 'WhatsApp confirmation was sent successfully.'
           : whatsappStatus === 'queued'
-            ? 'WhatsApp was queued or recorded for operator follow-up.'
-            : 'WhatsApp is optional and only runs when a valid phone number is supplied.',
+            ? 'WhatsApp confirmation is queued and will be sent shortly.'
+            : 'Add a phone number to receive a WhatsApp confirmation for this booking.',
       status: deriveCommunicationLaneStatus(result.automation?.whatsapp),
       reference: result.automation?.whatsapp?.messageId ?? null,
     },
     {
       id: 'crm-sync',
-      title: 'CRM linkage',
+      title: 'Business sync',
       detail:
         crmStatus === 'completed'
-          ? 'CRM sync completed across lead, contact, deal, and task records.'
+          ? 'Your booking details have been synced with the business system.'
           : crmStatus === 'attention'
-            ? 'CRM sync needs operator review or retry attention.'
-            : 'CRM sync is still in progress or pending reconciliation.',
+            ? 'Business sync needs a review — the team has been notified.'
+            : 'Business sync will begin once your booking is confirmed.',
       status: crmStatus,
       reference:
         result.crm_sync?.deal?.external_entity_id ??
         result.crm_sync?.contact?.external_entity_id ??
         result.crm_sync?.lead?.external_entity_id ??
         null,
+    },
+    {
+      id: 'revenue-ops-agent',
+      title: 'Follow-up actions',
+      detail: result.automation?.revenueOps
+        ? `${result.automation.revenueOps.actionCount} follow-up action${result.automation.revenueOps.actionCount === 1 ? '' : 's'} queued — reminders, confirmations, and next steps will be sent.`
+        : 'Follow-up reminders and confirmations will be queued after your booking is confirmed.',
+      status:
+        result.automation?.revenueOps?.status === 'queued'
+          ? 'in_progress'
+          : result.automation?.revenueOps?.status === 'manual_review'
+            ? 'attention'
+            : 'pending',
+      reference: result.automation?.revenueOps?.actionTypes.slice(0, 2).join(', ') ?? null,
     },
   ];
 }
@@ -830,7 +905,7 @@ function buildCommunicationPreviewCards(params: {
   const calendarLine =
     result.meeting_event_url || result.calendar_add_url
       ? `Calendar link: ${result.meeting_event_url ?? result.calendar_add_url}`
-      : 'Calendar invite will be completed by the operations team.';
+      : 'A calendar invite will be sent to you once the booking is confirmed.';
 
   const cards: CommunicationPreviewCard[] = [];
 
@@ -841,8 +916,8 @@ function buildCommunicationPreviewCards(params: {
       channel: 'Email',
       tone: 'dark',
       recipient: normalizedEmail,
-      summary: 'Enterprise-format confirmation with booking reference, payment, and calendar next step.',
-      body: `Subject: Your ${serviceLabel} booking is in progress\n\nHi ${displayName},\n\nThanks for choosing ${serviceLabel}. Your booking reference is ${result.booking_reference}.\nRequested slot: ${slotLine}.\n${paymentLine}\n${calendarLine}\nPortal: ${getBookingPortalUrl(result)}\n\nBookedAI Revenue Ops`,
+      summary: 'Your booking confirmation with reference, payment status, and portal link.',
+      body: `Subject: Your ${serviceLabel} booking is confirmed\n\nHi ${displayName},\n\nThanks for choosing ${serviceLabel}. Your booking reference is ${result.booking_reference}.\nRequested slot: ${slotLine}.\n${paymentLine}\n${calendarLine}\nPortal: ${getBookingPortalUrl(result)}\n\nThe BookedAI team`,
     });
   }
 
@@ -853,16 +928,16 @@ function buildCommunicationPreviewCards(params: {
       channel: 'SMS',
       tone: 'light',
       recipient: normalizedPhone,
-      summary: 'Short-form operational reminder designed for high open rates.',
+      summary: 'A short reminder with your booking reference and portal link.',
       body: `${displayName}, your ${serviceLabel} booking ref is ${result.booking_reference}. Slot: ${slotLine}. ${paymentReadyCopy(result)} Portal: ${getBookingPortalUrl(result)}`,
     });
     cards.push({
       id: 'whatsapp',
-      title: 'WhatsApp handoff',
+      title: 'WhatsApp confirmation',
       channel: 'WhatsApp',
       tone: 'success',
       recipient: normalizedPhone,
-      summary: 'Richer channel for payment nudges, reschedule help, and concierge follow-up.',
+      summary: 'A richer channel for payment reminders, reschedule help, and follow-up questions.',
       body: `Hi ${displayName}, thanks for booking ${serviceLabel} with BookedAI.\nBooking reference: ${result.booking_reference}\nRequested slot: ${slotLine}\n${paymentLine}\nIf you need to reschedule or ask a question, reply here and our team will continue the conversation.`,
     });
   }
@@ -909,10 +984,10 @@ function buildEnterpriseJourneySteps(params: {
     },
     {
       id: 'booking',
-      title: 'Booking capture',
+      title: 'Booking confirmed',
       description: result
-        ? `Booking reference ${result.booking_reference} is stored and ready for downstream automation.`
-        : 'Contact, preferred slot, and notes will create the booking record.',
+        ? `Your booking reference ${result.booking_reference} has been created and confirmed.`
+        : 'Fill in your details and preferred time to create your booking.',
       status: result ? 'completed' : selectedService ? 'in_progress' : 'pending',
       channel: 'Booking',
     },
@@ -924,19 +999,19 @@ function buildEnterpriseJourneySteps(params: {
           ? `Confirmation email has been sent for ${customerEmail.trim().toLowerCase()}.`
           : emailLaneStatus === 'in_progress'
             ? `Confirmation email is queued for ${customerEmail.trim().toLowerCase()}.`
-            : `Email follow-up requires operator review for ${customerEmail.trim().toLowerCase()}.`
-        : 'Email remains optional until the customer provides an address.',
+            : `Confirmation email is ready for ${customerEmail.trim().toLowerCase()}.`
+        : 'Add an email address to receive a confirmation for your booking.',
       status: !hasEmail ? 'pending' : result ? emailLaneStatus : 'pending',
       channel: 'Email',
     },
     {
       id: 'calendar',
-      title: 'Calendar handoff',
+      title: 'Calendar event',
       description: calendarReady
-        ? 'Calendar action is ready for the customer and ops team.'
+        ? 'Your calendar invite is ready to add.'
         : result
-          ? 'Calendar follow-up is still required from ops.'
-          : 'Calendar event will be prepared after the booking request is created.',
+          ? 'A calendar event will be prepared by the provider.'
+          : 'A calendar event will be added after your booking is confirmed.',
       status: calendarReady ? 'completed' : result ? 'attention' : 'pending',
       channel: 'Calendar',
     },
@@ -947,21 +1022,21 @@ function buildEnterpriseJourneySteps(params: {
         ? 'Checkout link is ready for immediate payment.'
         : paymentIntentStatus
           ? paymentWarnings.length
-            ? 'Payment intent is recorded, but provider checkout still needs additive orchestration.'
-            : 'Payment intent is recorded and waiting on the next provider step.'
+            ? 'Payment is recorded. The provider will confirm the checkout link shortly.'
+            : 'Payment is ready and waiting on the next step from the provider.'
         : result
-          ? 'Payment follow-up stays under operator control before confirmation.'
-          : 'Payment step activates after the booking request is accepted.'
+          ? 'Payment will be collected once the provider confirms your booking.'
+          : 'Payment options will appear after your booking request is submitted.'
       ,
       status: paymentReady ? 'completed' : paymentIntentStatus ? 'in_progress' : result ? 'attention' : 'pending',
       channel: 'Payment',
     },
     {
       id: 'crm',
-      title: 'CRM sync',
+      title: 'Business sync',
       description: result?.crm_sync
-        ? 'Lead, contact, deal, and follow-up task sync are tracked from the booking write path.'
-        : 'CRM linkage begins once the booking intent is written.',
+        ? 'Your booking details have been synced with the business system.'
+        : 'Business sync will begin once your booking is confirmed.',
       status: result ? crmStatus : 'pending',
       channel: 'CRM',
     },
@@ -970,11 +1045,11 @@ function buildEnterpriseJourneySteps(params: {
       title: 'SMS and WhatsApp follow-up',
       description: hasPhone
         ? smsLaneStatus === 'completed' || whatsappLaneStatus === 'completed'
-          ? 'SMS and WhatsApp follow-up have usable outbound status for the same booking reference.'
+          ? 'SMS and WhatsApp confirmations have been sent to your number.'
           : smsLaneStatus === 'in_progress' || whatsappLaneStatus === 'in_progress'
-            ? 'SMS and WhatsApp are queued or prepared from the provided phone number.'
-            : 'Phone-provided follow-up can continue over SMS or WhatsApp with the same booking reference.'
-        : 'SMS and WhatsApp stay on hold until the customer shares a valid phone number.',
+            ? 'SMS and WhatsApp confirmations are being prepared for your number.'
+            : 'You will receive SMS and WhatsApp updates on the number you provided.'
+        : 'Add a phone number to receive SMS and WhatsApp updates for your booking.',
       status: !hasPhone
         ? 'pending'
         : result
@@ -990,10 +1065,10 @@ function buildEnterpriseJourneySteps(params: {
     },
     {
       id: 'thank-you',
-      title: 'Thank-you and aftercare',
+      title: 'What to do next',
       description: result
-        ? 'Thank-you state, portal access, and next-step guidance are ready immediately.'
-        : 'Thank-you and aftercare content unlock after booking submission.',
+        ? 'Your booking portal, payment link, and support details are all ready above.'
+        : 'Next steps and portal access will appear after your booking is confirmed.',
       status: result ? 'completed' : 'pending',
       channel: 'Aftercare',
     },
@@ -1013,6 +1088,15 @@ function getBookingPortalUrl(
   }
 
   return `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(result.booking_reference)}${action ? `&action=${encodeURIComponent(action)}` : ''}`;
+}
+
+function getBookingQrCodeUrl(result: BookingAssistantSessionResponse) {
+  if (result.qr_code_url?.trim()) {
+    return result.qr_code_url.trim();
+  }
+
+  const targetUrl = result.payment_url?.trim() || getBookingPortalUrl(result);
+  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(targetUrl)}`;
 }
 
 function buildBookingFlowSteps(params: {
@@ -1056,7 +1140,7 @@ function buildBookingFlowSteps(params: {
 function buildFallbackCatalog(): BookingAssistantCatalogResponse {
   return {
     status: 'fallback',
-    business_email: 'hello@bookedai.au',
+    business_email: 'info@bookedai.au',
     stripe_enabled: true,
     services: demoContent.results.map((item, index) => ({
       id: `fallback-${index + 1}`,
@@ -1581,6 +1665,7 @@ export function HomepageSearchExperience({
   const [searchQuery, setSearchQuery] = useState(initialQuery ?? '');
   const [currentQuery, setCurrentQuery] = useState(initialQuery ?? '');
   const [results, setResults] = useState<ServiceCatalogItem[]>([]);
+  const [agentChatMessages, setAgentChatMessages] = useState<AgentChatMessage[]>([]);
   const [selectedServiceId, setSelectedServiceId] = useState('');
   const [previewService, setPreviewService] = useState<ServiceCatalogItem | null>(null);
   const [assistantSummary, setAssistantSummary] = useState('');
@@ -1601,11 +1686,11 @@ export function HomepageSearchExperience({
   const [submitError, setSubmitError] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [result, setResult] = useState<BookingAssistantSessionResponse | null>(null);
+  const [thankYouReturnCountdown, setThankYouReturnCountdown] = useState(5);
   const [bookingComposerOpen, setBookingComposerOpen] = useState(false);
   const [composerCollapsed, setComposerCollapsed] = useState(false);
   const [isDesktopViewport, setIsDesktopViewport] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(false);
-  const [isBottomBarVisible, setIsBottomBarVisible] = useState(true);
   const [voiceSupported, setVoiceSupported] = useState(false);
   const [voiceListening, setVoiceListening] = useState(false);
   const [voiceError, setVoiceError] = useState('');
@@ -1613,6 +1698,7 @@ export function HomepageSearchExperience({
   const [liveReadBookingSummary, setLiveReadBookingSummary] = useState<LiveReadBookingSummary | null>(null);
   const [bookingReturnNotice, setBookingReturnNotice] = useState<BookingReturnNotice | null>(null);
   const [lastHandledRequestId, setLastHandledRequestId] = useState(0);
+  const [clarificationStepIndex, setClarificationStepIndex] = useState(0);
   const bookingPanelRef = useRef<HTMLDivElement | null>(null);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
   const customerNameInputRef = useRef<HTMLInputElement | null>(null);
@@ -1621,6 +1707,33 @@ export function HomepageSearchExperience({
   const recognitionBaseQueryRef = useRef('');
   const bookingAssistantV1SessionIdRef = useRef<string | null>(null);
   const lastScrollYRef = useRef(0);
+
+  function returnToHomepageSearch() {
+    setResult(null);
+    setBookingComposerOpen(false);
+    setComposerCollapsed(false);
+    setSelectedServiceId('');
+    setPreviewService(null);
+    setLiveReadBookingSummary(null);
+    setSubmitError('');
+    setSubmitLoading(false);
+    setSearchQuery('');
+    setCurrentQuery('');
+    setResults([]);
+    setAgentChatMessages([]);
+    setAssistantSummary('');
+    setSearchWarnings([]);
+    setCustomerName('');
+    setCustomerEmail('');
+    setCustomerPhone('');
+    setNotes('');
+    setPreferredSlot(buildDefaultPreferredSlot());
+
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', '/');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  }
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -1697,6 +1810,30 @@ export function HomepageSearchExperience({
   }, [currentQuery, result]);
 
   useEffect(() => {
+    if (!result) {
+      setThankYouReturnCountdown(5);
+      return;
+    }
+
+    setThankYouReturnCountdown(5);
+    const countdownInterval = window.setInterval(() => {
+      setThankYouReturnCountdown((current) => Math.max(0, current - 1));
+    }, 1000);
+    const returnTimer = window.setTimeout(() => {
+      returnToHomepageSearch();
+    }, 5000);
+
+    return () => {
+      window.clearInterval(countdownInterval);
+      window.clearTimeout(returnTimer);
+    };
+  }, [result?.booking_reference]);
+
+  useEffect(() => {
+    setClarificationStepIndex(0);
+  }, [currentQuery]);
+
+  useEffect(() => {
     if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') {
       return;
     }
@@ -1754,38 +1891,6 @@ export function HomepageSearchExperience({
   }, []);
 
   useEffect(() => {
-    if (!isMobileViewport || typeof window === 'undefined') {
-      setIsBottomBarVisible(true);
-      return;
-    }
-
-    lastScrollYRef.current = window.scrollY;
-    setIsBottomBarVisible(true);
-
-    const handleScroll = () => {
-      const nextScrollY = window.scrollY;
-      const delta = nextScrollY - lastScrollYRef.current;
-
-      if (nextScrollY <= 24 || delta < -8) {
-        setIsBottomBarVisible(true);
-      } else if (delta > 12 && nextScrollY > 140) {
-        setIsBottomBarVisible(false);
-      }
-
-      lastScrollYRef.current = nextScrollY;
-    };
-
-    window.addEventListener('scroll', handleScroll, { passive: true });
-    return () => window.removeEventListener('scroll', handleScroll);
-  }, [isMobileViewport]);
-
-  useEffect(() => {
-    if (isMobileViewport && (searchLoading || voiceListening || !composerCollapsed)) {
-      setIsBottomBarVisible(true);
-    }
-  }, [composerCollapsed, isMobileViewport, searchLoading, voiceListening]);
-
-  useEffect(() => {
     if (!searchLoading) {
       setSearchProgressStageIndex(0);
       setShowDelayedSearchNudge(false);
@@ -1828,6 +1933,10 @@ export function HomepageSearchExperience({
   const selectedService = useMemo(
     () => results.find((service) => service.id === selectedServiceId) ?? null,
     [results, selectedServiceId],
+  );
+  const resultById = useMemo(
+    () => new Map(results.map((service) => [service.id, service])),
+    [results],
   );
   async function handleSearchComposerKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
     if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) {
@@ -2014,10 +2123,8 @@ export function HomepageSearchExperience({
           provider: null,
           warnings: ['WhatsApp follow-up requires an international-format phone number such as +61400000000.'],
         };
-        return automation;
-      }
-
-      try {
+      } else {
+        try {
         const smsResponse = await apiV1.sendSmsMessage({
           to: phone,
           template_key: 'bookedai_booking_confirmation',
@@ -2047,7 +2154,7 @@ export function HomepageSearchExperience({
         };
       }
 
-      try {
+        try {
         const whatsappResponse = await apiV1.sendWhatsAppMessage({
           to: phone,
           template_key: 'bookedai_booking_confirmation',
@@ -2076,6 +2183,55 @@ export function HomepageSearchExperience({
           warnings: [error instanceof Error ? error.message : 'WhatsApp automation failed.'],
         };
       }
+      }
+    }
+
+    try {
+      const handoffResponse = await apiV1.queueRevenueOpsHandoff({
+        booking_reference: params.bookingReference,
+        booking_intent_id: params.bookingIntentId,
+        customer: {
+          name: params.customerName.trim(),
+          email: params.customerEmail,
+          phone: params.customerPhone,
+        },
+        service: {
+          service_id: params.selectedService.id,
+          service_name: params.selectedService.name,
+          category: params.selectedService.category,
+          venue_name: params.selectedService.venue_name,
+          location: params.selectedService.location,
+          booking_path: params.bookingPath,
+        },
+        lifecycle: {
+          requested_slot: slotLabel,
+          payment_allowed_before_confirmation: params.paymentAllowedBeforeConfirmation,
+          payment_link: params.paymentLink ?? null,
+          portal_url: params.portalUrl ?? null,
+          notes: params.notes,
+        },
+        actor_context: actorContext,
+        context: {
+          source_page: sourcePath,
+          agent_handoff: 'search_conversation_to_revenue_operations',
+        },
+      });
+
+      if ('data' in handoffResponse) {
+        automation.revenueOps = {
+          status: 'queued',
+          actionCount: handoffResponse.data.queued_actions.length,
+          actionTypes: handoffResponse.data.queued_actions.map((action: { action_type: string }) => action.action_type),
+          warnings: [],
+        };
+      }
+    } catch (error) {
+      automation.revenueOps = {
+        status: 'manual_review',
+        actionCount: 0,
+        actionTypes: [],
+        warnings: [error instanceof Error ? error.message : 'Revenue operations handoff could not be queued.'],
+      };
     }
 
     return automation;
@@ -2086,6 +2242,8 @@ export function HomepageSearchExperience({
     if (!trimmedQuery) {
       return;
     }
+
+    const clarificationDecision = shouldHoldResultsForClarification(trimmedQuery);
 
     const attachmentContext =
       attachedReferences.length > 0
@@ -2098,7 +2256,19 @@ export function HomepageSearchExperience({
             .join(', ')}.`
         : '';
     const effectiveQuery = `${trimmedQuery}${attachmentContext}`.trim();
+    const priorAgentMessages = agentChatMessages.slice(-8).map((message) => ({
+      role: message.role,
+      content: message.content,
+    }));
 
+    setAgentChatMessages((current) => [
+      ...current,
+      {
+        id: createAgentChatMessageId('user'),
+        role: 'user',
+        content: trimmedQuery,
+      },
+    ]);
     setCurrentQuery(trimmedQuery);
     setSearchLoading(true);
     setSearchError('');
@@ -2111,19 +2281,99 @@ export function HomepageSearchExperience({
     setBookingComposerOpen(false);
     setComposerCollapsed(false);
 
+    async function requestCustomerAgentTurn(nextGeoContext?: UserGeoContext | null) {
+      const response = await apiV1.createCustomerAgentTurn({
+        message: effectiveQuery,
+        conversation_id: bookingAssistantV1SessionIdRef.current,
+        messages: priorAgentMessages,
+        location: nextGeoContext?.locality ?? geoContext?.locality ?? null,
+        preferences: selectedServiceId ? { requested_service_id: selectedServiceId } : null,
+        channel_context: {
+          channel: homepageRuntimeConfig.channel ?? 'public_web',
+          tenant_ref: homepageRuntimeConfig.tenantRef ?? null,
+          deployment_mode: homepageRuntimeConfig.deploymentMode ?? 'standalone_app',
+          widget_id: homepageRuntimeConfig.widgetId ?? 'bookedai-homepage-live-read',
+        },
+        attribution: {
+          source: homepageRuntimeConfig.source ?? 'bookedai_homepage',
+          medium: homepageRuntimeConfig.medium ?? 'bookedai_owned_website',
+          campaign: homepageRuntimeConfig.campaign ?? 'bookedai_homepage_live_read',
+          keyword: trimmedQuery,
+          landing_path: sourcePath,
+        },
+        user_location: nextGeoContext
+          ? { latitude: nextGeoContext.latitude, longitude: nextGeoContext.longitude }
+          : geoContext
+            ? { latitude: geoContext.latitude, longitude: geoContext.longitude }
+            : null,
+        context: {
+          surface: homepageRuntimeConfig.surface ?? 'bookedai_homepage_search_shell',
+          attached_reference_count: attachedReferences.length,
+        },
+      });
+
+      return 'data' in response ? response.data : null;
+    }
+
+    if (clarificationDecision.hold) {
+      setSearchLoading(false);
+      setResults([]);
+      setSelectedServiceId('');
+      setSearchWarnings(['Clarification needed before ranking']);
+      const clarificationSummary =
+        clarificationDecision.needs.includes('location') && clarificationDecision.needs.includes('timing')
+          ? 'Before I rank results, add your area and preferred timing. One short detail about the type of booking will make the shortlist much stronger.'
+          : clarificationDecision.needs.includes('location')
+            ? 'Before I rank results, add your area so I can narrow the shortlist.'
+            : clarificationDecision.needs.includes('timing')
+              ? 'Before I rank results, add your preferred timing so I can narrow the shortlist.'
+              : 'Before I rank results, add one stronger detail about what you need.';
+      setAssistantSummary(clarificationSummary);
+      setAgentChatMessages((current) => [
+        ...current,
+        {
+          id: createAgentChatMessageId('assistant'),
+          role: 'assistant',
+          content: clarificationSummary,
+          suggestions: deriveIntentSuggestions(trimmedQuery).slice(0, 3),
+        },
+      ]);
+      return;
+    }
+
     try {
       let activeGeoContext = geoContext;
-      let liveRead = await getPublicBookingAssistantLiveReadRecommendation({
-        query: effectiveQuery,
-        sourcePage: sourcePath,
-        locationHint: activeGeoContext?.locality ?? null,
-        serviceCategory: null,
-        selectedServiceId: selectedServiceId || null,
-        userLocation: activeGeoContext
-          ? { latitude: activeGeoContext.latitude, longitude: activeGeoContext.longitude }
-          : null,
-        runtimeConfig: homepageRuntimeConfig,
-      });
+      let agentTurn = await requestCustomerAgentTurn(activeGeoContext);
+      let liveRead = agentTurn?.search
+        ? {
+            candidateIds: agentTurn.search.candidates.map((candidate) => candidate.candidateId),
+            rankedCandidates: agentTurn.search.candidates,
+            recommendedCandidateIds: agentTurn.search.recommendations
+              .map((recommendation) => recommendation.candidateId)
+              .filter(Boolean),
+            suggestedServiceId:
+              agentTurn.search.recommendations[0]?.candidateId ??
+              agentTurn.search.candidates[0]?.candidateId ??
+              null,
+            queryUnderstandingSummary: agentTurn.search.query_understanding,
+            semanticAssistSummary: agentTurn.search.semantic_assist,
+            warnings: agentTurn.search.warnings,
+            trustSummary: null,
+            bookingRequestSummary: agentTurn.search.booking_context?.summary ?? null,
+            bookingPathSummary: null,
+            usedLiveRead: true,
+          }
+        : await getPublicBookingAssistantLiveReadRecommendation({
+            query: effectiveQuery,
+            sourcePage: sourcePath,
+            locationHint: activeGeoContext?.locality ?? null,
+            serviceCategory: null,
+            selectedServiceId: selectedServiceId || null,
+            userLocation: activeGeoContext
+              ? { latitude: activeGeoContext.latitude, longitude: activeGeoContext.longitude }
+              : null,
+            runtimeConfig: homepageRuntimeConfig,
+          });
       if (
         liveRead.usedLiveRead &&
         !activeGeoContext &&
@@ -2132,18 +2382,38 @@ export function HomepageSearchExperience({
         const requestedGeo = await requestGeoContext();
         if (requestedGeo) {
           activeGeoContext = requestedGeo;
-          liveRead = await getPublicBookingAssistantLiveReadRecommendation({
-            query: effectiveQuery,
-            sourcePage: sourcePath,
-            locationHint: requestedGeo.locality ?? null,
-            serviceCategory: null,
-            selectedServiceId: selectedServiceId || null,
-            userLocation: {
-              latitude: requestedGeo.latitude,
-              longitude: requestedGeo.longitude,
-            },
-            runtimeConfig: homepageRuntimeConfig,
-          });
+          agentTurn = await requestCustomerAgentTurn(requestedGeo);
+          liveRead = agentTurn?.search
+            ? {
+                candidateIds: agentTurn.search.candidates.map((candidate) => candidate.candidateId),
+                rankedCandidates: agentTurn.search.candidates,
+                recommendedCandidateIds: agentTurn.search.recommendations
+                  .map((recommendation) => recommendation.candidateId)
+                  .filter(Boolean),
+                suggestedServiceId:
+                  agentTurn.search.recommendations[0]?.candidateId ??
+                  agentTurn.search.candidates[0]?.candidateId ??
+                  null,
+                queryUnderstandingSummary: agentTurn.search.query_understanding,
+                semanticAssistSummary: agentTurn.search.semantic_assist,
+                warnings: agentTurn.search.warnings,
+                trustSummary: null,
+                bookingRequestSummary: agentTurn.search.booking_context?.summary ?? null,
+                bookingPathSummary: null,
+                usedLiveRead: true,
+              }
+            : await getPublicBookingAssistantLiveReadRecommendation({
+                query: effectiveQuery,
+                sourcePage: sourcePath,
+                locationHint: requestedGeo.locality ?? null,
+                serviceCategory: null,
+                selectedServiceId: selectedServiceId || null,
+                userLocation: {
+                  latitude: requestedGeo.latitude,
+                  longitude: requestedGeo.longitude,
+                },
+                runtimeConfig: homepageRuntimeConfig,
+              });
         } else {
           setGeoHint(content.ui.geoHint);
         }
@@ -2208,29 +2478,44 @@ export function HomepageSearchExperience({
         (hasLiveReadSearchGrounding
           ? liveRead.suggestedServiceId ?? ''
           : legacyPayload?.suggested_service_id ?? '');
-      const nextAssistantSummary = hasLiveReadSearchGrounding
-        ? buildLiveReadResultsSummary({
-            rankedCount: prioritizedResults.length,
-            warnings: liveRead.warnings,
-            normalizedQuery:
-              liveRead.queryUnderstandingSummary?.normalizedQuery ??
-              liveRead.semanticAssistSummary?.normalizedQuery ??
-              trimmedQuery.toLowerCase(),
-            inferredLocation:
-              liveRead.queryUnderstandingSummary?.inferredLocation ??
-              liveRead.semanticAssistSummary?.inferredLocation ??
-              null,
-            inferredCategory: liveRead.semanticAssistSummary?.inferredCategory ?? null,
-          })
-        : legacyPayload?.reply ?? content.ui.noMatchBody;
+      const nextAssistantSummary =
+        agentTurn?.reply ||
+        (hasLiveReadSearchGrounding
+          ? buildLiveReadResultsSummary({
+              rankedCount: prioritizedResults.length,
+              warnings: liveRead.warnings,
+              normalizedQuery:
+                liveRead.queryUnderstandingSummary?.normalizedQuery ??
+                liveRead.semanticAssistSummary?.normalizedQuery ??
+                trimmedQuery.toLowerCase(),
+              inferredLocation:
+                liveRead.queryUnderstandingSummary?.inferredLocation ??
+                liveRead.semanticAssistSummary?.inferredLocation ??
+                null,
+              inferredCategory: liveRead.semanticAssistSummary?.inferredCategory ?? null,
+            })
+          : legacyPayload?.reply ?? content.ui.noMatchBody);
 
+      const nextIntentSuggestions = agentTurn?.suggestions?.length
+        ? agentTurn.suggestions.slice(0, 3)
+        : deriveIntentSuggestions(trimmedQuery).slice(0, 3);
       setResults(prioritizedResults);
       setSelectedServiceId(nextSuggestedId);
-      setAssistantSummary(
+      const agentSummary =
         prioritizedResults.length > 0 && (activeGeoContext?.locality || prioritizedResults.some((item) => isOnlineFriendlyService(item, trimmedQuery)))
           ? `${nextAssistantSummary} Prioritising nearby services and online-ready options first.`
-          : nextAssistantSummary,
-      );
+          : nextAssistantSummary;
+      setAssistantSummary(agentSummary);
+      setAgentChatMessages((current) => [
+        ...current,
+        {
+          id: createAgentChatMessageId('assistant'),
+          role: 'assistant',
+          content: agentSummary,
+          resultIds: prioritizedResults.slice(0, 3).map((item) => item.id),
+          suggestions: nextIntentSuggestions,
+        },
+      ]);
       setSearchWarnings([
         ...liveRead.warnings,
         ...(liveRead.bookingPathSummary?.warnings ?? []),
@@ -2352,7 +2637,6 @@ export function HomepageSearchExperience({
       });
 
       setComposerCollapsed(false);
-      setIsBottomBarVisible(true);
     })();
 
     event.target.value = '';
@@ -2602,8 +2886,8 @@ export function HomepageSearchExperience({
     ? selectedService.why_this_matches ||
       selectedService.next_step ||
       selectedService.summary ||
-      'This is the active match carried forward from your shortlist into the BookedAI booking flow.'
-    : 'Choose a ranked search result and BookedAI will carry that selection into the booking request.';
+      'This is the active match carried forward into booking.'
+    : 'Choose a ranked result to continue.';
   const shortcutToneClasses = [
     'public-apple-shortcut-blue hover:bg-[#eef4ff]',
     'public-apple-shortcut-green hover:bg-[#eef9ee]',
@@ -2628,7 +2912,7 @@ export function HomepageSearchExperience({
       : result
         ? {
             label: 'Booking path ready',
-            detail: `Booking reference ${result.booking_reference} is ready with follow-up and portal access.`,
+            detail: `Booking ${result.booking_reference} is ready with next steps and portal access.`,
             tone: 'border-emerald-200 bg-emerald-50 text-emerald-700',
           }
         : hasActiveQuery
@@ -2636,26 +2920,22 @@ export function HomepageSearchExperience({
               label: 'Shortlist ready',
               detail:
                 results.length > 0
-                  ? `${results.length} ranked option${results.length === 1 ? '' : 's'} ready above. Review the shortlist, then continue to booking.`
+                  ? `${results.length} ranked option${results.length === 1 ? '' : 's'} ready above. Review, then continue.`
                   : 'No strong match yet. Refine the request and search again.',
               tone: 'border-slate-900/8 bg-white/78 text-[#172033]/72',
             }
           : {
               label: 'Ready to receive',
-              detail: 'Type a natural-language enquiry below. Results will appear above in the BookedAI booking flow.',
+              detail: 'Type a natural-language request below. Results appear here.',
               tone: 'border-slate-900/8 bg-white/78 text-[#172033]/72',
             };
-  const mobileStatusLabel = searchLoading
-    ? 'Matching'
-    : result
-      ? 'Booked'
-      : 'Ready';
   const activeSearchProgressStage = SEARCH_PROGRESS_STAGES[searchProgressStageIndex] ?? SEARCH_PROGRESS_STAGES[0];
   const activeSearchPrompt = SEARCH_PROGRESS_PROMPTS[searchProgressStageIndex] ?? SEARCH_PROGRESS_PROMPTS[0];
   const followUpQuestions = useMemo(
     () => deriveFollowUpQuestions(currentQuery || searchQuery, results, uniqueWarnings),
     [currentQuery, searchQuery, results, uniqueWarnings],
   );
+  const activeClarificationQuestion = followUpQuestions[clarificationStepIndex] ?? followUpQuestions[0] ?? null;
   const noResultSuggestions = useMemo(
     () => deriveNoResultSuggestions(currentQuery || searchQuery, uniqueWarnings),
     [currentQuery, searchQuery, uniqueWarnings],
@@ -2711,6 +2991,16 @@ export function HomepageSearchExperience({
 
     commitServiceSelection(previewService, { focusNameField: true });
     setPreviewService(null);
+  }
+
+  function applyClarificationAnswer(answer: string) {
+    const nextQuery = `${searchQuery.trim()} ${answer}`.trim();
+    setSearchQuery(nextQuery);
+    setCurrentQuery(nextQuery);
+    setAssistantSummary(`Noted. ${answer}. I will continue the search with that context.`);
+    setClarificationStepIndex((current) => Math.min(current + 1, Math.max(0, followUpQuestions.length - 1)));
+    setComposerCollapsed(false);
+    void runSearch(nextQuery);
   }
 
   function handleVoiceSearch() {
@@ -2781,7 +3071,7 @@ export function HomepageSearchExperience({
     <div
       id="bookedai-search-assistant"
       ref={bookingPanelRef}
-      className={`mx-auto max-w-[1440px] ${isMobileViewport ? 'pb-28' : ''}`}
+      className="mx-auto max-w-[1440px]"
     >
       <style>
         {`
@@ -2803,9 +3093,95 @@ export function HomepageSearchExperience({
           }
         `}
       </style>
-      <div className="public-search-results-shell grid gap-5 xl:grid-cols-[minmax(0,1fr)_368px] xl:items-start">
-        <section className="min-w-0 overflow-hidden rounded-[1.75rem] border border-[#e0e6ef] bg-white shadow-[0_20px_56px_rgba(60,64,67,0.08)]">
-          <div className="px-4 py-4 sm:px-6 sm:py-6 lg:px-8 lg:py-7">
+      <div className="public-search-results-shell grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
+        <section className="min-w-0 overflow-hidden rounded-[1.6rem] border border-[#e3e3e7] bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+          <div className="px-3 py-3 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
+            <div className="mb-5 rounded-[1.35rem] border border-[#dedee3] bg-white px-3 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:px-4 sm:py-4">
+              <div
+                className={`mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[1rem] border px-3 py-2 text-xs ${workspaceStatus.tone}`}
+              >
+                <span className="font-semibold">{workspaceStatus.label}</span>
+                <span className="min-w-0 text-[11px] leading-5 opacity-80">{workspaceStatus.detail}</span>
+              </div>
+              <div className="flex items-start gap-3">
+                <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f0f0f2] text-[#111827]">
+                  <SparkIcon className="h-4 w-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b7280]">Message BookedAI</div>
+                  <textarea
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onKeyDown={handleSearchComposerKeyDown}
+                    placeholder="What service do you want to book today? Tell me area, time, or preference."
+                    rows={3}
+                    className="mt-2 min-h-[84px] w-full resize-none border-0 bg-transparent text-[15px] leading-7 text-[#111827] outline-none placeholder:text-[#8a94a6] sm:text-[1.03rem]"
+                    aria-label="Ask BookedAI"
+                  />
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#eeeeef] pt-3">
+                    <div className="flex flex-wrap gap-2">
+                      {['Service', 'Area', 'Time', 'Preference'].map((item) => (
+                        <span key={item} className="rounded-full border border-[#e3e3e7] bg-[#f7f7f8] px-3 py-1.5 text-[11px] font-medium text-[#5f6368]">
+                          {item}
+                        </span>
+                      ))}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {voiceSupported ? (
+                        <button
+                          type="button"
+                          onClick={handleVoiceSearch}
+                          className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition ${voiceListening ? 'border-[#c9c9d1] bg-[#f0f0f2] text-[#111827]' : 'border-[#dedee3] bg-white text-[#4b5563] hover:text-[#111827]'}`}
+                        >
+                          {voiceListening ? 'Listening' : 'Voice'}
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => void runSearch(searchQuery)}
+                        disabled={searchLoading || !searchQuery.trim()}
+                        aria-label="Send search"
+                        className="rounded-xl bg-[#111827] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {searchLoading ? 'Working' : 'Send'}
+                      </button>
+                    </div>
+                  </div>
+                  {voiceError ? <div className="mt-2 text-xs text-rose-600">{voiceError}</div> : null}
+                </div>
+              </div>
+            </div>
+
+            {!hasActiveQuery ? (
+              <div className="mb-5 rounded-[1.35rem] border border-[#eeeeef] bg-[#fafafa] px-4 py-4 sm:px-5 sm:py-5">
+                <div className="flex items-start gap-3">
+                  <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#111827] text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)]">
+                    <SparkIcon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b7280]">Assistant-led search</div>
+                    <div className="mt-2 text-[1.05rem] font-semibold tracking-[-0.02em] text-[#111827]">
+                      Start with what you need. I will ask for the missing signals before I rank results.
+                    </div>
+                    <p className="mt-2 max-w-[62ch] text-sm leading-6 text-[#5f6368]">
+                      This homepage is designed to turn messy service demand into a clear next step. Search starts like a conversation, then the booking path tightens as soon as area, timing, and fit are clear enough.
+                    </p>
+                    <div className="mt-4 grid gap-2 sm:grid-cols-3">
+                      {[
+                        'What service do you want?',
+                        'Which area works best?',
+                        'When do you need it?',
+                      ].map((item) => (
+                        <div key={item} className="rounded-[1rem] border border-[#eeeeef] bg-white px-3 py-3 text-sm font-medium text-[#334155]">
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
             {currentQuery ? (
               <div className="mb-4 flex flex-wrap items-center gap-2">
                 <span className="rounded-full border border-[#d2e3fc] bg-[#eef4ff] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
@@ -2814,6 +3190,75 @@ export function HomepageSearchExperience({
                 <span className="rounded-full border border-[#e5e9f0] bg-[#f8fafc] px-3 py-1 text-[10px] font-medium text-[#5f6368]">
                   {resultCountLabel}
                 </span>
+              </div>
+            ) : null}
+
+            {agentChatMessages.length > 0 ? (
+              <div className="mb-5 space-y-3">
+                {agentChatMessages.slice(-6).map((message) => {
+                  const inlineResults = (message.resultIds ?? [])
+                    .map((resultId) => resultById.get(resultId))
+                    .filter((item): item is ServiceCatalogItem => Boolean(item));
+                  return (
+                    <div
+                      key={message.id}
+                      className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                    >
+                      <div
+                        className={`max-w-[min(44rem,92%)] rounded-[1.35rem] px-4 py-3 text-sm leading-6 shadow-[0_8px_24px_rgba(60,64,67,0.05)] ${
+                          message.role === 'user'
+                            ? 'rounded-tr-[0.45rem] bg-[#111827] text-white'
+                            : 'rounded-tl-[0.45rem] border border-[#dbe7fb] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] text-[#2f3d4f]'
+                        }`}
+                      >
+                        <div>{message.content}</div>
+                        {inlineResults.length > 0 ? (
+                          <div className="mt-3 grid gap-2">
+                            {inlineResults.map((service) => (
+                              <button
+                                key={`${message.id}-${service.id}`}
+                                type="button"
+                                onClick={() => commitServiceSelection(service, { focusNameField: true })}
+                                className="rounded-[1rem] border border-[#e6edf8] bg-white px-3 py-3 text-left transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
+                              >
+                                <div className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <div className="truncate text-sm font-semibold text-[#111827]">{service.name}</div>
+                                    <div className="mt-1 line-clamp-2 text-[11px] leading-5 text-[#5f6368]">
+                                      {[service.venue_name, service.location, service.price_posture || formatCurrencyAud(service.amount_aud)]
+                                        .filter(Boolean)
+                                        .join(' • ')}
+                                    </div>
+                                  </div>
+                                  <span className="shrink-0 rounded-full bg-[#111827] px-2.5 py-1 text-[10px] font-semibold text-white">
+                                    Book
+                                  </span>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                        {message.suggestions?.length ? (
+                          <div className="mt-3 flex flex-wrap gap-2">
+                            {message.suggestions.map((item) => (
+                              <button
+                                key={`${message.id}-${item.query}`}
+                                type="button"
+                                onClick={() => {
+                                  setSearchQuery(item.query);
+                                  void runSearch(item.query);
+                                }}
+                                className="rounded-full border border-[#dbe7fb] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1a73e8] transition hover:bg-[#f8fbff]"
+                              >
+                                {item.label}
+                              </button>
+                            ))}
+                          </div>
+                        ) : null}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             ) : null}
 
@@ -2837,15 +3282,19 @@ export function HomepageSearchExperience({
             ) : null}
 
             {hasActiveQuery && assistantSummary ? (
-              <div className="mb-4 rounded-[1.1rem] border border-[#e7edf5] bg-[#fbfdff] px-4 py-3 text-sm leading-6 text-[#3c4043]">
-                <div className="mb-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">BookedAI readout</div>
-                {assistantSummary}
+              <div className="mb-5 flex items-start gap-3">
+                <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0f3d7a] text-white shadow-[0_10px_24px_rgba(15,61,122,0.18)]">
+                  <SparkIcon className="h-4 w-4" />
+                </div>
+                <div className="max-w-[48rem] rounded-[1.35rem] rounded-tl-[0.45rem] border border-[#dbe7fb] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-3 text-sm leading-6 text-[#2f3d4f] shadow-[0_8px_24px_rgba(7,27,64,0.04)]">
+                  {assistantSummary}
+                </div>
               </div>
             ) : null}
 
             <div className="space-y-3">
               {searchLoading ? (
-                <div className="rounded-[1.3rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-5 py-5 lg:px-6 lg:py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                <div className="rounded-[1.5rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-5 py-5 lg:px-6 lg:py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
                   <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
                     <span className="relative inline-flex h-2.5 w-2.5">
                       <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#1a73e8]/45" />
@@ -2855,7 +3304,7 @@ export function HomepageSearchExperience({
                   </div>
                   <p className="mt-2 text-sm leading-6 text-[#5f6368]">
                     {currentQuery
-                      ? `Searching for "${currentQuery}" while BookedAI looks for the most suitable place and booking path.`
+                      ? `Searching for "${currentQuery}" and deciding what else is needed before ranking the strongest matches.`
                       : content.ui.resultsLoadingBody}
                   </p>
                   <div className="mt-4 space-y-3">
@@ -2864,11 +3313,8 @@ export function HomepageSearchExperience({
                         <SparkIcon className="h-4 w-4" />
                       </div>
                       <div className="max-w-[44rem] rounded-[1.2rem] rounded-tl-[0.45rem] border border-[#dbe7fb] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(60,64,67,0.05)]">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                          BookedAI is refining the brief
-                        </div>
                         <p className="mt-1 text-sm leading-6 text-slate-700">
-                          I am ranking options now. If you add area, timing, or one stronger preference, I can tighten the shortlist while search is still running.
+                          I am ranking options now. Add area, timing, or one clear preference and I can sharpen the shortlist.
                         </p>
                       </div>
                     </div>
@@ -2880,9 +3326,8 @@ export function HomepageSearchExperience({
                           onClick={() => {
                             setSearchQuery((current) => `${current.trim()} ${item.suggestion}`.trim());
                             setComposerCollapsed(false);
-                            setIsBottomBarVisible(true);
                           }}
-                          className="flex w-full items-start justify-between gap-3 rounded-[1rem] border border-[#e6edf8] bg-[#fbfdff] px-3 py-3 text-left transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
+                          className="flex w-full items-start justify-between gap-3 rounded-[1.1rem] border border-[#e6edf8] bg-[#fbfdff] px-3 py-3 text-left transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
                         >
                           <div className="min-w-0">
                             <div className="text-[11px] font-semibold text-slate-950">{item.question}</div>
@@ -2901,17 +3346,15 @@ export function HomepageSearchExperience({
                     ))}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
-                    {['Checking nearby area', 'Opening live search', 'Preparing booking options'].map((label) => (
-                      <div key={label} className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-medium text-[#6d28d9]">
+                    {['Checking fit', 'Ranking options', 'Preparing next step'].map((label) => (
+                      <div key={label} className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-medium text-[#0f3d7a]">
                         {label}
                       </div>
                     ))}
                   </div>
                   {(showDelayedSearchNudge || intentSuggestions.length > 0) ? (
                     <div className="mt-4 rounded-[1.1rem] border border-[#e6edf8] bg-[#fbfdff] px-4 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                        Similar searches you can try now
-                      </div>
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">Try nearby searches</div>
                       <p className="mt-1 text-[11px] leading-5 text-slate-600">{activeSearchPrompt}</p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {intentSuggestions.slice(0, 4).map((item) => (
@@ -2934,31 +3377,47 @@ export function HomepageSearchExperience({
               ) : null}
 
               {!searchLoading && !searchError && hasActiveQuery && !result && followUpQuestions.length > 0 ? (
-                <div className="rounded-[1.3rem] border border-[#dfe8f3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-5 py-5">
+                <div className="rounded-[1.45rem] border border-[#dfe8f3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-5 py-5">
                   <div className="flex items-start gap-3">
                     <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1a73e8] text-white shadow-[0_10px_24px_rgba(26,115,232,0.16)]">
                       <SparkIcon className="h-4 w-4" />
                     </div>
                     <div className="max-w-[44rem] rounded-[1.2rem] rounded-tl-[0.45rem] border border-[#dbe7fb] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(60,64,67,0.05)]">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                        Refinement prompts
+                        Clarifying question {Math.min(clarificationStepIndex + 1, followUpQuestions.length)} / {followUpQuestions.length}
                       </div>
                       <div className="mt-1 text-sm leading-6 text-slate-700">
-                        Add one more signal and BookedAI can rank the shortlist with higher confidence.
+                        {activeClarificationQuestion?.question ?? 'Add one more signal and I can tighten the shortlist before I show the best-fit results.'}
+                      </div>
+                      <div className="mt-2 text-[11px] leading-5 text-slate-600">
+                        {activeClarificationQuestion?.suggestion}
                       </div>
                     </div>
                   </div>
-                  <div className="mt-3 ml-11 grid gap-2.5 md:grid-cols-3">
-                      {followUpQuestions.map((item) => (
+                  {activeClarificationQuestion?.quickAnswers?.length ? (
+                    <div className="mt-3 ml-11 flex flex-wrap gap-2">
+                      {activeClarificationQuestion.quickAnswers.map((answer) => (
                         <button
-                          key={item.id}
+                          key={answer}
+                          type="button"
+                          onClick={() => applyClarificationAnswer(answer)}
+                          className="rounded-full border border-slate-200 bg-white px-3.5 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] hover:text-slate-950"
+                        >
+                          {answer}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                  <div className="mt-3 ml-11 grid gap-2.5 md:grid-cols-3">
+                    {followUpQuestions.map((item) => (
+                      <button
+                        key={item.id}
                         type="button"
                         onClick={() => {
                           setSearchQuery((current) => `${current.trim()} ${item.suggestion}`.trim());
                           setComposerCollapsed(false);
-                          setIsBottomBarVisible(true);
                         }}
-                        className="rounded-[1rem] border border-slate-200 bg-white px-3.5 py-3 text-left transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
+                        className={`rounded-[1rem] border px-3.5 py-3 text-left transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] ${activeClarificationQuestion?.id === item.id ? 'border-[#cfe1ff] bg-[#f8fbff]' : 'border-slate-200 bg-white'}`}
                       >
                         <div className="text-[11px] font-semibold text-slate-950">{item.question}</div>
                         <div className="mt-1 text-[11px] leading-5 text-slate-600">{item.suggestion}</div>
@@ -2967,9 +3426,7 @@ export function HomepageSearchExperience({
                   </div>
                   {intentSuggestions.length > 0 ? (
                     <div className="mt-4 ml-11 border-t border-[#e6edf8] pt-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                        Similar intent searches
-                      </div>
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">Nearby intent</div>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {intentSuggestions.slice(0, 4).map((item) => (
                           <button
@@ -3015,13 +3472,9 @@ export function HomepageSearchExperience({
                       </p>
                       {currentQuery ? (
                         <div className="mx-auto mt-4 max-w-3xl rounded-[1.1rem] border border-[#dfe8f3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4 text-left">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                            Why ranking stayed low
-                          </div>
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">Why this is still broad</div>
                           <p className="mt-2 text-sm leading-6 text-slate-600">{noResultReason}</p>
-                          <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                            Better next searches
-                          </div>
+                          <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">Better next searches</div>
                           <div className="mt-3 flex flex-wrap gap-2">
                             {noResultSuggestions.map((item) => (
                               <button
@@ -3039,9 +3492,7 @@ export function HomepageSearchExperience({
                           </div>
                           {intentSuggestions.length > 0 ? (
                             <>
-                              <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                                Similar intent searches
-                              </div>
+                              <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">Nearby intent</div>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {intentSuggestions.slice(0, 4).map((item) => (
                                   <button
@@ -3064,17 +3515,24 @@ export function HomepageSearchExperience({
                     </div>
                   }
                   renderMeta={({ visibleCount, totalCount }) => (
-                    <div className="flex flex-wrap items-center justify-between gap-3 rounded-[1.1rem] border border-[#e8edf3] bg-[#fbfdff] px-4 py-3">
-                      <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5f6368]">
-                          {content.ui.shortlistLabel}
-                        </div>
-                        <div className="mt-1 text-base font-semibold text-[#202124]">
-                          {currentQuery ? `Best matches for "${currentQuery}"` : content.ui.resultsTitle}
-                        </div>
+                    <div className="mb-1 flex items-start gap-3 rounded-[1.25rem] border border-[#e8edf3] bg-[#fbfdff] px-4 py-4 shadow-[0_8px_22px_rgba(60,64,67,0.04)]">
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef4ff] text-[#1a73e8]">
+                        <SparkIcon className="h-4 w-4" />
                       </div>
-                      <div className="rounded-full border border-[#e5e9f0] bg-white px-3 py-1 text-[11px] text-[#5f6368]">
-                        {visibleCount} / {totalCount}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                          <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5f6368]">
+                              {content.ui.shortlistLabel}
+                            </div>
+                            <div className="mt-1 text-base font-semibold text-[#202124]">
+                              {currentQuery ? `Best matches for "${currentQuery}"` : content.ui.resultsTitle}
+                            </div>
+                          </div>
+                          <div className="rounded-full border border-[#e5e9f0] bg-white px-3 py-1 text-[11px] text-[#5f6368]">
+                            {visibleCount} / {totalCount}
+                          </div>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -3095,16 +3553,26 @@ export function HomepageSearchExperience({
                         key={service.id}
                         data-homepage-result-entry="true"
                         style={getResultEntryStyle(resultIndex)}
-                        className={`rounded-[1.4rem] border px-3 py-3 shadow-[0_12px_30px_rgba(60,64,67,0.06)] transition duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                        className={`rounded-[1.55rem] border px-3 py-3 shadow-[0_14px_32px_rgba(60,64,67,0.06)] transition duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                           isSelected
                             ? 'border-[#d2e3fc] bg-[linear-gradient(180deg,#ffffff_0%,#f6faff_100%)] shadow-[0_16px_34px_rgba(26,115,232,0.10)]'
                             : 'border-[#e8edf3] bg-white hover:border-[#d7e3f7]'
                         }`}
                       >
+                <div className="mb-3 flex items-center justify-between gap-3 px-1">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5f6368]">
+                            Option {resultIndex + 1}
+                          </div>
+                          {service.featured ? (
+                            <div className="rounded-full bg-[#f0f0f2] px-2.5 py-1 text-[10px] font-semibold text-[#111827]">
+                              Top match
+                            </div>
+                          ) : null}
+                        </div>
                         <PartnerMatchCard
                           card={card}
                           tone={isSelected ? 'selected' : 'default'}
-                          badge={service.featured ? 'Top match' : null}
+                          badge={null}
                           trailingLabel={service.category}
                           onClick={() => handleServiceSelect(service)}
                         />
@@ -3119,20 +3587,20 @@ export function HomepageSearchExperience({
                           <div className="mt-1 opacity-90">{confidencePresentation.body}</div>
                         </div>
                         <PartnerMatchActionFooter model={footer} tone={isSelected ? 'selected' : 'default'} />
-                        <div className="mt-3 flex flex-wrap items-center gap-2 px-1">
+                        <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-[#edf1f7] px-1 pt-3">
                           <button
                             type="button"
                             onClick={() => handleServiceSelect(service)}
-                            className="inline-flex items-center rounded-full border border-[#dfe1e5] bg-white px-3.5 py-2 text-[11px] font-semibold text-[#3c4043] transition hover:border-[#c6dafc] hover:text-[#202124]"
+                            className="inline-flex items-center rounded-xl border border-[#dedee3] bg-white px-3.5 py-2 text-[11px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:text-[#202124]"
                           >
-                            Review match
+                            View
                           </button>
                           <button
                             type="button"
                             onClick={() => commitServiceSelection(service, { focusNameField: true })}
-                            className="inline-flex items-center rounded-full border border-[#d2e3fc] bg-[#eef4ff] px-3.5 py-2 text-[11px] font-semibold text-[#1a73e8] transition hover:bg-[#dce9ff]"
+                            className="inline-flex items-center rounded-xl border border-[#111827] bg-[#111827] px-3.5 py-2 text-[11px] font-semibold text-white transition hover:bg-[#1f2937]"
                           >
-                            Open booking flow
+                            Book
                           </button>
                         </div>
                       </div>
@@ -3144,14 +3612,15 @@ export function HomepageSearchExperience({
           </div>
         </section>
 
-        <aside className="public-booking-sidebar min-w-0 rounded-[1.75rem] border border-[#e0e6ef] bg-[linear-gradient(180deg,#fdfefe_0%,#f6f9fe_100%)] p-4 shadow-[0_20px_56px_rgba(60,64,67,0.08)] xl:sticky xl:self-start">
-          <div className="mb-3 rounded-[1.2rem] border border-[#dbe7fb] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.95)]">
-            <div className="text-base font-semibold text-[#202124]">
-              Keep search, selection, and booking in one place.
+        <aside className="public-booking-sidebar min-w-0 rounded-[1.6rem] border border-[#e3e3e7] bg-white p-3 shadow-[0_18px_50px_rgba(15,23,42,0.06)] xl:sticky xl:self-start">
+          <div className="mb-3 hidden rounded-[1.2rem] border border-[#eeeeef] bg-[#fafafa] px-4 py-4 xl:block">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b7280]">Booking flow</div>
+            <div className="mt-2 text-base font-semibold text-[#202124]">
+              One calm path from search to booking.
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {['Search', 'Select', 'Book'].map((item) => (
-                <div key={item} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#35507a] ring-1 ring-[#e3ecf9]">
+              {['Search', 'Choose', 'Book'].map((item) => (
+                <div key={item} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#4b5563] ring-1 ring-[#e3e3e7]">
                   {item}
                 </div>
               ))}
@@ -3176,13 +3645,11 @@ export function HomepageSearchExperience({
             </div>
           </div>
 
-          <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-[0_10px_28px_rgba(60,64,67,0.05)]">
+          <div className="hidden xl:block public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-[0_8px_22px_rgba(60,64,67,0.04)]">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
-                Booking workflow
-              </div>
-              <div className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-semibold">
-                {result ? 'Handoff ready' : selectedService ? 'Booking in motion' : 'Awaiting selection'}
+              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">Progress</div>
+              <div className="rounded-full border border-[#e3e3e7] bg-white px-2.5 py-1 text-[10px] font-semibold text-[#5f6368]">
+                {result ? 'Ready' : selectedService ? 'In motion' : 'Waiting'}
               </div>
             </div>
 
@@ -3219,10 +3686,8 @@ export function HomepageSearchExperience({
             </div>
           </div>
 
-          <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-[0_10px_28px_rgba(60,64,67,0.05)]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
-              Follow-up flow
-            </div>
+          <div className="hidden xl:block public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-[0_10px_28px_rgba(60,64,67,0.05)]">
+            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">Follow-up</div>
             <div className="mt-3 space-y-2.5">
               {enterpriseJourneySteps.slice(0, 3).map((step) => (
                 <div key={step.id} className="rounded-[0.95rem] border border-slate-200 bg-white px-3 py-3">
@@ -3263,12 +3728,12 @@ export function HomepageSearchExperience({
                     {selectedServiceFlowNote}
                   </div>
                   <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
-                    Preferred path
+                    Best path
                   </div>
                 </div>
                 {currentQuery ? (
                   <div className="mt-2 inline-flex rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368] ring-1 ring-slate-900/6">
-                    Search: "{currentQuery}"
+                    Query: "{currentQuery}"
                   </div>
                 ) : null}
               </div>
@@ -3277,15 +3742,15 @@ export function HomepageSearchExperience({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                      Booking brief
+                      Brief
                     </div>
-                    <div className="mt-1 font-semibold">Confirm booking details for the selected match</div>
+                    <div className="mt-1 font-semibold">Confirm details for the selected match</div>
                     <div className="mt-1 text-xs leading-5 text-emerald-800">
-                      Capture contact details, preferred timing, and any decision-critical context. Only reopen comparison if the brief changes.
+                      Capture contact details, timing, and any decision-critical context. Reopen comparison only if the brief changes.
                     </div>
                   </div>
                   <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
-                    Match locked
+                    Locked
                   </div>
                 </div>
               </div>
@@ -3297,13 +3762,35 @@ export function HomepageSearchExperience({
                   className="public-apple-primary-button mt-3 inline-flex h-10 w-full items-center justify-center gap-2 rounded-full px-4 text-sm font-semibold lg:hidden"
                 >
                   <SparkIcon className="h-4 w-4" />
-                  {bookingComposerOpen ? 'Hide booking form' : 'Continue with this match'}
+                  {bookingComposerOpen ? 'Hide form' : 'Book this match'}
                 </button>
               ) : null}
             </div>
           ) : null}
 
-          {!result ? (
+          {!result && !selectedService ? (
+            <div className="mt-3 rounded-[1.1rem] border border-dashed border-[#d9dce3] bg-[#fbfbfc] px-4 py-5 text-center">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#111827] ring-1 ring-[#e3e3e7]">
+                <SparkIcon className="h-4 w-4" />
+              </div>
+              <div className="mt-3 text-sm font-semibold text-[#111827]">Booking form unlocks after a match is selected.</div>
+              <p className="mx-auto mt-2 max-w-[18rem] text-sm leading-6 text-[#6b7280]">
+                Keep the flow conversational first. Once a result is chosen, BookedAI carries that context into the booking brief.
+              </p>
+              <div className="mt-4 space-y-2 text-left">
+                {BOOKING_EMPTY_STEPS.map((item, index) => (
+                  <div key={item} className="flex items-center gap-3 rounded-xl border border-[#eeeeef] bg-white px-3 py-2.5">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f0f0f2] text-[11px] font-semibold text-[#4b5563]">
+                      {index + 1}
+                    </span>
+                    <span className="text-sm font-medium text-[#4b5563]">{item}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {!result && selectedService ? (
             <div
               ref={bookingFormRef}
               className={`public-apple-workspace-panel mt-3 rounded-[1.1rem] p-3.5 shadow-[0_10px_28px_rgba(60,64,67,0.05)] ${
@@ -3319,7 +3806,7 @@ export function HomepageSearchExperience({
                 </div>
                 {selectedService ? (
                   <p className="mt-2 text-sm leading-6 text-[#172033]/62">
-                    Complete the booking brief for <span className="font-semibold text-[#111827]">{selectedService.name}</span>. BookedAI will keep this selected match as the source of truth for the booking request.
+                    Complete the booking brief for <span className="font-semibold text-[#111827]">{selectedService.name}</span>. This match stays locked for the request.
                   </p>
                 ) : null}
               </div>
@@ -3393,9 +3880,11 @@ export function HomepageSearchExperience({
                 </button>
               </form>
             </div>
-          ) : (
+          ) : null}
+
+          {result ? (
             <div className="public-apple-workspace-panel mt-3 space-y-3 rounded-[1.1rem] px-3.5 py-3.5">
-              <div className="rounded-[1.1rem] bg-[linear-gradient(180deg,#8B5CF6_0%,#4F8CFF_100%)] px-4 py-4 text-white shadow-[0_14px_34px_rgba(139,92,246,0.2)]">
+              <div className="rounded-[1.2rem] bg-[linear-gradient(180deg,#5B8CFF_0%,#1A73E8_100%)] px-4 py-4 text-white shadow-[0_16px_36px_rgba(26,115,232,0.22)]">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
                     <div className="inline-flex rounded-full bg-white/18 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/92">
@@ -3411,12 +3900,15 @@ export function HomepageSearchExperience({
                       {content.ui.thankYouBody}
                     </p>
                     <p className="mt-2 text-sm leading-6 text-white/78">{result.confirmation_message}</p>
+                    <div className="mt-3 inline-flex rounded-full bg-white/14 px-3 py-1.5 text-[11px] font-semibold text-white/90 ring-1 ring-white/14">
+                      Returning to the main BookedAI screen in {thankYouReturnCountdown}s
+                    </div>
                     <div className="mt-4 rounded-[1rem] bg-white/12 px-3 py-3 ring-1 ring-white/12">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
                         Customer portal and edit flow
                       </div>
                       <p className="mt-1 text-xs leading-5 text-white/82">
-                        Scan the QR or open the portal to review booking details, edit the request, reschedule, cancel, or save this booking. The same portal link is also included in the confirmation email.
+                        Scan the QR or open the live portal to review booking details, edit the request, reschedule, cancel, or save this booking. The same portal link is included in the confirmation email and follow-up flow.
                       </p>
                       <a
                         href={getBookingPortalUrl(result)}
@@ -3440,22 +3932,16 @@ export function HomepageSearchExperience({
                       </div>
                     </div>
                   </div>
-                  {result.qr_code_url ? (
-                    <div className="rounded-[1.2rem] bg-white p-2 text-[#202124] shadow-sm">
-                      <img
-                        src={result.qr_code_url}
-                        alt={`${content.ui.qrLabel} ${result.booking_reference}`}
-                        className="h-24 w-24 rounded-[0.9rem] bg-white object-cover"
-                      />
-                      <div className="mt-2 rounded-[0.85rem] bg-[#f8f9fa] px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368]">
-                        Scan to open booking
-                      </div>
+                  <div className="rounded-[1.25rem] bg-white p-2.5 text-[#202124] shadow-sm">
+                    <img
+                      src={getBookingQrCodeUrl(result)}
+                      alt={`${content.ui.qrLabel} ${result.booking_reference}`}
+                      className="h-32 w-32 rounded-[1rem] bg-white object-cover"
+                    />
+                    <div className="mt-2 rounded-[0.85rem] bg-[#f8f9fa] px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368]">
+                      Scan to open booking
                     </div>
-                  ) : (
-                    <div className="inline-flex h-24 w-24 items-center justify-center rounded-[1.2rem] bg-white/12 text-white/90 ring-1 ring-white/10">
-                      <QrIcon className="h-8 w-8" />
-                    </div>
-                  )}
+                  </div>
                 </div>
               </div>
 
@@ -3527,7 +4013,7 @@ export function HomepageSearchExperience({
                 <div className="mt-1 text-sm font-semibold text-[#202124]">
                   {result.email_status === 'sent' ? 'Email sent' : 'Manual follow-up'}
                 </div>
-                <div className="mt-0.5 text-xs text-[#5f6368]">{result.contact_email}</div>
+                <div className="mt-0.5 text-xs text-[#5f6368]">From info@bookedai.au to {result.contact_email}</div>
                 <div className="mt-2 text-xs leading-5 text-[#5f6368]">
                   The confirmation email should include the same portal link, booking reference, payment path, and calendar action so the customer can review or edit later without losing context.
                 </div>
@@ -3675,10 +4161,7 @@ export function HomepageSearchExperience({
                 <button
                   type="button"
                   aria-label="Return home"
-                  onClick={() => {
-                    window.history.replaceState({}, '', '/');
-                    window.scrollTo({ top: 0, behavior: 'smooth' });
-                  }}
+                  onClick={returnToHomepageSearch}
                   className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
                 >
                   <HomeIcon className="h-4 w-4" />
@@ -3694,7 +4177,7 @@ export function HomepageSearchExperience({
                     : 'The booking is confirmed, email handoff is ready, and operations follow-up has already been prepared.'}
               </p>
             </div>
-          )}
+          ) : null}
         </aside>
       </div>
 

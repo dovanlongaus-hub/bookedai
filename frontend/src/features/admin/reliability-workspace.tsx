@@ -1,6 +1,7 @@
 import { Suspense, lazy } from 'react';
 
 import { ReliabilityDrilldownSection } from './reliability-drilldown-section';
+import { RevenueOpsActionLedger } from './revenue-ops-action-ledger';
 import type { AdminApiRoute, AdminConfigEntry, AdminWorkspacePanelId } from './types';
 
 const Prompt5PreviewSection = lazy(async () => {
@@ -25,6 +26,7 @@ type ReliabilityWorkspaceProps = {
   apiRoutes: AdminApiRoute[];
   apiBaseUrl: string;
   sessionToken: string;
+  selectedTenantRef?: string | null;
   onPanelNavigate: (panel: Extract<AdminWorkspacePanelId, 'prompt5-preview' | 'live-configuration' | 'api-inventory'>) => void;
 };
 
@@ -35,6 +37,7 @@ export function ReliabilityWorkspace({
   apiRoutes,
   apiBaseUrl,
   sessionToken,
+  selectedTenantRef,
   onPanelNavigate,
 }: ReliabilityWorkspaceProps) {
   const effectivePanel = activePanel ?? 'prompt5-preview';
@@ -57,6 +60,8 @@ export function ReliabilityWorkspace({
 
       <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
         <div className="space-y-6">
+          <RevenueOpsActionLedger selectedTenantRef={selectedTenantRef} />
+
           <section
             id="prompt5-preview"
             tabIndex={-1}

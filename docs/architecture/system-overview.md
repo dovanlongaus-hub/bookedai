@@ -37,11 +37,11 @@ The platform is currently designed around a single Docker host with multiple rou
 
 | Subdomain | Purpose | Runtime Target |
 |---|---|---|
-| `bookedai.au` | Homepage sales deck and registration entry surface | frontend + backend |
+| `bookedai.au` | Canonical public redirect into the pitch host | nginx redirect |
 | `beta.bookedai.au` | Beta staging surface for pre-production validation | beta-web + beta-backend |
 | `admin.bookedai.au` | Admin-facing UI | frontend |
 | `product.bookedai.au` | Live product demo and booking-agent host | frontend + backend |
-| `demo.bookedai.au` | Lightweight conversational demo landing page | frontend |
+| `demo.bookedai.au` | Canonical public web entrypoint for the BookedAI demo experience | frontend |
 | `portal.bookedai.au` | Customer booking portal and booking-detail host | frontend + backend |
 | `api.bookedai.au` | Direct API access | backend |
 | `supabase.bookedai.au` | Self-hosted Supabase gateway | Supabase Kong |

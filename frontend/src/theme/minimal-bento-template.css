@@ -1065,13 +1065,13 @@ pre {
 }
 
 .booked-brand-image--hero          { height: 2.45rem; }
-.booked-brand-image--landing-nav   { height: 2.8rem; }
+.booked-brand-image--landing-nav   { width: min(100%, 12.75rem); height: 3rem; object-fit: cover; object-position: center; }
 .booked-brand-image--hero-banner   { width: min(100%, 18rem); height: auto; max-height: 4.75rem; }
 .booked-brand-image--frameless     { filter: none; }
 .booked-brand-image--soft          { filter: none; }
-.booked-brand-image--footer        { height: 2.6rem; }
-.booked-brand-image--landing-footer { height: 3.25rem; }
-.booked-brand-image--admin         { height: 2.4rem; }
+.booked-brand-image--footer        { width: min(100%, 12rem); height: 2.8rem; object-fit: cover; object-position: center; }
+.booked-brand-image--landing-footer { width: min(100%, 13rem); height: 3.25rem; object-fit: cover; object-position: center; }
+.booked-brand-image--admin         { width: 11.5rem; height: 2.8rem; object-fit: cover; object-position: center; }
 
 .booked-brand-lockup--sm .booked-brand-image { height: 1.5rem; }
 .booked-brand-lockup--md .booked-brand-image { height: 2.15rem; }
@@ -1080,11 +1080,11 @@ pre {
 @media (min-width: 640px) {
   .booked-brand-lockup--sm .booked-brand-image { height: 1.75rem; }
   .booked-brand-image--hero          { height: 2.85rem; }
-  .booked-brand-image--landing-nav   { height: 4rem; }
+  .booked-brand-image--landing-nav   { width: min(100%, 15rem); height: 3.7rem; }
   .booked-brand-image--hero-banner   { width: min(100%, 22rem); max-height: 5.95rem; }
-  .booked-brand-image--footer        { height: 2.95rem; }
-  .booked-brand-image--landing-footer { height: 3.8rem; }
-  .booked-brand-image--admin         { height: 2.8rem; }
+  .booked-brand-image--footer        { width: min(100%, 13rem); height: 3rem; }
+  .booked-brand-image--landing-footer { width: min(100%, 15rem); height: 3.7rem; }
+  .booked-brand-image--admin         { width: 12.5rem; height: 3rem; }
 }
 
 

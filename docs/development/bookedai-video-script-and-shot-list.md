@@ -32,7 +32,7 @@ Create a polished 35 to 45 second promo video that explains BookedAI as an AI re
 - minimal clutter, strong typography
 
 ## Core message
-BookedAI turns inbound questions and service interest into structured revenue operations, from AI conversation to booking flow, CRM sync, payments, and operator visibility.
+BookedAI turns inbound questions and service interest into structured revenue operations, from AI search and conversation to booking flow, CRM sync, payments, reminders, retention actions, tenant financial summaries, and operator visibility.
 
 ---
 
@@ -40,9 +40,9 @@ BookedAI turns inbound questions and service interest into structured revenue op
 
 Service businesses do not need another disconnected tool.
 They need one revenue flow.
-BookedAI captures customer intent through AI conversation,
-turns it into bookings and follow-up,
-and gives operators visibility across CRM sync, payments, tenants, and audit.
+BookedAI captures customer intent through AI search and conversation,
+turns it into bookings, follow-up, reminders, and customer care,
+while a revenue operations agent keeps CRM sync, payments, billing, retention, and audit moving.
 BookedAI is the AI revenue engine for service businesses.
 
 ---
@@ -56,7 +56,7 @@ BookedAI is the AI revenue engine for service businesses.
 **Visual:**
 - dark gradient background with subtle motion
 - soft glassmorphism panel appears
-- abstract traces of search, calls, emails, and enquiries animate into frame
+- abstract traces of search, calls, emails, enquiries, and follow-up animate into frame
 
 **On-screen text:**
 Service businesses do not need more tools.
@@ -81,7 +81,7 @@ Service businesses do not need another disconnected tool.
 
 **Visual:**
 - transition into `output/playwright/root-desktop.png` or cropped homepage value-prop area
-- show multichannel intake idea: search, calls, emails, enquiries
+- show multichannel intake idea: search, calls, emails, enquiries, and follow-up
 - slight zoom across the page headline
 
 **On-screen text:**
@@ -110,10 +110,10 @@ They need one revenue flow.
 - if possible, simulate a typed query entering the assistant
 
 **On-screen text:**
-AI conversation captures intent.
+AI search captures intent.
 
 **Voiceover:**
-BookedAI captures customer intent through AI conversation,
+BookedAI captures customer intent through AI search and conversation,
 
 **Motion / edit notes:**
 - add subtle screen zoom
@@ -138,7 +138,7 @@ BookedAI captures customer intent through AI conversation,
 Intent becomes bookable action.
 
 **Voiceover:**
-turns it into bookings and follow-up,
+turns it into bookings, follow-up, reminders, and customer care,
 
 **Motion / edit notes:**
 - use one smooth pan across the available slots
@@ -162,7 +162,7 @@ turns it into bookings and follow-up,
 Booking confirmed.
 
 **Voiceover:**
-and gives operators visibility across CRM sync, payments, tenants, and audit.
+while a revenue operations agent keeps working.
 
 **Motion / edit notes:**
 - use a clean snap cut from Shot 4
@@ -183,10 +183,10 @@ and gives operators visibility across CRM sync, payments, tenants, and audit.
 - emphasize that one surface connects discovery and action
 
 **On-screen text:**
-From inquiry to booking flow.
+From inquiry to revenue flow.
 
 **Voiceover:**
-and gives operators visibility across CRM sync, payments, tenants, and audit.
+CRM sync, payments, reminders, and tenant actions stay in sync.
 
 **Motion / edit notes:**
 - use a controlled left-to-right pan
@@ -207,22 +207,23 @@ and gives operators visibility across CRM sync, payments, tenants, and audit.
 - if no direct admin screenshot is available, use a layered mock frame with labels:
   - CRM sync
   - payments
-  - tenants
+  - tenant billing
+  - retention
   - audit
 - animate each label in as a clean grid
 
 **On-screen text:**
-CRM sync. Payments. Tenants. Audit.
+CRM sync. Billing. Retention. Audit.
 
 **Voiceover:**
-and gives operators visibility across CRM sync, payments, tenants, and audit.
+Operators can act on leads, receivables, renewals, and customer status in time.
 
 **Motion / edit notes:**
 - this shot can be semi-abstract if admin screenshots are not ready
 - use clean tile reveals, not chaotic transitions
 
 **Asset notes:**
-- preferred future upgrade: replace with real admin dashboard, CRM status, and payment screenshots
+- preferred future upgrade: replace with real admin dashboard, CRM status, billing, and retention screenshots
 - current fallback: use branded UI montage from existing product assets
 
 ---
@@ -259,11 +260,11 @@ BookedAI is the AI revenue engine for service businesses.
 ## Primary overlays
 - Service businesses do not need more tools.
 - They need one revenue flow.
-- AI conversation captures intent.
+- AI search captures intent.
 - Intent becomes bookable action.
 - Booking confirmed.
-- From inquiry to booking flow.
-- CRM sync. Payments. Tenants. Audit.
+- From inquiry to revenue flow.
+- CRM sync. Billing. Retention. Audit.
 - AI revenue engine for service businesses.
 
 ## Overlay style notes
@@ -318,16 +319,3 @@ BookedAI is the AI revenue engine for service businesses.
 - `/workspace/bookedai.au/frontend/public/bookedai-ui-shot-1.jpg`
 - `/workspace/bookedai.au/frontend/public/bookedai-ui-shot-2.jpg`
 - `/workspace/bookedai.au/frontend/output/local-homepage-qa/homepage-desktop.png`
-- `/workspace/bookedai.au/public/branding/bookedai-logo-official.png`
-
-## Nice-to-have assets
-- real admin dashboard screenshot
-- CRM sync screenshot
-- payments view screenshot
-- tenant settings screenshot
-
----
-
-# Prompt for video generation or editing skill
-
-Create a 40-second 1080p promo video for BookedAI with a premium dark SaaS style, cyan and violet accents, glassmorphism overlays, smooth UI pans, and concise text overlays. Use a calm, confident electronic music bed. Structure the video around this flow: disconnected tools problem, one revenue flow, AI conversation capture, available times, booking confirmation, desktop workflow, operator visibility across CRM sync/payments/tenants/audit, then final brand close with the line: BookedAI, AI revenue engine for service businesses.

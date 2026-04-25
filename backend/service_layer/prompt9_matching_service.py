@@ -1296,7 +1296,7 @@ def build_booking_trust_payload(
     category_value = _string_or_none(getattr(service, "category", None))
     featured = bool(getattr(service, "featured", 0))
     if desired_date and desired_time:
-        warnings.append("Availability is estimated from catalog metadata until provider verification is connected.")
+        warnings.append("Your preferred time has been noted. The provider will confirm the final slot when your booking is reviewed.")
 
     if party_size and party_size > 6:
         warnings.append("Large party sizes should be confirmed manually before payment.")
@@ -1346,34 +1346,34 @@ def resolve_booking_path_policy(
     if availability_state == "partner_booking_only":
         return (
             "book_on_partner_site",
-            "Redirect the customer to the partner booking flow and keep Bookedai.au advisory only.",
+            "This service books directly through the provider's website. You'll be taken there to complete your booking.",
             warnings,
             False,
         )
 
     if availability_state in {"needs_manual_confirmation", "availability_unknown"}:
-        warnings.append("Manual confirmation is required before committing to a slot.")
+        warnings.append("The provider will confirm your preferred time before the booking is finalised.")
         return (
             "request_callback",
-            "Escalate to operator review or provider follow-up before taking payment.",
+            "Submit your details and preferred time. The provider will review and confirm your booking shortly.",
             warnings,
             False,
         )
 
     if party_size and party_size > 6:
-        warnings.append("Large party size should be confirmed manually.")
+        warnings.append("Large group bookings are confirmed manually to ensure capacity.")
         return (
             "request_callback",
-            "Route to a callback path so an operator can confirm capacity and policy constraints.",
+            "Submit your group details and the provider will confirm availability and pricing for your party size.",
             warnings,
             False,
         )
 
     if booking_confidence in {"low", "unverified"}:
-        warnings.append("Confidence is too weak for an instant-book commitment.")
+        warnings.append("Your booking will be reviewed and confirmed by the provider.")
         return (
             "request_callback",
-            "Collect more context or escalate to human review before committing the booking.",
+            "Submit your details and the provider will follow up to confirm your booking.",
             warnings,
             False,
         )
@@ -1381,18 +1381,18 @@ def resolve_booking_path_policy(
     if availability_state in {"available", "limited_availability", "temporarily_held"}:
         payment_allowed = payment_option in {None, "", "stripe_card", "bank_transfer", "bank_transfer_qr"}
         if not payment_allowed:
-            warnings.append("Selected payment option is not ready for immediate confirmation.")
+            warnings.append("Payment will be collected once the booking is confirmed.")
         return (
             "instant_book",
-            "Continue to confirm slot and create a payment intent.",
+            "Fill in your details below and confirm to lock in this booking.",
             warnings,
             payment_allowed,
         )
 
-    warnings.append("No safe booking path could be resolved automatically.")
+    warnings.append("The provider will review and confirm this booking with you.")
     return (
         "request_callback",
-        "Escalate to manual follow-up because the booking path is still uncertain.",
+        "Submit your details and the provider will be in touch to confirm your booking.",
         warnings,
         False,
     )

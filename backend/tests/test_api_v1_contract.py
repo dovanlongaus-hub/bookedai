@@ -121,7 +121,7 @@ def test_resolve_booking_path_returns_instant_book_contract(client):
     body = assert_success_envelope(response)
     assert body["data"]["path_type"] == "instant_book"
     assert body["data"]["payment_allowed_before_confirmation"] is True
-    assert body["data"]["next_step"] == "Continue to confirm slot and create a payment intent."
+    assert body["data"]["next_step"] == "Fill in your details below and confirm to lock in this booking."
 
 
 def test_search_candidates_returns_catalog_matches(client, monkeypatch):
@@ -302,12 +302,14 @@ def test_create_payment_intent_returns_pending_envelope(client, monkeypatch):
 
     payment_mock = AsyncMock(return_value="payment_123")
     monkeypatch.setattr(v1_routes.PaymentIntentRepository, "upsert_payment_intent", payment_mock)
+    booking_sync_mock = AsyncMock(return_value={"booking_intent_id": "booking_123"})
+    monkeypatch.setattr(v1_routes.BookingIntentRepository, "sync_callback_status", booking_sync_mock)
 
     response = client.post(
         "/api/v1/payments/intents",
         json={
             "booking_intent_id": "booking_123",
-            "selected_payment_option": "card",
+            "selected_payment_option": "invoice_after_confirmation",
             "actor_context": ACTOR_CONTEXT,
         },
     )
@@ -316,18 +318,19 @@ def test_create_payment_intent_returns_pending_envelope(client, monkeypatch):
     assert body["data"]["payment_intent_id"] == "payment_123"
     assert body["data"]["payment_status"] == "pending"
     assert body["data"]["checkout_url"] is None
-    assert body["data"]["warnings"][0].startswith("Payment intent contract is ready")
+    assert body["data"]["warnings"][0].startswith("Provider confirmation is required")
     payment_mock.assert_awaited_once_with(
         tenant_id=TENANT_ID,
         booking_intent_id="booking_123",
-        payment_option="card",
+        payment_option="invoice_after_confirmation",
         status="pending",
         amount_aud=None,
         currency="aud",
         external_session_id=None,
         payment_url=None,
-        metadata_json='{"created_by": "public_web"}',
+        metadata_json='{"created_by": "public_web", "booking_reference": "booking_123", "requested_booking_intent_id": "booking_123", "service_name": "BookedAI service"}',
     )
+    booking_sync_mock.assert_awaited_once()
 
 
 def test_send_lifecycle_email_rejects_empty_recipients(client):

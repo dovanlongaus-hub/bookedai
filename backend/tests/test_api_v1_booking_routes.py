@@ -40,6 +40,9 @@ def create_test_app() -> FastAPI:
         admin_password="test-admin-password",
         admin_session_ttl_hours=8,
         google_oauth_client_id="google-client-id",
+        stripe_secret_key="sk_test_bookedai",
+        stripe_currency="aud",
+        public_app_url="https://demo.bookedai.au",
     )
     app.state.email_service = SimpleNamespace(
         smtp_configured=lambda: False,
@@ -249,3 +252,153 @@ class Apiv1BookingRoutes(TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertIn("path_type", payload["data"])
         self.assertIn("payment_allowed_before_confirmation", payload["data"])
+
+    def test_create_payment_intent_returns_stripe_checkout_url_when_ready(self):
+        captured_phase2_calls: list[dict[str, object]] = []
+        captured_payment_calls: list[dict[str, object]] = []
+
+        class _FakePaymentSession:
+            def __init__(self):
+                self.calls = 0
+
+            async def execute(self, *_args, **_kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    return _FakeExecuteResult(
+                        {
+                            "booking_intent_id": "booking-intent-123",
+                            "booking_tenant_id": "tenant-service",
+                            "booking_reference": "v1-demo123",
+                            "service_name": "Tutor session",
+                            "service_id": "svc_tutor",
+                            "customer_email": "mia@example.com",
+                            "amount_aud": 95.0,
+                            "booking_url": "https://partner.example.com/book",
+                        }
+                    )
+                return _FakeExecuteResult()
+
+            async def commit(self):
+                return None
+
+        @asynccontextmanager
+        async def _fake_payment_session(_session_factory):
+            yield _FakePaymentSession()
+
+        async def _create_stripe_checkout(**_kwargs):
+            return {
+                "checkout_url": "https://checkout.stripe.com/pay/cs_test_123",
+                "external_session_id": "cs_test_123",
+            }
+
+        async def _upsert_payment_intent(*_args, **kwargs):
+            captured_payment_calls.append(kwargs)
+            return "payment-intent-123"
+
+        async def _sync_booking_status(*_args, **_kwargs):
+            return {"booking_intent_id": "booking-intent-123"}
+
+        async def _record_phase2_write_activity(_session, **kwargs):
+            captured_phase2_calls.append(kwargs)
+
+        with patch("api.v1_booking_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_booking_handlers.get_session",
+            _fake_payment_session,
+        ), patch(
+            "api.v1_booking_handlers._create_public_stripe_checkout_session",
+            _create_stripe_checkout,
+        ), patch(
+            "api.v1_booking_handlers.PaymentIntentRepository.upsert_payment_intent",
+            _upsert_payment_intent,
+        ), patch(
+            "api.v1_booking_handlers.BookingIntentRepository.sync_callback_status",
+            _sync_booking_status,
+        ), patch(
+            "api.v1_booking_handlers._record_phase2_write_activity",
+            _record_phase2_write_activity,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/payments/intents",
+                json={
+                    "booking_intent_id": "v1-demo123",
+                    "selected_payment_option": "stripe_card",
+                    "actor_context": {
+                        "channel": "public_web",
+                        "tenant_id": "tenant-test",
+                    },
+                },
+                headers={"origin": "https://demo.bookedai.au"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["payment_intent_id"], "payment-intent-123")
+        self.assertEqual(payload["data"]["payment_status"], "requires_action")
+        self.assertEqual(
+            payload["data"]["checkout_url"],
+            "https://checkout.stripe.com/pay/cs_test_123",
+        )
+        self.assertEqual(payload["data"]["warnings"], [])
+        self.assertEqual(captured_payment_calls[0]["tenant_id"], "tenant-service")
+        self.assertEqual(captured_payment_calls[0]["booking_intent_id"], "booking-intent-123")
+        self.assertEqual(len(captured_phase2_calls), 1)
+        self.assertEqual(captured_phase2_calls[0]["audit_event_type"], "payment_intent.created")
+
+    def test_create_payment_intent_uses_partner_checkout_url_when_available(self):
+        class _FakePaymentSession:
+            async def execute(self, *_args, **_kwargs):
+                return _FakeExecuteResult(
+                    {
+                        "booking_intent_id": "booking-intent-456",
+                        "booking_reference": "v1-demo456",
+                        "service_name": "Swim class",
+                        "service_id": "svc_swim",
+                        "customer_email": "mia@example.com",
+                        "amount_aud": 32.0,
+                        "booking_url": "https://partner.example.com/swim",
+                    }
+                )
+
+            async def commit(self):
+                return None
+
+        @asynccontextmanager
+        async def _fake_payment_session(_session_factory):
+            yield _FakePaymentSession()
+
+        async def _upsert_payment_intent(*_args, **_kwargs):
+            return "payment-intent-456"
+
+        async def _sync_booking_status(*_args, **_kwargs):
+            return {"booking_intent_id": "booking-intent-456"}
+
+        with patch("api.v1_booking_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_booking_handlers.get_session",
+            _fake_payment_session,
+        ), patch(
+            "api.v1_booking_handlers.PaymentIntentRepository.upsert_payment_intent",
+            _upsert_payment_intent,
+        ), patch(
+            "api.v1_booking_handlers.BookingIntentRepository.sync_callback_status",
+            _sync_booking_status,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/payments/intents",
+                json={
+                    "booking_intent_id": "booking-intent-456",
+                    "selected_payment_option": "partner_checkout",
+                    "actor_context": {
+                        "channel": "public_web",
+                        "tenant_id": "tenant-test",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["payment_status"], "requires_action")
+        self.assertEqual(payload["data"]["checkout_url"], "https://partner.example.com/swim")

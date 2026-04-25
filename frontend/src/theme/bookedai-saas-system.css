@@ -1,0 +1,191 @@
+:root {
+  --bookedai-saas-bg: #0B0F1A;
+  --bookedai-saas-bg-soft: #101626;
+  --bookedai-saas-surface: rgba(255, 255, 255, 0.045);
+  --bookedai-saas-surface-strong: rgba(16, 23, 38, 0.92);
+  --bookedai-saas-surface-elevated: rgba(12, 17, 29, 0.94);
+  --bookedai-saas-border: rgba(255, 255, 255, 0.1);
+  --bookedai-saas-border-strong: rgba(32, 246, 179, 0.22);
+  --bookedai-saas-text: #F6F8FC;
+  --bookedai-saas-muted: rgba(226, 232, 240, 0.72);
+  --bookedai-saas-primary: #20F6B3;
+  --bookedai-saas-secondary: #00D1FF;
+  --bookedai-saas-gradient: linear-gradient(135deg, #20F6B3 0%, #00D1FF 100%);
+  --bookedai-saas-bg-gradient:
+    radial-gradient(circle at top left, rgba(32, 246, 179, 0.08), transparent 28%),
+    radial-gradient(circle at top right, rgba(0, 209, 255, 0.08), transparent 30%),
+    linear-gradient(180deg, #0B0F1A 0%, #0E1422 100%);
+  --bookedai-saas-blur: blur(22px);
+  --bookedai-saas-shadow-card: 0 18px 65px rgba(0, 0, 0, 0.3);
+  --bookedai-saas-shadow-float: 0 24px 90px rgba(0, 0, 0, 0.36);
+  --bookedai-saas-shadow-glow: 0 0 0 1px rgba(32, 246, 179, 0.1), 0 0 40px rgba(32, 246, 179, 0.12);
+  --bookedai-saas-shadow-glow-strong: 0 0 0 1px rgba(32, 246, 179, 0.14), 0 0 60px rgba(32, 246, 179, 0.16), 0 24px 70px rgba(0, 0, 0, 0.34);
+  --bookedai-saas-transition: 180ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bookedai-saas-shell {
+  background: var(--bookedai-saas-bg-gradient);
+  color: var(--bookedai-saas-text);
+  perspective: 1600px;
+}
+
+.bookedai-saas-glass {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.055) 0%, rgba(255, 255, 255, 0.03) 100%);
+  border: 1px solid var(--bookedai-saas-border);
+  backdrop-filter: var(--bookedai-saas-blur);
+  -webkit-backdrop-filter: var(--bookedai-saas-blur);
+  box-shadow: var(--bookedai-saas-shadow-card);
+  transition:
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bookedai-saas-panel {
+  background: linear-gradient(180deg, rgba(14, 20, 34, 0.94) 0%, rgba(10, 15, 26, 0.98) 100%);
+  border: 1px solid var(--bookedai-saas-border);
+  backdrop-filter: var(--bookedai-saas-blur);
+  -webkit-backdrop-filter: var(--bookedai-saas-blur);
+  box-shadow: var(--bookedai-saas-shadow-float);
+  transition:
+    transform 420ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 260ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.bookedai-saas-card {
+  background: linear-gradient(180deg, rgba(14, 20, 34, 0.92) 0%, rgba(10, 15, 26, 0.98) 100%);
+  border: 1px solid var(--bookedai-saas-border);
+  box-shadow: var(--bookedai-saas-shadow-card);
+  transition:
+    transform var(--bookedai-saas-transition),
+    border-color var(--bookedai-saas-transition),
+    box-shadow var(--bookedai-saas-transition),
+    background var(--bookedai-saas-transition);
+}
+
+.bookedai-saas-card:hover {
+  border-color: rgba(32, 246, 179, 0.18);
+  box-shadow: var(--bookedai-saas-shadow-glow-strong), var(--bookedai-saas-shadow-card);
+}
+
+.bookedai-saas-chat-bubble {
+  border: 1px solid var(--bookedai-saas-border);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  transition:
+    transform var(--bookedai-saas-transition),
+    border-color var(--bookedai-saas-transition),
+    background var(--bookedai-saas-transition);
+}
+
+.bookedai-saas-chat-bubble-user {
+  background: linear-gradient(135deg, rgba(0, 209, 255, 0.22), rgba(32, 246, 179, 0.18));
+  border-color: rgba(0, 209, 255, 0.22);
+}
+
+.bookedai-saas-chat-bubble-assistant {
+  background: rgba(255, 255, 255, 0.045);
+}
+
+.bookedai-saas-chat-bubble-success {
+  background: linear-gradient(180deg, rgba(32, 246, 179, 0.12) 0%, rgba(13, 30, 27, 0.9) 100%);
+  border-color: rgba(32, 246, 179, 0.18);
+}
+
+.bookedai-saas-chat-bubble-warning {
+  background: linear-gradient(180deg, rgba(255, 197, 92, 0.1) 0%, rgba(32, 23, 15, 0.92) 100%);
+  border-color: rgba(251, 191, 36, 0.18);
+}
+
+.bookedai-saas-button-primary,
+.bookedai-saas-button-secondary,
+.bookedai-saas-icon-button {
+  transition:
+    transform var(--bookedai-saas-transition),
+    box-shadow var(--bookedai-saas-transition),
+    border-color var(--bookedai-saas-transition),
+    background var(--bookedai-saas-transition),
+    color var(--bookedai-saas-transition);
+}
+
+.bookedai-saas-button-primary {
+  background: var(--bookedai-saas-gradient);
+  color: #08111F;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.04), 0 12px 28px rgba(0, 209, 255, 0.16);
+}
+
+.bookedai-saas-button-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 0 0 1px rgba(32, 246, 179, 0.18), 0 0 32px rgba(32, 246, 179, 0.22), 0 12px 28px rgba(0, 209, 255, 0.16);
+}
+
+.bookedai-saas-button-secondary,
+.bookedai-saas-icon-button {
+  background: rgba(255, 255, 255, 0.045);
+  border: 1px solid var(--bookedai-saas-border);
+  color: var(--bookedai-saas-text);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.bookedai-saas-button-secondary:hover,
+.bookedai-saas-icon-button:hover {
+  border-color: rgba(32, 246, 179, 0.18);
+  box-shadow: var(--bookedai-saas-shadow-glow);
+}
+
+.bookedai-saas-focus-ring:focus-within {
+  border-color: rgba(32, 246, 179, 0.26);
+  box-shadow: 0 0 0 1px rgba(32, 246, 179, 0.18), 0 0 42px rgba(32, 246, 179, 0.14), var(--bookedai-saas-shadow-card);
+}
+
+.bookedai-cinematic-stage {
+  transform-style: preserve-3d;
+  will-change: transform;
+}
+
+.bookedai-depth-near {
+  transform: translateZ(30px);
+}
+
+.bookedai-depth-mid {
+  transform: translateZ(18px);
+}
+
+.bookedai-depth-far {
+  transform: translateZ(8px);
+}
+
+.bookedai-hover-lift {
+  transition:
+    transform 320ms cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 280ms cubic-bezier(0.16, 1, 0.3, 1),
+    border-color 220ms cubic-bezier(0.16, 1, 0.3, 1);
+  will-change: transform;
+}
+
+.bookedai-hover-lift:hover {
+  transform: translateY(-6px) scale(1.01);
+}
+
+.bookedai-glow-pulse {
+  animation: bookedai-glow-pulse 4.8s ease-in-out infinite;
+}
+
+.bookedai-ambient-line {
+  position: absolute;
+  inset: auto 8% 14% 8%;
+  height: 1px;
+  background: linear-gradient(90deg, rgba(32, 246, 179, 0), rgba(32, 246, 179, 0.24), rgba(0, 209, 255, 0.24), rgba(0, 209, 255, 0));
+  opacity: 0.45;
+  filter: blur(0.2px);
+}
+
+@keyframes bookedai-glow-pulse {
+  0%, 100% {
+    box-shadow: var(--bookedai-saas-shadow-card);
+  }
+  50% {
+    box-shadow: var(--bookedai-saas-shadow-glow), var(--bookedai-saas-shadow-card);
+  }
+}

@@ -23,6 +23,14 @@ class ServiceMatchInsight:
     score: int
 
 
+NON_DECISIVE_QUERY_TOKENS = {
+    "in", "near", "around", "at", "within", "today", "tomorrow", "tonight", "week", "weekend",
+    "morning", "afternoon", "evening", "night", "monday", "tuesday", "wednesday", "thursday",
+    "friday", "saturday", "sunday", "am", "pm", "book", "booking", "need", "want", "looking",
+    "find", "service", "services", "option", "options", "best", "good", "local", "nearby", "closest",
+}
+
+
 def recent_user_context(
     conversation: list[BookingAssistantChatMessage],
     *,
@@ -255,6 +263,16 @@ def rank_services(
     )
     explicit_location_need = query_signals.explicit_location_need
     follow_up_refinement = query_signals.follow_up_refinement
+    location_tokens = {
+        token
+        for location in query_signals.preferred_locations
+        for token in tokenize_text(location)
+    }
+    core_intent_tokens = {
+        token
+        for token in intent_tokens
+        if token not in NON_DECISIVE_QUERY_TOKENS and token not in location_tokens
+    }
     prefers_low_cost = bool(
         {"cheap", "cheapest", "budget", "re", "nhat"} & intent_tokens
         or "gia re" in query_lower
@@ -269,6 +287,7 @@ def rank_services(
         service_tags = {tag.lower() for tag in service.tags}
         category_tokens = {*CATEGORY_KEYWORDS.get(service.category, set()), *tokenize_text(service.category)}
         synonym_tokens = SERVICE_KEYWORD_SYNONYMS.get(service.id, set())
+        aligned_tokens = service_tokens | service_tags | category_tokens | synonym_tokens
 
         overlap = len(intent_tokens & service_tokens)
         exact_tag_matches = len(intent_tokens & service_tags)
@@ -286,6 +305,9 @@ def rank_services(
                 category_score += 12
             else:
                 category_score -= 12
+
+        if not detected_categories and core_intent_tokens and not (core_intent_tokens & aligned_tokens):
+            continue
 
         if service.name.lower() in query_lower:
             phrase_bonus += 18
