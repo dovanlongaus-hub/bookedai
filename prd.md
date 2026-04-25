@@ -6,6 +6,14 @@ Status: `active consolidated baseline`
 
 Latest phase-plan update: `2026-04-25`.
 
+Latest roadmap and pitch architecture update: `2026-04-25`.
+
+Latest public/product design requirement update: reviewed BookedAI tenant matches, starting with the `Co Mai Hung Chess Class` / Grandmaster Chess tenant, must remain inside the normal search-results list while exposing richer tenant capability signals. Search cards and selected-booking states must label the result as a verified BookedAI tenant and show compact capability chips for BookedAI booking, Stripe, QR payment, QR booking confirmation, calendar, email, WhatsApp Agent follow-up, and portal edit/revisit. The flow must not auto-focus booking just because a tenant match exists; booking starts only after an explicit `Book` action. Tenant-confirmed bookings must keep QR confirmation and the `portal.bookedai.au` link visible so customers can check, change, reschedule, or cancel safely after booking.
+
+Latest search-card usability update: public/product results must include a visible thumbnail or branded preview in the top-left scan position, expose a Google Maps action for each physical place, and feel progressive under slower search by showing early matches and faster staged status copy while deeper maps, booking-path, and fit checks continue. Clarification and suggested next questions remain inside the BookedAI chat thread.
+
+Latest WhatsApp customer-care update: configured WhatsApp inbound messages now run through a dedicated `BookedAI WhatsApp Booking Care Agent` for `bookedai.au`. The agent resolves returning customers against booking truth, answers all service questions related to already-booked records from the portal snapshot, and queues audited cancel or reschedule requests when the customer clearly asks to change an existing booking. Because WhatsApp Business verification is still a rollout blocker, the near-term customer channel is a personal WhatsApp QR-session bridge through Evolution API at `/api/webhooks/evolution`, supervised by the OpenClaw agent. The BookedAI WhatsApp identity is `+61455301335` with `info@bookedai.au`; cancel/reschedule requests must also confirm by email, mirror into CRM task state, and show in tenant booking dashboards. OpenClaw is the safe gateway/operator surface for this agent; the repo-owned agent manifest lives at `deploy/openclaw/agents/bookedai-whatsapp-booking-care-agent.json`, syncs into the OpenClaw runtime with `sync-openclaw-bookedai-agent`, and has a read-only `whatsapp-bot-status` check for gateway health, API health, active provider connectivity, and webhook reachability without sending customer messages. Meta/Twilio Business messaging remains the later verified provider path.
+
 The active next-phase implementation plan now lives in
 `docs/development/next-phase-implementation-plan-2026-04-25.md`.
 
@@ -20,6 +28,13 @@ The next delivery wave should be read as:
 - `Phase 21`: billing, receivables, subscription, and commission truth
 - `Phase 22`: reusable multi-tenant templates after chess and Future Swim remain stable
 - `Phase 23`: release governance, observability, rollback, and documentation sync hardening
+
+The public roadmap and pitch must present that sequence visually, not only as internal planning text. The current pitch architecture visual should explain the system as:
+
+1. customer surfaces: pitch, product, demo/widget, and portal
+2. AI agent layer: search/conversation, revenue operations, customer-care/status, and policy gates
+3. booking core: leads, matches, bookings, payments, and lifecycle action runs
+4. operations truth: tenant Ops, admin Reliability, CRM/email/webhooks, audit ledger, and release gates
 
 ## 1. Purpose
 
@@ -175,11 +190,20 @@ The public experience must convert demand into shortlist, booking, and payment m
 - the same session must support search, shortlist review, booking continuation, and confirmation
 - the UX must show professional in-progress states during matching
 - when confidence is low or context is missing, the product should ask short follow-up questions or suggest nearby query refinements
+- follow-up questions, secondary clarifications, and suggested next questions must stay inside the BookedAI chat conversation as interactive agent chips rather than appearing in a separate results-side questionnaire
+- physical-place result cards must expose a Google Maps link. If the backend supplies a specific `map_url`, use it; otherwise build a Google Maps search URL from venue name, location, and service name so the customer can inspect the found place directly.
+- every result card should reserve the top-left scan position for an image thumbnail when available, or a compact branded initials/preview fallback when no image exists
+- result cards should be able to appear in useful batches while ranking continues; progress labels should advance fast enough that slow search feels active rather than stalled
 - selecting a result should not force a detail popup or immediately jump the customer into a form; compact result actions should support provider link, detail popup, contact, phone/SMS where available, and an explicit `book this` action on one responsive row
 - the customer detail form should appear only after the customer explicitly commits to book a selected result
+- when a search returns a reviewed BookedAI tenant match, such as the chess tenant, the result must stay in the shortlist but add verified-tenant treatment: a compact `BookedAI tenant` or `Verified tenant` badge, a concise capability summary, and chips for Book, Stripe, QR payment, QR confirmation, calendar, email, WhatsApp Agent, and portal edit
+- tenant-backed results must be visually distinct from public-web fallback results, but they must not bypass the compare/review step or force focus into booking before the user asks
 - booking confirmation should expose durable booking references, a scan-ready QR code that opens `portal.bookedai.au` with the booking reference, and next-step visibility
+- tenant-confirmed bookings must show the portal QR even if the backend does not provide a QR image URL, using a generated QR to the portal link as a fallback
+- tenant confirmation copy must name payment posture clearly: Stripe checkout when ready, QR transfer/payment or manual follow-up when required, and no claim that payment is complete until the payment state says so
 - the Thank You state should remain visible long enough for the customer to act, currently `16s`, while offering compact email, calendar, portal, and continue-chat actions before returning to the main search screen
 - payment, email, SMS, WhatsApp, and CRM follow-up should run as best-effort post-booking automation without hiding customer-visible success
+- WhatsApp follow-up for tenant-confirmed bookings should be framed as a continuation of the BookedAI booking-care agent, so the customer can ask questions or request changes by replying from the phone number used during booking
 
 ### Customer-facing agent requirements
 
@@ -191,6 +215,10 @@ The customer-facing AI agent must:
 - transition smoothly between search UI and chat UI without losing context
 - preserve identity, intent, and selected service context into the booking flow
 - support customer re-entry through phone number, email, booking reference, or secure session context where appropriate
+- support WhatsApp as a returning-customer channel when configured, using booking reference as the strongest identity anchor and phone/email only when they resolve to one safe booking
+- answer WhatsApp booking, payment, support, academy/progress, cancellation, and reschedule questions from current booking/portal truth rather than from generic chat memory
+- queue cancellation or reschedule requests as auditable portal/customer-care requests when the WhatsApp message is clear, while telling the customer that the provider/team must still review the change
+- send or record an email confirmation and CRM task mirror after WhatsApp-driven cancellation or reschedule requests, then expose the request posture to tenant dashboards
 
 ### Public trust rules
 
@@ -219,6 +247,7 @@ BookedAI search must behave like a real booking engine, not a generic recommenda
 - public internet fallback may use grounded web search only after tenant retrieval fails quality gates
 - sourced public results must not be treated as tenant-trusted catalog truth
 - search loading states should explain progress, invite missing context when useful, and keep useful interim results visible instead of leaving the customer waiting on a blank search state
+- search result presentation must prioritize direct inspection: thumbnail/preview, Google Maps, provider/source, detail popup, and booking action should be reachable without losing the chat context
 
 ### Search agent scope
 

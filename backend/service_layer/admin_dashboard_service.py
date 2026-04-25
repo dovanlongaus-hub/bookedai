@@ -81,7 +81,8 @@ async def build_admin_portal_support_queue(
             ) r on true
             where a.event_type in (
               'portal.reschedule_request.requested',
-              'portal.cancel_request.requested'
+              'portal.cancel_request.requested',
+              'portal.support_request.requested'
             )
             order by a.created_at desc, a.id desc
             limit :limit
@@ -227,7 +228,8 @@ async def apply_admin_portal_support_action(
             where id = :request_id
               and event_type in (
                 'portal.reschedule_request.requested',
-                'portal.cancel_request.requested'
+                'portal.cancel_request.requested',
+                'portal.support_request.requested'
               )
             limit 1
             """

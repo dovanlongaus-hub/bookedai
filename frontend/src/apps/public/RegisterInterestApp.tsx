@@ -311,6 +311,10 @@ export function RegisterInterestApp() {
   const googleCalendarUrl = result ? buildGoogleCalendarUrl(result) : null;
   const icsDownloadUrl = result ? buildIcsDownloadUrl(result) : null;
 
+  useEffect(() => {
+    document.title = 'Register Interest | BookedAI SME Setup';
+  }, []);
+
   function updateFormState<K extends keyof ConsultationFormState>(
     key: K,
     value: ConsultationFormState[K],
@@ -799,6 +803,8 @@ export function RegisterInterestApp() {
                     value={formState.businessName}
                     onChange={(event) => updateFormState('businessName', event.target.value)}
                     placeholder="Your company or venue"
+                    required
+                    minLength={2}
                     className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                 </label>
@@ -810,6 +816,7 @@ export function RegisterInterestApp() {
                     value={businessWebsite}
                     onChange={(event) => setBusinessWebsite(event.target.value)}
                     placeholder="https://yourbusiness.com.au"
+                    required
                     className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                 </label>
@@ -821,6 +828,8 @@ export function RegisterInterestApp() {
                     value={formState.businessType}
                     onChange={(event) => updateFormState('businessType', event.target.value)}
                     placeholder="Salon, clinic, tutoring, trades, hospitality..."
+                    required
+                    minLength={2}
                     className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                   <datalist id="register-interest-business-types">
@@ -837,6 +846,7 @@ export function RegisterInterestApp() {
                     value={formState.customerEmail}
                     onChange={(event) => updateFormState('customerEmail', event.target.value)}
                     placeholder="you@business.com.au"
+                    required
                     className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                 </label>
@@ -848,6 +858,8 @@ export function RegisterInterestApp() {
                     value={formState.customerPhone}
                     onChange={(event) => updateFormState('customerPhone', event.target.value)}
                     placeholder="+61 ..."
+                    required
+                    minLength={8}
                     className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                 </label>
@@ -859,6 +871,8 @@ export function RegisterInterestApp() {
                     value={formState.customerName}
                     onChange={(event) => updateFormState('customerName', event.target.value)}
                     placeholder="How should we address you?"
+                    required
+                    minLength={2}
                     className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                 </label>
@@ -883,6 +897,7 @@ export function RegisterInterestApp() {
                     type="datetime-local"
                     value={formState.preferredSlot}
                     onChange={(event) => updateFormState('preferredSlot', event.target.value)}
+                    required
                     className="booked-field rounded-2xl px-4 py-3 text-sm"
                   />
                 </label>

@@ -20,7 +20,11 @@ import {
 import { brandPreferredLogoPath } from '../../components/landing/data';
 import { BrandLockup } from '../../components/landing/ui/BrandLockup';
 import { apiV1 } from '../../shared/api/v1';
-import type { PortalBookingAction, PortalBookingDetailResponse } from '../../shared/contracts';
+import type {
+  PortalBookingAction,
+  PortalBookingDetailResponse,
+  PortalCustomerCareTurnResponse,
+} from '../../shared/contracts';
 
 type PortalLoadState =
   | { status: 'idle' }
@@ -244,6 +248,10 @@ export function PortalApp() {
   const [requestMessage, setRequestMessage] = useState<string | null>(null);
   const [requestError, setRequestError] = useState<string | null>(null);
   const [submittingRequest, setSubmittingRequest] = useState(false);
+  const [careQuestion, setCareQuestion] = useState('');
+  const [careTurn, setCareTurn] = useState<PortalCustomerCareTurnResponse | null>(null);
+  const [careError, setCareError] = useState<string | null>(null);
+  const [careLoading, setCareLoading] = useState(false);
   const [loadState, setLoadState] = useState<PortalLoadState>(
     initialReference ? { status: 'loading', bookingReference: initialReference } : { status: 'idle' },
   );
@@ -308,6 +316,8 @@ export function PortalApp() {
       setRequestMode(null);
       setRequestMessage(null);
       setRequestError(null);
+      setCareTurn(null);
+      setCareError(null);
       setLoadState({
         status: 'ready',
         bookingReference: normalizedReference,
@@ -381,6 +391,34 @@ export function PortalApp() {
       );
     } finally {
       setSubmittingRequest(false);
+    }
+  }
+
+  async function handleCustomerCareSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!detail || !careQuestion.trim()) {
+      return;
+    }
+
+    setCareLoading(true);
+    setCareError(null);
+    try {
+      const envelope = await apiV1.createPortalCustomerCareTurn(
+        detail.booking.booking_reference,
+        {
+          message: careQuestion.trim(),
+          customer_email: detail.customer.email ?? null,
+          customer_phone: detail.customer.phone ?? null,
+        },
+      );
+      if (envelope.status !== 'ok') {
+        return;
+      }
+      setCareTurn(envelope.data);
+    } catch (error) {
+      setCareError(error instanceof Error ? error.message : 'The customer-care agent could not answer right now.');
+    } finally {
+      setCareLoading(false);
     }
   }
 
@@ -680,6 +718,63 @@ export function PortalApp() {
                   <div className={`mx-5 mb-5 rounded-[1rem] border px-4 py-4 sm:mx-6 sm:mb-6 ${statusSummaryClasses(detail.status_summary.tone)}`}>
                     <div className="text-sm font-semibold">{detail.status_summary.title}</div>
                     <div className="mt-1 text-sm leading-6 opacity-90">{detail.status_summary.body}</div>
+                  </div>
+
+                  <div className="mx-5 mb-5 rounded-[1.25rem] border border-sky-200 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4 sm:mx-6 sm:mb-6">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                      <Sparkles className="h-4 w-4" />
+                      Customer-care status agent
+                    </div>
+                    <form onSubmit={handleCustomerCareSubmit} className="mt-3 flex flex-col gap-2 sm:flex-row">
+                      <input
+                        value={careQuestion}
+                        onChange={(event) => setCareQuestion(event.target.value)}
+                        placeholder="Ask about payment, reschedule, class progress, pause, or support..."
+                        className="min-h-11 flex-1 rounded-full border border-slate-200 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-[#0f62fe]"
+                      />
+                      <button
+                        type="submit"
+                        disabled={careLoading || !careQuestion.trim()}
+                        className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#0f62fe] bg-[#0f62fe] px-5 text-sm font-semibold text-white transition hover:bg-[#0b57e3] disabled:cursor-not-allowed disabled:opacity-55"
+                      >
+                        {careLoading ? 'Checking...' : 'Ask'}
+                      </button>
+                    </form>
+                    {careError ? (
+                      <div className="mt-3 rounded-[1rem] border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">
+                        {careError}
+                      </div>
+                    ) : null}
+                    {careTurn ? (
+                      <div className="mt-3 rounded-[1rem] border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500">
+                          <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">
+                            {careTurn.phase.replace(/_/g, ' ')}
+                          </span>
+                          <span className="rounded-full border border-slate-200 bg-white px-2.5 py-1">
+                            {Number(careTurn.operations.summary.total ?? 0)} ops action(s)
+                          </span>
+                          {careTurn.academy?.report_available ? (
+                            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-emerald-700">
+                              report context
+                            </span>
+                          ) : null}
+                        </div>
+                        <p className="mt-3 text-sm leading-6 text-slate-700">{careTurn.reply}</p>
+                        {careTurn.created_request ? (
+                          <div className="mt-3 rounded-[0.85rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
+                            {careTurn.created_request.message ?? 'A support request has been queued for manual review.'}
+                          </div>
+                        ) : null}
+                        <div className="mt-3 flex flex-wrap gap-2">
+                          {careTurn.next_actions.filter((action) => action.enabled).slice(0, 4).map((action) => (
+                            <span key={action.id ?? action.label} className="rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-600">
+                              {action.label}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ) : null}
                   </div>
 
                   {viewMode === 'edit' ? (

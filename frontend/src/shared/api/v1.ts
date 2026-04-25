@@ -46,6 +46,8 @@ import type {
   PortalBookingActionRequest,
   PortalBookingActionResponse,
   PortalBookingDetailResponse,
+  PortalCustomerCareTurnRequest,
+  PortalCustomerCareTurnResponse,
   ReplayOutboxEventRequest,
   ReplayOutboxEventResponse,
   ResolveBookingPathRequest,
@@ -87,6 +89,8 @@ import type {
   TenantIntegrationProviderUpdateRequest,
   TenantLeadsResponse,
   TenantOnboardingResponse,
+  TenantOperationsDispatchRequest,
+  TenantOperationsDispatchResponse,
   TenantOverviewResponse,
   TenantRevenueMetrics,
   TenantTeamResponse,
@@ -1288,6 +1292,27 @@ export async function updateTenantIntegrationProvider(
   );
 }
 
+export async function dispatchTenantOperationsAutomation(
+  request: TenantOperationsDispatchRequest,
+  params: {
+    tenantRef?: string | null;
+    sessionToken: string;
+  },
+) {
+  const query = params.tenantRef ? `?tenant_ref=${encodeURIComponent(params.tenantRef)}` : '';
+  const headers = new Headers();
+  headers.set('Authorization', `Bearer ${params.sessionToken}`);
+  return requestV1Envelope<TenantOperationsDispatchResponse>(
+    `/v1/tenant/operations/dispatch${query}`,
+    withJsonBody(
+      {
+        limit: request.limit ?? 10,
+      },
+      { method: 'POST', headers },
+    ),
+  );
+}
+
 export async function getTenantBilling(tenantRef?: string | null, sessionToken?: string | null) {
   const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
   const headers = new Headers();
@@ -1318,6 +1343,16 @@ export async function getTenantTeam(tenantRef?: string | null, sessionToken?: st
 export async function getPortalBookingDetail(bookingReference: string) {
   return requestV1Envelope<PortalBookingDetailResponse>(
     `/v1/portal/bookings/${encodeURIComponent(bookingReference)}`,
+  );
+}
+
+export async function createPortalCustomerCareTurn(
+  bookingReference: string,
+  request: PortalCustomerCareTurnRequest,
+) {
+  return requestV1Envelope<PortalCustomerCareTurnResponse>(
+    `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/care-turn`,
+    withJsonBody(request, { method: 'POST' }),
   );
 }
 
@@ -1706,10 +1741,12 @@ export const apiV1 = {
   getTenantIntegrations,
   getTenantPluginInterface,
   updateTenantIntegrationProvider,
+  dispatchTenantOperationsAutomation,
   getTenantOnboarding,
   getTenantTeam,
   getTenantOverview,
   getPortalBookingDetail,
+  createPortalCustomerCareTurn,
   requestPortalBookingReschedule,
   requestPortalBookingCancellation,
   requestPortalBookingPause,

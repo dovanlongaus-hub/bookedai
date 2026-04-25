@@ -134,6 +134,7 @@ During implementation:
 - preserve already-approved branding, logo, motion, and primitive inheritance unless the sprint explicitly carries an approved replacement
 - preserve previously approved locality or trust gates for assistant and recommendation flows unless the sprint explicitly carries an approved replacement
 - preserve previously approved query-grounded search rules, so the system does not auto-fill customer answers with unrelated stored data, mixed domains, or out-of-scope fallback rows
+- preserve the verified-tenant search contract when tenant-backed results are touched: reviewed tenants stay in the normal shortlist, show compact tenant capability chips, require explicit `Book`, and keep QR/portal/Stripe/email/calendar/WhatsApp continuation visible after confirmation
 - land the sprint's promised runner additions early enough that feature work can use them before closeout
 - when a later-sprint bug or logic gap is discovered, assign it into the correct later sprint artifact immediately instead of leaving it as a loose note
 

@@ -5,6 +5,10 @@ from urllib.parse import quote, urlencode
 import httpx
 from fastapi import Request
 
+from core.logging import get_logger
+
+_logger = get_logger("bookedai.api.v1_booking_handlers")
+
 from api.v1_routes import (
     AppError,
     BookingIntentRepository,
@@ -37,6 +41,34 @@ from api.v1_routes import (
     text,
     uuid4,
 )
+
+
+def _build_booking_confirmation_whatsapp_text(
+    *,
+    customer_name: str | None,
+    service_name: str | None,
+    requested_date: str | None,
+    requested_time: str | None,
+    timezone: str | None,
+    booking_reference: str,
+) -> str:
+    name_line = f"Hi {customer_name}," if customer_name else "Hi,"
+    parts = [
+        f"✅ Booking confirmed!\n",
+        f"{name_line} your booking request has been received.",
+        f"\n\U0001f4cb Reference: {booking_reference}",
+    ]
+    if service_name:
+        parts.append(f"\U0001f3f7️ Service: {service_name}")
+    slot = " ".join(p for p in [requested_date or "", requested_time or ""] if p)
+    if slot:
+        parts.append(f"\U0001f4c5 Date: {slot}")
+    if timezone:
+        parts.append(f"\U0001f30f Timezone: {timezone}")
+    parts.append(
+        "\n\nReply here anytime for help with your booking — status, changes, payment, or anything else. We're here!"
+    )
+    return "\n".join(parts)
 
 
 def _normalize_text(value: object | None) -> str | None:
@@ -388,6 +420,64 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                 idempotency_key=f"booking-intent:{booking_intent_id}" if booking_intent_id else None,
             )
             await session.commit()
+
+        if normalized_phone and hasattr(request.app.state, "communication_service"):
+            try:
+                from schemas import TawkMessage
+                from services import store_event
+                confirmation_text = _build_booking_confirmation_whatsapp_text(
+                    customer_name=payload.contact.full_name,
+                    service_name=service.name if service else None,
+                    requested_date=payload.desired_slot.date if payload.desired_slot else None,
+                    requested_time=payload.desired_slot.time if payload.desired_slot else None,
+                    timezone=payload.desired_slot.timezone if payload.desired_slot else None,
+                    booking_reference=booking_reference,
+                )
+                await request.app.state.communication_service.send_whatsapp(
+                    to=normalized_phone,
+                    body=confirmation_text,
+                )
+                confirmation_message = TawkMessage(
+                    conversation_id=normalized_phone,
+                    text=confirmation_text,
+                    sender_name="BookedAI",
+                    sender_phone=normalized_phone,
+                    metadata={"channel": "whatsapp", "direction": "outbound", "event_type": "booking_confirmation"},
+                )
+                async with get_session(request.app.state.session_factory) as confirm_session:
+                    await store_event(
+                        confirm_session,
+                        source="whatsapp",
+                        event_type="whatsapp_booking_confirmation",
+                        message=confirmation_message,
+                        ai_intent="booking_confirmation",
+                        ai_reply=None,
+                        workflow_status="sent",
+                        metadata={
+                            "channel": "whatsapp",
+                            "direction": "outbound",
+                            "booking_reference": booking_reference,
+                            "tenant_id": str(effective_tenant_id or ""),
+                            "service_name": service.name if service else None,
+                        },
+                    )
+            except Exception as exc:
+                _logger.warning(
+                    "whatsapp_booking_confirmation_failed",
+                    extra={
+                        "event_type": "whatsapp_booking_confirmation_failed",
+                        "tenant_id": str(effective_tenant_id or ""),
+                        "status": 0,
+                        "route": "/api/v1/booking/intent",
+                        "request_id": "",
+                        "integration_name": "whatsapp",
+                        "conversation_id": normalized_phone,
+                        "booking_reference": booking_reference,
+                        "job_name": "",
+                        "job_id": "",
+                    },
+                    exc_info=exc,
+                )
 
         availability_state, verified, recommended_path, warnings, payment_allowed_now, booking_confidence = (
             build_booking_trust_payload(

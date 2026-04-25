@@ -90,6 +90,7 @@ from service_layer.prompt11_integration_service import (
 from service_layer.tenant_app_service import (
     build_tenant_invoice_receipt,
     build_portal_booking_snapshot,
+    build_portal_customer_care_turn,
     queue_portal_booking_request,
     build_tenant_billing_snapshot,
     build_tenant_catalog_snapshot,

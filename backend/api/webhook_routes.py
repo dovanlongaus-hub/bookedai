@@ -23,6 +23,11 @@ router.add_api_route(
     methods=["POST"],
 )
 router.add_api_route(
+    "/webhooks/evolution",
+    handlers.evolution_webhook,
+    methods=["POST"],
+)
+router.add_api_route(
     "/automation/booking-callback",
     handlers.booking_callback,
     methods=["POST"],

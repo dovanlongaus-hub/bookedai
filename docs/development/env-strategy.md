@@ -105,6 +105,35 @@ Admin sign-in expectations now are:
   - `python3 scripts/zoho_crm_connect.py exchange-code ... --write-env`
   - `python3 scripts/zoho_crm_connect.py test-connection --module Leads`
 
+## WhatsApp customer-care runtime
+
+The current approved WhatsApp customer-care sender identity is:
+
+- `WHATSAPP_PROVIDER=meta` for the direct WhatsApp Cloud API primary provider path
+- `WHATSAPP_FALLBACK_PROVIDER=twilio` to keep Twilio available as the backup transport
+- `WHATSAPP_FROM_NUMBER=+61455301335` for the BookedAI main customer-facing WhatsApp number
+- `EMAIL_SMTP_FROM=info@bookedai.au` and `EMAIL_SMTP_USERNAME=info@bookedai.au` for the matching customer email confirmation identity
+
+Required provider credentials depend on the selected provider:
+
+- Twilio path:
+  - `WHATSAPP_TWILIO_ACCOUNT_SID`
+  - `WHATSAPP_TWILIO_AUTH_TOKEN` or the API key pair `WHATSAPP_TWILIO_API_KEY_SID` and `WHATSAPP_TWILIO_API_KEY_SECRET`
+- Meta path:
+  - `WHATSAPP_META_PHONE_NUMBER_ID`
+  - `WHATSAPP_META_ACCESS_TOKEN`
+- inbound verification:
+  - `WHATSAPP_VERIFY_TOKEN`
+
+Runtime behavior:
+
+- booking confirmation WhatsApp messages should include the booking reference, portal manage link, and instruction that the customer can reply on WhatsApp for questions, reschedule, or cancellation review
+- inbound provider webhooks should target `/api/webhooks/whatsapp`
+- inbound WhatsApp replies should be treated as the dedicated `BookedAI WhatsApp Booking Care Agent` for `bookedai.au`, answering all service questions tied to already-booked records from booking/portal truth
+- clear WhatsApp cancel/reschedule requests are queued as audited portal/customer-care requests, then confirmed by email, mirrored into CRM task state, and exposed in tenant booking dashboards
+- OpenClaw remains the safe gateway/operator and deployment supervision surface; the customer-facing WhatsApp bot is the backend webhook plus WhatsApp provider adapter
+- OpenClaw/Telegram operators can run `python3 scripts/telegram_workspace_ops.py whatsapp-bot-status` as a read-only readiness check for gateway health, API health, provider status, and webhook route reachability
+
 ## Telegram/OpenClaw operator authorization
 
 The current approved Telegram operator authorization variables are:
@@ -126,6 +155,7 @@ Current elevated action vocabulary:
 - `repo_structure`
 - `host_command`
 - `host_shell`
+- `whatsapp_bot_status`
 - `sync_doc`
 - `sync_repo_docs`
 - `full_project`
@@ -133,6 +163,8 @@ Current elevated action vocabulary:
 Use `host_command` when the trusted Telegram operator should be able to run the checked-in allowlist of host-maintenance binaries such as `apt-get`, `docker`, `systemctl`, `journalctl`, `service`, `timedatectl`, or `ufw` through `python3 scripts/telegram_workspace_ops.py host-command --command "..."`.
 
 Use `host_shell` when the trusted Telegram operator should be able to run fully elevated host shell commands from any server path through `python3 scripts/telegram_workspace_ops.py host-shell --cwd / --command "..."`.
+
+Use `whatsapp_bot_status` when the trusted Telegram/OpenClaw operator should be able to run the read-only WhatsApp customer-care readiness check without receiving broader host shell authority.
 
 Use `full_project` when the trusted Telegram operator should be able to test, refactor file structure, update any project area, run approved host commands, run full host shell commands, and deploy the result across the whole BookedAI repo and server.
 

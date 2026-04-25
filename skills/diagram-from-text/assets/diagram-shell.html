@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Diagram Shell</title>
+  <style>
+    :root {
+      --bg: #08111f;
+      --panel: #101b2d;
+      --text: #eef4ff;
+      --muted: #9db0cf;
+      --accent: #6ee7ff;
+      --accent2: #8b5cf6;
+      --line: rgba(255,255,255,0.12);
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, Arial, sans-serif;
+      background: radial-gradient(circle at top, #12213b 0%, var(--bg) 55%);
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px;
+    }
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      display: grid;
+      gap: 24px;
+    }
+    .header h1 { margin: 0 0 8px; font-size: 44px; }
+    .header p { margin: 0; color: var(--muted); font-size: 18px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 16px;
+    }
+    .card {
+      background: linear-gradient(180deg, rgba(255,255,255,0.06), rgba(255,255,255,0.03));
+      border: 1px solid var(--line);
+      border-radius: 20px;
+      padding: 20px;
+      min-height: 180px;
+    }
+    .kicker { color: var(--accent); font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
+    .title { font-size: 24px; margin: 10px 0; }
+    .body { color: var(--muted); line-height: 1.5; }
+    .footer { color: var(--muted); font-size: 14px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="header">
+      <h1>Diagram title</h1>
+      <p>Short explanation of the visual or process.</p>
+    </div>
+    <div class="grid">
+      <section class="card"><div class="kicker">Step 1</div><div class="title">Input</div><div class="body">Replace with your first node or chart block.</div></section>
+      <section class="card"><div class="kicker">Step 2</div><div class="title">Process</div><div class="body">Replace with the main transform or relationship.</div></section>
+      <section class="card"><div class="kicker">Step 3</div><div class="title">Outcome</div><div class="body">Replace with the output, result, or decision.</div></section>
+    </div>
+    <div class="footer">Edit this shell into a flow, KPI board, comparison chart, or storyboard frame.</div>
+  </div>
+</body>
+</html>

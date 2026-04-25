@@ -50,7 +50,7 @@ from service_layer.catalog_quality_service import (
 )
 from service_layer.email_service import EmailService
 from service_layer.demo_workflow_service import submit_demo_brief, sync_demo_booking_from_brief
-from service_layer.event_store import store_event
+from service_layer.event_store import purge_expired_whatsapp_conversations, store_event
 from service_layer.followup_copy import (
     build_booking_customer_confirmation_text,
     build_booking_internal_notification_text,
@@ -184,6 +184,7 @@ __all__ = [
     "save_uploaded_file",
     "seed_crm_sync_for_lead",
     "sync_callback_status_to_mirrors",
+    "purge_expired_whatsapp_conversations",
     "store_event",
     "submit_demo_brief",
     "sync_demo_booking_from_brief",

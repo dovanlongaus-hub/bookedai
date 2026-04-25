@@ -18,7 +18,11 @@ import {
   getResultConfidencePresentation,
 } from '../../shared/runtime/publicAssistantRuntime';
 import {
+  BOOKEDAI_TENANT_CAPABILITY_CHIPS,
+  buildBookedAiTenantCapabilitySummary,
+  buildGoogleMapsSearchUrl,
   buildPartnerMatchActionFooterModelFromServiceItem,
+  isBookedAiChessTenantService,
   type BookingReadyServiceItem,
 } from '../../shared/presenters/partnerMatch';
 import { PartnerMatchShortlist } from '../../shared/components/PartnerMatchShortlist';
@@ -168,6 +172,8 @@ type HomepageSearchExperienceProps = {
   sourcePath: string;
   initialQuery: string | null;
   initialQueryRequestId: number;
+  experimentVariant?: 'control' | 'product_first';
+  onHomepageEvent?: (eventName: string, payload?: Record<string, unknown>) => void;
 };
 
 type LiveReadBookingSummary = {
@@ -185,28 +191,28 @@ type BookingReturnNotice = {
 
 const SEARCH_PROGRESS_STAGES = [
   {
-    label: 'Understanding the request',
-    detail: 'Cleaning the search intent, service type, and timing before ranking options.',
+    label: 'Reading your request',
+    detail: 'I am checking the service, location, and timing signals before ranking options.',
   },
   {
-    label: 'Checking location and fit',
-    detail: 'Balancing suburb hints, online-ready options, and likely availability signals.',
+    label: 'Finding places and providers',
+    detail: 'Early matches can appear while I keep checking location and booking paths.',
   },
   {
-    label: 'Scoring the shortlist',
-    detail: 'Ranking stronger matches first so the first options are worth reviewing.',
+    label: 'Showing the shortlist',
+    detail: 'I will keep the screen on results so you can scroll, compare, and ask follow-up questions.',
   },
   {
-    label: 'Getting your results ready',
-    detail: 'Keeping the top match ready so you can continue straight into booking.',
+    label: 'Checking next actions',
+    detail: 'Maps, details, contact, and booking actions are being attached to the best matches.',
   },
 ] as const;
 
 const SEARCH_PROGRESS_PROMPTS = [
-  'Best next input: add suburb or area, for example Surry Hills or near Chatswood.',
-  'Best next input: add a preferred day or time window, for example Saturday morning.',
-  'Best next input: add the person, age, or context, for example for a 7-year-old beginner.',
-  'Best next input: add a budget or preference, for example premium, fastest, or closest.',
+  'You can keep chatting while I search: add a suburb, landmark, or "near me".',
+  'Add a preferred day or time window if timing matters.',
+  'Add who this is for, for example age, level, goal, or group size.',
+  'Ask me to compare by closest, fastest, price, or best reviewed.',
 ] as const;
 const BOOKING_EMPTY_STEPS = [
   'Send a booking request',
@@ -543,6 +549,15 @@ function LinkIcon({ className = 'h-5 w-5' }: { className?: string }) {
   );
 }
 
+function MapPinIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
+      <path d="M12 21s7-5.2 7-11a7 7 0 1 0-14 0c0 5.8 7 11 7 11Z" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="10" r="2.25" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
 function InfoIcon({ className = 'h-5 w-5' }: { className?: string }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
@@ -824,9 +839,9 @@ function getServiceInitials(service: ServiceCatalogItem) {
 
 function buildSearchResultFacts(service: ServiceCatalogItem, confidenceLabel: string) {
   return [
-    service.price_posture || formatCurrencyAud(service.amount_aud),
-    service.duration_minutes ? `${service.duration_minutes} min` : null,
-    service.location || service.venue_name,
+    service.price_posture || formatCurrencyAud(service.amount_aud) || 'Price not listed',
+    service.duration_minutes ? `${service.duration_minutes} min` : 'Duration TBD',
+    service.location || service.venue_name || 'Location TBD',
     confidenceLabel,
   ].filter((item): item is string => Boolean(item)).slice(0, 4);
 }
@@ -1505,9 +1520,43 @@ function prioritizeSearchResults(
 function uniqueCandidateServices(
   rankedCandidates: MatchCandidate[],
   legacyMatches: ServiceCatalogItem[],
-  _catalog: BookingAssistantCatalogResponse | null,
+  catalog: BookingAssistantCatalogResponse | null,
 ) {
-  const v1Matches = rankedCandidates.map((candidate) => toServiceCatalogItem(candidate));
+  const catalogById = new Map((catalog?.services ?? []).map((service) => [service.id, service]));
+  const v1Matches = rankedCandidates.map((candidate) => {
+    const match = toServiceCatalogItem(candidate);
+    const catalogMatch = catalogById.get(match.id);
+    if (!catalogMatch) {
+      return match;
+    }
+
+    return {
+      ...catalogMatch,
+      ...match,
+      category: match.category || catalogMatch.category,
+      summary: match.summary || catalogMatch.summary,
+      duration_minutes: match.duration_minutes && match.duration_minutes !== 30
+        ? match.duration_minutes
+        : catalogMatch.duration_minutes,
+      amount_aud: match.amount_aud > 0 ? match.amount_aud : catalogMatch.amount_aud,
+      image_url: match.image_url || catalogMatch.image_url,
+      map_snapshot_url: match.map_snapshot_url || catalogMatch.map_snapshot_url,
+      venue_name: match.venue_name || catalogMatch.venue_name,
+      location: match.location || catalogMatch.location,
+      map_url: match.map_url || catalogMatch.map_url,
+      booking_url: match.booking_url || catalogMatch.booking_url,
+      contact_phone: match.contact_phone || catalogMatch.contact_phone,
+      source_url: match.source_url || catalogMatch.source_url,
+      tags: match.tags.length ? match.tags : catalogMatch.tags,
+      featured: match.featured || catalogMatch.featured,
+      price_posture: match.price_posture || catalogMatch.price_posture,
+      booking_path_type: match.booking_path_type || catalogMatch.booking_path_type,
+      next_step: match.next_step || catalogMatch.next_step,
+      availability_state: match.availability_state || catalogMatch.availability_state,
+      booking_confidence: match.booking_confidence || catalogMatch.booking_confidence,
+      trust_signal: match.trust_signal || catalogMatch.trust_signal,
+    };
+  });
   const merged = [...v1Matches, ...legacyMatches];
   const normalized = merged.map<ServiceCatalogItem>((item) => ({
     id: item.id,
@@ -1727,6 +1776,8 @@ export function HomepageSearchExperience({
   sourcePath,
   initialQuery,
   initialQueryRequestId,
+  experimentVariant = 'control',
+  onHomepageEvent,
 }: HomepageSearchExperienceProps) {
   const isLiveReadMode = isPublicBookingAssistantV1LiveReadEnabled();
   const homepageRuntimeConfig = useMemo(() => createBookedAiHomepageRuntimeConfig(), []);
@@ -1774,6 +1825,17 @@ export function HomepageSearchExperience({
   const recognitionBaseQueryRef = useRef('');
   const bookingAssistantV1SessionIdRef = useRef<string | null>(null);
   const announcedBookingReferenceRef = useRef<string | null>(null);
+
+  function trackHomepageSearchEvent(eventName: string, payload: Record<string, unknown> = {}) {
+    onHomepageEvent?.(eventName, {
+      variant: experimentVariant,
+      surface: 'homepage_search',
+      query: currentQuery || searchQuery || null,
+      selected_service_id: selectedServiceId || null,
+      result_count: results.length,
+      ...payload,
+    });
+  }
 
   function returnToHomepageSearch() {
     setResult(null);
@@ -1949,12 +2011,12 @@ export function HomepageSearchExperience({
     const startedAt = Date.now();
     const interval = window.setInterval(() => {
       const elapsedMs = Date.now() - startedAt;
-      const nextIndex = Math.min(SEARCH_PROGRESS_STAGES.length - 1, Math.floor(elapsedMs / 1500));
+      const nextIndex = Math.min(SEARCH_PROGRESS_STAGES.length - 1, Math.floor(elapsedMs / 800));
       setSearchProgressStageIndex(nextIndex);
-    }, 300);
+    }, 180);
     const delayedNudgeTimer = window.setTimeout(() => {
       setShowDelayedSearchNudge(true);
-    }, 4200);
+    }, 2600);
 
     return () => {
       window.clearInterval(interval);
@@ -2298,6 +2360,12 @@ export function HomepageSearchExperience({
       return;
     }
 
+    trackHomepageSearchEvent('homepage_search_started', {
+      query: trimmedQuery,
+      query_length: trimmedQuery.length,
+      attachment_count: attachedReferences.length,
+      live_read_mode: isLiveReadMode,
+    });
     const clarificationDecision = shouldHoldResultsForClarification(trimmedQuery);
 
     const attachmentContext =
@@ -2347,6 +2415,11 @@ export function HomepageSearchExperience({
       ).slice(0, 3);
 
       if (initialResults.length > 0) {
+        trackHomepageSearchEvent('homepage_top_research_visible', {
+          query: trimmedQuery,
+          result_count: initialResults.length,
+          mode: 'initial_catalog',
+        });
         setResults(initialResults);
         setSelectedServiceId('');
         setAssistantSummary('I am showing the first likely matches while live ranking, location, and booking-path checks continue.');
@@ -2620,6 +2693,14 @@ export function HomepageSearchExperience({
           suggestions: nextIntentSuggestions,
         },
       ]);
+      if (prioritizedResults.length > 0) {
+        trackHomepageSearchEvent('homepage_top_research_visible', {
+          query: trimmedQuery,
+          result_count: prioritizedResults.slice(0, 3).length,
+          total_result_count: prioritizedResults.length,
+          mode: isLiveReadAuthoritative ? 'live_read' : 'legacy',
+        });
+      }
       setSearchWarnings([
         ...liveRead.warnings,
         ...(liveRead.bookingPathSummary?.warnings ?? []),
@@ -2650,6 +2731,10 @@ export function HomepageSearchExperience({
         setComposerCollapsed(true);
       }
     } catch (error) {
+      trackHomepageSearchEvent('homepage_search_failed', {
+        query: trimmedQuery,
+        message: error instanceof Error ? error.message : 'Unable to search services right now.',
+      });
       setSearchError(error instanceof Error ? error.message : 'Unable to search services right now.');
       setResults([]);
       setSelectedServiceId('');
@@ -2735,6 +2820,10 @@ export function HomepageSearchExperience({
         });
         return next;
       });
+      trackHomepageSearchEvent('homepage_attachment_added', {
+        attachment_count: mapped.length,
+        attachment_kinds: mapped.map((item) => item.kind),
+      });
 
       setComposerCollapsed(false);
     })();
@@ -2776,6 +2865,13 @@ export function HomepageSearchExperience({
     const normalizedCustomerEmail = customerEmail.trim() ? customerEmail.trim().toLowerCase() : null;
     const normalizedCustomerPhone = customerPhone.trim() || null;
     const normalizedNotes = notes.trim() || null;
+    trackHomepageSearchEvent('homepage_booking_submitted', {
+      service_id: selectedService.id,
+      service_name: selectedService.name,
+      booking_path: liveReadBookingSummary?.bookingPath ?? selectedService.booking_path_type ?? null,
+      has_email: Boolean(normalizedCustomerEmail),
+      has_phone: Boolean(normalizedCustomerPhone),
+    });
 
     try {
       const finalizeAuthoritativeBookingIntent = async () => {
@@ -2924,6 +3020,10 @@ export function HomepageSearchExperience({
   const resultCountLabel =
     results.length === 1 ? '1 ranked option' : `${results.length} ranked options`;
   const hasActiveQuery = Boolean(currentQuery.trim());
+  const hasAssistantChatReply = agentChatMessages.some((message) => message.role === 'assistant');
+  const hasChatInlineResults = agentChatMessages.some(
+    (message) => message.role === 'assistant' && (message.resultIds?.length ?? 0) > 0,
+  );
   const bookingOutcomeSteps = result ? buildBookingOutcomeSteps(result) : [];
   const enterpriseJourneySteps = useMemo(
     () =>
@@ -3026,6 +3126,36 @@ export function HomepageSearchExperience({
     result,
     submitLoading,
   });
+  const customerFlowSteps = [
+    {
+      label: 'Ask',
+      detail: currentQuery ? 'Request received' : 'Tell me what you need',
+      state: currentQuery || result ? 'complete' : 'active',
+    },
+    {
+      label: 'Match',
+      detail: results.length > 0 ? `${results.length} option${results.length === 1 ? '' : 's'} ready` : 'Rank the best fit',
+      state: result || selectedService ? 'complete' : results.length > 0 || searchLoading ? 'active' : 'pending',
+    },
+    {
+      label: 'Book',
+      detail: selectedService ? 'Booking brief ready' : 'Choose one match',
+      state: result ? 'complete' : selectedService ? 'active' : 'pending',
+    },
+    {
+      label: 'Confirm',
+      detail: result ? result.booking_reference : 'Portal and follow-up',
+      state: result ? 'active' : 'pending',
+    },
+  ] as const;
+  const previewGoogleMapsUrl = previewService
+    ? buildGoogleMapsSearchUrl({
+        mapUrl: previewService.map_url,
+        venueName: previewService.venue_name,
+        location: previewService.location,
+        serviceName: previewService.name,
+      })
+    : null;
 
   function focusBookingNameField() {
     window.setTimeout(() => {
@@ -3036,6 +3166,19 @@ export function HomepageSearchExperience({
   }
 
   function commitServiceSelection(service: ServiceCatalogItem, options?: { openBooking?: boolean; focusNameField?: boolean }) {
+    trackHomepageSearchEvent('homepage_result_selected', {
+      service_id: service.id,
+      service_name: service.name,
+      open_booking: Boolean(options?.openBooking),
+      booking_path: liveReadBookingSummary?.bookingPath ?? service.booking_path_type ?? null,
+    });
+    if (options?.openBooking) {
+      trackHomepageSearchEvent('homepage_booking_started', {
+        service_id: service.id,
+        service_name: service.name,
+        booking_path: liveReadBookingSummary?.bookingPath ?? service.booking_path_type ?? null,
+      });
+    }
     setSelectedServiceId(service.id);
     setResult(null);
     setSubmitError('');
@@ -3048,6 +3191,14 @@ export function HomepageSearchExperience({
 
   function handleServiceSelect(service: ServiceCatalogItem) {
     commitServiceSelection(service);
+  }
+
+  function openServicePreview(service: ServiceCatalogItem) {
+    trackHomepageSearchEvent('homepage_result_details_opened', {
+      service_id: service.id,
+      service_name: service.name,
+    });
+    setPreviewService(service);
   }
 
   function handlePreviewBook() {
@@ -3152,70 +3303,52 @@ export function HomepageSearchExperience({
       <div className="public-search-results-shell grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
         <section className="min-w-0 overflow-hidden rounded-[1.75rem] border border-[#e5e7eb] bg-[#f8fafc] shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
           <div className="px-3 py-3 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
-            <div className="mb-5 rounded-[1.5rem] border border-[#e5e7eb] bg-white px-3 py-3 shadow-[0_14px_40px_rgba(15,23,42,0.07)] sm:px-4 sm:py-4">
-              <div
-                className={`mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[1rem] border px-3 py-2 text-xs ${workspaceStatus.tone}`}
-              >
-                <span className="font-semibold">{workspaceStatus.label}</span>
-                <span className="min-w-0 text-[11px] leading-5 opacity-80">{workspaceStatus.detail}</span>
-              </div>
-              <div className="flex items-start gap-3">
-                <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#111827] text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]">
-                  <SparkIcon className="h-4 w-4" />
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
+            <div className="overflow-hidden rounded-[1.55rem] border border-[#e5e7eb] bg-white shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
+              <div className="border-b border-[#eef2f7] bg-[#fbfdff] px-3 py-3 sm:px-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#111827] text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]">
+                      <SparkIcon className="h-4 w-4" />
+                    </div>
+                    <div className="min-w-0">
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b7280]">Message BookedAI</div>
-                      <div className="mt-1 text-sm font-medium text-[#111827]">Search, clarify, compare, then book when ready.</div>
-                    </div>
-                    <div className="hidden rounded-full border border-[#e5e7eb] bg-[#f8fafc] px-3 py-1 text-[11px] font-semibold text-[#4b5563] sm:block">
-                      Chat mode
+                      <div className="mt-1 text-sm font-medium text-[#111827]">Search, compare, open details, then book in one thread.</div>
                     </div>
                   </div>
-                  <textarea
-                    ref={searchComposerRef}
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    onKeyDown={handleSearchComposerKeyDown}
-                    placeholder="What service do you want to book today? Tell me area, time, or preference."
-                    rows={2}
-                    className="mt-3 min-h-[76px] w-full resize-none rounded-[1.25rem] border border-[#e5e7eb] bg-[#f8fafc] px-4 py-3 text-[15px] leading-7 text-[#111827] outline-none transition placeholder:text-[#8a94a6] focus:border-[#cbd5e1] focus:bg-white focus:shadow-[0_0_0_4px_rgba(148,163,184,0.12)] sm:text-[1.03rem]"
-                    aria-label="Ask BookedAI"
-                  />
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-                    <div className="flex flex-wrap gap-2">
-                      {['Service', 'Area', 'Time', 'Preference'].map((item) => (
-                        <span key={item} className="rounded-full border border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5 text-[11px] font-medium text-[#5f6368]">
-                          {item}
-                        </span>
-                      ))}
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {voiceSupported ? (
-                        <button
-                          type="button"
-                          onClick={handleVoiceSearch}
-                          className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition ${voiceListening ? 'border-[#c9c9d1] bg-[#f0f0f2] text-[#111827]' : 'border-[#e5e7eb] bg-white text-[#4b5563] hover:border-[#cbd5e1] hover:text-[#111827]'}`}
-                        >
-                          {voiceListening ? 'Listening' : 'Voice'}
-                        </button>
-                      ) : null}
-                      <button
-                        type="button"
-                        onClick={() => void runSearch(searchQuery)}
-                        disabled={searchLoading || !searchQuery.trim()}
-                        aria-label="Send search"
-                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#111827] px-5 text-sm font-semibold text-white transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <ArrowRightIcon className="h-4 w-4" />
-                        {searchLoading ? 'Working' : 'Send'}
-                      </button>
-                    </div>
+                  <div className={`max-w-full rounded-full border px-3 py-1.5 text-[11px] font-semibold ${workspaceStatus.tone}`}>
+                    {workspaceStatus.label}
                   </div>
-                  {voiceError ? <div className="mt-2 text-xs text-rose-600">{voiceError}</div> : null}
                 </div>
+                <p className="mt-2 text-[11px] leading-5 text-[#64748b]">{workspaceStatus.detail}</p>
               </div>
+              <div className="max-h-[min(68vh,50rem)] space-y-4 overflow-y-auto px-3 py-4 sm:px-4 lg:px-5">
+
+            <div className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              {customerFlowSteps.map((step, index) => {
+                const tone =
+                  step.state === 'complete'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : step.state === 'active'
+                      ? 'border-[#cfe1ff] bg-[#eef4ff] text-[#1a73e8]'
+                      : 'border-[#e5e7eb] bg-white text-[#64748b]';
+                const dot =
+                  step.state === 'complete'
+                    ? 'bg-emerald-500'
+                    : step.state === 'active'
+                      ? 'bg-[#1a73e8]'
+                      : 'bg-slate-300';
+                return (
+                  <div key={step.label} className={`rounded-[1.1rem] border px-3 py-3 ${tone}`}>
+                    <div className="flex items-center gap-2">
+                      <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
+                      <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">
+                        0{index + 1} {step.label}
+                      </span>
+                    </div>
+                    <div className="mt-2 text-sm font-semibold leading-5">{step.detail}</div>
+                  </div>
+                );
+              })}
             </div>
 
             {!hasActiveQuery ? (
@@ -3265,60 +3398,218 @@ export function HomepageSearchExperience({
                   const inlineResults = (message.resultIds ?? [])
                     .map((resultId) => resultById.get(resultId))
                     .filter((item): item is ServiceCatalogItem => Boolean(item));
+                  const hasInlineResults = inlineResults.length > 0;
                   return (
                     <div
                       key={message.id}
                       className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`max-w-[min(44rem,92%)] rounded-[1.35rem] px-4 py-3 text-sm leading-6 shadow-[0_8px_24px_rgba(60,64,67,0.05)] ${
+                        className={`${hasInlineResults ? 'max-w-[min(56rem,94%)]' : 'max-w-[min(44rem,92%)]'} rounded-[1.35rem] px-4 py-3 text-sm leading-6 shadow-[0_8px_24px_rgba(60,64,67,0.05)] ${
                           message.role === 'user'
                             ? 'rounded-tr-[0.45rem] bg-[#111827] text-white'
                             : 'rounded-tl-[0.45rem] border border-[#dbe7fb] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] text-[#2f3d4f]'
                         }`}
                       >
+                        {message.role === 'assistant' ? (
+                          <div className="mb-2 flex flex-wrap items-center gap-2">
+                            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8] ring-1 ring-[#dbe7fb]">
+                              BookedAI answer
+                            </span>
+                            {hasInlineResults ? (
+                              <span className="rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-100">
+                                Live search result
+                              </span>
+                            ) : null}
+                          </div>
+                        ) : null}
                         <div>{message.content}</div>
                         {inlineResults.length > 0 ? (
-                          <div className="mt-3 grid gap-2">
-                            {inlineResults.map((service) => (
-                              <button
+                          <div className="mt-3 grid gap-2.5">
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-[0.95rem] border border-[#e6edf8] bg-white/78 px-3 py-2">
+                              <div>
+                                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">Top research</div>
+                                <div className="mt-0.5 text-[11px] leading-5 text-[#64748b]">
+                                  Review the best {inlineResults.length} option{inlineResults.length === 1 ? '' : 's'} in chat, then open details or book.
+                                </div>
+                              </div>
+                              <span className="rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold text-[#475569] ring-1 ring-[#e5e7eb]">
+                                {inlineResults.length} shown
+                              </span>
+                            </div>
+                            {inlineResults.map((service) => {
+                              const resultIndex = Math.max(0, results.findIndex((item) => item.id === service.id));
+                              const confidencePresentation = getResultConfidencePresentation(service);
+                              const resultFacts = buildSearchResultFacts(service, confidencePresentation.label);
+                              const isBookedAiTenantMatch = isBookedAiChessTenantService(service);
+                              const googleMapsUrl = buildGoogleMapsSearchUrl({
+                                mapUrl: service.map_url,
+                                venueName: service.venue_name,
+                                location: service.location,
+                                serviceName: service.name,
+                              });
+                              const providerUrl = service.source_url || service.booking_url || null;
+                              const phoneHref = service.contact_phone
+                                ? `tel:${service.contact_phone.replace(/[^\d+]/g, '')}`
+                                : null;
+                              const mailHref = `mailto:${catalog?.business_email ?? 'info@bookedai.au'}?subject=${encodeURIComponent(`Booking enquiry: ${service.name}`)}`;
+                              const bookingNote =
+                                service.why_this_matches ||
+                                service.next_step ||
+                                service.summary ||
+                                'Ready to carry into booking once you confirm the fit.';
+                              return (
+                              <article
                                 key={`${message.id}-${service.id}`}
-                                type="button"
-                                onClick={() => commitServiceSelection(service)}
-                                className="rounded-[1rem] border border-[#e6edf8] bg-white px-3 py-3 text-left transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
+                                className="rounded-[1rem] border border-[#e6edf8] bg-white px-3 py-3 text-left shadow-[0_8px_22px_rgba(60,64,67,0.04)]"
                               >
-                                <div className="flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    <div className="truncate text-sm font-semibold text-[#111827]">{service.name}</div>
-                                    <div className="mt-1 line-clamp-2 text-[11px] leading-5 text-[#5f6368]">
-                                      {[service.venue_name, service.location, service.price_posture || formatCurrencyAud(service.amount_aud)]
-                                        .filter(Boolean)
-                                        .join(' • ')}
-                                    </div>
-                                  </div>
-                                  <span className="shrink-0 rounded-full bg-[#111827] px-2.5 py-1 text-[10px] font-semibold text-white">
-                                    Select
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="rounded-full bg-[#f8fafc] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#64748b] ring-1 ring-[#e5e7eb]">
+                                    Option {resultIndex + 1}
+                                  </span>
+                                  {service.featured ? (
+                                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-700">
+                                      Top match
+                                    </span>
+                                  ) : null}
+                                  {isBookedAiTenantMatch ? (
+                                    <span className="rounded-full bg-[#ecfdf5] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-800 ring-1 ring-emerald-200">
+                                      BookedAI tenant
+                                    </span>
+                                  ) : null}
+                                  <span className="rounded-full bg-[#eef4ff] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#1a73e8]">
+                                    {service.category}
                                   </span>
                                 </div>
-                              </button>
-                            ))}
+                                <div className="mt-2 flex items-start justify-between gap-3">
+                                  <div className="min-w-0 flex-1">
+                                    <button
+                                      type="button"
+                                      onClick={() => commitServiceSelection(service)}
+                                      className="block max-w-full text-left text-sm font-semibold leading-5 text-[#111827] transition hover:text-[#1a73e8]"
+                                    >
+                                      <span className="line-clamp-2">{service.name}</span>
+                                    </button>
+                                    <div className="mt-1 line-clamp-1 text-[11px] font-medium leading-5 text-[#64748b]">
+                                      {[service.venue_name, service.location || service.source_label].filter(Boolean).join(' • ') || 'BookedAI matched option'}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {resultFacts.map((item) => (
+                                    <span
+                                      key={`${message.id}-${service.id}-${item}`}
+                                      className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                                        item === confidencePresentation.label
+                                          ? confidencePresentation.tone === 'tenant'
+                                            ? 'bg-emerald-50 text-emerald-800'
+                                            : 'bg-amber-50 text-amber-800'
+                                          : 'bg-[#f8fafc] text-[#475569] ring-1 ring-[#e5e7eb]'
+                                      }`}
+                                    >
+                                      {item}
+                                    </span>
+                                  ))}
+                                </div>
+                                <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-[#475569]">
+                                  {bookingNote}
+                                </p>
+                                <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 border-t border-[#edf1f7] pt-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => openServicePreview(service)}
+                                    aria-label={`View details for ${service.name}`}
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                  >
+                                    <InfoIcon className="h-3.5 w-3.5" />
+                                    Details
+                                  </button>
+                                  {googleMapsUrl ? (
+                                    <a
+                                      href={googleMapsUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      aria-label={`Open Google Maps location for ${service.name}`}
+                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                    >
+                                      <MapPinIcon className="h-3.5 w-3.5" />
+                                      Maps
+                                    </a>
+                                  ) : null}
+                                  {providerUrl ? (
+                                    <a
+                                      href={providerUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      aria-label={`Open provider website for ${service.name}`}
+                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                    >
+                                      <LinkIcon className="h-3.5 w-3.5" />
+                                      Provider
+                                    </a>
+                                  ) : null}
+                                  {phoneHref ? (
+                                    <a
+                                      href={phoneHref}
+                                      aria-label={`Call ${service.name}`}
+                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                    >
+                                      <PhoneIcon className="h-3.5 w-3.5" />
+                                      Call
+                                    </a>
+                                  ) : null}
+                                  <a
+                                    href={mailHref}
+                                    aria-label={`Email BookedAI about ${service.name}`}
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                  >
+                                    <MailIcon className="h-3.5 w-3.5" />
+                                    Mail
+                                  </a>
+                                  <button
+                                    type="button"
+                                    onClick={() => commitServiceSelection(service)}
+                                    aria-label={`Select ${service.name}`}
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                  >
+                                    <CheckIcon className="h-3.5 w-3.5" />
+                                    Select
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => commitServiceSelection(service, { openBooking: true, focusNameField: true })}
+                                    aria-label={`Book ${service.name}`}
+                                    className="inline-flex h-8 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg border border-[#111827] bg-[#111827] px-3 text-[10px] font-semibold text-white transition hover:bg-[#1f2937]"
+                                  >
+                                    <SparkIcon className="h-3.5 w-3.5" />
+                                    Book
+                                  </button>
+                                </div>
+                              </article>
+                              );
+                            })}
                           </div>
                         ) : null}
                         {message.suggestions?.length ? (
-                          <div className="mt-3 flex flex-wrap gap-2">
-                            {message.suggestions.map((item) => (
-                              <button
-                                key={`${message.id}-${item.query}`}
-                                type="button"
-                                onClick={() => {
-                                  setSearchQuery(item.query);
-                                  void runSearch(item.query);
-                                }}
-                                className="rounded-full border border-[#dbe7fb] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1a73e8] transition hover:bg-[#f8fbff]"
-                              >
-                                {item.label}
-                              </button>
-                            ))}
+                          <div className="mt-3 rounded-[1rem] border border-[#e6edf8] bg-white/70 px-3 py-3">
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#64748b]">
+                              Suggested chat refinements
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-2">
+                              {message.suggestions.map((item) => (
+                                <button
+                                  key={`${message.id}-${item.query}`}
+                                  type="button"
+                                  onClick={() => {
+                                    setSearchQuery(item.query);
+                                    void runSearch(item.query);
+                                  }}
+                                  className="rounded-full border border-[#dbe7fb] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1a73e8] transition hover:bg-[#f8fbff]"
+                                >
+                                  {item.label}
+                                </button>
+                              ))}
+                            </div>
                           </div>
                         ) : null}
                       </div>
@@ -3347,7 +3638,7 @@ export function HomepageSearchExperience({
               </div>
             ) : null}
 
-            {hasActiveQuery && assistantSummary ? (
+            {hasActiveQuery && assistantSummary && !hasAssistantChatReply ? (
               <div className="mb-5 flex items-start gap-3">
                 <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0f3d7a] text-white shadow-[0_10px_24px_rgba(15,61,122,0.18)]">
                   <SparkIcon className="h-4 w-4" />
@@ -3370,7 +3661,9 @@ export function HomepageSearchExperience({
                   </div>
                   <p className="mt-2 text-sm leading-6 text-[#5f6368]">
                     {currentQuery
-                      ? `Searching for "${currentQuery}" and deciding what else is needed before ranking the strongest matches.`
+                      ? results.length > 0
+                        ? `I found ${results.length} early match${results.length === 1 ? '' : 'es'} for "${currentQuery}" and I am still checking maps, booking paths, and fit.`
+                        : `Searching for "${currentQuery}". I will show useful matches as soon as they are found, then keep refining in the background.`
                       : content.ui.resultsLoadingBody}
                   </p>
                   <div className="mt-4 space-y-3">
@@ -3380,7 +3673,7 @@ export function HomepageSearchExperience({
                       </div>
                       <div className="max-w-[44rem] rounded-[1.2rem] rounded-tl-[0.45rem] border border-[#dbe7fb] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(60,64,67,0.05)]">
                         <p className="mt-1 text-sm leading-6 text-slate-700">
-                          I am ranking options now. Add area, timing, or one clear preference and I can sharpen the shortlist.
+                          I am searching now. If you add area, timing, budget, age, or preference in chat, I can tighten the results while they appear.
                         </p>
                       </div>
                     </div>
@@ -3448,7 +3741,7 @@ export function HomepageSearchExperience({
                 </div>
               ) : null}
 
-              {!searchError && (!searchLoading || results.length > 0) ? (
+              {!searchError && (!searchLoading || results.length > 0) && !hasChatInlineResults ? (
                 <PartnerMatchShortlist
                   items={results}
                   batchSize={3}
@@ -3541,7 +3834,15 @@ export function HomepageSearchExperience({
                     );
                     const confidencePresentation = getResultConfidencePresentation(service);
                     const resultFacts = buildSearchResultFacts(service, confidencePresentation.label);
+                    const isBookedAiTenantMatch = isBookedAiChessTenantService(service);
+                    const tenantCapabilitySummary = buildBookedAiTenantCapabilitySummary(service);
                     const providerUrl = service.source_url || service.booking_url || footer.links[0]?.href || null;
+                    const googleMapsUrl = buildGoogleMapsSearchUrl({
+                      mapUrl: service.map_url,
+                      venueName: service.venue_name,
+                      location: service.location,
+                      serviceName: service.name,
+                    });
                     const phoneHref = service.contact_phone
                       ? `tel:${service.contact_phone.replace(/[^\d+]/g, '')}`
                       : null;
@@ -3570,10 +3871,14 @@ export function HomepageSearchExperience({
                                 className="h-full w-full object-cover"
                                 loading="lazy"
                               />
+                              <div className="absolute left-1 top-1 rounded-full bg-white/88 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.1em] text-[#64748b]">
+                                Photo
+                              </div>
                             </div>
                           ) : (
-                            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1rem] border border-[#e5e7eb] bg-[#f8fafc] text-[11px] font-bold uppercase tracking-[0.16em] text-[#64748b] sm:h-[4.5rem] sm:w-[4.5rem]">
-                              {getServiceInitials(service)}
+                            <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-[1rem] border border-[#e5e7eb] bg-[#f8fafc] text-[11px] font-bold uppercase tracking-[0.16em] text-[#64748b] sm:h-[4.5rem] sm:w-[4.5rem]">
+                              <span>{getServiceInitials(service)}</span>
+                              <span className="mt-1 text-[7px] tracking-[0.12em] opacity-70">Preview</span>
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
@@ -3584,6 +3889,11 @@ export function HomepageSearchExperience({
                               {service.featured ? (
                                 <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
                                   Top match
+                                </span>
+                              ) : null}
+                              {isBookedAiTenantMatch ? (
+                                <span className="rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-emerald-200">
+                                  BookedAI tenant
                                 </span>
                               ) : null}
                               <span className="rounded-full bg-[#eef4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
@@ -3623,6 +3933,23 @@ export function HomepageSearchExperience({
                                 {service.why_this_matches || service.next_step}
                               </p>
                             ) : null}
+                            {tenantCapabilitySummary ? (
+                              <div className="mt-2 rounded-[0.95rem] border border-emerald-100 bg-emerald-50/70 px-3 py-2">
+                                <p className="line-clamp-2 text-[11px] font-medium leading-5 text-emerald-900">
+                                  {tenantCapabilitySummary}
+                                </p>
+                                <div className="mt-2 flex flex-wrap gap-1.5">
+                                  {BOOKEDAI_TENANT_CAPABILITY_CHIPS.slice(1, 7).map((item) => (
+                                    <span
+                                      key={`${service.id}-tenant-capability-${item}`}
+                                      className="rounded-full bg-white px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-emerald-700 ring-1 ring-emerald-100"
+                                    >
+                                      {item}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            ) : null}
                           </div>
                         </div>
                         <div className="mt-3 flex min-w-0 items-center gap-2 overflow-x-auto border-t border-[#edf1f7] px-1 pt-3">
@@ -3647,9 +3974,21 @@ export function HomepageSearchExperience({
                               <LinkIcon className="h-4 w-4" />
                             </a>
                           ) : null}
+                          {googleMapsUrl ? (
+                            <a
+                              href={googleMapsUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              aria-label={`Open Google Maps location for ${service.name}`}
+                              title="Google Maps"
+                              className={compactActionClass}
+                            >
+                              <MapPinIcon className="h-4 w-4" />
+                            </a>
+                          ) : null}
                           <button
                             type="button"
-                            onClick={() => setPreviewService(service)}
+                            onClick={() => openServicePreview(service)}
                             aria-label={`View details for ${service.name}`}
                             title="View details"
                             className={compactActionClass}
@@ -3692,7 +4031,7 @@ export function HomepageSearchExperience({
                             className="inline-flex h-9 min-w-[6.5rem] shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#111827] bg-[#111827] px-3 text-[11px] font-semibold text-white transition hover:bg-[#1f2937]"
                           >
                             <SparkIcon className="h-4 w-4" />
-                            Book
+                            {isBookedAiTenantMatch ? 'Book tenant' : 'Book'}
                           </button>
                         </div>
                       </div>
@@ -3700,6 +4039,99 @@ export function HomepageSearchExperience({
                   }}
                 />
               ) : null}
+              </div>
+              </div>
+              <div className="border-t border-[#eef2f7] bg-white px-3 py-3 sm:px-4">
+                {attachedReferences.length > 0 ? (
+                  <div className="mb-2 flex flex-wrap gap-2">
+                    {attachedReferences.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => removeAttachedReference(item.id)}
+                        className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5 text-[11px] font-semibold text-[#475569] transition hover:border-[#cbd5e1] hover:bg-white"
+                        title="Remove attachment"
+                      >
+                        <AttachmentIcon className="h-3.5 w-3.5 shrink-0" />
+                        <span className="max-w-[12rem] truncate">{item.name}</span>
+                        <span className="text-[#94a3b8]">x</span>
+                      </button>
+                    ))}
+                  </div>
+                ) : null}
+                <div className="rounded-[1.25rem] border border-[#dfe5ee] bg-[#f8fafc] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus-within:border-[#cbd5e1] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(148,163,184,0.12)]">
+                  <div className="flex items-end gap-2">
+                    <input
+                      ref={attachmentInputRef}
+                      type="file"
+                      multiple
+                      accept="image/*,.txt,.md,.pdf,text/plain,text/markdown,application/pdf"
+                      onChange={handleAttachmentPick}
+                      className="hidden"
+                      aria-label="Attach image text or file"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => attachmentInputRef.current?.click()}
+                      aria-label="Attach image text or file"
+                      title="Attach image, text, or file"
+                      className="mb-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#e5e7eb] bg-white text-[#475569] transition hover:border-[#cbd5e1] hover:bg-[#f8fbff] hover:text-[#111827]"
+                    >
+                      <AttachmentIcon className="h-4 w-4" />
+                    </button>
+                    <textarea
+                      ref={searchComposerRef}
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      onKeyDown={handleSearchComposerKeyDown}
+                      placeholder="Ask for a service, area, timing, budget, or attach a reference..."
+                      rows={1}
+                      className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-[15px] leading-6 text-[#111827] outline-none placeholder:text-[#8a94a6] sm:text-[1rem]"
+                      aria-label="Ask BookedAI"
+                    />
+                    <div className="mb-1 flex shrink-0 items-center gap-1.5">
+                      {voiceSupported ? (
+                        <button
+                          type="button"
+                          onClick={handleVoiceSearch}
+                          aria-label={voiceListening ? 'Stop voice input' : 'Start voice input'}
+                          title={voiceListening ? 'Listening' : 'Voice'}
+                          className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition ${
+                            voiceListening
+                              ? 'border-[#c9c9d1] bg-[#f0f0f2] text-[#111827]'
+                              : 'border-[#e5e7eb] bg-white text-[#475569] hover:border-[#cbd5e1] hover:bg-[#f8fbff] hover:text-[#111827]'
+                          }`}
+                        >
+                          <MicIcon className="h-4 w-4" />
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={() => void runSearch(searchQuery)}
+                        disabled={searchLoading || !searchQuery.trim()}
+                        aria-label="Send search"
+                        title="Send"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#111827] text-white transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <ArrowRightIcon className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap gap-1.5">
+                    {['Service', 'Area', 'Time', 'Budget'].map((item) => (
+                      <span key={item} className="rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-medium text-[#64748b] ring-1 ring-[#e5e7eb]">
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                  <span className="text-[10px] font-medium text-[#94a3b8]">
+                    Results scroll above. Enter sends, Shift+Enter adds a line.
+                  </span>
+                </div>
+                {voiceError ? <div className="mt-2 text-xs text-rose-600">{voiceError}</div> : null}
+              </div>
             </div>
           </div>
         </section>
@@ -3847,6 +4279,27 @@ export function HomepageSearchExperience({
                 </div>
               </div>
 
+              {isBookedAiChessTenantService(selectedService) ? (
+                <div className="mt-3 rounded-[1rem] border border-emerald-200 bg-white px-3 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                    Tenant booking channels
+                  </div>
+                  <p className="mt-1 text-xs leading-5 text-emerald-900">
+                    This chess tenant can continue through BookedAI with Stripe payment, QR transfer/booking confirmation, calendar invite, email confirmation, WhatsApp Agent chat, and portal edits after booking.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {BOOKEDAI_TENANT_CAPABILITY_CHIPS.slice(2).map((item) => (
+                      <span
+                        key={`selected-tenant-capability-${item}`}
+                        className="rounded-full bg-emerald-50 px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] text-emerald-700 ring-1 ring-emerald-100"
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
+
               {!result ? (
                 <button
                   type="button"
@@ -3901,6 +4354,25 @@ export function HomepageSearchExperience({
                     Complete the booking brief for <span className="font-semibold text-[#111827]">{selectedService.name}</span>. This match stays locked for the request.
                   </p>
                 ) : null}
+                <div className="mt-3 grid gap-2 sm:grid-cols-3">
+                  {[
+                    ['1', 'Contact', 'Name plus email or phone'],
+                    ['2', 'Preferred time', 'Pick the best slot'],
+                    ['3', 'Next step', 'Portal, QR, and follow-up'],
+                  ].map(([number, title, body]) => (
+                    <div key={title} className="rounded-[0.95rem] border border-[#e5e7eb] bg-[#f8fafc] px-3 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[#1a73e8] ring-1 ring-[#dbe7fb]">
+                          {number}
+                        </span>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#475569]">
+                          {title}
+                        </span>
+                      </div>
+                      <div className="mt-2 text-[11px] leading-5 text-[#64748b]">{body}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
               <form onSubmit={handleBookingSubmit} className="space-y-3">
@@ -3911,6 +4383,8 @@ export function HomepageSearchExperience({
                     type="text"
                     value={customerName}
                     onChange={(event) => setCustomerName(event.target.value)}
+                    required
+                    autoComplete="name"
                     className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
                   />
                 </label>
@@ -3921,6 +4395,7 @@ export function HomepageSearchExperience({
                     type="email"
                     value={customerEmail}
                     onChange={(event) => setCustomerEmail(event.target.value)}
+                    autoComplete="email"
                     className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
                   />
                 </label>
@@ -3931,9 +4406,13 @@ export function HomepageSearchExperience({
                     type="tel"
                     value={customerPhone}
                     onChange={(event) => setCustomerPhone(event.target.value)}
+                    autoComplete="tel"
                     className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
                   />
                 </label>
+                <div className="-mt-2 text-[11px] leading-5 text-[#64748b]">
+                  Email or phone is enough; phone enables SMS and WhatsApp updates.
+                </div>
 
                 <label className="block">
                   <span className="mb-2 block text-sm font-medium text-[#172033]/76">{content.ui.dateTimeLabel}</span>
@@ -3941,6 +4420,7 @@ export function HomepageSearchExperience({
                     type="datetime-local"
                     value={preferredSlot}
                     onChange={(event) => setPreferredSlot(event.target.value)}
+                    required
                     className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
                   />
                 </label>
@@ -3992,7 +4472,7 @@ export function HomepageSearchExperience({
                       {content.ui.thankYouBody}
                     </p>
                     <p className="mt-2 max-w-md text-sm leading-6 text-white/86">
-                      Thank you for booking with BookedAI. Your booking code and portal QR are ready, and I can keep helping with another search while this confirmation remains on screen.
+                      Your booking code, portal QR, and follow-up path are ready. You can review, edit, reschedule, or ask for help from the same booking record.
                     </p>
                     <p className="mt-2 text-sm leading-6 text-white/78">{result.confirmation_message}</p>
                     <div className="mt-3 inline-flex rounded-full bg-white/14 px-3 py-1.5 text-[11px] font-semibold text-white/90 ring-1 ring-white/14">
@@ -4374,9 +4854,9 @@ export function HomepageSearchExperience({
                   Book on provider site
                 </a>
               ) : null}
-              {previewService.map_url ? (
+              {previewGoogleMapsUrl ? (
                 <a
-                  href={previewService.map_url}
+                  href={previewGoogleMapsUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="public-apple-secondary-button inline-flex h-11 items-center justify-center rounded-[1rem] px-5 text-sm font-semibold transition"

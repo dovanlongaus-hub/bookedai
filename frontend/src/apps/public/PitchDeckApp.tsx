@@ -24,7 +24,6 @@ import {
   trustItems,
   faqItems,
 } from '../../components/landing/data';
-import { ArchitectureInfographicSection } from '../../components/landing/sections/ArchitectureInfographicSection';
 import { BrandLockup } from '../../components/landing/ui/BrandLockup';
 import { SectionCard } from '../../components/landing/ui/SectionCard';
 import { SignalPill } from '../../components/landing/ui/SignalPill';
@@ -36,6 +35,7 @@ import {
 
 const productUrl = 'https://product.bookedai.au/';
 const demoLandingUrl = 'https://demo.bookedai.au/';
+const architectureUrl = '/architecture';
 const closingPitchImageUrl = '/branding/optimized/final-contact-proof-1400.webp';
 const closingPitchImageSrcSet =
   '/branding/optimized/final-contact-proof-960.webp 960w, /branding/optimized/final-contact-proof-1400.webp 1400w';
@@ -45,14 +45,13 @@ const chessScreenImageSrcSet =
 
 const pitchNavItems = [
   { id: 'hero', label: 'Overview' },
+  { id: 'proof', label: 'Product' },
   { id: 'problem', label: 'Problem' },
   { id: 'solution', label: 'Solution' },
-  { id: 'proof', label: 'Product' },
-  { id: 'architecture', label: 'Architecture' },
+  { id: 'pricing', label: 'Pricing' },
+  { id: 'architecture', label: 'Architecture', href: architectureUrl },
   { id: 'surfaces', label: 'Surfaces' },
   { id: 'trust', label: 'Trust' },
-  { id: 'team', label: 'Team' },
-  { id: 'pricing', label: 'Pricing' },
 ];
 
 const industryTypes = ['Salon', 'Tradie', 'Swim School', 'Trades', 'Healthcare'];
@@ -136,6 +135,63 @@ const pricingPlans = [
   },
 ];
 
+const architectureCapabilityCards = [
+  ['Designed surface', 'A visual system buyers can inspect, not a hidden backend diagram.'],
+  ['Connected workflow', 'Every customer turn can become booking state, care state, and operator evidence.'],
+  ['Enterprise posture', 'Tenant boundaries, policy gates, audit trails, and fallback rails are visible by design.'],
+];
+
+const architectureLayers = [
+  {
+    eyebrow: 'Layer 01',
+    title: 'Customer demand surfaces',
+    summary: 'Where intent enters the BookedAI system.',
+    tone: 'border-sky-200 bg-sky-50',
+    rail: 'bg-sky-500',
+    modules: ['bookedai.au', 'product.bookedai.au', 'demo/widget', 'portal.bookedai.au', 'WhatsApp entry'],
+  },
+  {
+    eyebrow: 'Layer 02',
+    title: 'AI orchestration layer',
+    summary: 'Turns raw messages into structured commercial intent.',
+    tone: 'border-violet-200 bg-violet-50',
+    rail: 'bg-violet-500',
+    modules: ['Customer-turn agent', 'Search and match', 'Qualification policy', 'Revenue-ops agent', 'Care/status agent'],
+  },
+  {
+    eyebrow: 'Layer 03',
+    title: 'Revenue transaction core',
+    summary: 'Creates durable booking, payment, and confirmation state.',
+    tone: 'border-emerald-200 bg-emerald-50',
+    rail: 'bg-emerald-500',
+    modules: ['Lead capture', 'Booking intent', 'Payment intent', 'QR portal return', 'Email/calendar'],
+  },
+  {
+    eyebrow: 'Layer 04',
+    title: 'Operations control plane',
+    summary: 'Makes every handoff inspectable by the tenant and BookedAI team.',
+    tone: 'border-amber-200 bg-amber-50',
+    rail: 'bg-amber-500',
+    modules: ['Tenant Ops', 'Admin Reliability', 'Action ledger', 'Support queue', 'Manual review'],
+  },
+];
+
+const architectureIntegrationRails = [
+  ['Payments', 'Stripe checkout, QR transfer posture, invoice readiness'],
+  ['Messaging', 'Meta WhatsApp primary, Twilio fallback, email lifecycle'],
+  ['Workflow', 'n8n automation, CRM tasks, webhook/outbox recovery'],
+  ['Operator AI', 'OpenClaw, Telegram commands, Notion and Discord closeout'],
+];
+
+const architectureStackGroups = [
+  ['Frontend', 'React', 'TypeScript', 'Vite', 'Tailwind'],
+  ['Backend', 'FastAPI', 'Pydantic', 'service layer', 'API v1'],
+  ['Data', 'Supabase', 'Postgres', 'audit/outbox', 'storage'],
+  ['Runtime', 'Docker Compose', 'Nginx', 'Cloudflare DNS/TLS', 'health checks'],
+];
+
+const architectureFlowMarkers = ['Demand', 'AI decision', 'Booking state', 'Ops truth'];
+
 function VisualChip({
   children,
   tone = 'light',
@@ -153,6 +209,327 @@ function VisualChip({
     <div className={`rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] ${cls}`}>
       {children}
     </div>
+  );
+}
+
+function PitchArchitectureFlowVisual() {
+  return (
+    <section id="architecture" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+      <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_44%,#eef6ff_70%,#f7f4ff_100%)] px-5 py-6 shadow-[0_28px_80px_rgba(15,23,42,0.10)] sm:px-7 lg:px-8 lg:py-8">
+        <div className="grid gap-8 xl:grid-cols-[0.62fr_1.38fr] xl:items-start">
+          <div>
+            <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
+              Architecture image
+            </SignalPill>
+            <h2 className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl lg:text-5xl">
+              A multi-layer revenue engine, visualized like a technical buyer expects.
+            </h2>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
+              BookedAI is not a single chatbot screen. It is a connected system of acquisition
+              surfaces, AI orchestration, booking contracts, integrations, tenant operations, and
+              infrastructure controls built to turn service demand into visible revenue workflow.
+            </p>
+
+            <div className="mt-6 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              {architectureCapabilityCards.map(([title, body]) => (
+                <div key={title} className="rounded-[1.2rem] border border-black/6 bg-white/82 px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
+                    {title}
+                  </div>
+                  <div className="mt-1 text-sm leading-6 text-slate-700">{body}</div>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <a
+                href={architectureUrl}
+                className="rounded-full bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+              >
+                Open full architecture
+              </a>
+              <a
+                href={roadmapHref}
+                className="rounded-full border border-black/8 bg-white/80 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
+              >
+                View roadmap
+              </a>
+            </div>
+          </div>
+
+          <figure
+            aria-label="BookedAI professional architecture infographic showing linked product surfaces, AI agents, revenue core, operations modules, integrations, and infrastructure"
+            className="rounded-[1.85rem] border border-black/6 bg-white/78 p-3 shadow-[0_22px_58px_rgba(15,23,42,0.08)] sm:p-4"
+          >
+            <div className="rounded-[1.55rem] border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-4 sm:p-5">
+              <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center">
+                <div>
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+                    BookedAI platform architecture
+                  </div>
+                  <figcaption className="mt-1 text-lg font-semibold tracking-[-0.04em] text-slate-950 sm:text-2xl">
+                    Customer demand {'->'} AI revenue engine {'->'} booking truth {'->'} operator control
+                  </figcaption>
+                </div>
+                <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                  Designed system
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-2 sm:grid-cols-4">
+                {architectureFlowMarkers.map((marker, index) => (
+                  <div key={marker} className="relative rounded-full border border-slate-200 bg-white px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+                    {index < architectureFlowMarkers.length - 1 ? (
+                      <div className="absolute left-[calc(100%+0.08rem)] top-1/2 hidden h-px w-2 -translate-y-1/2 bg-slate-300 sm:block" />
+                    ) : null}
+                    {marker}
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 grid gap-3">
+                {architectureLayers.map((layer) => (
+                  <article
+                    key={layer.title}
+                    className={`grid gap-3 rounded-[1.25rem] border ${layer.tone} p-3 shadow-[0_10px_28px_rgba(15,23,42,0.035)] lg:grid-cols-[0.28fr_0.72fr] lg:items-center`}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div className={`mt-1 h-11 w-1.5 shrink-0 rounded-full ${layer.rail}`} />
+                      <div>
+                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                          {layer.eyebrow}
+                        </div>
+                        <h3 className="mt-1 text-base font-semibold tracking-[-0.03em] text-slate-950">
+                          {layer.title}
+                        </h3>
+                        <p className="mt-1 text-xs leading-5 text-slate-600">{layer.summary}</p>
+                      </div>
+                    </div>
+                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
+                      {layer.modules.map((item) => (
+                        <div
+                          key={item}
+                          className="min-w-0 break-words rounded-[0.9rem] border border-white/80 bg-white/88 px-3 py-2 text-[11px] font-semibold leading-5 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] [overflow-wrap:anywhere]"
+                        >
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  </article>
+                ))}
+              </div>
+
+              <div className="mt-4 grid gap-3 lg:grid-cols-[1.05fr_0.95fr]">
+                <div className="rounded-[1.25rem] border border-slate-200 bg-white p-4">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    Partner and integration rails
+                  </div>
+                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                    {architectureIntegrationRails.map(([title, body]) => (
+                      <div key={title} className="rounded-[1rem] border border-slate-200 bg-slate-50 px-3 py-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-900">
+                          {title}
+                        </div>
+                        <div className="mt-1 text-xs leading-5 text-slate-600">{body}</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="rounded-[1.25rem] border border-slate-900 bg-slate-950 p-4 text-white">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
+                    Infrastructure and technology stack
+                  </div>
+                  <div className="mt-3 grid gap-2">
+                    {architectureStackGroups.map(([title, ...items]) => (
+                      <div key={title} className="rounded-[1rem] border border-white/10 bg-white/7 px-3 py-3">
+                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
+                          {title}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-1.5">
+                          {items.map((item) => (
+                            <span
+                              key={item}
+                              className="min-w-0 break-words rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-semibold text-slate-300 [overflow-wrap:anywhere]"
+                            >
+                              {item}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </figure>
+        </div>
+      </SectionCard>
+    </section>
+  );
+}
+
+type PitchRegisterSource = 'header' | 'hero' | 'pricing' | 'call_to_action' | 'footer';
+
+type PricingPitchSectionProps = {
+  openRegisterInterest: (sourceSection: PitchRegisterSource, sourceDetail: string) => void;
+};
+
+function PricingPitchSection({ openRegisterInterest }: PricingPitchSectionProps) {
+  return (
+    <section id="pricing" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+      <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f7f9ff_42%,#eef6ff_100%)] px-6 py-6 shadow-[0_28px_80px_rgba(15,23,42,0.08)] sm:px-7 lg:px-8">
+        <div className="grid gap-8 xl:grid-cols-[0.75fr_1.25fr] xl:items-start">
+          <div>
+            <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
+              Commercial terms
+            </SignalPill>
+            <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
+              Start small, prove captured revenue, then expand the operating layer.
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-black/58">
+              The first buying step should feel easy for an SME: launch the assistant, capture enquiries,
+              and review booked outcomes before committing to heavier workflow automation.
+            </p>
+
+            <div className="mt-6 rounded-[1.75rem] border border-black/6 bg-white/72 p-5 backdrop-blur">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-black/42">
+                Starting from
+              </div>
+              <div className="mt-2 text-5xl font-semibold tracking-[-0.07em] text-[#1d1d1f]">
+                {pricingContent.planPrice}
+              </div>
+              <div className="mt-2 text-sm text-black/50">{pricingContent.planCaption}</div>
+            </div>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <a
+                href={architectureUrl}
+                className="rounded-full border border-black/8 bg-white/80 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
+              >
+                View Architecture
+              </a>
+              <button
+                type="button"
+                onClick={() => openRegisterInterest('pricing', 'pitch_pricing_register')}
+                className="rounded-full bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+              >
+                Open SME Registration
+              </button>
+              <a
+                href={productUrl}
+                className="rounded-full border border-black/8 bg-white/80 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
+              >
+                Open Web App
+              </a>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-3">
+            {pricingPlans.map((plan) => (
+              <div
+                key={plan.tier}
+                className={`relative flex flex-col rounded-[1.75rem] border px-5 py-6 ${
+                  plan.highlight
+                    ? 'border-[#1d4ed8]/28 bg-[linear-gradient(180deg,#eff6ff_0%,#ffffff_100%)] shadow-[0_20px_50px_rgba(29,78,216,0.10)]'
+                    : 'border-black/6 bg-white'
+                }`}
+              >
+                {plan.highlight && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#1d4ed8] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-white">
+                    Most popular
+                  </div>
+                )}
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/40">
+                  {plan.tier}
+                </div>
+                <div className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f]">
+                  {plan.price}
+                </div>
+                <div className="mt-1 text-[11px] text-black/48">{plan.caption}</div>
+                <ul className="mt-5 flex-1 space-y-2">
+                  {plan.features.map((feature) => (
+                    <li key={feature} className="flex items-start gap-2 text-sm leading-6 text-black/62">
+                      <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1d4ed8]" />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+                <button
+                  type="button"
+                  onClick={() =>
+                    openRegisterInterest(
+                      'pricing',
+                      `pitch_pricing_${plan.tier.toLowerCase().replace(' ', '_')}`,
+                    )
+                  }
+                  className={`mt-6 rounded-full px-4 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 ${
+                    plan.highlight
+                      ? 'bg-[#1d4ed8] text-white hover:bg-[#1e40af]'
+                      : 'border border-black/10 bg-white text-[#1d1d1f]'
+                  }`}
+                >
+                  {plan.cta}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </SectionCard>
+    </section>
+  );
+}
+
+function ChessProofSection() {
+  return (
+    <section aria-labelledby="pitch-chess-screen-title" className="relative mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+      <div className="overflow-hidden rounded-[1.75rem] border border-black/6 bg-[#0f172a] shadow-[0_32px_90px_rgba(15,23,42,0.16)]">
+        <div className="grid items-stretch xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.42fr)]">
+          <div className="relative flex items-center bg-[linear-gradient(135deg,#111827_0%,#182235_52%,#0f172a_100%)] p-3 sm:p-4 lg:p-5">
+            <div className="w-full overflow-hidden rounded-[1.35rem] border border-white/10 bg-[#e8edf5] shadow-[0_24px_64px_rgba(2,6,23,0.28)]">
+              <img
+                src={chessScreenImageUrl}
+                srcSet={chessScreenImageSrcSet}
+                sizes="(min-width: 1280px) 58vw, calc(100vw - 3rem)"
+                alt="Grandmaster Chess Academy booking flow in BookedAI"
+                className="block aspect-[3/2] h-auto w-full object-contain object-center"
+                loading="eager"
+                width={1400}
+                height={933}
+              />
+            </div>
+          </div>
+
+          <div className="flex flex-col justify-between gap-6 bg-[linear-gradient(180deg,#111827_0%,#0f172a_100%)] p-5 text-white sm:p-6 lg:p-8">
+            <div>
+              <SignalPill className="w-fit border border-white/10 bg-white/[0.08] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#8EFCE0]">
+                Live proof
+              </SignalPill>
+              <h2 id="pitch-chess-screen-title" className="mt-4 text-2xl font-semibold leading-tight tracking-[-0.045em] text-white sm:text-3xl lg:text-4xl">
+                A real tenant flow before the architecture story.
+              </h2>
+              <p className="mt-4 text-sm leading-7 text-slate-300 sm:text-[15px]">
+                Grandmaster Chess Academy shows the product in context: search intent, assessment,
+                placement, booking posture, portal follow-up, and revenue-ops evidence in one journey.
+              </p>
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+              {[
+                ['Tenant', 'GM Chess Academy'],
+                ['Journey', 'Search to booking'],
+                ['Runtime', 'API-backed demo'],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
+                  <div className="mt-1 text-sm font-semibold leading-6 text-white">{value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 
@@ -222,66 +599,15 @@ export function PitchDeckApp() {
         bookDemoLabel="Open Web App"
         utilityLinks={[
           { label: 'Product', href: productUrl },
+          { label: 'Architecture', href: architectureUrl },
           { label: 'Video Demo', href: demoLandingUrl },
           { label: 'Roadmap', href: roadmapHref },
         ]}
       />
 
-      <section aria-labelledby="pitch-chess-screen-title" className="relative mx-auto w-full max-w-7xl px-6 pt-6 lg:px-8 lg:pt-8">
-        <div className="overflow-hidden rounded-[1.75rem] border border-black/6 bg-[#0f172a] shadow-[0_32px_90px_rgba(15,23,42,0.16)]">
-          <div className="grid items-stretch xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.42fr)]">
-            <div className="relative flex items-center bg-[linear-gradient(135deg,#111827_0%,#182235_52%,#0f172a_100%)] p-3 sm:p-4 lg:p-5">
-              <div className="w-full overflow-hidden rounded-[1.35rem] border border-white/10 bg-[#e8edf5] shadow-[0_24px_64px_rgba(2,6,23,0.28)]">
-                <img
-                  src={chessScreenImageUrl}
-                  srcSet={chessScreenImageSrcSet}
-                  sizes="(min-width: 1280px) 58vw, calc(100vw - 3rem)"
-                  alt="Grandmaster Chess Academy booking flow in BookedAI"
-                  className="block aspect-[3/2] h-auto w-full object-contain object-center"
-                  loading="eager"
-                  width={1400}
-                  height={933}
-                />
-              </div>
-            </div>
-
-            <div className="flex flex-col justify-between gap-6 bg-[linear-gradient(180deg,#111827_0%,#0f172a_100%)] p-5 text-white sm:p-6 lg:p-8">
-              <div>
-                <SignalPill className="w-fit border border-white/10 bg-white/[0.08] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#8EFCE0]">
-                  Chess_screen proof
-                </SignalPill>
-                <h2 id="pitch-chess-screen-title" className="mt-4 text-2xl font-semibold leading-tight tracking-[-0.045em] text-white sm:text-3xl lg:text-4xl">
-                  The buyer sees a working booking surface before the pitch begins.
-                </h2>
-                <p className="mt-4 text-sm leading-7 text-slate-300 sm:text-[15px]">
-                  Grandmaster Chess Academy shows the BookedAI loop in context: search intent, assessment,
-                  placement, booking posture, and follow-up evidence presented as one polished service journey.
-                </p>
-              </div>
-
-              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                {[
-                  ['Tenant', 'GM Chess Academy'],
-                  ['Journey', 'Search to booking'],
-                  ['Runtime', 'API-backed demo'],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
-                    <div className="mt-1 text-sm font-semibold leading-6 text-white">{value}</div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
       {/* ── 1. HERO ─────────────────────────────────────────────────── */}
       <section id="hero" className="relative mx-auto w-full max-w-7xl px-6 pt-6 lg:px-8 lg:pt-8">
         <SectionCard className="relative overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#fbfdff_0%,#f6faff_42%,#eef4ff_72%,#f8f5ff_100%)] px-6 py-8 shadow-[0_32px_90px_rgba(15,23,42,0.10)] sm:px-8 lg:px-10 lg:py-10">
-          <div className="absolute -left-20 top-8 h-56 w-56 rounded-full bg-cyan-400/12 blur-3xl" />
-          <div className="absolute right-0 top-0 h-full w-2/5 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.10),transparent_42%)]" />
-
           <div className="relative grid items-start gap-8 xl:grid-cols-[1.1fr_0.9fr]">
             {/* Left: brand narrative + CTAs */}
             <div className="flex flex-col gap-5">
@@ -298,13 +624,13 @@ export function PitchDeckApp() {
               />
 
               <h1 className="max-w-2xl text-4xl font-semibold tracking-[-0.06em] text-[#1d1d1f] sm:text-5xl lg:text-[3.4rem] lg:leading-[1.09]">
-                Turn service demand into booking-ready revenue — without losing the handoff.
+                Convert service enquiries into confirmed bookings, follow-up, and revenue visibility.
               </h1>
 
               <p className="max-w-xl text-base leading-8 text-black/60 sm:text-lg">
-                BookedAI is an AI-native revenue operating layer for Australian service businesses.
-                Capture enquiries, qualify intent, rank the best fit, and confirm the booking in one
-                connected commercial flow.
+                BookedAI responds instantly, qualifies customer intent, recommends the right service,
+                and hands every booking into a visible operator workflow. Built first for Australian
+                service businesses.
               </p>
 
               {/* Industry type chips */}
@@ -341,6 +667,12 @@ export function PitchDeckApp() {
                 >
                   Claim Free Setup
                 </button>
+                <a
+                  href={architectureUrl}
+                  className="rounded-full border border-black/8 bg-white/70 px-6 py-3 text-sm font-semibold text-black/62 transition hover:-translate-y-0.5"
+                >
+                  View Architecture
+                </a>
               </div>
             </div>
 
@@ -374,6 +706,8 @@ export function PitchDeckApp() {
         </SectionCard>
       </section>
 
+      <ChessProofSection />
+
       {/* ── 2. PROBLEM ──────────────────────────────────────────────── */}
       <section id="problem" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
         <div className="grid gap-5 xl:grid-cols-[0.88fr_1.12fr] xl:items-start">
@@ -383,9 +717,12 @@ export function PitchDeckApp() {
               {problemContent.kicker}
             </SignalPill>
             <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-              {problemContent.title}
+              Warm leads leak when staff are busy.
             </h2>
-            <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">{problemContent.body}</p>
+            <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">
+              Customers are ready to book, but slow replies, unclear qualification, and messy handoffs
+              turn demand into missed revenue before the team can act.
+            </p>
 
             <div className="mt-6 space-y-2">
               {problemFunnel.map(({ step, label, sub, alert }) => (
@@ -464,9 +801,12 @@ export function PitchDeckApp() {
                 {solutionContent.kicker}
               </SignalPill>
               <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-                {solutionContent.title}
+                Close the gap between enquiry, booking, payment posture, and follow-up.
               </h2>
-              <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">{solutionContent.body}</p>
+              <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">
+                The product gives every enquiry a fast first response, enough context to qualify fit,
+                and a clear next step operators can trust.
+              </p>
 
               <div className="mt-6 space-y-3">
                 {solutionCards.map((card, index) => (
@@ -536,7 +876,7 @@ export function PitchDeckApp() {
               Product proof
             </SignalPill>
             <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-              Search, shortlist, decision, booking — one premium visual flow.
+              Search, shortlist, book, and continue in one visible customer flow.
             </h2>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
@@ -622,10 +962,13 @@ export function PitchDeckApp() {
         </div>
       </section>
 
-      {/* ── 5. ARCHITECTURE ─────────────────────────────────────────── */}
-      <ArchitectureInfographicSection />
+      {/* ── 5. PRICING ──────────────────────────────────────────────── */}
+      <PricingPitchSection openRegisterInterest={openRegisterInterest} />
 
-      {/* ── 6. SURFACES ─────────────────────────────────────────────── */}
+      {/* ── 6. ARCHITECTURE ─────────────────────────────────────────── */}
+      <PitchArchitectureFlowVisual />
+
+      {/* ── 7. SURFACES ─────────────────────────────────────────────── */}
       <section id="surfaces" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
         <SectionCard className="overflow-hidden bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_52%,#f6fffb_100%)] px-6 py-6 sm:px-7 lg:px-8">
           <div className="grid gap-8 xl:grid-cols-[0.82fr_1.18fr] xl:items-center">
@@ -680,7 +1023,7 @@ export function PitchDeckApp() {
         </SectionCard>
       </section>
 
-      {/* ── 7. TRUST + PARTNERS ─────────────────────────────────────── */}
+      {/* ── 8. TRUST + PARTNERS ─────────────────────────────────────── */}
       <section id="trust" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
         <div className="grid gap-5 xl:grid-cols-2">
           {/* Operator voices */}
@@ -814,101 +1157,6 @@ export function PitchDeckApp() {
                     <p className="mt-3 text-sm leading-6 text-black/58">{member.bio}</p>
                   </div>
                 </SectionCard>
-              ))}
-            </div>
-          </div>
-        </SectionCard>
-      </section>
-
-      {/* ── 9. PRICING ──────────────────────────────────────────────── */}
-      <section id="pricing" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
-        <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f7f9ff_42%,#eef6ff_100%)] px-6 py-6 shadow-[0_28px_80px_rgba(15,23,42,0.08)] sm:px-7 lg:px-8">
-          <div className="grid gap-8 xl:grid-cols-[0.75fr_1.25fr] xl:items-start">
-            {/* Left: headline + entry price */}
-            <div>
-              <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-                {pricingContent.kicker}
-              </SignalPill>
-              <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-                Simple enough for SMEs to buy. Structured enough for enterprise growth.
-              </h2>
-              <p className="mt-4 text-sm leading-7 text-black/58">{pricingContent.body}</p>
-
-              <div className="mt-6 rounded-[1.75rem] border border-black/6 bg-white/72 p-5 backdrop-blur">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-black/42">
-                  Starting from
-                </div>
-                <div className="mt-2 text-5xl font-semibold tracking-[-0.07em] text-[#1d1d1f]">
-                  {pricingContent.planPrice}
-                </div>
-                <div className="mt-2 text-sm text-black/50">{pricingContent.planCaption}</div>
-              </div>
-
-              <div className="mt-5 flex flex-wrap gap-3">
-                <button
-                  type="button"
-                  onClick={() => openRegisterInterest('pricing', 'pitch_pricing_register')}
-                  className="rounded-full bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
-                >
-                  Open SME Registration
-                </button>
-                <a
-                  href={productUrl}
-                  className="rounded-full border border-black/8 bg-white/80 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
-                >
-                  Open Web App
-                </a>
-              </div>
-            </div>
-
-            {/* Right: 3 plan tiers */}
-            <div className="grid gap-4 md:grid-cols-3">
-              {pricingPlans.map((plan) => (
-                <div
-                  key={plan.tier}
-                  className={`relative flex flex-col rounded-[1.75rem] border px-5 py-6 ${
-                    plan.highlight
-                      ? 'border-[#1d4ed8]/28 bg-[linear-gradient(180deg,#eff6ff_0%,#ffffff_100%)] shadow-[0_20px_50px_rgba(29,78,216,0.10)]'
-                      : 'border-black/6 bg-white'
-                  }`}
-                >
-                  {plan.highlight && (
-                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#1d4ed8] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-white">
-                      Most popular
-                    </div>
-                  )}
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/40">
-                    {plan.tier}
-                  </div>
-                  <div className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f]">
-                    {plan.price}
-                  </div>
-                  <div className="mt-1 text-[11px] text-black/48">{plan.caption}</div>
-                  <ul className="mt-5 flex-1 space-y-2">
-                    {plan.features.map((feature) => (
-                      <li key={feature} className="flex items-start gap-2 text-sm leading-6 text-black/62">
-                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1d4ed8]" />
-                        {feature}
-                      </li>
-                    ))}
-                  </ul>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      openRegisterInterest(
-                        'pricing',
-                        `pitch_pricing_${plan.tier.toLowerCase().replace(' ', '_')}`,
-                      )
-                    }
-                    className={`mt-6 rounded-full px-4 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 ${
-                      plan.highlight
-                        ? 'bg-[#1d4ed8] text-white hover:bg-[#1e40af]'
-                        : 'border border-black/10 bg-white text-[#1d1d1f]'
-                    }`}
-                  >
-                    {plan.cta}
-                  </button>
-                </div>
               ))}
             </div>
           </div>

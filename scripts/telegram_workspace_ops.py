@@ -2,16 +2,20 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime, timezone
 import json
 import os
 import shlex
 import shutil
 import subprocess
+import urllib.error
+import urllib.request
 from pathlib import Path
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HOST_REPO_ROOT = Path("/home/dovanlong/BookedAI")
+DEFAULT_OPENCLAW_AGENT_SPEC = REPO_ROOT / "deploy/openclaw/agents/bookedai-whatsapp-booking-care-agent.json"
 DEFAULT_TRUSTED_TELEGRAM_USER_IDS = {"8426853622"}
 DEFAULT_TELEGRAM_ALLOWED_ACTIONS = {
     "sync_doc",
@@ -24,6 +28,7 @@ DEFAULT_TELEGRAM_ALLOWED_ACTIONS = {
     "repo_structure",
     "host_command",
     "host_shell",
+    "whatsapp_bot_status",
     "full_project",
 }
 HOST_COMMAND_ALLOWED_PROGRAMS = {
@@ -314,6 +319,254 @@ def handle_permissions(args: argparse.Namespace) -> int:
     return 0
 
 
+def _http_probe(url: str, *, timeout: float = 8.0) -> dict[str, object]:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json,text/plain,*/*",
+            "User-Agent": "BookedAI-OpenClaw-WhatsAppBotStatus/1.0",
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw_body = response.read(4096).decode("utf-8", errors="replace")
+            parsed_body: object
+            try:
+                parsed_body = json.loads(raw_body)
+            except json.JSONDecodeError:
+                parsed_body = raw_body[:500]
+            return {
+                "ok": 200 <= response.status < 300,
+                "status_code": response.status,
+                "body": parsed_body,
+            }
+    except urllib.error.HTTPError as exc:
+        raw_body = exc.read(4096).decode("utf-8", errors="replace")
+        parsed_body: object
+        try:
+            parsed_body = json.loads(raw_body)
+        except json.JSONDecodeError:
+            parsed_body = raw_body[:500]
+        return {
+            "ok": False,
+            "status_code": exc.code,
+            "body": parsed_body,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "status_code": None,
+            "error": str(exc),
+        }
+
+
+def _http_json_probe(url: str, *, payload: dict[str, object], timeout: float = 8.0) -> dict[str, object]:
+    request = urllib.request.Request(
+        url,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Accept": "application/json,text/plain,*/*",
+            "Content-Type": "application/json",
+            "User-Agent": "BookedAI-OpenClaw-WhatsAppBotStatus/1.0",
+        },
+        method="POST",
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw_body = response.read(4096).decode("utf-8", errors="replace")
+            try:
+                parsed_body: object = json.loads(raw_body)
+            except json.JSONDecodeError:
+                parsed_body = raw_body[:500]
+            return {
+                "ok": 200 <= response.status < 300,
+                "status_code": response.status,
+                "body": parsed_body,
+            }
+    except urllib.error.HTTPError as exc:
+        raw_body = exc.read(4096).decode("utf-8", errors="replace")
+        try:
+            parsed_body = json.loads(raw_body)
+        except json.JSONDecodeError:
+            parsed_body = raw_body[:500]
+        return {
+            "ok": False,
+            "status_code": exc.code,
+            "body": parsed_body,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "status_code": None,
+            "error": str(exc),
+        }
+
+
+def _extract_whatsapp_provider_status(provider_payload: object) -> dict[str, object] | None:
+    if not isinstance(provider_payload, dict):
+        return None
+    data = provider_payload.get("data")
+    if not isinstance(data, dict):
+        return None
+    items = data.get("items")
+    if not isinstance(items, list):
+        return None
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        provider = str(item.get("provider") or "")
+        if "whatsapp" in provider:
+            return item
+    return None
+
+
+def handle_whatsapp_bot_status(args: argparse.Namespace) -> int:
+    api_base = args.api_base.rstrip("/")
+    bot_base = args.bot_base.rstrip("/")
+    invalid_verify_token = args.invalid_verify_token or "bookedai-openclaw-status-invalid"
+    challenge = "bookedai-openclaw-whatsapp-status"
+    probes = {
+        "openclaw_gateway": _http_probe(f"{bot_base}/healthz", timeout=args.timeout),
+        "api_health": _http_probe(f"{api_base}/api/health", timeout=args.timeout),
+        "provider_status": _http_probe(f"{api_base}/api/v1/integrations/providers/status", timeout=args.timeout),
+        "whatsapp_verify_route": _http_probe(
+            f"{api_base}/api/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token={invalid_verify_token}&hub.challenge={challenge}",
+            timeout=args.timeout,
+        ),
+        "evolution_webhook_route": _http_json_probe(
+            f"{api_base}/api/webhooks/evolution",
+            payload={"event": "bookedai.openclaw.status_probe", "data": {}},
+            timeout=args.timeout,
+        ),
+    }
+    provider_status = _extract_whatsapp_provider_status(probes["provider_status"].get("body"))
+    provider_name = str(provider_status.get("provider") or "") if provider_status else ""
+    verify_status_code = probes["whatsapp_verify_route"].get("status_code")
+    evolution_webhook_status_code = probes["evolution_webhook_route"].get("status_code")
+    provider_uses_evolution = provider_name == "whatsapp_evolution"
+    channel_webhook_reaches_backend = (
+        evolution_webhook_status_code == 200 if provider_uses_evolution else verify_status_code in {200, 403}
+    )
+    summary = {
+        "agent_id": "bookedai-whatsapp-booking-care-agent",
+        "agent_name": "BookedAI WhatsApp Booking Agent",
+        "agent_scope": (
+            "Start WhatsApp booking intake and answer service, booking, payment, provider, "
+            "status, support, cancellation, and reschedule questions for records in BookedAI."
+        ),
+        "agent_manifest": "deploy/openclaw/agents/bookedai-whatsapp-booking-care-agent.json",
+        "channel": "whatsapp",
+        "operator_surface": "openclaw",
+        "gateway_boundary": "OpenClaw operator gateway plus BookedAI FastAPI/provider webhooks",
+        "bookedai_whatsapp_number": "+61455301335",
+        "support_email": "info@bookedai.au",
+        "openclaw_gateway_live": bool(probes["openclaw_gateway"].get("ok")),
+        "api_live": bool(probes["api_health"].get("ok")),
+        "whatsapp_provider": provider_name or None,
+        "whatsapp_provider_status": provider_status.get("status") if provider_status else "unknown",
+        "personal_whatsapp_bridge": provider_uses_evolution,
+        "webhook_verify_reaches_backend": verify_status_code in {200, 403},
+        "webhook_verify_probe_status_code": verify_status_code,
+        "evolution_webhook_reaches_backend": evolution_webhook_status_code == 200,
+        "evolution_webhook_probe_status_code": evolution_webhook_status_code,
+        "channel_webhook_reaches_backend": channel_webhook_reaches_backend,
+        "safe_to_send_customer_messages": bool(
+            probes["openclaw_gateway"].get("ok")
+            and probes["api_health"].get("ok")
+            and provider_status
+            and provider_status.get("status") == "connected"
+            and channel_webhook_reaches_backend
+        ),
+        "note": (
+            "This is a read-only OpenClaw/operator readiness check for the dedicated BookedAI "
+            "WhatsApp booking-care agent; it does not send WhatsApp messages. "
+            "When whatsapp_provider is whatsapp_evolution, the customer channel is the personal "
+            "WhatsApp QR-session bridge rather than Meta/Twilio Business messaging."
+        ),
+    }
+    print(
+        json.dumps(
+            {
+                "status": "ok" if summary["safe_to_send_customer_messages"] else "attention_required",
+                "summary": summary,
+                "probes": probes,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0 if summary["safe_to_send_customer_messages"] else 1
+
+
+def resolve_openclaw_config_path(path_value: str | None) -> Path:
+    if path_value:
+        return Path(path_value).expanduser().resolve()
+    env_dir = os.getenv("OPENCLAW_CONFIG_DIR", "").strip()
+    if env_dir:
+        return (Path(env_dir).expanduser() / "openclaw.json").resolve()
+    container_path = Path("/home/node/.openclaw/openclaw.json")
+    if container_path.exists():
+        return container_path
+    return Path("/home/dovanlong/.openclaw-bookedai-v3/openclaw.json")
+
+
+def handle_sync_openclaw_bookedai_agent(args: argparse.Namespace) -> int:
+    spec_path = Path(args.spec).expanduser().resolve()
+    config_path = resolve_openclaw_config_path(args.config)
+    if not spec_path.exists():
+        raise ValueError(f"OpenClaw agent spec not found: {spec_path}")
+    if not config_path.exists():
+        raise ValueError(f"OpenClaw config not found: {config_path}")
+
+    agent_spec = json.loads(spec_path.read_text())
+    agent_id = str(agent_spec.get("id") or "").strip()
+    if not agent_id:
+        raise ValueError("OpenClaw agent spec must include a non-empty id.")
+
+    config = json.loads(config_path.read_text())
+    agents = config.setdefault("agents", {})
+    current_list = agents.setdefault("list", [])
+    if isinstance(current_list, list):
+        agents["list"] = [
+            item
+            for item in current_list
+            if not (isinstance(item, dict) and item.get("id") == agent_id)
+        ]
+    if isinstance(config.get("meta"), dict):
+        config["meta"].pop("bookedaiAgentLastSyncedAt", None)
+        config["meta"].pop("bookedaiAgentLastSyncedId", None)
+    config_path.write_text(json.dumps(config, indent=2, sort_keys=False) + "\n")
+
+    agent_manifest_dir = config_path.parent / "agents"
+    agent_manifest_dir.mkdir(parents=True, exist_ok=True)
+    agent_manifest_path = agent_manifest_dir / f"{agent_id}.json"
+    previous_manifest_exists = agent_manifest_path.exists()
+    if previous_manifest_exists and not args.no_backup:
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        backup_path = agent_manifest_path.with_name(f"{agent_manifest_path.name}.bak.{timestamp}")
+        backup_path.write_text(agent_manifest_path.read_text())
+    agent_manifest_path.write_text(json.dumps(agent_spec, indent=2, sort_keys=False) + "\n")
+
+    print(
+        json.dumps(
+            {
+                "status": "ok",
+                "agent_id": agent_id,
+                "agent_name": agent_spec.get("name"),
+                "action": "updated" if previous_manifest_exists else "created",
+                "config_path": str(config_path),
+                "manifest_path": str(agent_manifest_path),
+                "spec_path": str(spec_path),
+                "runtime_note": "OpenClaw v2026.4.15 keeps the live runtime agent list schema-strict; the BookedAI agent is installed as a manifest and supervised through the operator command/API gateway.",
+                "restart_required": False,
+            },
+            indent=2,
+            sort_keys=True,
+        )
+    )
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Telegram-friendly operator entrypoints for BookedAI workspace sync, test, build, and deploy.",
@@ -413,6 +666,25 @@ def build_parser() -> argparse.ArgumentParser:
     )
     permissions_parser.set_defaults(handler=handle_permissions)
 
+    whatsapp_status_parser = subparsers.add_parser(
+        "whatsapp-bot-status",
+        help="Run a read-only OpenClaw/operator readiness check for the BookedAI WhatsApp bot without sending messages.",
+    )
+    whatsapp_status_parser.add_argument("--api-base", default="https://api.bookedai.au")
+    whatsapp_status_parser.add_argument("--bot-base", default="https://bot.bookedai.au")
+    whatsapp_status_parser.add_argument("--invalid-verify-token", default="bookedai-openclaw-status-invalid")
+    whatsapp_status_parser.add_argument("--timeout", type=float, default=8.0)
+    whatsapp_status_parser.set_defaults(handler=handle_whatsapp_bot_status)
+
+    openclaw_agent_parser = subparsers.add_parser(
+        "sync-openclaw-bookedai-agent",
+        help="Create or update the BookedAI WhatsApp Booking Care Agent in the OpenClaw runtime config.",
+    )
+    openclaw_agent_parser.add_argument("--spec", default=str(DEFAULT_OPENCLAW_AGENT_SPEC))
+    openclaw_agent_parser.add_argument("--config")
+    openclaw_agent_parser.add_argument("--no-backup", action="store_true")
+    openclaw_agent_parser.set_defaults(handler=handle_sync_openclaw_bookedai_agent)
+
     return parser
 
 
@@ -427,6 +699,8 @@ def main() -> int:
         "workspace-command": {"workspace_write", "repo_structure"},
         "host-command": {"host_command"},
         "host-shell": {"host_shell"},
+        "whatsapp-bot-status": {"whatsapp_bot_status"},
+        "sync-openclaw-bookedai-agent": {"workspace_write", "whatsapp_bot_status"},
     }
     required_actions = required_actions_by_command.get(args.command)
     if required_actions:

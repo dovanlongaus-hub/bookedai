@@ -46,19 +46,19 @@ function modeTitle(authMode: TenantAuthMode) {
   if (authMode === 'claim') {
     return 'Accept invite';
   }
-  return 'Sign in with email';
+  return 'Access your tenant workspace';
 }
 
 function modeDescription(authMode: TenantAuthMode, isGateway: boolean) {
   if (authMode === 'create') {
-    return 'Use email as the primary identity. BookedAI sends a verification code, then opens your new workspace.';
+    return 'Create a workspace for bookings, revenue proof, follow-up, and tenant-owned operations.';
   }
   if (authMode === 'claim') {
     return 'Use the invited email to receive a code and activate tenant access safely.';
   }
   return isGateway
-    ? 'Enter your tenant email and BookedAI sends a one-time code. Google sign-in stays available on the same form.'
-    : 'Enter the tenant email linked to this workspace and BookedAI sends a one-time code to unlock write access.';
+    ? 'Use Google when your account is linked to a tenant. Use email code if you need a secure fallback.'
+    : 'Use Google or email code to unlock tenant-owned changes for this workspace.';
 }
 
 export function TenantAuthWorkspaceEmail({
@@ -130,6 +130,12 @@ export function TenantAuthWorkspaceEmail({
       ? 'Create with Google'
       : authMode === 'claim'
         ? 'Accept invite with Google'
+        : 'Continue with Google';
+  const googlePrimaryAction =
+    authMode === 'create'
+      ? 'Create with Google'
+      : authMode === 'claim'
+        ? 'Accept with Google'
         : 'Continue with Google';
   const emailValue =
     authMode === 'create'
@@ -260,7 +266,14 @@ export function TenantAuthWorkspaceEmail({
               {googleEnabled ? (
                 <>
                   <div className="mt-4 grid gap-3">
-                    <div className="min-h-[44px] rounded-md bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.08)]">
+                    <button
+                      type="button"
+                      onClick={onPromptGoogle}
+                      className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-md border border-slate-900 bg-slate-950 px-4 py-2.5 text-sm font-semibold text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)] transition hover:bg-slate-800"
+                    >
+                      {googlePrimaryAction}
+                    </button>
+                    <div className="hidden min-h-[44px] w-full items-center justify-center overflow-hidden rounded-md bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.08)] sm:flex">
                       {googleButtonSlot}
                     </div>
                     <button
@@ -307,7 +320,8 @@ export function TenantAuthWorkspaceEmail({
                   disabled={emailSubmitDisabled}
                   className={`booked-button w-full ${emailSubmitDisabled ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
                 >
-                  Send login code
+                  <span className="sm:hidden">Send code</span>
+                  <span className="hidden sm:inline">Send login code</span>
                 </button>
               </form>
             ) : null}

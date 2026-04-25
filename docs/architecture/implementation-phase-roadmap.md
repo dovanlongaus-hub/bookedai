@@ -40,6 +40,11 @@ This roadmap aligns with:
 - keep the public homepage lean so search, shortlist, booking, and confirmation have maximum practical space
 - keep public/product search results results-first after ranking: users must be able to pause, scroll, compare compact result cards, open full detail in a popup, and move to booking only through an explicit `Book` action
 - keep clarification questions and suggested follow-up prompts inside the customer-facing BookedAI chat flow as interactive agent chips, not as a separate results-side panel
+- keep physical-place search cards inspectable from the list: show a top-left thumbnail/preview and expose Google Maps for the specific mapped place or a venue/location/service fallback query
+- keep the public homepage persuasive for both investors and customers: the first viewport should explain the revenue-engine thesis, show real vertical/product proof, and then expose the live search-to-booking workspace instead of making visitors infer the company story from the composer alone
+- keep the latest homepage proof-board pattern intact: contained product imagery, visual `Wedge`/`Proof`/`Moat`/`Scale` signals, demand-to-booking workflow steps, and regression-safe `Open Web App` CTA language
+- make slow search feel progressive by showing early useful matches and faster staged progress language while deeper maps, booking-path, and fit checks continue
+- when public/product search returns a reviewed BookedAI tenant, such as the chess tenant, keep it inside the normal result list but mark it as tenant-verified and expose the richer enabled actions: BookedAI booking, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit/revisit
 - treat the customer portal as a durable post-booking workspace: booking truth, payment posture, provider context, timeline, academy/customer-care context, and request-safe actions must stay visible and mobile-safe
 - treat mobile-first responsive execution as a hard requirement for any public conversion surface
 - ship the public revenue-engine narrative early
@@ -53,6 +58,7 @@ This roadmap aligns with:
 - make agent-triggered lifecycle actions auditable, replay-safe, and tenant-policy-aware
 - keep deployed subdomain routing explicit for product, tenant, portal, and admin surfaces; any host serving a frontend shell must proxy `/api/` to backend before SPA fallback so auth and runtime reads cannot be swallowed by static HTML
 - keep tenant account access explicit: Google sign-in must prove an active membership, while Google create-account is the intentional path for opening a new tenant workspace from `tenant.bookedai.au`
+- keep the public roadmap and pitch architecture visualization aligned with the real implementation sequence; the pitch-level diagram should remain a simple `demand -> qualification -> booking -> ops ledger` flow, while the roadmap should expose the current Phase/Sprint `17-23` plan directly in code
 
 ## Agent execution model
 
@@ -88,6 +94,13 @@ Owns:
 - reschedule, cancel, payment-help, and support-chat guidance
 - escalation into human support when policy or confidence requires it
 - first connected implementation target: `Grandmaster Chess Academy`
+
+Current implementation note from `2026-04-25`:
+
+- WhatsApp is now a customer-care channel for configured Twilio/Meta inbound messages
+- inbound messages resolve a booking by explicit reference first, then by phone/email only when the match is unambiguous
+- booking/payment/support replies reuse portal booking truth and action-run context
+- cancellation and reschedule messages queue audited portal requests instead of silently changing booking state
 
 ## Chess-first priority rule
 
@@ -231,6 +244,8 @@ Planning update from `2026-04-25`:
 - `Phase 17` is the current closeout lane for the verified full-flow stabilization work: pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You screen, and `16s` return to the main BookedAI screen
 - `Phase 17` now also includes the enterprise product-booking UX guardrails: progressive first-result rendering during slow matching, compact result action rows, explicit select-versus-book separation, portal-first QR confirmation, and continue-chat behavior during the Thank You grace period
 - `Phase 18` through `Phase 23` should execute in this order: revenue-ops ledger control, customer-care/status agent, widget/plugin runtime, billing and receivables truth, multi-tenant template generalization, release governance and scale hardening
+- `Phase 19` has a portal-native implementation slice: returning customers can now ask a booking-reference anchored status agent about payment, academy/report context, support, and enabled lifecycle actions from inside `portal.bookedai.au`, with answers grounded in portal booking truth and recent revenue-ops action runs
+- `Phase 19` now also has a first support-case automation slice: when the portal care agent detects explicit human-support, escalation, urgent, or broken payment-link intent, it queues `portal.support_request.requested` for audit/outbox review and admin Billing Support triage
 
 | Phase | Name | Primary outcome |
 |---|---|---|
@@ -299,7 +314,7 @@ Deliver:
 Current next-phase order from `2026-04-25`:
 
 1. close `Phase 17` with GitHub submission and release notes for the current full-flow stabilization work
-2. deepen `Phase 18` by making revenue-ops action runs inspectable from tenant and admin surfaces, including lifecycle-event filters, policy metadata, evidence summaries, and later fuller evidence from outbox, audit, job runs, CRM, payment, and webhook state
+2. deepen `Phase 18` by making revenue-ops action runs inspectable and runnable from tenant/admin surfaces, including lifecycle-event filters, policy metadata, evidence summaries, tenant automation connection plans, and later fuller evidence from outbox, audit, job runs, CRM, payment, and webhook state
 3. implement `Phase 19` customer-care/status answers against academy student, booking, payment, report, communication, and action-run truth
 4. implement `Phase 20` widget identity and one tenant-branded full-flow proof from SME website embed through Thank You and portal continuation
 5. implement `Phase 21` billing, receivable, subscription, reminder, and commission truth only after action evidence is reliable

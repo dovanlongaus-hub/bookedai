@@ -112,9 +112,9 @@ export function deriveTenantActivationState({
   if (!session) {
     return {
       phase: 'verify_identity',
-      headline: 'Verify tenant identity first',
-      body: `Preview is available, but activation cannot start until a real tenant session exists. ${getVerticalHint(overview.tenant)}`,
-      actionLabel: 'Open sign-in flow',
+      headline: 'Sign in to start activation',
+      body: `Preview data is visible now. Sign in to edit catalog details, connect billing, and complete tenant-owned setup. ${getVerticalHint(overview.tenant)}`,
+      actionLabel: 'Open sign-in',
       actionPanel: null,
       statusTone: 'sky',
       checklist,

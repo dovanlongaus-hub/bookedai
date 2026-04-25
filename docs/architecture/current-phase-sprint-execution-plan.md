@@ -32,19 +32,26 @@ This execution baseline now also assumes a dual-agent product direction:
 Latest next-phase update from `2026-04-25`:
 
 - the latest product/public search refinement keeps search results as the active surface after ranking: no automatic jump into booking, compact result cards for scanning, detail popup for full context, and explicit `Book` before customer details open
+- reviewed tenant matches must still live inside the same search-results surface; for chess tenant results, the card and selected-booking state show verified BookedAI tenant posture plus BookedAI booking, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit support
 - follow-up questions and suggested next prompts belong inside the BookedAI chat conversation as interactive chips so clarification continues with the customer-facing agent instead of appearing as a disconnected panel
 - the immediate execution plan after the full-flow QA pass is now documented in `docs/development/next-phase-implementation-plan-2026-04-25.md`
 - current closeout is `Phase 17 - Full-flow stabilization`, covering pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You confirmation, and return to the main BookedAI screen after `16s`
 - the product/public booking runtime should now treat slow matching as a progressive-search problem: show first useful local/catalog matches while live ranking continues, keep refinement suggestions visible in chat, and keep the user informed with active status copy
 - result selection and booking commitment are separate UX states: select marks a result active, detail opens from the detail icon, and the customer form opens only after an explicit `Book` action
+- product assistant event selections are now part of the same stabilization baseline: choosing an event posts a real `/booking-assistant/session` request with synthetic `event:<url>` identity plus event metadata, and the backend must preserve that as an attendance-request confirmation path without pretending the flow is a normal Stripe-backed service booking
 - confirmation must be portal-first: show booking reference, QR to `portal.bookedai.au`, compact email/calendar/chat/home actions, and a thank-you message that allows continued chat during the `16s` grace period
 - `portal.bookedai.au` now inherits that portal-first confirmation baseline as a real customer command center: lookup, booking/payment/support status, provider/customer detail, academy progress, timeline, and request-safe action rail must remain cohesive across desktop and mobile
 - the next implementation sequence is now `Phase 18` revenue-ops ledger control, `Phase 19` customer-care/status agent, `Phase 20` widget/plugin runtime, `Phase 21` billing and receivables truth, `Phase 22` reusable tenant templates, and `Phase 23` release governance
 - the public brand/menu and live booking lane were re-checked after the uploaded logo rollout: demo/product/pitch/tenant now render without horizontal overflow on mobile and desktop, the customer-agent live-read path falls back to the v1 matching/search contract when needed, and the live stack health gate passed after deployment
 - the pitch image layer now uses local optimized WebP assets for the uploaded logo, chess proof, final contact proof, and team imagery, keeping the visual redesign intact while avoiding multi-megabyte upload originals during production page load
-- `admin.bookedai.au` login recovery is now part of the current stabilization baseline: the admin host must proxy `/api/` to backend before frontend SPA fallback, and the shipped shared-frontend admin shell now uses a compact sidebar workspace layout grouped by `Operate`, `Tenants`, `Revenue`, and `Platform`
+- `admin.bookedai.au` login recovery is now part of the current stabilization baseline: the admin host must proxy `/api/` to backend before frontend SPA fallback, the dedicated admin hostname must resolve frontend API calls to same-origin `/api` even when a global `VITE_API_BASE_URL` exists, and the shipped shared-frontend admin shell now uses a compact sidebar workspace layout grouped by `Operate`, `Tenants`, `Revenue`, and `Platform`
 - `tenant.bookedai.au` login is now part of the same stabilization baseline: the shipped tenant gateway is Google-first with email-code fallback, create-account is explicit, and Google sign-in no longer silently creates a tenant workspace when no active membership exists
 - the tenant live QA baseline now also includes `future-swim` workspace stability: audit-log nullable filters and revenue-metrics day windows are asyncpg-safe, the ready workspace no longer violates React hook ordering after loading/error states, and live API/browser checks pass for the shared gateway and tenant workspace
+- the pitch and roadmap now carry the current architecture and phase plan as user-visible code, not just docs: pitch shows the simplified `customer surfaces -> AI agents -> booking core -> operations truth` map, and the roadmap dataset exposes Phase/Sprint `17-23` for stabilization, revenue ops, customer care, widget runtime, billing truth, templates, and release governance
+- Phase 19 has now started through WhatsApp customer-care: configured inbound WhatsApp messages can resolve the correct booking, answer from portal booking/payment/support truth, and queue audited cancel or reschedule requests when the customer clearly asks to change an existing booking
+- Phase 19 WhatsApp transport now uses direct Meta/WhatsApp Cloud API as the intended primary path for `+61455301335`, with Twilio kept as a backup transport so customer-care delivery can continue during provider migration
+- Phase 19 now also has its first portal-native care turn: `portal.bookedai.au` can answer returning-customer payment, class/report, support, and lifecycle-action questions from booking-reference anchored portal truth, recent revenue-ops action runs, and request-safe next actions
+- the next operational step is now in place: portal care-turns with clear human-support/escalation or broken payment-link intent create a `support_request` audit/outbox case that admin Billing Support can review or escalate
 
 ## Source-of-truth inputs
 
@@ -298,7 +305,7 @@ The immediate post-Sprint-16 working cadence is now locked to:
 The post-release implementation order is now:
 
 1. finish `Phase 17` documentation and GitHub submission for the verified full-flow stabilization work
-2. extend `Phase 18` so admin and tenant operators can inspect, filter, dispatch, transition, and audit revenue-ops action runs, including lifecycle-event, dependency, policy, and evidence-summary posture
+2. extend `Phase 18` so admin and tenant operators can inspect, filter, dispatch, transition, and audit revenue-ops action runs, including lifecycle-event, dependency, policy, evidence-summary posture, and tenant-scoped automation connection/run controls
 3. implement `Phase 19` customer-care/status replies using booking, payment, subscription, report, communication, and action-run state
 4. implement `Phase 20` widget/plugin install identity for SME-owned websites and prove one tenant-branded embed flow end to end
 5. implement `Phase 21` billing, receivable, subscription, reminder, and commission truth after the ledger evidence model is stable

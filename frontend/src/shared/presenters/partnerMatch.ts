@@ -110,6 +110,95 @@ export type PartnerMatchActionFooterModel = {
   links: PartnerMatchActionLinkModel[];
 };
 
+type TenantCapabilityService = Pick<
+  BookingReadyServiceItem,
+  | 'id'
+  | 'name'
+  | 'category'
+  | 'venue_name'
+  | 'source_type'
+  | 'source_label'
+  | 'trust_signal'
+  | 'booking_path_type'
+  | 'tags'
+>;
+
+export function isBookedAiChessTenantService(service: TenantCapabilityService) {
+  const searchableText = [
+    service.id,
+    service.name,
+    service.category,
+    service.venue_name,
+    service.source_label,
+    service.source_type,
+    service.trust_signal,
+    service.booking_path_type,
+    ...(service.tags ?? []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+
+  const isChessIntent =
+    searchableText.includes('chess') ||
+    searchableText.includes('cờ vua') ||
+    searchableText.includes('co mai hung') ||
+    searchableText.includes('grandmaster');
+  const isKnownBookedAiTenant =
+    searchableText.includes('co-mai-hung-chess') ||
+    searchableText.includes('co mai hung chess') ||
+    searchableText.includes('grandmaster chess') ||
+    searchableText.includes('gm mai hung') ||
+    searchableText.includes('strong_catalog_match') ||
+    service.source_type === 'service_catalog';
+  const isPublicWebFallback = service.source_type === 'public_web_search';
+
+  return Boolean(isChessIntent && isKnownBookedAiTenant && !isPublicWebFallback);
+}
+
+export const BOOKEDAI_TENANT_CAPABILITY_CHIPS = [
+  'Verified tenant',
+  'Book now',
+  'Stripe',
+  'QR payment',
+  'QR confirmation',
+  'Calendar',
+  'Email',
+  'WhatsApp Agent',
+  'Portal edit',
+] as const;
+
+export function buildBookedAiTenantCapabilitySummary(service: TenantCapabilityService) {
+  if (!isBookedAiChessTenantService(service)) {
+    return null;
+  }
+
+  return 'This chess provider is already reviewed and registered in BookedAI, so booking can continue with Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent chat, and a portal link for later changes.';
+}
+
+export function buildGoogleMapsSearchUrl(params: {
+  mapUrl?: string | null;
+  venueName?: string | null;
+  location?: string | null;
+  serviceName?: string | null;
+}) {
+  const directMapUrl = params.mapUrl?.trim();
+  if (directMapUrl) {
+    return directMapUrl;
+  }
+
+  const query = [params.venueName, params.location, params.serviceName]
+    .map((value) => value?.trim())
+    .filter(Boolean)
+    .join(' ');
+
+  if (!query) {
+    return null;
+  }
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
 function isHousingCategory(category: string | null | undefined) {
   const normalized = (category || '').toLowerCase();
   return normalized.includes('housing') || normalized.includes('property');

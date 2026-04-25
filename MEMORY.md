@@ -21,6 +21,7 @@
 - `openclaw-cli` now auto-restarts through compose if it loses the first gateway connect race
 - Host execution from the OpenClaw CLI container now enters the real VPS namespaces through `nsenter --target 1 ...`
 - Current default trusted operator id remains `8426853622`
+- Near-term WhatsApp customer-care path uses `WHATSAPP_PROVIDER=evolution` through the Evolution API personal WhatsApp QR-session bridge at `https://waba.bookedai.au` and backend webhook `/api/webhooks/evolution` while WhatsApp Business/Meta verification is pending
 
 ## Memory Policy
 

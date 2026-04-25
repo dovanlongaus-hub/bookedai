@@ -39,9 +39,9 @@ for name in "${required_supabase_containers[@]}"; do
   fi
 done
 
-root_redirect_location="$(curl -fsSI "https://${ROOT_DOMAIN}" | awk 'BEGIN{IGNORECASE=1} /^location:/ {print $2}' | tr -d '\r' | tail -n 1)"
-if [[ "${root_redirect_location}" != "https://${PITCH_DOMAIN}/" ]]; then
-  echo "ERROR: ${ROOT_DOMAIN} did not redirect to https://${PITCH_DOMAIN}/ (got ${root_redirect_location:-<none>})"
+root_html="$(curl -fsS "https://${ROOT_DOMAIN}")"
+if ! grep -Fq "BookedAI | The AI Revenue Engine" <<<"${root_html}"; then
+  echo "ERROR: ${ROOT_DOMAIN} did not serve the BookedAI homepage shell"
   exit 1
 fi
 curl -fsS "https://${PITCH_DOMAIN}" >/dev/null

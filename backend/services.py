@@ -57,7 +57,7 @@ from service_layer.calls_scheduling import (
 )
 from service_layer.catalog_assets import resolve_service_image_url
 from service_layer.email_service import EmailService
-from service_layer.event_store import store_event
+from service_layer.event_store import purge_expired_whatsapp_conversations, store_event
 from service_layer.geo_utils import (
     _build_geocode_query,
     _build_google_maps_url,
@@ -2636,7 +2636,28 @@ class BookingAssistantService:
         services: list[ServiceCatalogItem] | None = None,
     ) -> BookingAssistantSessionResponse:
         catalog = services or SERVICE_CATALOG
+        is_event_request = payload.service_id.startswith("event:") and bool(payload.event_url and payload.event_title)
         service = next((item for item in catalog if item.id == payload.service_id), None)
+        if not service and is_event_request:
+            service = ServiceCatalogItem(
+                id=payload.service_id,
+                name=payload.event_title or "Event request",
+                category="Event",
+                business_email=self.settings.booking_business_email,
+                summary=payload.event_summary or "Event attendance request captured by BookedAI.",
+                duration_minutes=60,
+                amount_aud=0,
+                currency_code="AUD",
+                display_price="Details in follow-up",
+                image_url=None,
+                map_snapshot_url=None,
+                venue_name=payload.event_venue_name,
+                location=payload.event_location,
+                map_url=None,
+                booking_url=payload.event_url,
+                tags=["event"],
+                featured=False,
+            )
         if not service:
             raise ValueError("Selected service was not found")
 
@@ -2660,32 +2681,40 @@ class BookingAssistantService:
             (service.business_email or "").strip().lower() or self.settings.booking_business_email
         )
         info_recipient = self.settings.booking_business_email.strip().lower()
-        amount_label = format_amount(service.amount_aud)
+        amount_label = "Details in follow-up" if is_event_request else format_amount(service.amount_aud)
 
         payment_status = "payment_follow_up_required"
-        payment_url = build_manual_followup_url(
-            booking_reference=booking_reference,
-            service_name=service.name,
-            business_recipient=business_recipient,
-            customer_name=payload.customer_name,
-            customer_email=normalized_email,
-            customer_phone=normalized_phone,
-            requested_date=payload.requested_date.isoformat(),
-            requested_time=payload.requested_time.strftime("%H:%M"),
-            timezone=payload.timezone,
-            notes=payload.notes,
+        payment_url = (
+            ""
+            if is_event_request
+            else build_manual_followup_url(
+                booking_reference=booking_reference,
+                service_name=service.name,
+                business_recipient=business_recipient,
+                customer_name=payload.customer_name,
+                customer_email=normalized_email,
+                customer_phone=normalized_phone,
+                requested_date=payload.requested_date.isoformat(),
+                requested_time=payload.requested_time.strftime("%H:%M"),
+                timezone=payload.timezone,
+                notes=payload.notes,
+            )
         )
         meeting_status = "configuration_required"
         meeting_join_url: str | None = None
-        meeting_event_url: str | None = None
-        calendar_add_url = build_google_calendar_url(
-            booking_reference=booking_reference,
-            service=service,
-            customer_name=payload.customer_name,
-            requested_date=payload.requested_date,
-            requested_time=payload.requested_time,
-            timezone=payload.timezone,
-            notes=payload.notes,
+        meeting_event_url: str | None = payload.event_url if is_event_request else None
+        calendar_add_url = (
+            payload.event_url
+            if is_event_request
+            else build_google_calendar_url(
+                booking_reference=booking_reference,
+                service=service,
+                customer_name=payload.customer_name,
+                requested_date=payload.requested_date,
+                requested_time=payload.requested_time,
+                timezone=payload.timezone,
+                notes=payload.notes,
+            )
         )
 
         if normalized_email and zoho_calendar_configured(self.settings):
@@ -2701,7 +2730,7 @@ class BookingAssistantService:
             except Exception:
                 meeting_status = "configuration_required"
 
-        if self.settings.stripe_secret_key:
+        if self.settings.stripe_secret_key and not is_event_request:
             try:
                 payment_url = await self._create_stripe_checkout_url(
                     booking_reference=booking_reference,
@@ -2798,11 +2827,15 @@ class BookingAssistantService:
         )
 
         confirmation_message = (
-            "Your booking request is ready. Continue to Stripe checkout to secure the appointment."
-            if payment_status == "stripe_checkout_ready"
+            "Your attendance request has been captured. The organiser will confirm the final event details with you."
+            if is_event_request
             else (
-                "Your booking request has been captured. Payment checkout will be completed with "
-                f"a follow-up from {business_recipient}."
+                "Your booking request is ready. Continue to Stripe checkout to secure the appointment."
+                if payment_status == "stripe_checkout_ready"
+                else (
+                    "Your booking request has been captured. Payment checkout will be completed with "
+                    f"a follow-up from {business_recipient}."
+                )
             )
         )
         if meeting_status == "scheduled":
@@ -2820,7 +2853,7 @@ class BookingAssistantService:
             timezone=payload.timezone,
             payment_status=payment_status,  # type: ignore[arg-type]
             payment_url=payment_url,
-            qr_code_url=build_qr_code_url(payment_url),
+            qr_code_url=build_qr_code_url(payment_url) if payment_url else "",
             email_status=email_status,  # type: ignore[arg-type]
             meeting_status=meeting_status,  # type: ignore[arg-type]
             meeting_join_url=meeting_join_url,

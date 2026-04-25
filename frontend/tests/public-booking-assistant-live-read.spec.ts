@@ -246,7 +246,7 @@ async function getActiveAssistantInput(page: Parameters<typeof test>[0]['page'])
 
   const homepageSearchInput = page
     .locator('#bookedai-search-assistant')
-    .getByPlaceholder(/What service do you want to book today\?/i)
+    .getByRole('textbox', { name: /Ask BookedAI/i })
     .first();
   if (await isVisible(homepageSearchInput, 500)) {
     return homepageSearchInput;
@@ -278,7 +278,7 @@ async function openAssistant(page: Parameters<typeof test>[0]['page']) {
   const inlineAssistantInput = page.locator('#assistant-chat-input');
   const homepageSearchInput = page
     .locator('#bookedai-search-assistant')
-    .getByPlaceholder(/What service do you want to book today\?/i)
+    .getByRole('textbox', { name: /Ask BookedAI/i })
     .first();
 
   if (!(await isVisible(inlineAssistantInput, 5000)) && !(await isVisible(homepageSearchInput, 5000))) {
@@ -319,7 +319,7 @@ async function submitAssistantQuery(
   const homepageAssistantPane = page.locator('#bookedai-search-assistant').first();
   if (await isVisible(homepageAssistantPane, 500)) {
     const homepageSearchInput = homepageAssistantPane
-      .getByPlaceholder(/What service do you want to book today\?/i)
+      .getByRole('textbox', { name: /Ask BookedAI/i })
       .first();
     await homepageSearchInput.fill(query);
     await homepageAssistantPane.getByRole('button', { name: /Send search|Try Now/i }).first().click();
@@ -2708,7 +2708,7 @@ test.describe('public assistant rollout smoke', () => {
     expect(matchingSearchRequests).toBeGreaterThanOrEqual(2);
   });
 
-  test('booking submit uses v1 booking intent as the authoritative write when live-read is enabled @live-read', async ({ page }) => {
+  test('booking submit uses v1 booking intent as the authoritative write when live-read is enabled and keeps the homepage chat full flow friendly @live-read', async ({ page }) => {
     let legacySessionRequests = 0;
     let shadowLeadRequests = 0;
     let shadowBookingIntentRequests = 0;
@@ -2866,12 +2866,36 @@ test.describe('public assistant rollout smoke', () => {
     });
 
     await openAssistant(page);
+    await expect(page.getByText(/01 Ask/i).first()).toBeVisible();
+    await expect(page.getByText(/02 Match/i).first()).toBeVisible();
+    await expect(page.getByText(/03 Book/i).first()).toBeVisible();
+    await expect(page.getByText(/04 Confirm/i).first()).toBeVisible();
+    await expect(page.getByText('Booking form unlocks after a match is selected.')).toBeVisible();
     await submitAssistantQuery(page, 'Need a haircut in Sydney');
+    await expect(page.getByText('BookedAI answer').first()).toBeVisible();
+    await expect(page.getByText('Live search result').first()).toBeVisible();
+    await expect(page.getByText('Top research').first()).toBeVisible();
+    const chatResultCard = page.locator('article').filter({ hasText: 'V1 Precision Fade' }).first();
+    await expect(chatResultCard).toBeVisible();
+    await expect(chatResultCard.getByText('Option 1')).toBeVisible();
+    await expect(chatResultCard.getByText('Hair')).toBeVisible();
+    await expect(chatResultCard.getByText(/\$75|A\$75|Price not listed/)).toBeVisible();
+    await expect(chatResultCard.getByText(/30 min|60 min|Duration TBD/)).toBeVisible();
+    await expect(chatResultCard.getByText(/Sydney/).first()).toBeVisible();
+    await expect(chatResultCard.getByRole('button', { name: /View details for V1 Precision Fade/i })).toBeVisible();
+    await expect(chatResultCard.getByRole('link', { name: /Email BookedAI about V1 Precision Fade/i })).toBeVisible();
+    await expect(chatResultCard.getByRole('button', { name: /Book V1 Precision Fade/i })).toBeVisible();
+    await expect(page.getByText('Suggested chat refinements').first()).toBeVisible();
     await selectLiveReadServiceForBooking(page);
+    await expect(page.getByText('Booking brief ready').first()).toBeVisible();
     await openBookingComposerIfNeeded(page);
 
     const bookingForm = getBookingForm(page);
     await expect(bookingForm).toBeVisible();
+    await expect(page.getByText('Contact', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Preferred time', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Next step', { exact: true }).first()).toBeVisible();
+    await expect(bookingForm.getByText(/Email or phone is enough/i)).toBeVisible();
     await bookingForm.getByLabel('Name').fill('BookedAI Customer');
     await bookingForm.getByLabel('Email').fill('customer@example.com');
     await bookingForm.locator('input[type="datetime-local"]').fill(requestedSlot);
@@ -2879,11 +2903,28 @@ test.describe('public assistant rollout smoke', () => {
       .getByRole('button', { name: /Create Booking Request|Continue booking/i })
       .click({ force: true });
 
-    await expect(page.getByText('shadow-ref', { exact: true })).toBeVisible();
+    await expect(page.getByText('shadow-ref', { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/Booking request captured in v1\./)).toBeVisible();
+    await expect(page.getByText(/Your booking code, portal QR, and follow-up path are ready/i)).toBeVisible();
+    await expect(page.getByText('Scan to open booking')).toBeVisible();
+    await expect(page.getByText('Review booking').first()).toBeVisible();
+    await expect(page.getByText('Edit and submit').first()).toBeVisible();
+    await expect(page.getByText('Request reschedule').first()).toBeVisible();
+    await expect(page.getByText('Customer-facing follow-up prepared from the booking result')).toBeVisible();
+    await expect.poll(async () =>
+      page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
+    ).toBe(true);
     expect(legacySessionRequests).toBe(0);
     await expect.poll(() => shadowLeadRequests).toBe(1);
     await expect.poll(() => shadowBookingIntentRequests).toBe(1);
+    const homepageEvents = await page.evaluate(() =>
+      ((window as unknown as { __bookedaiHomepageEvents?: Array<{ event?: string }> }).__bookedaiHomepageEvents ?? []),
+    );
+    expect(homepageEvents.some((event) => event.event === 'homepage_search_started')).toBe(true);
+    expect(homepageEvents.some((event) => event.event === 'homepage_top_research_visible')).toBe(true);
+    expect(homepageEvents.some((event) => event.event === 'homepage_result_selected')).toBe(true);
+    expect(homepageEvents.some((event) => event.event === 'homepage_booking_started')).toBe(true);
+    expect(homepageEvents.some((event) => event.event === 'homepage_booking_submitted')).toBe(true);
   });
 
   test('booking submit surfaces v1 booking intent validation details when the authoritative write fails @live-read', async ({

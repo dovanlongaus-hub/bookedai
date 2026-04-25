@@ -8,20 +8,32 @@ Additional synchronization baseline from `2026-04-25`:
 
 - `prd.md`
 - `project.md`
+- `DESIGN.md`
+- `docs/architecture/bookedai-master-prd.md`
 - `docs/architecture/implementation-phase-roadmap.md`
 - `docs/architecture/current-phase-sprint-execution-plan.md`
 - `docs/development/implementation-progress.md`
+- `docs/development/bookedai-chatbot-landing-design-spec.md`
 - `docs/development/sprint-13-16-user-surface-delivery-package.md`
 - `docs/development/next-phase-implementation-plan-2026-04-25.md`
+- `frontend/src/apps/public/PitchDeckApp.tsx`
+- `frontend/src/components/landing/data.ts`
+
+Current pitch and roadmap visualization rule:
+
+- `pitch.bookedai.au` should show the whole-project architecture as one simple buyer-readable operating flow: `demand -> qualification -> booking -> ops ledger`
+- `/roadmap` should expose the active post-Sprint-16 plan directly from the frontend roadmap dataset: Phase/Sprint `17-23`
+- the public/product design requirements now include a verified tenant search contract: reviewed chess tenant results stay in the normal result list while surfacing BookedAI booking, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit/revisit capability
+- the public/product search-card contract now also requires top-left thumbnail/preview treatment, Google Maps actions for physical-place matches, faster staged progress copy, and early-match visibility while chat-based clarification continues
 
 Current post-Sprint-16 phase map:
 
-- `Phase 17`: full-flow stabilization
+- `Phase 17`: full-flow stabilization, including results-first reviewed-tenant search and portal-first QR confirmation
 - `Phase 18`: revenue-ops ledger control
-- `Phase 19`: customer-care and status agent
+- `Phase 19`: customer-care and status agent, now started with WhatsApp booking-truth replies plus audited cancel/reschedule request queueing
 - `Phase 20`: widget and plugin runtime
 - `Phase 21`: billing, receivables, subscriptions, and commission truth
-- `Phase 22`: reusable multi-tenant templates
+- `Phase 22`: reusable multi-tenant templates, including reusable verified-tenant search/result/confirmation treatment after chess and Future Swim stay stable
 - `Phase 23`: release governance and scale hardening
 
 ## Purpose

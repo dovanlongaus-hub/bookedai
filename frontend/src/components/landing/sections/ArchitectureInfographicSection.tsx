@@ -490,16 +490,18 @@ function InvestorArchitectureImage() {
 }
 
 type ArchitectureInfographicSectionProps = {
+  id?: string;
   onStartTrial?: () => void;
   onBookDemo?: () => void;
 };
 
 export function ArchitectureInfographicSection({
+  id = 'architecture',
   onStartTrial,
   onBookDemo,
 }: ArchitectureInfographicSectionProps) {
   return (
-    <SectionShell id="architecture" className="py-10 lg:py-12">
+    <SectionShell id={id} className="py-10 lg:py-12">
       <SectionCard className="relative overflow-hidden border border-black/6 bg-[linear-gradient(155deg,#fcfdff_0%,#f3f8ff_30%,#f7fbff_65%,#ffffff_100%)] p-7 shadow-[0_34px_110px_rgba(15,23,42,0.08)] lg:p-9">
         <div className="absolute -right-20 top-0 h-56 w-56 rounded-full bg-sky-400/10 blur-3xl" />
         <div className="absolute left-0 top-20 h-48 w-48 rounded-full bg-emerald-400/10 blur-3xl" />

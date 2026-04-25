@@ -663,6 +663,55 @@ export interface PortalBookingDetailResponse {
   status_timeline: PortalBookingTimelineItem[];
 }
 
+export interface PortalCustomerCareTurnRequest {
+  message: string;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+}
+
+export interface PortalCustomerCareTurnResponse {
+  booking_reference: string;
+  phase: string;
+  reply: string;
+  identity: {
+    booking_reference?: string | null;
+    resolved_by: string[];
+    email_match?: boolean;
+    phone_match?: boolean;
+    verified: boolean;
+    verification_note: string;
+  };
+  status: {
+    booking?: string | null;
+    payment?: string | null;
+    summary?: PortalBookingStatusSummary | null;
+  };
+  academy?: {
+    student?: Record<string, unknown> | null;
+    report_available?: boolean;
+  } | null;
+  operations: {
+    summary: Record<string, unknown>;
+    recent_actions: RevenueAgentActionRun[];
+  };
+  created_request?: {
+    request_status?: string | null;
+    request_type?: string | null;
+    booking_reference?: string | null;
+    message?: string | null;
+    support_email?: string | null;
+    outbox_event_id?: number | null;
+  } | null;
+  next_actions: Array<{
+    id?: string | null;
+    label?: string | null;
+    enabled?: boolean;
+    href?: string | null;
+    note?: string | null;
+  }>;
+  sources: string[];
+}
+
 export interface PortalBookingActionRequest {
   customer_note?: string | null;
   preferred_date?: string | null;
@@ -1133,6 +1182,27 @@ export interface TenantBookingsResponse {
     cancelled: number;
     other: number;
   };
+  portal_request_summary?: {
+    open: number;
+    counts: {
+      reschedule_request: number;
+      cancel_request: number;
+      support_request: number;
+      pause_request: number;
+      downgrade_request: number;
+      [key: string]: number;
+    };
+    recent: Array<{
+      request_type: string;
+      booking_reference?: string | null;
+      customer_note?: string | null;
+      customer_name?: string | null;
+      customer_email?: string | null;
+      customer_phone?: string | null;
+      service_name?: string | null;
+      created_at?: string | null;
+    }>;
+  };
   items: TenantOverviewRecentBooking[];
 }
 
@@ -1171,6 +1241,41 @@ export interface TenantIntegrationsResponse {
   attention: IntegrationAttentionItem[];
   reconciliation: IntegrationReconciliationDetailsResponse;
   crm_retry_backlog: CrmRetryBacklogResponse;
+  automation?: {
+    status: string;
+    mode: string;
+    summary: {
+      ready_connections?: number;
+      required_connections?: number;
+      attention_items?: number;
+      hold_recommended?: boolean;
+      [key: string]: unknown;
+    };
+    next_step: string;
+    required_connections: Array<{
+      id: string;
+      label: string;
+      status: string;
+      ready: boolean;
+      provider?: string | null;
+      sync_mode?: string | null;
+      required_for?: string[];
+      note?: string | null;
+    }>;
+    action_routes: Array<{
+      action_type: string;
+      trigger: string;
+      connection: string;
+      automation_mode: string;
+      approval_policy: string;
+    }>;
+    dispatch: {
+      tenant_endpoint: string;
+      admin_endpoint: string;
+      can_run_policy_actions: boolean;
+      guardrail: string;
+    };
+  };
   activity: TenantSectionActivity;
   controls?: {
     available_statuses: string[];
@@ -1183,6 +1288,27 @@ export interface TenantIntegrationsResponse {
     write_mode: string;
     operator_note: string;
   };
+}
+
+export interface TenantOperationsDispatchRequest {
+  limit?: number;
+}
+
+export interface TenantOperationsDispatchResponse {
+  tenant_id?: string | null;
+  tenant_ref?: string | null;
+  job_run_id?: number | null;
+  dispatch_status: string;
+  detail?: string | null;
+  retryable: boolean;
+  metadata: {
+    total_actions?: number;
+    processed_actions?: number;
+    manual_review_actions?: number;
+    failed_actions?: number;
+    [key: string]: unknown;
+  };
+  message: string;
 }
 
 export interface TenantBillingResponse {

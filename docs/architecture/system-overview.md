@@ -6,6 +6,13 @@ BookedAI is a full-stack booking automation platform for `bookedai.au`. It combi
 
 The platform is currently designed around a single Docker host with multiple routed subdomains, plus a beta runtime tier used for pre-production release rehearsal.
 
+Current pitch-level architecture summary:
+
+- customer surfaces: `pitch.bookedai.au`, `product.bookedai.au`, `demo.bookedai.au`, widget/plugin runtime, and `portal.bookedai.au`
+- AI agent layer: search/conversation agent, revenue-ops agent, customer-care/status agent, WhatsApp booking-care replies, and policy gates
+- booking core: leads, matches, booking intents, payment intents, lifecycle events, and action runs
+- operations truth: tenant Ops, admin Reliability, CRM/email/WhatsApp/webhook evidence, audit ledger, release gate, and stack health checks
+
 ## Business Domains
 
 ### Public product experience
@@ -161,12 +168,16 @@ Primary directories:
 
 - `n8n/`
 - `scripts/provision_n8n_workflows.sh`
+- `backend/api/webhook_routes.py`
+- `backend/service_layer/tenant_app_service.py`
 
 Responsibilities:
 
 - workflow intake
 - callback automation
 - downstream booking signal handling
+- WhatsApp inbound customer-care replies grounded in portal booking truth
+- audited customer request queueing for WhatsApp reschedule and cancellation messages
 
 ### 6. Platform Layer
 

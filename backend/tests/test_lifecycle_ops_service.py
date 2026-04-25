@@ -927,6 +927,7 @@ class CommunicationServiceDeliveryFallbackTestCase(IsolatedAsyncioTestCase):
             sms_from_number="+10000000000",
         )
         service = CommunicationService(settings)
+        test_case = self
 
         class _FakeAsyncClient:
             def __init__(self, *args, **kwargs):
@@ -965,6 +966,7 @@ class CommunicationServiceDeliveryFallbackTestCase(IsolatedAsyncioTestCase):
             whatsapp_from_number="whatsapp:+14155238886",
         )
         service = CommunicationService(settings)
+        test_case = self
 
         class _FakeAsyncClient:
             def __init__(self, *args, **kwargs):
@@ -993,3 +995,151 @@ class CommunicationServiceDeliveryFallbackTestCase(IsolatedAsyncioTestCase):
         self.assertIsNone(result.provider_message_id)
         self.assertTrue(result.warnings)
         self.assertIn("manual review", result.warnings[0].lower())
+
+    async def test_send_whatsapp_uses_twilio_backup_when_meta_primary_is_unconfigured(self):
+        settings = replace(
+            _build_test_settings(),
+            whatsapp_provider="meta",
+            whatsapp_fallback_provider="twilio",
+            whatsapp_twilio_account_sid="AC123",
+            whatsapp_twilio_api_key_sid="SK123",
+            whatsapp_twilio_api_key_secret="secret",
+            whatsapp_from_number="+61455301335",
+            whatsapp_meta_phone_number_id="",
+            whatsapp_meta_access_token="",
+        )
+        service = CommunicationService(settings)
+        test_case = self
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                return None
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, **kwargs):
+                test_case.assertIn("/Accounts/AC123/Messages.json", url)
+                test_case.assertEqual(kwargs["data"]["From"], "whatsapp:+61455301335")
+                return httpx.Response(
+                    201,
+                    request=httpx.Request("POST", url),
+                    json={"sid": "SM123", "status": "queued"},
+                )
+
+        with patch("service_layer.communication_service.httpx.AsyncClient", _FakeAsyncClient):
+            result = await service.send_whatsapp(
+                to="+61400000000",
+                body="Hello from BookedAI on WhatsApp",
+            )
+
+        self.assertEqual(result.provider, "whatsapp_twilio")
+        self.assertEqual(result.delivery_status, "queued")
+        self.assertEqual(result.provider_message_id, "SM123")
+        self.assertTrue(result.warnings)
+        self.assertIn("backup provider whatsapp_twilio", result.warnings[0])
+
+    async def test_send_whatsapp_falls_back_to_twilio_when_meta_auth_fails(self):
+        settings = replace(
+            _build_test_settings(),
+            whatsapp_provider="meta",
+            whatsapp_fallback_provider="twilio",
+            whatsapp_twilio_account_sid="AC123",
+            whatsapp_twilio_api_key_sid="SK123",
+            whatsapp_twilio_api_key_secret="secret",
+            whatsapp_from_number="+61455301335",
+            whatsapp_meta_phone_number_id="meta-phone-id",
+            whatsapp_meta_access_token="meta-token",
+        )
+        service = CommunicationService(settings)
+        test_case = self
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                self.calls = []
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, **kwargs):
+                self.calls.append(url)
+                if "graph.facebook.com" in url:
+                    return httpx.Response(
+                        401,
+                        request=httpx.Request("POST", url),
+                        text="Unauthorized",
+                    )
+                test_case.assertIn("/Accounts/AC123/Messages.json", url)
+                test_case.assertEqual(kwargs["data"]["From"], "whatsapp:+61455301335")
+                return httpx.Response(
+                    201,
+                    request=httpx.Request("POST", url),
+                    json={"sid": "SM456", "status": "sent"},
+                )
+
+        with patch("service_layer.communication_service.httpx.AsyncClient", _FakeAsyncClient):
+            result = await service.send_whatsapp(
+                to="+61400000000",
+                body="Hello from BookedAI on WhatsApp",
+            )
+
+        self.assertEqual(result.provider, "whatsapp_twilio")
+        self.assertEqual(result.delivery_status, "sent")
+        self.assertEqual(result.provider_message_id, "SM456")
+        self.assertTrue(result.warnings)
+        self.assertIn("primary provider whatsapp_meta is unavailable", result.warnings[0])
+
+    async def test_send_whatsapp_falls_back_to_twilio_when_meta_bad_request_fails(self):
+        settings = replace(
+            _build_test_settings(),
+            whatsapp_provider="meta",
+            whatsapp_fallback_provider="twilio",
+            whatsapp_twilio_account_sid="AC123",
+            whatsapp_twilio_api_key_sid="SK123",
+            whatsapp_twilio_api_key_secret="secret",
+            whatsapp_from_number="+61455301335",
+            whatsapp_meta_phone_number_id="meta-phone-id",
+            whatsapp_meta_access_token="meta-token",
+        )
+        service = CommunicationService(settings)
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                return None
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, **_kwargs):
+                if "graph.facebook.com" in url:
+                    return httpx.Response(
+                        400,
+                        request=httpx.Request("POST", url),
+                        text="Bad Request",
+                    )
+                return httpx.Response(
+                    201,
+                    request=httpx.Request("POST", url),
+                    json={"sid": "SM789", "status": "sent"},
+                )
+
+        with patch("service_layer.communication_service.httpx.AsyncClient", _FakeAsyncClient):
+            result = await service.send_whatsapp(
+                to="+61400000000",
+                body="Hello from BookedAI on WhatsApp",
+            )
+
+        self.assertEqual(result.provider, "whatsapp_twilio")
+        self.assertEqual(result.delivery_status, "sent")
+        self.assertEqual(result.provider_message_id, "SM789")
+        self.assertTrue(result.warnings)
+        self.assertIn("primary provider whatsapp_meta is unavailable", result.warnings[0])

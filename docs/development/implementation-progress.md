@@ -12,6 +12,112 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-25`
 
+Implementation update from `2026-04-25` (homepage chat inline results and booking-flow regression):
+
+- reworked `frontend/src/apps/public/HomepageSearchExperience.tsx` so homepage assistant results render as compact booking cards inside the chat bubble instead of relying on a detached shortlist after the conversation
+- chat result cards now show the booking-critical scan layer: option/category, price or explicit missing-price state, duration, location, confidence, fit/next-step copy, and direct details/maps/provider/select/book actions
+- suggestion chips now remain inside assistant chat bubbles under `Suggested chat refinements`, preserving a single conversational path from ask to refine to book
+- redesigned the homepage chat frame so the conversation/results area scrolls above a Claude-style bottom composer with attachment, textarea, voice, and send icon controls
+- added `Top research` framing to the assistant result bubble so the top summarized options are clearly reviewable in-chat before the user selects or books
+- expanded in-chat result actions with Mail and Call paths beside Details, Maps, Provider, Select, and Book, making real-world follow-up feel attached to the found result
+- removed the duplicate standalone assistant summary whenever an assistant chat reply already exists, keeping the UI tighter and less repetitive
+- enriched live-read candidates from the loaded catalog by id where possible, and made missing booking fields explicit with `Price not listed`, `Duration TBD`, and `Location TBD` fallbacks
+- expanded the live-read Playwright booking smoke to assert the inline chat result card, booking-critical facts, suggestion refinements, and in-chat `Book` action before submitting the authoritative v1 booking intent
+- verification passed with frontend typecheck, production build, live-read Playwright smoke, legacy homepage responsive smoke, backend `test_api_v1_booking_routes.py`, live deploy, stack healthcheck, public-surface production smoke, and non-mutating live homepage composer/search/status smoke with no console/request failures or mobile overflow
+- full homepage UAT and A/B review was rerun after deployment: production desktop, tablet, and mobile passed with `19/19` heuristic scores, screenshots/JSON were saved under `frontend/output/playwright/homepage-full-uat-ab-2026-04-25/`, and the recommended next experiment is a product-first `Start with a request` variant measured against search-start, booking-start, and investor-click events
+
+Implementation update from `2026-04-25` (architecture showcase page and big-tech pitch visualization):
+
+- added `frontend/src/apps/public/ArchitectureApp.tsx` as a standalone `/architecture` showcase for technical buyers and investors, with an architecture image, revenue-engine control map, system lane map, design capability cards, product proof imagery, and enterprise posture section
+- wired `/architecture`, `/architecture/`, and `architecture.bookedai.au` into `frontend/src/app/AppRouter.tsx`
+- linked the architecture showcase from the pitch nav, pitch hero/pricing CTAs, and public homepage nav so architecture review is discoverable without re-expanding the main pitch page
+- upgraded the in-pitch architecture section from a short four-step operating loop into a professional multi-layer infographic: customer demand surfaces, AI orchestration, revenue transaction core, operations control plane, partner/integration rails, and infrastructure/technology stack are grouped directly in the pitch flow
+- the pitch infographic now explicitly names BookedAI surfaces, customer-turn/search/revenue-ops/care agents, booking/payment/QR/email-calendar modules, tenant/admin/action-ledger/support controls, Stripe, Meta WhatsApp, Twilio, n8n, CRM/webhook recovery, OpenClaw, Telegram, Notion, Discord, React, TypeScript, Vite, Tailwind, FastAPI, Supabase, Postgres, Docker Compose, Nginx, and Cloudflare DNS/TLS
+- kept the pitch page concise while giving the architecture story a dedicated big-tech-style layout focused on visual system design, governance, and real product surfaces
+- verified with `npm --prefix frontend exec tsc -- --noEmit`, `npm --prefix frontend run build`, and local Playwright desktop/mobile smoke for `/architecture` and `/pitch-deck`; `/architecture` and the pitch architecture infographic have no horizontal overflow, required layers/integrations/stack labels are present, the proof images load, and there are no console/page/request failures
+- deployed live with `python3 scripts/telegram_workspace_ops.py deploy-live`; production smoke passed for `https://bookedai.au/architecture` and `https://pitch.bookedai.au/architecture` on desktop/mobile, and `https://pitch.bookedai.au/` now exposes four `/architecture` links while preserving one pricing section and zero horizontal overflow
+- follow-up pitch deployment published the expanded multi-layer architecture infographic directly inside `https://pitch.bookedai.au/`; production desktop/mobile smoke confirmed the architecture image, all layer/integration/stack labels, one pricing section, no horizontal overflow, and no browser console/page/request failures
+
+Implementation update from `2026-04-25` (pitch UAT rewording and layout compression):
+
+- reworked `frontend/src/apps/public/PitchDeckApp.tsx` after UAT review so the pitch now reads as a shorter buyer/investor flow: outcome-led hero, live tenant proof, problem, solution, product proof, pricing, one operating-model architecture visual, surfaces, trust/team, and final CTA
+- moved pricing immediately after product proof and removed the oversized architecture-detail infographic from the pitch runtime, leaving a single `demand -> qualification -> booking -> ops ledger` operating-model section
+- tightened copy around captured demand, booking-ready action, operator workflow visibility, and commercial terms instead of repeating long system-layer language
+- added native required/min-length validation to the SME registration form for business name, website/app URL, business type, email, phone, name, and preferred setup time
+- verified with `npm --prefix frontend run build` and local Playwright desktop/mobile smoke for `/pitch-deck` plus `/register-interest`; mobile pitch height is about `21.1kpx`, there is one pricing section, no architecture-detail section, no horizontal overflow, and no console/page/request errors
+- deployed the pitch rework live with `python3 scripts/telegram_workspace_ops.py deploy-live`; production smoke on `https://pitch.bookedai.au/` confirmed the target hero copy, one pricing section before architecture, no old `architecture-detail` section, the `Demand -> Qualification -> Booking -> Ops ledger` flow, no horizontal overflow, and no console/page/request failures on desktop and mobile
+
+Implementation update from `2026-04-25` (public homepage investor/customer redesign):
+
+- redesigned `frontend/src/apps/public/PublicApp.tsx` from a sidebar-first search shell into an executive acquisition homepage that explains BookedAI as an AI revenue engine for service businesses
+- rebuilt the first viewport around the promise `Turn demand into booked revenue`, with concise stats, product and investor CTAs, the Grandmaster Chess proof visual, Future Swim tenant proof, and the WhatsApp booking-care channel
+- preserved the real `HomepageSearchExperience` as the live product workspace, then added compact sections for the market problem, revenue outcomes, operating model, investor thesis, customer value, and final CTA
+- adjusted responsive header behavior to avoid the repo's legacy `.hidden { display:none!important }` override by using default-visible desktop controls with max-width hiding instead of `hidden lg:flex`
+- verified with `npm --prefix frontend run build`, local Playwright desktop/mobile screenshots under `frontend/output/playwright/homepage-redesign-2026-04-25/`, desktop header visibility checks, and mobile no-horizontal-overflow measurement at `390px`; local preview still reports the expected unauthenticated conversation-session `401` without a signed backend session
+- deployed live with `python3 scripts/telegram_workspace_ops.py deploy-live`; the deploy hit the known transient Docker compose recreate `No such container` race, retried with orphan cleanup, and completed successfully
+- live verification passed on `https://bookedai.au`: Playwright confirmed title, H1, desktop nav, mobile no-horizontal-overflow at `390px`, and zero console errors; evidence lives under `frontend/output/playwright/homepage-live-redesign-2026-04-25/`
+- updated `scripts/healthcheck_stack.sh` so root `bookedai.au` is expected to serve the BookedAI homepage shell directly instead of redirecting to `pitch.bookedai.au`; the refreshed stack health check passed
+- completed a follow-up live public-surface smoke after the routing change: `bookedai.au`, `product.bookedai.au`, `pitch.bookedai.au`, `bookedai.au/roadmap`, `tenant.bookedai.au`, `portal.bookedai.au`, and `admin.bookedai.au` all returned `200`, matched expected visible copy, had no browser console errors or failed requests, and had no mobile horizontal overflow at `390px`; evidence lives under `frontend/output/playwright/public-surfaces-live-smoke-2026-04-25/`
+
+Implementation update from `2026-04-25` (tenant gateway and Future Swim UAT follow-up):
+
+- implemented the live UAT content/UX recommendations for `tenant.bookedai.au` and `tenant.bookedai.au/future-swim`
+- reframed the tenant gateway around business outcomes instead of auth mechanics, updated the value chips, softened the auth card copy, added a visible first-party Google CTA fallback above the third-party iframe, and shortened the mobile email-code button to `Send code`
+- moved Future Swim revenue proof into a prominent summary section immediately after the tenant hero, rewrote the hero and activation copy, compressed the mobile workspace menu into a two-column jump-style layout, and removed the repeated lower revenue proof block from the overview stack
+- verified with `npm --prefix frontend run build`
+- deployed live through the host-level wrapper via `python3 scripts/telegram_workspace_ops.py host-shell --cwd /home/dovanlong/BookedAI --command "bash scripts/deploy_live_host.sh"` after an earlier direct deploy attempt hit a transient Docker container-name conflict during compose recreate
+- final live checks passed: API health, tenant gateway, and Future Swim routes returned `200`; live Playwright desktop/mobile smoke reported no console errors, page errors, request failures, or horizontal overflow, and Future Swim tenant APIs returned `200`
+- final evidence lives under `frontend/output/playwright/live-tenant-ux-final-2026-04-25/`
+- follow-up polish then hid the Google iframe container from the mobile-visible auth surface so the native BookedAI Google CTA is the only visible Google control on small screens, reframed the gateway source label into trust-oriented copy, and corrected the Future Swim `Next follow-up` card to show tenant attention signals instead of a demand-source label
+- the polish build and deploy also passed; final polish smoke confirmed the mobile Google iframe is not visible, the native Google CTA remains visible, Future Swim revenue proof appears once, Future Swim tenant APIs returned `200`, and no console errors, page errors, failed requests, or horizontal overflow were detected
+- polish evidence lives under `frontend/output/playwright/live-tenant-ux-polish-2026-04-25/`
+- continued the UAT follow-up with a compact tenant-gateway proof row covering booking flow, revenue proof, customer care, and automation, plus visible support contacts for `info@bookedai.au` and `+61 455 301 335`
+- added stable Future Swim anchors and a mobile quick navigation strip for revenue proof, activation, workspace menu, bookings, and catalog readiness so long tenant previews are easier to scan on small screens
+- the proof/navigation pass built and deployed live through the host wrapper; Playwright live smoke confirmed desktop/mobile gateway and Future Swim routes returned `200`, gateway proof/support copy is visible, Future Swim mobile quick nav and anchors are present, the mobile Google iframe remains hidden, Future Swim tenant APIs returned `200`, and no console errors, page errors, failed requests, or horizontal overflow were detected
+- proof/navigation evidence lives under `frontend/output/playwright/live-tenant-ux-proof-nav-2026-04-25/`
+- ran a full interaction UAT across gateway auth modes, mobile quick navigation, and all Future Swim panels; this found `GET /api/v1/tenant/leads?tenant_ref=future-swim` was missing from the modular live tenant router and then, after route restoration, exposed a production-schema mismatch in tenant lead reporting
+- restored `GET /api/v1/tenant/leads` in `backend/api/v1_tenant_routes.py` / `backend/api/v1_tenant_handlers.py`, fixed `ReportingRepository.list_tenant_leads()` to read normalized contact fields from `contacts` and latest service context from `booking_intents`, and added regression coverage in `tests/test_api_v1_tenant_routes.py` plus `tests/test_phase2_repositories.py`
+- verification passed with `python3 -m py_compile backend/repositories/reporting_repository.py backend/api/v1_tenant_handlers.py backend/api/v1_tenant_routes.py` and `cd backend && ../.venv/bin/python -m pytest -q tests/test_phase2_repositories.py tests/test_api_v1_tenant_routes.py` (`53 passed`)
+- final live UAT after deploy passed for desktop/mobile gateway and Future Swim: gateway mode switching works, mobile quick nav works, all Future Swim panels open, `tenant/leads` returns `200`, checked tenant APIs return `200`, and there are no app console errors, page errors, request failures, or horizontal overflow; third-party Google iframe font/log aborts are recorded separately as non-app blockers
+- full UAT evidence lives under `frontend/output/playwright/live-tenant-full-uat-fixed-2026-04-25/`
+
+Implementation update from `2026-04-25` (portal live UAT, content, and UX review):
+
+- ran a live UAT/content/UX review for `portal.bookedai.au` using the workspace `qa-testing-vi` structure plus manual startup/investor/content review lenses
+- created a public booking-intent UAT record `v1-6879356dc2`; creation succeeded, but `GET /api/v1/portal/bookings/v1-6879356dc2` and the matching `care-turn` endpoint returned live `500`
+- confirmed the browser customer experience currently degrades to `Booking not available` / `Failed to fetch`, with console CORS symptoms because the failed API response does not carry CORS headers
+- invalid references still return a structured `404 portal_booking_not_found` with CORS headers, and the tested desktop/mobile error layouts had no horizontal overflow
+- wrote the detailed review and rewrite/layout recommendations to `docs/development/portal-bookedai-uat-content-ux-review-2026-04-25.md`; top follow-up is hardening portal snapshot hydration for public `v1-*` booking-intent records before UI polish
+
+Implementation update from `2026-04-25` (product assistant native event attendance handoff):
+
+- extended `backend/schemas.py` so `BookingAssistantSessionRequest` accepts event attendance metadata (`event_title`, summary, timing, venue/location, organizer, URL) and `ServiceCatalogItem.amount_aud` can be zero for event-style confirmations
+- updated `backend/services.py` so `BookingAssistantService.create_session()` accepts synthetic `service_id` values shaped like `event:<url>`, builds an internal event proxy service for confirmation/session persistence, skips Stripe/manual payment routing for attendance requests, and returns event-specific confirmation copy instead of the normal paid-booking posture
+- rewired `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` so product assistant event selection now posts the real event metadata into `/booking-assistant/session` rather than stopping at a frontend-only handoff
+- added backend regression coverage in `backend/tests/test_booking_assistant_service.py` for event attendance requests and kept the existing frontend regression/build lane intact
+- live runtime verification in this workspace was partially blocked because the available Python installation has no `pip`, cannot create a venv via `ensurepip`, and lacks installed deps like `pydantic`, `fastapi`, `httpx`, and `pytest`; as a fallback, source-level verification confirmed the backend event path fields, zero-price schema allowance, synthetic `event:` session handling, event proxy creation, and payment-skip confirmation behavior, while frontend source checks confirmed the event metadata is now posted into `/booking-assistant/session`
+
+Implementation update from `2026-04-25` (search result maps, thumbnails, and progressive response):
+
+- added a shared Google Maps URL builder for result cards so physical-place matches open a direct `map_url` when provided or a venue/location/service Google Maps query fallback when not
+- updated homepage and product assistant result cards to show a top-left image thumbnail or branded preview fallback, keeping the card scan order visual first and then decision facts
+- added Google Maps actions to homepage/product result cards and detail popups so customers can inspect the specific place without leaving the BookedAI chat/search context
+- made search progress feel faster by advancing staged progress copy sooner, lowering delayed-nudge timing, and explicitly showing early-match copy while maps, booking paths, and fit checks continue
+- kept refinement prompts inside the BookedAI chat conversation, preserving the ChatGPT-like ask/refine/results/book flow
+- verified with `npm --prefix frontend run build`
+
+Implementation update from `2026-04-25` (OpenClaw WhatsApp bot readiness):
+
+- added `python3 scripts/telegram_workspace_ops.py whatsapp-bot-status` as a read-only OpenClaw/Telegram operator check for the BookedAI WhatsApp bot
+- clarified the runtime contract as a dedicated `BookedAI WhatsApp Booking Care Agent` for `bookedai.au`: it answers all service questions tied to already-booked records, while OpenClaw is the safe gateway/operator surface rather than a customer-visible persona
+- updated the active WhatsApp provider contract so `WHATSAPP_PROVIDER=evolution` can be the near-term personal WhatsApp QR-session path for `+61455301335` while Meta/WhatsApp Business verification remains blocked; Meta and Twilio remain later business-provider paths
+- added the repo-owned OpenClaw agent manifest at `deploy/openclaw/agents/bookedai-whatsapp-booking-care-agent.json` plus `python3 scripts/telegram_workspace_ops.py sync-openclaw-bookedai-agent` to install/update that manifest under the live OpenClaw runtime `agents/` directory
+- kept `openclaw.json` schema-safe for OpenClaw v2026.4.15 by not forcing the rich BookedAI agent contract into `agents.list`; the live runtime retains `main` there while the BookedAI WhatsApp agent manifest is supervised through OpenClaw commands and the BookedAI API gateway
+- the check verifies `bot.bookedai.au` gateway health, `api.bookedai.au` backend health, `/api/v1/integrations/providers/status` WhatsApp provider posture, and the active webhook path; for `whatsapp_evolution` it probes `/api/webhooks/evolution`, and for Meta/Twilio it keeps the `/api/webhooks/whatsapp` verify-route probe
+- added `whatsapp_bot_status` to the default OpenClaw/Telegram action vocabulary in the wrapper, OpenClaw compose, and OpenClaw env templates, and updated the live OpenClaw `.env` action list
+- kept the check non-sending by design, so it can be safely run from OpenClaw without triggering a real WhatsApp conversation
+- previous verification with `python3 scripts/telegram_workspace_ops.py whatsapp-bot-status` returned `status: ok`, `openclaw_gateway_live: true`, `api_live: true`, `whatsapp_provider: whatsapp_twilio`, `whatsapp_provider_status: connected`, and webhook verify-route `403`; the updated probe now also reports Evolution webhook reachability when the personal WhatsApp bridge is configured
+
 Implementation update from `2026-04-25` (ChatGPT-like search workspace polish):
 
 - restyled the public homepage search frame in `frontend/src/apps/public/HomepageSearchExperience.tsx` as a calmer ChatGPT-like composer with a clearer message area, status copy, prompt chips, voice/send controls, and a softer workspace shell
@@ -21,13 +127,77 @@ Implementation update from `2026-04-25` (ChatGPT-like search workspace polish):
 - tightened the product welcome state after browser review so the search composer is visible in the first desktop viewport, reducing the hero and quick-prompt height to match search-first user behavior
 - verified with `npm --prefix frontend run build` plus local Playwright screenshots at `output/playwright/product-saas-polish-desktop-v3.png` and `output/playwright/product-saas-polish-after-search.png`; local preview still shows expected unauthenticated API `401`/static fallback `404` calls when not connected to the live backend
 
+Implementation update from `2026-04-25` (portal customer-care support escalation):
+
+- extended the portal customer-care turn so explicit human-support, escalation, urgent, or broken payment-link messages can queue a `support_request` through the existing portal booking request/audit/outbox path
+- added `portal.support_request.requested` to the admin portal support queue and support action resolution path, so operator Billing Support can review or escalate AI-created care cases beside reschedule and cancel requests
+- added `created_request` to the portal care-turn response contract and surfaced the queued support case in the portal care agent card
+- kept reschedule/cancel/pause/downgrade as explicit customer action flows; the AI care turn only auto-queues general support/escalation cases with the original message as customer note
+- verified with `python3 -m py_compile backend/service_layer/tenant_app_service.py backend/service_layer/admin_dashboard_service.py backend/api/v1_tenant_handlers.py backend/api/v1_tenant_routes.py`, `.venv/bin/python -m pytest backend/tests/test_api_v1_portal_routes.py -q`, `.venv/bin/python -m pytest backend/tests/test_api_v1_tenant_routes.py backend/tests/test_academy_action_worker.py -q`, `cd frontend && npx tsc --noEmit`, and `npm --prefix frontend run build`
+
+Implementation update from `2026-04-25` (portal customer-care status agent):
+
+- added `POST /api/v1/portal/bookings/{booking_reference}/care-turn` as a booking-reference anchored customer-care turn contract for the portal
+- added `build_portal_customer_care_turn` so status replies are generated from portal booking snapshot truth, payment posture, support contact, academy/report context, enabled portal actions, and recent revenue-ops action runs
+- wired `frontend/src/apps/portal/PortalApp.tsx` with a customer-care status agent card that lets returning customers ask payment, reschedule, class/report, pause/downgrade/cancel, or support questions from inside the booking workspace
+- kept lifecycle changes request-safe: the portal agent returns enabled next actions and support routes, while unsupported or incomplete paths remain escalation/manual-review cases
+- verified with `.venv/bin/python -m pytest backend/tests/test_api_v1_portal_routes.py backend/tests/test_api_v1_tenant_routes.py backend/tests/test_academy_action_worker.py -q`, `cd frontend && npx tsc --noEmit`, and `npm --prefix frontend run build`
+
+Implementation update from `2026-04-25` (WhatsApp customer-care booking channel):
+
+- upgraded `/api/webhooks/whatsapp` so configured inbound WhatsApp messages can trigger an automatic customer-care reply, not only foundation event logging
+- set the default BookedAI WhatsApp sender to `+61455301335` and tightened booking-confirmation WhatsApp copy so customers know they can reply there for questions, reschedule, or cancellation review while `info@bookedai.au` remains the email support identity
+- added booking-reference extraction and safe customer booking resolution by reference, WhatsApp phone, or email, with ambiguous phone/email matches asking for the booking reference before exposing booking details
+- reused `build_portal_customer_care_turn` so WhatsApp answers are grounded in the portal booking snapshot, payment status, support contact, academy/report state, and recent revenue-ops action runs
+- clear WhatsApp cancellation and reschedule requests now queue the same audited portal request path used by `portal.bookedai.au`, keeping changes manual-review and outbox-backed rather than pretending instant mutation
+- added lifecycle follow-through for WhatsApp change requests: email confirmation is sent or recorded, CRM gets a task mirror via lifecycle email sync, and tenant Bookings now exposes a recent WhatsApp/portal request queue with cancellation/reschedule/support counts
+- verified with backend py_compile, `.venv/bin/python -m pytest backend/tests/test_whatsapp_webhook_routes.py backend/tests/test_api_v1_portal_routes.py backend/tests/test_api_v1_tenant_routes.py backend/tests/test_api_v1_communication_routes.py -q`, `npm --prefix frontend exec tsc -- --noEmit`, live deploy through `python3 scripts/telegram_workspace_ops.py deploy-live`, stack health, live API health, and the live WhatsApp webhook verification route reaching FastAPI
+
 Implementation update from `2026-04-25` (public/product search-results flow refinement):
 
+- added a shared verified-tenant detection layer for BookedAI chess services, so search results for the reviewed `Co Mai Hung Chess Class` / Grandmaster Chess tenant surface tenant-specific capabilities without interrupting result browsing
+- updated homepage and product assistant result cards to show compact tenant capability chips for Book, Stripe, QR payment, QR confirmation, calendar, email, WhatsApp Agent, and portal edit when a chess tenant result is present
+- updated the selected-booking and confirmation copy so tenant-confirmed chess bookings explicitly keep QR/portal confirmation, Stripe or QR transfer posture, calendar, email, and WhatsApp Agent follow-up visible
+- synchronized the requirement into `prd.md`, `DESIGN.md`, the master PRD, detailed landing/product design spec, Sprint 13-16 package, next-phase plan, roadmap register, sprint checklist, implementation roadmap, current sprint plan, and public roadmap dataset so Phase 17 keeps the current proof and Phase 22 owns reusable template extraction
 - changed `frontend/src/apps/public/HomepageSearchExperience.tsx` so completed searches no longer auto-scroll or focus the booking side panel; users can pause on the results list, scroll, compare, and choose the next action intentionally
 - moved clarification/follow-up prompts into the visible BookedAI chat thread as actionable suggestion chips, while removing the separate clarification panel that competed with the result surface
 - tightened homepage result cards so the list shows only essential comparison facts and compact actions; full summary, provider context, confidence, next step, map/provider links, and booking continuation remain in the detail popup
 - changed `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` so popup/product assistant results do not auto-select the first returned match; `View details` opens the popup and `Book` is the explicit route into customer details
 - verified with `npm --prefix frontend run build`
+
+Implementation update from `2026-04-25` (tenant AI operations automation connection plan):
+
+- added a tenant automation connection plan to the `GET /api/v1/tenant/integrations` payload, summarizing platform messaging, CRM write-back, webhook/workflow automation, customer-care state readiness, action routes, dispatch endpoints, and guardrails
+- added `POST /api/v1/tenant/operations/dispatch`, scoped to the signed tenant and restricted to tenant admins/operators, so tenants can run policy-gated queued revenue-ops actions without using the global admin dispatch endpoint
+- wired `frontend/src/apps/tenant/TenantApp.tsx` so the Integrations workspace shows the automation connection plan and the Ops workspace exposes a `Run policy automation` control with scoped dispatch result feedback
+- kept the execution model conservative: the worker only processes supported queued actions under current policy, and missing contacts, unsupported actions, or degraded provider paths move to manual review
+- verified with `python3 -m py_compile backend/service_layer/tenant_app_service.py backend/api/v1_tenant_handlers.py backend/api/v1_tenant_routes.py`, `./.venv/bin/python -m pytest backend/tests/test_api_v1_tenant_routes.py -q`, `cd frontend && npx tsc --noEmit`, and `npm --prefix frontend run build`
+
+Implementation update from `2026-04-25` (roadmap and pitch architecture visualization):
+
+- added a buyer-readable architecture flow visual to `pitch.bookedai.au` before the detailed architecture section, mapping `customer surfaces -> AI agents -> booking core -> operations truth`
+- updated the roadmap UI dataset so Phase/Sprint `17-23` now appear directly in the public roadmap code instead of only in planning documents
+- refreshed the roadmap technical architecture language around the current implementation baseline: customer-turn contract, revenue-ops action ledger, tenant Ops, portal-first confirmation, chess/Future Swim vertical proofs, billing truth, widget runtime, and release governance
+- synchronized `project.md`, `prd.md`, roadmap/progress planning docs, README, DESIGN, and system overview so the request-facing docs and execution-tracking docs describe the same architecture and next-phase sequence
+
+Implementation update from `2026-04-25` (pitch rewording and layout compression):
+
+- rewrote the pitch hero around a simpler buyer promise: AI receptionist and revenue operations for service businesses
+- moved the live Grandmaster Chess tenant proof directly after the hero, so the pitch shows a working booking surface before the system explanation
+- moved pricing immediately after product proof, making commercial terms visible before deeper architecture/platform detail
+- removed the oversized detailed architecture infographic from the pitch runtime and kept one concise operating-model visual: `demand -> qualification -> booking -> ops ledger`
+- updated the pitch navigation order to match the new story: Overview, Product, Problem, Solution, Pricing, Architecture, Surfaces, Trust
+- verification passed with `npm --prefix frontend run build` and local Playwright desktop/mobile smoke at `1440x950` and `390x844`; mobile height dropped from the previous roughly `44.9kpx` live review issue to about `21.0kpx`, with no console errors, page errors, failed requests, or horizontal overflow
+- live verification passed after production web refresh: `https://pitch.bookedai.au` now serves the new pitch chunk with the hero `AI receptionist and revenue ops for service businesses.`, pricing before architecture, and the concise operating-model visual; Playwright desktop/mobile UAT saved under `output/playwright/pitch-live-reword-uat-2026-04-25/` reported no console errors, page errors, failed requests, horizontal overflow, or overflowing elements
+- follow-up deploy verification cleared the earlier Docker-only `PublicApp` resolution caveat: a clean frontend Docker build passed, `python3 scripts/telegram_workspace_ops.py deploy-live` completed successfully, and a scoped `web`/`beta-web` refresh published the final hero copy; post-deploy smoke confirmed API health, all production services running, and pitch desktop/mobile rendering the new hero with no browser issues or overflow
+- conversion-path UAT continued from the pitch: `RegisterInterestApp` now sets a page-specific browser title (`Register Interest | BookedAI SME Setup`), production `web`/`beta-web` were refreshed, and live desktop/mobile CTA-to-registration flows submitted to `/api/pricing/consultation` with `200` responses, confirmation references, preserved pitch attribution, no app browser errors, and no mobile horizontal overflow
+
+Implementation update from `2026-04-25` (tenant login hero visual proof):
+
+- added the operator-provided tenant workspace screenshot to the `tenant.bookedai.au` login hero as a professional desktop/tablet preview panel beside the Google-first auth card
+- optimized the uploaded PNG into responsive local WebP assets under `frontend/public/branding/optimized/` so the gateway does not depend on the remote upload URL or ship the full original image weight
+- kept the mobile login path focused by hiding the preview frame below the tablet breakpoint while preserving the Google, create-account, and email-code auth controls
+- verified with `npm --prefix frontend exec tsc -- --noEmit`, `npm --prefix frontend run build`, local Playwright desktop/mobile QA, live web deploy, stack health, and live Playwright checks confirming the image renders, console is clean, and mobile has no horizontal overflow
 
 Implementation update from `2026-04-25` (tenant live QA and Future Swim workspace stability):
 
@@ -71,6 +241,20 @@ Implementation update from `2026-04-25` (admin login routing recovery and worksp
 - reorganized the shipped admin workspace from a large card selector into a sidebar-led shell in `frontend/src/components/AdminPage.tsx` and `frontend/src/features/admin/workspace-nav.tsx`, grouping workspaces into `Operate`, `Tenants`, `Revenue`, and `Platform` lanes with lucide icons and a compact active-surface summary; the Catalog workspace now stacks partner profile management ahead of service import so protected partner mutations remain viewport-safe beside the sidebar
 - verified with `npm --prefix frontend run build`; live proxy `nginx -t` passed through `sudo -n docker compose ... exec proxy nginx -t`, the proxy container was restarted, `https://admin.bookedai.au/api/health` returned backend JSON, and a bad-password login probe now returns backend `401 Invalid admin credentials` instead of frontend nginx `405`; targeted Playwright coverage passed for the previously failing partner create re-auth smoke
 - final mainline QA and deployment then passed with `npm --prefix frontend exec tsc -- --noEmit`, `npm --prefix frontend run test:playwright:admin-smoke`, `.venv/bin/python -m pytest backend/tests -q`, and `bash scripts/run_release_gate.sh`; commit `71436df` was pushed to `origin/main`, deployed through `python3 scripts/telegram_workspace_ops.py deploy-live`, stack health passed, and live admin probes confirmed `admin.bookedai.au` serves the refreshed bundle while `/api/health` and bad-password login reach the backend
+
+Implementation update from `2026-04-25` (admin login same-origin hardening and enterprise entry redesign):
+
+- traced the remaining browser-side admin login failure risk to the production admin bundle still honoring the global `VITE_API_BASE_URL=https://api.bookedai.au/api`; `frontend/src/shared/config/api.ts` now forces `admin.bookedai.au` to use same-origin `/api` before environment overrides, so login posts through the admin-host proxy that was already verified live
+- wrapped `loginAdmin(...)` network failures in `frontend/src/features/admin/api.ts` so raw browser errors such as `Load failed`, `Failed to fetch`, or `NetworkError` become an operator-readable admin API reachability message instead of leaking transport text in the form
+- redesigned `frontend/src/features/admin/login-screen.tsx` into a polished enterprise control-plane entry: dark command-center shell, secure sign-in panel, API-route posture indicator, BookedAI brand mark, operator intelligence copy, and compact operational status rows for booking ops, revenue posture, and platform control
+- verification passed with `npm --prefix frontend exec tsc -- --noEmit`, `npm --prefix frontend run build`, `npm --prefix frontend run test:playwright:admin-smoke`, `.venv/bin/python -m pytest backend/tests -q`, and `bash scripts/run_release_gate.sh`; a hostname-mapped Playwright probe against the built bundle confirmed login now requests `http://admin.bookedai.au:<port>/api/admin/login` on the same origin
+
+Implementation update from `2026-04-25` (admin live UAT and production session-secret runtime fix):
+
+- follow-up live UAT found a second admin-login runtime gap: `docker-compose.prod.yml` passed the admin credential variables but not the session-signing secret family into `backend`/`beta-backend`, so successful credential checks could still fail while minting the signed admin session token
+- `docker-compose.prod.yml` now passes `SESSION_SIGNING_SECRET`, `TENANT_SESSION_SIGNING_SECRET`, and `ADMIN_SESSION_SIGNING_SECRET` into both backend services
+- production deployment initially hit a 100% root disk condition during Docker web image export; Docker build cache cleanup reclaimed space, after which `python3 scripts/telegram_workspace_ops.py deploy-live` completed successfully
+- verification passed with live `/api/health`, live `/api/admin/login` returning `200`, and Playwright UAT artifacts under `output/playwright/admin-live-uat-2026-04-25/`; desktop and mobile login/navigation across all admin workspaces returned only `200` API responses, with no console errors, page errors, failed requests, or horizontal overflow
 
 Implementation update from `2026-04-25` (public brand/menu, live booking QA, and responsive regression):
 
@@ -2141,3 +2325,14 @@ Current execution has also been running through a specialist multi-agent pattern
   - update: added the requested end-of-flow thank-you state and automatic return across the BookedAI booking surfaces. `HomepageSearchExperience`, `BookingAssistantDialog`, `FutureSwimApp`, and `ChessGrandmasterApp` now show a prominent Thank You confirmation after booking/enquiry capture, display a 5-second countdown, and return to the main screen automatically while keeping manual return available.
   - update: the product/embedded assistant return path reuses one reset function for the Thank You hero and Home action, while homepage search resets booking state back to the main search surface. Tenant runtimes reset their form state and scroll back to the top after the countdown.
   - verification: `./.venv/bin/python -m pytest backend/tests/test_api_v1_booking_routes.py -q`; `npm --prefix frontend run build`; `python3 scripts/telegram_workspace_ops.py deploy-live`; `bash scripts/healthcheck_stack.sh`; live Playwright `product.bookedai.au` flow created booking `v1-ce0d20a95d`, observed the Thank You countdown, confirmed API calls for leads/bookings/payment/email/SMS/WhatsApp returned `200`, and verified auto-return after 5 seconds
+- `2026-04-25`
+  - lane: `Public homepage investor proof polish`
+  - update: tightened `frontend/src/apps/public/PublicApp.tsx` after live review so the hero chess proof image is contained inside its frame, the top proof language is shorter and more visual, and the investor-facing cards now expose concise `Wedge`, `Proof`, `Moat`, and `Scale` signals before the live search workspace.
+  - update: restored the regression-tested `Open Web App` CTA label and fixed the backend `Settings` dataclass field order in `backend/config.py`, unblocking release-gate imports after the WhatsApp Evolution defaults were added.
+  - verification: `npm --prefix frontend exec tsc -- --noEmit`; `npm --prefix frontend run build`; `npm --prefix frontend run test:playwright:legacy`; `npm --prefix frontend run test:playwright:live-read`; `npm --prefix frontend run test:playwright:admin-smoke`; `.venv-backend/bin/python -m unittest backend.tests.test_api_v1_routes backend.tests.test_lifecycle_ops_service`; `.venv-backend/bin/python scripts/run_search_eval_pack.py`; live deploy; `bash scripts/healthcheck_stack.sh`; live public-surface smoke; hero Playwright check confirming `object-fit: contain` and no desktop/mobile overflow
+- `2026-04-25`
+  - lane: `Homepage chat full booking flow UX`
+  - update: upgraded `HomepageSearchExperience` so the homepage workspace now exposes a customer-facing `Ask -> Match -> Book -> Confirm` rail, clearer booking brief helper cards, required name/time fields, and confirmation copy centered on QR portal, edit, reschedule, cancellation request, and follow-up.
+  - update: fixed a form accessibility issue found by the new full-flow regression: phone helper text now sits outside the `<label>`, so `Email` and `Phone` accessible names stay distinct.
+  - update: escaped the pitch architecture arrow text so Docker/Node 20 production builds no longer fail on JSX `>` parsing.
+  - verification: `npm --prefix frontend exec tsc -- --noEmit`; `npm --prefix frontend run build`; `npm --prefix frontend run test:playwright:live-read`; `npm --prefix frontend run test:playwright:legacy`; production deploy through the host wrapper; `bash scripts/healthcheck_stack.sh`; live public-surface smoke across home/product/pitch/roadmap/tenant/portal/admin; live homepage smoke confirmed the rail/copy render, clean console/request state, and no mobile overflow

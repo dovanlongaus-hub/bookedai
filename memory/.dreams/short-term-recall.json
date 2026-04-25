@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-23T00:58:30.275Z",
+  "updatedAt": "2026-04-24T00:50:18.655Z",
   "entries": {
     "memory:memory/2026-04-21.md:85:86": {
       "key": "memory:memory/2026-04-21.md:85:86",
@@ -715,6 +715,130 @@
         "node-modules/next/dist/bin/next",
         "follow-up",
         "extended"
+      ]
+    },
+    "memory:memory/2026-04-22.md:28:32": {
+      "key": "memory:memory/2026-04-22.md:28:32",
+      "path": "memory/2026-04-22.md",
+      "startLine": 28,
+      "endLine": 32,
+      "source": "memory",
+      "snippet": "- Upgraded the root `Next.js` admin `Bookings` slice with list view, date-grouped calendar view, confirm/cancel/reschedule actions, explicit customer/service linkage, booking create form, time-range validation, and API routes under `/api/admin/bookings` plus dedicated action endpoints for `confirm`, `cancel`, and `reschedule`. - Turned the root `Next.js` admin dashboard into a real revenue overview in `app/admin/page.tsx`, with KPI cards for revenue/pipeline/bookings/conversion, chart sections for revenue trend plus booking and lead distributions, and operational panels for overdue follow-ups, recent bookings, and audit highlights. - Added a tenant-scoped `getDashboardSnapshot(...)` read mod",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-24T00:50:18.655Z",
+      "lastRecalledAt": "2026-04-24T00:50:18.655Z",
+      "queryHashes": [
+        "a22fcee0ace1"
+      ],
+      "recallDays": [
+        "2026-04-24"
+      ],
+      "conceptTags": [
+        "next.js",
+        "date-grouped",
+        "confirm/cancel/reschedule",
+        "customer/service",
+        "time-range",
+        "api/admin/bookings",
+        "app/admin/page.tsx",
+        "follow-ups"
+      ]
+    },
+    "memory:memory/2026-04-22.md:209:214": {
+      "key": "memory:memory/2026-04-22.md:209:214",
+      "path": "memory/2026-04-22.md",
+      "startLine": 209,
+      "endLine": 214,
+      "source": "memory",
+      "snippet": "- Root admin `Phase 3` settings lane now also mirrors integration operator posture from the backend runtime, including provider status, CRM retry backlog, attention triage, and reconciliation slices directly inside `/admin/settings`. - Admin settings API now also exposes `/api/admin/settings/integrations`, and the aggregate settings read model now includes `integrations`; provider posture writes remain tenant-owned and link back to the tenant integrations workspace instead of bypassing tenant auth boundaries. - Verification for this integration settings slice passed with root `node node_modules/typescript/bin/tsc --noEmit`; a standalone `tsx` import probe was not treated as signal because `s",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-24T00:50:18.655Z",
+      "lastRecalledAt": "2026-04-24T00:50:18.655Z",
+      "queryHashes": [
+        "a22fcee0ace1"
+      ],
+      "recallDays": [
+        "2026-04-24"
+      ],
+      "conceptTags": [
+        "admin/settings",
+        "api/admin/settings/integrations",
+        "tenant-owned",
+        "node-modules/typescript/bin/tsc",
+        "root",
+        "admin",
+        "phase",
+        "settings"
+      ]
+    },
+    "memory:memory/2026-04-22.md:93:100": {
+      "key": "memory:memory/2026-04-22.md:93:100",
+      "path": "memory/2026-04-22.md",
+      "startLine": 93,
+      "endLine": 100,
+      "source": "memory",
+      "snippet": "- That same Phase 5 lane now also exposes outstanding-revenue posture: dashboard cards track outstanding revenue, paid bookings, and unpaid bookings, and recent bookings now show payment posture with paid versus outstanding breakdowns. - Phase 5 now also includes collections operations: dashboard shows receivables aging buckets and a collection-priority queue ranked by overdue age and outstanding value. - Phase 6 has started with a dedicated `/admin/reports` workspace for paid vs unpaid trend, collections aging, recovered revenue, and collection-priority reporting. - Phase 6 reporting now also includes repeat revenue, repeat customer rate, retention segments, and source-to-revenue attributio",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-24T00:50:18.655Z",
+      "lastRecalledAt": "2026-04-24T00:50:18.655Z",
+      "queryHashes": [
+        "a22fcee0ace1"
+      ],
+      "recallDays": [
+        "2026-04-24"
+      ],
+      "conceptTags": [
+        "outstanding-revenue",
+        "collection-priority",
+        "admin/reports",
+        "source-to-revenue",
+        "phase",
+        "lane",
+        "now",
+        "exposes"
+      ]
+    },
+    "memory:memory/2026-04-22.md:138:141": {
+      "key": "memory:memory/2026-04-22.md:138:141",
+      "path": "memory/2026-04-22.md",
+      "startLine": 138,
+      "endLine": 141,
+      "source": "memory",
+      "snippet": "- Verification for the email-sent slice passed with `python3 -m py_compile backend/service_layer/lifecycle_ops_service.py backend/api/v1_routes.py backend/api/v1_communication_handlers.py backend/tests/test_lifecycle_ops_service.py backend/tests/test_api_v1_communication_routes.py` and `node node_modules/typescript/bin/tsc --noEmit`; local route-level unittest execution still fails to import because `fastapi` is missing in the default shell runtime. - Started the first inbound CRM intelligence slice: backend now exposes `POST /api/v1/integrations/crm-feedback/deal-outcome` plus `GET /api/v1/integrations/crm-feedback/deal-outcome-summary`, and the root admin dashboard/reporting surfaces won/l",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-24T00:50:18.655Z",
+      "lastRecalledAt": "2026-04-24T00:50:18.655Z",
+      "queryHashes": [
+        "a22fcee0ace1"
+      ],
+      "recallDays": [
+        "2026-04-24"
+      ],
+      "conceptTags": [
+        "email-sent",
+        "py-compile",
+        "backend/api/v1-routes.py",
+        "node-modules/typescript/bin/tsc",
+        "route-level",
+        "dashboard/reporting",
+        "won/l",
+        "verification"
       ]
     }
   }

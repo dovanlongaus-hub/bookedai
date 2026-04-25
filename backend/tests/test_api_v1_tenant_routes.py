@@ -292,6 +292,61 @@ class ApiV1TenantRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["items"][0]["booking_reference"], "BR-1002")
         self.assertEqual(payload["meta"]["tenant_id"], "tenant-test")
 
+    def test_tenant_leads_returns_success_envelope(self):
+        async def _resolve_tenant_id(*_args, **_kwargs):
+            return "tenant-test"
+
+        async def _build_tenant_leads_snapshot(*_args, **_kwargs):
+            return {
+                "tenant": {
+                    "id": "tenant-test",
+                    "slug": "default-production-tenant",
+                    "name": "BookedAI Demo Tenant",
+                },
+                "summary": {
+                    "total": 2,
+                    "active": 1,
+                    "needs_follow_up": 1,
+                    "converted": 1,
+                    "crm_attention": 0,
+                },
+                "items": [
+                    {
+                        "lead_id": "lead-1001",
+                        "customer_name": "Future Swim Parent",
+                        "customer_email": "parent@example.com",
+                        "customer_phone": "+61400000000",
+                        "status": "active",
+                        "source": "future_swim",
+                        "service_name": "Kids Swimming Lessons",
+                        "last_activity_at": None,
+                        "created_at": None,
+                        "booking_reference": "BR-1001",
+                        "crm_sync_status": "pending",
+                    }
+                ],
+            }
+
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.build_tenant_leads_snapshot",
+            _build_tenant_leads_snapshot,
+        ), patch.object(
+            TenantRepository,
+            "resolve_tenant_id",
+            _resolve_tenant_id,
+        ):
+            client = TestClient(create_test_app())
+            response = client.get(
+                "/api/v1/tenant/leads?tenant_ref=default-production-tenant&status=active"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["summary"]["total"], 2)
+        self.assertEqual(payload["data"]["items"][0]["lead_id"], "lead-1001")
+        self.assertEqual(payload["meta"]["tenant_id"], "tenant-test")
+
     def test_tenant_integrations_returns_success_envelope(self):
         async def _resolve_tenant_id(*_args, **_kwargs):
             return "tenant-test"
@@ -1287,6 +1342,81 @@ class ApiV1TenantRoutesTestCase(TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["data"]["providers"][0]["status"], "paused")
         self.assertEqual(payload["data"]["access"]["write_mode"], "provider_controls")
+
+    def test_tenant_operations_dispatch_runs_tenant_scoped_worker(self):
+        @asynccontextmanager
+        async def _session(_session_factory):
+            yield _WritableFakeSession()
+
+        async def _resolve_tenant_request_context(*_args, **_kwargs):
+            return (
+                "future-swim",
+                "tenant-future-swim",
+                {"email": "ops@future.test", "tenant_ref": "future-swim"},
+                {"email": "ops@future.test", "role": "operator", "status": "active"},
+            )
+
+        async def _run_tracked_academy_action_dispatch(*_args, **kwargs):
+            self.assertEqual(kwargs["tenant_id"], "tenant-future-swim")
+            self.assertEqual(kwargs["limit"], 7)
+            return SimpleNamespace(
+                job_run_id=91,
+                result=SimpleNamespace(
+                    status="completed",
+                    detail="Processed 3 queued tenant action(s).",
+                    retryable=False,
+                    metadata={
+                        "total_actions": 3,
+                        "processed_actions": 3,
+                        "manual_review_actions": 1,
+                        "failed_actions": 0,
+                    },
+                ),
+            )
+
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
+            _resolve_tenant_request_context,
+        ), patch(
+            "api.v1_tenant_handlers.run_tracked_academy_action_dispatch",
+            _run_tracked_academy_action_dispatch,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/tenant/operations/dispatch?tenant_ref=future-swim",
+                json={"limit": 7},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["dispatch_status"], "completed")
+        self.assertEqual(payload["data"]["metadata"]["processed_actions"], 3)
+        self.assertEqual(payload["meta"]["tenant_id"], "tenant-future-swim")
+
+    def test_tenant_operations_dispatch_rejects_finance_manager_role(self):
+        async def _resolve_tenant_request_context(*_args, **_kwargs):
+            return (
+                "future-swim",
+                "tenant-future-swim",
+                {"email": "finance@future.test", "tenant_ref": "future-swim"},
+                {"email": "finance@future.test", "role": "finance_manager", "status": "active"},
+            )
+
+        with patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
+            _resolve_tenant_request_context,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/tenant/operations/dispatch?tenant_ref=future-swim",
+                json={"limit": 7},
+            )
+
+        self.assertEqual(response.status_code, 403)
+        payload = response.json()
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["error"]["code"], "tenant_role_forbidden")
 
     def test_tenant_integration_provider_update_rejects_finance_manager_role(self):
         async def _resolve_tenant_request_context(*_args, **_kwargs):

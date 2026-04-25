@@ -134,7 +134,17 @@ from service_layer.demo_workflow_service import (
     submit_demo_brief,
     sync_demo_booking_from_brief as sync_demo_booking_from_brief_service,
 )
+from service_layer.lifecycle_ops_service import (
+    orchestrate_email_sent_sync,
+    orchestrate_lifecycle_email,
+)
 from service_layer.prompt9_semantic_search_service import Prompt9SemanticSearchService
+from service_layer.tenant_app_service import (
+    build_portal_customer_care_turn,
+    infer_portal_request_type_from_message,
+    queue_portal_booking_request,
+    resolve_customer_care_booking_reference,
+)
 from services import (
     BookingAssistantService,
     EmailService,
@@ -145,6 +155,7 @@ from services import (
     _rank_services,
     extract_tawk_message,
     parse_cors_origins,
+    purge_expired_whatsapp_conversations,
     resolve_service_image_url,
     store_event,
     verify_bearer_token,
@@ -162,6 +173,13 @@ def _model_dump_compat(value):
     if hasattr(value, "dict"):
         return value.dict()
     return value
+
+
+def _json_safe_value(value):
+    try:
+        return json.loads(json.dumps(value, default=str))
+    except (TypeError, ValueError):
+        return str(value)
 
 
 DEFAULT_PARTNER_PROFILES = [
@@ -312,6 +330,7 @@ async def lifespan(app: FastAPI):
     upload_root = Path(settings.upload_base_dir)
     (upload_root / "images").mkdir(parents=True, exist_ok=True)
     (upload_root / "documents").mkdir(parents=True, exist_ok=True)
+    (upload_root / "videos").mkdir(parents=True, exist_ok=True)
     engine = create_engine(settings.database_url)
     session_factory = create_session_factory(engine)
     await init_database(engine)
@@ -320,6 +339,13 @@ async def lifespan(app: FastAPI):
     semantic_search_service = Prompt9SemanticSearchService(SemanticSearchAdapter(settings))
     await seed_default_service_catalog(session_factory, booking_assistant_service)
     await seed_default_partner_profiles(session_factory)
+    try:
+        async with get_session(session_factory) as _purge_session:
+            purged = await purge_expired_whatsapp_conversations(_purge_session)
+            if purged:
+                logger.info("whatsapp_conversation_purge_complete", extra={"event_type": "whatsapp_conversation_purge", "purged_rows": purged, "tenant_id": None, "status": 0, "route": "startup", "request_id": "", "integration_name": "whatsapp", "conversation_id": "", "booking_reference": "", "job_name": "purge_expired_whatsapp_conversations", "job_id": ""})
+    except Exception:
+        pass
 
     app.state.settings = settings
     app.state.db_engine = engine
@@ -841,6 +867,384 @@ async def _complete_whatsapp_webhook_event(
             },
             exc_info=exc,
         )
+
+
+async def _load_whatsapp_conversation_history(
+    session,
+    *,
+    phone: str,
+    limit: int = 10,
+) -> list[dict[str, object]]:
+    from datetime import UTC, datetime, timedelta
+    cutoff = datetime.now(UTC) - timedelta(days=60)
+    result = await session.execute(
+        select(ConversationEvent)
+        .where(ConversationEvent.source == "whatsapp")
+        .where(ConversationEvent.conversation_id == phone)
+        .where(ConversationEvent.created_at >= cutoff)
+        .order_by(desc(ConversationEvent.created_at))
+        .limit(limit)
+    )
+    events = list(reversed(result.scalars().all()))
+    turns: list[dict[str, object]] = []
+    for ev in events:
+        meta = ev.metadata_json if isinstance(ev.metadata_json, dict) else {}
+        booking_ref = str(meta.get("booking_reference") or "").strip() or None
+        if ev.message_text:
+            turns.append({"role": "customer", "text": ev.message_text, "booking_reference": booking_ref})
+        if ev.ai_reply:
+            turns.append({"role": "assistant", "text": ev.ai_reply, "booking_reference": booking_ref})
+    return turns
+
+
+def _format_conversation_history_for_context(history: list[dict[str, object]]) -> str:
+    if not history:
+        return ""
+    lines = ["[Prior conversation:"]
+    for turn in history[-6:]:
+        role = str(turn.get("role") or "").capitalize()
+        text = str(turn.get("text") or "").strip()
+        if text:
+            lines.append(f"  {role}: {text}")
+    lines.append("]")
+    return "\n".join(lines)
+
+
+def _is_whatsapp_booking_intake_intent(message: str) -> bool:
+    normalized = unicodedata.normalize("NFKD", str(message or "").strip().lower())
+    ascii_text = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+    booking_terms = {
+        "book",
+        "booking",
+        "appointment",
+        "reserve",
+        "reservation",
+        "schedule",
+        "dat lich",
+        "dat cho",
+        "giu cho",
+        "hen lich",
+        "muon dat",
+        "can dat",
+    }
+    return any(term in ascii_text for term in booking_terms)
+
+
+def _build_whatsapp_booking_intake_reply(message: TawkMessage) -> str:
+    sender_name = str(message.sender_name or "").strip()
+    greeting = f"Hi {sender_name}," if sender_name else "Hi,"
+    return (
+        f"{greeting} I can help you start a new booking with BookedAI. "
+        "Please reply with the service you want, preferred day/time, suburb or online preference, "
+        "and your name/email if you want a confirmation sent. "
+        "If you already booked, send the booking reference and I can check status, payment, "
+        "reschedule, or cancellation options. You can also continue at https://bookedai.au."
+    )
+
+
+async def _build_whatsapp_customer_care_response(
+    session,
+    *,
+    message: TawkMessage,
+    metadata: dict[str, object],
+) -> tuple[str | None, dict[str, object]]:
+    sender_phone = str(metadata.get("sender_phone") or message.sender_phone or "").strip() or None
+
+    history: list[dict[str, object]] = []
+    if sender_phone:
+        try:
+            history = await _load_whatsapp_conversation_history(session, phone=sender_phone)
+        except Exception:
+            history = []
+
+    prior_booking_reference: str | None = None
+    for turn in reversed(history):
+        ref = str(turn.get("booking_reference") or "").strip()
+        if ref:
+            prior_booking_reference = ref
+            break
+
+    resolution = await resolve_customer_care_booking_reference(
+        session,
+        message=message.text,
+        customer_phone=sender_phone,
+        customer_email=message.sender_email,
+    )
+    booking_reference = str(resolution.get("booking_reference") or prior_booking_reference or "").strip()
+    if not booking_reference:
+        if _is_whatsapp_booking_intake_intent(message.text):
+            return (
+                _build_whatsapp_booking_intake_reply(message),
+                {
+                    "customer_care_status": "booking_intake",
+                    "booking_resolution": resolution,
+                    "booking_intake": {
+                        "source": "whatsapp",
+                        "requested_service_text": message.text,
+                        "sender_phone": sender_phone,
+                    },
+                },
+            )
+        if resolution.get("resolved_by") == "ambiguous_customer_identity":
+            return (
+                "I found more than one recent booking for this WhatsApp number. "
+                "Please reply with the booking reference so I can answer against the correct booking.",
+                {
+                    "customer_care_status": "needs_booking_reference",
+                    "booking_resolution": resolution,
+                },
+            )
+        return (
+            "I can help with booking status, payment, rescheduling, or cancellation. "
+            "Please reply with your booking reference so I can look up the exact booking.",
+            {
+                "customer_care_status": "needs_booking_reference",
+                "booking_resolution": resolution,
+            },
+        )
+
+    history_context = _format_conversation_history_for_context(history)
+    enriched_message = f"{history_context}\n{message.text}".strip() if history_context else message.text
+
+    care_turn = await build_portal_customer_care_turn(
+        session,
+        booking_reference=booking_reference,
+        message=enriched_message,
+        customer_email=message.sender_email,
+        customer_phone=sender_phone,
+    )
+    if not care_turn:
+        return (
+            f"I could not open booking {booking_reference}. Please check the reference or contact support@bookedai.au.",
+            {
+                "customer_care_status": "booking_not_found",
+                "booking_reference": booking_reference,
+                "booking_resolution": resolution,
+            },
+        )
+
+    reply = str(care_turn.get("reply") or "").strip()
+    request_type = infer_portal_request_type_from_message(message.text)
+    queued_request: dict[str, object] | None = None
+    if request_type in {"cancel_request", "reschedule_request"}:
+        enabled_action_id = "request_cancel" if request_type == "cancel_request" else "request_reschedule"
+        action_enabled = any(
+            isinstance(action, dict)
+            and str(action.get("id") or "") == enabled_action_id
+            and bool(action.get("enabled"))
+            for action in care_turn.get("next_actions", [])
+        )
+        if action_enabled:
+            queued_request = await queue_portal_booking_request(
+                session,
+                booking_reference=booking_reference,
+                request_type=request_type,
+                customer_note=message.text,
+                preferred_date=None,
+                preferred_time=None,
+                timezone=None,
+            )
+            if queued_request:
+                reply += f" {queued_request.get('message')}"
+
+    return (
+        reply,
+        {
+            "customer_care_status": "answered",
+            "booking_reference": booking_reference,
+            "booking_resolution": resolution,
+            "care_turn": care_turn,
+            "queued_request": queued_request,
+        },
+    )
+
+
+async def _send_whatsapp_customer_care_reply(
+    request: Request,
+    *,
+    to: str | None,
+    body: str | None,
+) -> dict[str, object] | None:
+    if not to or not body or not hasattr(request.app.state, "communication_service"):
+        return None
+    communication_service: CommunicationService = request.app.state.communication_service
+    try:
+        result = await communication_service.send_whatsapp(to=to, body=body)
+        return {
+            "provider": result.provider,
+            "delivery_status": result.delivery_status,
+            "provider_message_id": result.provider_message_id,
+            "warnings": result.warnings or [],
+        }
+    except Exception as exc:
+        logger.warning(
+            "whatsapp_customer_care_reply_failed",
+            extra={
+                "event_type": "whatsapp_customer_care_reply_failed",
+                "tenant_id": None,
+                "status": 0,
+                "route": "/api/webhooks/whatsapp",
+                "request_id": "",
+                "integration_name": "whatsapp",
+                "conversation_id": "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+        return {
+            "provider": "whatsapp",
+            "delivery_status": "failed",
+            "warnings": [str(exc)],
+        }
+
+
+def _build_whatsapp_booking_request_email(
+    *,
+    queued_request: dict[str, object],
+    customer_message: str,
+    support_email: str,
+) -> tuple[str, str]:
+    booking_reference = str(queued_request.get("booking_reference") or "pending").strip()
+    request_type = str(queued_request.get("request_type") or "support_request").replace("_", " ")
+    customer_name = str(queued_request.get("customer_name") or "there").strip()
+    service_name = str(queued_request.get("service_name") or "your booking").strip()
+    business_name = str(queued_request.get("business_name") or "BookedAI").strip()
+    portal_url = f"https://portal.bookedai.au/?booking_reference={booking_reference}"
+    subject = f"BookedAI received your {request_type} for {booking_reference}"
+    body = "\n".join(
+        [
+            f"Hi {customer_name},",
+            "",
+            f"We received your {request_type} through WhatsApp for {service_name}.",
+            f"Booking reference: {booking_reference}",
+            f"Handled by: {business_name}",
+            "",
+            "Your request has been recorded for review. The booking is not treated as changed until the provider or BookedAI confirms the outcome.",
+            "",
+            f"Customer message: {customer_message.strip()}",
+            f"Portal: {portal_url}",
+            "",
+            f"Need help? Reply to this email or contact {support_email}.",
+            "BookedAI",
+        ]
+    )
+    return subject, body
+
+
+async def _finalize_whatsapp_booking_request_side_effects(
+    request: Request,
+    session,
+    *,
+    queued_request: dict[str, object] | None,
+    customer_message: str,
+) -> dict[str, object] | None:
+    if not queued_request:
+        return None
+
+    tenant_id = str(queued_request.get("tenant_id") or "").strip() or None
+    customer_email = str(queued_request.get("customer_email") or "").strip().lower()
+    booking_business_email = str(
+        getattr(request.app.state.settings, "booking_business_email", "info@bookedai.au") or "info@bookedai.au"
+    ).strip().lower()
+    support_email = (
+        str(queued_request.get("support_email") or "").strip().lower()
+        or booking_business_email
+        or "info@bookedai.au"
+    )
+    cc = [
+        value
+        for value in {
+            support_email,
+            booking_business_email or "info@bookedai.au",
+        }
+        if value and value != customer_email
+    ]
+    if not tenant_id:
+        return {
+            "email_confirmation": {
+                "delivery_status": "skipped",
+                "warnings": ["tenant_id_missing"],
+            },
+            "crm_sync": {
+                "task": {
+                    "sync_status": "skipped",
+                    "warnings": ["tenant_id_missing"],
+                }
+            },
+        }
+
+    subject, body = _build_whatsapp_booking_request_email(
+        queued_request=queued_request,
+        customer_message=customer_message,
+        support_email=support_email,
+    )
+    template_key = "bookedai_whatsapp_booking_request"
+    delivery_status = "queued"
+    warnings: list[str] = []
+
+    if customer_email and hasattr(request.app.state, "email_service"):
+        email_service: EmailService = request.app.state.email_service
+        if email_service.smtp_configured():
+            try:
+                await email_service.send_email(
+                    to=[customer_email],
+                    cc=cc,
+                    subject=subject,
+                    text=body,
+                    html=None,
+                )
+                delivery_status = "sent"
+            except Exception as exc:
+                delivery_status = "queued"
+                warnings.append(f"email_send_failed:{exc}")
+        else:
+            warnings.append("smtp_unconfigured")
+    else:
+        warnings.append("customer_email_missing")
+
+    email_result = await orchestrate_lifecycle_email(
+        session,
+        tenant_id=tenant_id,
+        template_key=template_key,
+        subject=subject,
+        provider="smtp" if delivery_status == "sent" else "unconfigured",
+        delivery_status=delivery_status,
+        event_payload={
+            "channel": "whatsapp",
+            "request_type": queued_request.get("request_type"),
+            "booking_reference": queued_request.get("booking_reference"),
+            "customer_email_present": bool(customer_email),
+            "support_email": support_email,
+        },
+    )
+    crm_sync = await orchestrate_email_sent_sync(
+        session,
+        tenant_id=tenant_id,
+        message_id=email_result.message_id,
+        template_key=template_key,
+        subject=subject,
+        recipient_email=customer_email or support_email,
+        provider="smtp" if delivery_status == "sent" else "unconfigured",
+        delivery_status=delivery_status,
+    )
+    return {
+        "email_confirmation": {
+            "message_id": email_result.message_id,
+            "delivery_status": email_result.delivery_status,
+            "provider": email_result.provider,
+            "warnings": warnings + email_result.warning_codes,
+        },
+        "crm_sync": {
+            "task": {
+                "record_id": crm_sync.task_record_id,
+                "sync_status": crm_sync.task_sync_status,
+                "external_entity_id": crm_sync.task_external_entity_id,
+                "warnings": crm_sync.warning_codes,
+            }
+        },
+    }
 
 
 def require_admin_access(
@@ -1687,27 +2091,190 @@ async def whatsapp_webhook(request: Request) -> dict[str, object]:
             )
             if not should_process:
                 continue
+            ai_reply: str | None = None
+            care_metadata: dict[str, object] = {}
+            delivery_metadata: dict[str, object] | None = None
+            try:
+                if hasattr(request.app.state, "communication_service"):
+                    ai_reply, care_metadata = await _build_whatsapp_customer_care_response(
+                        session,
+                        message=message,
+                        metadata=metadata,
+                    )
+                    lifecycle_metadata = await _finalize_whatsapp_booking_request_side_effects(
+                        request,
+                        session,
+                        queued_request=care_metadata.get("queued_request")
+                        if isinstance(care_metadata.get("queued_request"), dict)
+                        else None,
+                        customer_message=message.text,
+                    )
+                    if lifecycle_metadata:
+                        care_metadata["lifecycle_updates"] = lifecycle_metadata
+                    delivery_metadata = await _send_whatsapp_customer_care_reply(
+                        request,
+                        to=str(metadata.get("sender_phone") or message.sender_phone or "").strip() or None,
+                        body=ai_reply,
+                    )
+                await store_event(
+                    session,
+                    source="whatsapp",
+                    event_type="whatsapp_inbound",
+                    message=message,
+                    ai_intent=str(care_metadata.get("customer_care_status") or "inbound_message"),
+                    ai_reply=ai_reply,
+                    workflow_status="answered" if ai_reply else "received",
+                    metadata=_json_safe_value(
+                        {
+                            **metadata,
+                            **care_metadata,
+                            "reply_delivery": delivery_metadata,
+                        }
+                    ),
+                )
+                await _complete_whatsapp_webhook_event(
+                    session,
+                    event_id=webhook_event_id,
+                    tenant_id=tenant_id,
+                    provider=str(metadata.get("provider") or "unknown"),
+                    external_event_id=external_event_id,
+                    response_payload=_json_safe_value({
+                        "status": "processed",
+                        "message_id": message.message_id,
+                        "customer_care_status": care_metadata.get("customer_care_status"),
+                        "reply_delivery": delivery_metadata,
+                        "lifecycle_updates": care_metadata.get("lifecycle_updates"),
+                    }),
+                )
+            except Exception as exc:
+                logger.warning(
+                    "whatsapp_webhook_processing_failed",
+                    extra={
+                        "event_type": "whatsapp_webhook_processing_failed",
+                        "tenant_id": tenant_id,
+                        "status": 0,
+                        "route": "/api/webhooks/whatsapp",
+                        "request_id": "",
+                        "integration_name": "whatsapp",
+                        "conversation_id": message.conversation_id or "",
+                        "booking_reference": "",
+                        "job_name": "",
+                        "job_id": "",
+                    },
+                    exc_info=exc,
+                )
+            messages_processed += 1
+
+    return {"status": "processed", "messages_processed": messages_processed}
+
+
+@api.post("/webhooks/evolution")
+async def evolution_webhook(request: Request) -> dict[str, object]:
+    try:
+        payload = await request.json()
+    except Exception:
+        return {"status": "ignored", "reason": "invalid_json"}
+
+    if not isinstance(payload, dict):
+        return {"status": "ignored", "reason": "not_object"}
+
+    event = str(payload.get("event") or "").strip()
+    if event != "messages.upsert":
+        return {"status": "ignored", "event": event}
+
+    data = payload.get("data")
+    if not isinstance(data, dict):
+        return {"status": "ignored", "reason": "no_data"}
+
+    key = data.get("key") or {}
+    if not isinstance(key, dict):
+        return {"status": "ignored", "reason": "no_key"}
+
+    if bool(key.get("fromMe")):
+        return {"status": "ignored", "reason": "outbound"}
+
+    remote_jid = str(key.get("remoteJid") or "").strip()
+    sender_phone = remote_jid.split("@")[0] if "@" in remote_jid else remote_jid
+    if not sender_phone:
+        return {"status": "ignored", "reason": "no_sender"}
+
+    provider_message_id = str(key.get("id") or "").strip() or None
+    push_name = str(data.get("pushName") or "").strip() or None
+    message_content = data.get("message") or {}
+    body: str | None = None
+    if isinstance(message_content, dict):
+        body = (
+            str(message_content.get("conversation") or "").strip()
+            or str((message_content.get("extendedTextMessage") or {}).get("text") or "").strip()
+            or None
+        )
+
+    message = TawkMessage(
+        conversation_id=sender_phone,
+        message_id=provider_message_id,
+        text=body or "[WhatsApp message]",
+        sender_name=push_name,
+        sender_phone=f"+{sender_phone}" if not sender_phone.startswith("+") else sender_phone,
+        metadata={"channel": "whatsapp", "provider": "evolution"},
+    )
+    metadata: dict[str, object] = {
+        "channel": "whatsapp",
+        "provider": "evolution",
+        "direction": "inbound",
+        "provider_message_id": provider_message_id,
+        "sender_phone": message.sender_phone,
+        "profile_name": push_name,
+        "remote_jid": remote_jid,
+        "message_type": str(data.get("messageType") or "").strip() or None,
+        "raw_payload": data,
+    }
+
+    ai_reply: str | None = None
+    care_metadata: dict[str, object] = {}
+    delivery_metadata: dict[str, object] | None = None
+
+    async with get_session(request.app.state.session_factory) as session:
+        try:
+            if hasattr(request.app.state, "communication_service"):
+                ai_reply, care_metadata = await _build_whatsapp_customer_care_response(
+                    session,
+                    message=message,
+                    metadata=metadata,
+                )
+                delivery_metadata = await _send_whatsapp_customer_care_reply(
+                    request,
+                    to=message.sender_phone,
+                    body=ai_reply,
+                )
             await store_event(
                 session,
                 source="whatsapp",
                 event_type="whatsapp_inbound",
                 message=message,
-                ai_intent="inbound_message",
-                ai_reply=None,
-                workflow_status="received",
-                metadata=metadata,
+                ai_intent=str(care_metadata.get("customer_care_status") or "inbound_message"),
+                ai_reply=ai_reply,
+                workflow_status="answered" if ai_reply else "received",
+                metadata=_json_safe_value({**metadata, **care_metadata, "reply_delivery": delivery_metadata}),
             )
-            await _complete_whatsapp_webhook_event(
-                session,
-                event_id=webhook_event_id,
-                tenant_id=tenant_id,
-                provider=str(metadata.get("provider") or "unknown"),
-                external_event_id=external_event_id,
-                response_payload={"status": "processed", "message_id": message.message_id},
+        except Exception as exc:
+            logger.warning(
+                "evolution_webhook_processing_failed",
+                extra={
+                    "event_type": "evolution_webhook_processing_failed",
+                    "tenant_id": None,
+                    "status": 0,
+                    "route": "/api/webhooks/evolution",
+                    "request_id": "",
+                    "integration_name": "whatsapp_evolution",
+                    "conversation_id": sender_phone,
+                    "booking_reference": "",
+                    "job_name": "",
+                    "job_id": "",
+                },
+                exc_info=exc,
             )
-            messages_processed += 1
 
-    return {"status": "processed", "messages_processed": messages_processed}
+    return {"status": "processed", "messages_processed": 1}
 
 
 @api.post("/automation/booking-callback")

@@ -51,6 +51,10 @@ This package now also inherits one explicit AI-agent execution rule:
 
 Latest implementation continuation from `2026-04-25`:
 
+- the public homepage has been reframed as an investor/customer acquisition surface: the first viewport now carries the revenue-engine promise, real vertical proof, concise traction-style stats, and clear product/pitch CTAs before the live search-to-booking workspace
+- `frontend/src/apps/public/PublicApp.tsx` still keeps `HomepageSearchExperience` on-page, but now supports it with compact sections for the customer-intent problem, ask/compare/book product proof, operating model, investor thesis, and customer value
+- follow-up homepage polish tightened the hero screenshot into a contained proof frame, reduced long explanatory copy into visual investor signals (`Wedge`, `Proof`, `Moat`, `Scale`), and kept the live CTA language regression-safe as `Open Web App`
+- release verification for the homepage polish now includes frontend build/typecheck, legacy homepage smoke, live-read booking smoke, admin-smoke, backend v1/lifecycle unittest, search eval pack, live deploy, stack healthcheck, public-surface smoke, and hero-specific production evidence showing no image/frame overflow
 - `portal.bookedai.au` now has an enterprise workspace UI pass: secure lookup, booking/payment/support status cards, shared command navigation, sticky desktop action rail, service/customer panels, academy progress, and timeline all live in one customer-facing portal surface
 - portal request actions remain request-safe and auditable through the existing reschedule/cancel/pause/downgrade endpoints; the frontend now also resets request-composer URL state back to overview when the composer is closed
 - focused portal Playwright coverage now locks the render, reschedule submission, and mobile no-overflow acceptance path
@@ -59,6 +63,10 @@ Latest implementation continuation from `2026-04-25`:
 - the homepage live-read path now consumes that backend customer-turn contract before falling back to the earlier public assistant helper, so UI copy and result payloads come from one reusable agent contract
 - the popup/product assistant now consumes the same backend customer-turn contract before falling back to legacy streaming, keeping public homepage, product proof, and embedded assistant behavior closer together
 - clarification chips now rerun the search with added context, so the visible flow behaves more like a live agent than a static helper panel
+- public/product search results now carry a detailed verified-tenant design requirement: reviewed chess tenant matches stay in the shortlist, show `BookedAI tenant`/`Verified tenant` treatment plus Book, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit capability chips, and still require explicit `Book` before the customer form opens
+- public/product search cards must now show a top-left thumbnail or branded preview fallback and a Google Maps action for each physical-place match, preferring a direct map URL and falling back to a venue/location/service Google Maps query
+- slow search should feel more responsive by showing early matches, faster staged progress copy, and chat-based refinement prompts while deeper maps, booking-path, and fit checks continue
+- tenant-confirmed bookings must keep the portal-first QR confirmation path visible, with Stripe/QR/manual payment posture, email/calendar actions, WhatsApp Agent follow-up, and portal review/edit/reschedule/cancel links available after confirmation
 - `POST /api/v1/revenue-ops/handoffs` now lets a customer-facing booking lifecycle spawn queued SME revenue-ops work in `agent_action_runs`
 - the queued revenue-ops handoff currently covers lead follow-up, payment reminder, CRM sync, customer-care status monitoring, and webhook callback, is called by homepage plus popup/product post-booking automation after the best-effort payment and communication steps, and is visible through the admin Reliability ledger filters
 
@@ -102,6 +110,8 @@ Expected outcomes:
 - stronger continuity from homepage CTA into the approved product and registration paths
 - more consistent result, decision, and booking-entry states on the product route
 - a more enterprise-grade public booking journey where search visibly communicates `matching services`, selected results move through preview into booking capture, and confirmation state makes email, calendar, payment, CRM, thank-you, and SMS/WhatsApp follow-up steps legible and executable through the current v1 seams
+- reviewed tenant results, starting with chess, should be treated as a richer subclass of search result rather than a separate route: keep browse/compare behavior intact while surfacing tenant-backed BookedAI actions, QR confirmation, and WhatsApp Agent continuity
+- result cards for physical places should remain compact but directly inspectable: thumbnail/preview first, essential facts next, Google Maps/provider/detail actions in-list, and fuller context in the popup
 - the homepage-specific search runtime should stay aligned with that same journey instead of drifting into a thinner booking-only branch, so homepage confirmation now inherits CRM-aware result posture, communication drafts, and a delivery timeline too
 - homepage booking confirmation should also stay responsive under enterprise orchestration pressure, so the authoritative booking capture must surface immediately while payment/email/SMS/WhatsApp automation completes asynchronously in the background
 - homepage sidebar parity should continue to close toward the richer assistant shell, which now means exposing the explicit enterprise journey rail from search through aftercare directly on the homepage surface

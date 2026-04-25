@@ -1,0 +1,25 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="1600" height="900" fill="#08111F"/>
+  <rect x="80" y="70" width="1440" height="760" rx="32" fill="#101B2D" stroke="rgba(255,255,255,0.12)"/>
+  <text x="140" y="160" fill="#EEF4FF" font-size="44" font-family="Arial, sans-serif">Diagram title</text>
+  <text x="140" y="205" fill="#9DB0CF" font-size="22" font-family="Arial, sans-serif">Short explanation of the visual or process.</text>
+
+  <rect x="140" y="280" width="360" height="280" rx="24" fill="#14233A" stroke="rgba(255,255,255,0.12)"/>
+  <rect x="620" y="280" width="360" height="280" rx="24" fill="#14233A" stroke="rgba(255,255,255,0.12)"/>
+  <rect x="1100" y="280" width="360" height="280" rx="24" fill="#14233A" stroke="rgba(255,255,255,0.12)"/>
+
+  <text x="180" y="340" fill="#6EE7FF" font-size="16" font-family="Arial, sans-serif">STEP 1</text>
+  <text x="180" y="390" fill="#EEF4FF" font-size="30" font-family="Arial, sans-serif">Input</text>
+  <text x="180" y="445" fill="#9DB0CF" font-size="20" font-family="Arial, sans-serif">Replace with your first node</text>
+
+  <text x="660" y="340" fill="#6EE7FF" font-size="16" font-family="Arial, sans-serif">STEP 2</text>
+  <text x="660" y="390" fill="#EEF4FF" font-size="30" font-family="Arial, sans-serif">Process</text>
+  <text x="660" y="445" fill="#9DB0CF" font-size="20" font-family="Arial, sans-serif">Replace with transformation</text>
+
+  <text x="1140" y="340" fill="#6EE7FF" font-size="16" font-family="Arial, sans-serif">STEP 3</text>
+  <text x="1140" y="390" fill="#EEF4FF" font-size="30" font-family="Arial, sans-serif">Outcome</text>
+  <text x="1140" y="445" fill="#9DB0CF" font-size="20" font-family="Arial, sans-serif">Replace with final result</text>
+
+  <path d="M500 420H620" stroke="#8B5CF6" stroke-width="8" stroke-linecap="round"/>
+  <path d="M980 420H1100" stroke="#8B5CF6" stroke-width="8" stroke-linecap="round"/>
+</svg>

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 import sys
@@ -22,6 +23,7 @@ from api.v1_routes import (
 from api.v1_router import router as v1_router
 from repositories.integration_repository import IntegrationRepository
 from service_layer.prompt9_matching_service import RankedServiceMatch
+from service_layer import tenant_app_service
 from service_layer.tenant_app_service import build_portal_booking_snapshot
 from repositories.tenant_repository import TenantRepository
 
@@ -210,6 +212,119 @@ class ApiV1PortalRoutesTestCase(TestCase):
         payload = response.json()
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["error"]["code"], "portal_booking_not_found")
+
+    def test_portal_customer_care_turn_returns_grounded_status_answer(self):
+        async def _build_portal_customer_care_turn(*_args, **_kwargs):
+            return {
+                "booking_reference": "BR-PORTAL-CARE",
+                "phase": "payment_help",
+                "reply": "Booking BR-PORTAL-CARE is still showing payment pending.",
+                "identity": {
+                    "booking_reference": "BR-PORTAL-CARE",
+                    "resolved_by": ["booking_reference", "email_match"],
+                    "email_match": True,
+                    "phone_match": False,
+                    "verified": True,
+                    "verification_note": "Booking reference is the portal identity anchor.",
+                },
+                "status": {
+                    "booking": "captured",
+                    "payment": "pending",
+                    "summary": {"tone": "monitor", "title": "Booking under review", "body": "Active."},
+                },
+                "academy": {"student": None, "report_available": False},
+                "operations": {"summary": {"total": 2}, "recent_actions": []},
+                "created_request": None,
+                "next_actions": [{"id": "pay_now", "label": "Complete payment", "enabled": True}],
+                "sources": ["portal_booking_snapshot", "agent_action_runs"],
+            }
+
+        with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
+            "api.v1_tenant_handlers.build_portal_customer_care_turn",
+            _build_portal_customer_care_turn,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/portal/bookings/BR-PORTAL-CARE/care-turn",
+                json={"message": "Do I still need to pay?", "customer_email": "parent@example.com"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["phase"], "payment_help")
+        self.assertEqual(payload["data"]["operations"]["summary"]["total"], 2)
+
+    def test_portal_customer_care_turn_queues_support_request_for_escalation(self):
+        async def _build_portal_booking_snapshot(*_args, **_kwargs):
+            return {
+                "tenant_id": "tenant-care",
+                "booking": {
+                    "booking_reference": "BR-PORTAL-CARE",
+                    "tenant_id": "tenant-care",
+                    "status": "captured",
+                },
+                "customer": {"email": "parent@example.com", "phone": "+61400000000"},
+                "service": {"service_name": "Chess class", "business_name": "Grandmaster Chess"},
+                "payment": {"status": "pending", "payment_url": "https://pay.example.test"},
+                "support": {"contact_email": "support@example.com"},
+                "status_summary": {"tone": "monitor", "title": "Payment pending", "body": "Payment is not complete."},
+                "allowed_actions": [
+                    {"id": "pay_now", "label": "Complete payment", "enabled": True, "href": "https://pay.example.test"},
+                    {"id": "contact_support", "label": "Contact support", "enabled": True, "href": "mailto:support@example.com"},
+                ],
+                "academy_student": None,
+                "academy_report_preview": None,
+            }
+
+        async def _queue_portal_booking_request(*_args, **kwargs):
+            return {
+                "request_status": "queued",
+                "request_type": kwargs["request_type"],
+                "booking_reference": kwargs["booking_reference"],
+                "message": "Your support request has been recorded for manual review.",
+                "support_email": "support@example.com",
+                "outbox_event_id": 99,
+            }
+
+        class _AcademyRepository:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            async def list_agent_action_runs(self, **_kwargs):
+                return []
+
+        async def _run():
+            with patch.object(tenant_app_service, "build_portal_booking_snapshot", _build_portal_booking_snapshot), patch.object(
+                tenant_app_service,
+                "queue_portal_booking_request",
+                _queue_portal_booking_request,
+            ), patch.object(tenant_app_service, "AcademyRepository", _AcademyRepository):
+                return await tenant_app_service.build_portal_customer_care_turn(
+                    SimpleNamespace(),
+                    booking_reference="BR-PORTAL-CARE",
+                    message="The payment link is not working, can a human help me?",
+                    customer_email="parent@example.com",
+                )
+
+        result = asyncio.run(_run())
+
+        self.assertEqual(result["phase"], "payment_help")
+        self.assertEqual(result["created_request"]["request_type"], "support_request")
+        self.assertEqual(result["created_request"]["outbox_event_id"], 99)
+        self.assertIn("queued this as a support request", result["reply"])
+
+    def test_portal_customer_care_turn_requires_message(self):
+        client = TestClient(create_test_app())
+        response = client.post(
+            "/api/v1/portal/bookings/BR-PORTAL-CARE/care-turn",
+            json={"message": ""},
+        )
+
+        self.assertEqual(response.status_code, 422)
+        payload = response.json()
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["error"]["code"], "validation_error")
 
     def test_portal_reschedule_request_returns_success_envelope(self):
         async def _queue_portal_booking_request(*_args, **_kwargs):

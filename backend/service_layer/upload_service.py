@@ -28,6 +28,19 @@ ALLOWED_IMAGE_CONTENT_TYPES = {
     ".webp": "image/webp",
 }
 
+ALLOWED_VIDEO_CONTENT_TYPES = {
+    ".mp4": "video/mp4",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".mkv": "video/x-matroska",
+    ".webm": "video/webm",
+    ".m4v": "video/x-m4v",
+    ".wmv": "video/x-ms-wmv",
+    ".flv": "video/x-flv",
+    ".ogv": "video/ogg",
+    ".3gp": "video/3gpp",
+}
+
 RateLimitEnforcer = Callable[..., Awaitable[None]]
 
 
@@ -40,6 +53,20 @@ def detect_image_extension(content: bytes) -> str | None:
         return ".gif"
     if len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP":
         return ".webp"
+    return None
+
+
+def detect_video_extension(content: bytes) -> str | None:
+    # ISO Base Media (MP4/MOV/M4V) — ftyp box at offset 4
+    if len(content) >= 12 and content[4:8] == b"ftyp":
+        brand = content[8:12]
+        return ".mov" if brand in (b"qt  ", b"moov") else ".mp4"
+    # WebM / MKV — EBML header
+    if content[:4] == b"\x1a\x45\xdf\xa3":
+        return ".webm"
+    # AVI — RIFF....AVI
+    if len(content) >= 12 and content[:4] == b"RIFF" and content[8:11] == b"AVI":
+        return ".avi"
     return None
 
 
@@ -56,6 +83,19 @@ def guess_document_extension(file: UploadFile) -> str | None:
             normalized = ".jpg"
         if normalized in ALLOWED_DOCUMENT_EXTENSIONS:
             return normalized
+
+    return None
+
+
+def guess_video_extension(file: UploadFile) -> str | None:
+    original_name = (file.filename or "").strip()
+    suffix = Path(original_name).suffix.lower()
+    if suffix in ALLOWED_VIDEO_CONTENT_TYPES:
+        return suffix
+
+    guessed_from_type = mimetypes.guess_extension(file.content_type or "")
+    if guessed_from_type and guessed_from_type.lower() in ALLOWED_VIDEO_CONTENT_TYPES:
+        return guessed_from_type.lower()
 
     return None
 
@@ -98,6 +138,7 @@ async def save_uploaded_file(
         )
 
     image_extension = detect_image_extension(content)
+    video_extension = detect_video_extension(content)
     if allowed_kind == "images":
         if image_extension is None:
             raise HTTPException(
@@ -108,18 +149,29 @@ async def save_uploaded_file(
         category = "images"
         content_type = ALLOWED_IMAGE_CONTENT_TYPES[extension]
     else:
-        extension = image_extension or guess_document_extension(file)
+        extension = (
+            image_extension
+            or video_extension
+            or guess_video_extension(file)
+            or guess_document_extension(file)
+        )
         if extension is None:
             raise HTTPException(
                 status_code=400,
                 detail=(
-                    "Allowed files: JPEG, PNG, GIF, WebP, PDF, DOC, DOCX, XLS, XLSX, "
-                    "PPT, PPTX, TXT, CSV"
+                    "Allowed files: JPEG, PNG, GIF, WebP, MP4, MOV, AVI, MKV, WebM, "
+                    "M4V, WMV, FLV, OGV, 3GP, PDF, DOC, DOCX, XLS, XLSX, PPT, PPTX, TXT, CSV"
                 ),
             )
-        category = "images" if extension in ALLOWED_IMAGE_CONTENT_TYPES else "documents"
+        if extension in ALLOWED_IMAGE_CONTENT_TYPES:
+            category = "images"
+        elif extension in ALLOWED_VIDEO_CONTENT_TYPES:
+            category = "videos"
+        else:
+            category = "documents"
         content_type = (
             ALLOWED_IMAGE_CONTENT_TYPES.get(extension)
+            or ALLOWED_VIDEO_CONTENT_TYPES.get(extension)
             or ALLOWED_DOCUMENT_EXTENSIONS.get(extension)
             or file.content_type
             or "application/octet-stream"

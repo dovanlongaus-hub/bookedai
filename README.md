@@ -7,8 +7,13 @@ Current application release baseline: `1.0.1-stable`.
 Current public runtime decision:
 
 - BookedAI is shipping the responsive web app as the primary current-phase product surface.
-- `bookedai.au` is the acquisition and orientation surface for that web runtime.
+- `bookedai.au` now has an executive acquisition homepage that explains the full BookedAI revenue-engine story in the first viewport, then keeps the real live search-to-booking workspace on-page for proof.
+- `pitch.bookedai.au` remains the deeper pitch and architecture-visualization surface for investors who want the longer company story.
+- `scripts/healthcheck_stack.sh` expects `bookedai.au` to serve the homepage shell directly and still probes `pitch.bookedai.au` as the deeper pitch surface.
 - `product.bookedai.au` is the deeper live product web runtime; search uses a ChatGPT-like composer, results stay results-first after ranking, and compact cards use detail popups, chat-based refinements, and explicit `Book` actions before customer details open.
+- chess searches can surface the reviewed BookedAI chess tenant in the normal result list with verified-tenant capability chips for booking, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit/revisit.
+- configured WhatsApp inbound messages now act as a customer-care channel: BookedAI resolves the booking, answers from portal booking/payment truth, and queues audited cancel or reschedule requests when customers ask to change an existing booking.
+- `/roadmap` exposes the active Phase/Sprint `17-23` plan for full-flow stabilization, revenue-ops control, customer care, widget runtime, billing truth, templates, and release governance.
 - native mobile is intentionally deferred to a later phase.
 
 ## Repository structure
@@ -108,6 +113,22 @@ Core production services defined in [`docker-compose.prod.yml`](/home/dovanlong/
 - Backend stores the event in Postgres managed by the self-hosted Supabase stack
 - Backend triggers `n8n` through `N8N_BOOKING_WEBHOOK_URL`
 - `n8n` handles Google Calendar and downstream automation
+
+## WhatsApp customer care
+
+- `Evolution API personal WhatsApp QR session -> /api/webhooks/evolution` on the backend while WhatsApp Business verification is pending
+- `Twilio/Meta WhatsApp -> /api/webhooks/whatsapp` remains the business-provider path for later verified rollout
+- the customer-facing runtime is the dedicated `BookedAI WhatsApp Booking Care Agent` for `bookedai.au`
+- the default BookedAI WhatsApp sender is `+61455301335`, with `info@bookedai.au` as the matching email support identity
+- personal WhatsApp through Evolution API is the intended primary outbound path for the near-term customer-care bot; Meta/WhatsApp Cloud API and Twilio remain provider paths for the later verified business rollout
+- post-booking WhatsApp confirmation messages include the booking reference, portal link, and instruction to reply on WhatsApp for any service question about the existing booking, including status, payment, provider details, support, reschedule, or cancellation review
+- inbound messages are normalized, idempotency-checked, and stored as `whatsapp_inbound` events
+- when the communication service is configured, BookedAI resolves the booking by reference first, then by sender phone/email only when one safe booking is found
+- replies use portal booking truth, including booking status, payment posture, support contact, service/provider context, academy/report context, and revenue-ops action state
+- clear cancellation or reschedule messages queue the same audited portal requests as `portal.bookedai.au`, send or record an email confirmation, create a CRM task mirror, and become visible in the tenant booking request queue; unsupported or ambiguous cases ask for booking reference or human review
+- OpenClaw remains the trusted gateway/operator surface for deploying, supervising, and safely checking this dedicated AI agent through `bot.bookedai.au` and `scripts/telegram_workspace_ops.py`; the customer-facing WhatsApp bot itself is the FastAPI webhook plus provider adapter path above
+- the OpenClaw-owned agent manifest lives at `deploy/openclaw/agents/bookedai-whatsapp-booking-care-agent.json` and can be synced into the OpenClaw runtime with `python3 scripts/telegram_workspace_ops.py sync-openclaw-bookedai-agent`
+- operators can run `python3 scripts/telegram_workspace_ops.py whatsapp-bot-status` from OpenClaw or the repo to verify gateway health, API health, WhatsApp provider connectivity, and webhook route reachability without sending a customer message
 
 AI provider:
 
@@ -215,7 +236,7 @@ python3 scripts/telegram_workspace_ops.py sync-repo-docs --skip-discord
 - `NOTION_API_TOKEN` plus either `NOTION_PARENT_PAGE_ID` or `NOTION_DATABASE_ID` if you want Telegram-driven change summaries written directly into Notion
 - optional `NOTION_VERSION` to override the default Notion API version used by the sync script
 - `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` with the Telegram user ids allowed to run elevated BookedAI workspace actions through `telegram_workspace_ops.py`
-- `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` to define which elevated Telegram actions are allowed, such as `build_frontend`, `deploy_live`, `test`, `workspace_write`, `repo_structure`, `host_command`, `host_shell`, or `full_project`
+- `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` to define which elevated Telegram actions are allowed, such as `build_frontend`, `deploy_live`, `test`, `workspace_write`, `repo_structure`, `host_command`, `host_shell`, `whatsapp_bot_status`, or `full_project`
 - `ADMIN_API_TOKEN` for protected email admin routes
 - `ADMIN_PASSWORD` for admin login credentials
 - `ADMIN_BOOTSTRAP_PASSWORD` for explicitly enabled bootstrap-style admin login routes
@@ -251,6 +272,7 @@ Session secret notes:
 - `TENANT_SESSION_SIGNING_SECRET` is the preferred signing key for tenant sessions.
 - `SESSION_SIGNING_SECRET` is a shared fallback for session signing when a more specific secret is not set.
 - Session signing no longer falls back to `ADMIN_API_TOKEN` or `ADMIN_PASSWORD`.
+- Production Compose passes `SESSION_SIGNING_SECRET`, `TENANT_SESSION_SIGNING_SECRET`, and `ADMIN_SESSION_SIGNING_SECRET` into both `backend` and `beta-backend`; admin login will fail fast if the admin signing secret family is absent from the live container environment.
 - The root `Next.js` admin lane now defaults to email-based one-time verification codes through `/admin-login` plus `/api/admin/auth/request-code` and `/api/admin/auth/verify-code`.
 - When `BOOKEDAI_ENABLE_PRISMA=1`, those admin codes persist in Prisma-backed `admin_email_login_codes`; otherwise the root admin lane now uses the live legacy tenant membership tables plus `tenant_email_login_codes` as the compatibility persistence path.
 - Bootstrap admin login is now a break-glass path only: it must be explicitly enabled with `ADMIN_ENABLE_BOOTSTRAP_LOGIN=1`, and then uses `ADMIN_BOOTSTRAP_PASSWORD`.
@@ -457,6 +479,8 @@ python3 scripts/telegram_workspace_ops.py test --command "./scripts/run_release_
 python3 scripts/telegram_workspace_ops.py workspace-command --command "git mv old/path new/path"
 python3 scripts/telegram_workspace_ops.py host-command --command "apt-get update"
 python3 scripts/telegram_workspace_ops.py host-shell --cwd / --command "docker ps && systemctl status nginx"
+python3 scripts/telegram_workspace_ops.py sync-openclaw-bookedai-agent
+python3 scripts/telegram_workspace_ops.py whatsapp-bot-status
 ```
 
 The wrapper keeps the operator path explicit:
@@ -467,6 +491,8 @@ The wrapper keeps the operator path explicit:
 - `workspace-command` runs a repo-scoped shell command so Telegram/OpenClaw can handle broader BookedAI changes, including file moves, refactors, and multi-surface rollout steps
 - `host-command` runs a host-level command through `sudo -n` only when the requested program is in the checked-in allowlist such as `apt-get`, `docker`, `systemctl`, `journalctl`, `service`, `timedatectl`, or `ufw`
 - `host-shell` runs a fully elevated host shell command from any server path and is the intended lane when trusted Telegram/OpenClaw operators need broad `host/elevated` access across the whole machine
+- `sync-openclaw-bookedai-agent` installs or updates the BookedAI WhatsApp Booking Care Agent manifest in the OpenClaw runtime config directory without adding schema-invalid entries to `openclaw.json`
+- `whatsapp-bot-status` runs the read-only WhatsApp bot readiness probe for OpenClaw, API health, provider status, and the active webhook route; for `whatsapp_evolution` it checks `/api/webhooks/evolution`, and for Meta/Twilio it checks `/api/webhooks/whatsapp`
 - when the wrapper is running inside the privileged OpenClaw CLI container, `deploy-live`, `host-command`, and `host-shell` now jump into the real host namespaces through `nsenter --target 1 ...`, so Docker, package managers, and system binaries resolve against the VPS itself instead of the container filesystem
 - `sync-doc` is the documentation or Notion or Discord path for Telegram change tracking
 - `host-command` intentionally does not expose `bash`, `sh`, or arbitrary executable paths, so it can support machine operations without turning the Telegram path into a general-purpose root shell
@@ -598,6 +624,17 @@ EMAIL_IMAP_USERNAME=info@bookedai.au
 EMAIL_IMAP_PASSWORD=your-zoho-app-password
 EMAIL_IMAP_MAILBOX=INBOX
 EMAIL_IMAP_USE_SSL=true
+WHATSAPP_PROVIDER=evolution
+WHATSAPP_FALLBACK_PROVIDER=
+WHATSAPP_FROM_NUMBER=+61455301335
+WHATSAPP_EVOLUTION_API_URL=https://waba.bookedai.au
+WHATSAPP_EVOLUTION_API_KEY=your-evolution-api-key
+WHATSAPP_EVOLUTION_INSTANCE=bookedai
+# Later, after WhatsApp Business verification:
+# WHATSAPP_PROVIDER=meta
+# WHATSAPP_FALLBACK_PROVIDER=twilio
+# WHATSAPP_META_PHONE_NUMBER_ID=your-meta-phone-number-id
+# WHATSAPP_META_ACCESS_TOKEN=your-meta-system-user-token
 ADMIN_API_TOKEN=your-long-random-admin-token
 ```
 

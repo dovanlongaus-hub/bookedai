@@ -33,7 +33,8 @@ BOOKEDAI_COMMUNICATION_TEMPLATES: dict[str, str] = {
     "bookedai_booking_confirmation": (
         "Bookedai.au confirmed: ${service_name} for ${customer_name} on ${slot_label}. "
         "Ref ${booking_reference}. ${business_name} will handle the next step. "
-        "Need help? ${support_email}"
+        "Manage it here: ${manage_link}. Reply on WhatsApp to ask, reschedule, or request cancellation. "
+        "BookedAI support: +61455301335 or ${support_email}"
     ),
     "bookedai_demo_reminder": (
         "Bookedai.au: Hi ${customer_name}, your live demo is coming up at ${slot_label}. "
@@ -206,24 +207,13 @@ class CommunicationService:
         )
 
     def whatsapp_configured(self) -> bool:
-        provider = self.settings.whatsapp_provider
-        if provider == "twilio":
-            has_credentials = bool(
-                (self.settings.whatsapp_twilio_account_sid and self.settings.whatsapp_twilio_auth_token)
-                or (self.settings.whatsapp_twilio_api_key_sid and self.settings.whatsapp_twilio_api_key_secret)
-            )
-            return bool(
-                self.settings.whatsapp_twilio_account_sid
-                and has_credentials
-                and self.settings.whatsapp_from_number
-            )
-        if provider == "meta":
-            return bool(
-                self.settings.whatsapp_meta_phone_number_id
-                and self.settings.whatsapp_meta_access_token
-                and self.settings.whatsapp_from_number
-            )
-        return False
+        primary_provider = self._normalize_provider_name(self.settings.whatsapp_provider)
+        fallback_provider = self._normalize_provider_name(self.settings.whatsapp_fallback_provider)
+        return self._whatsapp_provider_configured(primary_provider) or (
+            bool(fallback_provider)
+            and fallback_provider != primary_provider
+            and self._whatsapp_provider_configured(fallback_provider)
+        )
 
     def sms_safe_summary(self) -> dict[str, object]:
         configured_fields: list[str] = []
@@ -240,20 +230,43 @@ class CommunicationService:
 
     def whatsapp_safe_summary(self) -> dict[str, object]:
         configured_fields: list[str] = []
-        if self.settings.whatsapp_provider == "twilio":
+        primary_provider = self._normalize_provider_name(self.settings.whatsapp_provider)
+        fallback_provider = self._normalize_provider_name(self.settings.whatsapp_fallback_provider)
+        notes: list[str] = []
+        if primary_provider == "twilio":
             if self.settings.whatsapp_twilio_account_sid:
                 configured_fields.append("whatsapp_twilio_account_sid")
             if self.settings.whatsapp_twilio_api_key_sid:
                 configured_fields.append("whatsapp_twilio_api_key_sid")
             if self.settings.whatsapp_from_number:
                 configured_fields.append("whatsapp_from_number")
-        elif self.settings.whatsapp_provider == "meta":
+        elif primary_provider == "meta":
             if self.settings.whatsapp_meta_phone_number_id:
                 configured_fields.append("whatsapp_meta_phone_number_id")
             if self.settings.whatsapp_from_number:
                 configured_fields.append("whatsapp_from_number")
+        elif primary_provider == "evolution":
+            if self.settings.whatsapp_evolution_api_url:
+                configured_fields.append("whatsapp_evolution_api_url")
+            if self.settings.whatsapp_evolution_api_key:
+                configured_fields.append("whatsapp_evolution_api_key")
+            if self.settings.whatsapp_evolution_instance:
+                configured_fields.append("whatsapp_evolution_instance")
+            notes.extend(
+                [
+                    "personal_whatsapp_bridge=evolution_api",
+                    "requires_qr_session_connected",
+                ]
+            )
+        if fallback_provider and fallback_provider != primary_provider:
+            notes.append(f"fallback_provider=whatsapp_{fallback_provider}")
+            if self._whatsapp_provider_configured(fallback_provider):
+                notes.append("fallback_provider_configured")
         summary = self.whatsapp_adapter.safe_summary(configured_fields=configured_fields)
-        return summary.model_dump(mode="json")
+        payload = summary.model_dump(mode="json")
+        payload["enabled"] = self.whatsapp_configured()
+        payload["notes"] = notes
+        return payload
 
     def render_template(
         self,
@@ -326,24 +339,163 @@ class CommunicationService:
             variables=variables,
             fallback_body=body,
         )
+        primary_provider = self._normalize_provider_name(self.settings.whatsapp_provider)
+        fallback_provider = self._normalize_provider_name(self.settings.whatsapp_fallback_provider)
         if not self.whatsapp_configured():
             return CommunicationSendResult(
                 provider=self.whatsapp_adapter.provider_name,
                 delivery_status="queued",
                 warnings=["WhatsApp provider is not fully configured; message was recorded for manual review."],
             )
-        if self.settings.whatsapp_provider == "meta":
-            return await self._send_meta_whatsapp_message(to=recipient, body=rendered_body)
+        fallback_warning = ""
+        if self._whatsapp_provider_configured(primary_provider):
+            result = await self._send_whatsapp_for_provider(
+                primary_provider,
+                to=recipient,
+                body=rendered_body,
+            )
+            if not self._should_try_whatsapp_fallback(result, primary_provider, fallback_provider):
+                return result
+            fallback_warning = (
+                f"WhatsApp primary provider whatsapp_{primary_provider} is unavailable; "
+                f"trying backup provider whatsapp_{fallback_provider}."
+            )
+        elif fallback_provider and fallback_provider != primary_provider:
+            fallback_warning = (
+                f"WhatsApp primary provider whatsapp_{primary_provider or 'unconfigured'} is not configured; "
+                f"using backup provider whatsapp_{fallback_provider}."
+            )
+
+        if fallback_provider and fallback_provider != primary_provider and self._whatsapp_provider_configured(fallback_provider):
+            result = await self._send_whatsapp_for_provider(
+                fallback_provider,
+                to=recipient,
+                body=rendered_body,
+            )
+            warnings = [fallback_warning, *(result.warnings or [])] if fallback_warning else result.warnings
+            return CommunicationSendResult(
+                provider=result.provider,
+                delivery_status=result.delivery_status,
+                provider_message_id=result.provider_message_id,
+                warnings=warnings,
+            )
+
+        return CommunicationSendResult(
+            provider=self.whatsapp_adapter.provider_name,
+            delivery_status="queued",
+            warnings=["WhatsApp provider is not fully configured; message was recorded for manual review."],
+        )
+
+    @staticmethod
+    def _normalize_provider_name(value: str | None) -> str:
+        return str(value or "").strip().lower()
+
+    def _whatsapp_provider_configured(self, provider: str) -> bool:
+        if provider == "twilio":
+            has_credentials = bool(
+                (self.settings.whatsapp_twilio_account_sid and self.settings.whatsapp_twilio_auth_token)
+                or (self.settings.whatsapp_twilio_api_key_sid and self.settings.whatsapp_twilio_api_key_secret)
+            )
+            return bool(
+                self.settings.whatsapp_twilio_account_sid
+                and has_credentials
+                and self.settings.whatsapp_from_number
+            )
+        if provider == "meta":
+            return bool(
+                self.settings.whatsapp_meta_phone_number_id
+                and self.settings.whatsapp_meta_access_token
+                and self.settings.whatsapp_from_number
+            )
+        if provider == "evolution":
+            return bool(
+                self.settings.whatsapp_evolution_api_url
+                and self.settings.whatsapp_evolution_api_key
+            )
+        return False
+
+    @staticmethod
+    def _should_try_whatsapp_fallback(
+        result: CommunicationSendResult,
+        primary_provider: str,
+        fallback_provider: str,
+    ) -> bool:
+        if not fallback_provider or fallback_provider == primary_provider:
+            return False
+        return bool(
+            result.delivery_status == "queued"
+            and not result.provider_message_id
+            and result.warnings
+        )
+
+    async def _send_whatsapp_for_provider(
+        self,
+        provider: str,
+        *,
+        to: str,
+        body: str,
+    ) -> CommunicationSendResult:
+        if provider == "meta":
+            return await self._send_meta_whatsapp_message(
+                to=to,
+                body=body,
+                provider_label="whatsapp_meta",
+            )
+        if provider == "twilio":
+            return await self._send_twilio_whatsapp_message(to=to, body=body)
+        if provider == "evolution":
+            return await self._send_evolution_whatsapp_message(to=to, body=body)
+        return CommunicationSendResult(
+            provider=f"whatsapp_{provider or 'unconfigured'}",
+            delivery_status="queued",
+            warnings=["WhatsApp provider is not supported; message was recorded for manual review."],
+        )
+
+    async def _send_twilio_whatsapp_message(self, *, to: str, body: str) -> CommunicationSendResult:
         return await self._send_twilio_message(
             account_sid=self.settings.whatsapp_twilio_account_sid,
             auth_username=self.settings.whatsapp_twilio_api_key_sid or self.settings.whatsapp_twilio_account_sid,
             auth_secret=self.settings.whatsapp_twilio_api_key_secret or self.settings.whatsapp_twilio_auth_token,
-            to=f"whatsapp:{recipient}",
-            body=rendered_body,
+            to=f"whatsapp:{to}",
+            body=body,
             from_number=self._normalize_whatsapp_sender(self.settings.whatsapp_from_number),
             messaging_service_sid=None,
-            provider_label=self.whatsapp_adapter.provider_name,
+            provider_label="whatsapp_twilio",
         )
+
+    async def _send_evolution_whatsapp_message(self, *, to: str, body: str) -> CommunicationSendResult:
+        base_url = self.settings.whatsapp_evolution_api_url.rstrip("/")
+        instance = self.settings.whatsapp_evolution_instance or "bookedai"
+        api_key = self.settings.whatsapp_evolution_api_key
+        number = to.lstrip("+").replace(" ", "")
+        url = f"{base_url}/message/sendText/{instance}"
+        try:
+            import httpx
+            async with httpx.AsyncClient(timeout=15) as client:
+                response = await client.post(
+                    url,
+                    json={"number": number, "text": body},
+                    headers={"apikey": api_key, "Content-Type": "application/json"},
+                )
+                if response.status_code in {200, 201}:
+                    payload = response.json() if response.content else {}
+                    msg_id = str(payload.get("key", {}).get("id") or payload.get("id") or "")
+                    return CommunicationSendResult(
+                        provider="whatsapp_evolution",
+                        delivery_status="sent",
+                        provider_message_id=msg_id or None,
+                    )
+                return CommunicationSendResult(
+                    provider="whatsapp_evolution",
+                    delivery_status="queued",
+                    warnings=[f"Evolution API returned {response.status_code}: {response.text[:200]}"],
+                )
+        except Exception as exc:
+            return CommunicationSendResult(
+                provider="whatsapp_evolution",
+                delivery_status="queued",
+                warnings=[f"Evolution API request failed: {exc}"],
+            )
 
     @staticmethod
     def _normalize_whatsapp_sender(value: str) -> str:
@@ -402,7 +554,13 @@ class CommunicationService:
             warnings=[],
         )
 
-    async def _send_meta_whatsapp_message(self, *, to: str, body: str) -> CommunicationSendResult:
+    async def _send_meta_whatsapp_message(
+        self,
+        *,
+        to: str,
+        body: str,
+        provider_label: str | None = None,
+    ) -> CommunicationSendResult:
         recipient = to.lstrip("+")
         async with httpx.AsyncClient(timeout=20) as client:
             try:
@@ -422,21 +580,23 @@ class CommunicationService:
                 response.raise_for_status()
             except httpx.HTTPStatusError as error:
                 status_code = error.response.status_code if error.response is not None else None
-                if status_code in {401, 403} or (status_code is not None and status_code >= 500):
-                    return CommunicationSendResult(
-                        provider=self.whatsapp_adapter.provider_name,
-                        delivery_status="queued",
-                        provider_message_id=None,
-                        warnings=[
-                            "Messaging provider delivery is unavailable right now; the message was recorded for manual review."
-                        ],
+                warning = "Messaging provider delivery is unavailable right now; the message was recorded for manual review."
+                if status_code is not None:
+                    warning = (
+                        f"WhatsApp provider returned HTTP {status_code}; "
+                        "the message was recorded for manual review."
                     )
-                raise
+                return CommunicationSendResult(
+                    provider=provider_label or self.whatsapp_adapter.provider_name,
+                    delivery_status="queued",
+                    provider_message_id=None,
+                    warnings=[warning],
+                )
             data = response.json()
         messages = data.get("messages") or []
         first_message = messages[0] if messages else {}
         return CommunicationSendResult(
-            provider=self.whatsapp_adapter.provider_name,
+            provider=provider_label or self.whatsapp_adapter.provider_name,
             delivery_status="sent",
             provider_message_id=first_message.get("id"),
             warnings=[],

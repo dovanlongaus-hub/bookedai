@@ -43,7 +43,7 @@ export function ProductApp() {
       source_detail: 'product_page_trial',
       source_flow_mode: 'guided',
     });
-    const target = new URL('/register-interest', window.location.origin);
+    const target = new URL('/register-interest', brandHomeUrl);
     target.searchParams.set('source_section', attribution.source_section);
     target.searchParams.set('source_cta', attribution.source_cta);
     target.searchParams.set('source_detail', attribution.source_detail ?? 'product_page_trial');
@@ -84,6 +84,14 @@ export function ProductApp() {
               <span className="text-[10px] font-semibold text-emerald-700">{productFlowLabel}</span>
             </div>
 
+            <button
+              type="button"
+              onClick={openRegisterInterest}
+              className="booked-button inline-flex h-8 shrink-0 items-center justify-center px-3 text-[10px] font-semibold sm:hidden"
+            >
+              Free Trial
+            </button>
+
             <a
               href={brandHomeUrl}
               aria-label="Back to main site"
@@ -108,8 +116,8 @@ export function ProductApp() {
           </div>
         </div>
 
-        <div className="relative z-10 hidden px-3 pb-2 sm:block sm:px-5">
-          <div className="mx-auto flex max-w-[32rem] items-center justify-between gap-3 rounded-[1.25rem] border border-black/6 bg-white/72 px-4 py-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] backdrop-blur-sm">
+        <div className="relative z-10 px-3 pb-2 sm:px-5">
+          <div className="mx-auto flex max-w-[32rem] flex-col gap-2 rounded-[1.25rem] border border-black/6 bg-white/72 px-4 py-2.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] backdrop-blur-sm sm:flex-row sm:items-center sm:justify-between sm:gap-3">
             <div className="min-w-0 flex-1">
               <div className="text-[11px] font-semibold text-[var(--apple-near-black)]">
                 {productFlowDescription}
@@ -128,7 +136,7 @@ export function ProductApp() {
           </div>
         </div>
 
-        <div className="relative z-10 hidden px-3 pb-3 sm:block sm:px-5">
+        <div className="relative z-10 px-3 pb-3 sm:px-5">
           <div className="mx-auto flex max-w-[32rem] flex-wrap items-center justify-between gap-3 rounded-[1.5rem] border border-[#dbeafe] bg-[linear-gradient(135deg,rgba(255,255,255,0.95)_0%,rgba(239,246,255,0.98)_100%)] px-4 py-3 shadow-[0_12px_32px_rgba(20,89,199,0.08)]">
             <div className="min-w-0">
               <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1459c7]">

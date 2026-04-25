@@ -350,7 +350,7 @@ export const brandLandingDarkSurfaceLogoPath = brandUploadedLogoPath;
 export const brandLandingLightSurfaceLogoPath = brandUploadedLogoPath;
 export const brandContactEmail = 'info@bookedai.au';
 export const brandWhatsAppHref =
-  'https://wa.me/14155238886?text=Hi%20BookedAI%2C%20I%20want%20to%20see%20how%20the%20AI%20Revenue%20Engine%20works.';
+  'https://wa.me/61455301335?text=Hi%20BookedAI%2C%20I%20want%20to%20talk%20to%20the%20Booking%20Customer%20Care%20Agent.';
 export const brandLinkedInHref = 'https://www.linkedin.com/company/booked-ai-aus/';
 export const brandXHref = 'https://twitter.com/BookedAIAU';
 
@@ -717,10 +717,10 @@ export const partnersSectionContent: PartnersSectionContent = {
 export const technicalArchitectureContent: TechnicalArchitectureContent = {
   kicker: 'Technical Architecture',
   kickerClassName: 'text-slate-500',
-  title: 'A layered booking platform designed to stay calm under real operational load',
-  body: 'The BookedAI architecture is designed as a clean operating system for enquiry capture, AI reasoning, booking fulfilment, and operational visibility.',
+  title: 'A connected revenue-engine architecture from pitch to post-booking operations',
+  body: 'The BookedAI architecture is shown as one flow: customer surfaces capture intent, AI agents qualify and hand off work, the booking core writes commercial truth, and tenant/admin surfaces expose the lifecycle.',
   lead:
-    'Each layer has a single job, clear handoff boundaries, and traceable ownership so the product can scale without turning the booking flow into a black box.',
+    'Each layer has a single job, clear handoff boundaries, and traceable ownership so the product can scale across pitch, product, demo, portal, tenant, admin, widget, and revenue-ops workflows without turning automation into a black box.',
   principles: [
     {
       title: 'Composable by default',
@@ -738,125 +738,125 @@ export const technicalArchitectureContent: TechnicalArchitectureContent = {
   layers: [
     {
       name: 'Experience Layer',
-      summary: 'Customer-facing touchpoints and internal operator surfaces.',
+      summary: 'Customer, buyer, tenant, portal, and operator surfaces that start or continue the revenue journey.',
       items: [
         {
-          name: 'Public landing and demo flows',
-          description: 'Hero, product proof, pricing, and conversion sections that explain and trigger the booking journey.',
-          status: 'In Progress',
-        },
-        {
-          name: 'AI booking assistant',
-          description: 'Guided chat entry point for service discovery, qualification, and booking capture.',
+          name: 'Pitch, product, demo, and homepage surfaces',
+          description: 'Commercial pitch, live booking app, product-proof demo, and public redirect surfaces explain, prove, and trigger the booking journey.',
           status: 'Completed',
         },
         {
-          name: 'Embedded booking widgets',
-          description: 'Floating and inline entry points that keep the assistant accessible across the site.',
+          name: 'Customer-facing AI agent',
+          description: 'Visible chat, search, shortlist, refinement chips, and booking handoff now share one backend customer-turn contract.',
           status: 'Completed',
         },
         {
-          name: 'Admin dashboard',
-          description: 'Operational interface for bookings, partner content, imported services, and live diagnostics.',
+          name: 'Widget and plugin runtime',
+          description: 'The next installable assistant shell for tenant-owned websites, with host origin and deployment identity preserved.',
+          status: 'Planned',
+        },
+        {
+          name: 'Tenant, portal, and admin workspaces',
+          description: 'Tenant Ops, customer portal, and admin Reliability now expose booking truth, post-booking actions, support state, and evidence posture.',
           status: 'Completed',
         },
         {
-          name: 'Demo and video storytelling',
-          description: 'Pre-sales product education that bridges marketing into product interaction.',
+          name: 'Vertical proof surfaces',
+          description: 'Grandmaster Chess Academy and Future Swim show the reusable path from intake to booking, support, reporting, and revenue operations.',
           status: 'In Progress',
         },
       ],
     },
     {
       name: 'Application Layer',
-      summary: 'Domain logic that turns raw conversations into booking-ready outcomes.',
+      summary: 'Domain logic that turns conversations into booking, payment, portal, and support-ready outcomes.',
       items: [
         {
-          name: 'Lead qualification engine',
-          description: 'Collects intent, timing, contact details, and service fit before a booking is committed.',
-          status: 'In Progress',
+          name: 'Lead and customer-turn contracts',
+          description: 'Structured agent turns capture intent, missing context, suggestions, top matches, attribution, and next-agent handoff metadata.',
+          status: 'Completed',
         },
         {
           name: 'Booking orchestration',
-          description: 'Coordinates booking creation, payment state, confirmation, and workflow progression.',
+          description: 'Coordinates search, lead creation, booking intent, confirmation, QR/portal continuation, and best-effort communication work.',
           status: 'Completed',
         },
         {
-          name: 'Partner and service catalog management',
-          description: 'Stores offer metadata, imported service information, and featured partner presentation logic.',
+          name: 'Revenue-ops action ledger',
+          description: 'Post-booking handoffs queue lead follow-up, payment reminder, CRM sync, customer-care monitoring, webhook callback, report, and retention actions.',
           status: 'In Progress',
         },
         {
-          name: 'Review and drift analysis',
-          description: 'Compares expected booking fields with downstream state to surface mismatches early.',
+          name: 'Customer-care and status layer',
+          description: 'Returning customer questions should reopen booking, payment, subscription, report, communication, and action-run truth.',
           status: 'Planned',
         },
         {
-          name: 'Notification and confirmation services',
-          description: 'Handles outbound updates, confirmation notes, and customer-facing follow-up events.',
-          status: 'Completed',
+          name: 'Billing and receivable truth',
+          description: 'The next commercial layer connects payments, subscriptions, invoices, reminders, commission, and reconciliation state.',
+          status: 'Planned',
         },
       ],
     },
     {
       name: 'AI and Automation Layer',
-      summary: 'Reasoning, routing, and workflow execution that keep the funnel responsive.',
+      summary: 'Reasoning, routing, and policy-gated workflow execution across the full lifecycle.',
       items: [
         {
-          name: 'Intent understanding',
-          description: 'Interprets customer requests and maps them into service and scheduling signals.',
-          status: 'In Progress',
-        },
-        {
-          name: 'Conversation state management',
-          description: 'Maintains the active booking context across messages, forms, and assisted flows.',
-          status: 'In Progress',
-        },
-        {
-          name: 'Workflow routing rules',
-          description: 'Directs simple paths to automation and sends high-risk conversations to human review.',
-          status: 'Planned',
-        },
-        {
-          name: 'Automation triggers',
-          description: 'Starts reminder, onboarding, CRM, and operational sequences after key booking milestones.',
+          name: 'Search and conversation agent',
+          description: 'Interprets customer requests, asks short clarifications, keeps chat context visible, and hands off to booking.',
           status: 'Completed',
         },
         {
-          name: 'Quality feedback loops',
-          description: 'Feeds admin review outcomes back into prompt, logic, and workflow tuning.',
+          name: 'Revenue operations agent',
+          description: 'Queues, dispatches, and reports post-lead and post-booking actions with policy, dependency, and evidence metadata.',
+          status: 'In Progress',
+        },
+        {
+          name: 'Customer-care and status agent',
+          description: 'The next agent answers returning customer status, payment, subscription, report, reschedule, pause, downgrade, and escalation questions.',
+          status: 'Planned',
+        },
+        {
+          name: 'Worker and dispatch policy',
+          description: 'Action runners move work through queued, sent, completed, manual-review, failed, and dependency-gated states.',
+          status: 'Completed',
+        },
+        {
+          name: 'Release and quality feedback loops',
+          description: 'Release gates, action evidence, admin review, and tenant visibility feed back into safer automation and prompt tuning.',
           status: 'Planned',
         },
       ],
     },
     {
       name: 'Data and Integration Layer',
-      summary: 'Persistence, third-party systems, and observability required for production reliability.',
+      summary: 'Persistence, third-party systems, and observability required for production revenue operations.',
       items: [
         {
           name: 'Booking records and audit trails',
-          description: 'Stores booking references, lifecycle events, review notes, and status history.',
+          description: 'Stores booking references, lifecycle events, academy snapshots, portal requests, action runs, and status history.',
           status: 'Completed',
         },
         {
           name: 'Payments integration',
-          description: 'Links paid flows to booking state so commercial conversion is visible and recoverable.',
+          description: 'Links payment intent, checkout, subscription, receivable, reminder, and dependency state back to booking truth.',
           status: 'In Progress',
         },
         {
-          name: 'Calendar and scheduling connectors',
-          description: 'Keeps confirmed bookings aligned with availability and follow-up timing.',
+          name: 'CRM, messaging, and webhook connectors',
+          description: 'Zoho CRM, email, SMS, WhatsApp, webhooks, and outbox records form the follow-up evidence layer.',
           status: 'In Progress',
         },
         {
-          name: 'Growth and partner content APIs',
-          description: 'Supports the landing page, featured partner wall, and promotional content management.',
+          name: 'Tenant and vertical templates',
+          description: 'Chess and Future Swim are the current proof paths before the lifecycle contracts are generalized across more SME templates.',
           status: 'Completed',
         },
         {
-          name: 'Operational telemetry',
-          description: 'Captures metrics, recent events, API inventory, and configuration visibility for support.',
-          status: 'Planned',
+          name: 'Operational telemetry and release gates',
+          description: 'Route inventory, stack health, browser smoke, action evidence, and release gates keep the platform deployable and supportable.',
+          status: 'In Progress',
         },
       ],
     },
@@ -1312,6 +1312,106 @@ export const roadmapContent: RoadmapContent = {
   ],
   phases: [
     {
+      name: 'Phase 17',
+      timing: 'Full-flow stabilization',
+      windowLabel: 'Current verified baseline',
+      focusLabel: 'Pitch registration, product booking, payment preparation, communication handoff, portal-first confirmation, and 16s Thank You return',
+      milestoneLabel: 'Live pitch/product/portal/tenant/admin surfaces have been brought back into one stable customer journey',
+      summary: 'Phase 17 keeps the full revenue-engine path dependable across pitch, product, demo, portal, tenant, admin, and API surfaces before the roadmap widens again.',
+      tasks: [
+        { title: 'Keep pitch package registration resilient when calendar, Stripe, event-store, or dual-write side effects degrade', status: 'Completed' },
+        { title: 'Preserve product search -> shortlist -> explicit Book -> booking intent -> payment intent -> communication best-effort flow', status: 'Completed' },
+        { title: 'Keep reviewed chess tenant matches results-first while surfacing BookedAI booking, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit support', status: 'Completed' },
+        { title: 'Keep confirmation portal-first with booking reference, QR, email/calendar/chat/home actions, and 16s Thank You state', status: 'Completed' },
+        { title: 'Keep public, pitch, product, portal, tenant, and admin mobile views free of horizontal overflow', status: 'In Progress' },
+      ],
+    },
+    {
+      name: 'Phase 18',
+      timing: 'Revenue-ops ledger control',
+      windowLabel: 'Active implementation',
+      focusLabel: 'Tenant/admin evidence visibility for every post-booking action',
+      milestoneLabel: 'Action-run filters, summary counts, policy posture, and tenant Ops visibility are now implemented; deeper evidence drawers remain next',
+      summary: 'Phase 18 makes post-lead and post-booking operations inspectable, dispatchable, policy-aware, and tenant/admin-safe.',
+      tasks: [
+        { title: 'Filter action runs by tenant, booking, student/customer, entity, lifecycle event, dependency state, status, and action type', status: 'Completed' },
+        { title: 'Expose summary counts and derived policy, approval, dependency, lifecycle, and evidence metadata in ledger responses', status: 'Completed' },
+        { title: 'Show tenant read-only Ops visibility for follow-up, reminder, CRM, customer-care, webhook, report, and retention actions', status: 'Completed' },
+        { title: 'Add deeper admin evidence drawers for outbox, audit, job-run, CRM, payment, and webhook traces', status: 'Planned' },
+      ],
+    },
+    {
+      name: 'Phase 19',
+      timing: 'Customer-care and status agent',
+      windowLabel: 'Next',
+      focusLabel: 'Returning customer support against booking, payment, subscription, report, and action-run truth',
+      milestoneLabel: 'Portal and academy read models are ready enough for the first status-agent proof',
+      summary: 'Phase 19 lets returning customers ask where things stand and request safe next actions without losing lifecycle context.',
+      tasks: [
+        { title: 'Resolve returning identity by booking reference, email, phone, signed portal session, or tenant-safe support context', status: 'Planned' },
+        { title: 'Answer status questions from booking, payment, subscription, report, communication, and action-run truth', status: 'Planned' },
+        { title: 'Route reschedule, pause, downgrade, cancel, payment-help, and escalation requests through policy-safe flows', status: 'Planned' },
+        { title: 'Use Grandmaster Chess Academy parent status as the first complete proof case', status: 'Planned' },
+      ],
+    },
+    {
+      name: 'Phase 20',
+      timing: 'Widget and plugin runtime',
+      windowLabel: 'Next',
+      focusLabel: 'Installable BookedAI assistant on SME-owned websites',
+      milestoneLabel: 'The public assistant contract is shared; install identity and embed-safe shell are next',
+      summary: 'Phase 20 makes the customer-facing agent deployable as a tenant-scoped widget while preserving shared booking, payment, portal, and revenue-ops truth.',
+      tasks: [
+        { title: 'Persist tenant, host origin, page source, campaign, deployment mode, and install identity through the widget runtime', status: 'Planned' },
+        { title: 'Build embed-safe receptionist, sales, and customer-service assistant shell', status: 'Planned' },
+        { title: 'Keep widget search, booking, Thank You, portal continuation, and revenue-ops handoff on the shared platform contracts', status: 'Planned' },
+        { title: 'Add tenant install diagnostics and CORS/browser smoke coverage', status: 'Planned' },
+      ],
+    },
+    {
+      name: 'Phase 21',
+      timing: 'Billing and receivables truth',
+      windowLabel: 'Next',
+      focusLabel: 'Payments, subscriptions, invoices, reminders, commission, and reconciliation',
+      milestoneLabel: 'Payment intent and subscription intent foundations exist; receivable truth is the next commercial layer',
+      summary: 'Phase 21 connects customer payment state, tenant billing posture, subscription renewal, reminders, and commission into one auditable layer.',
+      tasks: [
+        { title: 'Create real subscription checkout and invoice linkage where supported', status: 'Planned' },
+        { title: 'Queue policy-gated payment reminder and receivable recovery actions', status: 'Planned' },
+        { title: 'Expose tenant billing summaries for paid, outstanding, overdue, and manual-review revenue', status: 'Planned' },
+        { title: 'Add admin reconciliation views for payment dependency state and follow-up actions', status: 'Planned' },
+      ],
+    },
+    {
+      name: 'Phase 22',
+      timing: 'Reusable tenant templates',
+      windowLabel: 'Next',
+      focusLabel: 'Generalize chess and Future Swim into repeatable vertical templates',
+      milestoneLabel: 'Chess and Future Swim remain the proof paths before broader template extraction',
+      summary: 'Phase 22 extracts the proven lifecycle into tenant-configurable intake, placement, booking, payment, report, support, and retention templates.',
+      tasks: [
+        { title: 'Define vertical template contracts for intake, placement, booking, payment, report, and retention policy', status: 'Planned' },
+        { title: 'Extract reusable verified-tenant search-result and confirmation rules from the chess tenant proof', status: 'Planned' },
+        { title: 'Make copy and workflow settings tenant-configurable for education, kids activities, wellness, trades, and professional services', status: 'Planned' },
+        { title: 'Add reusable smoke fixtures for approved vertical templates', status: 'Planned' },
+        { title: 'Move one-off demo logic into tenant-safe policy and config records', status: 'Planned' },
+      ],
+    },
+    {
+      name: 'Phase 23',
+      timing: 'Release governance and scale hardening',
+      windowLabel: 'Continuous',
+      focusLabel: 'Release gates, observability, rollback, docs, Notion, and Discord closeout discipline',
+      milestoneLabel: 'Release-gate scripts and live health checks exist; the next step is broader traceability and repeatable closeout',
+      summary: 'Phase 23 makes deploy, QA, rollback, evidence, docs, and operator communication boring and repeatable.',
+      tasks: [
+        { title: 'Run one release-gate suite across pitch registration, product booking, demo academy flow, portal, tenant, admin, and API health', status: 'In Progress' },
+        { title: 'Strengthen trace ids from public session through booking, payment, action run, job run, and outbox', status: 'Planned' },
+        { title: 'Document rollback and hold criteria for public, backend, worker, proxy, and docs changes', status: 'In Progress' },
+        { title: 'Keep docs, memory, roadmap, Notion, and Discord closeout aligned for meaningful releases', status: 'In Progress' },
+      ],
+    },
+    {
       name: 'Phase 1',
       timing: 'Core Stability',
       windowLabel: 'Priority 1',
@@ -1405,6 +1505,211 @@ export const roadmapContent: RoadmapContent = {
     },
   ],
   sprints: [
+    {
+      name: 'Sprint 17',
+      phaseName: 'Phase 17',
+      timing: 'Full-flow stabilization',
+      status: 'Completed',
+      windowLabel: 'Post Sprint 16',
+      focusLabel: 'Pitch registration plus product booking plus portal-first confirmation',
+      milestoneLabel: 'Full-flow QA baseline is locked for the current production surfaces',
+      summary: 'Sprint 17 keeps the shipped pitch, product, portal, tenant, admin, and API flows aligned around the customer journey from registration/search to confirmation and follow-up.',
+      evidence:
+        'Pitch registration, product booking, verified chess tenant search treatment, payment-intent preparation, communication best-effort work, portal QR continuation, and 16s Thank You return are reflected in code, docs, and implementation progress.',
+      mainGap:
+        'Keep mobile and live smoke coverage running as the next revenue-ops and status-agent slices land.',
+      nextPrompt: 'Phase 18',
+      ownerGroup: 'Coordination and release',
+      agents: ['PM Integrator'],
+      tasks: [
+        { title: 'Lock the current pitch and product full-flow baseline', status: 'Completed' },
+        { title: 'Preserve reviewed tenant search cards with verified capability chips and explicit Book action', status: 'Completed' },
+        { title: 'Keep confirmation and portal continuation visible and truthful', status: 'Completed' },
+        { title: 'Continue cross-surface responsive QA while new phases land', status: 'In Progress' },
+      ],
+      references: [
+        {
+          title: 'Next Phase Implementation Plan',
+          path: 'docs/development/next-phase-implementation-plan-2026-04-25.md',
+          summary: 'Active phase bridge from full-flow stabilization through release governance.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 18',
+      phaseName: 'Phase 18',
+      timing: 'Revenue-ops ledger control',
+      status: 'In Progress',
+      windowLabel: 'Current',
+      focusLabel: 'Tenant/admin action evidence and policy posture',
+      milestoneLabel: 'Ledger filters, summary counts, metadata, admin filters, and tenant Ops visibility are implemented',
+      summary: 'Sprint 18 makes action runs a real operator and tenant surface rather than a hidden automation queue.',
+      evidence:
+        '`GET /api/v1/agent-actions`, admin Reliability, tenant Ops, action policy metadata, and worker dispatch behavior now share the revenue-ops ledger baseline.',
+      mainGap:
+        'Deepen evidence drawers and provider-specific trace joins for outbox, audit, job-run, CRM, payment, and webhook state.',
+      nextPrompt: 'Phase 19',
+      ownerGroup: 'Backend execution',
+      agents: ['PM Integrator'],
+      tasks: [
+        { title: 'Expose ledger filters, summary counts, and derived policy/evidence metadata', status: 'Completed' },
+        { title: 'Show tenant-safe Ops visibility without admin transition controls', status: 'Completed' },
+        { title: 'Add deeper evidence drill-ins and replay-safe controls', status: 'Planned' },
+      ],
+      references: [
+        {
+          title: 'Phase 18 Revenue Ops Ledger Tenant Visibility',
+          path: 'docs/development/phase-18-revenue-ops-ledger-tenant-visibility-2026-04-25.md',
+          summary: 'Implementation note for the revenue-ops ledger visibility slice.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 19',
+      phaseName: 'Phase 19',
+      timing: 'Customer-care status agent',
+      status: 'Planned',
+      windowLabel: 'Next',
+      focusLabel: 'Returning customer status and safe support actions',
+      milestoneLabel: 'Portal, academy snapshots, and action-run truth are the input sources',
+      summary: 'Sprint 19 turns returning customer support into a state-backed agent flow instead of a disconnected support form.',
+      evidence:
+        'Portal request flows, academy read models, payment posture, booking references, and revenue-ops action runs are already present as source truth.',
+      mainGap:
+        'Implement identity resolution, status answers, and policy-safe support actions.',
+      nextPrompt: 'Phase 20',
+      ownerGroup: 'Platform and intelligence',
+      agents: ['PM Integrator'],
+      tasks: [
+        { title: 'Resolve customer identity from booking reference, email, phone, or portal session', status: 'Planned' },
+        { title: 'Answer from booking, payment, subscription, report, communication, and action-run state', status: 'Planned' },
+        { title: 'Escalate unsupported or risky actions instead of pretending completion', status: 'Planned' },
+      ],
+      references: [
+        {
+          title: 'Grandmaster Chess Revenue Engine Blueprint',
+          path: 'docs/architecture/demo-grandmaster-chess-revenue-engine-blueprint.md',
+          summary: 'First vertical proof case for status, parent support, reporting, and retention flows.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 20',
+      phaseName: 'Phase 20',
+      timing: 'Widget and plugin runtime',
+      status: 'Planned',
+      windowLabel: 'Next',
+      focusLabel: 'Installable assistant with tenant and host identity',
+      milestoneLabel: 'Shared customer-turn and booking contracts are ready for embed packaging',
+      summary: 'Sprint 20 packages the customer-facing agent as an SME-owned website runtime while preserving shared platform truth.',
+      evidence:
+        'Public and popup/product assistant flows now share the customer-turn contract and booking/revenue-ops handoff path.',
+      mainGap:
+        'Add embed identity, install diagnostics, CORS coverage, and tenant-branded full-flow proof.',
+      nextPrompt: 'Phase 21',
+      ownerGroup: 'Frontend rollout',
+      agents: ['PM Integrator'],
+      tasks: [
+        { title: 'Preserve tenant, origin, source page, campaign, and deployment mode through widget runtime', status: 'Planned' },
+        { title: 'Build embed-safe assistant shell for receptionist, sales, and customer-service use cases', status: 'Planned' },
+        { title: 'Complete one tenant-branded widget flow through booking, Thank You, portal, and handoff', status: 'Planned' },
+      ],
+      references: [
+        {
+          title: 'Widget Plugin Multi Tenant Booking Architecture',
+          path: 'docs/development/widget-plugin-multi-tenant-booking-architecture-2026-04-23.md',
+          summary: 'Architecture note for installable multi-tenant widget identity and lifecycle flow.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 21',
+      phaseName: 'Phase 21',
+      timing: 'Billing and receivables truth',
+      status: 'Planned',
+      windowLabel: 'Next',
+      focusLabel: 'Subscription, invoice, reminder, commission, and reconciliation truth',
+      milestoneLabel: 'Payment and subscription intent foundations exist',
+      summary: 'Sprint 21 upgrades commercial truth so customer payments, tenant billing, and BookedAI revenue posture reconcile cleanly.',
+      evidence:
+        'Payment intent, payment mirror, subscription intent, action-run reminder, and tenant/admin ledger foundations are already present.',
+      mainGap:
+        'Real checkout/invoice linkage, receivable summaries, and admin reconciliation views remain to be implemented.',
+      nextPrompt: 'Phase 22',
+      ownerGroup: 'Backend execution',
+      agents: ['PM Integrator'],
+      tasks: [
+        { title: 'Link subscription checkout and invoices into booking/customer state', status: 'Planned' },
+        { title: 'Expose tenant paid, outstanding, overdue, and manual-review revenue summaries', status: 'Planned' },
+        { title: 'Add policy-gated payment reminders and receivable recovery actions', status: 'Planned' },
+      ],
+      references: [
+        {
+          title: 'Pricing Packaging Monetization Strategy',
+          path: 'docs/architecture/pricing-packaging-monetization-strategy.md',
+          summary: 'Commercial strategy for packages, revenue, commission, and pricing posture.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 22',
+      phaseName: 'Phase 22',
+      timing: 'Reusable tenant templates',
+      status: 'Planned',
+      windowLabel: 'Next',
+      focusLabel: 'Template extraction after chess and Future Swim stay stable',
+      milestoneLabel: 'Vertical-specific proof paths should become tenant-configurable contracts',
+      summary: 'Sprint 22 moves successful vertical logic out of one-off demo code and into reusable policy, copy, workflow, and QA fixtures.',
+      evidence:
+        'Grandmaster Chess Academy and Future Swim already exercise education/kids-activity lifecycles across booking, portal, tenant, search-result verification, and operations surfaces.',
+      mainGap:
+        'Template contracts, verified-tenant result rules, config records, and reusable vertical smoke fixtures are still planned.',
+      nextPrompt: 'Phase 23',
+      ownerGroup: 'Product delivery',
+      agents: ['PM Integrator'],
+      tasks: [
+        { title: 'Define reusable intake, placement, booking, payment, report, and retention contracts', status: 'Planned' },
+        { title: 'Generalize verified-tenant result badges, capability chips, QR confirmation, WhatsApp Agent, and portal edit actions', status: 'Planned' },
+        { title: 'Move tenant copy and workflow settings into configurable records', status: 'Planned' },
+        { title: 'Prove at least three vertical templates through booking and revenue-ops handoff', status: 'Planned' },
+      ],
+      references: [
+        {
+          title: 'Future Swim Tenant Use Case',
+          path: 'docs/development/future-swim-tenant-use-case.md',
+          summary: 'Future Swim vertical requirements and tenant workspace expectations.',
+        },
+      ],
+    },
+    {
+      name: 'Sprint 23',
+      phaseName: 'Phase 23',
+      timing: 'Release governance and scale hardening',
+      status: 'In Progress',
+      windowLabel: 'Continuous',
+      focusLabel: 'Release gates, traceability, rollback, docs, Notion, and Discord',
+      milestoneLabel: 'Release gate, stack health, docs sync, and operator closeout are active but need stronger automation',
+      summary: 'Sprint 23 keeps quality, deployment, evidence, documentation, and operator communication synchronized as the product broadens.',
+      evidence:
+        '`scripts/run_release_gate.sh`, `scripts/healthcheck_stack.sh`, deploy-live workflow, implementation progress, roadmap docs, memory notes, and Telegram/Notion/Discord closeout process exist.',
+      mainGap:
+        'Trace ids, rollback criteria, and automated cross-surface release evidence need deeper standardization.',
+      nextPrompt: 'Continuous',
+      ownerGroup: 'Coordination and release',
+      agents: ['PM Integrator'],
+      tasks: [
+        { title: 'Run release gates across pitch, product, demo, portal, tenant, admin, and API health', status: 'In Progress' },
+        { title: 'Strengthen traceability from public session through action runs and outbox', status: 'Planned' },
+        { title: 'Keep docs, memory, Notion, and Discord closeout in the same release pass', status: 'In Progress' },
+      ],
+      references: [
+        {
+          title: 'Release Gate Checklist',
+          path: 'docs/development/release-gate-checklist.md',
+          summary: 'Promote, hold, rollback, and release-readiness checklist.',
+        },
+      ],
+    },
     {
       name: 'Sprint 1',
       phaseName: 'Phase 1',

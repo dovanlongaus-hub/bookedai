@@ -109,6 +109,35 @@ class ReportingRepositoryTestCase(IsolatedAsyncioTestCase):
         self.assertEqual(metrics["period_days"], 30)
         self.assertEqual(metrics["bookings_confirmed"], 1)
 
+    async def test_list_tenant_leads_uses_normalized_contact_columns(self):
+        execute = AsyncMock(
+            return_value=SimpleNamespace(
+                mappings=lambda: SimpleNamespace(all=lambda: []),
+            )
+        )
+        repository = ReportingRepository(
+            RepositoryContext(
+                session=SimpleNamespace(execute=execute),
+                tenant_id="default-production-tenant",
+            )
+        )
+
+        rows = await repository.list_tenant_leads(
+            "372a0ba4-e7ab-4de1-90a8-9e7787d50157",
+            status_filter="qualified",
+        )
+
+        self.assertEqual(rows, [])
+        statement = str(execute.await_args.args[0])
+        params = execute.await_args.args[1]
+        self.assertIn("left join contacts contact", statement)
+        self.assertIn("left join lateral", statement)
+        self.assertIn("contact.full_name as name", statement)
+        self.assertNotIn("l.name", statement)
+        self.assertNotIn("l.email", statement)
+        self.assertNotIn("l.service_name", statement)
+        self.assertEqual(params["status_filter"], "qualified")
+
 
 class OutboxRepositoryTestCase(IsolatedAsyncioTestCase):
     async def test_enqueue_event_uses_tenant_lookup_and_json_payload(self):

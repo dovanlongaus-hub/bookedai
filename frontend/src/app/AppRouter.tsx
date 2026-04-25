@@ -36,6 +36,10 @@ const PitchDeckApp = lazy(async () => {
   const module = await import('../apps/public/PitchDeckApp');
   return { default: module.PitchDeckApp };
 });
+const ArchitectureApp = lazy(async () => {
+  const module = await import('../apps/public/ArchitectureApp');
+  return { default: module.ArchitectureApp };
+});
 const RoadmapApp = lazy(async () => {
   const module = await import('../apps/public/RoadmapApp');
   return { default: module.RoadmapApp };
@@ -64,6 +68,19 @@ function isRoadmapRuntime() {
   }
 
   return window.location.pathname === '/roadmap' || window.location.pathname.startsWith('/roadmap/');
+}
+
+function isArchitectureRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname, pathname } = window.location;
+  return (
+    hostname === 'architecture.bookedai.au' ||
+    pathname === '/architecture' ||
+    pathname === '/architecture/'
+  );
 }
 
 function isPitchDeckRuntime() {
@@ -222,6 +239,14 @@ export function AppRouter() {
             window.location.href = 'https://product.bookedai.au/';
           }}
         />
+      </Suspense>
+    );
+  }
+
+  if (isArchitectureRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <ArchitectureApp />
       </Suspense>
     );
   }

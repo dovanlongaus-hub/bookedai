@@ -61,6 +61,8 @@ The current live public growth surface should now be treated as:
 - an inline assistant-led booking surface
 - an English-default public shell with visible locale switching
 - a lightweight conversion surface where the main viewport is reserved for search, shortlist, booking, and confirmation rather than long landing copy
+- a results-first comparison workspace where completed searches do not auto-jump into booking, even when a reviewed BookedAI tenant match is present
+- a compact visual search-card pattern where physical-place matches show a top-left thumbnail/preview, Google Maps inspection, and explicit detail/book actions before any booking form appears
 
 The current approved locale options for the public shell are:
 
@@ -92,6 +94,7 @@ Cross-surface UX and productization rule now also locked from `2026-04-19`:
 
 - public frontend, customer portal, tenant workspace, admin entry, and billing flows must now be planned and reviewed as one coherent SaaS system
 - later sprint planning should not improve one surface in isolation while leaving adjacent surfaces obviously lower-trust, lower-clarity, or visually disconnected
+- reviewed tenant search results, starting with `Co Mai Hung Chess Class` / Grandmaster Chess, must bridge all adjacent surfaces in one visible flow: shortlist badge, explicit Book action, Stripe/QR payment posture, QR booking confirmation, email/calendar follow-up, WhatsApp Agent continuation, and portal edit/revisit
 
 ### Product operating principles now locked
 
@@ -102,6 +105,7 @@ All requirement-side and execution-side documents should now inherit these produ
 - the product should prefer lightweight, fast-scanning, mobile-safe interfaces over section-heavy storytelling when a workflow is active
 - responsive behavior should be treated as mobile-first for every customer-facing surface that directly affects search, shortlist, booking, payment, or recovery
 - when there is a tradeoff between explanatory content and live conversion space, the live conversion space should win by default
+- tenant-backed search matches must be visually richer than public-web fallback rows but cannot skip user review, detail popup, or explicit booking consent
 - `frontend/public/branding/` should be treated as the only approved source of BookedAI logo, short-mark, favicon, touch-icon, PWA icon, and mobile-responsive brand assets across every app, web, site, single-page, and adjacent shell
 - all BookedAI surfaces should resolve brand assets through shared brand mappings rather than route-local logo files, remote logo URLs, or parallel logo systems
 
@@ -624,6 +628,9 @@ The landing experience must:
 - explain setup fee plus commission pricing clearly
 - feel premium, modern, and commercially credible
 - drive demo bookings
+- keep the live search workspace results-first: users can stop, scroll, compare, open details, ask follow-up questions in chat, and book only from an explicit action
+- when a reviewed tenant match appears in search, show verified-tenant capability chips for Book, Stripe, QR payment, QR confirmation, calendar, email, WhatsApp Agent, and portal edit without turning the result card into a full booking form
+- keep booking confirmation portal-first with booking reference, scan-ready QR, payment posture, email/calendar actions, WhatsApp Agent follow-up, and portal links for review, edit, reschedule, and cancellation requests
 
 ### Tenant workspace requirements
 

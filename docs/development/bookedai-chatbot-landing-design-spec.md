@@ -53,6 +53,16 @@ This theme should not feel:
 - futuristic sci-fi
 - crowded SaaS template
 
+## Product Search Interaction Rule
+
+`product.bookedai.au` and the shared public assistant should behave like a professional chat search workspace.
+
+- keep all clarification questions and suggested next prompts inside the BookedAI chat thread
+- show useful matches progressively when search is slow instead of waiting on a blank loading state
+- result cards should put a thumbnail or branded preview in the top-left scan position, then compact provider/title, category, price, duration, location, confidence, and one short fit reason
+- physical-place results must include a Google Maps action that opens a direct mapped place when available or a Google Maps search built from venue, location, and service name
+- fuller provider context belongs in the detail popup so the shortlist remains compact and easy to compare
+
 ## Visual System
 
 ### Color strategy
@@ -120,6 +130,40 @@ The landing page must accomplish these goals quickly:
 3. Make the revenue angle feel concrete, not abstract.
 4. Build trust through integrations, capabilities, and outcome framing.
 5. Push users toward a clear primary CTA: `Try Now`.
+
+## Current Product Workspace Requirement
+
+The active `bookedai.au`/`product.bookedai.au` implementation is no longer only a chatbot-style landing concept. It must behave like a ChatGPT-like search and booking workspace.
+
+Detailed design rules:
+
+- the composer is the primary first action and should remain visible before long proof or marketing content
+- search results remain the active surface after ranking; the viewport should not jump into booking just because results exist
+- result cards show scan-critical facts only: provider/title, category/top-match/verified status, price posture, duration, location/provider, confidence, and one short fit/next-step line
+- detail popups carry fuller provider context, long summaries, confidence notes, map/provider links, and extended next-step explanation
+- follow-up prompts and secondary questions live inside the BookedAI chat thread as agent chips
+- explicit actions control the flow: `View details` opens detail, `Book` opens the customer details/schedule/payment path
+
+### Verified BookedAI Tenant Results
+
+When search intent maps to a reviewed tenant, such as a chess query matching `Co Mai Hung Chess Class` / Grandmaster Chess, the card should become richer without leaving compare mode.
+
+Required card treatment:
+
+- badge: `BookedAI tenant` or `Verified tenant`
+- compact capability chips: Book, Stripe, QR payment, QR confirmation, Calendar, Email, WhatsApp Agent, Portal edit
+- CTA copy may read `Book tenant` when space allows, but should remain compact on mobile
+- no auto-selection or auto-focus into booking after results are returned
+
+Required selected and confirmation treatment:
+
+- selected-booking panel explains that the tenant is already reviewed/onboarded in BookedAI
+- booking confirmation shows booking reference and QR to `portal.bookedai.au`
+- if no QR image URL exists, generate a QR from the portal URL rather than hiding QR confirmation
+- payment language distinguishes Stripe checkout, QR transfer/payment, and manual follow-up
+- email/calendar actions stay visible beside portal actions
+- WhatsApp Agent is presented as the post-booking chat channel for questions, booking status, reschedule, cancellation review, and support
+- portal links must let users review, edit, request reschedule, and request cancellation later
 
 ## Information Hierarchy
 

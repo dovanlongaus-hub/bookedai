@@ -493,7 +493,7 @@ class ServiceCatalogItem(BaseModel):
     business_email: str | None = Field(default=None, max_length=255)
     summary: str
     duration_minutes: int = Field(gt=0)
-    amount_aud: float = Field(gt=0)
+    amount_aud: float = Field(ge=0)
     currency_code: str = Field(default="AUD", max_length=8)
     display_price: str | None = Field(default=None, max_length=255)
     image_url: str | None = Field(default=None, max_length=500)
@@ -559,6 +559,14 @@ class BookingAssistantChatResponse(BaseModel):
 
 class BookingAssistantSessionRequest(BaseModel):
     service_id: str
+    event_title: str | None = Field(default=None, max_length=255)
+    event_summary: str | None = Field(default=None, max_length=1000)
+    event_start_at: str | None = Field(default=None, max_length=64)
+    event_end_at: str | None = Field(default=None, max_length=64)
+    event_venue_name: str | None = Field(default=None, max_length=200)
+    event_location: str | None = Field(default=None, max_length=300)
+    event_organizer: str | None = Field(default=None, max_length=255)
+    event_url: str | None = Field(default=None, max_length=500)
     customer_name: str = Field(min_length=2)
     customer_email: str | None = Field(default=None, max_length=255)
     customer_phone: str | None = None
@@ -573,7 +581,7 @@ class BookingAssistantSessionResponse(BaseModel):
     booking_reference: str
     portal_url: str
     service: ServiceCatalogItem
-    amount_aud: float = Field(gt=0)
+    amount_aud: float = Field(ge=0)
     amount_label: str
     requested_date: str
     requested_time: str

@@ -1,5 +1,46 @@
 # Design System Inspired by Apple
 
+## 2026-04-25 Public Homepage Acquisition Override
+
+`bookedai.au` should now sell the whole product in the first minute while preserving a real product interaction on the page.
+
+- lead with a clear executive promise: BookedAI turns service demand into booked revenue
+- keep the first viewport split between business thesis and real proof, not a generic search-only or decorative landing composition
+- show vertical proof immediately through the Grandmaster Chess visual, Future Swim tenant operations signal, and WhatsApp booking-care channel
+- keep the live `HomepageSearchExperience` on-page as product evidence, but frame it with concise investor/customer sections so visitors understand the operating model before they interact
+- homepage hero proof imagery must sit inside a contained product frame, not crop past the card; pair it with short visual signals that an investor can scan in seconds: wedge, proof, moat, scale, and demand-to-booking workflow
+- homepage chat must show the full customer journey visually, not hide it in backend state: `Ask`, `Match`, `Book`, and `Confirm` should stay visible as the user moves from natural-language request to selected result, booking brief, QR portal, edit/reschedule/cancel request, and follow-up
+- homepage chat should feel like a compact Claude-style work surface: a scrollable conversation/results pane above a bottom composer, with attach on the left, the text input centered, and voice/send icon actions on the right
+- homepage search results and suggested follow-up prompts must live inside the chat interface. Assistant result bubbles should carry the booking-critical scan layer in one compact card: option, category, price or explicit missing-price state, duration, location, confidence, one fit/next-step line, and details/maps/provider/select/book actions
+- top search outputs should be labeled as `Top research` and show up to three summarized options in-chat; users can choose, book, or open a detail popup without leaving the conversation flow
+- result action rows should include real-world contact paths when available or useful: Google Maps, provider link, phone/call, mail, select, and book
+- live-search status must feel real and honest: while ranking is pending, show an active in-chat/searching state; when backend data is incomplete, display explicit placeholders such as `Price not listed`, `Duration TBD`, or `Location TBD` instead of hiding those booking fields
+- booking-form helper text must not pollute field accessible names; email/phone guidance belongs outside the phone label so screen readers and tests can target `Email` and `Phone` cleanly
+- use a warm neutral base with dark navy product proof, green/teal operational accents, and restrained amber labels; avoid a one-note blue or purple gradient look
+- keep desktop header links visible without relying on `hidden lg:flex`, because the legacy theme defines `.hidden` with `!important`
+- mobile must stay no-overflow, with compact header actions and large narrative type that wraps cleanly
+
+## 2026-04-25 WhatsApp Customer-Care Override
+
+WhatsApp customer-care replies are a dedicated BookedAI booking-care agent experience for `bookedai.au`, backed by the same system-of-record truth as the portal rather than a generic chatbot persona.
+
+- answer all service questions related to an already-booked record when identity is safely resolved, including booking reference, service, provider, booking status, payment posture, support contact, academy/report context, and next safe action
+- keep cancellation and reschedule language explicit: BookedAI records a request for review, not an instant booking mutation
+- when a phone number maps to zero or multiple bookings, ask for the booking reference before sharing booking detail
+- treat OpenClaw as the safe gateway/operator surface for supervising the agent, not as a customer-visible persona in the WhatsApp copy
+- keep `+61455301335` as the customer-visible WhatsApp identity while direct Meta delivery is primary and Twilio is only the backup transport
+- preserve concise, mobile-readable WhatsApp copy; long operational evidence belongs in portal/admin surfaces, not the chat reply
+
+## 2026-04-25 Pitch Architecture Visual Override
+
+`pitch.bookedai.au` should explain the whole BookedAI system through a simple visual flow before deeper technical detail.
+
+- show the architecture as `customer surfaces -> AI agents -> booking core -> operations truth`
+- keep the visual buyer-readable: pitch, product, demo/widget, portal, search agent, revenue ops, customer-care/status, booking core, tenant Ops, admin Reliability, CRM/email, and audit ledger
+- use compact cards and stable grid dimensions so the diagram reads as an image-like flow on desktop and stacked cards on mobile
+- keep the deeper architecture infographic underneath as supporting detail, not the first thing a buyer has to parse
+- update this visual whenever new surfaces, agent classes, or lifecycle boundaries become product-facing
+
 ## 2026-04-25 Portal Workspace Override
 
 `portal.bookedai.au` should feel like a secure enterprise customer command center, not a generic booking receipt.
@@ -17,14 +58,35 @@
 - style the search frame as a calm ChatGPT-like composer: one obvious message area, restrained status line, lightweight prompt chips, and a primary send action that does not compete with results
 - keep the product search composer visible in the first usable viewport; welcome proof and quick prompts should support search, not push the input below the fold
 - show first useful matches while live search/ranking continues, with visible status and refinement chips in chat
+- make perceived response faster by advancing search-progress copy quickly and keeping any early shortlist matches visible while deeper ranking, maps, and booking-path checks continue
 - keep the viewport anchored on results after search completes so users can stop, scroll, and compare without being pulled into the booking form
 - keep result cards compact; show only decision-critical facts in the list, then move fuller provider context, summary, confidence notes, and next-step copy into the detail popup
-- group search-result list information in this order: provider/title, category/top-match status, price or price posture, duration, location/provider, confidence, one short reason or next-step line, then actions
+- group search-result list information in this order: top-left thumbnail or branded preview, provider/title, category/top-match status, price or price posture, duration, location/provider, confidence, one short reason or next-step line, then actions
+- every physical-place search result should expose a Google Maps action that opens the specific mapped place when `map_url` is known, or a Google Maps search for venue + location + service when only structured place data is available
+- for reviewed BookedAI tenant matches, such as chess, add a compact verified-tenant badge and capability chips in the result card without taking the user out of comparison mode
 - put provider link, detail popup, contact, phone/SMS, and `Book` on one horizontal action row using icons where possible
 - clicking/selecting a result marks it active only; detail opens from the detail action, and the customer form opens only after an explicit booking action
 - keep all clarification questions and suggested next prompts inside the BookedAI chat conversation as interactive agent chips
-- confirmation is portal-first: booking code, QR to `portal.bookedai.au`, and compact portal/email/calendar/chat/home actions must stay on one responsive row without horizontal layout breakage
+- confirmation is portal-first: booking code, QR to `portal.bookedai.au`, and compact portal/email/calendar/chat/home actions must stay on one responsive row without horizontal layout breakage; tenant matches should also name Stripe/QR payment posture and WhatsApp Agent follow-up when those channels are enabled
 - keep the thank-you confirmation visible for `16s` and allow the customer to continue chat/search from the same screen before auto-return
+
+## 2026-04-25 Verified Tenant Search Requirement
+
+Searches that return a reviewed BookedAI tenant must stay inside the normal compare-first search flow. The first proof case is chess: `Co Mai Hung Chess Class` / Grandmaster Chess.
+
+Required behavior:
+
+- keep the result in the ranked shortlist with the same compact card hierarchy as other results
+- add a small `BookedAI tenant` or `Verified tenant` badge near the top-match/category badges
+- include only the most important tenant capabilities in-list: Book, Stripe, QR payment, QR confirmation, calendar, email, WhatsApp Agent, and portal edit
+- keep fuller explanation in the detail popup or selected-booking panel, not as a long result-card paragraph
+- do not auto-select the tenant result or auto-focus the booking form after search completes
+- require the customer to tap `Book` before contact details, schedule, payment, or QR confirmation become the active task
+- selected-booking panels should explain that the tenant is reviewed/onboarded and can continue through BookedAI booking, payment, QR confirmation, email/calendar, WhatsApp Agent, and portal change support
+- confirmation must always show a QR path to `portal.bookedai.au`; if the backend response does not include `qr_code_url`, the frontend may generate a QR from the portal URL
+- payment copy must distinguish Stripe checkout, QR transfer/payment, and manual follow-up; do not imply payment is complete before the source state confirms it
+- WhatsApp copy must frame the customer reply path as BookedAI Agent continuation for questions, reschedule, cancellation review, or booking status
+- portal links must include review, edit, reschedule, and cancel/request-safe actions so the user can check and change the booking later
 
 ## 2026-04-25 Tenant Gateway Override
 

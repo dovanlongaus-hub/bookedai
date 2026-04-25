@@ -131,6 +131,10 @@ class Settings:
     session_signing_secret: str = ""
     tenant_session_signing_secret: str = ""
     admin_session_signing_secret: str = ""
+    whatsapp_evolution_api_url: str = ""
+    whatsapp_evolution_api_key: str = ""
+    whatsapp_evolution_instance: str = "bookedai"
+    whatsapp_fallback_provider: str = ""
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -357,10 +361,14 @@ def get_settings() -> Settings:
             "WHATSAPP_TWILIO_API_KEY_SECRET",
             os.getenv("SMS_TWILIO_API_KEY_SECRET", ""),
         ),
-        whatsapp_from_number=os.getenv("WHATSAPP_FROM_NUMBER", ""),
+        whatsapp_from_number=os.getenv("WHATSAPP_FROM_NUMBER", "+61455301335"),
         whatsapp_meta_phone_number_id=os.getenv("WHATSAPP_META_PHONE_NUMBER_ID", ""),
         whatsapp_meta_access_token=os.getenv("WHATSAPP_META_ACCESS_TOKEN", ""),
         whatsapp_verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", ""),
+        whatsapp_evolution_api_url=os.getenv("WHATSAPP_EVOLUTION_API_URL", ""),
+        whatsapp_evolution_api_key=os.getenv("WHATSAPP_EVOLUTION_API_KEY", ""),
+        whatsapp_evolution_instance=os.getenv("WHATSAPP_EVOLUTION_INSTANCE", "bookedai"),
+        whatsapp_fallback_provider=os.getenv("WHATSAPP_FALLBACK_PROVIDER", ""),
         admin_username=os.getenv("ADMIN_USERNAME", "admin"),
         admin_password=os.getenv(
             "ADMIN_BOOTSTRAP_PASSWORD",
@@ -386,5 +394,5 @@ def get_settings() -> Settings:
         upload_public_base_url=os.getenv(
             "UPLOAD_PUBLIC_BASE_URL", "https://upload.bookedai.au"
         ),
-        upload_max_file_size_bytes=env_int("UPLOAD_MAX_FILE_SIZE_BYTES", 10 * 1024 * 1024),
+        upload_max_file_size_bytes=env_int("UPLOAD_MAX_FILE_SIZE_BYTES", 50 * 1024 * 1024),
     )

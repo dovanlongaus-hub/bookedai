@@ -88,6 +88,10 @@ type TenantGatewayChoice = {
   label: string;
 };
 
+const tenantLoginHeroImage = '/branding/optimized/tenant-login-hero-1400.webp';
+const tenantLoginHeroImageSrcSet =
+  '/branding/optimized/tenant-login-hero-960.webp 960w, /branding/optimized/tenant-login-hero-1400.webp 1400w';
+
 type TenantInviteContext = {
   authMode: TenantAuthMode;
   email: string | null;
@@ -817,6 +821,8 @@ export function TenantApp() {
   const [operationsActions, setOperationsActions] = useState<RevenueAgentActionRun[]>([]);
   const [operationsSummary, setOperationsSummary] = useState<Record<string, unknown>>({});
   const [operationsError, setOperationsError] = useState<string | null>(null);
+  const [operationsMessage, setOperationsMessage] = useState<string | null>(null);
+  const [operationsDispatching, setOperationsDispatching] = useState(false);
   const [session, setSession] = useState<StoredTenantSession | null>(() => readStoredTenantSession(tenantRef));
   const [googleReady, setGoogleReady] = useState(false);
   const [authPending, setAuthPending] = useState(false);
@@ -936,6 +942,9 @@ export function TenantApp() {
   const scopedTenantRef = session?.membership?.tenant_slug ?? session?.tenant?.slug ?? tenantRef;
   const adminReturnContext = useMemo(() => resolveAdminReturnContext(scopedTenantRef), [scopedTenantRef]);
   const canWriteCatalog = !!session?.session_token && (
+    tenantMembershipRole === 'tenant_admin' || tenantMembershipRole === 'operator'
+  );
+  const canRunTenantAutomation = !!session?.session_token && (
     tenantMembershipRole === 'tenant_admin' || tenantMembershipRole === 'operator'
   );
   const canManageExperience = !!session?.session_token && (
@@ -2497,6 +2506,70 @@ export function TenantApp() {
     }
   }
 
+  async function handleTenantAutomationDispatch() {
+    if (!session?.session_token) {
+      setOperationsError('Sign in with a tenant admin or operator account before running tenant automation.');
+      return;
+    }
+    if (!canRunTenantAutomation) {
+      setOperationsError('Your current tenant role can inspect operations but cannot run policy automation.');
+      return;
+    }
+
+    setOperationsDispatching(true);
+    setOperationsError(null);
+    setOperationsMessage(null);
+
+    try {
+      const envelope = await apiV1.dispatchTenantOperationsAutomation(
+        { limit: 10 },
+        {
+          tenantRef: scopedTenantRef,
+          sessionToken: session.session_token,
+        },
+      );
+
+      if (envelope.status !== 'ok') {
+        throw new Error('Tenant automation dispatch did not return a success envelope.');
+      }
+
+      const metadata = envelope.data.metadata ?? {};
+      setOperationsMessage(
+        `Automation ${envelope.data.dispatch_status}: ${metadata.processed_actions ?? 0}/${metadata.total_actions ?? 0} processed, ${metadata.manual_review_actions ?? 0} moved to manual review.`,
+      );
+
+      const tenantSlug = session.membership?.tenant_slug ?? session.tenant?.slug ?? tenantRef ?? null;
+      const refreshed = await apiV1.listRevenueAgentActions({
+        channel: 'tenant_app',
+        tenant_ref: tenantSlug,
+        actor_id: session.user.email ?? null,
+        role: session.membership?.role ?? 'tenant_operator',
+        deployment_mode: 'standalone_app',
+        status: operationsStatusFilter === 'all' ? null : operationsStatusFilter,
+        limit: 30,
+      });
+      if (refreshed.status === 'ok') {
+        setOperationsActions(refreshed.data.action_runs);
+        setOperationsSummary(refreshed.data.summary ?? {});
+      }
+    } catch (error) {
+      const fallbackMessage =
+        error instanceof Error ? error.message : 'Tenant automation dispatch failed.';
+      const apiError = error as ApiClientError | undefined;
+      const bodyMessage =
+        typeof apiError?.body === 'object' &&
+        apiError?.body &&
+        'error' in apiError.body &&
+        typeof (apiError.body as { error?: { message?: unknown } }).error?.message === 'string'
+          ? ((apiError.body as { error?: { message?: string } }).error?.message as string)
+          : null;
+
+      setOperationsError(bodyMessage ?? fallbackMessage);
+    } finally {
+      setOperationsDispatching(false);
+    }
+  }
+
   async function handleCatalogSave(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!session?.session_token || !selectedCatalogItem) {
@@ -2680,23 +2753,25 @@ export function TenantApp() {
 
     return (
       <main className="booked-admin-shell booked-page-shell text-slate-950">
-        <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center px-4 py-8 sm:px-6 lg:px-8">
-          <section className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(380px,440px)] lg:items-center">
-            <div className="max-w-2xl">
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-7xl items-center px-4 py-8 sm:px-6 lg:px-8">
+          <section className="grid w-full gap-8 lg:grid-cols-[minmax(0,1.08fr)_minmax(380px,440px)] lg:items-center xl:gap-10">
+            <div className="min-w-0">
               <div className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
                 tenant.bookedai.au
               </div>
-              <h1 className="mt-5 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
-                Sign in to your BookedAI workspace
+              <h1 className="mt-5 max-w-2xl text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+                Run bookings, enquiries, and follow-up from one tenant workspace
               </h1>
               <p className="mt-4 max-w-xl text-base leading-7 text-slate-600">
-                Use Google for the fastest verified access, create a new tenant account, or fall back to a one-time email code.
+                Sign in with Google, create a new workspace, or use a one-time email code.
+                BookedAI routes you to the right tenant and keeps booking, revenue, and automation
+                work in one place.
               </p>
               <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
                 {[
-                  ['Google first', 'Verified workspace access'],
-                  ['Email code', 'No password required'],
-                  ['Auto routing', 'Opens the right tenant'],
+                  ['Fast verified access', 'Google-linked tenant identity'],
+                  ['Password-free fallback', 'Secure one-time email code'],
+                  ['Right workspace', 'Routes to the matching tenant'],
                 ].map(([label, detail]) => (
                   <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
                     <div className="text-sm font-semibold text-slate-950">{label}</div>
@@ -2704,9 +2779,54 @@ export function TenantApp() {
                   </div>
                 ))}
               </div>
-              <div className="mt-6 text-xs font-medium text-slate-400">
-                {releaseLabel} - Source {releaseVersion}
+              <div className="mt-5 grid max-w-2xl gap-2 sm:grid-cols-2 xl:grid-cols-4">
+                {[
+                  ['Booking flow', 'Search, shortlist, and capture'],
+                  ['Revenue proof', 'Bookings, payments, follow-up'],
+                  ['Customer care', 'Portal and WhatsApp support'],
+                  ['Automation', 'Ops ledger and reminders'],
+                ].map(([label, detail]) => (
+                  <div
+                    key={label}
+                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2.5"
+                  >
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      {label}
+                    </div>
+                    <div className="mt-1 text-xs leading-5 text-slate-700">{detail}</div>
+                  </div>
+                ))}
               </div>
+              <div className="mt-5 flex max-w-2xl flex-wrap gap-2 text-xs font-semibold text-slate-500">
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">
+                  Support info@bookedai.au
+                </span>
+                <span className="rounded-full border border-slate-200 bg-white px-3 py-1.5">
+                  WhatsApp care +61 455 301 335
+                </span>
+              </div>
+              <div className="mt-6 text-xs font-medium text-slate-400" aria-label="Tenant gateway release">
+                Secure tenant access · API-backed workspace · Source {releaseVersion}
+              </div>
+              <figure className="mt-8 hidden max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.14)] md:block">
+                <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
+                  <span className="h-2.5 w-2.5 rounded-full bg-rose-300" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-amber-300" />
+                  <span className="h-2.5 w-2.5 rounded-full bg-emerald-300" />
+                  <span className="ml-3 truncate text-xs font-semibold text-slate-500">
+                    tenant.bookedai.au/workspace
+                  </span>
+                </div>
+                <img
+                  src={tenantLoginHeroImage}
+                  srcSet={tenantLoginHeroImageSrcSet}
+                  sizes="(min-width: 1280px) 760px, (min-width: 768px) 58vw, 0px"
+                  alt="BookedAI tenant workspace preview"
+                  className="block aspect-[3/2] w-full object-cover object-top"
+                  loading="eager"
+                  decoding="async"
+                />
+              </figure>
             </div>
             <TenantAuthWorkspaceEmail
               tenantName="BookedAI Tenant Gateway"
@@ -2867,6 +2987,8 @@ export function TenantApp() {
   const outstandingRevenueAud = deriveOutstandingRevenueAud(billing);
   const paidRevenueAud = derivePaidRevenueAud(billing, revenueMetrics);
   const sourceContribution = deriveSourceContribution(overview);
+  const tenantAttentionCount =
+    overview.summary.lifecycle_attention_count + overview.integration_snapshot.attention_count;
   const revenueProofNarrative = buildRevenueProofNarrative(overview, billing, revenueMetrics);
 
   return (
@@ -2882,9 +3004,9 @@ export function TenantApp() {
                 {overview.tenant.name}
               </h1>
               <p className="mt-3 max-w-3xl text-sm leading-6 text-black/66">
-                A structured enterprise surface for tenant operations: profile content, catalog,
-                bookings, integrations, billing, team control, and plugin readiness all sit behind
-                one role-aware workspace.
+                {futureSwim
+                  ? 'Future Swim can review bookings, parent enquiries, lesson revenue, catalog readiness, and follow-up automation from one operator workspace.'
+                  : 'Review bookings, enquiries, revenue posture, catalog readiness, integrations, and follow-up automation from one role-aware operator workspace.'}
               </p>
               <div className="mt-6 flex flex-wrap gap-3 text-xs text-black/62">
                 <span className="rounded-full border border-black/6 bg-white/72 px-3 py-1.5">
@@ -2932,7 +3054,7 @@ export function TenantApp() {
                   </div>
                   <div className="mt-1 font-semibold text-[var(--apple-near-black)]">{overview.shell.current_role}</div>
                   <div className="mt-1 text-xs text-black/54">
-                    {overview.shell.read_only ? 'Preview access' : 'Live access'} • {overview.shell.deployment_mode}
+                    {overview.shell.read_only ? 'Preview before sign-in' : 'Live operator access'}
                   </div>
                 </div>
                 <div className="rounded-[1.25rem] border border-black/6 bg-white/72 px-4 py-3 backdrop-blur">
@@ -3004,43 +3126,145 @@ export function TenantApp() {
           </section>
         ) : null}
 
-        <TenantActivationChecklistCard
-          activation={activationState}
-          eyebrow={futureSwim ? 'Future Swim activation control tower' : 'Activation control tower'}
-          action={
-            activationState.actionPanel ? (
-              <button
-                type="button"
-                onClick={() => setPanel(activationState.actionPanel ?? 'overview')}
-                className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+        <section
+          id="tenant-revenue-proof"
+          className="scroll-mt-24 rounded-[1.75rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)] lg:p-6"
+        >
+          <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                {futureSwim ? 'Future Swim revenue proof' : 'Tenant revenue proof'}
+              </div>
+              <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                {futureSwim ? 'Monthly booking and revenue proof' : 'Monthly booking value proof'}
+              </h2>
+              <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-700">
+                {revenueMetrics
+                  ? futureSwim
+                    ? `In the last ${revenueMetrics.period_days} days, BookedAI tracked ${revenueMetrics.sessions_started} parent enquiries, ${revenueMetrics.bookings_confirmed} booked lessons, and ${formatAud(paidRevenueAud)} in lesson revenue.`
+                    : `In the last ${revenueMetrics.period_days} days, BookedAI tracked ${revenueMetrics.sessions_started} sessions, ${revenueMetrics.bookings_confirmed} bookings, and ${formatAud(paidRevenueAud)} in revenue.`
+                  : revenueProofNarrative}
+              </p>
+            </div>
+            {revenueMetrics ? (
+              <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-white px-4 py-2 text-sm font-semibold text-emerald-700">
+                <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                {revenueMetrics.capture_rate_pct}% captured
+              </div>
+            ) : null}
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                {futureSwim ? 'Parent enquiries' : 'Sessions'}
+              </div>
+              <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
+                {revenueMetrics?.sessions_started ?? overview.summary.total_leads}
+              </div>
+              <div className="mt-0.5 text-[11px] text-slate-500">
+                {futureSwim ? 'families in the funnel' : 'captured demand'}
+              </div>
+            </div>
+            <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                {futureSwim ? 'Lessons booked' : 'Bookings'}
+              </div>
+              <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
+                {revenueMetrics?.bookings_confirmed ?? bookings.status_summary.active + bookings.status_summary.completed}
+              </div>
+              <div className="mt-0.5 text-[11px] text-slate-500">
+                {futureSwim ? 'class conversion proof' : 'conversion proof'}
+              </div>
+            </div>
+            <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                {futureSwim ? 'Lesson revenue' : 'Revenue'}
+              </div>
+              <div className="mt-1.5 text-3xl font-semibold tracking-tight text-emerald-700">
+                {formatAud(paidRevenueAud)}
+              </div>
+              <div className="mt-0.5 text-[11px] text-slate-500">captured value</div>
+            </div>
+            <div className="rounded-[1.2rem] border border-amber-100 bg-white px-4 py-4">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Next follow-up
+              </div>
+              <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
+                {tenantAttentionCount}
+              </div>
+              <div className="mt-0.5 text-[11px] text-slate-500">
+                {tenantAttentionCount > 0 ? 'tenant attention signals' : 'no urgent follow-up'}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="tenant-activation" className="scroll-mt-24">
+          <TenantActivationChecklistCard
+            activation={activationState}
+            eyebrow={futureSwim ? 'Future Swim activation' : 'Activation control'}
+            action={
+              activationState.actionPanel ? (
+                <button
+                  type="button"
+                  onClick={() => setPanel(activationState.actionPanel ?? 'overview')}
+                  className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                >
+                  {activationState.actionLabel}
+                </button>
+              ) : !session ? (
+                <button
+                  type="button"
+                  onClick={() => setPanel('overview')}
+                  className="rounded-full border border-sky-300 bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+                >
+                  {activationState.actionLabel}
+                </button>
+              ) : null
+            }
+          />
+        </section>
+
+        <nav
+          aria-label="Tenant workspace quick navigation"
+          className="xl:hidden"
+        >
+          <div className="flex gap-2 overflow-x-auto rounded-[1.2rem] border border-slate-200 bg-white p-2 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
+            {[
+              ['Revenue', '#tenant-revenue-proof'],
+              ['Activation', '#tenant-activation'],
+              ['Menu', '#tenant-workspace-menu'],
+              ['Bookings', '#tenant-booking-pipeline'],
+              ['Catalog', '#tenant-catalog-readiness'],
+            ].map(([label, href]) => (
+              <a
+                key={label}
+                href={href}
+                className="shrink-0 rounded-full border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700"
               >
-                {activationState.actionLabel}
-              </button>
-            ) : !session ? (
-              <button
-                type="button"
-                onClick={() => setPanel('overview')}
-                className="rounded-full border border-sky-300 bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
-              >
-                {activationState.actionLabel}
-              </button>
-            ) : null
-          }
-        />
+                {label}
+              </a>
+            ))}
+          </div>
+        </nav>
 
         <section className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
           <aside className="space-y-4">
-            <article className="rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+            <article
+              id="tenant-workspace-menu"
+              className="scroll-mt-24 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]"
+            >
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                 Workspace menu
               </div>
-              <div className="mt-4 space-y-2">
+              <div className="mt-4 grid grid-cols-2 gap-2 xl:block xl:space-y-2">
                 {tenantPanels.map((item) => (
                   <button
                     key={item.key}
                     type="button"
                     onClick={() => setPanel(item.key)}
-                    className={`flex w-full items-start gap-3 rounded-[1.1rem] border px-4 py-3 text-left transition ${
+                    className={`flex w-full items-start gap-2 rounded-[1.1rem] border px-3 py-3 text-left transition xl:gap-3 xl:px-4 ${
                       panel === item.key
                         ? 'border-slate-950 bg-slate-950 text-white shadow-[0_16px_34px_rgba(15,23,42,0.16)]'
                         : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
@@ -3049,7 +3273,7 @@ export function TenantApp() {
                     <span className={`mt-0.5 ${panel === item.key ? 'text-white' : 'text-slate-500'}`}>{item.icon}</span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold">{item.label}</span>
-                      <span className={`mt-1 block text-xs leading-5 ${panel === item.key ? 'text-white/78' : 'text-slate-500'}`}>
+                      <span className={`mt-1 hidden text-xs leading-5 sm:block ${panel === item.key ? 'text-white/78' : 'text-slate-500'}`}>
                         {item.description}
                       </span>
                     </span>
@@ -3120,14 +3344,14 @@ export function TenantApp() {
           <section className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
             <div className="space-y-6">
 
-              <article className="rounded-[1.75rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+              <article className="hidden rounded-[1.75rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-emerald-600">
                       {futureSwim ? 'Future Swim revenue proof loop' : 'Revenue proof loop'}
                     </div>
                     <h2 className="mt-1.5 text-2xl font-semibold tracking-tight text-slate-950">
-                      {futureSwim ? 'Monthly swim value board' : 'Monthly value board'}
+                      {futureSwim ? 'Monthly booking and revenue proof' : 'Monthly booking value proof'}
                     </h2>
                   </div>
                   {revenueMetrics ? (
@@ -3207,7 +3431,7 @@ export function TenantApp() {
                     <p className="mt-2 text-sm leading-6 text-slate-700">
                       {revenueMetrics || paidRevenueAud > 0 || outstandingRevenueAud > 0
                         ? futureSwim
-                          ? `BookedAI is turning Future Swim activity into commercial proof: ${revenueMetrics?.sessions_started ?? overview.recent_bookings.length} parent enquiries, ${revenueMetrics?.bookings_confirmed ?? bookings.status_summary.active + bookings.status_summary.completed} lessons booked, ${formatAud(paidRevenueAud)} lesson revenue, and ${formatAud(outstandingRevenueAud)} still recoverable through family follow-up.`
+                          ? `In the last ${revenueMetrics?.period_days ?? 30} days, BookedAI tracked ${revenueMetrics?.sessions_started ?? overview.recent_bookings.length} parent enquiries, ${revenueMetrics?.bookings_confirmed ?? bookings.status_summary.active + bookings.status_summary.completed} booked lessons, and ${formatAud(paidRevenueAud)} in lesson revenue. ${overview.summary.lifecycle_attention_count + overview.integration_snapshot.attention_count} follow-up item(s) still need tenant attention.`
                           : `BookedAI is turning tenant activity into commercial proof: ${revenueMetrics?.sessions_started ?? overview.recent_bookings.length} captured sessions, ${revenueMetrics?.bookings_confirmed ?? bookings.status_summary.active + bookings.status_summary.completed} confirmed bookings, ${formatAud(paidRevenueAud)} paid revenue, and ${formatAud(outstandingRevenueAud)} still recoverable through billing follow-up.`
                         : futureSwim
                           ? 'BookedAI is still building the first Future Swim revenue proof sample. Finish swim-business activation, publish one lesson, and attach billing posture to unlock stronger monthly reporting.'
@@ -3247,7 +3471,10 @@ export function TenantApp() {
                 )}
               </article>
 
-              <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+              <article
+                id="tenant-booking-pipeline"
+                className="scroll-mt-24 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]"
+              >
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -3295,7 +3522,10 @@ export function TenantApp() {
                 </div>
               </article>
 
-              <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+              <article
+                id="tenant-catalog-readiness"
+                className="scroll-mt-24 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]"
+              >
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
@@ -4254,6 +4484,70 @@ export function TenantApp() {
                 ))}
               </div>
             </article>
+
+            <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)] xl:col-span-2">
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    WhatsApp and portal changes
+                  </div>
+                  <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                    Customer request queue
+                  </h2>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    Requests from WhatsApp and the portal are recorded for review before BookedAI or the provider confirms an actual booking change.
+                  </p>
+                </div>
+                <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm">
+                  <span className="font-semibold text-slate-950">
+                    {bookings.portal_request_summary?.open ?? 0}
+                  </span>{' '}
+                  <span className="text-slate-600">recent request(s)</span>
+                </div>
+              </div>
+
+              <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
+                {Object.entries(bookings.portal_request_summary?.counts ?? {}).map(([key, value]) => (
+                  <div key={key} className="rounded-[1rem] border border-slate-200 bg-slate-50 px-3 py-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      {key.replace(/_/g, ' ')}
+                    </div>
+                    <div className="mt-1 text-2xl font-semibold text-slate-950">{value}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-5 space-y-3">
+                {(bookings.portal_request_summary?.recent ?? []).slice(0, 5).map((item) => (
+                  <div
+                    key={`${item.request_type}-${item.booking_reference ?? 'booking'}-${item.created_at ?? ''}`}
+                    className="rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4"
+                  >
+                    <div className="flex flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
+                      <div>
+                        <div className="text-sm font-semibold text-slate-950">
+                          {item.request_type.replace(/_/g, ' ')} · {item.booking_reference ?? 'pending ref'}
+                        </div>
+                        <div className="mt-1 text-xs text-slate-600">
+                          {item.service_name ?? 'Booking'} {item.customer_name ? `for ${item.customer_name}` : ''}
+                        </div>
+                        {item.customer_note ? (
+                          <p className="mt-2 text-sm leading-6 text-slate-600">{item.customer_note}</p>
+                        ) : null}
+                      </div>
+                      <span className="w-fit rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs text-slate-600">
+                        {item.created_at ?? 'time pending'}
+                      </span>
+                    </div>
+                  </div>
+                ))}
+                {!(bookings.portal_request_summary?.recent ?? []).length ? (
+                  <div className="rounded-[1.25rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
+                    No customer change requests are waiting in the recent booking queue.
+                  </div>
+                ) : null}
+              </div>
+            </article>
           </section>
         ) : null}
 
@@ -4429,10 +4723,41 @@ export function TenantApp() {
                   created after leads or bookings. Tenant users can inspect state here while admin keeps
                   transition and dispatch control.
                 </p>
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleTenantAutomationDispatch()}
+                    disabled={
+                      operationsDispatching ||
+                      !canRunTenantAutomation ||
+                      integrations.automation?.dispatch.can_run_policy_actions === false
+                    }
+                    className="rounded-full border border-slate-900 bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {operationsDispatching ? 'Running automation...' : 'Run policy automation'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setPanel('integrations')}
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                  >
+                    Review connection plan
+                  </button>
+                </div>
+                {!canRunTenantAutomation ? (
+                  <div className="mt-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                    Running automation requires a tenant admin or operator session. This view remains read-only for the current role.
+                  </div>
+                ) : null}
                 <div className="mt-4 rounded-[1rem] border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-800">
                   Each item now shows the lifecycle event, dependency posture, policy gate, and evidence
                   summary that BookedAI used before the revenue-operations worker or admin takes action.
                 </div>
+                {operationsMessage ? (
+                  <div className="mt-3 rounded-[1rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {operationsMessage}
+                  </div>
+                ) : null}
                 <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
                   {[
                     ['Queued', 'queued'],
@@ -4597,6 +4922,77 @@ export function TenantApp() {
                   <TenantSectionActivityCard label="Integration audit" activity={integrations.activity} />
                 </div>
               </article>
+
+              {integrations.automation ? (
+                <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Automation connection plan
+                  </div>
+                  <div className="mt-2 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                      <h2 className="text-2xl font-semibold tracking-tight text-slate-950">
+                        Tenant AI operations: {integrations.automation.status.replace(/_/g, ' ')}
+                      </h2>
+                      <p className="mt-3 text-sm leading-6 text-slate-600">
+                        {integrations.automation.next_step}
+                      </p>
+                    </div>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
+                      {integrations.automation.mode.replace(/_/g, ' ')}
+                    </span>
+                  </div>
+                  <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                    {integrations.automation.required_connections.map((connection) => (
+                      <div
+                        key={connection.id}
+                        className={`rounded-[1.1rem] border px-4 py-4 ${
+                          connection.ready
+                            ? 'border-emerald-100 bg-emerald-50'
+                            : 'border-amber-100 bg-amber-50'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-sm font-semibold text-slate-950">{connection.label}</div>
+                            <div className="mt-1 text-xs text-slate-600">
+                              {connection.provider || connection.id}
+                              {connection.sync_mode ? ` • ${connection.sync_mode}` : ''}
+                            </div>
+                          </div>
+                          <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
+                            connection.ready
+                              ? 'border-emerald-200 bg-white text-emerald-700'
+                              : 'border-amber-200 bg-white text-amber-700'
+                          }`}>
+                            {connection.status.replace(/_/g, ' ')}
+                          </span>
+                        </div>
+                        <p className="mt-3 text-xs leading-5 text-slate-600">{connection.note}</p>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-5 space-y-2">
+                    {integrations.automation.action_routes.map((route) => (
+                      <div key={route.action_type} className="rounded-[1rem] border border-slate-200 bg-slate-50 px-4 py-3">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <div className="text-sm font-semibold text-slate-950">
+                            {tenantActionLabel(route.action_type)}
+                          </div>
+                          <div className="text-xs font-medium text-slate-500">
+                            {route.automation_mode.replace(/_/g, ' ')}
+                          </div>
+                        </div>
+                        <div className="mt-1 text-xs leading-5 text-slate-500">
+                          Trigger {route.trigger.replace(/_/g, ' ')} via {route.connection.replace(/_/g, ' ')}. {route.approval_policy.replace(/_/g, ' ')}.
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="mt-5 rounded-[1rem] border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-800">
+                    {integrations.automation.dispatch.guardrail}
+                  </div>
+                </article>
+              ) : null}
 
               <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">

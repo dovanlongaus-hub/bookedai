@@ -1,5 +1,7 @@
 .env
 deploy/openclaw/.env
+deploy/evolution/.env
+.clawhub/
 .DS_Store
 __pycache__/
 *.pyc
@@ -24,6 +26,7 @@ bookedai-video/node_modules/
 bookedai-video/out/
 frontend/node_modules/
 frontend/dist/
+frontend/tmp-*
 supabase/.env
 supabase/.env.old
 supabase/volumes/db/data/

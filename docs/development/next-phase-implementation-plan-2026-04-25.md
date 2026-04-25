@@ -23,9 +23,12 @@ The latest verified baseline is:
 
 - pitch package registration completes from `pitch.bookedai.au` through `/register-interest`
 - product booking completes from `product.bookedai.au` through search, match, booking intent, payment intent, and communication best-effort work
-- booking success now shows a Thank You state and returns to the main BookedAI screen after `5s`
+- booking success now shows a portal-first Thank You state and returns to the main BookedAI screen after `16s`
+- reviewed chess tenant search now has an explicit design contract: tenant-backed results stay in the normal shortlist, show verified BookedAI tenant capability chips, and continue into booking/payment/QR/calendar/email/WhatsApp/portal only after an explicit `Book` action
+- public/product search cards now require top-left thumbnail/preview treatment, Google Maps actions for physical places, faster staged progress copy, and early-match visibility while deeper checks continue
 - the homepage customer-facing agent now keeps a visible chat thread and can spawn revenue-ops handoff actions after booking
 - the revenue-ops action ledger has admin visibility, dispatch, transition, and evidence inspection seams
+- the pitch and roadmap now visualize the implementation sequence and system architecture directly: `customer surfaces -> AI agents -> booking core -> operations truth`, plus Phase/Sprint `17-23` in the public roadmap dataset
 - production deploy and stack health checks passed after the full-flow release gate
 
 ## Phase 17 - Full-Flow Stabilization
@@ -37,9 +40,13 @@ Objective:
 Deliverables:
 
 - preserve the `search -> match -> book -> pay/prepare payment -> follow up -> Thank You -> return home` customer journey
+- preserve results-first search behavior, including reviewed tenant matches; tenant matches may show richer verified capability chips but must not auto-jump to booking
+- preserve result-card inspection basics: thumbnail/preview, direct or fallback Google Maps, provider/detail actions, early-match rendering, and chat-based refinement prompts
+- preserve portal-first tenant confirmation: booking reference, QR to `portal.bookedai.au`, Stripe/QR/manual payment posture, email/calendar actions, WhatsApp Agent follow-up, and portal review/edit/reschedule/cancel links
 - keep package registration resilient when calendar, Stripe, event-store, or dual-write side effects degrade
 - keep public booking confirmation immediate while downstream automation runs best effort
 - maintain compact mobile UI for package boxes, result cards, forms, and action controls
+- keep the pitch architecture visual current whenever the agent, booking, tenant/admin, or integration boundaries change
 
 Acceptance gates:
 
@@ -71,6 +78,8 @@ Implementation status from `2026-04-25`:
 
 - `GET /api/v1/agent-actions` now supports deeper ledger filters for entity type, entity id, agent type, dependency state, and lifecycle event
 - ledger responses now include summary counts for the current tenant/filter scope
+- `GET /api/v1/tenant/integrations` now includes a tenant automation connection plan for platform messaging, CRM write-back, webhook/workflow automation, customer-care state, action routes, dispatch endpoints, and guardrails
+- `POST /api/v1/tenant/operations/dispatch` now gives signed tenant admins/operators a tenant-scoped way to run policy-gated queued revenue-ops actions
 - ledger responses now expose derived lifecycle event, dependency state, policy mode, approval requirement, and evidence summary fields so surfaces do not need to parse raw JSON first
 - admin Reliability exposes entity, dependency, and lifecycle filters plus policy/evidence summary on action cards
 - tenant workspace now has an `Ops` panel for read-only tenant visibility into follow-up, reminder, CRM, customer-care, and webhook actions, including event/policy/evidence posture
@@ -93,6 +102,27 @@ Acceptance gates:
 - portal and assistant can reopen the same booking/student lifecycle state
 - unsupported actions escalate instead of pretending completion
 - support answers cite current state and next step without exposing another tenant's data
+
+Implementation status from `2026-04-25`:
+
+- `POST /api/v1/portal/bookings/{booking_reference}/care-turn` now gives the portal a first booking-reference anchored customer-care status turn
+- portal care replies use booking status, payment posture, support contact, academy/report context, recent revenue-ops action runs, and enabled portal actions as the response basis
+- `portal.bookedai.au` now includes a customer-care status agent card so returning customers can continue asking about payment, reschedule, class/report status, pause/downgrade/cancel, or support escalation in the same booking workspace
+- explicit human-support, escalation, urgent, or broken payment-link messages in the portal care turn now queue a `support_request` through the existing portal audit/outbox path
+- admin Billing Support now includes `portal.support_request.requested` in the same review/escalation queue as reschedule and cancel portal requests
+- the care-turn response includes `created_request`, allowing the portal UI to show customers when their AI-assisted support case has actually been queued
+- unsupported or incomplete lifecycle changes remain request-safe next actions or escalation paths rather than simulated instant mutations
+- WhatsApp is now the first live channel attached to Phase 19 customer-care behavior
+- WhatsApp should be treated as the dedicated `BookedAI WhatsApp Booking Care Agent` for `bookedai.au`: it answers all service questions tied to an already-booked record and uses OpenClaw as the safe gateway/operator supervision surface, not as customer-visible chat copy
+- the OpenClaw agent contract is repo-owned at `deploy/openclaw/agents/bookedai-whatsapp-booking-care-agent.json` and syncs into the live OpenClaw runtime `agents/` directory with `python3 scripts/telegram_workspace_ops.py sync-openclaw-bookedai-agent`
+- the configured BookedAI WhatsApp identity is the main support number `+61455301335`, paired with `info@bookedai.au` for email confirmation and support continuity
+- `/api/webhooks/whatsapp` still accepts the configured Twilio form payload and Meta JSON payload, but now also runs a customer-care response when the backend communication service is available
+- booking identity resolution prefers a booking reference in the WhatsApp message, then falls back to the sender phone or email only when exactly one booking is found
+- the response is generated from `build_portal_customer_care_turn`, so the answer uses portal booking, payment, support, academy/report, and action-run truth
+- clear WhatsApp cancellation and reschedule messages queue the same portal request records as `portal.bookedai.au`, preserving audit/outbox behavior and manual-review guardrails
+- WhatsApp-driven cancel/reschedule requests now run lifecycle follow-through: customer email confirmation is sent or recorded, CRM gets a task mirror through lifecycle email sync, and tenant bookings expose a recent request queue for dashboard visibility
+- ambiguous or unresolved identity asks the customer for a booking reference instead of exposing booking detail
+- OpenClaw/Telegram operators can now run `python3 scripts/telegram_workspace_ops.py whatsapp-bot-status` to verify the customer WhatsApp bot surface without sending a message: OpenClaw gateway, backend API health, WhatsApp provider status, and webhook verify-route reachability are checked in one read-only command
 
 ## Phase 20 - Widget And Plugin Runtime
 
@@ -141,6 +171,7 @@ Objective:
 Deliverables:
 
 - vertical template contracts for intake, placement, booking, payment, report, and retention policy
+- reusable verified-tenant search-result contract covering shortlist badge/chips, explicit booking consent, Stripe/QR payment posture, QR confirmation, WhatsApp Agent continuation, and portal change actions
 - tenant-configurable copy and workflow settings for education, kids activities, wellness, trades, and professional services
 - reusable smoke fixtures for each approved vertical
 - migration notes for moving one-off demo logic into tenant-safe policy/config records

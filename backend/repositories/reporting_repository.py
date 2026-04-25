@@ -158,23 +158,34 @@ class ReportingRepository(BaseRepository):
                 f"""
                 select
                   l.id::text as id,
-                  l.name,
-                  l.email,
-                  l.phone,
+                  contact.full_name as name,
+                  contact.email,
+                  contact.phone,
                   l.status,
                   l.source,
-                  l.service_name,
-                  l.notes,
-                  l.follow_up_at::text as follow_up_at,
-                  l.pipeline_stage,
+                  recent_booking.service_name,
+                  null::text as notes,
+                  null::text as follow_up_at,
+                  null::text as pipeline_stage,
                   l.created_at::text as created_at,
                   l.updated_at::text as updated_at,
-                  coalesce(c.sync_status, 'not_synced') as crm_sync_status,
-                  c.external_entity_id as crm_external_id
+                  coalesce(crm.sync_status, 'not_synced') as crm_sync_status,
+                  crm.external_entity_id as crm_external_id
                 from leads l
-                left join crm_sync_records c
-                  on c.entity_type = 'lead'
-                  and c.local_entity_id::text = l.id::text
+                left join contacts contact
+                  on contact.id = l.contact_id
+                  and contact.tenant_id = l.tenant_id
+                left join lateral (
+                  select b.service_name
+                  from booking_intents b
+                  where b.tenant_id = l.tenant_id
+                    and b.contact_id = l.contact_id
+                  order by b.created_at desc
+                  limit 1
+                ) recent_booking on true
+                left join crm_sync_records crm
+                  on crm.entity_type = 'lead'
+                  and crm.local_entity_id::text = l.id::text
                 where l.tenant_id = cast(:tenant_id as uuid)
                 {status_clause}
                 order by l.created_at desc

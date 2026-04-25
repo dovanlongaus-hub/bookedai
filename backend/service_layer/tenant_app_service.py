@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import UTC, datetime
 from urllib.parse import urlencode
 from uuid import UUID
@@ -259,6 +260,54 @@ async def build_tenant_bookings_snapshot(session, *, tenant_ref: str | None = No
 
     reporting_repository = ReportingRepository(RepositoryContext(session=session, tenant_id=tenant_id))
     recent_bookings = await reporting_repository.list_recent_booking_intents(tenant_id, limit=12)
+    portal_request_result = await session.execute(
+        text(
+            """
+            select
+              a.event_type,
+              a.payload,
+              a.created_at::text as created_at
+            from audit_logs a
+            where a.tenant_id = :tenant_id
+              and a.event_type in (
+                'portal.reschedule_request.requested',
+                'portal.cancel_request.requested',
+                'portal.support_request.requested',
+                'portal.pause_request.requested',
+                'portal.downgrade_request.requested'
+              )
+            order by a.created_at desc, a.id desc
+            limit 8
+            """
+        ),
+        {"tenant_id": tenant_id},
+    )
+    portal_request_rows = list(portal_request_result.mappings().all())
+    portal_request_counts = {
+        "reschedule_request": 0,
+        "cancel_request": 0,
+        "support_request": 0,
+        "pause_request": 0,
+        "downgrade_request": 0,
+    }
+    recent_portal_requests = []
+    for row in portal_request_rows:
+        payload = _coerce_json_object(row.get("payload"))
+        request_type = str(payload.get("request_type") or "").strip()
+        if request_type in portal_request_counts:
+            portal_request_counts[request_type] += 1
+        recent_portal_requests.append(
+            {
+                "request_type": request_type or str(row.get("event_type") or "").replace("portal.", "").replace(".requested", ""),
+                "booking_reference": payload.get("booking_reference"),
+                "customer_note": payload.get("customer_note"),
+                "customer_name": payload.get("customer_name"),
+                "customer_email": payload.get("customer_email"),
+                "customer_phone": payload.get("customer_phone"),
+                "service_name": payload.get("service_name"),
+                "created_at": row.get("created_at"),
+            }
+        )
 
     status_summary = {
         "pending_confirmation": 0,
@@ -296,6 +345,11 @@ async def build_tenant_bookings_snapshot(session, *, tenant_ref: str | None = No
     return {
         "tenant": tenant_profile,
         "status_summary": status_summary,
+        "portal_request_summary": {
+            "open": len(portal_request_rows),
+            "counts": portal_request_counts,
+            "recent": recent_portal_requests,
+        },
         "items": recent_bookings,
     }
 
@@ -351,6 +405,12 @@ async def build_tenant_integrations_snapshot(session, *, tenant_ref: str | None 
     crm_backlog = await build_crm_retry_backlog(session, tenant_id=tenant_id)
     audit_repository = AuditLogRepository(RepositoryContext(session=session, tenant_id=tenant_id))
     recent_audit_entries = await audit_repository.list_recent_entries(tenant_id=tenant_id, limit=12)
+    automation_plan = _build_tenant_automation_plan(
+        providers=provider_items,
+        attention=attention_items,
+        crm_backlog=crm_backlog,
+        reconciliation=reconciliation,
+    )
 
     return {
         "tenant": tenant_profile,
@@ -358,6 +418,7 @@ async def build_tenant_integrations_snapshot(session, *, tenant_ref: str | None 
         "attention": attention_items,
         "reconciliation": reconciliation,
         "crm_retry_backlog": crm_backlog,
+        "automation": automation_plan,
         "activity": _build_section_activity(
             recent_audit_entries,
             event_prefixes=("tenant.integrations.",),
@@ -368,6 +429,168 @@ async def build_tenant_integrations_snapshot(session, *, tenant_ref: str | None 
             "available_statuses": ["connected", "paused"],
             "available_sync_modes": ["read_only", "write_back", "bidirectional"],
             "operator_note": "Tenant portal integration writes currently focus on provider posture only; credential-level configuration remains admin-managed.",
+        },
+    }
+
+
+def _provider_ready(
+    providers: list[dict[str, object | None]],
+    *,
+    provider_markers: tuple[str, ...],
+    write_required: bool = False,
+) -> tuple[bool, dict[str, object | None] | None]:
+    for provider in providers:
+        provider_name = str(provider.get("provider") or "").lower()
+        status = str(provider.get("status") or "").lower()
+        sync_mode = str(provider.get("sync_mode") or "read_only").lower()
+        if not any(marker in provider_name for marker in provider_markers):
+            continue
+        if status != "connected":
+            return False, provider
+        if write_required and sync_mode not in {"write_back", "bidirectional", "read_write"}:
+            return False, provider
+        return True, provider
+    return False, None
+
+
+def _build_tenant_automation_plan(
+    *,
+    providers: list[dict[str, object | None]],
+    attention: list[dict[str, object | None]],
+    crm_backlog: dict[str, object | None],
+    reconciliation: dict[str, object | None],
+) -> dict[str, object]:
+    crm_ready, crm_provider = _provider_ready(
+        providers,
+        provider_markers=("crm", "zoho", "hubspot"),
+        write_required=True,
+    )
+    webhook_ready, webhook_provider = _provider_ready(
+        providers,
+        provider_markers=("webhook", "n8n", "zapier", "make"),
+        write_required=False,
+    )
+    hold_recommended = bool(
+        dict(crm_backlog.get("summary") or {}).get("hold_recommended")
+        if isinstance(crm_backlog, dict)
+        else False
+    )
+    high_attention_count = sum(
+        int(item.get("item_count") or 0)
+        for item in attention
+        if str(item.get("severity") or "").lower() == "high"
+    )
+    reconciliation_sections = reconciliation.get("sections") if isinstance(reconciliation, dict) else []
+    failed_sections = [
+        section
+        for section in (reconciliation_sections if isinstance(reconciliation_sections, list) else [])
+        if str(dict(section).get("status") or "").lower() == "attention_required"
+    ]
+
+    if hold_recommended or high_attention_count or failed_sections:
+        status = "blocked"
+        next_step = "Resolve failed integration, CRM retry, or reconciliation attention before widening tenant automation."
+    elif crm_ready and webhook_ready:
+        status = "ready"
+        next_step = "Policy-gated automation can run for queued tenant actions; unsupported provider paths still move to manual review."
+    else:
+        status = "partial"
+        next_step = "Run platform-managed follow-up now, then connect CRM write-back and webhook automation before broad auto-run."
+
+    required_connections = [
+        {
+            "id": "platform_messaging",
+            "label": "BookedAI platform messaging",
+            "status": "ready",
+            "ready": True,
+            "required_for": ["lead_follow_up", "payment_reminder"],
+            "note": "Email, SMS, and WhatsApp actions remain policy-gated and check customer contact before provider dispatch.",
+        },
+        {
+            "id": "crm_writeback",
+            "label": "CRM write-back",
+            "status": "ready" if crm_ready else "setup_required",
+            "ready": crm_ready,
+            "provider": crm_provider.get("provider") if crm_provider else None,
+            "sync_mode": crm_provider.get("sync_mode") if crm_provider else None,
+            "required_for": ["crm_sync"],
+            "note": "Use write-back or bidirectional mode before letting the revenue-ops agent sync lifecycle records automatically.",
+        },
+        {
+            "id": "webhook_automation",
+            "label": "Webhook or workflow automation",
+            "status": "ready" if webhook_ready else "setup_required",
+            "ready": webhook_ready,
+            "provider": webhook_provider.get("provider") if webhook_provider else None,
+            "sync_mode": webhook_provider.get("sync_mode") if webhook_provider else None,
+            "required_for": ["webhook_callback"],
+            "note": "Connect n8n, webhook, Zapier, or Make when the tenant wants downstream workflow callbacks.",
+        },
+        {
+            "id": "customer_care_state",
+            "label": "Customer-care lifecycle state",
+            "status": "ready",
+            "ready": True,
+            "required_for": ["customer_care_status_monitor"],
+            "note": "Status monitoring reads BookedAI booking, payment, report, and action state before answering customers.",
+        },
+    ]
+
+    action_routes = [
+        {
+            "action_type": "lead_follow_up",
+            "trigger": "lead_or_booking_created",
+            "connection": "platform_messaging",
+            "automation_mode": "policy_gated_auto_run",
+            "approval_policy": "manual_review_when_contact_missing",
+        },
+        {
+            "action_type": "payment_reminder",
+            "trigger": "payment_pending_or_unpaid",
+            "connection": "platform_messaging",
+            "automation_mode": "policy_gated_auto_run",
+            "approval_policy": "manual_review_when_contact_missing_or_payment_state_unknown",
+        },
+        {
+            "action_type": "crm_sync",
+            "trigger": "booking_lifecycle_handoff",
+            "connection": "crm_writeback",
+            "automation_mode": "auto_run" if crm_ready else "manual_review_until_connected",
+            "approval_policy": "requires_writeback_connection",
+        },
+        {
+            "action_type": "webhook_callback",
+            "trigger": "booking_lifecycle_handoff",
+            "connection": "webhook_automation",
+            "automation_mode": "auto_run" if webhook_ready else "manual_review_until_connected",
+            "approval_policy": "requires_webhook_connection",
+        },
+        {
+            "action_type": "customer_care_status_monitor",
+            "trigger": "booking_lifecycle_handoff",
+            "connection": "customer_care_state",
+            "automation_mode": "policy_gated_auto_run",
+            "approval_policy": "answers_only_from_current_lifecycle_truth",
+        },
+    ]
+
+    return {
+        "status": status,
+        "mode": "policy_gated_auto_run",
+        "summary": {
+            "ready_connections": sum(1 for item in required_connections if item["ready"]),
+            "required_connections": len(required_connections),
+            "attention_items": sum(int(item.get("item_count") or 0) for item in attention),
+            "hold_recommended": hold_recommended,
+        },
+        "next_step": next_step,
+        "required_connections": required_connections,
+        "action_routes": action_routes,
+        "dispatch": {
+            "tenant_endpoint": "POST /api/v1/tenant/operations/dispatch",
+            "admin_endpoint": "POST /api/v1/agent-actions/dispatch",
+            "can_run_policy_actions": status in {"ready", "partial"},
+            "guardrail": "Tenant dispatch is scoped to the signed tenant and only runs supported policy-gated queued actions; unsupported or degraded provider paths move to manual review.",
         },
     }
 
@@ -1408,6 +1631,7 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
     return {
         "booking": {
             "booking_reference": normalized_reference,
+            "tenant_id": booking_row.get("tenant_id"),
             "status": booking_status,
             "created_at": booking_row.get("created_at"),
             "requested_date": booking_row.get("requested_date"),
@@ -1472,6 +1696,392 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
         else None,
         "status_timeline": timeline,
     }
+
+
+def _portal_action_enabled(snapshot: dict, action_id: str) -> bool:
+    return any(
+        str(action.get("id") or "") == action_id and bool(action.get("enabled"))
+        for action in snapshot.get("allowed_actions", [])
+        if isinstance(action, dict)
+    )
+
+
+def _summarize_portal_action_runs(action_runs: list[dict]) -> dict:
+    status_counts: dict[str, int] = {}
+    action_type_counts: dict[str, int] = {}
+    latest_action = None
+    for action in action_runs:
+        status = str(action.get("status") or "unknown")
+        action_type = str(action.get("action_type") or "unknown")
+        status_counts[status] = status_counts.get(status, 0) + 1
+        action_type_counts[action_type] = action_type_counts.get(action_type, 0) + 1
+        if latest_action is None or str(action.get("updated_at") or action.get("created_at") or "") > str(latest_action.get("updated_at") or latest_action.get("created_at") or ""):
+            latest_action = action
+    return {
+        "total": len(action_runs),
+        "status_counts": status_counts,
+        "action_type_counts": action_type_counts,
+        "latest_action": latest_action,
+    }
+
+
+def _build_customer_care_reply(*, message: str, snapshot: dict, action_summary: dict) -> tuple[str, str]:
+    normalized_message = str(message or "").lower()
+    booking = snapshot.get("booking", {})
+    service = snapshot.get("service", {})
+    payment = snapshot.get("payment", {})
+    support = snapshot.get("support", {})
+    booking_reference = str(booking.get("booking_reference") or "").strip()
+    service_name = str(service.get("service_name") or service.get("business_name") or "your booking").strip()
+    payment_status = str(payment.get("status") or "pending").replace("_", " ")
+    booking_status = str(booking.get("status") or "captured").replace("_", " ")
+
+    if any(term in normalized_message for term in ("pay", "payment", "checkout", "invoice")):
+        phase = "payment_help"
+        if payment.get("payment_url") and str(payment.get("status") or "").lower() not in {"paid", "succeeded", "completed"}:
+            reply = (
+                f"Booking {booking_reference} for {service_name} is still showing payment status `{payment_status}`. "
+                "Use the payment action in this portal to complete the secure step, or contact support if the link does not work."
+            )
+        else:
+            reply = (
+                f"Booking {booking_reference} payment is currently `{payment_status}`. "
+                "There is no active payment link shown in the portal right now, so support can review the next step if anything looks wrong."
+            )
+    elif any(term in normalized_message for term in ("reschedule", "move", "change time", "another time", "date")):
+        phase = "reschedule_help"
+        reply = (
+            f"Booking {booking_reference} can be reviewed for reschedule from this portal."
+            if _portal_action_enabled(snapshot, "request_reschedule")
+            else f"Booking {booking_reference} is currently `{booking_status}`, so reschedule is not available from the portal."
+        )
+    elif any(term in normalized_message for term in ("pause", "downgrade", "cancel", "stop")):
+        phase = "support_request_help"
+        enabled = []
+        if _portal_action_enabled(snapshot, "request_pause"):
+            enabled.append("pause")
+        if _portal_action_enabled(snapshot, "request_downgrade"):
+            enabled.append("downgrade")
+        if _portal_action_enabled(snapshot, "request_cancel"):
+            enabled.append("cancel")
+        reply = (
+            f"Booking {booking_reference} supports these managed request paths: {', '.join(enabled)}. Submit one here so the team receives the current booking context."
+            if enabled
+            else f"Booking {booking_reference} does not currently have pause, downgrade, or cancel actions enabled in the portal."
+        )
+    elif any(term in normalized_message for term in ("class", "report", "student", "academy", "progress")):
+        phase = "academy_status"
+        academy_student = snapshot.get("academy_student") if isinstance(snapshot.get("academy_student"), dict) else None
+        report = snapshot.get("academy_report_preview") if isinstance(snapshot.get("academy_report_preview"), dict) else None
+        if academy_student or report:
+            student_name = str((academy_student or {}).get("student_name") or "the student")
+            reply = (
+                f"Booking {booking_reference} is linked to academy progress for {student_name}. "
+                "The portal is showing the latest report/learning context available, and support requests keep that student context attached."
+            )
+        else:
+            reply = (
+                f"Booking {booking_reference} does not yet show an academy report or student snapshot. "
+                "If this should be a class or report question, contact support and the team can attach the right learning context."
+            )
+    else:
+        phase = "booking_status"
+        status_title = str(snapshot.get("status_summary", {}).get("title") or "Booking status")
+        status_body = str(snapshot.get("status_summary", {}).get("body") or "")
+        reply = (
+            f"Booking {booking_reference} for {service_name} is currently `{booking_status}` with payment `{payment_status}`. "
+            f"{status_title}: {status_body}"
+        ).strip()
+
+    if action_summary.get("total"):
+        reply += (
+            f" BookedAI also has {action_summary['total']} revenue-ops action"
+            f"{'' if action_summary['total'] == 1 else 's'} tracking follow-up behind the scenes."
+        )
+    if support.get("contact_email"):
+        reply += f" Support contact: {support.get('contact_email')}."
+    return phase, reply
+
+
+def _should_queue_customer_care_support(message: str, phase: str) -> bool:
+    normalized = str(message or "").lower()
+    human_terms = (
+        "human",
+        "person",
+        "agent",
+        "support",
+        "help me",
+        "call me",
+        "contact me",
+        "escalate",
+        "urgent",
+        "complaint",
+        "not working",
+        "doesn't work",
+        "does not work",
+        "failed",
+        "error",
+        "broken",
+        "người thật",
+        "ho tro",
+        "hỗ trợ",
+        "gọi tôi",
+        "lỗi",
+    )
+    if any(term in normalized for term in human_terms):
+        return True
+    payment_problem_terms = ("payment link", "checkout", "invoice", "pay")
+    problem_terms = ("issue", "problem", "stuck", "cannot", "can't", "unable")
+    return phase == "payment_help" and any(term in normalized for term in payment_problem_terms) and any(
+        term in normalized for term in problem_terms
+    )
+
+
+async def build_portal_customer_care_turn(
+    session,
+    *,
+    booking_reference: str,
+    message: str,
+    customer_email: str | None = None,
+    customer_phone: str | None = None,
+) -> dict:
+    snapshot = await build_portal_booking_snapshot(session, booking_reference=booking_reference)
+    if not snapshot:
+        return {}
+
+    customer = snapshot.get("customer", {}) if isinstance(snapshot.get("customer"), dict) else {}
+    provided_email = str(customer_email or "").strip().lower()
+    provided_phone = str(customer_phone or "").strip()
+    known_email = str(customer.get("email") or "").strip().lower()
+    known_phone = str(customer.get("phone") or "").strip()
+    identity = {
+        "booking_reference": snapshot.get("booking", {}).get("booking_reference"),
+        "resolved_by": ["booking_reference"],
+        "email_match": bool(provided_email and known_email and provided_email == known_email),
+        "phone_match": bool(provided_phone and known_phone and provided_phone == known_phone),
+        "verified": True,
+        "verification_note": "Booking reference is treated as the portal identity anchor; email/phone matches increase confidence when supplied.",
+    }
+    if provided_email:
+        identity["resolved_by"].append("email_match" if identity["email_match"] else "email_supplied")
+    if provided_phone:
+        identity["resolved_by"].append("phone_match" if identity["phone_match"] else "phone_supplied")
+
+    tenant_id = str(snapshot.get("tenant_id") or "").strip() or None
+    booking = snapshot.get("booking", {}) if isinstance(snapshot.get("booking"), dict) else {}
+    booking_tenant_id = str(booking.get("tenant_id") or "").strip() or tenant_id
+    if not booking_tenant_id:
+        booking_tenant_id = None
+
+    action_runs: list[dict] = []
+    try:
+        academy_repository = AcademyRepository(RepositoryContext(session=session, tenant_id=booking_tenant_id))
+        action_runs = await academy_repository.list_agent_action_runs(
+            tenant_id=booking_tenant_id,
+            booking_reference=str(booking.get("booking_reference") or booking_reference),
+            agent_type="revenue_operations",
+            limit=8,
+        )
+    except Exception:
+        action_runs = []
+
+    action_summary = _summarize_portal_action_runs(action_runs)
+    phase, reply = _build_customer_care_reply(
+        message=message,
+        snapshot=snapshot,
+        action_summary=action_summary,
+    )
+    created_request: dict | None = None
+    if _should_queue_customer_care_support(message, phase):
+        try:
+            created_request = await queue_portal_booking_request(
+                session,
+                booking_reference=str(booking.get("booking_reference") or booking_reference),
+                request_type="support_request",
+                customer_note=message,
+            )
+            if created_request:
+                support_email = created_request.get("support_email")
+                reply += (
+                    " I have also queued this as a support request with the booking context attached"
+                    f"{f' for {support_email}' if support_email else ''}."
+                )
+        except Exception:
+            created_request = {
+                "request_status": "manual_review_required",
+                "request_type": "support_request",
+                "booking_reference": booking.get("booking_reference") or booking_reference,
+                "message": "Support escalation could not be queued automatically; please use the support contact shown in the portal.",
+            }
+
+    next_actions = [
+        {
+            "id": action.get("id"),
+            "label": action.get("label"),
+            "enabled": action.get("enabled"),
+            "href": action.get("href"),
+            "note": action.get("note"),
+        }
+        for action in snapshot.get("allowed_actions", [])
+        if isinstance(action, dict)
+        and str(action.get("id") or "") in {
+            "pay_now",
+            "request_reschedule",
+            "request_cancel",
+            "request_pause",
+            "request_downgrade",
+            "contact_support",
+        }
+    ]
+
+    return {
+        "booking_reference": booking.get("booking_reference") or booking_reference,
+        "phase": phase,
+        "reply": reply,
+        "identity": identity,
+        "status": {
+            "booking": booking.get("status"),
+            "payment": snapshot.get("payment", {}).get("status")
+            if isinstance(snapshot.get("payment"), dict)
+            else None,
+            "summary": snapshot.get("status_summary"),
+        },
+        "academy": {
+            "student": snapshot.get("academy_student"),
+            "report_available": bool(snapshot.get("academy_report_preview")),
+        },
+        "operations": {
+            "summary": action_summary,
+            "recent_actions": action_runs,
+        },
+        "created_request": created_request,
+        "next_actions": next_actions,
+        "sources": [
+            "portal_booking_snapshot",
+            "payment_intents",
+            "academy_student_snapshot",
+            "academy_report_snapshot",
+            "agent_action_runs",
+        ],
+    }
+
+
+def extract_booking_reference_from_text(value: str | None) -> str | None:
+    normalized = str(value or "").strip()
+    if not normalized:
+        return None
+
+    patterns = (
+        r"\b(v1-[a-z0-9-]{6,})\b",
+        r"\b(BR-[A-Z0-9-]{4,})\b",
+        r"\b(CONS-[A-Z0-9-]{4,})\b",
+        r"\b(ref(?:erence)?|booking)\s*[:#-]?\s*([A-Z0-9][A-Z0-9_-]{5,})\b",
+    )
+    for pattern in patterns:
+        match = re.search(pattern, normalized, flags=re.IGNORECASE)
+        if not match:
+            continue
+        candidate = match.group(match.lastindex or 1)
+        if candidate.lower() in {"ref", "reference", "booking"} and match.lastindex and match.lastindex > 1:
+            candidate = match.group(match.lastindex)
+        return candidate.strip()
+    return None
+
+
+def _normalize_lookup_phone(value: str | None) -> str | None:
+    normalized = re.sub(r"[^\d+]", "", str(value or "").strip())
+    if not normalized:
+        return None
+    if normalized.startswith("+"):
+        return normalized
+    return f"+{normalized}"
+
+
+async def resolve_customer_care_booking_reference(
+    session,
+    *,
+    message: str | None = None,
+    customer_phone: str | None = None,
+    customer_email: str | None = None,
+) -> dict:
+    explicit_reference = extract_booking_reference_from_text(message)
+    if explicit_reference:
+        booking_row = await _load_portal_booking_row(session, booking_reference=explicit_reference)
+        if booking_row:
+            return {
+                "booking_reference": str(booking_row.get("booking_reference") or explicit_reference),
+                "resolved_by": "message_booking_reference",
+                "candidate_count": 1,
+            }
+
+    normalized_phone = _normalize_lookup_phone(customer_phone)
+    normalized_email = str(customer_email or "").strip().lower()
+    if not normalized_phone and not normalized_email:
+        return {
+            "booking_reference": None,
+            "resolved_by": "unresolved",
+            "candidate_count": 0,
+        }
+
+    where_clauses = []
+    params: dict[str, str] = {}
+    if normalized_phone:
+        where_clauses.append("regexp_replace(coalesce(c.phone, ''), '[^0-9+]', '', 'g') = :customer_phone")
+        params["customer_phone"] = normalized_phone
+    if normalized_email:
+        where_clauses.append("lower(coalesce(c.email, '')) = :customer_email")
+        params["customer_email"] = normalized_email
+
+    result = await session.execute(
+        text(
+            f"""
+            select
+              bi.booking_reference,
+              bi.created_at::text as created_at
+            from booking_intents bi
+            left join contacts c
+              on c.id = bi.contact_id
+            where {" or ".join(where_clauses)}
+            order by bi.created_at desc
+            limit 2
+            """
+        ),
+        params,
+    )
+    rows = list(result.mappings().all())
+    if len(rows) == 1:
+        return {
+            "booking_reference": str(rows[0].get("booking_reference") or "").strip() or None,
+            "resolved_by": "customer_phone" if normalized_phone else "customer_email",
+            "candidate_count": 1,
+        }
+    return {
+        "booking_reference": None,
+        "resolved_by": "ambiguous_customer_identity" if rows else "unresolved",
+        "candidate_count": len(rows),
+    }
+
+
+def infer_portal_request_type_from_message(message: str | None) -> str | None:
+    normalized = str(message or "").lower()
+    if any(term in normalized for term in ("cancel", "cancelled", "cancellation", "huỷ", "hủy")):
+        return "cancel_request"
+    if any(
+        term in normalized
+        for term in (
+            "reschedule",
+            "change time",
+            "change date",
+            "move my booking",
+            "another time",
+            "đổi lịch",
+            "doi lich",
+            "thay đổi lịch",
+            "thay doi lich",
+        )
+    ):
+        return "reschedule_request"
+    return None
 
 
 async def queue_portal_booking_request(
@@ -1542,12 +2152,21 @@ async def queue_portal_booking_request(
         else "Your pause request has been recorded for academy review."
         if safe_request_type == "pause_request"
         else "Your downgrade request has been recorded for academy review."
+        if safe_request_type == "downgrade_request"
+        else "Your support request has been recorded for manual review."
     )
 
     return {
         "request_status": "queued",
         "request_type": safe_request_type,
         "booking_reference": normalized_reference,
+        "tenant_id": tenant_id,
+        "booking_intent_id": booking_intent_id,
+        "customer_name": booking_row.get("customer_name"),
+        "customer_email": booking_row.get("customer_email"),
+        "customer_phone": booking_row.get("customer_phone"),
+        "service_name": booking_row.get("service_name"),
+        "business_name": booking_row.get("business_name"),
         "message": message,
         "support_email": support_email,
         "outbox_event_id": outbox_id,

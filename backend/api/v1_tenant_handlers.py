@@ -4,6 +4,7 @@ from datetime import UTC, datetime, timedelta
 
 from fastapi import Header, Request
 from httpx import HTTPError
+from pydantic import BaseModel
 
 from api.v1_routes import (
     ActorContextPayload,
@@ -69,10 +70,12 @@ from api.v1_routes import (
     _verify_tenant_password,
     apply_catalog_quality_gate,
     build_portal_booking_snapshot,
+    build_portal_customer_care_turn,
     build_tenant_billing_snapshot,
     build_tenant_bookings_snapshot,
     build_tenant_catalog_snapshot,
     build_tenant_integrations_snapshot,
+    build_tenant_leads_snapshot,
     build_tenant_invoice_receipt,
     build_tenant_onboarding_snapshot,
     build_tenant_overview,
@@ -90,6 +93,7 @@ from service_layer.tenant_app_service import (
     create_tenant_stripe_billing_portal_session,
     create_tenant_stripe_checkout_session,
 )
+from workers.academy_actions import run_tracked_academy_action_dispatch
 
 
 def _derive_google_tenant_business_name(
@@ -113,6 +117,16 @@ def _derive_google_tenant_business_name(
         if part
     )
     return readable_local_part.title() or "BookedAI Tenant"
+
+
+class TenantOperationsDispatchRequestPayload(BaseModel):
+    limit: int = 10
+
+
+class PortalCustomerCareTurnRequestPayload(BaseModel):
+    message: str
+    customer_email: str | None = None
+    customer_phone: str | None = None
 
 
 async def _resolve_available_google_tenant_slug(
@@ -1042,6 +1056,45 @@ async def tenant_bookings(request: Request, authorization: str | None = Header(d
     )
 
 
+async def tenant_leads(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    status: str | None = None,
+):
+    tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    async with get_session(request.app.state.session_factory) as session:
+        if not tenant_id:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved.",
+                    status_code=404,
+                    details={"tenant_ref": tenant_ref},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        snapshot = await build_tenant_leads_snapshot(
+            session,
+            tenant_ref=tenant_ref or tenant_id,
+            status_filter=status,
+        )
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role="tenant_admin" if tenant_session else "tenant_preview",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
 async def tenant_plugin_interface(request: Request, authorization: str | None = Header(default=None)):
     tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
         request,
@@ -1359,6 +1412,65 @@ async def tenant_integration_provider_update(
             deployment_mode="standalone_app",
         ),
     )
+
+
+async def tenant_operations_dispatch(
+    request: Request,
+    payload: TenantOperationsDispatchRequestPayload,
+    authorization: str | None = Header(default=None),
+):
+    tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session or not membership or not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with a tenant admin or operator account before running tenant automation.",
+                status_code=401 if not tenant_session else 403,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    role_error = _require_tenant_membership_role(
+        membership,
+        allowed_roles=TENANT_INTEGRATION_WRITE_ROLES,
+        message="Only tenant admins and operators can run policy-gated tenant automation.",
+    )
+    if role_error:
+        return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+    dispatch_limit = max(1, min(int(payload.limit or 10), 25))
+    async with get_session(request.app.state.session_factory) as session:
+        tracked_result = await run_tracked_academy_action_dispatch(
+            session,
+            tenant_id=tenant_id,
+            limit=dispatch_limit,
+        )
+        await session.commit()
+
+    return _success_response(
+        {
+            "tenant_id": tenant_id,
+            "tenant_ref": tenant_ref,
+            "job_run_id": tracked_result.job_run_id,
+            "dispatch_status": tracked_result.result.status,
+            "detail": tracked_result.result.detail,
+            "retryable": tracked_result.result.retryable,
+            "metadata": tracked_result.result.metadata,
+            "message": "Tenant automation dispatch completed under BookedAI worker policy.",
+        },
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role=_membership_role(membership),
+            deployment_mode="standalone_app",
+        ),
+    )
+
 
 async def tenant_billing(request: Request, authorization: str | None = Header(default=None)):
     tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
@@ -2559,6 +2671,55 @@ async def portal_booking_detail(booking_reference: str, request: Request):
         )
 
     return _success_response(snapshot, tenant_id=None, actor_context=None)
+
+
+async def portal_customer_care_turn(
+    booking_reference: str,
+    request: Request,
+    payload: PortalCustomerCareTurnRequestPayload,
+):
+    normalized_message = str(payload.message or "").strip()
+    if not normalized_message:
+        return _error_response(
+            ValidationAppError(
+                "Please enter a booking, payment, class, or support question.",
+                details={"message": ["required"]},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        result = await build_portal_customer_care_turn(
+            session,
+            booking_reference=booking_reference,
+            message=normalized_message,
+            customer_email=payload.customer_email,
+            customer_phone=payload.customer_phone,
+        )
+
+    if not result:
+        return _error_response(
+            AppError(
+                code="portal_booking_not_found",
+                message="The requested booking reference could not be found for the customer-care agent.",
+                status_code=404,
+                details={"booking_reference": booking_reference},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    return _success_response(
+        result,
+        tenant_id=None,
+        actor_context=ActorContextPayload(
+            channel="portal_app",
+            role="customer",
+            deployment_mode="standalone_app",
+        ),
+    )
+
 
 async def portal_booking_reschedule_request(
     booking_reference: str,

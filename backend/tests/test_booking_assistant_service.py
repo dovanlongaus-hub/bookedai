@@ -39,7 +39,7 @@ sys.modules["service_layer.event_store"] = event_store_module
 sys.modules["service_layer.n8n_service"] = n8n_service_module
 
 from config import get_settings
-from schemas import BookingAssistantChatMessage
+from schemas import BookingAssistantChatMessage, BookingAssistantSessionRequest
 from services import BookingAssistantService, OpenAIService
 
 
@@ -51,6 +51,47 @@ class _FakeOpenAIService:
 class BookingAssistantServiceTestCase(IsolatedAsyncioTestCase):
     def setUp(self) -> None:
         self.service = BookingAssistantService(get_settings())
+
+    async def test_create_session_supports_event_attendance_requests(self):
+        email_service = AsyncMock()
+        email_service.smtp_configured.return_value = False
+        n8n_service = AsyncMock()
+        n8n_service.trigger_booking.return_value = 'event_attendance_requested'
+
+        payload = BookingAssistantSessionRequest(
+            service_id='event:https://events.example.com/demo-night',
+            event_title='BookedAI Demo Night',
+            event_summary='Live product walkthrough and Q&A.',
+            event_start_at='2026-05-01T09:00:00Z',
+            event_end_at='2026-05-01T10:00:00Z',
+            event_venue_name='BookedAI HQ',
+            event_location='Sydney',
+            event_organizer='BookedAI Team',
+            event_url='https://events.example.com/demo-night',
+            customer_name='Aus Tester',
+            customer_email='aus@example.com',
+            requested_date='2026-05-01',
+            requested_time='09:00',
+            timezone='Australia/Sydney',
+            notes='Need one attendee spot.',
+        )
+
+        result = await self.service.create_session(
+            payload,
+            email_service=email_service,
+            n8n_service=n8n_service,
+            services=[],
+        )
+
+        self.assertEqual(result.status, 'ok')
+        self.assertEqual(result.service.category, 'Event')
+        self.assertEqual(result.service.name, 'BookedAI Demo Night')
+        self.assertEqual(result.amount_aud, 0)
+        self.assertEqual(result.amount_label, 'Details in follow-up')
+        self.assertEqual(result.payment_status, 'payment_follow_up_required')
+        self.assertEqual(result.payment_url, '')
+        self.assertEqual(result.calendar_add_url, 'https://events.example.com/demo-night')
+        self.assertIn('attendance request', result.confirmation_message.lower())
 
     def test_should_search_ai_events_requires_explicit_event_intent(self):
         self.assertFalse(

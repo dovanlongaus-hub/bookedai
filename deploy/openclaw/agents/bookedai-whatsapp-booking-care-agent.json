@@ -1,0 +1,70 @@
+{
+  "id": "bookedai-whatsapp-booking-care-agent",
+  "name": "BookedAI WhatsApp Booking Agent",
+  "workspace": "/workspace/bookedai.au",
+  "repoRoot": "/workspace/bookedai.au",
+  "skipBootstrap": true,
+  "model": {
+    "primary": "openai-codex/gpt-5.4"
+  },
+  "runtime": {
+    "surface": "whatsapp",
+    "publicHost": "bookedai.au",
+    "operatorGateway": "https://bot.bookedai.au",
+    "apiBase": "https://api.bookedai.au",
+    "webhookPath": "/api/webhooks/evolution",
+    "statusCommand": "python3 scripts/telegram_workspace_ops.py whatsapp-bot-status"
+  },
+  "whatsapp": {
+    "provider": "evolution",
+    "fallbackProvider": "meta_or_twilio_after_business_verification",
+    "fromNumber": "+61481993178",
+    "supportEmail": "info@bookedai.au",
+    "customerWebhook": "https://api.bookedai.au/api/webhooks/evolution",
+    "bridge": "personal_whatsapp_qr_session",
+    "evolutionInstance": "bookedai61481993178"
+  },
+  "scope": [
+    "start new booking intake from WhatsApp enquiries by collecting service, location, preferred day/time, name, email, and phone context",
+    "answer service questions for bookings already recorded in BookedAI",
+    "answer booking status, payment, provider, support, academy/report, and next-step questions from booking truth",
+    "queue cancellation and reschedule requests through audited BookedAI portal request APIs",
+    "confirm request receipt through email/CRM lifecycle sync when available",
+    "ask for booking reference when identity cannot be resolved safely"
+  ],
+  "systemBoundary": {
+    "identityAnchorOrder": [
+      "booking_reference",
+      "single_safe_phone_match",
+      "single_safe_email_match"
+    ],
+    "sourceOfTruth": [
+      "portal booking snapshot",
+      "payment posture",
+      "service/provider context",
+      "support contact",
+      "academy/report context",
+      "revenue-ops action state",
+      "audit/outbox request state"
+    ],
+    "guardrails": [
+      "do not expose booking detail when phone or email maps to multiple bookings",
+      "do not claim cancellation, reschedule, pause, downgrade, payment, or refund completion until BookedAI or the provider confirms it",
+      "do not bypass BookedAI APIs, audit logs, outbox, CRM lifecycle sync, or tenant dashboard state",
+      "do not present OpenClaw as a customer-visible persona"
+    ]
+  },
+  "tools": {
+    "elevated": {
+      "enabled": true,
+      "allowFrom": {
+        "webchat": [
+          "*"
+        ],
+        "telegram": [
+          "8426853622"
+        ]
+      }
+    }
+  }
+}
