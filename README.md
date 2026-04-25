@@ -78,11 +78,11 @@ Implementation rules:
 
 Production traffic is expected to follow this path:
 
-- `https://bookedai.au/` -> homepage acquisition surface for the responsive web app
+- `https://bookedai.au/` -> canonical public redirect to `https://pitch.bookedai.au/`
 - `https://api.bookedai.au/*` -> FastAPI backend
 - `https://admin.bookedai.au/` -> admin-facing frontend routes behind the same proxy
 - `https://product.bookedai.au/` -> live product web runtime and booking-agent frontend
-- `https://demo.bookedai.au/` -> minimal conversational landing page for the AI revenue engine demo
+- `https://demo.bookedai.au/` -> canonical public web entrypoint for the BookedAI demo experience
 - `https://portal.bookedai.au/` -> customer booking portal routes on the shared frontend plus backend proxy
 - `https://tenant.bookedai.au/` -> tenant auth gateway with email-first sign-in, email verification code flow, Google continuation, workspace creation, and catalog workspace on the shared frontend plus backend proxy
 - `https://supabase.bookedai.au/` -> Supabase Studio, Auth, REST, Storage via Kong
@@ -660,6 +660,6 @@ curl -s \
 - `scripts/prepare_supabase_env.sh`: generates and patches `supabase/.env`
 - `scripts/sync_app_env_from_supabase.sh`: syncs app DB and API keys from `supabase/.env`
 - `scripts/deploy_beta.sh`: rebuilds and redeploys the beta staging runtime at `beta.bookedai.au`
-- `scripts/deploy_production.sh`: obtains Let's Encrypt certs and deploys both production and beta stacks
-- `scripts/healthcheck_stack.sh`: validates core containers and HTTPS endpoints
+- `scripts/deploy_production.sh`: obtains Let's Encrypt certs, deploys both production and beta stacks, and retries production Compose bring-up with orphan cleanup if recreate fails transiently
+- `scripts/healthcheck_stack.sh`: validates production Compose services, required Supabase containers, and HTTPS endpoints
 - `scripts/install_healthcheck_cron.sh`: installs recurring health check cron job

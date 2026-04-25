@@ -8,15 +8,43 @@ Current synchronized release baseline: `1.0.1-stable`.
 
 Latest infrastructure update date: `2026-04-16`.
 
-Latest product-surface update date: `2026-04-24`.
+Latest product-surface update date: `2026-04-25`.
 
-Latest public-search UX update date: `2026-04-24`.
+Latest public-search UX update date: `2026-04-25`.
 
 Current top product-surface priority: `responsive homepage web-app UX`.
+
+Latest next-phase plan update from `2026-04-25`:
+
+- `docs/development/next-phase-implementation-plan-2026-04-25.md` is now the active implementation bridge for the next BookedAI phases
+- `Phase 17` closes the current full-flow stabilization baseline: pitch package registration, product booking, payment-intent preparation, follow-up automation, Thank You confirmation, and `5s` return to the main BookedAI screen
+- `Phase 18` through `Phase 23` are now ordered as revenue-ops ledger control, customer-care/status agent, widget/plugin runtime, billing and receivables truth, reusable multi-tenant templates, and release governance/scale hardening
+
+Latest homepage AI-agent continuation note from `2026-04-25`:
+
+- `POST /api/v1/agents/customer-turn` now gives the public customer-facing AI agent a reusable backend turn contract: one chat message in, one grounded assistant reply out, plus search payload, phase, missing context, suggestions, and next-agent handoff metadata
+- `frontend/src/apps/public/HomepageSearchExperience.tsx` now keeps a visible customer-agent chat thread: user turns, assistant replies, inline top-result mini cards, and quick suggestion chips stay in the conversation so the user can continue refining instead of jumping between disconnected panels
+- the homepage live-read path now calls the customer-agent turn contract first, then renders the returned search payload and assistant reply inside the same chat-to-booking workspace
+- clarification chips now continue the same chat flow and rerun search with the added context, keeping the public agent closer to `ask -> refine -> show results -> book`
+- `POST /api/v1/revenue-ops/handoffs` now queues SME revenue-operations actions after a booking lifecycle event, using `agent_action_runs` for lead follow-up, payment reminder, CRM sync, customer-care status monitoring, and webhook callbacks
+- homepage booking automation now calls that handoff after payment and communication best-effort work, so the customer-facing search/conversation agent can spawn the revenue-operations agent for downstream SME operations; admin Reliability can filter those generic SME action types beside the chess academy actions
+
+Latest product-runtime QA note from `2026-04-24`:
+
+- `product.bookedai.au` was live-QA tested across desktop and mobile after the product-shell polish; the mobile first screen now exposes quick-search cards immediately, and the desktop shell has more room for the live product proof instead of a narrow phone-like frame
+- `/api/v1/payments/intents` now resolves booking intents by UUID text or `booking_reference`, casts mixed service and tenant join keys safely, and writes payment mirror state under the booking's real tenant, preventing the previous browser-visible payment CORS/500 failure after booking confirmation
+- final production Playwright smoke created booking `v1-1ed89a5995` through search, match, lead, booking intent, payment intent, email, SMS, and WhatsApp with all observed API calls returning `200`, no console errors, and no failed browser requests
 
 Latest public marketplace visual update date: `2026-04-24`.
 
 Latest widget/plugin architecture update date: `2026-04-23`.
+
+Latest pitch registration stability update from `2026-04-24`:
+
+- `pitch.bookedai.au` pricing CTAs now route into the real `RegisterInterestApp` on `/register-interest` instead of being shadowed by the pitch host route
+- `https://pitch.bookedai.au` is now allowed by production CORS for the configured `api.bookedai.au` frontend API base, so BookedAI package registration can submit from the pitch host without `Failed to fetch`
+- pricing consultation creation now degrades external calendar, Stripe, event-store, or dual-write side-effect failures into manual follow-up states instead of failing the customer-visible registration flow
+- live browser verification completed from `pitch.bookedai.au` pricing through SME details submission to confirmation reference `CONS-391FA9D5`, with no app console errors and no horizontal overflow
 
 From this point onward, it serves three purposes:
 
@@ -74,6 +102,7 @@ The current inherited truth is:
   - the widget/plugin should operate as receptionist, sales, and customer-service surface while still flowing into the shared BookedAI booking, payment, portal, and follow-up lifecycle
   - runtime identity now needs to stay explicit through tenant, widget, deployment-mode, host-origin, source-page, and campaign context so many SME customers can share one BookedAI platform safely
   - the managed booking portal should be treated as the persistent post-booking control surface for widget installs too, including review, edit, reschedule, cancel, and resubmit behavior
+  - the next chess-academy productization layer is now captured in `docs/architecture/demo-grandmaster-chess-revenue-engine-blueprint.md`, which upgrades the current demo direction from search-plus-booking proof into a full recurring-revenue academy loop covering assessment, placement, subscription, coach reporting, parent portal, and retention automation while keeping the architecture reusable for many tenants later
 - the backend top-level router is now mounted in `backend/app.py` through explicit modules:
   - `public_catalog_routes`
   - `upload_routes`
@@ -133,13 +162,39 @@ The current inherited truth is:
     - `frontend/src/components/landing/sections/BookingAssistantSection.tsx` now uses a richer loading message that explains intent, locality, and shortlist checks instead of only showing a generic searching bubble
     - the root Next.js homepage shell also moved into a calmer Google-like light-theme pass: the hero now keeps the existing logo and navigation but uses a cleaner search-led above-the-fold composition, while the rest of the page now uses fewer cards, wider whitespace, lighter typography, and quieter white/pale-blue sections instead of the earlier dark glass-heavy landing treatment
   - the live homepage baseline then changed again on `2026-04-24`:
-    - `bookedai.au` now serves the calmer search-first light homepage directly from `frontend/src/apps/public/PublicApp.tsx`, rather than leaving that direction only in the parallel root Next.js shell
+    - `bookedai.au` now redirects to `pitch.bookedai.au` at the production proxy layer so public internet traffic lands on the pitch host instead of serving a separate apex-domain homepage runtime
     - the shipped homepage now keeps the current logo and navigation while presenting a blue search-led hero, quieter white/pale-blue support sections, lighter pricing and FAQ treatment, and the existing live `HomepageSearchExperience` lower on the page
     - production deployment completed through `python3 scripts/telegram_workspace_ops.py deploy-live`, host health passed via `bash scripts/healthcheck_stack.sh`, and a live proof screenshot now exists at `artifacts/screenshots/publicapp-live-2026-04-24.png`
   - the active homepage UX priority then shifted again later on `2026-04-24`:
     - the homepage should now be treated as a responsive web-app workspace first, not a marketing page with extra narrative sections
     - the desired interaction model is closer to current ChatGPT search UX than a stacked landing page: one primary search surface, same-page results, and one adjacent BookedAI booking rail on desktop
     - future homepage work should prefer calmer app-shell structure, tighter copy, stronger responsive behavior, and fewer decorative sections until the core search workspace feels premium enough to stand on its own
+  - the public entry surface then moved one more practical step again on `2026-04-24`:
+    - `frontend/src/apps/public/DemoLandingApp.tsx` is now a dark premium fullscreen chat-first runtime instead of the older story-led demo landing page
+    - the demo host now treats `chat = input`, `booking = output`, and `revenue = outcome` as one connected workspace with a live conversation rail, real result cards, and an inline booking-plus-payment panel
+    - the new demo runtime is wired directly to the BookedAI v1 public flow through `searchCandidates`, booking-path resolution, authoritative `lead + booking intent` creation, and `payment intent` preparation so `demo.bookedai.au` behaves like product proof rather than static marketing
+    - the next required expansion for that host is now explicit: `demo.bookedai.au` should become the canonical first-minute proof of the full BookedAI revenue engine for the Grandmaster Chess Academy use case, which means the surface must next show assessment, placement, subscription-aware payment, coach input, report preview, and retention-loop state instead of stopping at booking intent
+    - that academy-first expansion has now moved one more real step into the shared portal and customer-care lane on `2026-04-24`: the demo flow already persists a parent-facing `academy_report_preview` into booking metadata, and `portal.bookedai.au` must now treat that same booking as a continuing student account with progress context plus managed `reschedule`, `pause`, `downgrade`, and `cancel` request actions rather than a generic one-off booking receipt
+    - that same backend slice has now moved again on `2026-04-24` from booking-metadata-only continuity into the first dedicated academy read model: `backend/migrations/sql/017_academy_snapshot_read_models.sql`, `backend/repositories/academy_repository.py`, and `backend/service_layer/academy_service.py` now persist tenant-scoped `academy_students`, assessment snapshots, enrollment snapshots, report snapshots, and portal-request snapshots so demo, portal, and later retention automation can reopen the same student truth safely
+    - the current academy API contract now also includes dedicated read and retention seams through `/api/v1/academy/students/{student_ref}`, `/api/v1/academy/students/{student_ref}/report-preview`, `/api/v1/academy/students/{student_ref}/enrollment`, `/api/v1/portal/requests/pause`, and `/api/v1/portal/requests/downgrade`, while the existing `/api/v1/reports/preview` flow dual-writes into both booking metadata and the new academy read model for backward-compatible rollout
+    - motion polish for that runtime now uses `framer-motion`, and the UI direction is intentionally closer to Stripe / Linear / OpenAI-grade SaaS product surfaces than to a generic chatbot demo
+    - the hero layer on that same runtime now also follows a stronger ChatGPT-like booking homepage pattern: logo-only top nav, one dominant centered composer, approved quick-booking suggestion chips, instant chip-triggered search, subtler animated gradient atmosphere, and browser voice input for the main prompt
+    - the chat interaction on that runtime is now explicitly optimized for fast booking: BookedAI should ask at most one short clarification first, or a second only when the user answers and one critical detail is still missing, while keeping results visible immediately instead of forcing a long multi-turn intake
+    - the results workspace on that runtime now also behaves like a proper real-time booking panel: desktop uses a `40% chat / 60% results` split, mobile surfaces results in a slide-up bottom sheet, and each result card now shows image, rating, price, availability slots, and a direct `Book Now` action with skeleton loading and hover/fade polish
+    - the primary booking path on the demo host is now inline-modal based: `Book Now` opens a modal, confirmation stays minimal, payment advances through an inline v1 `payment intent` stage, success resolves in-place with confirmation previews, and the old side-panel form no longer acts as the main booking surface
+    - the active `DemoLandingApp` route now points at the modular API-backed demo runtime instead of the older local mock flow, so the shipped demo host uses the same public assistant session, shortlist, booking-intent, and payment-intent contracts that the rest of BookedAI exposes
+    - `/api/v1/payments/intents` now also goes one step further than the earlier additive stub: `stripe_card` can create a real hosted Stripe Checkout session when service pricing is available, `partner_checkout` can hand back the service booking URL directly, and mirror records now persist the resulting `payment_url` plus dependency state for portal and admin follow-up
+    - demo payment state is now truthful to the declared contract: if `/api/v1/payments/intents` returns a real checkout URL the UI opens that secure payment step, and if the API still only has a pending or confirmation-first posture the UI stays in `awaiting confirmation` rather than falsely marking the booking as `paid`
+    - the homepage demo narrative is now also self-playing after `3s` of idle time: BookedAI automatically types a sample tutor query that currently returns live candidates, shows loading and results, opens booking, and advances through the inline booking plus payment-intent flow so a first-time visitor can understand the product in roughly `10s` without touching the UI
+    - the demo host then received a full-flow professional workspace redesign on `2026-04-24`: header status, flow rail, intake composer, academy matches, revenue workflow, booking lock state, payment truth, and parent-report continuity now read as one connected `intent -> assessment -> placement -> booking -> report/retention` product proof across desktop and mobile
+    - the chess connected-agent slice then advanced into subscription and revenue-ops handoff: `POST /api/v1/subscriptions/intents`, `academy_subscription_intents`, and `agent_action_runs` now let a booking-linked academy student create a subscription intent and queue visible revenue-operations actions for confirmation, reminder, CRM sync, report generation, and retention evaluation
+    - the same revenue-ops foundation now also has direct queue seams for report generation and retention evaluation through `POST /api/v1/reports/generate` and `POST /api/v1/retention/evaluate`, both writing auditable action-run records instead of UI-only placeholders
+    - the revenue-ops ledger now has first tenant/admin inspection and control seams through `GET /api/v1/agent-actions`, `GET /api/v1/agent-actions/{action_run_id}`, and `POST /api/v1/agent-actions/{action_run_id}/transition`, so action runs can move beyond `queued` with audit and outbox evidence
+    - the same ledger now has a first tracked worker dispatch seam through `POST /api/v1/agent-actions/dispatch`, backed by `workers/academy_actions.py` and `job_runs`, so queued actions can be processed into `sent`, `completed`, `manual_review`, or `failed` based on current policy instead of relying only on manual transition calls
+    - admin Reliability now surfaces that ledger through `frontend/src/features/admin/revenue-ops-action-ledger.tsx`, giving operators status/action filters, dispatch control, summary counts, and quick complete/manual-review transitions for the chess revenue-ops actions
+    - the demo host then received a follow-up quality pass: desktop results no longer clip, the booking modal is viewport-safe on mobile, result media has a branded fallback, revenue-agent actions render as a clearer handoff timeline, and assessment API failures no longer masquerade as global search failures
+    - the demo host now also has dedicated Playwright live-read regression coverage for that connected-agent proof. The suite locks partial assessment-failure behavior plus a mobile full flow from search through assessment, placement, booking, report preview, and revenue-agent handoff; the QA pass also hardened assessment/placement response normalization, placement slot conversion, fast-answer shortlist continuity, and no-checkout-url payment copy.
+    - the `2026-04-24` go-live release gate then passed across backend booking/payment contracts, pricing/register resilience, portal, academy/revenue-ops routes, frontend build, demo Playwright regression, production deploy, stack healthcheck, CORS preflight, DNS, and browser smoke. The release fixed demo-origin CORS for `/api/v1/conversations/sessions` and corrected `chess.bookedai.au` into a proxied Cloudflare record on the active origin so all current public proof hosts respond through the expected edge path.
   - the same `Phase 7` growth lane then moved one step further on `2026-04-23` into the first messaging foundation:
     - FastAPI admin now exposes `/api/admin/messaging` plus source-specific detail and action routes for unified operator review
     - the first messaging workspace reads from `email_messages`, `outbox_events`, and `crm_sync_records` instead of inventing a disconnected communication-only store
@@ -412,6 +467,7 @@ Current checked-in repo truth:
 - data and infra:
   - `supabase/`, `deploy/`, `scripts/`, `storage/`
 - Telegram/OpenClaw live deploy authority is intentionally scoped to host-level elevated execution on the Docker VPS, with `scripts/deploy_live_host.sh` as the preferred entrypoint
+- production deploy now retries the full `docker-compose.prod.yml` bring-up with orphan cleanup if the first Compose recreate pass fails, and `scripts/healthcheck_stack.sh` validates running production Compose services plus HTTPS probes instead of assuming every service keeps a fixed container name
 - Telegram/OpenClaw elevated repo and host control now flows through `scripts/telegram_workspace_ops.py`, with trusted actor ids and allowed actions sourced from `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` plus `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS`
 
 Future work must not assume the repo is greenfield or single-runtime.
@@ -567,7 +623,6 @@ These items are explicitly open and should not be treated as resolved:
 - the repo still has a dual frontend reality:
   - active Next.js root app
   - legacy Vite subtree
-- two `backend/tests/test_api_v1_routes.py` public-web fallback cases are still failing and belong to the active search-hardening lane
 - tenant billing, invoice, payment-method, and value-reporting experience still need further productization
 - release gates for tenant auth, billing, and portal flows are not yet complete enough to be treated as fully closed
 
@@ -1485,6 +1540,20 @@ The public-surface realignment for `2026-04-23` now also includes a second relea
 - `frontend/src/components/landing/sections/PartnersSection.tsx` now supports an explicit static-data mode, and the pitch surface uses that mode so `pitch.bookedai.au` no longer attempts the cross-origin `/api/partners` fetch that previously produced production CORS noise
 - this keeps the pitch host aligned with the public split already locked in docs: homepage stays lighter, pitch carries the longer-form commercial brief, and product remains the live runtime proof host
 
+## 2026-04-24 Tenant Leads Panel (Slice 6 — Golden Tenant Activation Loop)
+
+The Tenant Leads panel is now live in the tenant workspace as Slice 6 of the Golden Tenant Activation Loop:
+
+- `GET /api/v1/tenant/leads` added to `backend/api/v1_routes.py` — resolves tenant, accepts optional `?status=` filter, returns lead list plus summary counts
+- `build_tenant_leads_snapshot` added to `backend/service_layer/tenant_app_service.py` — derives `needs_follow_up`, `converted`, and `crm_attention` stat card data in addition to the raw lead list
+- `list_tenant_leads` added to `backend/repositories/reporting_repository.py` — LEFT JOIN against `crm_sync_records` for live CRM sync posture per lead; scoped to tenant, filtered, ordered by recency
+- `TenantLeadItem` and `TenantLeadsResponse` added to `frontend/src/shared/contracts/api.ts`
+- `getTenantLeads` added to `frontend/src/shared/api/v1.ts` and registered on the `apiV1` export object
+- Tenant workspace `TenantApp.tsx` extended with the full Leads panel: `'leads'` added to `TenantPanel` union; `leads: TenantLeadsResponse | null` added to `TenantLoadState` ready variant; lazy-load `useEffect` fires on-demand when the user navigates to the panel; filter-reset `useEffect` refetches when `leadsStatusFilter` changes
+- Leads panel renders: summary stat cards, status filter tabs (All / New / Active / Converted), lead list rows with name, status badge, CRM sync badge, follow-up indicator, contact info, service name, formatted date; loading skeletons and empty state
+- swim-aware throughout: Future Swim tenants (`isFutureSwimTenant()`) see "Enquiries" / "Parent enquiries" in all headings; generic tenants see "Leads"
+- build and deploy passed; stack health verified
+
 ## Phase 1.5 Persistence Package Added
 
 The repo now also includes a first persistence implementation package for the next safe migration step.
@@ -1502,3 +1571,34 @@ This package is intended to support:
 - first outbox and idempotency infrastructure
 - first CRM/email/billing lifecycle persistence
 - later booking trust and availability truth work
+
+## 2026-04-24 Pitch Package Booking QA Closeout
+
+The pitch host has now been deep-tested through the package booking path:
+
+- `pitch.bookedai.au` pricing CTAs route to the pitch-host registration flow instead of falling back to the pitch deck runtime
+- package registration submits to the production pricing consultation API from the pitch origin with CORS allowed
+- backend pricing consultation side effects degrade to manual follow-up instead of failing the customer-visible submit when calendar, Stripe, event-store, or dual-write dependencies are unavailable
+- mobile UI polish removed the fixed bottom CTA overlay, tightened package selector wrapping, and adjusted the shared landing footer so brand copy, release badge, and compact icon-led CTA buttons stay readable without horizontal overflow
+- live verification passed on desktop, tablet, and mobile, including a mobile end-to-end confirmation reference `CONS-022CCEA9`
+
+## 2026-04-24 Admin Revenue-Ops Ledger Polish
+
+The chess revenue-ops ledger now has a more operator-ready admin surface inside Reliability:
+
+- tenant-wide summary counts stay visible even while status, action type, student, or booking filters are active
+- operators can filter action runs by student reference and booking reference from the UI
+- action cards expose input and result evidence payloads without leaving the Reliability workspace
+- refresh, dispatch, complete, and manual-review controls use compact icon-led buttons suitable for dense admin workflows
+- migration `018_academy_subscription_and_agent_action_runs.sql` now grants the live `bookedai_app` role access to `academy_subscription_intents` and `agent_action_runs`, fixing the production `permission denied for table agent_action_runs` failure found during live API probing
+- production verification passed for `GET /api/v1/agent-actions` and `POST /api/v1/agent-actions/dispatch`
+
+## 2026-04-24 Full Booking Thank-You Handoff
+
+The customer-facing booking flow now has a consistent end state after a booking or qualified booking enquiry is captured:
+
+- homepage search, product/embedded assistant, Future Swim tenant runtime, and Grandmaster Chess tenant runtime now show a prominent Thank You confirmation after the booking/enquiry result
+- the Thank You state includes a 5-second countdown and an immediate return action
+- after the countdown, the surface returns to the main BookedAI screen automatically
+- homepage search resets back to the main search state, product/embedded assistant returns through the existing main-site close path, and tenant runtimes reset their form state and scroll back to the top
+- live product verification created booking `v1-ce0d20a95d` and observed `200` responses for the lead, booking intent, payment intent, email, SMS, and WhatsApp automation steps before the auto-return

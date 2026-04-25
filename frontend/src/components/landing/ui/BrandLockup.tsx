@@ -16,6 +16,7 @@ type BrandLockupProps = {
   showDescriptor?: boolean;
   showEyebrow?: boolean;
   compact?: boolean;
+  showCompactIcon?: boolean;
   surface?: 'dark' | 'light';
   eyebrowLabel?: string;
 };
@@ -29,6 +30,7 @@ export function BrandLockup({
   showDescriptor = true,
   showEyebrow = true,
   compact = false,
+  showCompactIcon = false,
   surface = 'dark',
   eyebrowLabel = 'Revenue engine',
 }: BrandLockupProps) {
@@ -42,7 +44,7 @@ export function BrandLockup({
 
   return (
     <div className={['flex min-w-0 items-center gap-3', className].filter(Boolean).join(' ')}>
-      {compact ? (
+      {compact && showCompactIcon ? (
         <LogoMark
           variant="icon"
           alt={brandDomainLabel}
@@ -57,7 +59,6 @@ export function BrandLockup({
           alt={brandDomainLabel}
           className={[
             'booked-brand-image booked-brand-image--frameless origin-left',
-            compact ? 'hidden sm:block' : '',
             logoClassName,
           ]
             .filter(Boolean)

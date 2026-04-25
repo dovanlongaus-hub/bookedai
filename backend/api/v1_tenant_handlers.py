@@ -2609,6 +2609,86 @@ async def portal_booking_cancel_request(
 
     return _success_response(result, tenant_id=None, actor_context=None)
 
+async def portal_booking_pause_request(
+    booking_reference: str,
+    request: Request,
+    payload: PortalBookingActionRequestPayload,
+):
+    if not payload.customer_note:
+        return _error_response(
+            ValidationAppError(
+                "Please share the reason for pausing so the academy can suggest the safest next step.",
+                details={"customer_note": ["pause reason is required"]},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        result = await queue_portal_booking_request(
+            session,
+            booking_reference=booking_reference,
+            request_type="pause_request",
+            customer_note=payload.customer_note,
+            preferred_date=None,
+            preferred_time=None,
+            timezone=payload.timezone,
+        )
+        if not result:
+            return _error_response(
+                AppError(
+                    code="portal_booking_not_found",
+                    message="The requested booking reference could not be found for the customer portal.",
+                    status_code=404,
+                    details={"booking_reference": booking_reference},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+        await session.commit()
+
+    return _success_response(result, tenant_id=None, actor_context=None)
+
+async def portal_booking_downgrade_request(
+    booking_reference: str,
+    request: Request,
+    payload: PortalBookingActionRequestPayload,
+):
+    if not payload.customer_note:
+        return _error_response(
+            ValidationAppError(
+                "Please share what needs to change so the academy can suggest the right lower-commitment plan.",
+                details={"customer_note": ["downgrade reason is required"]},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        result = await queue_portal_booking_request(
+            session,
+            booking_reference=booking_reference,
+            request_type="downgrade_request",
+            customer_note=payload.customer_note,
+            preferred_date=None,
+            preferred_time=None,
+            timezone=payload.timezone,
+        )
+        if not result:
+            return _error_response(
+                AppError(
+                    code="portal_booking_not_found",
+                    message="The requested booking reference could not be found for the customer portal.",
+                    status_code=404,
+                    details={"booking_reference": booking_reference},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+        await session.commit()
+
+    return _success_response(result, tenant_id=None, actor_context=None)
+
 async def tenant_catalog_import_website(
     request: Request,
     payload: TenantCatalogImportRequestPayload,

@@ -13,6 +13,7 @@ DOMAIN_API="${DOMAIN_API:-api.bookedai.au}"
 DOMAIN_PRODUCT="${DOMAIN_PRODUCT:-product.bookedai.au}"
 DOMAIN_DEMO="${DOMAIN_DEMO:-demo.bookedai.au}"
 DOMAIN_FUTURESWIM="${DOMAIN_FUTURESWIM:-futureswim.bookedai.au}"
+DOMAIN_CHESS="${DOMAIN_CHESS:-chess.bookedai.au}"
 DOMAIN_PORTAL="${DOMAIN_PORTAL:-portal.bookedai.au}"
 DOMAIN_TENANT="${DOMAIN_TENANT:-tenant.bookedai.au}"
 DOMAIN_PITCH="${DOMAIN_PITCH:-pitch.bookedai.au}"
@@ -57,6 +58,6 @@ ufw allow 443/tcp || true
 ufw --force enable || true
 
 echo "Bootstrap completed."
-echo "DNS must already point ${DOMAIN_ROOT}, ${DOMAIN_WWW}, ${DOMAIN_API}, ${DOMAIN_PRODUCT}, ${DOMAIN_DEMO}, ${DOMAIN_FUTURESWIM}, ${DOMAIN_PORTAL}, ${DOMAIN_TENANT}, ${DOMAIN_PITCH}, ${DOMAIN_N8N}, ${DOMAIN_SUPABASE}, ${DOMAIN_UPLOAD}, ${DOMAIN_CALENDAR}, ${DOMAIN_BOT} to this server."
+echo "DNS must already point ${DOMAIN_ROOT}, ${DOMAIN_WWW}, ${DOMAIN_API}, ${DOMAIN_PRODUCT}, ${DOMAIN_DEMO}, ${DOMAIN_FUTURESWIM}, ${DOMAIN_CHESS}, ${DOMAIN_PORTAL}, ${DOMAIN_TENANT}, ${DOMAIN_PITCH}, ${DOMAIN_N8N}, ${DOMAIN_SUPABASE}, ${DOMAIN_UPLOAD}, ${DOMAIN_CALENDAR}, ${DOMAIN_BOT} to this server."
 echo "Next step:"
 echo "  sudo -u ${DEPLOY_USER} bash scripts/deploy_production.sh"

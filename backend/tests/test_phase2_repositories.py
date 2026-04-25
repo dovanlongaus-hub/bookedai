@@ -13,6 +13,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from repositories.audit_repository import AuditLogRepository
+from repositories.academy_repository import AcademyRepository
 from repositories.base import RepositoryContext
 from repositories.contact_repository import ContactRepository
 from repositories.crm_repository import CrmSyncRepository
@@ -256,6 +257,77 @@ class ContactAndLeadRepositoryTestCase(IsolatedAsyncioTestCase):
         update_statement = execute.await_args_list[2].args[0]
         self.assertIn("coalesce(cast(:source as text), '')", str(lookup_statement).lower())
         self.assertIn("cast(:source as text) is null", str(update_statement).lower())
+
+
+class AcademyRepositoryTestCase(IsolatedAsyncioTestCase):
+    async def test_upsert_student_snapshot_persists_json_payload(self):
+        execute = AsyncMock(
+            return_value=SimpleNamespace(
+                mappings=lambda: SimpleNamespace(
+                    first=lambda: {
+                        "student_id": "student-uuid",
+                        "student_ref": "student_brchess1",
+                    }
+                )
+            )
+        )
+        repository = AcademyRepository(
+            RepositoryContext(
+                session=SimpleNamespace(execute=execute),
+                tenant_id="tenant-test",
+            )
+        )
+
+        row = await repository.upsert_student_snapshot(
+            tenant_id="tenant-test",
+            student_ref="student_brchess1",
+            identity_key="mia|parent@example.com|+61400000000",
+            student_name="Mia",
+            guardian_email="parent@example.com",
+            profile_json={"program_code": "grandmaster_chess_academy"},
+        )
+
+        self.assertEqual(row["student_ref"], "student_brchess1")
+        statement = execute.await_args.args[0]
+        params = execute.await_args.args[1]
+        self.assertIn("insert into academy_students", str(statement).lower())
+        self.assertIn("cast(:profile_json as jsonb)", str(statement).lower())
+        self.assertEqual(
+            params["profile_json"],
+            json.dumps({"program_code": "grandmaster_chess_academy"}),
+        )
+
+    async def test_insert_portal_request_snapshot_writes_json_payload(self):
+        execute = AsyncMock(
+            return_value=SimpleNamespace(
+                scalar_one_or_none=lambda: 21,
+            )
+        )
+        repository = AcademyRepository(
+            RepositoryContext(
+                session=SimpleNamespace(execute=execute),
+                tenant_id="tenant-test",
+            )
+        )
+
+        request_id = await repository.insert_portal_request_snapshot(
+            tenant_id="tenant-test",
+            student_id="00000000-0000-0000-0000-000000000011",
+            booking_intent_id="00000000-0000-0000-0000-000000000012",
+            booking_reference="BR-CHESS-1",
+            request_type="pause",
+            reason_code="busy",
+            request_payload_json={"student_ref": "student_brchess1"},
+        )
+
+        self.assertEqual(request_id, 21)
+        statement = execute.await_args.args[0]
+        params = execute.await_args.args[1]
+        self.assertIn("insert into academy_portal_request_snapshots", str(statement).lower())
+        self.assertEqual(
+            params["request_payload_json"],
+            json.dumps({"student_ref": "student_brchess1"}),
+        )
 
 
 class WebhookEventRepositoryTestCase(IsolatedAsyncioTestCase):

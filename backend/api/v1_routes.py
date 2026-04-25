@@ -94,6 +94,7 @@ from service_layer.tenant_app_service import (
     build_tenant_billing_snapshot,
     build_tenant_catalog_snapshot,
     build_tenant_bookings_snapshot,
+    build_tenant_leads_snapshot,
     build_tenant_integrations_snapshot,
     build_tenant_onboarding_snapshot,
     build_tenant_plugin_interface_snapshot,
@@ -4045,6 +4046,43 @@ async def tenant_bookings(request: Request, authorization: str | None = Header(d
             )
 
         snapshot = await build_tenant_bookings_snapshot(session, tenant_ref=tenant_ref or tenant_id)
+    return _success_response(
+        snapshot,
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role="tenant_admin" if tenant_session else "tenant_preview",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+@router.get("/tenant/leads")
+async def tenant_leads(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    status: str | None = None,
+):
+    tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    async with get_session(request.app.state.session_factory) as session:
+        if not tenant_id:
+            return _error_response(
+                AppError(
+                    code="tenant_not_found",
+                    message="The requested tenant could not be resolved.",
+                    status_code=404,
+                    details={"tenant_ref": tenant_ref},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+        snapshot = await build_tenant_leads_snapshot(
+            session, tenant_ref=tenant_ref or tenant_id, status_filter=status
+        )
     return _success_response(
         snapshot,
         tenant_id=tenant_id,

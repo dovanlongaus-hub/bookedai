@@ -118,6 +118,259 @@ export interface StartChatSessionResponse {
   capabilities: string[];
 }
 
+export interface AssessmentStudentProfileInput {
+  student_name?: string | null;
+  student_age?: number | null;
+  guardian_name?: string | null;
+}
+
+export interface CreateAssessmentSessionRequest {
+  program_code?: string | null;
+  participant?: AssessmentStudentProfileInput | null;
+  context?: Record<string, unknown> | null;
+  actor_context: ApiActorContext;
+}
+
+export interface AssessmentQuestionOption {
+  option_id: string;
+  label: string;
+  description?: string | null;
+}
+
+export interface AssessmentQuestion {
+  question_id: string;
+  prompt: string;
+  helper_text?: string | null;
+  options: AssessmentQuestionOption[];
+}
+
+export interface AssessmentResult {
+  score_total: number;
+  level: string;
+  confidence: 'low' | 'medium' | 'high';
+  recommended_class_type: string;
+  summary: string;
+}
+
+export interface CreateAssessmentSessionResponse {
+  assessment_session_id: string;
+  status: 'in_progress' | 'completed';
+  academy_name: string;
+  answered_count: number;
+  total_questions: number;
+  progress_percent: number;
+  current_question?: AssessmentQuestion | null;
+  result?: AssessmentResult | null;
+}
+
+export interface SubmitAssessmentAnswerRequest {
+  question_id: string;
+  answer_id: string;
+  actor_context: ApiActorContext;
+}
+
+export interface PlacementPlanSummary {
+  plan_key: string;
+  title: string;
+  price_label: string;
+  billing_label: string;
+  recommended: boolean;
+}
+
+export interface PlacementSlotSummary {
+  slot_id: string;
+  label: string;
+  day: string;
+  time: string;
+  class_label: string;
+  seats_remaining: number;
+}
+
+export interface PlacementRecommendationSummary {
+  placement_label: string;
+  class_label: string;
+  level: string;
+  rationale: string[];
+  recommended_candidate_id?: string | null;
+  fallback_candidate_ids: string[];
+  booking_ready_candidate_ids: string[];
+  suggested_plan: PlacementPlanSummary;
+  alternative_plans: PlacementPlanSummary[];
+  available_slots: PlacementSlotSummary[];
+  retention_note?: string | null;
+}
+
+export interface ResolvePlacementRequest {
+  assessment_session_id: string;
+  participant?: AssessmentStudentProfileInput | null;
+  actor_context: ApiActorContext;
+}
+
+export interface ResolvePlacementResponse {
+  assessment_session_id: string;
+  status: 'placement_ready';
+  recommendation: PlacementRecommendationSummary;
+}
+
+export interface AcademyReportPreview {
+  student_name: string;
+  guardian_name: string;
+  headline: string;
+  summary: string;
+  strengths: string[];
+  focus_areas: string[];
+  homework: string[];
+  next_class_suggestion: {
+    class_label: string;
+    slot_label: string;
+    plan_label: string;
+  };
+  parent_cta: string;
+  retention_reasoning: string;
+}
+
+export interface CreateAcademyReportPreviewRequest {
+  booking_reference: string;
+  participant?: AssessmentStudentProfileInput | null;
+  assessment?: AssessmentResult | null;
+  placement?: PlacementRecommendationSummary | null;
+  service_name?: string | null;
+  actor_context: ApiActorContext;
+}
+
+export interface CreateAcademyReportPreviewResponse {
+  booking_reference: string;
+  student_ref?: string | null;
+  report_preview: AcademyReportPreview;
+}
+
+export interface CreateSubscriptionIntentRequest {
+  student_ref?: string | null;
+  booking_reference?: string | null;
+  booking_intent_id?: string | null;
+  plan: {
+    plan_code: string;
+    plan_label?: string | null;
+    amount_aud?: number | null;
+    billing_interval?: string | null;
+  };
+  placement?: PlacementRecommendationSummary | null;
+  actor_context: ApiActorContext;
+  context?: Record<string, unknown> | null;
+}
+
+export interface RevenueAgentActionRun {
+  action_run_id: string;
+  tenant_id?: string | null;
+  agent_type: string;
+  action_type: string;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  booking_reference?: string | null;
+  student_ref?: string | null;
+  status: string;
+  priority: string;
+  reason?: string | null;
+  input?: Record<string, unknown> | null;
+  result?: Record<string, unknown> | null;
+  created_at?: string | null;
+  updated_at?: string | null;
+}
+
+export interface CreateSubscriptionIntentResponse {
+  tenant_id?: string | null;
+  student_ref: string;
+  booking_reference?: string | null;
+  subscription_intent: {
+    subscription_intent_id: string;
+    plan_code: string;
+    plan_label?: string | null;
+    billing_interval: string;
+    amount_aud?: number | null;
+    status: string;
+    checkout_url?: string | null;
+    created_at?: string | null;
+  };
+  queued_actions: RevenueAgentActionRun[];
+  outbox_event_id?: number | string | null;
+  message: string;
+}
+
+export interface ListRevenueAgentActionsRequest {
+  tenant_id?: string | null;
+  tenant_ref?: string | null;
+  channel?: ApiChannel | null;
+  actor_id?: string | null;
+  role?: string | null;
+  deployment_mode?: DeploymentMode | null;
+  student_ref?: string | null;
+  booking_reference?: string | null;
+  status?: string | null;
+  action_type?: string | null;
+  limit?: number | null;
+}
+
+export interface ListRevenueAgentActionsResponse {
+  tenant_id?: string | null;
+  filters: Record<string, unknown>;
+  action_runs: RevenueAgentActionRun[];
+}
+
+export interface TransitionRevenueAgentActionRequest {
+  status: string;
+  note?: string | null;
+  result?: Record<string, unknown> | null;
+  actor_context: ApiActorContext;
+}
+
+export interface TransitionRevenueAgentActionResponse {
+  tenant_id?: string | null;
+  action_run: RevenueAgentActionRun;
+  outbox_event_id?: number | string | null;
+  message: string;
+}
+
+export interface DispatchRevenueAgentActionsRequest {
+  limit?: number;
+  actor_context?: ApiActorContext | null;
+}
+
+export interface DispatchRevenueAgentActionsResponse {
+  job_run_id?: number | null;
+  dispatch_status: string;
+  detail?: string | null;
+  retryable: boolean;
+  metadata: {
+    total_actions?: number;
+    processed_actions?: number;
+    manual_review_actions?: number;
+    failed_actions?: number;
+    [key: string]: unknown;
+  };
+}
+
+export interface QueueRevenueOpsHandoffRequest {
+  booking_reference?: string | null;
+  booking_intent_id?: string | null;
+  lead_id?: string | null;
+  contact_id?: string | null;
+  customer?: Record<string, unknown> | null;
+  service?: Record<string, unknown> | null;
+  lifecycle?: Record<string, unknown> | null;
+  actor_context: ApiActorContext;
+  context?: Record<string, unknown> | null;
+}
+
+export interface QueueRevenueOpsHandoffResponse {
+  tenant_id?: string | null;
+  booking_reference?: string | null;
+  booking_intent_id?: string | null;
+  lead_id?: string | null;
+  queued_actions: RevenueAgentActionRun[];
+  outbox_event_id?: number | string | null;
+  message: string;
+}
+
 export interface V1BookingChannelContext {
   channel: ApiChannel;
   tenant_id?: string | null;
@@ -174,6 +427,7 @@ export interface SearchCandidatesRequest {
     latitude: number;
     longitude: number;
   } | null;
+  chat_context?: Array<{ role: string; content: string }> | null;
 }
 
 export interface MatchRecommendation {
@@ -262,6 +516,48 @@ export interface SearchCandidatesResponse {
   search_diagnostics?: SearchDiagnosticsSummary | null;
 }
 
+export interface CustomerAgentMessage {
+  role: 'user' | 'assistant' | string;
+  content: string;
+}
+
+export interface CustomerAgentTurnRequest {
+  message: string;
+  conversation_id?: string | null;
+  messages?: CustomerAgentMessage[] | null;
+  location?: string | null;
+  preferences?: Record<string, unknown> | null;
+  budget?: Record<string, unknown> | null;
+  time_window?: Record<string, unknown> | null;
+  channel_context: V1BookingChannelContext;
+  attribution?: V1AttributionContext | null;
+  user_location?: {
+    latitude: number;
+    longitude: number;
+  } | null;
+  context?: Record<string, unknown> | null;
+}
+
+export interface CustomerAgentSuggestion {
+  label: string;
+  query: string;
+}
+
+export interface CustomerAgentTurnResponse {
+  agent_turn_id: string;
+  conversation_id: string;
+  reply: string;
+  phase: 'clarify' | 'match' | 'no_match' | string;
+  missing_context: string[];
+  suggestions: CustomerAgentSuggestion[];
+  search?: SearchCandidatesResponse | null;
+  handoff: {
+    next_agent: string;
+    revenue_ops_ready: boolean;
+    reason?: string | null;
+  };
+}
+
 export interface PortalBookingAction {
   id: string;
   label: string;
@@ -342,6 +638,7 @@ export interface PortalBookingDetailResponse {
   status_summary: PortalBookingStatusSummary;
   allowed_actions: PortalBookingAction[];
   support: PortalBookingSupport;
+  academy_report_preview?: AcademyReportPreview | null;
   status_timeline: PortalBookingTimelineItem[];
 }
 
@@ -816,6 +1113,35 @@ export interface TenantBookingsResponse {
     other: number;
   };
   items: TenantOverviewRecentBooking[];
+}
+
+export interface TenantLeadItem {
+  id: string;
+  name: string | null;
+  email: string | null;
+  phone: string | null;
+  status: string | null;
+  source: string | null;
+  service_name: string | null;
+  notes: string | null;
+  follow_up_at: string | null;
+  pipeline_stage: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  crm_sync_status: string;
+  crm_external_id: string | null;
+}
+
+export interface TenantLeadsResponse {
+  tenant: TenantOverviewTenantProfile;
+  summary: {
+    total: number;
+    active: number;
+    needs_follow_up: number;
+    converted: number;
+    crm_attention: number;
+  };
+  items: TenantLeadItem[];
 }
 
 export interface TenantIntegrationsResponse {

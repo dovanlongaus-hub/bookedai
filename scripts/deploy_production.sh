@@ -14,6 +14,7 @@ DOMAIN_BETA="${DOMAIN_BETA:-beta.bookedai.au}"
 DOMAIN_PRODUCT="${DOMAIN_PRODUCT:-product.bookedai.au}"
 DOMAIN_DEMO="${DOMAIN_DEMO:-demo.bookedai.au}"
 DOMAIN_FUTURESWIM="${DOMAIN_FUTURESWIM:-futureswim.bookedai.au}"
+DOMAIN_CHESS="${DOMAIN_CHESS:-chess.bookedai.au}"
 DOMAIN_PORTAL="${DOMAIN_PORTAL:-portal.bookedai.au}"
 DOMAIN_TENANT="${DOMAIN_TENANT:-tenant.bookedai.au}"
 DOMAIN_PITCH="${DOMAIN_PITCH:-pitch.bookedai.au}"
@@ -34,6 +35,7 @@ CERT_DOMAINS=(
   "${DOMAIN_PRODUCT}"
   "${DOMAIN_DEMO}"
   "${DOMAIN_FUTURESWIM}"
+  "${DOMAIN_CHESS}"
   "${DOMAIN_PORTAL}"
   "${DOMAIN_TENANT}"
   "${DOMAIN_PITCH}"
@@ -88,6 +90,8 @@ elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_DEM
   NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_FUTURESWIM}([, ]|$)"; then
   NEEDS_CERT_UPDATE="true"
+elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_CHESS}([, ]|$)"; then
+  NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_PORTAL}([, ]|$)"; then
   NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_TENANT}([, ]|$)"; then
@@ -124,7 +128,12 @@ docker compose \
   --env-file "${SUPABASE_ENV_FILE}" \
   up -d
 
-docker compose -f docker-compose.prod.yml --env-file .env up -d --build
+if ! docker compose -f docker-compose.prod.yml --env-file .env up -d --build; then
+  echo "Production compose up failed; retrying with orphan cleanup..." >&2
+  docker compose -f docker-compose.prod.yml --env-file .env ps >&2 || true
+  docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
+  docker compose -f docker-compose.prod.yml --env-file .env up -d --build --remove-orphans
+fi
 docker compose -f docker-compose.prod.yml --env-file .env restart proxy
 
 bash scripts/provision_n8n_workflows.sh
@@ -134,6 +143,7 @@ echo "App: https://${DOMAIN_ROOT}"
 echo "Beta: https://${DOMAIN_BETA}"
 echo "Product: https://${DOMAIN_PRODUCT}"
 echo "Demo: https://${DOMAIN_DEMO}"
+echo "Chess: https://${DOMAIN_CHESS}"
 echo "Portal: https://${DOMAIN_PORTAL}"
 echo "Tenant: https://${DOMAIN_TENANT}"
 echo "Pitch: https://${DOMAIN_PITCH}"

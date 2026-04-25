@@ -1,6 +1,6 @@
 # BookedAI Current Phase and Sprint Execution Plan
 
-Date: `2026-04-23`
+Date: `2026-04-25`
 
 Document status: `active execution baseline`
 
@@ -23,6 +23,17 @@ This document should now be used as the shortest planning bridge between:
 It exists because the project is no longer in a planning-only state.
 
 BookedAI already has substantial public, backend, tenant, admin, deploy, migration, and release-gate implementation in code, so the next planning baseline must start from what already exists instead of re-planning from a greenfield assumption.
+
+This execution baseline now also assumes a dual-agent product direction:
+
+- a customer-facing `search and conversation agent`
+- a BookedAI-side `revenue operations agent` that continues from lead through retention, billing, reminders, CRM sync, and action orchestration
+
+Latest next-phase update from `2026-04-25`:
+
+- the immediate execution plan after the full-flow QA pass is now documented in `docs/development/next-phase-implementation-plan-2026-04-25.md`
+- current closeout is `Phase 17 - Full-flow stabilization`, covering pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You confirmation, and return to the main BookedAI screen after `5s`
+- the next implementation sequence is now `Phase 18` revenue-ops ledger control, `Phase 19` customer-care/status agent, `Phase 20` widget/plugin runtime, `Phase 21` billing and receivables truth, `Phase 22` reusable tenant templates, and `Phase 23` release governance
 
 ## Source-of-truth inputs
 
@@ -232,6 +243,33 @@ Immediate next sequence after the current reporting baseline:
   - tenant revenue proof and monthly value reporting
 - only after that loop is commercially credible should the next explicit growth slice move into broader `Workflow` definitions and then `Automation`
 
+Immediate agent-specific execution overlay:
+
+- `Slice A - Search and conversation agent hardening`
+  - keep search/chat intake, clarification, shortlist, and booking handoff truthful and fast
+- `Slice B - Revenue operations agent foundation`
+  - create action queues for new leads, incomplete bookings, unpaid bookings, and follow-up due events
+  - trigger email, SMS, WhatsApp, CRM sync, and webhook callbacks from auditable lifecycle policies
+- `Slice C - Customer-state support agent`
+  - allow returning customers to ask for booking, payment, invoice, or status help using verified email, phone, or booking reference
+- `Slice D - Tenant billing and retention agent`
+  - calculate fees, remind overdue tenants, send financial summaries, and flag churn-risk or rescue opportunities
+
+Chess-first execution note:
+
+- the next connected-agent implementation should use `Grandmaster Chess Academy` as the first required proof case
+- do not start by designing the agent platform only as a generic abstraction without closing the chess end-to-end loop
+- the required order is:
+  - chess intake and assessment handoff
+  - chess placement and booking handoff
+  - chess subscription, reminder, and billing actions
+  - chess parent support and retention handling
+  - then reusable multi-tenant generalization
+- the current checked-in step inside that order now includes:
+  - parent-report preview persisted from booking success into portal continuation
+  - portal-safe `reschedule`, `pause`, `downgrade`, and `cancel` request actions for academy follow-up
+  - customer-care portal UX that reads the same academy lifecycle state instead of a disconnected booking-only receipt
+
 ### Next phase deadline
 
 The immediate post-Sprint-16 working cadence is now locked to:
@@ -243,6 +281,18 @@ The immediate post-Sprint-16 working cadence is now locked to:
 - record a rough video over the April 25-26, 2026 weekend
 - deliver the final edit by Sunday, April 26, 2026
 - use Monday, April 27, 2026 for final polish
+
+### Next phase implementation order
+
+The post-release implementation order is now:
+
+1. finish `Phase 17` documentation and GitHub submission for the verified full-flow stabilization work
+2. extend `Phase 18` so admin and tenant operators can inspect, filter, dispatch, transition, and audit revenue-ops action runs
+3. implement `Phase 19` customer-care/status replies using booking, payment, subscription, report, communication, and action-run state
+4. implement `Phase 20` widget/plugin install identity for SME-owned websites and prove one tenant-branded embed flow end to end
+5. implement `Phase 21` billing, receivable, subscription, reminder, and commission truth after the ledger evidence model is stable
+6. generalize `Phase 22` templates from chess and Future Swim only after both verticals remain green through the release gate
+7. make `Phase 23` release governance the closeout requirement for every phase, including tests, traces, rollback notes, memory, Notion, and Discord sync
  
 
 ## Program status by phase
@@ -257,6 +307,8 @@ Delivered baseline:
 - pricing and architecture documents have already moved away from the old chatbot-first framing
 
 Carry-forward work:
+
+- requirement and pitch materials now need to describe the product as an AI agent system, not only a booking/search flow
 
 - keep later sprint docs aligned with the current shipped product baseline instead of older historical assumptions
 - keep homepage, popup assistant, and embedded booking assistant flows aligned so search-state wording, progress treatment, and booking-submit resilience do not drift apart again

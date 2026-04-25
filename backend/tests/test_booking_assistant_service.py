@@ -116,6 +116,38 @@ class BookingAssistantServiceTestCase(IsolatedAsyncioTestCase):
         self.assertTrue(response.matched_services)
         self.assertIsNotNone(response.suggested_service_id)
 
+    async def test_chat_suppresses_wrong_domain_matches_when_core_intent_is_missing(self):
+        response = await self.service.chat(
+            message="cleaner in sydney this weekend",
+            conversation=[
+                BookingAssistantChatMessage(
+                    role="user",
+                    content="cleaner in sydney this weekend",
+                )
+            ],
+            openai_service=_FakeOpenAIService(),
+        )
+
+        self.assertEqual(response.status, "ok")
+        self.assertFalse(response.matched_services)
+        self.assertIsNone(response.suggested_service_id)
+
+    async def test_chat_keeps_domain_matches_when_core_intent_aligns(self):
+        response = await self.service.chat(
+            message="kids swimming lessons in caringbah this weekend",
+            conversation=[
+                BookingAssistantChatMessage(
+                    role="user",
+                    content="kids swimming lessons in caringbah this weekend",
+                )
+            ],
+            openai_service=_FakeOpenAIService(),
+        )
+
+        self.assertEqual(response.status, "ok")
+        self.assertTrue(response.matched_services)
+        self.assertTrue(any("swim" in (service.name or "").lower() for service in response.matched_services))
+
     async def test_search_public_service_candidates_uses_low_reasoning_for_web_search(self):
         captured_request: dict[str, object] = {}
 

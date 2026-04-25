@@ -40,3 +40,5 @@ router.add_api_route("/tenant/revenue-metrics", handlers.tenant_revenue_metrics,
 router.add_api_route("/portal/bookings/{booking_reference}", handlers.portal_booking_detail, methods=["GET"])
 router.add_api_route("/portal/bookings/{booking_reference}/reschedule-request", handlers.portal_booking_reschedule_request, methods=["POST"])
 router.add_api_route("/portal/bookings/{booking_reference}/cancel-request", handlers.portal_booking_cancel_request, methods=["POST"])
+router.add_api_route("/portal/bookings/{booking_reference}/pause-request", handlers.portal_booking_pause_request, methods=["POST"])
+router.add_api_route("/portal/bookings/{booking_reference}/downgrade-request", handlers.portal_booking_downgrade_request, methods=["POST"])

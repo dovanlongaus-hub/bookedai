@@ -187,6 +187,88 @@ class ApiV1SearchRoutesTestCase(TestCase):
         self.assertEqual(payload["meta"]["version"], "v1")
         self.assertEqual(payload["meta"]["tenant_id"], "tenant-test")
 
+    def test_customer_agent_turn_returns_reply_search_and_handoff(self):
+        async def _search_candidates(_request, _payload):
+            return SimpleNamespace(
+                data={
+                    "request_id": "match-test",
+                    "candidates": [
+                        {
+                            "candidate_id": "svc-chess-1",
+                            "provider_name": "Grandmaster Chess Academy",
+                            "service_name": "Kids beginner chess class",
+                            "source_type": "service_catalog",
+                            "summary": "Beginner-friendly class.",
+                            "match_score": 0.92,
+                        }
+                    ],
+                    "recommendations": [
+                        {
+                            "candidate_id": "svc-chess-1",
+                            "reason": "Best fit for a beginner child.",
+                        }
+                    ],
+                    "confidence": {
+                        "score": 0.92,
+                        "reason": "Strong tenant catalog match.",
+                        "gating_state": "high",
+                        "evidence": ["service_catalog"],
+                    },
+                    "warnings": [],
+                    "query_context": {"location_permission_needed": False},
+                    "query_understanding": {
+                        "normalized_query": "kids chess class in sydney this weekend",
+                        "inferred_location": "Sydney",
+                        "location_terms": ["sydney"],
+                        "core_intent_terms": ["chess"],
+                        "expanded_intent_terms": ["chess", "class"],
+                        "constraint_terms": ["kids", "weekend"],
+                        "near_me_requested": False,
+                        "is_chat_style": True,
+                        "requested_date": None,
+                        "requested_time": None,
+                        "schedule_hint": "this weekend",
+                        "party_size": None,
+                        "intent_label": "class_booking",
+                        "summary": "Kids chess class in Sydney this weekend.",
+                    },
+                    "semantic_assist": {
+                        "applied": False,
+                        "evidence": [],
+                    },
+                    "booking_context": {
+                        "summary": "Kids chess class in Sydney this weekend.",
+                    },
+                }
+            )
+
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_search_handlers.search_candidates",
+            _search_candidates,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/agents/customer-turn",
+                json={
+                    "message": "kids chess class in Sydney this weekend",
+                    "conversation_id": "conv-test",
+                    "messages": [{"role": "user", "content": "kids chess"}],
+                    "channel_context": {
+                        "channel": "public_web",
+                        "tenant_id": "tenant-test",
+                        "deployment_mode": "standalone_app",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["conversation_id"], "conv-test")
+        self.assertEqual(payload["data"]["phase"], "match")
+        self.assertTrue(payload["data"]["handoff"]["revenue_ops_ready"])
+        self.assertEqual(payload["data"]["search"]["request_id"], "match-test")
+
     def test_create_lead_returns_validation_error_envelope(self):
         with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub):
             client = TestClient(create_test_app())
@@ -469,7 +551,7 @@ class ApiV1SearchRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["candidates"][0]["booking_path_type"], "request_callback")
         self.assertEqual(
             payload["data"]["candidates"][0]["next_step"],
-            "Route to a callback path so an operator can confirm capacity and policy constraints.",
+            "Submit your group details and the provider will confirm availability and pricing for your party size.",
         )
         self.assertEqual(payload["data"]["warnings"], [])
         self.assertEqual(

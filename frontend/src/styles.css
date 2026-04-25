@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "./theme/minimal-bento-template.css";
 @import "./theme/bookedai-brand-kit.css";
+@import "./theme/bookedai-saas-system.css";
 
 /* ─── Tailwind v4 @theme — Apple Design Tokens ──────────────────────────────── */
 /* Exposes Apple tokens as Tailwind utilities:                                   */

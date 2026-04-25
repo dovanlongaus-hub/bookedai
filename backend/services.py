@@ -3156,22 +3156,28 @@ class PricingService:
         meeting_event_url: str | None = None
 
         if self.zoho_calendar_configured():
-            meeting_join_url, meeting_event_url = await self._create_zoho_calendar_event(
-                consultation_reference=consultation_reference,
-                plan=plan,
-                payload=payload,
-            )
-            meeting_status = "scheduled"
+            try:
+                meeting_join_url, meeting_event_url = await self._create_zoho_calendar_event(
+                    consultation_reference=consultation_reference,
+                    plan=plan,
+                    payload=payload,
+                )
+                meeting_status = "scheduled"
+            except Exception:
+                logger.exception("pricing_consultation_zoho_calendar_failed")
 
         payment_status = "payment_follow_up_required"
         payment_url: str | None = None
         if self.settings.stripe_secret_key:
-            payment_url = await self._create_stripe_checkout_url(
-                consultation_reference=consultation_reference,
-                plan=plan,
-                payload=payload,
-            )
-            payment_status = "stripe_checkout_ready"
+            try:
+                payment_url = await self._create_stripe_checkout_url(
+                    consultation_reference=consultation_reference,
+                    plan=plan,
+                    payload=payload,
+                )
+                payment_status = "stripe_checkout_ready"
+            except Exception:
+                logger.exception("pricing_consultation_stripe_checkout_failed")
 
         email_status = "pending_manual_followup"
         if email_service.smtp_configured():

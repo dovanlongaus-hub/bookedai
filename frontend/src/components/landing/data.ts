@@ -335,17 +335,19 @@ export const brandPositioning =
   'BookedAI turns fragmented enquiries into one visible operating flow for capture, qualification, booking conversion, and follow-up so growth teams, operators, and investors can all understand the revenue path quickly.';
 export const brandHomeUrl = 'https://bookedai.au/';
 export const brandAssetVersion = '20260421-branding-suite';
-export const brandUnifiedLogoPath = `/branding/bookedai-logo-light.webp?v=${brandAssetVersion}`;
+export const brandUploadedLogoPath =
+  'https://upload.bookedai.au/images/0a14/VAEjorVtB4CBewa8CmRmRQ.png';
+export const brandUnifiedLogoPath = brandUploadedLogoPath;
 export const brandPreferredLogoPath = brandUnifiedLogoPath;
-export const brandLogoPath = `/branding/bookedai-logo-light.webp?v=${brandAssetVersion}`;
-export const brandLogoOnDarkPath = `/branding/bookedai-logo-dark.webp?v=${brandAssetVersion}`;
-export const brandLogoBlackPath = `/branding/bookedai-logo-black.webp?v=${brandAssetVersion}`;
-export const brandLogoTransparentPath = `/branding/bookedai-logo-transparent.webp?v=${brandAssetVersion}`;
+export const brandLogoPath = brandUploadedLogoPath;
+export const brandLogoOnDarkPath = brandUploadedLogoPath;
+export const brandLogoBlackPath = brandUploadedLogoPath;
+export const brandLogoTransparentPath = brandUploadedLogoPath;
 export const brandLogoSquarePath = `/branding/bookedai-logo-square-1024.png?v=${brandAssetVersion}`;
 export const brandShortIconPath = `/branding/bookedai-mark-gradient.png?v=${brandAssetVersion}`;
 export const brandFaviconPath = `/branding/bookedai-icon-32.png?v=${brandAssetVersion}`;
-export const brandLandingDarkSurfaceLogoPath = brandLogoOnDarkPath;
-export const brandLandingLightSurfaceLogoPath = `/branding/bookedai-homepage-image.webp?v=${brandAssetVersion}`;
+export const brandLandingDarkSurfaceLogoPath = brandUploadedLogoPath;
+export const brandLandingLightSurfaceLogoPath = brandUploadedLogoPath;
 export const brandContactEmail = 'info@bookedai.au';
 export const brandWhatsAppHref =
   'https://wa.me/14155238886?text=Hi%20BookedAI%2C%20I%20want%20to%20see%20how%20the%20AI%20Revenue%20Engine%20works.';
@@ -692,10 +694,9 @@ export const bookingAssistantContent: BookingAssistantContent = {
   kickerClassName: 'text-rose-400',
   title: '',
   body: '',
-  searchPlaceholder:
-    'Ask for a salon booking, table reservation, clinic consult, event enquiry, kids service, membership help, or AI event...',
+  searchPlaceholder: 'What are you looking to book? e.g. salon, clinic, restaurant, swim class...',
   formIntro: '',
-  submitLabel: 'Create Booking Request',
+  submitLabel: 'Confirm Booking Request',
 };
 
 export const partnersSectionContent: PartnersSectionContent = {

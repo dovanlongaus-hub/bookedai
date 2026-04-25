@@ -10,13 +10,11 @@ import {
   ctaContent,
   demoContent,
   flowSteps,
-  implementationContent,
   metrics,
   partnersSectionContent,
   pricingContent,
   problemCards,
   problemContent,
-  proofContent,
   proofItems,
   showcaseImages,
   solutionCards,
@@ -27,16 +25,6 @@ import {
   faqItems,
 } from '../../components/landing/data';
 import { ArchitectureInfographicSection } from '../../components/landing/sections/ArchitectureInfographicSection';
-import { CallToActionSection } from '../../components/landing/sections/CallToActionSection';
-import { HomepageBrandStatementSection } from '../../components/landing/sections/HomepageBrandStatementSection';
-import { HomepageExecutiveBoardSection } from '../../components/landing/sections/HomepageExecutiveBoardSection';
-import { HomepageOverviewSection } from '../../components/landing/sections/HomepageOverviewSection';
-import { ImplementationSection } from '../../components/landing/sections/ImplementationSection';
-import { PartnersSection } from '../../components/landing/sections/PartnersSection';
-import { PricingSection } from '../../components/landing/sections/PricingSection';
-import { ProductProofSection } from '../../components/landing/sections/ProductProofSection';
-import { TeamSection } from '../../components/landing/sections/TeamSection';
-import { TrustSection } from '../../components/landing/sections/TrustSection';
 import { BrandLockup } from '../../components/landing/ui/BrandLockup';
 import { SectionCard } from '../../components/landing/ui/SectionCard';
 import { SignalPill } from '../../components/landing/ui/SignalPill';
@@ -50,148 +38,113 @@ const productUrl = 'https://product.bookedai.au/';
 const demoLandingUrl = 'https://demo.bookedai.au/';
 
 const pitchNavItems = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'flow-map', label: 'Revenue Path' },
-  { id: 'agent-lane', label: 'Surfaces' },
+  { id: 'hero', label: 'Overview' },
   { id: 'problem', label: 'Problem' },
-  { id: 'engine', label: 'Engine' },
+  { id: 'solution', label: 'Solution' },
+  { id: 'proof', label: 'Product' },
   { id: 'architecture', label: 'Architecture' },
-  { id: 'proof', label: 'Demo' },
-  { id: 'homepage-story', label: 'Homepage Story' },
-  { id: 'team-members', label: 'Team' },
+  { id: 'surfaces', label: 'Surfaces' },
+  { id: 'trust', label: 'Trust' },
+  { id: 'team', label: 'Team' },
   { id: 'pricing', label: 'Pricing' },
 ];
 
-const homepageFlowCards = [
-  {
-    step: '01',
-    title: 'Traffic enters',
-    body: 'Ads, organic search, missed calls, and website enquiries all land in one BookedAI-owned path.',
-    tone: 'from-[#eff6ff] to-white',
-  },
-  {
-    step: '02',
-    title: 'Intent is ranked',
-    body: 'BookedAI qualifies the request, surfaces the best-fit service, and keeps urgency visible.',
-    tone: 'from-[#ecfeff] to-white',
-  },
-  {
-    step: '03',
-    title: 'Booking closes',
-    body: 'Customer details, preferred time, payment readiness, and operator handoff continue without context loss.',
-    tone: 'from-[#f0fdf4] to-white',
-  },
-];
+const industryTypes = ['Salon', 'Tradie', 'Swim School', 'Trades', 'Healthcare'];
 
-const ctaRailCards = [
-  {
-    eyebrow: 'Free setup cohort',
-    title: 'First 10 SMEs get online setup free',
-    body: 'Strongest CTA for buyers who already understand the offer and want BookedAI to launch fast.',
-  },
-  {
-    eyebrow: 'Live product proof',
-    title: 'See the booking flow before you commit',
-    body: 'Keep a demo path nearby so the homepage still feels credible, not brochure-only.',
-  },
-  {
-    eyebrow: 'Commercial clarity',
-    title: 'Plan + setup + performance fee',
-    body: 'Explain the model visually so buyers can move from interest to action without a pricing maze.',
-  },
-];
-
-const investorSignalCards = [
-  {
-    eyebrow: 'Market wedge',
-    title: 'Service SMEs lose revenue in the handoff gap',
-    body: 'BookedAI closes the gap between enquiry, qualification, booking, and follow-up instead of acting like a generic chat widget.',
-  },
-  {
-    eyebrow: 'Commercial model',
-    title: 'Freemium to Pro to Pro Max, then custom only when needed',
-    body: 'The public package story is now simpler to buy and easier to explain in an investor conversation.',
-  },
-  {
-    eyebrow: 'Runtime split',
-    title: 'Homepage sells. Product host proves.',
-    body: 'The apex domain handles acquisition while `product.bookedai.au` carries the live booking and product-trial proof.',
-  },
-];
-
-const pitchAudienceCards = [
-  {
-    eyebrow: 'Buyer brief',
-    title: 'See the offer in one screen',
-    body: 'The top of the pitch now reads like an executive product brief, not a stitched-together landing page.',
-  },
-  {
-    eyebrow: 'Operator brief',
-    title: 'Understand the rollout path fast',
-    body: 'Surface split, workflow depth, pricing, and proof stay visible so teams can decide without extra calls.',
-  },
-  {
-    eyebrow: 'Investor brief',
-    title: 'Track wedge, proof, and expansion logic',
-    body: 'The commercial story stays tight enough for diligence while still pointing back to live product proof.',
-  },
-];
-
-const launchTrackCards = [
-  {
-    label: 'Acquire',
-    value: 'Homepage + pitch',
-    detail: 'Explain the commercial story, trust, and rollout offer.',
-  },
-  {
-    label: 'Prove',
-    value: 'Product host',
-    detail: 'Show the actual search, shortlist, and booking experience.',
-  },
-  {
-    label: 'Convert',
-    value: 'Registration + pricing',
-    detail: 'Carry intent into a clean paid path with fewer handoffs.',
-  },
-];
-
-const decisionRail = [
-  'One public narrative for buyers, partners, and investor conversations.',
-  'One live product surface for search, shortlist, and booking proof.',
-  'One conversion path from launch offer to paid rollout.',
+const problemFunnel = [
+  { step: '01', label: 'Enquiry arrives', sub: 'Customer reaches out via web, phone, or social', alert: false },
+  { step: '02', label: 'Slow reply', sub: 'No immediate response — lead begins to cool', alert: false },
+  { step: '03', label: 'Weak qualification', sub: 'Back-and-forth without capturing real intent', alert: false },
+  { step: '04', label: 'No clear next step', sub: 'Interest stalls — no booking offer surfaced', alert: false },
+  { step: '05', label: 'Lead lost', sub: 'Revenue disappears before staff even see it', alert: true },
 ];
 
 const agentSurfaceCards = [
   {
     eyebrow: 'Product agent',
-    title: 'Live AI booking flow on product.bookedai.au',
-    body: 'Use the dedicated product host for search, shortlist, booking capture, and the smoother booking-details handoff.',
+    title: 'Live AI booking flow',
+    body: 'product.bookedai.au runs the live search, shortlist, booking capture, and operator handoff in one session.',
+    href: productUrl,
+    cta: 'Open Web App',
     tone: 'from-[#eef6ff] to-white',
   },
   {
-    eyebrow: 'Demo narrative',
-    title: 'Keep demo.bookedai.au as the lighter story-led preview',
-    body: 'The demo host now supports explanation and product taste without hijacking the main conversion lane.',
+    eyebrow: 'Demo preview',
+    title: 'Story-led product preview',
+    body: 'demo.bookedai.au stays available as the lighter, explanation-first entry for buyers reviewing the product.',
+    href: demoLandingUrl,
+    cta: 'Open Demo',
     tone: 'from-[#f5f3ff] to-white',
   },
   {
-    eyebrow: 'Conversion continuity',
-    title: 'Homepage CTA stays commercial, product CTA stays operational',
-    body: 'Visitors can move from sales deck to product proof or free-trial registration without being bounced back into the old mixed shell.',
+    eyebrow: 'Commercial homepage',
+    title: 'Product-first landing',
+    body: 'bookedai.au stays lean and fast. The pitch carries the deeper commercial and investor narrative.',
+    href: 'https://bookedai.au/',
+    cta: 'View Homepage',
     tone: 'from-[#ecfdf5] to-white',
   },
 ];
 
-function VisualChip({ children, tone = 'light' }: { children: string; tone?: 'light' | 'dark' | 'brand' }) {
-  const className =
+const pricingPlans = [
+  {
+    tier: 'Freemium',
+    price: 'Free',
+    caption: 'Validate demand capture at zero cost',
+    features: [
+      'AI booking assistant',
+      '1 booking channel',
+      'Basic conversation flow',
+      'Community support',
+    ],
+    highlight: false,
+    cta: 'Get started free',
+  },
+  {
+    tier: 'Pro',
+    price: '$49+/mo',
+    caption: 'Full booking workflow for growing SMEs',
+    features: [
+      'Smart qualification engine',
+      'Multi-channel capture',
+      'Booking conversion analytics',
+      '1 month free at launch',
+      'Priority support',
+    ],
+    highlight: true,
+    cta: 'Start Pro trial',
+  },
+  {
+    tier: 'Pro Max',
+    price: 'Custom',
+    caption: 'Enterprise revenue operations suite',
+    features: [
+      'Full tenant admin workspace',
+      'API integrations',
+      'Performance commission model',
+      'Admin oversight layer',
+      'Dedicated onboarding',
+    ],
+    highlight: false,
+    cta: 'Talk to Sales',
+  },
+];
+
+function VisualChip({
+  children,
+  tone = 'light',
+}: {
+  children: string;
+  tone?: 'light' | 'dark' | 'brand';
+}) {
+  const cls =
     tone === 'dark'
       ? 'bg-[#1d1d1f] text-white'
       : tone === 'brand'
         ? 'bg-[#e7f4ff] text-[#1459c7]'
         : 'bg-white text-[#3c4043]';
-
   return (
-    <div className={`rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] ${className}`}>
+    <div className={`rounded-full px-3 py-2 text-[11px] font-semibold uppercase tracking-[0.14em] ${cls}`}>
       {children}
     </div>
   );
@@ -205,10 +158,7 @@ export function PitchDeckApp() {
     sourceSection: 'header' | 'hero' | 'pricing' | 'call_to_action' | 'footer',
     sourceDetail: string,
   ) {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
+    if (typeof window === 'undefined') return;
     const attribution = buildPublicCtaAttribution({
       source_section: sourceSection,
       source_cta: 'start_free_trial',
@@ -225,16 +175,12 @@ export function PitchDeckApp() {
     if (attribution.source_detail) {
       target.searchParams.set('source_detail', attribution.source_detail);
     }
-
     dispatchPublicCtaAttribution(attribution);
     window.location.href = `${target.pathname}${target.search}`;
   }
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
+    if (typeof window === 'undefined') return;
     const storedLocale = window.localStorage.getItem('bookedai.homepage.locale');
     if (storedLocale === 'en' || storedLocale === 'vi') {
       setLocale(storedLocale);
@@ -242,10 +188,7 @@ export function PitchDeckApp() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
+    if (typeof window === 'undefined') return;
     window.localStorage.setItem('bookedai.homepage.locale', locale);
     document.documentElement.lang = locale;
   }, [locale]);
@@ -278,344 +221,149 @@ export function PitchDeckApp() {
         ]}
       />
 
-      <section id="overview" className="relative mx-auto w-full max-w-7xl px-6 pt-6 lg:px-8 lg:pt-8">
-        <SectionCard className="relative overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#fbfdff_0%,#f6faff_42%,#eef4ff_72%,#f8f5ff_100%)] px-6 py-6 shadow-[0_32px_90px_rgba(15,23,42,0.10)] sm:px-8 sm:py-8 lg:px-10 lg:py-10">
-          <div className="absolute -left-20 top-8 h-48 w-48 rounded-full bg-cyan-400/12 blur-3xl" />
-          <div className="absolute right-0 top-0 h-full w-[44%] bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.10),transparent_42%)]" />
-          <div className="absolute bottom-0 right-10 h-40 w-40 rounded-full bg-emerald-400/8 blur-3xl" />
+      {/* ── 1. HERO ─────────────────────────────────────────────────── */}
+      <section id="hero" className="relative mx-auto w-full max-w-7xl px-6 pt-6 lg:px-8 lg:pt-8">
+        <SectionCard className="relative overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#fbfdff_0%,#f6faff_42%,#eef4ff_72%,#f8f5ff_100%)] px-6 py-8 shadow-[0_32px_90px_rgba(15,23,42,0.10)] sm:px-8 lg:px-10 lg:py-10">
+          <div className="absolute -left-20 top-8 h-56 w-56 rounded-full bg-cyan-400/12 blur-3xl" />
+          <div className="absolute right-0 top-0 h-full w-2/5 bg-[radial-gradient(circle_at_top_right,rgba(139,92,246,0.10),transparent_42%)]" />
 
-          <div className="relative grid gap-6 xl:grid-cols-[1.15fr_0.85fr] xl:items-stretch">
-            <div className="min-w-0">
+          <div className="relative grid items-start gap-8 xl:grid-cols-[1.1fr_0.9fr]">
+            {/* Left: brand narrative + CTAs */}
+            <div className="flex flex-col gap-5">
               <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-                Executive pitch surface
+                Executive pitch · pitch.bookedai.au
               </SignalPill>
 
-              <div className="mt-6 rounded-[2rem] border border-white/70 bg-white/82 p-5 shadow-[0_20px_44px_rgba(15,23,42,0.06)] backdrop-blur">
-                <BrandLockup
-                  surface="light"
-                  className="items-start"
-                  logoClassName="booked-brand-image max-w-[17rem] sm:max-w-[22rem] lg:max-w-[28rem]"
-                  descriptorClassName="hidden"
-                  eyebrowClassName="hidden"
-                />
+              <BrandLockup
+                surface="light"
+                className="items-start"
+                logoClassName="booked-brand-image max-w-[16rem] sm:max-w-[20rem]"
+                descriptorClassName="hidden"
+                eyebrowClassName="hidden"
+              />
 
-                <h1 className="mt-8 max-w-5xl text-4xl font-semibold tracking-[-0.06em] text-[#1d1d1f] sm:text-5xl lg:text-7xl">
-                  BookedAI turns service demand into booking-ready revenue without losing the handoff.
-                </h1>
-                <p className="mt-5 max-w-3xl text-base leading-8 text-black/64 sm:text-lg">
-                  `pitch.bookedai.au` now acts as the clear commercial brief for BookedAI: problem, workflow, proof, architecture, pricing, and rollout path in one place. `bookedai.au` stays lighter and product-first. The product host keeps the live runtime proof.
-                </p>
+              <h1 className="max-w-2xl text-4xl font-semibold tracking-[-0.06em] text-[#1d1d1f] sm:text-5xl lg:text-[3.4rem] lg:leading-[1.09]">
+                Turn service demand into booking-ready revenue — without losing the handoff.
+              </h1>
 
-                <div className="mt-6 grid gap-3 lg:grid-cols-3">
-                  {pitchAudienceCards.map((card) => (
-                    <div key={card.title} className="rounded-[1.35rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/42">{card.eyebrow}</div>
-                      <div className="mt-2 text-sm font-semibold text-[#1d1d1f]">{card.title}</div>
-                      <div className="mt-2 text-sm leading-6 text-black/62">{card.body}</div>
-                    </div>
-                  ))}
-                </div>
-
-                <div className="mt-6 flex flex-wrap gap-2">
-                  <VisualChip tone="brand">Revenue workflow</VisualChip>
-                  <VisualChip tone="light">Investor-readable</VisualChip>
-                  <VisualChip tone="light">Product proof connected</VisualChip>
-                  <VisualChip tone="light">Launch-ready pricing</VisualChip>
-                </div>
-
-                <div className="mt-8 flex flex-wrap gap-3">
-                  <a
-                    href={productUrl}
-                    className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#101828] transition hover:-translate-y-0.5"
-                  >
-                    Open Web App
-                  </a>
-                  <button
-                    type="button"
-                    onClick={() => openRegisterInterest('hero', 'pitch_hero_primary')}
-                    className="rounded-full border border-black/8 bg-white/72 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
-                  >
-                    Talk to Sales
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openRegisterInterest('hero', 'pitch_hero_registration_flow')}
-                    className="rounded-full border border-black/8 px-5 py-3 text-sm font-semibold text-black/66 transition hover:-translate-y-0.5"
-                  >
-                    Claim Free Setup
-                  </button>
-                </div>
-              </div>
-            </div>
-
-            <div className="grid gap-4">
-              <SectionCard className="border border-black/6 bg-white/72 p-5 text-[#1d1d1f] backdrop-blur">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
-                    Launch dashboard
-                  </div>
-                  <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                    Go-to-market ready
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                  {launchTrackCards.map((card) => (
-                    <div
-                      key={card.label}
-                      className="rounded-[1.5rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4"
-                    >
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/46">
-                        {card.label}
-                      </div>
-                      <div className="mt-3 text-2xl font-semibold tracking-[-0.05em] text-[#1d1d1f]">{card.value}</div>
-                      <div className="mt-2 text-sm leading-6 text-black/60">{card.detail}</div>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
-
-              <SectionCard className="border border-black/6 bg-white/72 p-5 text-[#1d1d1f] backdrop-blur">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
-                    Revenue snapshot
-                  </div>
-                  <div className="rounded-full bg-sky-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-700">
-                    Live signals
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
-                  {metrics.map((metric) => (
-                    <div
-                      key={metric.label}
-                      className="rounded-[1.5rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4"
-                    >
-                      <div className="text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f]">{metric.value}</div>
-                      <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
-                        {metric.label}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
-
-              <SectionCard className="border border-black/6 bg-white/72 p-5 text-[#1d1d1f] backdrop-blur">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
-                  Decision rail
-                </div>
-                <div className="mt-4 grid gap-3">
-                  {decisionRail.map((item, index) => (
-                    <div key={item} className="rounded-[1.2rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/40">Decision {index + 1}</div>
-                      <div className="mt-2 text-sm leading-6 text-black/62">{item}</div>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
-
-              <SectionCard className="border border-black/6 bg-white/72 p-5 text-[#1d1d1f] backdrop-blur">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
-                  Executive snapshot
-                </div>
-                <div className="mt-4 grid gap-3">
-                  {investorSignalCards.map((card) => (
-                    <div key={card.title} className="rounded-[1.2rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/40">{card.eyebrow}</div>
-                      <div className="mt-2 text-sm font-semibold text-[#1d1d1f]">{card.title}</div>
-                      <div className="mt-2 text-sm leading-6 text-black/62">{card.body}</div>
-                    </div>
-                  ))}
-                </div>
-              </SectionCard>
-
-              <div className="grid gap-4 sm:grid-cols-2">
-                {proofContent.channels.map((channel) => (
-                  <div
-                    key={channel}
-                    className="rounded-[1.35rem] border border-black/6 bg-white/72 px-4 py-4 text-center text-[12px] font-semibold uppercase tracking-[0.16em] text-black/66 backdrop-blur"
-                  >
-                    {channel}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        </SectionCard>
-      </section>
-
-      <section id="flow-map" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
-        <div className="grid gap-5 xl:grid-cols-[1.08fr_0.92fr]">
-          <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#f8fbff_0%,#ffffff_45%,#f6fff9_100%)] px-6 py-6 sm:px-7 lg:px-8">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <SignalPill className="w-fit bg-[#e0f2fe] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#0369a1]">
-                  Homepage flow map
-                </SignalPill>
-                <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-                  More than a landing page: this is the commercial route into BookedAI.
-                </h2>
-              </div>
-              <div className="rounded-full bg-[#1d1d1f] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
-                Visual CTA spine
-              </div>
-            </div>
-
-            <div className="mt-6 grid gap-4 lg:grid-cols-3">
-              {homepageFlowCards.map((card, index) => (
-                <div
-                  key={card.step}
-                  className={`relative rounded-[1.7rem] border border-black/6 bg-gradient-to-br ${card.tone} px-5 py-5 shadow-[0_18px_36px_rgba(15,23,42,0.06)]`}
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/42">
-                    Stage {card.step}
-                  </div>
-                  <div className="mt-4 text-xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">
-                    {card.title}
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-black/62">{card.body}</p>
-                  {index < homepageFlowCards.length - 1 ? (
-                    <div className="mt-4 hidden h-[2px] w-12 bg-[#1d4ed8] lg:block" />
-                  ) : null}
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-6 py-6 sm:px-7 lg:px-8">
-            <SignalPill className="w-fit bg-[#f3f4f6] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#374151]">
-              CTA rail
-            </SignalPill>
-            <div className="mt-5 grid gap-4">
-              {ctaRailCards.map((card, index) => (
-                <div
-                  key={card.title}
-                  className={`rounded-[1.5rem] border px-5 py-5 ${
-                    index === 0
-                      ? 'border-emerald-200 bg-[linear-gradient(180deg,#ecfdf5_0%,#ffffff_100%)]'
-                      : index === 1
-                        ? 'border-cyan-200 bg-[linear-gradient(180deg,#ecfeff_0%,#ffffff_100%)]'
-                        : 'border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)]'
-                  }`}
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/42">
-                    {card.eyebrow}
-                  </div>
-                  <div className="mt-2 text-lg font-semibold tracking-[-0.03em] text-[#1d1d1f]">
-                    {card.title}
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-black/62">{card.body}</p>
-                </div>
-              ))}
-
-              <div className="grid gap-3 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => openRegisterInterest('hero', 'flow_map_primary_cta')}
-                  className="booked-button justify-center"
-                >
-                  Open SME Registration
-                </button>
-                <a href={productUrl} className="booked-button-secondary justify-center text-center">
-                  Open Web App
-                </a>
-              </div>
-            </div>
-          </SectionCard>
-        </div>
-      </section>
-
-      <section id="agent-lane" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
-        <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_52%,#f6fffb_100%)] px-6 py-6 sm:px-7 lg:px-8">
-          <div className="grid gap-6 xl:grid-cols-[0.88fr_1.12fr] xl:items-start">
-            <div>
-              <SignalPill className="w-fit bg-[#e0f2fe] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#0369a1]">
-                Agent surface split
-              </SignalPill>
-              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-                Separate the live AI agent from the homepage so each surface does one job well.
-              </h2>
-              <p className="mt-4 max-w-xl text-sm leading-7 text-black/60 sm:text-base">
-                `bookedai.au` sells the outcome, `product.bookedai.au` runs the live booking agent,
-                and `demo.bookedai.au` stays available for a lighter story-first preview. That keeps
-                the funnel clearer and stops users from falling back into the older mixed runtime.
+              <p className="max-w-xl text-base leading-8 text-black/60 sm:text-lg">
+                BookedAI is an AI-native revenue operating layer for Australian service businesses.
+                Capture enquiries, qualify intent, rank the best fit, and confirm the booking in one
+                connected commercial flow.
               </p>
 
-              <div className="mt-6 flex flex-wrap gap-3">
-                <a href={productUrl} className="booked-button">
+              {/* Industry type chips */}
+              <div className="flex flex-wrap gap-2">
+                {industryTypes.map((type) => (
+                  <span
+                    key={type}
+                    className="rounded-full border border-black/8 bg-white/80 px-3.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-black/58 backdrop-blur"
+                  >
+                    {type}
+                  </span>
+                ))}
+              </div>
+
+              {/* Primary CTAs */}
+              <div className="flex flex-wrap gap-3">
+                <a
+                  href={productUrl}
+                  className="rounded-full bg-[#1d1d1f] px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#111]"
+                >
                   Open Web App
                 </a>
                 <button
                   type="button"
-                  onClick={() => openRegisterInterest('hero', 'agent_lane_trial')}
-                  className="booked-button-secondary"
+                  onClick={() => openRegisterInterest('hero', 'pitch_hero_sales')}
+                  className="rounded-full border border-black/12 bg-white/80 px-6 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
                 >
-                  Open SME Registration
+                  Talk to Sales
                 </button>
                 <button
                   type="button"
-                  onClick={openDemoLanding}
-                  className="booked-button-secondary"
+                  onClick={() => openRegisterInterest('hero', 'pitch_hero_free_setup')}
+                  className="rounded-full border border-black/8 px-6 py-3 text-sm font-semibold text-black/52 transition hover:-translate-y-0.5"
                 >
-                  Open Demo Page
+                  Claim Free Setup
                 </button>
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
-              {agentSurfaceCards.map((card) => (
-                <div
-                  key={card.title}
-                  className={`rounded-[1.6rem] border border-black/6 bg-gradient-to-br ${card.tone} px-5 py-5 shadow-[0_18px_36px_rgba(15,23,42,0.05)]`}
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/42">
-                    {card.eyebrow}
-                  </div>
-                  <div className="mt-3 text-lg font-semibold tracking-[-0.03em] text-[#1d1d1f]">
-                    {card.title}
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-black/62">{card.body}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        </SectionCard>
-      </section>
+            {/* Right: Scene image + key metrics */}
+            <div className="flex flex-col gap-4">
+              <div className="overflow-hidden rounded-[1.75rem] border border-black/6 shadow-[0_20px_50px_rgba(15,23,42,0.12)]">
+                <img
+                  src="/branding/bookedai-scene3-local-impact.png"
+                  alt="Local SMEs losing revenue daily — BookedAI closes the gap"
+                  className="w-full object-cover"
+                />
+              </div>
 
-      <section id="problem" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
-        <div className="grid gap-5 xl:grid-cols-[0.82fr_1.18fr]">
-          <SectionCard className="overflow-hidden px-6 py-6 sm:px-7 lg:px-8">
-            <SignalPill className="w-fit bg-[#eef2ff] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#3248a8]">
-              {problemContent.kicker}
-            </SignalPill>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-              {problemContent.title}
-            </h2>
-            <p className="mt-4 max-w-xl text-sm leading-7 text-black/60 sm:text-base">{problemContent.body}</p>
-
-            <div className="mt-6 rounded-[1.7rem] bg-[linear-gradient(180deg,#fff6f1_0%,#ffffff_100%)] p-5">
-              <div className="grid gap-3">
-                {[
-                  'Enquiry arrives',
-                  'Slow reply',
-                  'Weak qualification',
-                  'No next step',
-                  'Lead lost',
-                ].map((item, index) => (
-                  <div key={item} className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1d1d1f] text-[11px] font-semibold text-white">
-                      {index + 1}
+              <div className="grid grid-cols-3 gap-3">
+                {metrics.map((metric) => (
+                  <div
+                    key={metric.label}
+                    className="rounded-[1.35rem] border border-black/6 bg-white/80 px-4 py-4 text-center backdrop-blur"
+                  >
+                    <div className="text-2xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-3xl">
+                      {metric.value}
                     </div>
-                    <div className="flex-1 rounded-[1rem] border border-black/6 bg-white px-4 py-3 text-sm font-semibold text-[#1d1d1f]">
-                      {item}
+                    <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-black/44">
+                      {metric.label}
                     </div>
                   </div>
                 ))}
               </div>
             </div>
+          </div>
+        </SectionCard>
+      </section>
+
+      {/* ── 2. PROBLEM ──────────────────────────────────────────────── */}
+      <section id="problem" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+        <div className="grid gap-5 xl:grid-cols-[0.88fr_1.12fr] xl:items-start">
+          {/* Left: headline + funnel */}
+          <SectionCard className="overflow-hidden bg-[linear-gradient(180deg,#fff8f5_0%,#ffffff_100%)] px-6 py-6 sm:px-7 lg:px-8">
+            <SignalPill className="w-fit bg-[#fff0eb] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#b44a1f]">
+              {problemContent.kicker}
+            </SignalPill>
+            <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
+              {problemContent.title}
+            </h2>
+            <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">{problemContent.body}</p>
+
+            <div className="mt-6 space-y-2">
+              {problemFunnel.map(({ step, label, sub, alert }) => (
+                <div
+                  key={step}
+                  className={`flex items-center gap-4 rounded-[1.1rem] border px-4 py-3 ${
+                    alert
+                      ? 'border-red-200 bg-[linear-gradient(90deg,#fff1f2_0%,#ffffff_100%)]'
+                      : 'border-black/6 bg-white'
+                  }`}
+                >
+                  <div
+                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-[11px] font-bold ${
+                      alert ? 'bg-red-500 text-white' : 'bg-[#1d1d1f] text-white'
+                    }`}
+                  >
+                    {step}
+                  </div>
+                  <div>
+                    <div
+                      className={`text-sm font-semibold ${alert ? 'text-red-600' : 'text-[#1d1d1f]'}`}
+                    >
+                      {label}
+                    </div>
+                    <div className="text-[11px] text-black/46">{sub}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </SectionCard>
 
-          <div className="grid gap-4 md:grid-cols-3">
+          {/* Right: 3 leak point cards */}
+          <div className="grid gap-4 md:grid-cols-3 xl:grid-cols-1">
             {problemCards.map((card, index) => (
               <SectionCard
                 key={card.title}
@@ -627,90 +375,96 @@ export function PitchDeckApp() {
                       : 'bg-[linear-gradient(180deg,#fefce8_0%,#ffffff_100%)]'
                 }`}
               >
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/40">Leak point</div>
-                <div className="mt-6 h-28 rounded-[1.4rem] border border-black/6 bg-white/80 p-4">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/38">
+                  Revenue leak
+                </div>
+                <div className="mt-4 h-24 rounded-[1.2rem] border border-black/6 bg-white/80 p-4">
                   <div className="flex h-full items-end gap-2">
-                    {[40, 62, 86].map((height, barIndex) => (
+                    {[36, 56, 80].map((height, i) => (
                       <div
-                        key={`${card.title}-${height}`}
-                        className={`flex-1 rounded-t-[1rem] ${
-                          barIndex === 2 ? 'bg-[#1d4ed8]' : 'bg-black/10'
-                        }`}
+                        key={i}
+                        className={`flex-1 rounded-t-[0.8rem] ${i === 2 ? 'bg-red-400' : 'bg-black/10'}`}
                         style={{ height }}
                       />
                     ))}
                   </div>
                 </div>
-                <h3 className="mt-5 text-xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">{card.title}</h3>
-                <p className="mt-3 text-sm leading-6 text-black/62">{card.body}</p>
+                <h3 className="mt-5 text-xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">
+                  {card.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-black/58">{card.body}</p>
               </SectionCard>
             ))}
           </div>
         </div>
       </section>
 
-      <section id="engine" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
-        <SectionCard className="overflow-hidden px-6 py-6 sm:px-7 lg:px-8">
-          <div className="grid gap-6 xl:grid-cols-[0.88fr_1.12fr]">
+      {/* ── 3. SOLUTION ─────────────────────────────────────────────── */}
+      <section id="solution" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+        <SectionCard className="overflow-hidden bg-[linear-gradient(135deg,#f0fdf4_0%,#ffffff_45%,#f0f9ff_100%)] px-6 py-6 sm:px-7 lg:px-8">
+          <div className="grid gap-8 xl:grid-cols-[0.9fr_1.1fr] xl:items-start">
+            {/* Left: narrative + cards */}
             <div>
-              <SignalPill className="w-fit bg-[#ecfeff] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#0f766e]">
+              <SignalPill className="w-fit bg-[#dcfce7] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#15803d]">
                 {solutionContent.kicker}
               </SignalPill>
-              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
+              <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
                 {solutionContent.title}
               </h2>
-              <p className="mt-4 max-w-xl text-sm leading-7 text-black/60 sm:text-base">{solutionContent.body}</p>
+              <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">{solutionContent.body}</p>
 
-              <div className="mt-6 grid gap-3">
+              <div className="mt-6 space-y-3">
                 {solutionCards.map((card, index) => (
                   <div
                     key={card.title}
-                    className="rounded-[1.35rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4"
+                    className="flex items-start gap-4 rounded-[1.35rem] border border-black/6 bg-white/72 px-4 py-4 backdrop-blur"
                   >
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-[1rem] bg-[#1d1d1f] text-[11px] font-semibold text-white">
-                        0{index + 1}
-                      </div>
-                      <div>
-                        <div className="text-base font-semibold text-[#1d1d1f]">{card.title}</div>
-                        <div className="mt-1 text-sm leading-6 text-black/60">{card.body}</div>
-                      </div>
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[0.9rem] bg-[#1d1d1f] text-[11px] font-bold text-white">
+                      0{index + 1}
+                    </div>
+                    <div>
+                      <div className="text-sm font-semibold text-[#1d1d1f]">{card.title}</div>
+                      <div className="mt-1 text-sm leading-6 text-black/56">{card.body}</div>
                     </div>
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="grid gap-4">
-              <div className="rounded-[2rem] bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_52%,#f0fdf4_100%)] p-5">
-                <div className="grid gap-4 md:grid-cols-4">
+            {/* Right: flow rail + proof items */}
+            <div className="space-y-4">
+              <div className="rounded-[1.75rem] bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_52%,#f0fdf4_100%)] p-5">
+                <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/38">
+                  Revenue flow
+                </div>
+                <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   {flowSteps.map((step, index) => (
-                    <div key={step} className="relative">
-                      <div className="rounded-[1.5rem] border border-black/6 bg-white p-4 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/38">
-                          Stage {index + 1}
-                        </div>
-                        <div className="mt-5 text-base font-semibold tracking-[-0.03em] text-[#1d1d1f]">{step}</div>
+                    <div key={step} className="rounded-[1.35rem] border border-black/6 bg-white p-4 shadow-sm">
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/36">
+                        Step {index + 1}
                       </div>
-                      {index < flowSteps.length - 1 ? (
-                        <div className="hidden md:block">
-                          <div className="absolute right-[-12px] top-1/2 h-[2px] w-6 -translate-y-1/2 bg-[#1d4ed8]" />
-                        </div>
-                      ) : null}
+                      <div className="mt-3 text-sm font-semibold tracking-[-0.02em] text-[#1d1d1f]">
+                        {step}
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-3 md:grid-cols-3 xl:grid-cols-1">
                 {proofItems.map((item) => (
-                  <SectionCard key={item.title} className="h-full bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] p-5">
+                  <div
+                    key={item.title}
+                    className="rounded-[1.35rem] border border-black/6 bg-white/72 px-4 py-4 backdrop-blur"
+                  >
                     <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
                       {item.eyebrow}
                     </div>
-                    <h3 className="mt-4 text-xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">{item.title}</h3>
-                    <p className="mt-3 text-sm leading-6 text-black/60">{item.body}</p>
-                  </SectionCard>
+                    <h3 className="mt-3 text-base font-semibold tracking-[-0.02em] text-[#1d1d1f]">
+                      {item.title}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-black/56">{item.body}</p>
+                  </div>
                 ))}
               </div>
             </div>
@@ -718,62 +472,91 @@ export function PitchDeckApp() {
         </SectionCard>
       </section>
 
-      <ArchitectureInfographicSection />
-
+      {/* ── 4. PRODUCT PROOF ────────────────────────────────────────── */}
       <section id="proof" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
-        <div className="grid gap-5 xl:grid-cols-[1.02fr_0.98fr]">
+        <div className="grid gap-5 xl:grid-cols-2">
+          {/* Left: UI screenshots */}
           <SectionCard className="overflow-hidden px-6 py-6 sm:px-7 lg:px-8">
             <SignalPill className="w-fit bg-[#f5f3ff] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#6d28d9]">
               Product proof
             </SignalPill>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-              Search, shortlist, decision, booking. One premium visual flow.
+            <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
+              Search, shortlist, decision, booking — one premium visual flow.
             </h2>
 
             <div className="mt-6 grid gap-4 sm:grid-cols-3">
               {showcaseImages.map((image) => (
-                <div key={image.src} className="overflow-hidden rounded-[1.7rem] border border-black/6 bg-white">
+                <div
+                  key={image.src}
+                  className="overflow-hidden rounded-[1.5rem] border border-black/6 bg-white"
+                >
                   <div className="aspect-[4/4.8] overflow-hidden">
-                    <img src={image.src} alt={image.alt} className="h-full w-full object-cover" loading="lazy" />
+                    <img
+                      src={image.src}
+                      alt={image.alt}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
                   <div className="p-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/40">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/38">
                       {image.eyebrow}
                     </div>
-                    <div className="mt-2 text-sm font-semibold leading-6 text-[#1d1d1f]">{image.title}</div>
+                    <div className="mt-2 text-sm font-semibold leading-5 text-[#1d1d1f]">
+                      {image.title}
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
+
+            <div className="mt-6 flex gap-3">
+              <a href={productUrl} className="booked-button">
+                Open Web App
+              </a>
+              <button type="button" onClick={openDemoLanding} className="booked-button-secondary">
+                Open Demo
+              </button>
+            </div>
           </SectionCard>
 
-          <div className="grid gap-4">
+          {/* Right: proof storyboard */}
+          <div className="flex flex-col gap-5">
             {proofStoryboard.map((result, index) => (
-              <SectionCard key={`${result.name}-${index}`} className="overflow-hidden p-0">
-                <div className="grid gap-0 md:grid-cols-[0.95fr_1.05fr]">
+              <SectionCard key={`${result.name}-${index}`} className="flex-1 overflow-hidden p-0">
+                <div className="grid md:grid-cols-[0.95fr_1.05fr]">
                   <div className="aspect-[4/3] overflow-hidden bg-slate-100">
-                    <img src={result.imageUrl} alt={result.name} className="h-full w-full object-cover" loading="lazy" />
+                    <img
+                      src={result.imageUrl}
+                      alt={result.name}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
                   <div className="p-5 lg:p-6">
                     <div className="flex flex-wrap items-center gap-2">
-                      <VisualChip tone="brand">{index === 0 ? demoContent.topPickLabel : demoContent.nearbyDiningSearch.label}</VisualChip>
+                      <VisualChip tone="brand">
+                        {index === 0
+                          ? demoContent.topPickLabel
+                          : demoContent.nearbyDiningSearch.label}
+                      </VisualChip>
                       <VisualChip>{result.category}</VisualChip>
                     </div>
-                    <h3 className="mt-4 text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">{result.name}</h3>
-                    <p className="mt-3 text-sm leading-6 text-black/62">{result.summary}</p>
-
-                    <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                    <h3 className="mt-4 text-xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">
+                      {result.name}
+                    </h3>
+                    <p className="mt-2 text-sm leading-6 text-black/58">{result.summary}</p>
+                    <div className="mt-4 grid grid-cols-3 gap-2">
                       {[result.priceLabel, result.timingLabel, result.locationLabel].map((item) => (
                         <div
                           key={item}
-                          className="rounded-[1rem] border border-black/6 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-3 py-3 text-xs font-semibold uppercase tracking-[0.08em] text-[#1d1d1f]"
+                          className="rounded-[0.9rem] border border-black/6 bg-[#f8fbff] px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#1d1d1f]"
                         >
                           {item}
                         </div>
                       ))}
                     </div>
-
-                    <div className="mt-5 rounded-[1.25rem] bg-[#1d1d1f] px-4 py-4 text-sm leading-6 text-white/82">
+                    <div className="mt-4 rounded-[1.1rem] bg-[#1d1d1f] px-4 py-3 text-sm leading-6 text-white/80">
                       {result.bestFor}
                     </div>
                   </div>
@@ -784,94 +567,57 @@ export function PitchDeckApp() {
         </div>
       </section>
 
-      <section className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
-        <div className="grid gap-5 xl:grid-cols-[0.9fr_1.1fr]">
-          <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f6fbff_50%,#f0fdf4_100%)] px-6 py-6 text-[#1d1d1f] shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:px-7 lg:px-8">
-            <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-              Trust + fit
-            </SignalPill>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-              Built for service operators, not generic chatbot theatre.
-            </h2>
+      {/* ── 5. ARCHITECTURE ─────────────────────────────────────────── */}
+      <ArchitectureInfographicSection />
 
-            <div className="mt-6 grid gap-4">
-              {trustItems.map((item) => (
-                <div key={item.name} className="rounded-[1.5rem] border border-black/6 bg-white/72 p-4 backdrop-blur">
-                  <div className="text-sm leading-7 text-black/70">“{item.quote}”</div>
-                  <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
-                    {item.name} • {item.business}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-
-          <SectionCard className="px-6 py-6 sm:px-7 lg:px-8">
-            <SignalPill className="w-fit bg-[#f0fdf4] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#15803d]">
-              Partners story
-            </SignalPill>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-              {partnersSectionContent.title}
-            </h2>
-
-            <div className="mt-6 grid gap-4 md:grid-cols-3">
-              {partnersSectionContent.stats.map((stat, index) => (
-                <div
-                  key={stat}
-                  className={`rounded-[1.5rem] p-5 ${
-                    index === 0
-                      ? 'bg-[linear-gradient(180deg,#eef2ff_0%,#ffffff_100%)]'
-                      : index === 1
-                        ? 'bg-[linear-gradient(180deg,#ecfeff_0%,#ffffff_100%)]'
-                        : 'bg-[linear-gradient(180deg,#f0fdf4_0%,#ffffff_100%)]'
-                  }`}
-                >
-                  <div className="flex h-16 items-center justify-center rounded-[1.2rem] border border-black/6 bg-white text-[10px] font-semibold uppercase tracking-[0.16em] text-black/45">
-                    Signal {index + 1}
-                  </div>
-                  <p className="mt-4 text-sm leading-6 text-black/68">{stat}</p>
-                </div>
-              ))}
-            </div>
-          </SectionCard>
-        </div>
-      </section>
-
-      <section id="homepage-story" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
-        <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_48%,#f3f7ff_100%)] px-6 py-6 shadow-[0_24px_80px_rgba(15,23,42,0.08)] sm:px-7 lg:px-8">
-          <div className="grid gap-6 xl:grid-cols-[0.78fr_1.22fr] xl:items-start">
+      {/* ── 6. SURFACES ─────────────────────────────────────────────── */}
+      <section id="surfaces" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+        <SectionCard className="overflow-hidden bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_52%,#f6fffb_100%)] px-6 py-6 sm:px-7 lg:px-8">
+          <div className="grid gap-8 xl:grid-cols-[0.82fr_1.18fr] xl:items-center">
             <div>
-              <SignalPill className="w-fit border border-black/6 bg-white/80 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-                Migrated from homepage
+              <SignalPill className="w-fit bg-[#e0f2fe] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#0369a1]">
+                Product surfaces
               </SignalPill>
-              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-                The longer-form homepage story now belongs here.
+              <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
+                Separate surfaces. Each one does a single job.
               </h2>
-              <p className="mt-4 max-w-xl text-sm leading-7 text-black/62 sm:text-base">
-                `bookedai.au` is being simplified into a cleaner product-first landing page. The deeper narrative, board framing, architecture, broader proof, team, partner, trust, and pricing story now stay together inside `pitch.bookedai.au`.
+              <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">
+                The pitch keeps the commercial narrative. The product host runs the live booking
+                agent. The demo stays light and explanation-first. No mixed runtime, no context loss.
               </p>
-              <div className="mt-6 grid gap-3">
-                {[
-                  'Homepage stays fast, shorter, and product-entry-first.',
-                  'Pitch becomes the canonical long-form public narrative.',
-                  'The product host remains the deeper live runtime proof lane.',
-                ].map((point) => (
-                  <div key={point} className="rounded-[1.2rem] border border-black/6 bg-white/78 px-4 py-4 text-sm leading-6 text-black/68">
-                    {point}
-                  </div>
-                ))}
+              <div className="mt-6 flex flex-wrap gap-3">
+                <a href={productUrl} className="booked-button">
+                  Open Web App
+                </a>
+                <button
+                  type="button"
+                  onClick={() => openRegisterInterest('hero', 'surfaces_register')}
+                  className="booked-button-secondary"
+                >
+                  SME Registration
+                </button>
               </div>
             </div>
 
-            <div className="grid gap-3 md:grid-cols-3">
-              {[
-                { title: 'Brand statement', body: 'Keep the compact positioning layer here instead of crowding the homepage.' },
-                { title: 'Executive framing', body: 'Preserve investor-readable board context in the pitch, not in the first product screen.' },
-                { title: 'Architecture + proof', body: 'Let the deeper narrative live beside proof instead of splitting it across surfaces.' },
-              ].map((card) => (
-                <div key={card.title} className="rounded-[1.35rem] border border-black/6 bg-white p-4">
-                  <div className="text-sm font-semibold text-[#1d1d1f]">{card.title}</div>
-                  <p className="mt-2 text-sm leading-6 text-black/60">{card.body}</p>
+            <div className="grid gap-4 md:grid-cols-3">
+              {agentSurfaceCards.map((card) => (
+                <div
+                  key={card.title}
+                  className={`flex flex-col rounded-[1.6rem] border border-black/6 bg-gradient-to-br ${card.tone} px-5 py-5 shadow-sm`}
+                >
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/40">
+                    {card.eyebrow}
+                  </div>
+                  <div className="mt-3 text-base font-semibold tracking-[-0.02em] text-[#1d1d1f]">
+                    {card.title}
+                  </div>
+                  <p className="mt-2 flex-1 text-sm leading-6 text-black/58">{card.body}</p>
+                  <a
+                    href={card.href}
+                    className="mt-4 self-start rounded-full border border-black/8 bg-white/80 px-4 py-2 text-xs font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
+                  >
+                    {card.cta}
+                  </a>
                 </div>
               ))}
             </div>
@@ -879,75 +625,138 @@ export function PitchDeckApp() {
         </SectionCard>
       </section>
 
-      <HomepageBrandStatementSection />
-      <HomepageExecutiveBoardSection />
-      <ProductProofSection
-        content={proofContent}
-        items={proofItems}
-        onStartTrial={openProductDemo}
-        onBookDemo={() => openRegisterInterest('call_to_action', 'pitch_migrated_homepage_product_proof')}
-      />
-      <HomepageOverviewSection
-        onStartTrial={openProductDemo}
-        onBookDemo={() => openRegisterInterest('call_to_action', 'pitch_migrated_homepage_overview')}
-      />
-      <ImplementationSection content={implementationContent} />
-      <TrustSection items={trustItems} faqItems={faqItems} />
-      <PartnersSection
-        content={partnersSectionContent}
-        onStartTrial={openProductDemo}
-        onBookDemo={() => openRegisterInterest('call_to_action', 'pitch_migrated_homepage_partners')}
-        preferStaticData
-      />
+      {/* ── 7. TRUST + PARTNERS ─────────────────────────────────────── */}
+      <section id="trust" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+        <div className="grid gap-5 xl:grid-cols-2">
+          {/* Operator voices */}
+          <SectionCard className="overflow-hidden bg-[linear-gradient(135deg,#ffffff_0%,#f6fbff_50%,#f0fdf4_100%)] px-6 py-6 sm:px-7 lg:px-8">
+            <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
+              Operator voices
+            </SignalPill>
+            <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f] sm:text-3xl">
+              Built for service operators, not generic chatbot theatre.
+            </h2>
+            <div className="mt-6 space-y-3">
+              {trustItems.map((item) => (
+                <div
+                  key={item.name}
+                  className="rounded-[1.35rem] border border-black/6 bg-white/72 p-4 backdrop-blur"
+                >
+                  <p className="text-sm leading-7 text-black/68">"{item.quote}"</p>
+                  <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.13em] text-black/42">
+                    {item.name} · {item.business}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </SectionCard>
 
-      <section id="team-members" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+          {/* Partners + FAQ */}
+          <SectionCard className="overflow-hidden px-6 py-6 sm:px-7 lg:px-8">
+            <SignalPill className="w-fit bg-[#f0fdf4] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#15803d]">
+              {partnersSectionContent.kicker}
+            </SignalPill>
+            <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f] sm:text-3xl">
+              {partnersSectionContent.title}
+            </h2>
+
+            <div className="mt-5 grid gap-3 md:grid-cols-3 xl:grid-cols-1">
+              {partnersSectionContent.stats.map((stat, index) => (
+                <div
+                  key={stat}
+                  className={`rounded-[1.25rem] p-4 ${
+                    index === 0
+                      ? 'bg-[linear-gradient(180deg,#eef2ff_0%,#ffffff_100%)]'
+                      : index === 1
+                        ? 'bg-[linear-gradient(180deg,#ecfeff_0%,#ffffff_100%)]'
+                        : 'bg-[linear-gradient(180deg,#f0fdf4_0%,#ffffff_100%)]'
+                  }`}
+                >
+                  <p className="text-sm leading-6 text-black/62">{stat}</p>
+                </div>
+              ))}
+            </div>
+
+            <div className="mt-5 space-y-2">
+              {faqItems.map((item) => (
+                <details
+                  key={item.question}
+                  className="rounded-[1.2rem] border border-black/6 bg-white/72 px-4 py-3 backdrop-blur"
+                >
+                  <summary className="cursor-pointer list-none text-sm font-semibold text-[#1d1d1f] marker:hidden">
+                    {item.question}
+                  </summary>
+                  <p className="mt-3 text-sm leading-6 text-black/58">{item.answer}</p>
+                </details>
+              ))}
+            </div>
+          </SectionCard>
+        </div>
+      </section>
+
+      {/* ── 8. TEAM ─────────────────────────────────────────────────── */}
+      <section id="team" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
         <SectionCard className="overflow-hidden px-6 py-6 sm:px-7 lg:px-8">
-          <div className="grid gap-6 xl:grid-cols-[0.72fr_1.28fr]">
+          <div className="grid gap-8 xl:grid-cols-[0.72fr_1.28fr] xl:items-start">
             <div>
               <SignalPill className="w-fit bg-[#eef2ff] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#4338ca]">
                 {teamSectionContent.kicker}
               </SignalPill>
-              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
+              <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
                 Built by operators, engineers, and execution-minded founders
               </h2>
-              <p className="mt-4 max-w-xl text-sm leading-7 text-black/60 sm:text-base">{teamSectionContent.body}</p>
+              <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">
+                {teamSectionContent.body}
+              </p>
 
-              <div className="mt-6 grid gap-3">
+              <div className="mt-6 space-y-2">
                 {[
                   'Technical depth across backend, systems, AI, and product delivery.',
                   'Commercial, quality, and operational perspective from real service environments.',
                   'Founder-led execution focused on rollout, not demo-only AI theatre.',
                 ].map((point) => (
-                  <div key={point} className="rounded-[1.2rem] border border-black/6 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4 text-sm leading-6 text-black/70">
+                  <div
+                    key={point}
+                    className="rounded-[1.1rem] border border-black/6 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-3 text-sm leading-6 text-black/64"
+                  >
                     {point}
                   </div>
                 ))}
               </div>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+            <div className="grid gap-4 sm:grid-cols-2">
               {teamMembers.map((member) => (
                 <SectionCard key={member.name} className="overflow-hidden p-0">
                   <div className="aspect-[4/4.2] overflow-hidden bg-slate-100">
-                    <img src={member.imageSrc} alt={member.imageAlt} className="h-full w-full object-cover" loading="lazy" />
+                    <img
+                      src={member.imageSrc}
+                      alt={member.imageAlt}
+                      className="h-full w-full object-cover"
+                      loading="lazy"
+                    />
                   </div>
                   <div className="p-5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/42">{member.role}</div>
+                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/40">
+                        {member.role}
+                      </div>
                       <VisualChip tone="brand">Core team</VisualChip>
                     </div>
-                    <h3 className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">{member.name}</h3>
-                    <div className="mt-3 flex flex-wrap gap-2">
+                    <h3 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">
+                      {member.name}
+                    </h3>
+                    <div className="mt-2 flex flex-wrap gap-1.5">
                       {member.badges?.map((badge) => (
-                        <div
+                        <span
                           key={badge}
-                          className="rounded-full bg-[#f3f6fb] px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#314155]"
+                          className="rounded-full bg-[#f3f6fb] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#314155]"
                         >
                           {badge}
-                        </div>
+                        </span>
                       ))}
                     </div>
-                    <p className="mt-4 text-sm leading-6 text-black/62">{member.bio}</p>
+                    <p className="mt-3 text-sm leading-6 text-black/58">{member.bio}</p>
                   </div>
                 </SectionCard>
               ))}
@@ -956,120 +765,141 @@ export function PitchDeckApp() {
         </SectionCard>
       </section>
 
+      {/* ── 9. PRICING ──────────────────────────────────────────────── */}
       <section id="pricing" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
-        <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f7f9ff_42%,#eef6ff_100%)] px-6 py-6 text-[#1d1d1f] shadow-[0_28px_80px_rgba(15,23,42,0.08)] sm:px-7 lg:px-8">
-          <div className="grid gap-6 xl:grid-cols-[0.84fr_1.16fr] xl:items-center">
+        <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f7f9ff_42%,#eef6ff_100%)] px-6 py-6 shadow-[0_28px_80px_rgba(15,23,42,0.08)] sm:px-7 lg:px-8">
+          <div className="grid gap-8 xl:grid-cols-[0.75fr_1.25fr] xl:items-start">
+            {/* Left: headline + entry price */}
             <div>
-            <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-              {pricingContent.kicker}
-            </SignalPill>
-            <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-              Freemium, Pro, Pro Max, then custom scope only when complexity is real.
-            </h2>
-            <p className="mt-4 max-w-xl text-sm leading-7 text-black/60 sm:text-base">
-              The pricing story is now simpler for buyers and cleaner for investors: launch offer first, predictable plan second, performance-linked upside only when real booked revenue exists.
-            </p>
-            <div className="mt-8 rounded-[2rem] border border-black/6 bg-white/72 p-5 backdrop-blur">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/46">
-                {pricingContent.planLabel}
+              <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
+                {pricingContent.kicker}
+              </SignalPill>
+              <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
+                Simple enough for SMEs to buy. Structured enough for enterprise growth.
+              </h2>
+              <p className="mt-4 text-sm leading-7 text-black/58">{pricingContent.body}</p>
+
+              <div className="mt-6 rounded-[1.75rem] border border-black/6 bg-white/72 p-5 backdrop-blur">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-black/42">
+                  Starting from
                 </div>
-                <div className="mt-3 text-5xl font-semibold tracking-[-0.06em] text-[#1d1d1f]">{pricingContent.planPrice}</div>
-                <div className="mt-2 text-sm text-black/54">{pricingContent.planCaption}</div>
-              </div>
-            </div>
-
-            <div>
-              <div className="grid gap-3 sm:grid-cols-2">
-                {pricingContent.planFeatures.map((feature) => (
-                  <div
-                    key={feature}
-                    className="rounded-[1.35rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4 text-sm font-medium leading-6 text-black/72 backdrop-blur"
-                  >
-                    {feature}
-                  </div>
-                ))}
+                <div className="mt-2 text-5xl font-semibold tracking-[-0.07em] text-[#1d1d1f]">
+                  {pricingContent.planPrice}
+                </div>
+                <div className="mt-2 text-sm text-black/50">{pricingContent.planCaption}</div>
               </div>
 
-              <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-5 flex flex-wrap gap-3">
                 <button
                   type="button"
-                  onClick={() => openRegisterInterest('pricing', 'pitch_pricing_primary')}
-                  className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#111827] transition hover:-translate-y-0.5"
+                  onClick={() => openRegisterInterest('pricing', 'pitch_pricing_register')}
+                  className="rounded-full bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
                 >
                   Open SME Registration
                 </button>
                 <a
                   href={productUrl}
-                  className="rounded-full border border-black/8 bg-white/72 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
+                  className="rounded-full border border-black/8 bg-white/80 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
                 >
                   Open Web App
                 </a>
               </div>
             </div>
-          </div>
-        </SectionCard>
-      </section>
 
-      <section className="mx-auto w-full max-w-7xl px-6 py-6 pb-10 lg:px-8 lg:pb-12">
-        <SectionCard className="overflow-hidden px-6 py-6 sm:px-7 lg:px-8">
-          <div className="grid gap-5 xl:grid-cols-[1.02fr_0.98fr] xl:items-center">
-            <div>
-              <SignalPill className="w-fit bg-[#eff6ff] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1d4ed8]">
-                {ctaContent.kicker}
-              </SignalPill>
-              <h2 className="mt-4 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-                Move from pitch to live revenue flow.
-              </h2>
-              <p className="mt-4 max-w-xl text-sm leading-7 text-black/60 sm:text-base">
-                Proof, workflow, team, and rollout path are already visible. The next step is product trial or SME registration.
-              </p>
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              {[
-                { label: 'Product', href: productUrl },
-                { label: 'Trial', href: '/register-interest?offer=launch10&deployment=standalone_website&setup=online' },
-                { label: content.ui.roadmap, href: roadmapHref },
-              ].map((item, index) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  onClick={
-                    item.label === 'Trial'
-                      ? (event) => {
-                          event.preventDefault();
-                          openRegisterInterest('call_to_action', 'pitch_close_trial_card');
-                        }
-                      : undefined
-                  }
-                  className={`rounded-[1.6rem] px-5 py-6 text-center text-sm font-semibold transition hover:-translate-y-0.5 ${
-                    index === 0
-                      ? 'bg-[#1d1d1f] text-white'
-                      : index === 1
-                        ? 'bg-[linear-gradient(180deg,#e7f4ff_0%,#ffffff_100%)] text-[#1459c7]'
-                        : 'bg-[linear-gradient(180deg,#f3f4f6_0%,#ffffff_100%)] text-[#1d1d1f]'
+            {/* Right: 3 plan tiers */}
+            <div className="grid gap-4 md:grid-cols-3">
+              {pricingPlans.map((plan) => (
+                <div
+                  key={plan.tier}
+                  className={`relative flex flex-col rounded-[1.75rem] border px-5 py-6 ${
+                    plan.highlight
+                      ? 'border-[#1d4ed8]/28 bg-[linear-gradient(180deg,#eff6ff_0%,#ffffff_100%)] shadow-[0_20px_50px_rgba(29,78,216,0.10)]'
+                      : 'border-black/6 bg-white'
                   }`}
                 >
-                  {item.label}
-                </a>
+                  {plan.highlight && (
+                    <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#1d4ed8] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-white">
+                      Most popular
+                    </div>
+                  )}
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/40">
+                    {plan.tier}
+                  </div>
+                  <div className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f]">
+                    {plan.price}
+                  </div>
+                  <div className="mt-1 text-[11px] text-black/48">{plan.caption}</div>
+                  <ul className="mt-5 flex-1 space-y-2">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2 text-sm leading-6 text-black/62">
+                        <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1d4ed8]" />
+                        {feature}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      openRegisterInterest(
+                        'pricing',
+                        `pitch_pricing_${plan.tier.toLowerCase().replace(' ', '_')}`,
+                      )
+                    }
+                    className={`mt-6 rounded-full px-4 py-2.5 text-sm font-semibold transition hover:-translate-y-0.5 ${
+                      plan.highlight
+                        ? 'bg-[#1d4ed8] text-white hover:bg-[#1e40af]'
+                        : 'border border-black/10 bg-white text-[#1d1d1f]'
+                    }`}
+                  >
+                    {plan.cta}
+                  </button>
+                </div>
               ))}
             </div>
           </div>
         </SectionCard>
       </section>
 
-      <PricingSection />
-      <CallToActionSection
-        content={{
-          ...ctaContent,
-          title: 'Use pitch for the full story, then move straight into the live product.',
-          body: 'This surface now holds the deeper homepage narrative, so the landing page can stay cleaner while buyers and investors still have one place for the full story.',
-          primaryCta: 'Open Web App',
-          secondaryCta: 'Open SME Registration',
-        }}
-        onStartTrial={openProductDemo}
-        onBookDemo={() => openRegisterInterest('call_to_action', 'pitch_migrated_homepage_cta')}
-      />
+      {/* ── 10. FINAL CTA ───────────────────────────────────────────── */}
+      <section className="mx-auto w-full max-w-7xl px-6 py-6 pb-12 lg:px-8 lg:pb-16">
+        <SectionCard className="overflow-hidden bg-[#1d1d1f] px-6 py-10 text-white sm:px-8 lg:px-12 lg:py-12">
+          <div className="grid gap-8 xl:grid-cols-[1fr_0.55fr] xl:items-center">
+            <div>
+              <SignalPill className="w-fit bg-white/10 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white/64">
+                {ctaContent.kicker}
+              </SignalPill>
+              <h2 className="mt-5 max-w-2xl text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
+                Move from pitch to live revenue flow.
+              </h2>
+              <p className="mt-4 max-w-xl text-sm leading-7 text-white/58 sm:text-base">
+                {ctaContent.body}
+              </p>
+            </div>
+
+            <div className="flex flex-col gap-3 sm:flex-row xl:flex-col">
+              <a
+                href={productUrl}
+                className="rounded-full bg-white px-6 py-3.5 text-center text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
+              >
+                Open Web App
+              </a>
+              <button
+                type="button"
+                onClick={() => openRegisterInterest('call_to_action', 'pitch_final_cta_sales')}
+                className="rounded-full border border-white/20 bg-white/8 px-6 py-3.5 text-center text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/12"
+              >
+                Talk to Sales
+              </button>
+              <a
+                href={roadmapHref}
+                className="rounded-full border border-white/10 px-6 py-3.5 text-center text-sm font-semibold text-white/52 transition hover:-translate-y-0.5"
+              >
+                {content.ui.roadmap}
+              </a>
+            </div>
+          </div>
+        </SectionCard>
+      </section>
 
       <Footer
         onStartTrial={() => openRegisterInterest('footer', 'pitch_footer_register')}

@@ -141,6 +141,68 @@ class ReportingRepository(BaseRepository):
             "missed_revenue_aud": missed_revenue_aud,
         }
 
+    async def list_tenant_leads(
+        self,
+        tenant_id: str,
+        *,
+        limit: int = 20,
+        status_filter: str | None = None,
+    ) -> list[dict]:
+        status_clause = ""
+        params: dict = {"tenant_id": tenant_id, "limit": max(limit, 1)}
+        if status_filter and status_filter != "all":
+            status_clause = "and l.status = :status_filter"
+            params["status_filter"] = status_filter
+        result = await self.session.execute(
+            text(
+                f"""
+                select
+                  l.id::text as id,
+                  l.name,
+                  l.email,
+                  l.phone,
+                  l.status,
+                  l.source,
+                  l.service_name,
+                  l.notes,
+                  l.follow_up_at::text as follow_up_at,
+                  l.pipeline_stage,
+                  l.created_at::text as created_at,
+                  l.updated_at::text as updated_at,
+                  coalesce(c.sync_status, 'not_synced') as crm_sync_status,
+                  c.external_entity_id as crm_external_id
+                from leads l
+                left join crm_sync_records c
+                  on c.entity_type = 'lead'
+                  and c.local_entity_id::text = l.id::text
+                where l.tenant_id = cast(:tenant_id as uuid)
+                {status_clause}
+                order by l.created_at desc
+                limit :limit
+                """
+            ),
+            params,
+        )
+        return [
+            {
+                "id": row["id"],
+                "name": row["name"],
+                "email": row["email"],
+                "phone": row["phone"],
+                "status": row["status"],
+                "source": row["source"],
+                "service_name": row["service_name"],
+                "notes": row["notes"],
+                "follow_up_at": row["follow_up_at"],
+                "pipeline_stage": row["pipeline_stage"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+                "crm_sync_status": row["crm_sync_status"],
+                "crm_external_id": row["crm_external_id"],
+            }
+            for row in result.mappings().all()
+        ]
+
     async def list_recent_booking_intents(
         self,
         tenant_id: str,

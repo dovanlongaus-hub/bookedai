@@ -781,6 +781,7 @@ export function AdminPage() {
               apiRoutes={apiRoutes}
               apiBaseUrl={apiBaseUrl}
               sessionToken={sessionToken}
+              selectedTenantRef={selectedTenantRef || null}
               onPanelNavigate={changePanel}
             />
           </Suspense>

@@ -10,7 +10,7 @@ Create a 30 to 45 second promo video for BookedAI that explains the product as a
 - investors who need a fast product story
 
 ## Core message
-BookedAI turns inbound questions and service interest into structured revenue operations, from AI conversation to bookings, CRM sync, payment posture, and operator visibility.
+BookedAI turns inbound questions and service interest into structured revenue operations, from AI search and conversation to bookings, CRM sync, payment posture, reminders, tenant billing visibility, retention actions, and operator control.
 
 ## Video format
 - aspect ratio: 16:9 main version
@@ -41,26 +41,26 @@ Fast-moving gradient background, subtle dashboard silhouettes, strong headline r
 
 ### Scene 2, 5 to 12s
 Text:
-"BookedAI captures intent through AI conversation."
+"AI search and conversation capture intent."
 
 Visual:
-Chat surface, user asks for a booking, interface turns inquiry into action.
+Chat/search surface, user asks for a service, interface clarifies the need and turns inquiry into action.
 
-### Scene 3, 12 to 19s
+### Scene 3, 12 to 20s
 Text:
-"From leads to bookings to payments."
+"From leads to bookings to reminders."
 
 Visual:
-Quick sequence of leads board, booking detail, payment status, CRM sync badge.
+Quick sequence of shortlist, booking detail, payment posture, reminder state, and CRM sync badge.
 
-### Scene 4, 19 to 27s
+### Scene 4, 20 to 28s
 Text:
-"Operators stay in control across tenants, roles, and audit."
+"Revenue operations keep working after booking."
 
 Visual:
-Admin workspace shots: settings, team roles, audit timeline, tenant management.
+Admin and tenant workflow shots: lead queue, billing reminder, CRM sync, webhook trigger, retention flag.
 
-### Scene 5, 27 to 35s
+### Scene 5, 28 to 35s
 Text:
 "BookedAI, AI revenue engine for service businesses."
 
@@ -70,17 +70,18 @@ Hero lockup, product mark, clean CTA end frame.
 ## Voiceover draft
 Service businesses do not need another disconnected tool.
 They need one revenue flow.
-BookedAI captures customer intent through AI conversation,
-turns it into bookings and follow-up,
-and gives operators visibility across CRM sync, payments, tenants, and audit.
+BookedAI captures customer intent through AI search and conversation,
+turns it into bookings, follow-up, reminders, and customer care,
+while a revenue operations agent keeps CRM sync, payments, billing, retention, and audit moving.
 BookedAI is the AI revenue engine for service businesses.
 
 ## On-screen text beats
-- AI conversation
+- AI search and conversation
 - booking intent
-- CRM sync posture
-- payments and follow-up
-- tenant and operator control
+- reminders and follow-up
+- CRM sync and webhooks
+- tenant billing visibility
+- retention and customer care
 - AI revenue engine
 
 ## Music direction
@@ -96,8 +97,8 @@ BookedAI is the AI revenue engine for service businesses.
 
 ## Asset wishlist
 - BookedAI logo
-- screenshots of assistant, admin dashboard, leads, bookings, payments
+- screenshots of assistant, admin dashboard, leads, bookings, payments, reminders, and billing
 - one short screen capture of assistant flow if available
 
 ## Prompt starter for a video creation skill
-Create a 35-second 1080p promo video for BookedAI with a premium dark SaaS look, cyan and violet accents, glassmorphism overlays, animated product UI closeups, concise text overlays, and polished electronic background music. Emphasize AI conversation, booking flow, CRM sync, payments, and operator control. End with the line: BookedAI, AI revenue engine for service businesses.
+Create a 35-second 1080p promo video for BookedAI with a premium dark SaaS look, cyan and violet accents, glassmorphism overlays, animated product UI closeups, concise text overlays, and polished electronic background music. Emphasize AI search and conversation, booking flow, reminders, CRM sync, payments, tenant billing visibility, retention actions, and operator control. End with the line: BookedAI, AI revenue engine for service businesses.

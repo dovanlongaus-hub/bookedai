@@ -17,10 +17,11 @@ export const brandColorTokens = {
 } as const;
 
 const BRAND_ASSET_VERSION = '20260421-branding-suite';
-const BRAND_LOGO_LIGHT = `/branding/bookedai-logo-light.webp?v=${BRAND_ASSET_VERSION}`;
-const BRAND_LOGO_DARK = `/branding/bookedai-logo-dark.webp?v=${BRAND_ASSET_VERSION}`;
-const BRAND_LOGO_BLACK = `/branding/bookedai-logo-black.webp?v=${BRAND_ASSET_VERSION}`;
-const BRAND_LOGO_TRANSPARENT = `/branding/bookedai-logo-transparent.webp?v=${BRAND_ASSET_VERSION}`;
+const BRAND_UPLOADED_LOGO = 'https://upload.bookedai.au/images/0a14/VAEjorVtB4CBewa8CmRmRQ.png';
+const BRAND_LOGO_LIGHT = BRAND_UPLOADED_LOGO;
+const BRAND_LOGO_DARK = BRAND_UPLOADED_LOGO;
+const BRAND_LOGO_BLACK = BRAND_UPLOADED_LOGO;
+const BRAND_LOGO_TRANSPARENT = BRAND_UPLOADED_LOGO;
 const BRAND_ICON = `/branding/bookedai-app-icon-1024.png?v=${BRAND_ASSET_VERSION}`;
 
 export const brandLogoSources = {

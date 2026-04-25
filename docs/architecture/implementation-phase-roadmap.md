@@ -11,6 +11,9 @@ The roadmap now assumes:
 - revenue visibility, missed revenue, attribution, and commission are first-class delivery targets
 - pricing is setup fee plus performance-based commission
 - `tenant.bookedai.au` should become the unified tenant product gateway for sign-up, sign-in, data input, reporting, subscription, and billing
+- the product now needs a dual-agent execution model:
+  - a customer-facing `search and conversation agent`
+  - an internal `revenue operations agent` that runs from lead through retention and billing
 
 This roadmap aligns with:
 
@@ -44,6 +47,57 @@ This roadmap aligns with:
 - preserve one shared package vocabulary across public docs and UI:
   `Freemium`, `Pro`, `Pro Max`, plus the explicit `First 10 SMEs` launch offer
 - build test runners as delivery infrastructure, not as end-of-program polish
+- make agent-triggered lifecycle actions auditable, replay-safe, and tenant-policy-aware
+
+## Agent execution model
+
+All phase planning should now inherit this operational split:
+
+### 1. Search and conversation agent
+
+Owns:
+
+- demand capture
+- search and clarification
+- shortlist and booking-path handoff
+- customer-facing pre-booking experience
+- first full implementation target: `Grandmaster Chess Academy`
+
+### 2. Revenue operations agent
+
+Owns:
+
+- post-lead and post-booking action queues
+- email, SMS, WhatsApp, CRM, and webhook orchestration
+- payment reminder and receivable follow-up
+- tenant billing, commission, and summary generation
+- retention detection and recovery actions
+- first connected implementation target: `Grandmaster Chess Academy`
+
+### 3. Customer care and status agent
+
+Owns:
+
+- returning-customer identity resolution
+- current-status responses by phone, email, booking, invoice, or subscription context
+- reschedule, cancel, payment-help, and support-chat guidance
+- escalation into human support when policy or confidence requires it
+- first connected implementation target: `Grandmaster Chess Academy`
+
+## Chess-first priority rule
+
+The next phase of implementation should not start with a generic agent platform abstraction.
+
+It should start with the chess academy as the first complete connected-agent proof because chess forces BookedAI to solve:
+
+- intake plus assessment
+- recommendation plus placement
+- subscription-aware payment
+- parent-facing support
+- coach-report lifecycle
+- retention and pause or downgrade handling
+
+Only after the chess flow works end-to-end should the connected-agent pattern be generalized into wider multi-tenant templates.
 
 ## Priority reset locked from `2026-04-19`
 
@@ -133,7 +187,18 @@ Owns:
     - `lead qualified -> Zoho lead/contact/deal update`
     - `deal won/lost -> BookedAI dashboard/reporting feedback`
 
-### 5. Tenant and admin layer
+### 5. Agent and lifecycle orchestration layer
+
+Owns:
+
+- next-best-action policy evaluation
+- scheduled reminder jobs
+- retention and churn-risk checks
+- action approval and escalation controls
+- audit trails for AI-triggered lifecycle decisions
+- webhook-driven and cron-driven execution safety
+
+### 6. Tenant and admin layer
 
 Owns:
 
@@ -142,7 +207,7 @@ Owns:
 - commission and reconciliation views
 - optimization and support controls
 
-### 6. Test runner layer
+### 7. Test runner layer
 
 Owns:
 
@@ -154,13 +219,94 @@ Owns:
 
 ## Phase summary
 
+Planning update from `2026-04-25`:
+
+- the post-Sprint-16 execution wave is now tracked as `Phase 17` through `Phase 23`
+- the implementation bridge for that wave is `docs/development/next-phase-implementation-plan-2026-04-25.md`
+- `Phase 17` is the current closeout lane for the verified full-flow stabilization work: pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You screen, and `5s` return to the main BookedAI screen
+- `Phase 18` through `Phase 23` should execute in this order: revenue-ops ledger control, customer-care/status agent, widget/plugin runtime, billing and receivables truth, multi-tenant template generalization, release governance and scale hardening
+
+| Phase | Name | Primary outcome |
+|---|---|---|
+| 17 | Full-flow stabilization | verified pitch and product journeys complete through booking, Thank You, auto-return, and downstream handoff without customer-visible loading failure |
+| 18 | Revenue-ops ledger control | post-booking actions become tenant/admin visible, dispatchable, auditable, and policy-aware |
+| 19 | Customer-care and status agent | returning customers can ask about booking, payment, subscription, report, or support state from verified lifecycle truth |
+| 20 | Widget and plugin runtime | the BookedAI agent can run safely on SME-owned websites with tenant, origin, source, and campaign context preserved |
+| 21 | Billing and receivables truth | payments, subscriptions, invoices, reminders, commission, and tenant revenue summaries reconcile to shared records |
+| 22 | Multi-tenant template generalization | chess and Future Swim patterns become reusable tenant templates without custom-only branching |
+| 23 | Release governance and scale hardening | release gates, traces, rollback criteria, docs sync, and operator closeout become repeatable |
+
 | Phase | Name | Primary outcome |
 |---|---|---|
 | 0 | Narrative and architecture reset | one aligned revenue-engine definition across docs and product surfaces |
 | 1 | Core user journey stability and public pull | stable public user, tenant, and admin journeys with accurate search, payment, confirmation email, QR portal revisit, and a public-facing brand strong enough to attract investors, users, and real SME demand |
-| 2 | Module-by-module refinement | deeper improvements across tenant, admin, portal, catalog, reporting, lifecycle, and payment-support modules |
-| 3 | Advanced controls, legal, and user-group data | advanced features reviewed after core stability, including legal readiness and more detailed data models per user group |
+| 2 | Agent-led lifecycle operations | revenue-operations agent can act on leads, incomplete bookings, reminders, CRM sync, webhook triggers, and operator queues |
+| 3 | Billing, retention, and customer-care automation | tenant billing, receivables, summary emails, returning-customer support, and churn-risk handling become productized |
 | 4 | Release, regression, and scale hardening | release-gate discipline, observability, rollback readiness, and scale-safe promotion rules |
+
+## Concrete phase deliverables
+
+### Phase 1 - Customer-facing search and booking agent
+
+Deliver:
+
+- search-first and chat-first intake continuity
+- structured clarification prompts
+- shortlist, booking-path, and trust-state handoff
+- booking confirmation with asynchronous downstream automation
+- portal-safe continuation after booking
+- implement these first on the chess academy flow
+
+### Phase 2 - Revenue operations agent foundation
+
+Deliver:
+
+- unified lead and incomplete-booking action queue
+- next-best-action recommendation engine
+- event-driven triggers for email, SMS, WhatsApp, CRM, and webhooks
+- admin and tenant visibility into pending, sent, failed, queued, and escalated actions
+- replay-safe automation and audit logging
+- implement the first real connected handoff from chess intake and booking events
+
+### Phase 3 - Billing and retention automation
+
+Deliver:
+
+- payment reminder and receivable workflows
+- tenant billing, commission, and financial-summary generation
+- overdue and failed-renewal recovery actions
+- customer-care agent responses using current customer state
+- retention-risk scoring and save-action recommendations
+- prioritize chess subscriptions, parent reminders, and class pause or reschedule rescue first
+
+### Phase 4 - Hardening and scale
+
+Deliver:
+
+- policy gating for high-risk actions
+- observability for agent-triggered flows
+- replay, regression, and QA gates for lifecycle automation
+- pitch/demo alignment so public claims match the real agent system
+
+## Next implementation order
+
+Current next-phase order from `2026-04-25`:
+
+1. close `Phase 17` with GitHub submission and release notes for the current full-flow stabilization work
+2. deepen `Phase 18` by making revenue-ops action runs inspectable from tenant and admin surfaces, including evidence from outbox, audit, job runs, CRM, payment, and webhook state
+3. implement `Phase 19` customer-care/status answers against academy student, booking, payment, report, communication, and action-run truth
+4. implement `Phase 20` widget identity and one tenant-branded full-flow proof from SME website embed through Thank You and portal continuation
+5. implement `Phase 21` billing, receivable, subscription, reminder, and commission truth only after action evidence is reliable
+6. implement `Phase 22` reusable vertical templates after chess and Future Swim stay green through the release gate
+7. fold each phase into `Phase 23` release governance before broadening scope again
+
+Inherited chess-first order:
+
+1. chess search/conversation agent -> assessment -> placement handoff
+2. chess revenue operations agent -> booking -> subscription -> reminder triggers
+3. chess customer-care/status agent -> parent support and current-state replies
+4. chess admin and tenant visibility -> action queues, billing, retention, reporting
+5. reusable multi-tenant extraction only after steps 1 through 4 are stable
 
 ## Current implementation snapshot
 
@@ -211,6 +357,7 @@ The next roadmap change is to organize it under the revenue-engine model and fil
 - recovery workflow reporting
 - tenant-facing commercial visibility
 - customer-facing booking portal continuity after confirmation through a dedicated routed production host
+- agent-driven lead-to-retention orchestration with human-safe escalation and audit
 
 Current execution interpretation now locked from `2026-04-20`:
 

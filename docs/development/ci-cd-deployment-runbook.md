@@ -194,6 +194,7 @@ Current production deploy behavior from the script includes:
 - checking or extending the Let's Encrypt certificate domain set
 - starting the Supabase compose stack
 - bringing up the full production compose stack with build
+- retrying the production compose bring-up with orphan cleanup if Docker Compose hits a transient recreate failure
 - restarting `proxy`
 - provisioning n8n workflows
 

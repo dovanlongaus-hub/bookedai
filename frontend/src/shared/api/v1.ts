@@ -1,13 +1,33 @@
 import { apiRequest, ApiClientError } from './client';
 import type {
+  AcademyReportPreview,
+  AssessmentQuestion,
+  AssessmentResult,
+  CreateAcademyReportPreviewRequest,
+  CreateAcademyReportPreviewResponse,
+  CreateAssessmentSessionRequest,
+  CreateAssessmentSessionResponse,
   ApiAcceptedEnvelope,
   ApiSuccessEnvelope,
   CreateBookingIntentRequest,
   CreateBookingIntentResponse,
+  CustomerAgentTurnRequest,
+  CustomerAgentTurnResponse,
   CreateLeadRequest,
   CreateLeadResponse,
   CreatePaymentIntentRequest,
   CreatePaymentIntentResponse,
+  CreateSubscriptionIntentRequest,
+  CreateSubscriptionIntentResponse,
+  DispatchRevenueAgentActionsRequest,
+  DispatchRevenueAgentActionsResponse,
+  ListRevenueAgentActionsRequest,
+  ListRevenueAgentActionsResponse,
+  QueueRevenueOpsHandoffRequest,
+  QueueRevenueOpsHandoffResponse,
+  RevenueAgentActionRun,
+  TransitionRevenueAgentActionRequest,
+  TransitionRevenueAgentActionResponse,
   RetryCrmSyncRequest,
   RetryCrmSyncResponse,
   CheckAvailabilityRequest,
@@ -30,6 +50,8 @@ import type {
   ReplayOutboxEventResponse,
   ResolveBookingPathRequest,
   ResolveBookingPathResponse,
+  ResolvePlacementRequest,
+  ResolvePlacementResponse,
   SearchCandidatesRequest,
   SearchCandidatesResponse,
   SendCommunicationMessageRequest,
@@ -63,12 +85,14 @@ import type {
   TenantSubscriptionUpdateRequest,
   TenantIntegrationsResponse,
   TenantIntegrationProviderUpdateRequest,
+  TenantLeadsResponse,
   TenantOnboardingResponse,
   TenantOverviewResponse,
   TenantRevenueMetrics,
   TenantTeamResponse,
   TenantTeamInviteActionResponse,
   TenantUpdateMemberAccessRequest,
+  SubmitAssessmentAnswerRequest,
 } from '../contracts';
 import type { MatchBookingFit, MatchCandidate, MatchConfidence } from '../contracts';
 
@@ -118,6 +142,13 @@ function withJsonBody(body: unknown, init?: RequestInit): RequestInit {
     headers,
     body: JSON.stringify(body),
   };
+}
+
+function appendQueryParam(params: URLSearchParams, key: string, value: unknown) {
+  if (value === null || value === undefined || value === '') {
+    return;
+  }
+  params.set(key, String(value));
 }
 
 function toStringOrNull(value: unknown): string | null {
@@ -267,6 +298,29 @@ function normalizeBookingFit(value: unknown): MatchBookingFit | null {
     locationFit,
     bookingReadiness,
     summary: readString(value, 'summary'),
+  };
+}
+
+function normalizeRevenueAgentActionRun(value: unknown): RevenueAgentActionRun {
+  const action = isRecord(value) ? value : {};
+  const input = action.input ?? action.input_json;
+  const result = action.result ?? action.result_json;
+  return {
+    action_run_id: readString(action, 'action_run_id', 'actionRunId') ?? '',
+    tenant_id: readString(action, 'tenant_id', 'tenantId'),
+    agent_type: readString(action, 'agent_type', 'agentType') ?? 'revenue_operations',
+    action_type: readString(action, 'action_type', 'actionType') ?? '',
+    entity_type: readString(action, 'entity_type', 'entityType'),
+    entity_id: readString(action, 'entity_id', 'entityId'),
+    booking_reference: readString(action, 'booking_reference', 'bookingReference'),
+    student_ref: readString(action, 'student_ref', 'studentRef'),
+    status: readString(action, 'status') ?? 'queued',
+    priority: readString(action, 'priority') ?? 'normal',
+    reason: readString(action, 'reason'),
+    input: isRecord(input) ? input : null,
+    result: isRecord(result) ? result : null,
+    created_at: readString(action, 'created_at', 'createdAt'),
+    updated_at: readString(action, 'updated_at', 'updatedAt'),
   };
 }
 
@@ -509,12 +563,309 @@ export async function startChatSession(request: StartChatSessionRequest) {
   );
 }
 
+function normalizeAssessmentQuestion(value: unknown): AssessmentQuestion | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  return {
+    question_id: readString(value, 'question_id', 'questionId') ?? '',
+    prompt: readString(value, 'prompt') ?? '',
+    helper_text: readString(value, 'helper_text', 'helperText') ?? readString(value, 'step'),
+    options: readRecordList(value, 'choices', 'options').map((item) => ({
+      option_id: readString(item, 'answer_id', 'answerId') ?? readString(item, 'option_id', 'optionId') ?? '',
+      label: readString(item, 'label') ?? '',
+      description: readString(item, 'description'),
+    })),
+  };
+}
+
+function normalizeAssessmentResult(value: unknown): AssessmentResult | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const confidence = readString(value, 'confidence');
+  const recommendedClassType = (() => {
+    const placement = isRecord(value.placement) ? value.placement : {};
+    const primaryClass = isRecord(placement.primary_class) ? placement.primary_class : {};
+    return readString(primaryClass, 'class_name', 'className') ?? 'Chess class';
+  })();
+  return {
+    score_total: readNumber(value, 'score_total', 'scoreTotal') ?? readNumber(value, 'score') ?? 0,
+    level: readString(value, 'level') ?? 'Beginner',
+    confidence: confidence === 'low' || confidence === 'medium' || confidence === 'high' ? confidence : 'medium',
+    recommended_class_type:
+      readString(value, 'recommended_class_type', 'recommendedClassType') ?? recommendedClassType,
+    summary:
+      readString(value, 'summary') ??
+      `${readString(value, 'level_label', 'levelLabel') ?? readString(value, 'level') ?? 'Current'} placement is ready.`,
+  };
+}
+
+function normalizeAssessmentSessionEnvelope(
+  envelope: ApiSuccessEnvelope<CreateAssessmentSessionResponse> | ApiAcceptedEnvelope,
+) {
+  if (!isApiSuccessEnvelope<CreateAssessmentSessionResponse>(envelope)) {
+    return envelope;
+  }
+
+  const data: Record<string, unknown> = isRecord(envelope.data) ? envelope.data : {};
+  const progress: Record<string, unknown> = isRecord(data['progress']) ? data['progress'] : {};
+  return {
+    ...envelope,
+    data: {
+      assessment_session_id: readString(data, 'assessment_session_id', 'assessmentSessionId') ?? '',
+      status: readString(data, 'status') === 'completed' ? 'completed' : 'in_progress',
+      academy_name: 'Grandmaster Chess Academy',
+      answered_count: readNumber(progress, 'answered') ?? readNumber(data, 'answered_count', 'answeredCount') ?? 0,
+      total_questions: readNumber(progress, 'total') ?? readNumber(data, 'total_questions', 'totalQuestions') ?? 0,
+      progress_percent: (() => {
+        const answered = readNumber(progress, 'answered') ?? readNumber(data, 'answered_count', 'answeredCount') ?? 0;
+        const total = readNumber(progress, 'total') ?? readNumber(data, 'total_questions', 'totalQuestions') ?? 0;
+        if (total <= 0) {
+          return readNumber(data, 'progress_percent', 'progressPercent') ?? 0;
+        }
+        return Math.round((answered / total) * 100);
+      })(),
+      current_question: normalizeAssessmentQuestion(data['next_question'] ?? data['current_question'] ?? data['currentQuestion']),
+      result: normalizeAssessmentResult(data['assessment'] ?? data['result']),
+    },
+  };
+}
+
+function normalizePlacementEnvelope(
+  envelope: ApiSuccessEnvelope<ResolvePlacementResponse> | ApiAcceptedEnvelope,
+) {
+  if (!isApiSuccessEnvelope<ResolvePlacementResponse>(envelope)) {
+    return envelope;
+  }
+
+  const data: Record<string, unknown> = isRecord(envelope.data) ? envelope.data : {};
+  const recommendation: Record<string, unknown> = isRecord(data['recommendation']) ? data['recommendation'] : {};
+  const primaryClass: Record<string, unknown> = isRecord(recommendation['primary_class']) ? recommendation['primary_class'] : {};
+  const assessment: Record<string, unknown> = isRecord(data['assessment']) ? data['assessment'] : {};
+  const subscriptionSuggestion: Record<string, unknown> = isRecord(recommendation['subscription_suggestion'])
+    ? recommendation['subscription_suggestion']
+    : {};
+  const suggestedPlan: Record<string, unknown> = isRecord(recommendation['suggested_plan'])
+    ? recommendation['suggested_plan']
+    : {};
+  const directSlots = readRecordList(recommendation, 'available_slots', 'availableSlots');
+  const backendSlots = readRecordList(recommendation, 'recommended_slots', 'recommendedSlots');
+
+  return {
+    ...envelope,
+    data: {
+      assessment_session_id: readString(data, 'assessment_session_id', 'assessmentSessionId') ?? '',
+      status: 'placement_ready' as const,
+      recommendation: {
+        placement_label:
+          readString(recommendation, 'placement_label', 'placementLabel') ??
+          readString(recommendation, 'level_label', 'levelLabel') ??
+          readString(assessment, 'level_label', 'levelLabel') ??
+          '',
+        class_label:
+          readString(recommendation, 'class_label', 'classLabel') ??
+          readString(primaryClass, 'class_name', 'className') ??
+          '',
+        level: readString(recommendation, 'level') ?? readString(assessment, 'level') ?? '',
+        rationale: (() => {
+          const rationale = recommendation.rationale;
+          if (typeof rationale === 'string') {
+            return [rationale];
+          }
+          return toStringArray(rationale);
+        })(),
+        recommended_candidate_id: readString(recommendation, 'recommended_candidate_id', 'recommendedCandidateId'),
+        fallback_candidate_ids: readStringList(recommendation, 'fallback_candidate_ids', 'fallbackCandidateIds'),
+        booking_ready_candidate_ids: readStringList(
+          recommendation,
+          'booking_ready_candidate_ids',
+          'bookingReadyCandidateIds',
+        ),
+        suggested_plan: {
+          plan_key:
+            readString(suggestedPlan, 'plan_key', 'planKey') ??
+            readString(subscriptionSuggestion, 'plan_code', 'planCode') ??
+            '',
+          title: readString(suggestedPlan, 'title') ?? readString(subscriptionSuggestion, 'label') ?? '',
+          price_label: (() => {
+            const directPrice = readString(suggestedPlan, 'price_label', 'priceLabel');
+            if (directPrice) {
+              return directPrice;
+            }
+            const amount = readNumber(subscriptionSuggestion, 'monthly_price_aud', 'monthlyPriceAud');
+            return amount ? `$${amount}/month` : 'Subscription';
+          })(),
+          billing_label:
+            readString(suggestedPlan, 'billing_label', 'billingLabel') ??
+            readString(subscriptionSuggestion, 'billing_model', 'billingModel') ??
+            'subscription',
+          recommended: suggestedPlan.recommended === false ? false : true,
+        },
+        alternative_plans: [],
+        available_slots: (directSlots.length ? directSlots : backendSlots).map((item) => ({
+          slot_id: readString(item, 'slot_id', 'slotId') ?? readString(item, 'class_code', 'classCode') ?? '',
+          label:
+            readString(item, 'label') ??
+            `${readString(item, 'day_of_week', 'dayOfWeek') ?? ''} ${readString(item, 'time_local', 'timeLocal') ?? ''}`.trim(),
+          day: readString(item, 'day') ?? readString(item, 'day_of_week', 'dayOfWeek') ?? '',
+          time: readString(item, 'time') ?? readString(item, 'time_local', 'timeLocal') ?? '',
+          class_label: readString(item, 'class_label', 'classLabel') ?? readString(item, 'class_name', 'className') ?? '',
+          seats_remaining: readNumber(item, 'seats_remaining', 'seatsRemaining') ?? 0,
+        })),
+        retention_note: (() => {
+          const directRetentionNote = readString(recommendation, 'retention_note', 'retentionNote');
+          if (directRetentionNote) {
+            return directRetentionNote;
+          }
+          const notes = toStringArray(recommendation.retention_notes);
+          return notes[0] ?? null;
+        })(),
+      },
+    },
+  };
+}
+
+function normalizeAcademyReportPreview(value: unknown): AcademyReportPreview | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+
+  const nextClass = isRecord(value.next_class_suggestion) ? value.next_class_suggestion : {};
+  return {
+    student_name: readString(value, 'student_name', 'studentName') ?? 'Student',
+    guardian_name: readString(value, 'guardian_name', 'guardianName') ?? 'Parent',
+    headline: readString(value, 'headline') ?? '',
+    summary: readString(value, 'summary') ?? '',
+    strengths: readStringList(value, 'strengths'),
+    focus_areas: readStringList(value, 'focus_areas', 'focusAreas'),
+    homework: readStringList(value, 'homework'),
+    next_class_suggestion: {
+      class_label: readString(nextClass, 'class_label', 'classLabel') ?? '',
+      slot_label: readString(nextClass, 'slot_label', 'slotLabel') ?? '',
+      plan_label: readString(nextClass, 'plan_label', 'planLabel') ?? '',
+    },
+    parent_cta: readString(value, 'parent_cta', 'parentCta') ?? '',
+    retention_reasoning: readString(value, 'retention_reasoning', 'retentionReasoning') ?? '',
+  };
+}
+
+export async function createAssessmentSession(request: CreateAssessmentSessionRequest) {
+  const envelope = await requestV1Envelope<CreateAssessmentSessionResponse>(
+    '/v1/assessments/sessions',
+    withJsonBody(
+      {
+        actor_context: request.actor_context,
+        program_code: request.program_code ?? 'grandmaster_chess_academy',
+        participant: request.participant ?? {},
+        context: request.context ?? {},
+      },
+      { method: 'POST' },
+    ),
+  );
+  return normalizeAssessmentSessionEnvelope(envelope);
+}
+
+export async function answerAssessmentSession(
+  assessmentSessionId: string,
+  request: SubmitAssessmentAnswerRequest,
+) {
+  const envelope = await requestV1Envelope<CreateAssessmentSessionResponse>(
+    `/v1/assessments/sessions/${encodeURIComponent(assessmentSessionId)}/answers`,
+    withJsonBody(
+      {
+        actor_context: request.actor_context,
+        answers: [
+          {
+            question_id: request.question_id,
+            answer_id: request.answer_id,
+          },
+        ],
+      },
+      { method: 'POST' },
+    ),
+  );
+  return normalizeAssessmentSessionEnvelope(envelope);
+}
+
 export async function searchCandidates(request: SearchCandidatesRequest) {
   const envelope = await requestV1Envelope<SearchCandidatesResponse>(
     '/v1/matching/search',
     withJsonBody(request, { method: 'POST' }),
   );
   return normalizeSearchCandidatesEnvelope(envelope);
+}
+
+function normalizeCustomerAgentTurnEnvelope(
+  envelope: ApiSuccessEnvelope<CustomerAgentTurnResponse> | ApiAcceptedEnvelope,
+) {
+  if (!isApiSuccessEnvelope<CustomerAgentTurnResponse>(envelope)) {
+    return envelope;
+  }
+
+  const data: Record<string, unknown> = isRecord(envelope.data) ? envelope.data : {};
+  const rawSearch = envelope.data.search;
+  const rawSearchEnvelope = isRecord(rawSearch)
+    ? ({
+        status: 'ok',
+        data: rawSearch,
+      } as unknown as ApiSuccessEnvelope<SearchCandidatesResponse>)
+    : null;
+  const normalizedSearchEnvelope = rawSearchEnvelope
+    ? normalizeSearchCandidatesEnvelope(rawSearchEnvelope)
+    : null;
+  const normalizedSearch =
+    normalizedSearchEnvelope && isApiSuccessEnvelope<SearchCandidatesResponse>(normalizedSearchEnvelope)
+      ? normalizedSearchEnvelope.data
+      : null;
+  const rawHandoff = envelope.data.handoff;
+  const handoff = isRecord(rawHandoff) ? rawHandoff : {};
+
+  return {
+    ...envelope,
+    data: {
+      agent_turn_id: readString(data, 'agent_turn_id', 'agentTurnId') ?? '',
+      conversation_id: readString(data, 'conversation_id', 'conversationId') ?? '',
+      reply: readString(data, 'reply') ?? '',
+      phase: readString(data, 'phase') ?? 'clarify',
+      missing_context: readStringList(data, 'missing_context', 'missingContext'),
+      suggestions: readRecordList(data, 'suggestions').map((item) => ({
+        label: readString(item, 'label') ?? '',
+        query: readString(item, 'query') ?? '',
+      })),
+      search: normalizedSearch,
+      handoff: {
+        next_agent: readString(handoff, 'next_agent', 'nextAgent') ?? 'search_and_conversation',
+        revenue_ops_ready: readBoolean(handoff, 'revenue_ops_ready', 'revenueOpsReady'),
+        reason: readString(handoff, 'reason'),
+      },
+    },
+  };
+}
+
+export async function createCustomerAgentTurn(request: CustomerAgentTurnRequest) {
+  const envelope = await requestV1Envelope<CustomerAgentTurnResponse>(
+    '/v1/agents/customer-turn',
+    withJsonBody(
+      {
+        message: request.message,
+        conversation_id: request.conversation_id ?? null,
+        messages: request.messages ?? [],
+        location: request.location ?? null,
+        preferences: request.preferences ?? null,
+        budget: request.budget ?? null,
+        time_window: request.time_window ?? null,
+        channel_context: request.channel_context,
+        attribution: request.attribution ?? null,
+        user_location: request.user_location ?? null,
+        context: request.context ?? {},
+      },
+      { method: 'POST' },
+    ),
+  );
+  return normalizeCustomerAgentTurnEnvelope(envelope);
 }
 
 export async function checkAvailability(request: CheckAvailabilityRequest) {
@@ -529,6 +880,223 @@ export async function resolveBookingPath(request: ResolveBookingPathRequest) {
     '/v1/bookings/path/resolve',
     withJsonBody(request, { method: 'POST' }),
   );
+}
+
+export async function resolvePlacement(request: ResolvePlacementRequest) {
+  const envelope = await requestV1Envelope<ResolvePlacementResponse>(
+    '/v1/placements/recommend',
+    withJsonBody(
+      {
+        actor_context: request.actor_context,
+        session_id: request.assessment_session_id,
+        participant: request.participant ?? {},
+      },
+      { method: 'POST' },
+    ),
+  );
+  return normalizePlacementEnvelope(envelope);
+}
+
+export async function createAcademyReportPreview(request: CreateAcademyReportPreviewRequest) {
+  const envelope = await requestV1Envelope<CreateAcademyReportPreviewResponse>(
+    '/v1/reports/preview',
+    withJsonBody(
+      {
+        booking_reference: request.booking_reference,
+        participant: request.participant ?? {},
+        assessment: request.assessment
+          ? {
+              score_total: request.assessment.score_total,
+              level: request.assessment.level,
+              summary: request.assessment.summary,
+              recommended_class_type: request.assessment.recommended_class_type,
+            }
+          : {},
+        placement: request.placement
+          ? {
+              class_label: request.placement.class_label,
+              level: request.placement.level,
+              retention_note: request.placement.retention_note,
+              suggested_plan: {
+                title: request.placement.suggested_plan.title,
+                price_label: request.placement.suggested_plan.price_label,
+              },
+              available_slots: request.placement.available_slots.map((slot) => ({
+                label: slot.label,
+                day: slot.day,
+                time: slot.time,
+              })),
+            }
+          : {},
+        service_name: request.service_name ?? null,
+        actor_context: request.actor_context,
+      },
+      { method: 'POST' },
+    ),
+  );
+
+  if (!isApiSuccessEnvelope<CreateAcademyReportPreviewResponse>(envelope)) {
+    return envelope;
+  }
+
+  const data: Record<string, unknown> = isRecord(envelope.data) ? envelope.data : {};
+  return {
+    ...envelope,
+    data: {
+      booking_reference: readString(data, 'booking_reference', 'bookingReference') ?? '',
+      student_ref: readString(data, 'student_ref', 'studentRef'),
+      report_preview: normalizeAcademyReportPreview(data['report_preview']) ?? {
+        student_name: 'Student',
+        guardian_name: 'Parent',
+        headline: '',
+        summary: '',
+        strengths: [],
+        focus_areas: [],
+        homework: [],
+        next_class_suggestion: {
+          class_label: '',
+          slot_label: '',
+          plan_label: '',
+        },
+        parent_cta: '',
+        retention_reasoning: '',
+      },
+    },
+  };
+}
+
+export async function createSubscriptionIntent(request: CreateSubscriptionIntentRequest) {
+  return requestV1Envelope<CreateSubscriptionIntentResponse>(
+    '/v1/subscriptions/intents',
+    withJsonBody(
+      {
+        student_ref: request.student_ref ?? null,
+        booking_reference: request.booking_reference ?? null,
+        booking_intent_id: request.booking_intent_id ?? null,
+        plan: {
+          plan_code: request.plan.plan_code,
+          plan_label: request.plan.plan_label ?? null,
+          amount_aud: request.plan.amount_aud ?? null,
+          billing_interval: request.plan.billing_interval ?? 'month',
+        },
+        placement: request.placement ?? {},
+        actor_context: request.actor_context,
+        context: request.context ?? {},
+      },
+      { method: 'POST' },
+    ),
+  );
+}
+
+export async function listRevenueAgentActions(request: ListRevenueAgentActionsRequest = {}) {
+  const query = new URLSearchParams();
+  appendQueryParam(query, 'channel', request.channel ?? 'tenant_app');
+  appendQueryParam(query, 'tenant_id', request.tenant_id);
+  appendQueryParam(query, 'tenant_ref', request.tenant_ref);
+  appendQueryParam(query, 'actor_id', request.actor_id);
+  appendQueryParam(query, 'role', request.role);
+  appendQueryParam(query, 'deployment_mode', request.deployment_mode);
+  appendQueryParam(query, 'student_ref', request.student_ref);
+  appendQueryParam(query, 'booking_reference', request.booking_reference);
+  appendQueryParam(query, 'status', request.status);
+  appendQueryParam(query, 'action_type', request.action_type);
+  appendQueryParam(query, 'limit', request.limit ?? 25);
+
+  const envelope = await requestV1Envelope<ListRevenueAgentActionsResponse>(
+    `/v1/agent-actions?${query.toString()}`,
+  );
+
+  if (!isApiSuccessEnvelope<ListRevenueAgentActionsResponse>(envelope)) {
+    return envelope;
+  }
+
+  const data: Record<string, unknown> = isRecord(envelope.data) ? envelope.data : {};
+  const actionRuns = Array.isArray(data.action_runs) ? data.action_runs : [];
+  return {
+    ...envelope,
+    data: {
+      tenant_id: readString(data, 'tenant_id', 'tenantId'),
+      filters: isRecord(data.filters) ? data.filters : {},
+      action_runs: actionRuns.map(normalizeRevenueAgentActionRun),
+    },
+  };
+}
+
+export async function transitionRevenueAgentAction(
+  actionRunId: string,
+  request: TransitionRevenueAgentActionRequest,
+) {
+  const envelope = await requestV1Envelope<TransitionRevenueAgentActionResponse>(
+    `/v1/agent-actions/${encodeURIComponent(actionRunId)}/transition`,
+    withJsonBody(request, { method: 'POST' }),
+  );
+
+  if (!isApiSuccessEnvelope<TransitionRevenueAgentActionResponse>(envelope)) {
+    return envelope;
+  }
+
+  const data: Record<string, unknown> = isRecord(envelope.data) ? envelope.data : {};
+  return {
+    ...envelope,
+    data: {
+      tenant_id: readString(data, 'tenant_id', 'tenantId'),
+      action_run: normalizeRevenueAgentActionRun(data.action_run),
+      outbox_event_id: (data.outbox_event_id as string | number | null | undefined) ?? null,
+      message: readString(data, 'message') ?? 'Revenue operations action status updated.',
+    },
+  };
+}
+
+export async function dispatchRevenueAgentActions(request: DispatchRevenueAgentActionsRequest = {}) {
+  return requestV1Envelope<DispatchRevenueAgentActionsResponse>(
+    '/v1/agent-actions/dispatch',
+    withJsonBody(
+      {
+        limit: request.limit ?? 25,
+        actor_context: request.actor_context ?? null,
+      },
+      { method: 'POST' },
+    ),
+  );
+}
+
+export async function queueRevenueOpsHandoff(request: QueueRevenueOpsHandoffRequest) {
+  const envelope = await requestV1Envelope<QueueRevenueOpsHandoffResponse>(
+    '/v1/revenue-ops/handoffs',
+    withJsonBody(
+      {
+        booking_reference: request.booking_reference ?? null,
+        booking_intent_id: request.booking_intent_id ?? null,
+        lead_id: request.lead_id ?? null,
+        contact_id: request.contact_id ?? null,
+        customer: request.customer ?? {},
+        service: request.service ?? {},
+        lifecycle: request.lifecycle ?? {},
+        actor_context: request.actor_context,
+        context: request.context ?? {},
+      },
+      { method: 'POST' },
+    ),
+  );
+
+  if (!isApiSuccessEnvelope<QueueRevenueOpsHandoffResponse>(envelope)) {
+    return envelope;
+  }
+
+  const data = envelope.data as unknown as Record<string, unknown>;
+  const actionRuns = Array.isArray(data.queued_actions) ? data.queued_actions : [];
+  return {
+    ...envelope,
+    data: {
+      tenant_id: readString(data, 'tenant_id', 'tenantId'),
+      booking_reference: readString(data, 'booking_reference', 'bookingReference'),
+      booking_intent_id: readString(data, 'booking_intent_id', 'bookingIntentId'),
+      lead_id: readString(data, 'lead_id', 'leadId'),
+      queued_actions: actionRuns.map(normalizeRevenueAgentActionRun),
+      outbox_event_id: (data.outbox_event_id as string | number | null | undefined) ?? null,
+      message: readString(data, 'message') ?? 'Revenue operations agent handoff queued.',
+    },
+  };
 }
 
 export async function createBookingIntent(request: CreateBookingIntentRequest) {
@@ -668,6 +1236,20 @@ export async function getTenantBookings(tenantRef?: string | null) {
   return requestV1Envelope<TenantBookingsResponse>(`/v1/tenant/bookings${query}`);
 }
 
+export async function getTenantLeads(
+  tenantRef?: string | null,
+  statusFilter?: string | null,
+  sessionToken?: string | null,
+) {
+  const params = new URLSearchParams();
+  if (tenantRef) params.set('tenant_ref', tenantRef);
+  if (statusFilter && statusFilter !== 'all') params.set('status', statusFilter);
+  const query = params.size ? `?${params.toString()}` : '';
+  const headers = new Headers();
+  if (sessionToken) headers.set('Authorization', `Bearer ${sessionToken}`);
+  return requestV1Envelope<TenantLeadsResponse>(`/v1/tenant/leads${query}`, { headers });
+}
+
 export async function getTenantIntegrations(tenantRef?: string | null, sessionToken?: string | null) {
   const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
   const headers = new Headers();
@@ -743,6 +1325,26 @@ export async function requestPortalBookingCancellation(
 ) {
   return requestV1Envelope<PortalBookingActionResponse>(
     `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/cancel-request`,
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+export async function requestPortalBookingPause(
+  bookingReference: string,
+  request: PortalBookingActionRequest,
+) {
+  return requestV1Envelope<PortalBookingActionResponse>(
+    `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/pause-request`,
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+export async function requestPortalBookingDowngrade(
+  bookingReference: string,
+  request: PortalBookingActionRequest,
+) {
+  return requestV1Envelope<PortalBookingActionResponse>(
+    `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/downgrade-request`,
     withJsonBody(request, { method: 'POST' }),
   );
 }
@@ -1056,9 +1658,19 @@ export async function archiveTenantCatalogService(
 export const apiV1 = {
   createLead,
   startChatSession,
+  createAssessmentSession,
+  answerAssessmentSession,
+  createCustomerAgentTurn,
   searchCandidates,
   checkAvailability,
   resolveBookingPath,
+  resolvePlacement,
+  createAcademyReportPreview,
+  createSubscriptionIntent,
+  listRevenueAgentActions,
+  transitionRevenueAgentAction,
+  dispatchRevenueAgentActions,
+  queueRevenueOpsHandoff,
   createBookingIntent,
   createPaymentIntent,
   sendSmsMessage,
@@ -1088,6 +1700,8 @@ export const apiV1 = {
   getPortalBookingDetail,
   requestPortalBookingReschedule,
   requestPortalBookingCancellation,
+  requestPortalBookingPause,
+  requestPortalBookingDowngrade,
   archiveTenantCatalogService,
   createTenantCatalogService,
   importTenantCatalogFromWebsite,
@@ -1111,4 +1725,5 @@ export const apiV1 = {
   updateTenantCatalogService,
   retryCrmSync,
   getTenantRevenueMetrics,
+  getTenantLeads,
 };
