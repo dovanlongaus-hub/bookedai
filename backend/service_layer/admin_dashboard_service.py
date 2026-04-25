@@ -141,14 +141,16 @@ async def build_admin_portal_support_queue(
               pi.metadata_json,
               bi.booking_reference,
               bi.status as booking_status,
-              bi.customer_name,
-              bi.customer_email,
+              coalesce(c.full_name, pi.metadata_json->>'customer_name') as customer_name,
+              coalesce(c.email, pi.metadata_json->>'customer_email') as customer_email,
               smp.name as service_name,
               smp.business_name,
               coalesce(smp.business_email, 'support@bookedai.au') as support_email
             from payment_intents pi
             join booking_intents bi
               on bi.id = pi.booking_intent_id
+            left join contacts c
+              on c.id = bi.contact_id
             left join service_merchant_profiles smp
               on smp.service_id = bi.service_id
             where pi.status in ('failed', 'requires_action', 'payment_follow_up_required')
