@@ -322,8 +322,8 @@ export function AdminPage() {
   }
 
   return (
-    <main className="booked-admin-shell booked-page-shell">
-      <div className="booked-page-frame booked-page-frame--wide booked-page-stack">
+    <main className="booked-admin-shell booked-admin-enterprise-shell">
+      <div className="booked-admin-enterprise-frame">
         <AdminDashboardHeader
           username={username}
           sessionExpiry={sessionExpiry}
@@ -335,14 +335,14 @@ export function AdminPage() {
           onLogout={handleLogout}
         />
 
-        <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
+        <div className="booked-admin-workspace-layout">
           <AdminWorkspaceNav
             activeWorkspace={activeWorkspace}
             apiBaseUrl={apiBaseUrl}
             onWorkspaceChange={changeWorkspace}
           />
 
-          <div className="min-w-0 space-y-6">
+          <div className="booked-admin-workspace-canvas">
             <AdminWorkspaceInsights
               activeWorkspace={activeWorkspace}
               activePanel={activePanel}
