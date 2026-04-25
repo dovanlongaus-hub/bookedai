@@ -54,15 +54,18 @@ Latest implementation continuation from `2026-04-25`:
 - the public customer-facing agent now has a backend turn contract at `POST /api/v1/agents/customer-turn`, returning reply, phase, missing context, suggestions, grounded search payload, and next-agent handoff metadata
 - the public homepage agent now renders an explicit chat thread with user turns, assistant replies, inline top-result cards, and quick suggestions that continue the search inside the conversation
 - the homepage live-read path now consumes that backend customer-turn contract before falling back to the earlier public assistant helper, so UI copy and result payloads come from one reusable agent contract
+- the popup/product assistant now consumes the same backend customer-turn contract before falling back to legacy streaming, keeping public homepage, product proof, and embedded assistant behavior closer together
 - clarification chips now rerun the search with added context, so the visible flow behaves more like a live agent than a static helper panel
 - `POST /api/v1/revenue-ops/handoffs` now lets a customer-facing booking lifecycle spawn queued SME revenue-ops work in `agent_action_runs`
-- the queued revenue-ops handoff currently covers lead follow-up, payment reminder, CRM sync, customer-care status monitoring, and webhook callback, is called by homepage post-booking automation after the best-effort payment and communication steps, and is visible through the admin Reliability ledger filters
+- the queued revenue-ops handoff currently covers lead follow-up, payment reminder, CRM sync, customer-care status monitoring, and webhook callback, is called by homepage plus popup/product post-booking automation after the best-effort payment and communication steps, and is visible through the admin Reliability ledger filters
 
 Next phase carry-forward from `2026-04-25`:
 
 - `docs/development/next-phase-implementation-plan-2026-04-25.md` is now the implementation bridge after Sprint 16
 - Sprint 13-16 completion should hand directly into `Phase 17` full-flow stabilization closeout, then `Phase 18` revenue-ops ledger control, `Phase 19` customer-care/status agent, `Phase 20` widget/plugin runtime, `Phase 21` billing and receivables truth, `Phase 22` reusable templates, and `Phase 23` release governance
 - every user-surface phase must preserve the verified booking success behavior: show a Thank You state after booking, keep downstream automation best-effort, and return to the main BookedAI screen after `5s`
+- Phase 18 has now started in code: tenant users can open an `Ops` workspace panel to inspect BookedAI revenue-ops action state, while admin Reliability gained deeper entity, dependency, and lifecycle-event filters for the same ledger
+- Phase 18 action responses now include derived lifecycle event, dependency state, policy mode, approval requirement, and evidence summary fields so tenant/admin surfaces can explain what BookedAI did after capture without parsing raw action JSON first
 
 ## Surface inventory to build or upgrade
 

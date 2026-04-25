@@ -17,6 +17,130 @@ def _coerce_json_object(value: object) -> dict[str, Any]:
     return dict(value) if isinstance(value, dict) else {}
 
 
+POLICY_GATED_AGENT_ACTION_TYPES = {
+    "booking_confirmation_email",
+    "subscription_start_confirmation",
+    "lead_follow_up",
+    "payment_reminder",
+    "overdue_follow_up",
+    "crm_sync",
+    "report_generation_trigger",
+    "retention_evaluation_trigger",
+    "customer_care_status_monitor",
+    "webhook_callback",
+}
+
+
+def _first_clean_text(*values: object) -> str | None:
+    for value in values:
+        cleaned = _clean_optional_text(value)
+        if cleaned:
+            return cleaned
+    return None
+
+
+def _derive_action_lifecycle_event(
+    *,
+    entity_type: object,
+    input_payload: dict[str, Any],
+    result_payload: dict[str, Any],
+) -> str | None:
+    lifecycle_payload = _coerce_json_object(input_payload.get("lifecycle"))
+    context_payload = _coerce_json_object(input_payload.get("context"))
+    execution_payload = _coerce_json_object(result_payload.get("execution"))
+    return _first_clean_text(
+        input_payload.get("lifecycle_event"),
+        context_payload.get("lifecycle_event"),
+        context_payload.get("agent_handoff"),
+        lifecycle_payload.get("event_type"),
+        lifecycle_payload.get("status"),
+        execution_payload.get("lifecycle_event"),
+        entity_type,
+    )
+
+
+def _derive_action_dependency_state(
+    *,
+    input_payload: dict[str, Any],
+    result_payload: dict[str, Any],
+) -> str | None:
+    lifecycle_payload = _coerce_json_object(input_payload.get("lifecycle"))
+    execution_payload = _coerce_json_object(result_payload.get("execution"))
+    return _first_clean_text(
+        input_payload.get("dependency_state"),
+        lifecycle_payload.get("dependency_state"),
+        lifecycle_payload.get("payment_state"),
+        lifecycle_payload.get("payment_dependency_state"),
+        result_payload.get("dependency_state"),
+        execution_payload.get("dependency_state"),
+    )
+
+
+def _derive_action_policy(
+    *,
+    action_type: object,
+    status: object,
+    input_payload: dict[str, Any],
+    result_payload: dict[str, Any],
+) -> tuple[str, bool]:
+    policy_payload = _coerce_json_object(input_payload.get("policy"))
+    context_payload = _coerce_json_object(input_payload.get("context"))
+    normalized_action = _clean_optional_text(action_type)
+    normalized_status = _clean_optional_text(status)
+    explicit_mode = _first_clean_text(
+        policy_payload.get("mode"),
+        context_payload.get("policy_mode"),
+        result_payload.get("execution_mode"),
+    )
+    policy_mode = explicit_mode or (
+        "policy_gated_auto_run"
+        if normalized_action in POLICY_GATED_AGENT_ACTION_TYPES
+        else "approve_first"
+    )
+    requires_approval = bool(
+        policy_payload.get("requires_approval")
+        or normalized_status in {"manual_review", "failed"}
+        or policy_mode in {"approve_first", "manual_review"}
+        or normalized_action not in POLICY_GATED_AGENT_ACTION_TYPES
+    )
+    return policy_mode, requires_approval
+
+
+def _build_action_evidence_summary(
+    *,
+    input_payload: dict[str, Any],
+    result_payload: dict[str, Any],
+) -> dict[str, Any]:
+    lifecycle_payload = _coerce_json_object(input_payload.get("lifecycle"))
+    context_payload = _coerce_json_object(input_payload.get("context"))
+    service_payload = _coerce_json_object(input_payload.get("service"))
+    customer_payload = _coerce_json_object(input_payload.get("customer"))
+    return {
+        "has_customer_contact": bool(
+            _clean_optional_text(customer_payload.get("email"))
+            or _clean_optional_text(customer_payload.get("phone"))
+            or _clean_optional_text(input_payload.get("guardian_email"))
+            or _clean_optional_text(input_payload.get("guardian_phone"))
+        ),
+        "service_name": _first_clean_text(
+            service_payload.get("service_name"),
+            service_payload.get("name"),
+            input_payload.get("service_name"),
+        ),
+        "requested_slot": _first_clean_text(
+            lifecycle_payload.get("requested_slot"),
+            lifecycle_payload.get("requested_time"),
+            input_payload.get("requested_slot"),
+        ),
+        "source": _first_clean_text(input_payload.get("source"), context_payload.get("source_page")),
+        "outbox_event_type": _first_clean_text(
+            result_payload.get("outbox_event_type"),
+            _coerce_json_object(result_payload.get("execution")).get("outbox_event_type"),
+        ),
+        "issue": _first_clean_text(result_payload.get("issue"), _coerce_json_object(result_payload.get("execution")).get("issue")),
+    }
+
+
 def _build_student_identity_key(
     *,
     student_name: str | None,
@@ -59,6 +183,23 @@ def _build_student_ref(
 
 
 def _format_agent_action_run(item: dict[str, Any]) -> dict[str, Any]:
+    input_payload = _coerce_json_object(item.get("input_json"))
+    result_payload = _coerce_json_object(item.get("result_json"))
+    lifecycle_event = _derive_action_lifecycle_event(
+        entity_type=item.get("entity_type"),
+        input_payload=input_payload,
+        result_payload=result_payload,
+    )
+    dependency_state = _derive_action_dependency_state(
+        input_payload=input_payload,
+        result_payload=result_payload,
+    )
+    policy_mode, requires_approval = _derive_action_policy(
+        action_type=item.get("action_type"),
+        status=item.get("status"),
+        input_payload=input_payload,
+        result_payload=result_payload,
+    )
     return {
         "action_run_id": item.get("action_run_id"),
         "tenant_id": item.get("tenant_id"),
@@ -71,8 +212,16 @@ def _format_agent_action_run(item: dict[str, Any]) -> dict[str, Any]:
         "status": item.get("status"),
         "priority": item.get("priority"),
         "reason": item.get("reason"),
-        "input": _coerce_json_object(item.get("input_json")),
-        "result": _coerce_json_object(item.get("result_json")),
+        "lifecycle_event": lifecycle_event,
+        "dependency_state": dependency_state,
+        "policy_mode": policy_mode,
+        "requires_approval": requires_approval,
+        "evidence": _build_action_evidence_summary(
+            input_payload=input_payload,
+            result_payload=result_payload,
+        ),
+        "input": input_payload,
+        "result": result_payload,
         "created_at": item.get("created_at"),
         "updated_at": item.get("updated_at"),
     }
@@ -651,6 +800,19 @@ async def queue_sme_revenue_operations_handoff(
         "customer": customer_payload,
         "service": service_payload,
         "lifecycle": lifecycle_payload,
+        "lifecycle_event": _clean_optional_text(context.get("lifecycle_event") if context else None)
+        or "booking_lifecycle_handoff",
+        "dependency_state": _first_clean_text(
+            lifecycle_payload.get("dependency_state"),
+            lifecycle_payload.get("payment_state"),
+            lifecycle_payload.get("payment_dependency_state"),
+            "pending",
+        ),
+        "policy": {
+            "mode": "policy_gated_auto_run",
+            "requires_approval": False,
+            "approval_note": "Worker policy can run supported actions; unsupported or degraded provider states move to manual review.",
+        },
         "source": source,
         "context": context or {},
     }
@@ -749,28 +911,56 @@ async def list_academy_agent_actions(
     tenant_id: str | None,
     student_ref: str | None = None,
     booking_reference: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    agent_type: str | None = None,
     status: str | None = None,
     action_type: str | None = None,
+    dependency_state: str | None = None,
+    lifecycle_event: str | None = None,
     limit: int = 25,
 ) -> dict[str, Any]:
     repository = AcademyRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    normalized_limit = min(max(limit, 1), 100)
     action_runs = await repository.list_agent_action_runs(
         tenant_id=tenant_id,
         student_ref=_clean_optional_text(student_ref),
         booking_reference=_clean_optional_text(booking_reference),
+        entity_type=_clean_optional_text(entity_type),
+        entity_id=_clean_optional_text(entity_id),
+        agent_type=_clean_optional_text(agent_type),
         status=_clean_optional_text(status),
         action_type=_clean_optional_text(action_type),
-        limit=min(max(limit, 1), 100),
+        dependency_state=_clean_optional_text(dependency_state),
+        lifecycle_event=_clean_optional_text(lifecycle_event),
+        limit=normalized_limit,
+    )
+    summary = await repository.summarize_agent_action_runs(
+        tenant_id=tenant_id,
+        student_ref=_clean_optional_text(student_ref),
+        booking_reference=_clean_optional_text(booking_reference),
+        entity_type=_clean_optional_text(entity_type),
+        entity_id=_clean_optional_text(entity_id),
+        agent_type=_clean_optional_text(agent_type),
+        action_type=_clean_optional_text(action_type),
+        dependency_state=_clean_optional_text(dependency_state),
+        lifecycle_event=_clean_optional_text(lifecycle_event),
     )
     return {
         "tenant_id": tenant_id,
         "filters": {
             "student_ref": _clean_optional_text(student_ref),
             "booking_reference": _clean_optional_text(booking_reference),
+            "entity_type": _clean_optional_text(entity_type),
+            "entity_id": _clean_optional_text(entity_id),
+            "agent_type": _clean_optional_text(agent_type),
             "status": _clean_optional_text(status),
             "action_type": _clean_optional_text(action_type),
-            "limit": min(max(limit, 1), 100),
+            "dependency_state": _clean_optional_text(dependency_state),
+            "lifecycle_event": _clean_optional_text(lifecycle_event),
+            "limit": normalized_limit,
         },
+        "summary": summary,
         "action_runs": [_format_agent_action_run(item) for item in action_runs],
     }
 

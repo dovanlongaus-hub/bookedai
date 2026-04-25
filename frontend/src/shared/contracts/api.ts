@@ -271,6 +271,11 @@ export interface RevenueAgentActionRun {
   status: string;
   priority: string;
   reason?: string | null;
+  lifecycle_event?: string | null;
+  dependency_state?: string | null;
+  policy_mode?: string | null;
+  requires_approval?: boolean;
+  evidence?: Record<string, unknown> | null;
   input?: Record<string, unknown> | null;
   result?: Record<string, unknown> | null;
   created_at?: string | null;
@@ -305,14 +310,30 @@ export interface ListRevenueAgentActionsRequest {
   deployment_mode?: DeploymentMode | null;
   student_ref?: string | null;
   booking_reference?: string | null;
+  entity_type?: string | null;
+  entity_id?: string | null;
+  agent_type?: string | null;
   status?: string | null;
   action_type?: string | null;
+  dependency_state?: string | null;
+  lifecycle_event?: string | null;
   limit?: number | null;
 }
 
 export interface ListRevenueAgentActionsResponse {
   tenant_id?: string | null;
   filters: Record<string, unknown>;
+  summary?: {
+    total?: number;
+    queued?: number;
+    in_progress?: number;
+    sent?: number;
+    completed?: number;
+    manual_review?: number;
+    failed?: number;
+    needs_attention?: number;
+    [key: string]: unknown;
+  };
   action_runs: RevenueAgentActionRun[];
 }
 

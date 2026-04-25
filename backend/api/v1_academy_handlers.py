@@ -494,8 +494,13 @@ async def list_agent_actions(
     deployment_mode: str | None = None,
     student_ref: str | None = None,
     booking_reference: str | None = None,
+    entity_type: str | None = None,
+    entity_id: str | None = None,
+    agent_type: str | None = None,
     status: str | None = None,
     action_type: str | None = None,
+    dependency_state: str | None = None,
+    lifecycle_event: str | None = None,
     limit: int = 25,
 ):
     actor_context = _query_actor_context(
@@ -514,8 +519,13 @@ async def list_agent_actions(
                 tenant_id=resolved_tenant_id,
                 student_ref=student_ref,
                 booking_reference=booking_reference,
+                entity_type=entity_type,
+                entity_id=entity_id,
+                agent_type=agent_type,
                 status=status,
                 action_type=action_type,
+                dependency_state=dependency_state,
+                lifecycle_event=lifecycle_event,
                 limit=limit,
             )
 

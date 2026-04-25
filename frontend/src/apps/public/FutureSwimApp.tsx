@@ -54,10 +54,10 @@ const quickPrompts = [
 ];
 
 const reassurancePoints = [
-  'Future Swim-only search and booking flow, no marketplace leakage.',
-  'Prices and centre links are loaded from the live BookedAI Future Swim catalogue.',
-  'Lead capture, booking intent, and follow-up email run through the BookedAI API stack.',
-  'The experience is written for parents, not for generic software demos.',
+  'Results and recommendations are limited to Future Swim centres only.',
+  'Prices and centre links reflect the current Future Swim catalogue.',
+  'Booking requests, enquiries, and confirmation emails are handled securely through the BookedAI platform.',
+  'Designed for parents — not a generic chatbot.',
 ];
 
 const initialInquiryFormState: InquiryFormState = {
@@ -138,7 +138,7 @@ function formatAmountBand(services: MatchCandidate[]) {
 
 function buildAssistantReply(results: MatchCandidate[]) {
   if (!results.length) {
-    return 'I could not find a strong centre match from that request yet, but I can still capture your enquiry and route it to the right Future Swim team for follow-up.';
+    return 'I could not find a perfect match from that description. You can still send an enquiry below and the Future Swim team will follow up with you.';
   }
 
   const top = results[0];
@@ -147,7 +147,7 @@ function buildAssistantReply(results: MatchCandidate[]) {
     return `The best current Future Swim matches are ${top.venueName || top.serviceName} and ${second.venueName || second.serviceName}. Choose one below and I’ll move it into the booking flow.`;
   }
 
-  return `The strongest Future Swim match right now is ${top.venueName || top.serviceName}. You can continue straight to enquiry and booking capture below.`;
+  return `The closest Future Swim match is ${top.venueName || top.serviceName}. Continue below to enquire or send a booking request.`;
 }
 
 async function fetchFutureSwimCatalog(): Promise<MatchCandidate[]> {

@@ -12,6 +12,16 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-25`
 
+Implementation update from `2026-04-25` (public brand/menu, live booking QA, and responsive regression):
+
+- replaced the public/product/demo/shared header brand treatment with the uploaded BookedAI logo asset and added cropped responsive logo frames so top-left branding remains readable without causing horizontal overflow
+- added the uploaded `Chess_screen` image to the public homepage immediately before the hero prompt as a professional proof band for the Grandmaster Chess booking flow, with responsive image framing, product context, and compact status cards
+- upgraded the shared landing menu defaults to professional runtime links (`Product`, `Live Demo`, `Tenant Login`, `Roadmap`) and lucide iconography
+- restored regression-stable public homepage action names and visible status copy: `Open Web App`, `Send search`, `Ready to receive`, `Continue to booking`, and `Continue booking`
+- hardened homepage live-read search so the newer customer-agent turn can fail closed into the established v1 matching/search helper instead of blocking the real booking path
+- adjusted clarification gating so service + location queries can show a shortlist immediately while still asking for timing as follow-up context
+- verified with `npm --prefix frontend exec tsc -- --noEmit`, `npm --prefix frontend run build`, local Playwright visual smoke for the new chess proof band at `390px` and `1440px`, `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 PLAYWRIGHT_PUBLIC_ASSISTANT_MODE=live-read npx playwright test tests/public-homepage-responsive.spec.ts --project=live-read`, and focused live-read booking smoke coverage for the v1 booking-intent path plus near-me location guardrail
+
 Planning and execution synchronization update from `2026-04-25` (next phase plan and GitHub closeout):
 
 - added `docs/development/next-phase-implementation-plan-2026-04-25.md` as the executable bridge for the next BookedAI phases after the full-flow QA and Thank You handoff work
@@ -19,14 +29,24 @@ Planning and execution synchronization update from `2026-04-25` (next phase plan
 - updated `prd.md`, `docs/architecture/implementation-phase-roadmap.md`, and `docs/architecture/current-phase-sprint-execution-plan.md` so the roadmap, PRD, and execution plan all point to the same implementation order
 - the current verified release baseline remains the live pitch/product full-flow path with booking success, Thank You confirmation, `5s` return to main BookedAI screen, and downstream revenue-ops handoff
 
+Implementation update from `2026-04-25` (Phase 18 revenue-ops ledger tenant visibility):
+
+- extended the revenue-ops action ledger API so `GET /api/v1/agent-actions` now accepts deeper filters for `entity_type`, `entity_id`, `agent_type`, `dependency_state`, and `lifecycle_event` in addition to tenant, booking, student, status, and action type
+- added a ledger summary payload for total, queued, in-progress, sent, completed, manual-review, failed, and needs-attention counts so admin and tenant surfaces can explain action posture without deriving it only from a limited page of rows
+- added derived action metadata to each ledger response: lifecycle event, dependency state, policy mode, approval requirement, and evidence summary based on the existing action input/result payloads
+- upgraded the admin Reliability ledger with entity-id, dependency-state, and lifecycle-event filters plus policy/evidence summary on each action card, making it easier to trace a booking lifecycle or provider-dependency chain
+- added a tenant-facing `Ops` workspace panel in `frontend/src/apps/tenant/TenantApp.tsx` so tenant users can inspect BookedAI follow-up, payment reminder, CRM sync, customer-care, and webhook action state, including the event/policy/evidence posture, without receiving admin-only transition controls
+- verified with `./.venv/bin/python -m pytest backend/tests/test_api_v1_academy_routes.py backend/tests/test_academy_action_worker.py -q`, `cd frontend && npx tsc --noEmit`, and `npm --prefix frontend run build`
+
 Implementation update from `2026-04-25` (public AI-agent chat and SME revenue-ops handoff):
 
 - added `POST /api/v1/agents/customer-turn` as the reusable customer-facing AI agent turn contract; it accepts a message, chat context, runtime channel context, attribution, and location, then returns an assistant reply, phase, missing context, suggestions, grounded search payload, and next-agent handoff metadata
 - wired `frontend/src/apps/public/HomepageSearchExperience.tsx` to use the new customer-agent turn contract for live-read homepage searches before falling back to the older helper path, so the visible chat thread is now driven by a backend agent response rather than only client-side copy
+- wired `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` to use the same customer-agent turn contract for popup/product assistant searches before falling back to legacy streaming, keeping the public-owned and embedded assistant surfaces aligned
 - upgraded `frontend/src/apps/public/HomepageSearchExperience.tsx` so the homepage keeps an explicit chat thread with user turns, assistant replies, inline top-result mini cards, and suggestion chips that can continue the search from inside the conversation
 - changed clarification-answer chips to continue the same chat path and rerun search with the added context, keeping the customer-facing agent flow closer to `ask -> refine -> show results -> book`
 - added `POST /api/v1/revenue-ops/handoffs` on top of `agent_action_runs`, letting a booking lifecycle event queue SME revenue-operations actions for lead follow-up, payment reminder, CRM sync, customer-care status monitoring, and webhook callback
-- wired homepage post-booking automation to queue that revenue-ops handoff after payment, email, SMS, and WhatsApp best-effort steps, so the customer-facing search/conversation agent now spawns the downstream revenue operations agent
+- wired homepage and popup/product post-booking automation to queue that revenue-ops handoff after payment, email, SMS, and WhatsApp best-effort steps, so the customer-facing search/conversation agent now spawns the downstream revenue operations agent across the main public assistant surfaces
 - updated the revenue-ops worker policy and admin Reliability action filters so generic SME actions and academy actions can both progress through the existing action-run dispatcher without pretending unsupported provider delivery
 - verified with `./.venv/bin/python -m pytest backend/tests/test_api_v1_search_routes.py backend/tests/test_api_v1_academy_routes.py backend/tests/test_academy_action_worker.py -q` and `npm --prefix frontend run build`
 

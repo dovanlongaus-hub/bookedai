@@ -14,20 +14,37 @@ Latest public-search UX update date: `2026-04-25`.
 
 Current top product-surface priority: `responsive homepage web-app UX`.
 
+Latest public brand/menu and booking-flow QA note from `2026-04-25`:
+
+- BookedAI public, product, demo, shared landing, and brand-kit logo paths now use the operator-provided uploaded logo asset, with cropped responsive logo frames so top-left branding stays visible without horizontal overflow
+- the public homepage now includes the operator-provided `Chess_screen` proof image before the hero prompt, framed as a professional chess academy product proof band that stays ahead of the main search-to-booking hero without creating horizontal overflow
+- the shared landing header menu now exposes professional product paths by default: Product, Live Demo, Tenant Login, and Roadmap, using lucide iconography instead of hand-drawn menu glyphs
+- the public search workspace restored stable accessibility names for `Open Web App`, `Send search`, `Ready to receive`, and `Continue booking`, preserving the regression-tested homepage and booking flow after the app-shell redesign
+- homepage live-read search now falls back from the customer-agent turn endpoint to the established v1 matching/search path when the newer customer-agent turn is unavailable, so booking can continue through `lead + booking intent` instead of stalling
+- QA passed with production build, public homepage responsive Playwright coverage, and the live-read booking smoke that submits through the v1 booking intent path
+
 Latest next-phase plan update from `2026-04-25`:
 
 - `docs/development/next-phase-implementation-plan-2026-04-25.md` is now the active implementation bridge for the next BookedAI phases
 - `Phase 17` closes the current full-flow stabilization baseline: pitch package registration, product booking, payment-intent preparation, follow-up automation, Thank You confirmation, and `5s` return to the main BookedAI screen
 - `Phase 18` through `Phase 23` are now ordered as revenue-ops ledger control, customer-care/status agent, widget/plugin runtime, billing and receivables truth, reusable multi-tenant templates, and release governance/scale hardening
 
+Latest Phase 18 implementation note from `2026-04-25`:
+
+- `GET /api/v1/agent-actions` now supports entity, agent-type, dependency-state, and lifecycle-event filters plus ledger summary counts
+- action-run responses now carry derived lifecycle event, dependency state, policy mode, approval requirement, and evidence summary fields without requiring a schema migration
+- admin Reliability can filter action runs by entity id, dependency state, and lifecycle event, then inspect policy/evidence summary beside input/result evidence
+- tenant workspace now includes a read-only `Ops` panel so tenants can see queued, failed, manual-review, sent, and completed BookedAI revenue-ops actions, including what lifecycle event triggered them and whether the action is policy-gated or approval-required
+
 Latest homepage AI-agent continuation note from `2026-04-25`:
 
 - `POST /api/v1/agents/customer-turn` now gives the public customer-facing AI agent a reusable backend turn contract: one chat message in, one grounded assistant reply out, plus search payload, phase, missing context, suggestions, and next-agent handoff metadata
 - `frontend/src/apps/public/HomepageSearchExperience.tsx` now keeps a visible customer-agent chat thread: user turns, assistant replies, inline top-result mini cards, and quick suggestion chips stay in the conversation so the user can continue refining instead of jumping between disconnected panels
 - the homepage live-read path now calls the customer-agent turn contract first, then renders the returned search payload and assistant reply inside the same chat-to-booking workspace
+- `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` now also consumes the same customer-agent turn contract for popup/product assistant searches before falling back to legacy streaming, keeping homepage, product, and embedded assistant behavior aligned
 - clarification chips now continue the same chat flow and rerun search with the added context, keeping the public agent closer to `ask -> refine -> show results -> book`
 - `POST /api/v1/revenue-ops/handoffs` now queues SME revenue-operations actions after a booking lifecycle event, using `agent_action_runs` for lead follow-up, payment reminder, CRM sync, customer-care status monitoring, and webhook callbacks
-- homepage booking automation now calls that handoff after payment and communication best-effort work, so the customer-facing search/conversation agent can spawn the revenue-operations agent for downstream SME operations; admin Reliability can filter those generic SME action types beside the chess academy actions
+- homepage and popup/product booking automation now call that handoff after payment and communication best-effort work, so the customer-facing search/conversation agent can spawn the revenue-operations agent for downstream SME operations; admin Reliability can filter those generic SME action types beside the chess academy actions
 
 Latest product-runtime QA note from `2026-04-24`:
 

@@ -12,6 +12,8 @@ const suggestedSearches = [
   'AI mentor session for startup growth this week',
 ];
 
+const chessScreenImageUrl = 'https://upload.bookedai.au/images/dce7/lLNFvBibyQm8JRNhOLIQVw.png';
+
 const topMenuLinks = [
   { label: 'Chat', href: '#bookedai-search-assistant' },
   { label: 'Product', href: productHref },
@@ -164,6 +166,51 @@ export function PublicApp() {
           </header>
 
           <div className="mx-auto max-w-[1380px] px-4 pb-8 pt-6 sm:px-6 lg:px-8 lg:pb-12">
+            <section aria-labelledby="chess-screen-proof-title" className="mx-auto mb-7 max-w-6xl sm:mb-9">
+              <div className="overflow-hidden rounded-[28px] border border-[#e2e5ea] bg-[#111827] shadow-[0_28px_90px_rgba(15,23,42,0.14)]">
+                <div className="grid items-stretch lg:grid-cols-[minmax(0,0.92fr)_minmax(360px,0.48fr)]">
+                  <div className="relative min-h-[260px] overflow-hidden bg-[#0b1120] sm:min-h-[360px] lg:min-h-[440px]">
+                    <img
+                      src={chessScreenImageUrl}
+                      alt="Chess academy booking flow running inside BookedAI"
+                      className="h-full w-full object-cover object-top"
+                      loading="eager"
+                    />
+                    <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,rgba(17,24,39,0)_0%,rgba(17,24,39,0.72)_100%)] lg:hidden" />
+                  </div>
+
+                  <div className="flex flex-col justify-between gap-6 bg-[linear-gradient(180deg,#111827_0%,#0f172a_100%)] p-5 text-white sm:p-6 lg:p-8">
+                    <div>
+                      <div className="inline-flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.08] px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#8EFCE0]">
+                        <span className="h-2 w-2 rounded-full bg-emerald-400" />
+                        Chess academy proof
+                      </div>
+                      <h2 id="chess-screen-proof-title" className="mt-4 text-2xl font-semibold leading-tight tracking-[-0.04em] text-white sm:text-3xl lg:text-4xl">
+                        A real booking surface before the buyer starts typing.
+                      </h2>
+                      <p className="mt-4 text-sm leading-7 text-slate-300 sm:text-[15px]">
+                        The Grandmaster Chess flow shows how BookedAI presents a service business with search, assessment,
+                        placement, booking intent, and follow-up context in one professional customer journey.
+                      </p>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                      {[
+                        ['Tenant', 'GM Chess Academy'],
+                        ['Flow', 'Search to booking'],
+                        ['Status', 'Live API backed'],
+                      ].map(([label, value]) => (
+                        <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
+                          <div className="mt-1 text-sm font-semibold leading-6 text-white">{value}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
             <section id="hero" className="mx-auto max-w-[980px] text-center">
               <div className="mx-auto inline-flex items-center gap-2 rounded-full border border-[#e3e3e7] bg-white px-3 py-1.5 text-xs font-semibold text-[#5f6368] shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />

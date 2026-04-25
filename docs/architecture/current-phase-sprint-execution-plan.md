@@ -34,6 +34,7 @@ Latest next-phase update from `2026-04-25`:
 - the immediate execution plan after the full-flow QA pass is now documented in `docs/development/next-phase-implementation-plan-2026-04-25.md`
 - current closeout is `Phase 17 - Full-flow stabilization`, covering pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You confirmation, and return to the main BookedAI screen after `5s`
 - the next implementation sequence is now `Phase 18` revenue-ops ledger control, `Phase 19` customer-care/status agent, `Phase 20` widget/plugin runtime, `Phase 21` billing and receivables truth, `Phase 22` reusable tenant templates, and `Phase 23` release governance
+- the public brand/menu and live booking lane were re-checked after the uploaded logo rollout: demo/product/pitch/tenant now render without horizontal overflow on mobile and desktop, the customer-agent live-read path falls back to the v1 matching/search contract when needed, and the live stack health gate passed after deployment
 
 ## Source-of-truth inputs
 
@@ -287,7 +288,7 @@ The immediate post-Sprint-16 working cadence is now locked to:
 The post-release implementation order is now:
 
 1. finish `Phase 17` documentation and GitHub submission for the verified full-flow stabilization work
-2. extend `Phase 18` so admin and tenant operators can inspect, filter, dispatch, transition, and audit revenue-ops action runs
+2. extend `Phase 18` so admin and tenant operators can inspect, filter, dispatch, transition, and audit revenue-ops action runs, including lifecycle-event, dependency, policy, and evidence-summary posture
 3. implement `Phase 19` customer-care/status replies using booking, payment, subscription, report, communication, and action-run state
 4. implement `Phase 20` widget/plugin install identity for SME-owned websites and prove one tenant-branded embed flow end to end
 5. implement `Phase 21` billing, receivable, subscription, reminder, and commission truth after the ledger evidence model is stable

@@ -305,6 +305,7 @@ function normalizeRevenueAgentActionRun(value: unknown): RevenueAgentActionRun {
   const action = isRecord(value) ? value : {};
   const input = action.input ?? action.input_json;
   const result = action.result ?? action.result_json;
+  const evidence = action.evidence ?? action.evidence_summary;
   return {
     action_run_id: readString(action, 'action_run_id', 'actionRunId') ?? '',
     tenant_id: readString(action, 'tenant_id', 'tenantId'),
@@ -317,6 +318,11 @@ function normalizeRevenueAgentActionRun(value: unknown): RevenueAgentActionRun {
     status: readString(action, 'status') ?? 'queued',
     priority: readString(action, 'priority') ?? 'normal',
     reason: readString(action, 'reason'),
+    lifecycle_event: readString(action, 'lifecycle_event', 'lifecycleEvent'),
+    dependency_state: readString(action, 'dependency_state', 'dependencyState'),
+    policy_mode: readString(action, 'policy_mode', 'policyMode'),
+    requires_approval: readBoolean(action, 'requires_approval', 'requiresApproval'),
+    evidence: isRecord(evidence) ? evidence : null,
     input: isRecord(input) ? input : null,
     result: isRecord(result) ? result : null,
     created_at: readString(action, 'created_at', 'createdAt'),
@@ -998,8 +1004,13 @@ export async function listRevenueAgentActions(request: ListRevenueAgentActionsRe
   appendQueryParam(query, 'deployment_mode', request.deployment_mode);
   appendQueryParam(query, 'student_ref', request.student_ref);
   appendQueryParam(query, 'booking_reference', request.booking_reference);
+  appendQueryParam(query, 'entity_type', request.entity_type);
+  appendQueryParam(query, 'entity_id', request.entity_id);
+  appendQueryParam(query, 'agent_type', request.agent_type);
   appendQueryParam(query, 'status', request.status);
   appendQueryParam(query, 'action_type', request.action_type);
+  appendQueryParam(query, 'dependency_state', request.dependency_state);
+  appendQueryParam(query, 'lifecycle_event', request.lifecycle_event);
   appendQueryParam(query, 'limit', request.limit ?? 25);
 
   const envelope = await requestV1Envelope<ListRevenueAgentActionsResponse>(
@@ -1017,6 +1028,7 @@ export async function listRevenueAgentActions(request: ListRevenueAgentActionsRe
     data: {
       tenant_id: readString(data, 'tenant_id', 'tenantId'),
       filters: isRecord(data.filters) ? data.filters : {},
+      summary: isRecord(data.summary) ? data.summary : {},
       action_runs: actionRuns.map(normalizeRevenueAgentActionRun),
     },
   };

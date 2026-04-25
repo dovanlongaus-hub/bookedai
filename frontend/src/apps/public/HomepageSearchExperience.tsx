@@ -266,7 +266,7 @@ function shouldHoldResultsForClarification(query: string) {
   const needs = deriveClarificationNeeds(query);
   return {
     needs,
-    hold: needs.length >= 2,
+    hold: needs.includes('location') && needs.length >= 2,
   };
 }
 
@@ -2282,37 +2282,41 @@ export function HomepageSearchExperience({
     setComposerCollapsed(false);
 
     async function requestCustomerAgentTurn(nextGeoContext?: UserGeoContext | null) {
-      const response = await apiV1.createCustomerAgentTurn({
-        message: effectiveQuery,
-        conversation_id: bookingAssistantV1SessionIdRef.current,
-        messages: priorAgentMessages,
-        location: nextGeoContext?.locality ?? geoContext?.locality ?? null,
-        preferences: selectedServiceId ? { requested_service_id: selectedServiceId } : null,
-        channel_context: {
-          channel: homepageRuntimeConfig.channel ?? 'public_web',
-          tenant_ref: homepageRuntimeConfig.tenantRef ?? null,
-          deployment_mode: homepageRuntimeConfig.deploymentMode ?? 'standalone_app',
-          widget_id: homepageRuntimeConfig.widgetId ?? 'bookedai-homepage-live-read',
-        },
-        attribution: {
-          source: homepageRuntimeConfig.source ?? 'bookedai_homepage',
-          medium: homepageRuntimeConfig.medium ?? 'bookedai_owned_website',
-          campaign: homepageRuntimeConfig.campaign ?? 'bookedai_homepage_live_read',
-          keyword: trimmedQuery,
-          landing_path: sourcePath,
-        },
-        user_location: nextGeoContext
-          ? { latitude: nextGeoContext.latitude, longitude: nextGeoContext.longitude }
-          : geoContext
-            ? { latitude: geoContext.latitude, longitude: geoContext.longitude }
-            : null,
-        context: {
-          surface: homepageRuntimeConfig.surface ?? 'bookedai_homepage_search_shell',
-          attached_reference_count: attachedReferences.length,
-        },
-      });
+      try {
+        const response = await apiV1.createCustomerAgentTurn({
+          message: effectiveQuery,
+          conversation_id: bookingAssistantV1SessionIdRef.current,
+          messages: priorAgentMessages,
+          location: nextGeoContext?.locality ?? geoContext?.locality ?? null,
+          preferences: selectedServiceId ? { requested_service_id: selectedServiceId } : null,
+          channel_context: {
+            channel: homepageRuntimeConfig.channel ?? 'public_web',
+            tenant_ref: homepageRuntimeConfig.tenantRef ?? null,
+            deployment_mode: homepageRuntimeConfig.deploymentMode ?? 'standalone_app',
+            widget_id: homepageRuntimeConfig.widgetId ?? 'bookedai-homepage-live-read',
+          },
+          attribution: {
+            source: homepageRuntimeConfig.source ?? 'bookedai_homepage',
+            medium: homepageRuntimeConfig.medium ?? 'bookedai_owned_website',
+            campaign: homepageRuntimeConfig.campaign ?? 'bookedai_homepage_live_read',
+            keyword: trimmedQuery,
+            landing_path: sourcePath,
+          },
+          user_location: nextGeoContext
+            ? { latitude: nextGeoContext.latitude, longitude: nextGeoContext.longitude }
+            : geoContext
+              ? { latitude: geoContext.latitude, longitude: geoContext.longitude }
+              : null,
+          context: {
+            surface: homepageRuntimeConfig.surface ?? 'bookedai_homepage_search_shell',
+            attached_reference_count: attachedReferences.length,
+          },
+        });
 
-      return 'data' in response ? response.data : null;
+        return 'data' in response ? response.data : null;
+      } catch {
+        return null;
+      }
     }
 
     if (clarificationDecision.hold) {
@@ -3600,7 +3604,7 @@ export function HomepageSearchExperience({
                             onClick={() => commitServiceSelection(service, { focusNameField: true })}
                             className="inline-flex items-center rounded-xl border border-[#111827] bg-[#111827] px-3.5 py-2 text-[11px] font-semibold text-white transition hover:bg-[#1f2937]"
                           >
-                            Book
+                            Continue to booking
                           </button>
                         </div>
                       </div>

@@ -139,6 +139,12 @@ type BookingAssistantSessionResponse = {
       provider?: string | null;
       warnings: string[];
     } | null;
+    revenueOps?: {
+      status: string;
+      actionCount: number;
+      actionTypes: string[];
+      warnings: string[];
+    } | null;
   } | null;
 };
 
@@ -186,6 +192,8 @@ type ChatMessage = {
   matchedServices?: ServiceCatalogItem[];
   matchedEvents?: AIEventItem[];
 };
+
+type PublicAssistantLiveReadResult = Awaited<ReturnType<typeof getPublicBookingAssistantLiveReadRecommendation>>;
 
 type BookingAssistantDialogProps = {
   content: BookingAssistantContent;
@@ -1670,6 +1678,110 @@ export function BookingAssistantDialog({
     return payload as BookingAssistantSessionResponse;
   }
 
+  async function requestCustomerAgentTurn(
+    query: string,
+    conversationMessages: ChatMessage[],
+    geoContext: UserGeoContext | null,
+    previousService: ServiceCatalogItem | null,
+  ) {
+    const response = await apiV1.createCustomerAgentTurn({
+      message: query,
+      conversation_id: bookingAssistantV1SessionIdRef.current,
+      messages: conversationMessages.slice(-8).map((message) => ({
+        role: message.role,
+        content: message.content,
+      })),
+      location: geoContext?.locality ?? null,
+      preferences: {
+        service_category: previousService?.category ?? null,
+        requested_service_id: selectedServiceId || null,
+      },
+      channel_context: {
+        channel: runtimeConfig?.channel ?? 'public_web',
+        tenant_ref: runtimeConfig?.tenantRef ?? null,
+        deployment_mode: runtimeConfig?.deploymentMode ?? 'standalone_app',
+        widget_id: runtimeConfig?.widgetId ?? 'public-booking-assistant',
+      },
+      attribution: {
+        source: runtimeConfig?.source ?? 'public_booking_assistant',
+        medium: runtimeConfig?.medium ?? 'website',
+        campaign: runtimeConfig?.campaign ?? 'public_booking_assistant',
+        keyword: query,
+        landing_path: assistantSourcePath,
+      },
+      user_location: geoContext
+        ? {
+            latitude: geoContext.latitude,
+            longitude: geoContext.longitude,
+          }
+        : null,
+      context: {
+        surface: runtimeConfig?.surface ?? (isProductAppLayout ? 'product_app_assistant' : 'booking_assistant_dialog'),
+        layout_mode: layoutMode,
+      },
+    });
+
+    return 'data' in response ? response.data : null;
+  }
+
+  function buildLiveReadFromCustomerAgentTurn(
+    agentTurn: Awaited<ReturnType<typeof requestCustomerAgentTurn>>,
+  ): PublicAssistantLiveReadResult | null {
+    if (!agentTurn?.search) {
+      return null;
+    }
+
+    const search = agentTurn.search;
+    const queryUnderstanding = search.query_understanding;
+    const semanticAssist = search.semantic_assist;
+    return {
+      candidateIds: search.candidates.map((candidate) => candidate.candidateId),
+      rankedCandidates: search.candidates,
+      recommendedCandidateIds: search.recommendations
+        .map((recommendation) => recommendation.candidateId)
+        .filter(Boolean),
+      suggestedServiceId:
+        search.recommendations[0]?.candidateId ??
+        search.candidates[0]?.candidateId ??
+        null,
+      queryUnderstandingSummary: queryUnderstanding
+        ? {
+            normalizedQuery: queryUnderstanding.normalizedQuery ?? null,
+            inferredLocation: queryUnderstanding.inferredLocation ?? null,
+            locationTerms: queryUnderstanding.locationTerms ?? [],
+            coreIntentTerms: queryUnderstanding.coreIntentTerms ?? [],
+            expandedIntentTerms: queryUnderstanding.expandedIntentTerms ?? [],
+            constraintTerms: queryUnderstanding.constraintTerms ?? [],
+            requestedCategory: queryUnderstanding.requestedCategory ?? null,
+            budgetLimit: queryUnderstanding.budgetLimit ?? null,
+            nearMeRequested: Boolean(queryUnderstanding.nearMeRequested),
+            isChatStyle: Boolean(queryUnderstanding.isChatStyle),
+            requestedDate: queryUnderstanding.requestedDate ?? null,
+            requestedTime: queryUnderstanding.requestedTime ?? null,
+            scheduleHint: queryUnderstanding.scheduleHint ?? null,
+            partySize: queryUnderstanding.partySize ?? null,
+            intentLabel: queryUnderstanding.intentLabel ?? null,
+            summary: queryUnderstanding.summary ?? null,
+          }
+        : null,
+      semanticAssistSummary: semanticAssist
+        ? {
+            provider: semanticAssist.provider ?? null,
+            providerChain: semanticAssist.providerChain ?? [],
+            fallbackApplied: Boolean(semanticAssist.fallbackApplied),
+            normalizedQuery: semanticAssist.normalizedQuery ?? null,
+            inferredLocation: semanticAssist.inferredLocation ?? null,
+            inferredCategory: semanticAssist.inferredCategory ?? null,
+          }
+        : null,
+      warnings: search.warnings,
+      trustSummary: null,
+      bookingRequestSummary: search.booking_context?.summary ?? null,
+      bookingPathSummary: null,
+      usedLiveRead: true,
+    };
+  }
+
   async function runPostBookingAutomation(params: {
     bookingIntentId: string;
     bookingReference: string;
@@ -1778,10 +1890,8 @@ export function BookingAssistantDialog({
           provider: null,
           warnings: ['WhatsApp follow-up requires an international-format phone number such as +61400000000.'],
         };
-        return automation;
-      }
-
-      try {
+      } else {
+        try {
         const smsResponse = await apiV1.sendSmsMessage({
           to: phone,
           template_key: 'bookedai_booking_confirmation',
@@ -1811,7 +1921,7 @@ export function BookingAssistantDialog({
         };
       }
 
-      try {
+        try {
         const whatsappResponse = await apiV1.sendWhatsAppMessage({
           to: phone,
           template_key: 'bookedai_booking_confirmation',
@@ -1840,6 +1950,56 @@ export function BookingAssistantDialog({
           warnings: [error instanceof Error ? error.message : 'WhatsApp automation failed.'],
         };
       }
+      }
+    }
+
+    try {
+      const handoffResponse = await apiV1.queueRevenueOpsHandoff({
+        booking_reference: params.bookingReference,
+        booking_intent_id: params.bookingIntentId,
+        customer: {
+          name: params.customerName.trim(),
+          email: params.customerEmail,
+          phone: params.customerPhone,
+        },
+        service: {
+          service_id: params.selectedService.id,
+          service_name: params.selectedService.name,
+          category: params.selectedService.category,
+          venue_name: params.selectedService.venue_name,
+          location: params.selectedService.location,
+          booking_path: params.bookingPath,
+        },
+        lifecycle: {
+          requested_slot: slotLabel,
+          payment_allowed_before_confirmation: params.paymentAllowedBeforeConfirmation,
+          payment_link: params.paymentLink ?? null,
+          portal_url: params.portalUrl ?? null,
+          notes: params.notes,
+        },
+        actor_context: actorContext,
+        context: {
+          source_page: assistantSourcePath,
+          agent_handoff: 'assistant_dialog_to_revenue_operations',
+          layout_mode: layoutMode,
+        },
+      });
+
+      if ('data' in handoffResponse) {
+        automation.revenueOps = {
+          status: 'queued',
+          actionCount: handoffResponse.data.queued_actions.length,
+          actionTypes: handoffResponse.data.queued_actions.map((action: { action_type: string }) => action.action_type),
+          warnings: [],
+        };
+      }
+    } catch (error) {
+      automation.revenueOps = {
+        status: 'manual_review',
+        actionCount: 0,
+        actionTypes: [],
+        warnings: [error instanceof Error ? error.message : 'Revenue operations handoff could not be queued.'],
+      };
     }
 
     return automation;
@@ -2835,20 +2995,29 @@ export function BookingAssistantDialog({
     setPreviewService(null);
     setLiveReadSummary(null);
     try {
-      const liveReadPromise = getPublicBookingAssistantLiveReadRecommendation({
-        query: trimmedMessage,
-        sourcePage: assistantSourcePath,
-        locationHint: userGeoContext?.locality ?? null,
-        serviceCategory: previousSelectedService?.category ?? null,
-        selectedServiceId: selectedServiceId || null,
-        userLocation: userGeoContext
-          ? {
-              latitude: userGeoContext.latitude,
-              longitude: userGeoContext.longitude,
-            }
-          : null,
-        runtimeConfig,
-      });
+      let agentTurn = await requestCustomerAgentTurn(
+        trimmedMessage,
+        nextMessages,
+        userGeoContext,
+        previousSelectedService,
+      ).catch(() => null);
+      const agentTurnLiveRead = buildLiveReadFromCustomerAgentTurn(agentTurn);
+      let liveReadPromise = agentTurnLiveRead
+        ? Promise.resolve(agentTurnLiveRead)
+        : getPublicBookingAssistantLiveReadRecommendation({
+            query: trimmedMessage,
+            sourcePage: assistantSourcePath,
+            locationHint: userGeoContext?.locality ?? null,
+            serviceCategory: previousSelectedService?.category ?? null,
+            selectedServiceId: selectedServiceId || null,
+            userLocation: userGeoContext
+              ? {
+                  latitude: userGeoContext.latitude,
+                  longitude: userGeoContext.longitude,
+                }
+              : null,
+            runtimeConfig,
+          });
       const shadowSearchPromise = bookingAssistantV1Enabled
         ? shadowPublicBookingAssistantSearch({
             query: trimmedMessage,
@@ -2873,16 +3042,36 @@ export function BookingAssistantDialog({
       const streamingPlaceholderMsg: ChatMessage = { role: 'assistant', content: '' };
       setMessages((current) => [...current, streamingPlaceholderMsg]);
 
-      let payload = await requestChatReplyStreaming(nextMessages, null, (partial) => {
+      let payload: BookingAssistantChatResponse;
+      if (agentTurn?.reply) {
+        payload = {
+          status: 'ok',
+          reply: agentTurn.reply,
+          matched_services: [],
+          matched_events: [],
+          suggested_service_id: agentTurn.search?.candidates[0]?.candidateId ?? null,
+          should_request_location: agentTurn.missing_context.includes('location'),
+        };
         setMessages((current) => {
           const updated = [...current];
           const lastIdx = updated.length - 1;
           if (updated[lastIdx]?.role === 'assistant') {
-            updated[lastIdx] = { ...updated[lastIdx], content: partial };
+            updated[lastIdx] = { ...updated[lastIdx], content: agentTurn?.reply ?? '' };
           }
           return updated;
         });
-      });
+      } else {
+        payload = await requestChatReplyStreaming(nextMessages, null, (partial) => {
+          setMessages((current) => {
+            const updated = [...current];
+            const lastIdx = updated.length - 1;
+            if (updated[lastIdx]?.role === 'assistant') {
+              updated[lastIdx] = { ...updated[lastIdx], content: partial };
+            }
+            return updated;
+          });
+        });
+      }
 
       if (
         payload.should_request_location &&
@@ -2891,7 +3080,39 @@ export function BookingAssistantDialog({
       ) {
         const geoContext = await requestGeoContext();
         if (geoContext) {
-          payload = await requestChatReplyStreaming(nextMessages, geoContext);
+          agentTurn = await requestCustomerAgentTurn(
+            trimmedMessage,
+            nextMessages,
+            geoContext,
+            previousSelectedService,
+          ).catch(() => agentTurn);
+          if (agentTurn?.reply) {
+            payload = {
+              status: 'ok',
+              reply: agentTurn.reply,
+              matched_services: [],
+              matched_events: [],
+              suggested_service_id: agentTurn.search?.candidates[0]?.candidateId ?? null,
+              should_request_location: agentTurn.missing_context.includes('location'),
+            };
+            const refreshedAgentTurnLiveRead = buildLiveReadFromCustomerAgentTurn(agentTurn);
+            liveReadPromise = refreshedAgentTurnLiveRead
+              ? Promise.resolve(refreshedAgentTurnLiveRead)
+              : getPublicBookingAssistantLiveReadRecommendation({
+                  query: trimmedMessage,
+                  sourcePage: assistantSourcePath,
+                  locationHint: geoContext.locality ?? null,
+                  serviceCategory: previousSelectedService?.category ?? null,
+                  selectedServiceId: selectedServiceId || null,
+                  userLocation: {
+                    latitude: geoContext.latitude,
+                    longitude: geoContext.longitude,
+                  },
+                  runtimeConfig,
+                });
+          } else {
+            payload = await requestChatReplyStreaming(nextMessages, geoContext);
+          }
         } else {
           setMessages((current) => [
             ...current,

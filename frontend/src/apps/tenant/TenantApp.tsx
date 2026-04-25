@@ -17,6 +17,7 @@ import type {
   TenantOverviewPriority,
   TenantOverviewResponse,
   TenantPluginInterfaceResponse,
+  RevenueAgentActionRun,
   TenantRevenueMetrics,
   TenantTeamResponse,
 } from '../../shared/contracts';
@@ -57,7 +58,7 @@ import {
 } from '../../shared/presenters/partnerMatch';
 import { getApiBaseUrl } from '../../shared/config/api';
 
-type TenantPanel = 'overview' | 'experience' | 'catalog' | 'plugin' | 'bookings' | 'leads' | 'integrations' | 'billing' | 'team';
+type TenantPanel = 'overview' | 'experience' | 'catalog' | 'plugin' | 'bookings' | 'leads' | 'operations' | 'integrations' | 'billing' | 'team';
 type CatalogStatusFilter = 'all' | 'search-ready' | 'needs-review' | 'inactive';
 
 type TenantLoadState =
@@ -212,6 +213,7 @@ function resolveInitialPanel(): TenantPanel {
     || hash === 'plugin'
     || hash === 'integrations'
     || hash === 'billing'
+    || hash === 'operations'
     || hash === 'team'
   ) {
     return hash;
@@ -404,6 +406,50 @@ function deriveSourceContribution(overview: TenantOverviewResponse) {
     sourceBuckets.set(key, (sourceBuckets.get(key) ?? 0) + 1);
   }
   return Array.from(sourceBuckets.entries()).sort((a, b) => b[1] - a[1]).slice(0, 3);
+}
+
+function countRevenueOpsByStatus(actions: RevenueAgentActionRun[]) {
+  return actions.reduce<Record<string, number>>((accumulator, action) => {
+    accumulator[action.status] = (accumulator[action.status] ?? 0) + 1;
+    return accumulator;
+  }, {});
+}
+
+function tenantActionLabel(actionType: string) {
+  return actionType
+    .split('_')
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+    .join(' ');
+}
+
+function tenantActionStatusClass(status: string) {
+  if (status === 'completed' || status === 'sent') {
+    return 'border-emerald-100 bg-emerald-50 text-emerald-700';
+  }
+  if (status === 'failed' || status === 'manual_review') {
+    return 'border-rose-100 bg-rose-50 text-rose-700';
+  }
+  if (status === 'in_progress') {
+    return 'border-sky-100 bg-sky-50 text-sky-700';
+  }
+  return 'border-amber-100 bg-amber-50 text-amber-700';
+}
+
+function tenantActionPolicyClass(action: RevenueAgentActionRun) {
+  if (action.requires_approval) {
+    return 'border-rose-100 bg-rose-50 text-rose-700';
+  }
+  return 'border-emerald-100 bg-emerald-50 text-emerald-700';
+}
+
+function formatTenantActionMetadata(value?: string | null) {
+  return value ? value.replace(/_/g, ' ') : 'not recorded';
+}
+
+function getEvidenceText(action: RevenueAgentActionRun, key: string) {
+  const value = action.evidence?.[key];
+  return typeof value === 'string' && value.trim() ? value : null;
 }
 
 function derivePaidRevenueAud(billing: TenantBillingResponse, revenueMetrics: TenantRevenueMetrics | null) {
@@ -766,6 +812,11 @@ export function TenantApp() {
   const [revenueMetrics, setRevenueMetrics] = useState<TenantRevenueMetrics | null>(null);
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [leadsStatusFilter, setLeadsStatusFilter] = useState<string>('all');
+  const [operationsLoading, setOperationsLoading] = useState(false);
+  const [operationsStatusFilter, setOperationsStatusFilter] = useState<string>('queued');
+  const [operationsActions, setOperationsActions] = useState<RevenueAgentActionRun[]>([]);
+  const [operationsSummary, setOperationsSummary] = useState<Record<string, unknown>>({});
+  const [operationsError, setOperationsError] = useState<string | null>(null);
   const [session, setSession] = useState<StoredTenantSession | null>(() => readStoredTenantSession(tenantRef));
   const [googleReady, setGoogleReady] = useState(false);
   const [authPending, setAuthPending] = useState(false);
@@ -1111,6 +1162,46 @@ export function TenantApp() {
       .finally(() => setLeadsLoading(false));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [panel, state.status, 'leads' in state ? state.leads : null]);
+
+  useEffect(() => {
+    if (panel !== 'operations' || state.status !== 'ready') return;
+    const tenantSlug =
+      session?.membership?.tenant_slug ?? session?.tenant?.slug ?? tenantRef ?? null;
+    if (!tenantSlug) return;
+    setOperationsLoading(true);
+    setOperationsError(null);
+    apiV1
+      .listRevenueAgentActions({
+        channel: 'tenant_app',
+        tenant_ref: tenantSlug,
+        actor_id: session?.user.email ?? null,
+        role: session?.membership?.role ?? 'tenant_operator',
+        deployment_mode: 'standalone_app',
+        status: operationsStatusFilter === 'all' ? null : operationsStatusFilter,
+        limit: 30,
+      })
+      .then((env) => {
+        if (env.status === 'ok') {
+          setOperationsActions(env.data.action_runs);
+          setOperationsSummary(env.data.summary ?? {});
+          return;
+        }
+        setOperationsError('Revenue operations actions could not be loaded for this tenant.');
+      })
+      .catch((error: unknown) => {
+        setOperationsError(error instanceof Error ? error.message : 'Revenue operations actions could not be loaded.');
+      })
+      .finally(() => setOperationsLoading(false));
+  }, [
+    panel,
+    state.status,
+    operationsStatusFilter,
+    session?.membership?.tenant_slug,
+    session?.membership?.role,
+    session?.tenant?.slug,
+    session?.user.email,
+    tenantRef,
+  ]);
 
   useEffect(() => {
     if (!googleClientId || typeof window === 'undefined') {
@@ -2807,6 +2898,12 @@ export function TenantApp() {
       icon: <SearchIcon className="h-4 w-4" />,
     },
     {
+      key: 'operations',
+      label: 'Ops',
+      description: 'BookedAI follow-up, reminders, and automation state.',
+      icon: <SparkIcon className="h-4 w-4" />,
+    },
+    {
       key: 'integrations',
       label: 'Integrations',
       description: 'Provider posture, alerts, and retry signals.',
@@ -2826,8 +2923,8 @@ export function TenantApp() {
     },
   ];
   const activePanelMeta = tenantPanels.find((item) => item.key === panel) ?? tenantPanels[0];
-  const activePanelGuide = panel !== 'leads'
-    ? overview.workspace.guides[panel === 'experience' ? 'experience' : panel as Exclude<typeof panel, 'leads'>]
+  const activePanelGuide = panel !== 'leads' && panel !== 'operations'
+    ? overview.workspace.guides[panel === 'experience' ? 'experience' : panel as Exclude<typeof panel, 'leads' | 'operations'>]
     : undefined;
   const introPreview = stripHtmlPreview(overview.workspace.introduction_html);
   const activationState = useMemo(
@@ -4382,6 +4479,153 @@ export function TenantApp() {
                       </div>
                     );
                   })
+                )}
+              </div>
+            </article>
+          </section>
+        ) : null}
+
+        {panel === 'operations' ? (
+          <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
+            <div className="space-y-6">
+              <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Revenue operations
+                </div>
+                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                  What BookedAI is doing after capture
+                </h2>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                  Review follow-up, payment reminder, CRM sync, customer-care, and webhook actions
+                  created after leads or bookings. Tenant users can inspect state here while admin keeps
+                  transition and dispatch control.
+                </p>
+                <div className="mt-4 rounded-[1rem] border border-sky-100 bg-sky-50 px-4 py-3 text-sm leading-6 text-sky-800">
+                  Each item now shows the lifecycle event, dependency posture, policy gate, and evidence
+                  summary that BookedAI used before the revenue-operations worker or admin takes action.
+                </div>
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  {[
+                    ['Queued', 'queued'],
+                    ['Manual', 'manual_review'],
+                    ['Failed', 'failed'],
+                    ['Done', 'completed'],
+                  ].map(([label, key]) => {
+                    const fallback = countRevenueOpsByStatus(operationsActions)[key] ?? 0;
+                    const value = Number(operationsSummary[key] ?? fallback ?? 0);
+                    return (
+                      <div key={key} className="rounded-[1rem] border border-slate-200 bg-slate-50 px-3 py-3 text-center">
+                        <div className="text-2xl font-semibold text-slate-950">{Number.isFinite(value) ? value : 0}</div>
+                        <div className="mt-0.5 text-[11px] text-slate-500">{label}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </article>
+
+              <div className="flex gap-2 overflow-x-auto pb-1 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+                {(['all', 'queued', 'manual_review', 'failed', 'sent', 'completed'] as const).map((status) => (
+                  <button
+                    key={status}
+                    type="button"
+                    onClick={() => setOperationsStatusFilter(status)}
+                    className={`shrink-0 rounded-full border px-4 py-1.5 text-xs font-medium transition-colors ${
+                      status === operationsStatusFilter
+                        ? 'border-slate-900 bg-slate-900 text-white'
+                        : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300'
+                    }`}
+                  >
+                    {status === 'all' ? 'All' : status.replace(/_/g, ' ')}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    Action ledger
+                  </div>
+                  <h3 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+                    {operationsStatusFilter === 'all' ? 'All' : operationsStatusFilter.replace(/_/g, ' ')} actions
+                  </h3>
+                </div>
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-xs font-semibold text-slate-600">
+                  Tenant view
+                </span>
+              </div>
+
+              {operationsError ? (
+                <div className="mt-4 rounded-[1rem] border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                  {operationsError}
+                </div>
+              ) : null}
+
+              <div className="mt-4 space-y-3">
+                {operationsLoading ? (
+                  [...Array(4)].map((_, index) => (
+                    <div key={index} className="h-20 animate-pulse rounded-[1rem] bg-slate-100" />
+                  ))
+                ) : operationsActions.length === 0 ? (
+                  <div className="rounded-[1rem] border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-400">
+                    No revenue operations actions match this tenant filter.
+                  </div>
+                ) : (
+                  operationsActions.map((action) => (
+                    <div
+                      key={action.action_run_id}
+                      className="rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4"
+                    >
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${tenantActionStatusClass(action.status)}`}>
+                              {action.status.replace(/_/g, ' ')}
+                            </span>
+                            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                              {action.priority}
+                            </span>
+                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${tenantActionPolicyClass(action)}`}>
+                              {action.requires_approval ? 'approval needed' : 'policy gated'}
+                            </span>
+                          </div>
+                          <div className="mt-2 text-sm font-semibold text-slate-950">
+                            {tenantActionLabel(action.action_type)}
+                          </div>
+                          <div className="mt-1 text-xs leading-5 text-slate-500 line-clamp-2">
+                            {action.reason || 'BookedAI created this lifecycle action from a lead or booking event.'}
+                          </div>
+                          <div className="mt-3 grid gap-2 text-[11px] font-medium text-slate-500 sm:grid-cols-2">
+                            <span>Event: {formatTenantActionMetadata(action.lifecycle_event)}</span>
+                            <span>Dependency: {formatTenantActionMetadata(action.dependency_state)}</span>
+                            <span>Policy: {formatTenantActionMetadata(action.policy_mode)}</span>
+                            <span>{action.booking_reference ? `Booking ${action.booking_reference}` : action.entity_type || 'Lifecycle action'}</span>
+                          </div>
+                          {(getEvidenceText(action, 'service_name') || getEvidenceText(action, 'requested_slot') || getEvidenceText(action, 'issue')) ? (
+                            <div className="mt-3 rounded-[0.9rem] border border-slate-200 bg-white px-3 py-2 text-[11px] leading-5 text-slate-600">
+                              {getEvidenceText(action, 'service_name') ? (
+                                <div>Service: {getEvidenceText(action, 'service_name')}</div>
+                              ) : null}
+                              {getEvidenceText(action, 'requested_slot') ? (
+                                <div>Requested slot: {getEvidenceText(action, 'requested_slot')}</div>
+                              ) : null}
+                              {getEvidenceText(action, 'issue') ? (
+                                <div>Issue: {getEvidenceText(action, 'issue')}</div>
+                              ) : null}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className="text-xs text-slate-400 sm:shrink-0 sm:text-right">
+                          {action.updated_at
+                            ? new Date(action.updated_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
+                            : action.created_at
+                              ? new Date(action.created_at).toLocaleDateString('en-AU', { day: 'numeric', month: 'short' })
+                              : ''}
+                        </div>
+                      </div>
+                    </div>
+                  ))
                 )}
               </div>
             </article>

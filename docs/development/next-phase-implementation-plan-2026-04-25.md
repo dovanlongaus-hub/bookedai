@@ -67,6 +67,14 @@ Acceptance gates:
 - admin Reliability can show the complete handoff chain for a booking
 - tenant workspace can explain what BookedAI did after a lead or booking event
 
+Implementation status from `2026-04-25`:
+
+- `GET /api/v1/agent-actions` now supports deeper ledger filters for entity type, entity id, agent type, dependency state, and lifecycle event
+- ledger responses now include summary counts for the current tenant/filter scope
+- ledger responses now expose derived lifecycle event, dependency state, policy mode, approval requirement, and evidence summary fields so surfaces do not need to parse raw JSON first
+- admin Reliability exposes entity, dependency, and lifecycle filters plus policy/evidence summary on action cards
+- tenant workspace now has an `Ops` panel for read-only tenant visibility into follow-up, reminder, CRM, customer-care, and webhook actions, including event/policy/evidence posture
+
 ## Phase 19 - Customer-Care And Status Agent
 
 Objective:

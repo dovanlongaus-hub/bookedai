@@ -293,7 +293,7 @@ Deliver:
 Current next-phase order from `2026-04-25`:
 
 1. close `Phase 17` with GitHub submission and release notes for the current full-flow stabilization work
-2. deepen `Phase 18` by making revenue-ops action runs inspectable from tenant and admin surfaces, including evidence from outbox, audit, job runs, CRM, payment, and webhook state
+2. deepen `Phase 18` by making revenue-ops action runs inspectable from tenant and admin surfaces, including lifecycle-event filters, policy metadata, evidence summaries, and later fuller evidence from outbox, audit, job runs, CRM, payment, and webhook state
 3. implement `Phase 19` customer-care/status answers against academy student, booking, payment, report, communication, and action-run truth
 4. implement `Phase 20` widget identity and one tenant-branded full-flow proof from SME website embed through Thank You and portal continuation
 5. implement `Phase 21` billing, receivable, subscription, reminder, and commission truth only after action evidence is reliable

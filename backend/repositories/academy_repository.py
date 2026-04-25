@@ -760,8 +760,13 @@ class AcademyRepository(BaseRepository):
         tenant_id: str | None = None,
         student_ref: str | None = None,
         booking_reference: str | None = None,
+        entity_type: str | None = None,
+        entity_id: str | None = None,
+        agent_type: str | None = None,
         status: str | None = None,
         action_type: str | None = None,
+        dependency_state: str | None = None,
+        lifecycle_event: str | None = None,
         limit: int = 20,
     ) -> list[dict[str, Any]]:
         clauses = ["true"]
@@ -776,12 +781,49 @@ class AcademyRepository(BaseRepository):
         if booking_reference:
             clauses.append("booking_reference = :booking_reference")
             params["booking_reference"] = str(booking_reference or "").strip()
+        if entity_type:
+            clauses.append("entity_type = :entity_type")
+            params["entity_type"] = str(entity_type or "").strip()
+        if entity_id:
+            clauses.append("entity_id = :entity_id")
+            params["entity_id"] = str(entity_id or "").strip()
+        if agent_type:
+            clauses.append("agent_type = :agent_type")
+            params["agent_type"] = str(agent_type or "").strip()
         if status:
             clauses.append("status = :status")
             params["status"] = str(status or "").strip()
         if action_type:
             clauses.append("action_type = :action_type")
             params["action_type"] = str(action_type or "").strip()
+        if dependency_state:
+            clauses.append(
+                """
+                coalesce(
+                  input_json->>'dependency_state',
+                  input_json->'lifecycle'->>'dependency_state',
+                  input_json->'lifecycle'->>'payment_state',
+                  result_json->>'dependency_state',
+                  result_json->'execution'->>'dependency_state'
+                ) = :dependency_state
+                """
+            )
+            params["dependency_state"] = str(dependency_state or "").strip()
+        if lifecycle_event:
+            clauses.append(
+                """
+                coalesce(
+                  input_json->>'lifecycle_event',
+                  input_json->'context'->>'lifecycle_event',
+                  input_json->'context'->>'agent_handoff',
+                  input_json->'lifecycle'->>'event_type',
+                  input_json->'lifecycle'->>'status',
+                  result_json->'execution'->>'lifecycle_event',
+                  entity_type
+                ) = :lifecycle_event
+                """
+            )
+            params["lifecycle_event"] = str(lifecycle_event or "").strip()
 
         result = await self.session.execute(
             text(
@@ -811,6 +853,102 @@ class AcademyRepository(BaseRepository):
             params,
         )
         return [dict(row) for row in result.mappings().all()]
+
+    async def summarize_agent_action_runs(
+        self,
+        *,
+        tenant_id: str | None = None,
+        student_ref: str | None = None,
+        booking_reference: str | None = None,
+        entity_type: str | None = None,
+        entity_id: str | None = None,
+        agent_type: str | None = None,
+        action_type: str | None = None,
+        dependency_state: str | None = None,
+        lifecycle_event: str | None = None,
+    ) -> dict[str, Any]:
+        clauses = ["true"]
+        params: dict[str, Any] = {}
+        effective_tenant_id = tenant_id or self.tenant_id
+        if effective_tenant_id:
+            clauses.append("tenant_id = cast(:tenant_id as uuid)")
+            params["tenant_id"] = str(effective_tenant_id).strip()
+        if student_ref:
+            clauses.append("student_ref = :student_ref")
+            params["student_ref"] = str(student_ref or "").strip()
+        if booking_reference:
+            clauses.append("booking_reference = :booking_reference")
+            params["booking_reference"] = str(booking_reference or "").strip()
+        if entity_type:
+            clauses.append("entity_type = :entity_type")
+            params["entity_type"] = str(entity_type or "").strip()
+        if entity_id:
+            clauses.append("entity_id = :entity_id")
+            params["entity_id"] = str(entity_id or "").strip()
+        if agent_type:
+            clauses.append("agent_type = :agent_type")
+            params["agent_type"] = str(agent_type or "").strip()
+        if action_type:
+            clauses.append("action_type = :action_type")
+            params["action_type"] = str(action_type or "").strip()
+        if dependency_state:
+            clauses.append(
+                """
+                coalesce(
+                  input_json->>'dependency_state',
+                  input_json->'lifecycle'->>'dependency_state',
+                  input_json->'lifecycle'->>'payment_state',
+                  result_json->>'dependency_state',
+                  result_json->'execution'->>'dependency_state'
+                ) = :dependency_state
+                """
+            )
+            params["dependency_state"] = str(dependency_state or "").strip()
+        if lifecycle_event:
+            clauses.append(
+                """
+                coalesce(
+                  input_json->>'lifecycle_event',
+                  input_json->'context'->>'lifecycle_event',
+                  input_json->'context'->>'agent_handoff',
+                  input_json->'lifecycle'->>'event_type',
+                  input_json->'lifecycle'->>'status',
+                  result_json->'execution'->>'lifecycle_event',
+                  entity_type
+                ) = :lifecycle_event
+                """
+            )
+            params["lifecycle_event"] = str(lifecycle_event or "").strip()
+
+        result = await self.session.execute(
+            text(
+                f"""
+                select
+                  count(*)::int as total,
+                  count(*) filter (where status = 'queued')::int as queued,
+                  count(*) filter (where status = 'in_progress')::int as in_progress,
+                  count(*) filter (where status = 'sent')::int as sent,
+                  count(*) filter (where status = 'completed')::int as completed,
+                  count(*) filter (where status = 'manual_review')::int as manual_review,
+                  count(*) filter (where status = 'failed')::int as failed,
+                  count(*) filter (where status in ('queued', 'manual_review', 'failed'))::int as needs_attention
+                from agent_action_runs
+                where {" and ".join(clauses)}
+                """
+            ),
+            params,
+        )
+        row = result.mappings().first()
+        return dict(row) if row else {
+            "total": 0,
+            "queued": 0,
+            "in_progress": 0,
+            "sent": 0,
+            "completed": 0,
+            "manual_review": 0,
+            "failed": 0,
+            "needs_attention": 0,
+        }
 
     async def get_agent_action_run(
         self,

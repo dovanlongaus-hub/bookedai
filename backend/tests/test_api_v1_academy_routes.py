@@ -391,30 +391,44 @@ class ApiV1AcademyRoutes(TestCase):
         client = TestClient(create_test_app())
         fake_session = SimpleNamespace()
 
+        list_actions = AsyncMock(
+            return_value={
+                "tenant_id": "tenant-chess-demo",
+                "filters": {
+                    "student_ref": "student_brchess1",
+                    "booking_reference": "v1-demo",
+                    "entity_type": "booking_lifecycle",
+                    "entity_id": "booking-1",
+                    "agent_type": "revenue_operations",
+                    "status": "queued",
+                    "action_type": "payment_reminder",
+                    "dependency_state": "awaiting_payment",
+                    "lifecycle_event": "booking_lifecycle_handoff",
+                    "limit": 10,
+                },
+                "summary": {
+                    "total": 1,
+                    "queued": 1,
+                    "needs_attention": 1,
+                },
+                "action_runs": [
+                    {
+                        "action_run_id": "action-1",
+                        "agent_type": "revenue_operations",
+                        "action_type": "payment_reminder",
+                        "status": "queued",
+                        "student_ref": "student_brchess1",
+                    }
+                ],
+            }
+        )
+
         with patch(
             "api.v1_academy_handlers.get_session",
             self._fake_get_session(fake_session),
         ), patch(
             "api.v1_academy_handlers.list_academy_agent_actions",
-            AsyncMock(
-                return_value={
-                    "tenant_id": "tenant-chess-demo",
-                    "filters": {
-                        "student_ref": "student_brchess1",
-                        "status": "queued",
-                        "limit": 10,
-                    },
-                    "action_runs": [
-                        {
-                            "action_run_id": "action-1",
-                            "agent_type": "revenue_operations",
-                            "action_type": "payment_reminder",
-                            "status": "queued",
-                            "student_ref": "student_brchess1",
-                        }
-                    ],
-                }
-            ),
+            list_actions,
         ):
             response = client.get(
                 "/api/v1/agent-actions",
@@ -422,7 +436,14 @@ class ApiV1AcademyRoutes(TestCase):
                     "channel": "tenant_app",
                     "tenant_id": "tenant-chess-demo",
                     "student_ref": "student_brchess1",
+                    "booking_reference": "v1-demo",
+                    "entity_type": "booking_lifecycle",
+                    "entity_id": "booking-1",
+                    "agent_type": "revenue_operations",
                     "status": "queued",
+                    "action_type": "payment_reminder",
+                    "dependency_state": "awaiting_payment",
+                    "lifecycle_event": "booking_lifecycle_handoff",
                     "limit": 10,
                 },
             )
@@ -430,7 +451,13 @@ class ApiV1AcademyRoutes(TestCase):
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["summary"]["queued"], 1)
         self.assertEqual(payload["data"]["action_runs"][0]["action_type"], "payment_reminder")
+        list_actions.assert_awaited_once()
+        self.assertEqual(list_actions.await_args.kwargs["booking_reference"], "v1-demo")
+        self.assertEqual(list_actions.await_args.kwargs["entity_id"], "booking-1")
+        self.assertEqual(list_actions.await_args.kwargs["dependency_state"], "awaiting_payment")
+        self.assertEqual(list_actions.await_args.kwargs["lifecycle_event"], "booking_lifecycle_handoff")
 
     def test_get_agent_action_returns_detail(self):
         client = TestClient(create_test_app())

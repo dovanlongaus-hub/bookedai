@@ -29,6 +29,15 @@ const actionFilters = [
   'report_generation_trigger',
   'retention_evaluation_trigger',
 ] as const;
+const dependencyFilters = ['awaiting_payment', 'pending', 'manual_review', 'provider_unavailable'] as const;
+const lifecycleFilters = [
+  'booking_lifecycle_handoff',
+  'search_conversation_to_revenue_operations',
+  'assistant_dialog_to_revenue_operations',
+  'subscription_created',
+  'report_requested',
+  'retention_requested',
+] as const;
 
 const adminActorContext = {
   channel: 'admin' as const,
@@ -103,6 +112,9 @@ export function RevenueOpsActionLedger({
   const [actionFilter, setActionFilter] = useState<string>('');
   const [studentRefFilter, setStudentRefFilter] = useState('');
   const [bookingRefFilter, setBookingRefFilter] = useState('');
+  const [entityIdFilter, setEntityIdFilter] = useState('');
+  const [dependencyFilter, setDependencyFilter] = useState('');
+  const [lifecycleFilter, setLifecycleFilter] = useState('');
   const [loading, setLoading] = useState(false);
   const [dispatching, setDispatching] = useState(false);
   const [transitioningId, setTransitioningId] = useState<string | null>(null);
@@ -117,6 +129,9 @@ export function RevenueOpsActionLedger({
     actionFilter,
     studentRefFilter.trim(),
     bookingRefFilter.trim(),
+    entityIdFilter.trim(),
+    dependencyFilter,
+    lifecycleFilter,
   ].filter(Boolean).length;
 
   async function loadActions() {
@@ -138,8 +153,11 @@ export function RevenueOpsActionLedger({
           ...baseRequest,
           student_ref: studentRefFilter.trim() || null,
           booking_reference: bookingRefFilter.trim() || null,
+          entity_id: entityIdFilter.trim() || null,
           status: statusFilter || null,
           action_type: actionFilter || null,
+          dependency_state: dependencyFilter || null,
+          lifecycle_event: lifecycleFilter || null,
           limit: 25,
         }),
       ]);
@@ -163,6 +181,9 @@ export function RevenueOpsActionLedger({
     setActionFilter('');
     setStudentRefFilter('');
     setBookingRefFilter('');
+    setEntityIdFilter('');
+    setDependencyFilter('');
+    setLifecycleFilter('');
   }
 
   async function dispatchActions() {
@@ -225,7 +246,16 @@ export function RevenueOpsActionLedger({
 
   useEffect(() => {
     void loadActions();
-  }, [selectedTenantRef, statusFilter, actionFilter, studentRefFilter, bookingRefFilter]);
+  }, [
+    selectedTenantRef,
+    statusFilter,
+    actionFilter,
+    studentRefFilter,
+    bookingRefFilter,
+    entityIdFilter,
+    dependencyFilter,
+    lifecycleFilter,
+  ]);
 
   return (
     <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_24px_60px_rgba(15,23,42,0.06)] sm:p-6">
@@ -322,6 +352,30 @@ export function RevenueOpsActionLedger({
               </option>
             ))}
           </select>
+          <select
+            value={dependencyFilter}
+            onChange={(event) => setDependencyFilter(event.target.value)}
+            className="min-h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-slate-400"
+          >
+            <option value="">All dependencies</option>
+            {dependencyFilters.map((dependency) => (
+              <option key={dependency} value={dependency}>
+                {dependency.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
+          <select
+            value={lifecycleFilter}
+            onChange={(event) => setLifecycleFilter(event.target.value)}
+            className="min-h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-slate-400"
+          >
+            <option value="">All lifecycle events</option>
+            {lifecycleFilters.map((eventName) => (
+              <option key={eventName} value={eventName}>
+                {eventName.replace(/_/g, ' ')}
+              </option>
+            ))}
+          </select>
           {activeFilterCount > 1 ? (
             <button
               type="button"
@@ -335,7 +389,7 @@ export function RevenueOpsActionLedger({
         </div>
       </div>
 
-      <div className="mt-3 grid gap-3 md:grid-cols-2">
+      <div className="mt-3 grid gap-3 md:grid-cols-3">
         <label className="relative block">
           <span className="sr-only">Filter by student reference</span>
           <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
@@ -353,6 +407,16 @@ export function RevenueOpsActionLedger({
             value={bookingRefFilter}
             onChange={(event) => setBookingRefFilter(event.target.value)}
             placeholder="Filter by booking ref"
+            className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white py-2 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
+          />
+        </label>
+        <label className="relative block">
+          <span className="sr-only">Filter by entity id</span>
+          <Search className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
+          <input
+            value={entityIdFilter}
+            onChange={(event) => setEntityIdFilter(event.target.value)}
+            placeholder="Filter by entity id"
             className="min-h-11 w-full rounded-2xl border border-slate-200 bg-white py-2 pl-11 pr-4 text-sm font-medium text-slate-700 outline-none transition placeholder:text-slate-400 focus:border-slate-400"
           />
         </label>
@@ -400,6 +464,28 @@ export function RevenueOpsActionLedger({
                   <div className="mt-3 grid gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 sm:grid-cols-2">
                     <span>{action.student_ref ?? 'No student ref'}</span>
                     <span>{action.booking_reference ?? 'No booking ref'}</span>
+                    <span>{action.entity_type ?? 'No entity type'}</span>
+                    <span>{action.entity_id ?? 'No entity id'}</span>
+                  </div>
+                  <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold text-slate-600">
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                      Event {action.lifecycle_event?.replace(/_/g, ' ') ?? 'unclassified'}
+                    </span>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                      Dependency {action.dependency_state?.replace(/_/g, ' ') ?? 'not recorded'}
+                    </span>
+                    <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1">
+                      Policy {action.policy_mode?.replace(/_/g, ' ') ?? 'not recorded'}
+                    </span>
+                    {action.requires_approval ? (
+                      <span className="rounded-full border border-rose-200 bg-rose-50 px-3 py-1 text-rose-700">
+                        Approval required
+                      </span>
+                    ) : (
+                      <span className="rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700">
+                        Policy gated
+                      </span>
+                    )}
                   </div>
                   <div className="mt-2 text-xs text-slate-500">
                     Created {action.created_at ? formatDateTime(action.created_at) : 'time unavailable'}
@@ -448,7 +534,15 @@ export function RevenueOpsActionLedger({
                 </div>
               </div>
               {expandedActionId === action.action_run_id ? (
-                <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                  <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      Evidence summary
+                    </div>
+                    <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words text-xs leading-5 text-slate-700">
+                      {formatJsonEvidence(action.evidence)}
+                    </pre>
+                  </div>
                   <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 p-4">
                     <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                       Input evidence
