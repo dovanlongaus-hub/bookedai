@@ -12,6 +12,23 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-25`
 
+Implementation update from `2026-04-25` (ChatGPT-like search workspace polish):
+
+- restyled the public homepage search frame in `frontend/src/apps/public/HomepageSearchExperience.tsx` as a calmer ChatGPT-like composer with a clearer message area, status copy, prompt chips, voice/send controls, and a softer workspace shell
+- replaced the homepage result card body with a purpose-built compact layout: thumbnail or initials, option/top-match/category badges, provider/title, price or price posture, duration, location/provider, confidence, one short fit/next-step line, and the existing compact action row
+- mirrored the more compact result information hierarchy in `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` for inline assistant results and product suggested services, so product search and homepage search now read with the same scan pattern
+- wrapped the product assistant chat input in a cleaner composer shell so it feels more like a professional chat workspace while preserving voice/search behavior
+- tightened the product welcome state after browser review so the search composer is visible in the first desktop viewport, reducing the hero and quick-prompt height to match search-first user behavior
+- verified with `npm --prefix frontend run build` plus local Playwright screenshots at `output/playwright/product-saas-polish-desktop-v3.png` and `output/playwright/product-saas-polish-after-search.png`; local preview still shows expected unauthenticated API `401`/static fallback `404` calls when not connected to the live backend
+
+Implementation update from `2026-04-25` (public/product search-results flow refinement):
+
+- changed `frontend/src/apps/public/HomepageSearchExperience.tsx` so completed searches no longer auto-scroll or focus the booking side panel; users can pause on the results list, scroll, compare, and choose the next action intentionally
+- moved clarification/follow-up prompts into the visible BookedAI chat thread as actionable suggestion chips, while removing the separate clarification panel that competed with the result surface
+- tightened homepage result cards so the list shows only essential comparison facts and compact actions; full summary, provider context, confidence, next step, map/provider links, and booking continuation remain in the detail popup
+- changed `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` so popup/product assistant results do not auto-select the first returned match; `View details` opens the popup and `Book` is the explicit route into customer details
+- verified with `npm --prefix frontend run build`
+
 Implementation update from `2026-04-25` (tenant live QA and Future Swim workspace stability):
 
 - ran a live QA pass on `tenant.bookedai.au` covering the shared login gateway, Google/create-account surfaces, Future Swim tenant workspace, tenant API CORS posture, desktop rendering, and mobile horizontal-overflow checks

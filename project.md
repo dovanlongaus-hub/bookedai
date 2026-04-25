@@ -14,6 +14,16 @@ Latest public-search UX update date: `2026-04-25`.
 
 Current top product-surface priority: `responsive homepage web-app UX`.
 
+Latest public/product search-results flow refinement from `2026-04-25`:
+
+- the public search frame now behaves more like a professional ChatGPT-style workspace: a calm composer, clear chat status, lightweight prompt chips, and no visual competition with the result list
+- product search now keeps the composer visible in the first desktop viewport by reducing the welcome hero and limiting quick prompts, matching the way users expect to start a search before reading deeper proof
+- search result cards now group the scan layer around provider/title, category/top-match badge, price or price posture, duration, location/provider, confidence, and one short fit/next-step line
+- product and homepage search results now stay in a results-first state after ranking, so users can stop, scroll, and compare matches without the screen jumping or focus moving into booking before they ask for it
+- result cards are intentionally compact and show only decision-critical facts in-list; fuller provider context, summary, confidence notes, next step, map/provider links, and booking continuation live in the detail popup
+- follow-up questions and suggested refinements now stay inside the BookedAI chat conversation as actionable chips, keeping clarification interactive with the customer-facing agent instead of splitting questions into a separate panel
+- popup/product assistant search no longer auto-selects the first suggestion after search; customers explicitly choose `View details` or `Book`, preserving review mode until a booking commitment is made
+
 Latest customer portal enterprise workspace update from `2026-04-25`:
 
 - `portal.bookedai.au` now presents booking continuation as an enterprise customer workspace instead of a receipt-like review page: lookup, booking truth, payment posture, support route, provider details, customer details, academy progress, and timeline are arranged in a denser command-center layout

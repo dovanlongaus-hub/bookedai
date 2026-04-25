@@ -14,9 +14,15 @@
 
 `product.bookedai.au` and the shared public booking runtime should behave like a compact enterprise booking workspace.
 
+- style the search frame as a calm ChatGPT-like composer: one obvious message area, restrained status line, lightweight prompt chips, and a primary send action that does not compete with results
+- keep the product search composer visible in the first usable viewport; welcome proof and quick prompts should support search, not push the input below the fold
 - show first useful matches while live search/ranking continues, with visible status and refinement chips in chat
-- keep result cards compact; put provider link, detail popup, contact, phone/SMS, and `Book` on one horizontal action row using icons where possible
+- keep the viewport anchored on results after search completes so users can stop, scroll, and compare without being pulled into the booking form
+- keep result cards compact; show only decision-critical facts in the list, then move fuller provider context, summary, confidence notes, and next-step copy into the detail popup
+- group search-result list information in this order: provider/title, category/top-match status, price or price posture, duration, location/provider, confidence, one short reason or next-step line, then actions
+- put provider link, detail popup, contact, phone/SMS, and `Book` on one horizontal action row using icons where possible
 - clicking/selecting a result marks it active only; detail opens from the detail action, and the customer form opens only after an explicit booking action
+- keep all clarification questions and suggested next prompts inside the BookedAI chat conversation as interactive agent chips
 - confirmation is portal-first: booking code, QR to `portal.bookedai.au`, and compact portal/email/calendar/chat/home actions must stay on one responsive row without horizontal layout breakage
 - keep the thank-you confirmation visible for `16s` and allow the customer to continue chat/search from the same screen before auto-return
 

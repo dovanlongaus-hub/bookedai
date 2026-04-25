@@ -8,7 +8,7 @@ Current public runtime decision:
 
 - BookedAI is shipping the responsive web app as the primary current-phase product surface.
 - `bookedai.au` is the acquisition and orientation surface for that web runtime.
-- `product.bookedai.au` is the deeper live product web runtime.
+- `product.bookedai.au` is the deeper live product web runtime; search uses a ChatGPT-like composer, results stay results-first after ranking, and compact cards use detail popups, chat-based refinements, and explicit `Book` actions before customer details open.
 - native mobile is intentionally deferred to a later phase.
 
 ## Repository structure

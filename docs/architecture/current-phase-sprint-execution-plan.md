@@ -31,6 +31,8 @@ This execution baseline now also assumes a dual-agent product direction:
 
 Latest next-phase update from `2026-04-25`:
 
+- the latest product/public search refinement keeps search results as the active surface after ranking: no automatic jump into booking, compact result cards for scanning, detail popup for full context, and explicit `Book` before customer details open
+- follow-up questions and suggested next prompts belong inside the BookedAI chat conversation as interactive chips so clarification continues with the customer-facing agent instead of appearing as a disconnected panel
 - the immediate execution plan after the full-flow QA pass is now documented in `docs/development/next-phase-implementation-plan-2026-04-25.md`
 - current closeout is `Phase 17 - Full-flow stabilization`, covering pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You confirmation, and return to the main BookedAI screen after `16s`
 - the product/public booking runtime should now treat slow matching as a progressive-search problem: show first useful local/catalog matches while live ranking continues, keep refinement suggestions visible in chat, and keep the user informed with active status copy

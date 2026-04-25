@@ -19,10 +19,8 @@ import {
 } from '../../shared/runtime/publicAssistantRuntime';
 import {
   buildPartnerMatchActionFooterModelFromServiceItem,
-  buildPartnerMatchCardModelFromServiceItem,
   type BookingReadyServiceItem,
 } from '../../shared/presenters/partnerMatch';
-import { PartnerMatchCard } from '../../shared/components/PartnerMatchCard';
 import { PartnerMatchShortlist } from '../../shared/components/PartnerMatchShortlist';
 import type { MatchCandidate } from '../../shared/contracts';
 import { normalizePhoneForMessaging } from '../../shared/utils/phone';
@@ -364,6 +362,21 @@ function deriveIntentSuggestions(query: string) {
   }
 
   return suggestions.filter((item, index, array) => array.findIndex((candidate) => candidate.query === item.query) === index).slice(0, 4);
+}
+
+function deriveChatSuggestionsFromFollowUps(query: string, questions: FollowUpQuestion[]) {
+  const trimmed = query.trim();
+  const suggestions = questions.flatMap((item) => {
+    const answers = item.quickAnswers?.length ? item.quickAnswers : [item.suggestion];
+    return answers.map((answer) => ({
+      label: answer.length > 28 ? item.question.replace(/\?$/, '') : answer,
+      query: `${trimmed} ${answer}`.trim(),
+    }));
+  });
+
+  return suggestions
+    .filter((item, index, array) => array.findIndex((candidate) => candidate.query === item.query) === index)
+    .slice(0, 4);
 }
 
 function deriveNoResultReason(query: string, warnings: string[]) {
@@ -797,6 +810,25 @@ function formatCurrencyAud(amount: number | null | undefined) {
     currency: 'AUD',
     maximumFractionDigits: 0,
   }).format(amount);
+}
+
+function getServiceInitials(service: ServiceCatalogItem) {
+  const source = service.venue_name || service.name || service.category || 'AI';
+  return source
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('') || 'AI';
+}
+
+function buildSearchResultFacts(service: ServiceCatalogItem, confidenceLabel: string) {
+  return [
+    service.price_posture || formatCurrencyAud(service.amount_aud),
+    service.duration_minutes ? `${service.duration_minutes} min` : null,
+    service.location || service.venue_name,
+    confidenceLabel,
+  ].filter((item): item is string => Boolean(item)).slice(0, 4);
 }
 
 function derivePaymentOptionForAutomation(params: {
@@ -1733,7 +1765,6 @@ export function HomepageSearchExperience({
   const [liveReadBookingSummary, setLiveReadBookingSummary] = useState<LiveReadBookingSummary | null>(null);
   const [bookingReturnNotice, setBookingReturnNotice] = useState<BookingReturnNotice | null>(null);
   const [lastHandledRequestId, setLastHandledRequestId] = useState(0);
-  const [clarificationStepIndex, setClarificationStepIndex] = useState(0);
   const bookingPanelRef = useRef<HTMLDivElement | null>(null);
   const bookingFormRef = useRef<HTMLDivElement | null>(null);
   const searchComposerRef = useRef<HTMLTextAreaElement | null>(null);
@@ -1884,10 +1915,6 @@ export function HomepageSearchExperience({
       },
     ]);
   }, [currentQuery, result]);
-
-  useEffect(() => {
-    setClarificationStepIndex(0);
-  }, [currentQuery]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -2400,7 +2427,10 @@ export function HomepageSearchExperience({
           id: createAgentChatMessageId('assistant'),
           role: 'assistant',
           content: clarificationSummary,
-          suggestions: deriveIntentSuggestions(trimmedQuery).slice(0, 3),
+          suggestions: deriveChatSuggestionsFromFollowUps(
+            trimmedQuery,
+            deriveFollowUpQuestions(trimmedQuery, [], ['Clarification needed before ranking']),
+          ),
         },
       ]);
       return;
@@ -2563,7 +2593,14 @@ export function HomepageSearchExperience({
 
       const nextIntentSuggestions = agentTurn?.suggestions?.length
         ? agentTurn.suggestions.slice(0, 3)
-        : deriveIntentSuggestions(trimmedQuery).slice(0, 3);
+        : deriveChatSuggestionsFromFollowUps(
+            trimmedQuery,
+            deriveFollowUpQuestions(trimmedQuery, prioritizedResults, [
+              ...liveRead.warnings,
+              ...(liveRead.bookingPathSummary?.warnings ?? []),
+              ...(liveRead.trustSummary?.warnings ?? []),
+            ]),
+          ).concat(deriveIntentSuggestions(trimmedQuery)).slice(0, 4);
       setResults(prioritizedResults);
       setSelectedServiceId((current) =>
         current && prioritizedResults.some((service) => service.id === current) ? current : '',
@@ -2612,10 +2649,6 @@ export function HomepageSearchExperience({
       if (prioritizedResults.length > 0 || hasLiveReadSearchGrounding) {
         setComposerCollapsed(true);
       }
-
-      window.setTimeout(() => {
-        bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }, 80);
     } catch (error) {
       setSearchError(error instanceof Error ? error.message : 'Unable to search services right now.');
       setResults([]);
@@ -2970,13 +3003,11 @@ export function HomepageSearchExperience({
               detail: 'Type a natural-language request below. Results appear here.',
               tone: 'border-slate-900/8 bg-white/78 text-[#172033]/72',
             };
-  const activeSearchProgressStage = SEARCH_PROGRESS_STAGES[searchProgressStageIndex] ?? SEARCH_PROGRESS_STAGES[0];
   const activeSearchPrompt = SEARCH_PROGRESS_PROMPTS[searchProgressStageIndex] ?? SEARCH_PROGRESS_PROMPTS[0];
   const followUpQuestions = useMemo(
     () => deriveFollowUpQuestions(currentQuery || searchQuery, results, uniqueWarnings),
     [currentQuery, searchQuery, results, uniqueWarnings],
   );
-  const activeClarificationQuestion = followUpQuestions[clarificationStepIndex] ?? followUpQuestions[0] ?? null;
   const noResultSuggestions = useMemo(
     () => deriveNoResultSuggestions(currentQuery || searchQuery, uniqueWarnings),
     [currentQuery, searchQuery, uniqueWarnings],
@@ -3026,16 +3057,6 @@ export function HomepageSearchExperience({
 
     commitServiceSelection(previewService, { openBooking: true, focusNameField: true });
     setPreviewService(null);
-  }
-
-  function applyClarificationAnswer(answer: string) {
-    const nextQuery = `${searchQuery.trim()} ${answer}`.trim();
-    setSearchQuery(nextQuery);
-    setCurrentQuery(nextQuery);
-    setAssistantSummary(`Noted. ${answer}. I will continue the search with that context.`);
-    setClarificationStepIndex((current) => Math.min(current + 1, Math.max(0, followUpQuestions.length - 1)));
-    setComposerCollapsed(false);
-    void runSearch(nextQuery);
   }
 
   function handleVoiceSearch() {
@@ -3129,9 +3150,9 @@ export function HomepageSearchExperience({
         `}
       </style>
       <div className="public-search-results-shell grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-        <section className="min-w-0 overflow-hidden rounded-[1.6rem] border border-[#e3e3e7] bg-white shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+        <section className="min-w-0 overflow-hidden rounded-[1.75rem] border border-[#e5e7eb] bg-[#f8fafc] shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
           <div className="px-3 py-3 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
-            <div className="mb-5 rounded-[1.35rem] border border-[#dedee3] bg-white px-3 py-3 shadow-[0_8px_24px_rgba(15,23,42,0.05)] sm:px-4 sm:py-4">
+            <div className="mb-5 rounded-[1.5rem] border border-[#e5e7eb] bg-white px-3 py-3 shadow-[0_14px_40px_rgba(15,23,42,0.07)] sm:px-4 sm:py-4">
               <div
                 className={`mb-3 flex flex-wrap items-center justify-between gap-2 rounded-[1rem] border px-3 py-2 text-xs ${workspaceStatus.tone}`}
               >
@@ -3139,25 +3160,33 @@ export function HomepageSearchExperience({
                 <span className="min-w-0 text-[11px] leading-5 opacity-80">{workspaceStatus.detail}</span>
               </div>
               <div className="flex items-start gap-3">
-                <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#f0f0f2] text-[#111827]">
+                <div className="mt-1 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#111827] text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]">
                   <SparkIcon className="h-4 w-4" />
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b7280]">Message BookedAI</div>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b7280]">Message BookedAI</div>
+                      <div className="mt-1 text-sm font-medium text-[#111827]">Search, clarify, compare, then book when ready.</div>
+                    </div>
+                    <div className="hidden rounded-full border border-[#e5e7eb] bg-[#f8fafc] px-3 py-1 text-[11px] font-semibold text-[#4b5563] sm:block">
+                      Chat mode
+                    </div>
+                  </div>
                   <textarea
                     ref={searchComposerRef}
                     value={searchQuery}
                     onChange={(event) => setSearchQuery(event.target.value)}
                     onKeyDown={handleSearchComposerKeyDown}
                     placeholder="What service do you want to book today? Tell me area, time, or preference."
-                    rows={3}
-                    className="mt-2 min-h-[84px] w-full resize-none border-0 bg-transparent text-[15px] leading-7 text-[#111827] outline-none placeholder:text-[#8a94a6] sm:text-[1.03rem]"
+                    rows={2}
+                    className="mt-3 min-h-[76px] w-full resize-none rounded-[1.25rem] border border-[#e5e7eb] bg-[#f8fafc] px-4 py-3 text-[15px] leading-7 text-[#111827] outline-none transition placeholder:text-[#8a94a6] focus:border-[#cbd5e1] focus:bg-white focus:shadow-[0_0_0_4px_rgba(148,163,184,0.12)] sm:text-[1.03rem]"
                     aria-label="Ask BookedAI"
                   />
-                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3 border-t border-[#eeeeef] pt-3">
+                  <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
                     <div className="flex flex-wrap gap-2">
                       {['Service', 'Area', 'Time', 'Preference'].map((item) => (
-                        <span key={item} className="rounded-full border border-[#e3e3e7] bg-[#f7f7f8] px-3 py-1.5 text-[11px] font-medium text-[#5f6368]">
+                        <span key={item} className="rounded-full border border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5 text-[11px] font-medium text-[#5f6368]">
                           {item}
                         </span>
                       ))}
@@ -3167,7 +3196,7 @@ export function HomepageSearchExperience({
                         <button
                           type="button"
                           onClick={handleVoiceSearch}
-                          className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition ${voiceListening ? 'border-[#c9c9d1] bg-[#f0f0f2] text-[#111827]' : 'border-[#dedee3] bg-white text-[#4b5563] hover:text-[#111827]'}`}
+                          className={`rounded-xl border px-4 py-2.5 text-sm font-medium transition ${voiceListening ? 'border-[#c9c9d1] bg-[#f0f0f2] text-[#111827]' : 'border-[#e5e7eb] bg-white text-[#4b5563] hover:border-[#cbd5e1] hover:text-[#111827]'}`}
                         >
                           {voiceListening ? 'Listening' : 'Voice'}
                         </button>
@@ -3177,8 +3206,9 @@ export function HomepageSearchExperience({
                         onClick={() => void runSearch(searchQuery)}
                         disabled={searchLoading || !searchQuery.trim()}
                         aria-label="Send search"
-                        className="rounded-xl bg-[#111827] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex h-11 items-center justify-center gap-2 rounded-xl bg-[#111827] px-5 text-sm font-semibold text-white transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-60"
                       >
+                        <ArrowRightIcon className="h-4 w-4" />
                         {searchLoading ? 'Working' : 'Send'}
                       </button>
                     </div>
@@ -3412,77 +3442,6 @@ export function HomepageSearchExperience({
                 </div>
               ) : null}
 
-              {!searchLoading && !searchError && hasActiveQuery && !result && followUpQuestions.length > 0 ? (
-                <div className="rounded-[1.45rem] border border-[#dfe8f3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-5 py-5">
-                  <div className="flex items-start gap-3">
-                    <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1a73e8] text-white shadow-[0_10px_24px_rgba(26,115,232,0.16)]">
-                      <SparkIcon className="h-4 w-4" />
-                    </div>
-                    <div className="max-w-[44rem] rounded-[1.2rem] rounded-tl-[0.45rem] border border-[#dbe7fb] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(60,64,67,0.05)]">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
-                        Clarifying question {Math.min(clarificationStepIndex + 1, followUpQuestions.length)} / {followUpQuestions.length}
-                      </div>
-                      <div className="mt-1 text-sm leading-6 text-slate-700">
-                        {activeClarificationQuestion?.question ?? 'Add one more signal and I can tighten the shortlist before I show the best-fit results.'}
-                      </div>
-                      <div className="mt-2 text-[11px] leading-5 text-slate-600">
-                        {activeClarificationQuestion?.suggestion}
-                      </div>
-                    </div>
-                  </div>
-                  {activeClarificationQuestion?.quickAnswers?.length ? (
-                    <div className="mt-3 ml-11 flex flex-wrap gap-2">
-                      {activeClarificationQuestion.quickAnswers.map((answer) => (
-                        <button
-                          key={answer}
-                          type="button"
-                          onClick={() => applyClarificationAnswer(answer)}
-                          className="rounded-full border border-slate-200 bg-white px-3.5 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] hover:text-slate-950"
-                        >
-                          {answer}
-                        </button>
-                      ))}
-                    </div>
-                  ) : null}
-                  <div className="mt-3 ml-11 grid gap-2.5 md:grid-cols-3">
-                    {followUpQuestions.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => {
-                          setSearchQuery((current) => `${current.trim()} ${item.suggestion}`.trim());
-                          setComposerCollapsed(false);
-                        }}
-                        className={`rounded-[1rem] border px-3.5 py-3 text-left transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] ${activeClarificationQuestion?.id === item.id ? 'border-[#cfe1ff] bg-[#f8fbff]' : 'border-slate-200 bg-white'}`}
-                      >
-                        <div className="text-[11px] font-semibold text-slate-950">{item.question}</div>
-                        <div className="mt-1 text-[11px] leading-5 text-slate-600">{item.suggestion}</div>
-                      </button>
-                    ))}
-                  </div>
-                  {intentSuggestions.length > 0 ? (
-                    <div className="mt-4 ml-11 border-t border-[#e6edf8] pt-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">Nearby intent</div>
-                      <div className="mt-3 flex flex-wrap gap-2">
-                        {intentSuggestions.slice(0, 4).map((item) => (
-                          <button
-                            key={item.query}
-                            type="button"
-                            onClick={() => {
-                              setSearchQuery(item.query);
-                              void runSearch(item.query);
-                            }}
-                            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] hover:text-slate-950"
-                          >
-                            {item.label}: {item.query}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              ) : null}
-
               {searchError ? (
                 <div className="rounded-[1.35rem] border border-[#f2b8b5] bg-[#fce8e6] px-4 py-4 text-sm leading-6 text-[#b3261e]">
                   {searchError}
@@ -3576,14 +3535,12 @@ export function HomepageSearchExperience({
                     const resultIndex = Math.max(0, results.findIndex((item) => item.id === service.id));
                     const isSelected =
                       service.id === selectedServiceId || service.id === previewService?.id;
-                    const card = buildPartnerMatchCardModelFromServiceItem(service as BookingReadyServiceItem, {
-                      explanation: service.summary,
-                    });
                     const footer = buildPartnerMatchActionFooterModelFromServiceItem(
                       service as BookingReadyServiceItem,
                       { selected: isSelected, includeSourceLink: true },
                     );
                     const confidencePresentation = getResultConfidencePresentation(service);
+                    const resultFacts = buildSearchResultFacts(service, confidencePresentation.label);
                     const providerUrl = service.source_url || service.booking_url || footer.links[0]?.href || null;
                     const phoneHref = service.contact_phone
                       ? `tel:${service.contact_phone.replace(/[^\d+]/g, '')}`
@@ -3598,29 +3555,76 @@ export function HomepageSearchExperience({
                         key={service.id}
                         data-homepage-result-entry="true"
                         style={getResultEntryStyle(resultIndex)}
-                        className={`rounded-[1.55rem] border px-3 py-3 shadow-[0_14px_32px_rgba(60,64,67,0.06)] transition duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                        className={`rounded-[1.35rem] border p-3 shadow-[0_12px_28px_rgba(60,64,67,0.06)] transition duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                           isSelected
-                            ? 'border-[#d2e3fc] bg-[linear-gradient(180deg,#ffffff_0%,#f6faff_100%)] shadow-[0_16px_34px_rgba(26,115,232,0.10)]'
-                            : 'border-[#e8edf3] bg-white hover:border-[#d7e3f7]'
+                            ? 'border-[#cbd5e1] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.10)]'
+                            : 'border-[#e5e7eb] bg-white hover:border-[#cbd5e1] hover:shadow-[0_16px_34px_rgba(15,23,42,0.08)]'
                         }`}
                       >
-                <div className="mb-3 flex items-center justify-between gap-3 px-1">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5f6368]">
-                            Option {resultIndex + 1}
-                          </div>
-                          {service.featured ? (
-                            <div className="rounded-full bg-[#f0f0f2] px-2.5 py-1 text-[10px] font-semibold text-[#111827]">
-                              Top match
+                        <div className="flex items-start gap-3">
+                          {service.image_url ? (
+                            <div className="relative h-16 w-16 shrink-0 overflow-hidden rounded-[1rem] border border-black/8 bg-slate-100 sm:h-[4.5rem] sm:w-[4.5rem]">
+                              <img
+                                src={service.image_url}
+                                alt={service.name}
+                                className="h-full w-full object-cover"
+                                loading="lazy"
+                              />
                             </div>
-                          ) : null}
+                          ) : (
+                            <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-[1rem] border border-[#e5e7eb] bg-[#f8fafc] text-[11px] font-bold uppercase tracking-[0.16em] text-[#64748b] sm:h-[4.5rem] sm:w-[4.5rem]">
+                              {getServiceInitials(service)}
+                            </div>
+                          )}
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span className="rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#64748b] ring-1 ring-[#e5e7eb]">
+                                Option {resultIndex + 1}
+                              </span>
+                              {service.featured ? (
+                                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                                  Top match
+                                </span>
+                              ) : null}
+                              <span className="rounded-full bg-[#eef4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
+                                {service.category}
+                              </span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => handleServiceSelect(service)}
+                              className={`mt-2 block max-w-full text-left text-[1rem] font-semibold leading-6 transition ${
+                                isSelected ? 'text-[#111827]' : 'text-[#0f172a] hover:text-[#1a73e8]'
+                              }`}
+                            >
+                              <span className="line-clamp-2">{service.name}</span>
+                            </button>
+                            <div className="mt-1 line-clamp-1 text-[12px] font-medium text-[#64748b]">
+                              {[service.venue_name, service.location || service.source_label].filter(Boolean).join(' • ') || 'BookedAI matched option'}
+                            </div>
+                            <div className="mt-2 flex flex-wrap gap-1.5">
+                              {resultFacts.map((item) => (
+                                <span
+                                  key={`${service.id}-${item}`}
+                                  className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                                    item === confidencePresentation.label
+                                      ? confidencePresentation.tone === 'tenant'
+                                        ? 'bg-emerald-50 text-emerald-800'
+                                        : 'bg-amber-50 text-amber-800'
+                                      : 'bg-[#f8fafc] text-[#475569] ring-1 ring-[#e5e7eb]'
+                                  }`}
+                                >
+                                  {item}
+                                </span>
+                              ))}
+                            </div>
+                            {(service.why_this_matches || service.next_step) ? (
+                              <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-[#475569]">
+                                {service.why_this_matches || service.next_step}
+                              </p>
+                            ) : null}
+                          </div>
                         </div>
-                        <PartnerMatchCard
-                          card={card}
-                          tone={isSelected ? 'selected' : 'default'}
-                          badge={null}
-                          trailingLabel={service.category}
-                          onClick={() => handleServiceSelect(service)}
-                        />
                         <div className="mt-3 flex min-w-0 items-center gap-2 overflow-x-auto border-t border-[#edf1f7] px-1 pt-3">
                           <button
                             type="button"
@@ -3690,16 +3694,6 @@ export function HomepageSearchExperience({
                             <SparkIcon className="h-4 w-4" />
                             Book
                           </button>
-                        </div>
-                        <div
-                          className={`mt-3 rounded-[1rem] border px-3.5 py-3 text-[11px] leading-5 ${
-                            confidencePresentation.tone === 'tenant'
-                              ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
-                              : 'border-amber-200 bg-amber-50 text-amber-900'
-                          }`}
-                        >
-                          <div className="font-semibold">{confidencePresentation.label}</div>
-                          <div className="mt-1 opacity-90">{confidencePresentation.body}</div>
                         </div>
                       </div>
                     );

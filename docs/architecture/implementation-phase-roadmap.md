@@ -38,6 +38,8 @@ This roadmap aligns with:
 - prioritize stable public, tenant, admin, search, payment, email-confirmation, and portal revisit flows ahead of feature breadth
 - prioritize direct revenue capture and booking conversion over brochure expansion
 - keep the public homepage lean so search, shortlist, booking, and confirmation have maximum practical space
+- keep public/product search results results-first after ranking: users must be able to pause, scroll, compare compact result cards, open full detail in a popup, and move to booking only through an explicit `Book` action
+- keep clarification questions and suggested follow-up prompts inside the customer-facing BookedAI chat flow as interactive agent chips, not as a separate results-side panel
 - treat the customer portal as a durable post-booking workspace: booking truth, payment posture, provider context, timeline, academy/customer-care context, and request-safe actions must stay visible and mobile-safe
 - treat mobile-first responsive execution as a hard requirement for any public conversion surface
 - ship the public revenue-engine narrative early
