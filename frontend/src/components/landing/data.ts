@@ -336,7 +336,7 @@ export const brandPositioning =
 export const brandHomeUrl = 'https://bookedai.au/';
 export const brandAssetVersion = '20260421-branding-suite';
 export const brandUploadedLogoPath =
-  'https://upload.bookedai.au/images/0a14/VAEjorVtB4CBewa8CmRmRQ.png';
+  '/branding/optimized/bookedai-logo-uploaded-420.webp';
 export const brandUnifiedLogoPath = brandUploadedLogoPath;
 export const brandPreferredLogoPath = brandUnifiedLogoPath;
 export const brandLogoPath = brandUploadedLogoPath;
@@ -643,7 +643,7 @@ export const teamMembers: TeamMember[] = [
   {
     name: 'Do Van Long',
     role: 'CEO',
-    imageSrc: 'https://upload.bookedai.au/images/e40f/k262gljWOBBiDXdMf6hfCA.png',
+    imageSrc: '/branding/optimized/team-do-van-long-900.webp',
     imageAlt: 'Portrait of Do Van Long',
     badges: ['CEO', 'AI Builder', 'Former CTO', 'Tech Founder'],
     bio: 'Do Van Long is the CEO of BookedAI, a former CTO, and a tech founder with 26 years of experience building digital products, platforms, and technology ventures. He focuses on turning emerging technology into practical products that can scale in real operating environments.',
@@ -651,7 +651,7 @@ export const teamMembers: TeamMember[] = [
   {
     name: 'Angus Hoy',
     role: 'CTO',
-    imageSrc: 'https://upload.bookedai.au/images/da31/Wlht-j7K3zXyML3hYqnn8A.png',
+    imageSrc: '/branding/optimized/team-angus-hoy-900.webp',
     imageAlt: 'Portrait of Angus Hoy',
     badges: ['CTO', 'Systems Engineering', 'Backend & AI'],
     bio: 'Studied computer science and mathematics at the University of Melbourne. Worked as a freelancer for a few years, then in embedded systems developing motor drive PCBs. Currently works at a fraud detection scale-up doing backend Python development.',
@@ -659,7 +659,7 @@ export const teamMembers: TeamMember[] = [
   {
     name: 'Yogesh Kumar',
     role: 'COO',
-    imageSrc: 'https://upload.bookedai.au/images/3cd9/gOd4m5mT7aQilr_RySfoTQ.png',
+    imageSrc: '/branding/optimized/team-yogesh-kumar-900.webp',
     imageAlt: 'Portrait of Yogesh Kumar',
     badges: ['COO', 'Operations', 'IT & Markets'],
     bio: 'Master of IT from Queensland University of Technology with 6 years of experience in financial markets. Currently works as an IT Engineer at ASX and is also an AI enthusiast.',
@@ -667,7 +667,7 @@ export const teamMembers: TeamMember[] = [
   {
     name: 'Tommy Dam',
     role: 'CMO',
-    imageSrc: 'https://upload.bookedai.au/images/5a63/bISqviktp9_R_jFQwcTBew.jpg',
+    imageSrc: '/branding/optimized/team-tommy-dam-900.webp',
     imageAlt: 'Portrait of Tommy Dam',
     badges: ['CMO', 'Quality Systems', 'Service Growth'],
     bio: 'Bachelor of Science with a major in Chemistry. Worked in manufacturing of medical devices as a QA chemist, quality assurance for laboratory services in clinical trials, and quality assurance for NDIS and aged care service providers. Currently works in the NDIS and aged care industry.',

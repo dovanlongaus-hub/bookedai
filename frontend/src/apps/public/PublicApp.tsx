@@ -12,7 +12,9 @@ const suggestedSearches = [
   'AI mentor session for startup growth this week',
 ];
 
-const chessScreenImageUrl = 'https://upload.bookedai.au/images/dce7/lLNFvBibyQm8JRNhOLIQVw.png';
+const chessScreenImageUrl = '/branding/optimized/chess-screen-proof-1400.webp';
+const chessScreenImageSrcSet =
+  '/branding/optimized/chess-screen-proof-960.webp 960w, /branding/optimized/chess-screen-proof-1400.webp 1400w';
 
 const topMenuLinks = [
   { label: 'Chat', href: '#bookedai-search-assistant' },
@@ -172,9 +174,13 @@ export function PublicApp() {
                   <div className="relative min-h-[260px] overflow-hidden bg-[#0b1120] sm:min-h-[360px] lg:min-h-[440px]">
                     <img
                       src={chessScreenImageUrl}
+                      srcSet={chessScreenImageSrcSet}
+                      sizes="(min-width: 1024px) 58vw, calc(100vw - 2rem)"
                       alt="Chess academy booking flow running inside BookedAI"
                       className="h-full w-full object-cover object-top"
                       loading="eager"
+                      width={1400}
+                      height={933}
                     />
                     <div className="pointer-events-none absolute inset-x-0 bottom-0 h-28 bg-[linear-gradient(180deg,rgba(17,24,39,0)_0%,rgba(17,24,39,0.72)_100%)] lg:hidden" />
                   </div>

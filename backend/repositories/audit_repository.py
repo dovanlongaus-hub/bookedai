@@ -81,11 +81,11 @@ class AuditLogRepository(BaseRepository):
                   created_at
                 from audit_logs
                 where (
-                  :tenant_ref is null
+                  cast(:tenant_ref as text) is null
                   or tenant_id = {self.tenant_lookup_sql()}
                 )
                   and (
-                    :event_type is null
+                    cast(:event_type as text) is null
                     or event_type = :event_type
                   )
                 order by created_at desc, id desc

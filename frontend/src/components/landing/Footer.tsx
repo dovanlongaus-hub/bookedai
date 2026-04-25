@@ -27,6 +27,7 @@ type FooterProps = {
   onBookDemo: () => void;
   startTrialLabel?: string;
   bookDemoLabel?: string;
+  showBrandCopy?: boolean;
 };
 
 export function Footer({
@@ -34,6 +35,7 @@ export function Footer({
   onBookDemo,
   startTrialLabel = 'Open Web App',
   bookDemoLabel = 'Talk to Sales',
+  showBrandCopy = true,
 }: FooterProps) {
   const releaseBadgeLabel = getReleaseBadgeLabel();
   const releaseVersionLabel = getReleaseVersionLabel();
@@ -41,7 +43,7 @@ export function Footer({
   return (
     <footer className="mx-auto w-full max-w-7xl px-6 pb-12 pt-6 lg:px-8">
       <div className="template-card overflow-hidden border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] px-6 py-8 shadow-[0_24px_64px_rgba(15,23,42,0.06)] lg:px-8">
-        <div className="grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
+        <div className={`grid gap-6 ${showBrandCopy ? 'lg:grid-cols-[1.05fr_0.95fr]' : 'lg:grid-cols-[0.72fr_1.28fr]'} lg:items-start`}>
           <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
             <div className="flex w-fit max-w-full shrink-0 items-center overflow-hidden rounded-[1.25rem] border border-black/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.68)_0%,rgba(248,250,252,0.9)_100%)] px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
               <BrandLockup
@@ -52,18 +54,20 @@ export function Footer({
                 logoClassName="booked-brand-image booked-brand-image--landing-footer max-w-[11rem] sm:max-w-[12rem]"
               />
             </div>
-            <div className="min-w-0 pt-1">
-              <div className="template-kicker text-[11px]">AI Revenue Engine for Service Businesses</div>
-              <p className="template-body mt-2 max-w-2xl text-sm leading-7">
-                {brandPositioning}
-              </p>
-              <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
-                <SignalPill variant="brand" className="max-w-full px-3 py-1 text-left leading-5">
-                  {releaseBadgeLabel}
-                </SignalPill>
-                <span className="template-body text-black/55">{releaseVersionLabel}</span>
+            {showBrandCopy && (
+              <div className="min-w-0 pt-1">
+                <div className="template-kicker text-[11px]">AI Revenue Engine for Service Businesses</div>
+                <p className="template-body mt-2 max-w-2xl text-sm leading-7">
+                  {brandPositioning}
+                </p>
+                <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+                  <SignalPill variant="brand" className="max-w-full px-3 py-1 text-left leading-5">
+                    {releaseBadgeLabel}
+                  </SignalPill>
+                  <span className="template-body text-black/55">{releaseVersionLabel}</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
 
           <div className="grid gap-4">

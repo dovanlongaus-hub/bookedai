@@ -1,3 +1,18 @@
+import {
+  Activity,
+  Building2,
+  CreditCard,
+  FileClock,
+  Gauge,
+  LayoutDashboard,
+  MessageSquareText,
+  PackageSearch,
+  PlugZap,
+  Settings2,
+  UsersRound,
+  type LucideIcon,
+} from 'lucide-react';
+
 import { AdminWorkspaceId } from './types';
 
 type WorkspaceConfig = {
@@ -5,6 +20,8 @@ type WorkspaceConfig = {
   label: string;
   summary: string;
   backendSurface: string;
+  group: 'Operate' | 'Tenants' | 'Revenue' | 'Platform';
+  icon: LucideIcon;
 };
 
 const workspaceConfigs: WorkspaceConfig[] = [
@@ -12,65 +29,85 @@ const workspaceConfigs: WorkspaceConfig[] = [
     id: 'overview',
     label: 'Overview',
     summary: 'Ops home, booking triage, support queues, and operator entry points.',
-    backendSurface: '/api/admin/overview, /api/admin/bookings, /api/admin/bookings/{id}',
-  },
-  {
-    id: 'tenants',
-    label: 'Tenants',
-    summary: 'Tenant directory, health posture, and handoff into the editing workspace.',
-    backendSurface: '/api/admin/tenants and tenant selection state',
-  },
-  {
-    id: 'tenant-workspace',
-    label: 'Tenant Workspace',
-    summary: 'Tenant identity, permissions, branding, HTML intro, and tenant catalog editing.',
-    backendSurface:
-      '/api/admin/tenants, /api/admin/tenants/{tenant}, members, services, media upload',
-  },
-  {
-    id: 'catalog',
-    label: 'Catalog',
-    summary: 'Service import, partner publishing, and content activation.',
-    backendSurface: '/api/admin/services, /api/admin/partners, /api/admin/upload',
+    backendSurface: '/api/admin/overview, /api/admin/bookings',
+    group: 'Operate',
+    icon: LayoutDashboard,
   },
   {
     id: 'billing-support',
     label: 'Billing Support',
     summary: 'Portal requests, payment attention, and booking follow-up context.',
-    backendSurface:
-      '/api/admin/overview portal queue plus /api/admin/bookings/{id} detail review',
-  },
-  {
-    id: 'integrations',
-    label: 'Integrations',
-    summary: 'CRM, email, webhook, and provider visibility with operator guidance.',
-    backendSurface: 'Current admin overview events plus tenant and reliability surfaces',
+    backendSurface: '/api/admin/overview portal queue',
+    group: 'Operate',
+    icon: CreditCard,
   },
   {
     id: 'messaging',
     label: 'Messaging',
-    summary: 'Delivery posture, retry review, and manual follow-up across email, CRM, and outbox.',
-    backendSurface: '/api/admin/messaging plus source-specific detail and action routes',
+    summary: 'Delivery posture, retry review, and manual follow-up.',
+    backendSurface: '/api/admin/messaging',
+    group: 'Operate',
+    icon: MessageSquareText,
+  },
+  {
+    id: 'tenants',
+    label: 'Tenants',
+    summary: 'Tenant directory, health posture, and handoff into editing.',
+    backendSurface: '/api/admin/tenants',
+    group: 'Tenants',
+    icon: Building2,
+  },
+  {
+    id: 'tenant-workspace',
+    label: 'Tenant Workspace',
+    summary: 'Tenant identity, permissions, branding, HTML intro, and catalog editing.',
+    backendSurface: '/api/admin/tenants/{tenant}',
+    group: 'Tenants',
+    icon: UsersRound,
+  },
+  {
+    id: 'catalog',
+    label: 'Catalog',
+    summary: 'Service import, partner publishing, and content activation.',
+    backendSurface: '/api/admin/services, /api/admin/partners',
+    group: 'Revenue',
+    icon: PackageSearch,
+  },
+  {
+    id: 'integrations',
+    label: 'Integrations',
+    summary: 'CRM, email, webhook, and provider visibility.',
+    backendSurface: 'Admin events plus reliability surfaces',
+    group: 'Revenue',
+    icon: PlugZap,
   },
   {
     id: 'reliability',
     label: 'Reliability',
-    summary: 'Prompt 5 or Prompt 11 preview, config visibility, and route inventory.',
-    backendSurface: '/api/v1/* preview routes plus /api/admin/config and /api/admin/apis',
+    summary: 'Prompt previews, config visibility, route inventory, and action ledger.',
+    backendSurface: '/api/admin/config, /api/admin/apis',
+    group: 'Platform',
+    icon: Gauge,
   },
   {
     id: 'audit-activity',
     label: 'Audit & Activity',
-    summary: 'Recent communications, handoff context, and operator review chronology.',
-    backendSurface: '/api/admin/overview recent_events and support action state',
+    summary: 'Recent communications, handoff context, and chronology.',
+    backendSurface: '/api/admin/overview recent_events',
+    group: 'Platform',
+    icon: FileClock,
   },
   {
     id: 'platform-settings',
     label: 'Platform Settings',
-    summary: 'Admin-visible configuration and backend surface inventory for safe rollout review.',
+    summary: 'Configuration and backend inventory for rollout review.',
     backendSurface: '/api/admin/config and /api/admin/apis',
+    group: 'Platform',
+    icon: Settings2,
   },
 ];
+
+const workspaceGroups: WorkspaceConfig['group'][] = ['Operate', 'Tenants', 'Revenue', 'Platform'];
 
 type AdminWorkspaceNavProps = {
   activeWorkspace: AdminWorkspaceId;
@@ -83,62 +120,84 @@ export function AdminWorkspaceNav({
   apiBaseUrl,
   onWorkspaceChange,
 }: AdminWorkspaceNavProps) {
+  const activeConfig = workspaceConfigs.find((workspace) => workspace.id === activeWorkspace);
+
   return (
-    <section className="template-card mt-6 p-6">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div>
-          <div className="template-kicker text-sm tracking-[0.14em]">
-            Admin workspaces
+    <aside className="sticky top-4 h-fit rounded-3xl border border-white/70 bg-white/90 p-4 shadow-[0_22px_60px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="flex items-center gap-3 rounded-2xl bg-slate-950 px-4 py-4 text-white">
+        <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-white/12">
+          <Activity className="h-5 w-5" aria-hidden="true" />
+        </span>
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-200">
+            Admin control
           </div>
-          <h2 className="template-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
-            Enterprise admin IA is now organized by business function
-          </h2>
-          <p className="template-body mt-2 max-w-3xl text-sm leading-7">
-            The shell now follows the requested menu-first control-surface model so operators can
-            move from overview, tenants, billing, integrations, reliability, audit, and platform
-            settings without treating admin like one long mixed page.
-          </p>
-        </div>
-        <div className="booked-note-surface px-4 py-3 text-sm text-black/70">
-          <div className="text-xs font-semibold uppercase tracking-[0.08em] text-black/48">
-            Runtime linkage
-          </div>
-          <div className="mt-2 font-semibold text-[#1d1d1f]">admin.bookedai.au</div>
-          <div className="mt-1">API base: {apiBaseUrl}</div>
+          <div className="mt-1 truncate text-sm font-semibold">admin.bookedai.au</div>
         </div>
       </div>
 
-      <div className="mt-6 grid gap-4 xl:grid-cols-3">
-        {workspaceConfigs.map((workspace) => {
-          const isActive = workspace.id === activeWorkspace;
-          return (
-            <button
-              key={workspace.id}
-              type="button"
-              onClick={() => onWorkspaceChange(workspace.id)}
-              className={`booked-workspace-card p-5 text-left ${isActive ? 'booked-workspace-card--active' : ''}`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <div className={`text-lg font-semibold ${isActive ? 'text-white' : 'text-[#1d1d1f]'}`}>{workspace.label}</div>
-                  <div className={`mt-2 text-sm leading-6 ${isActive ? 'text-white/75' : 'text-black/70'}`}>{workspace.summary}</div>
-                </div>
-                <span
-                  className={`booked-pill px-3 py-1 ${
-                    isActive ? 'bg-white text-[#2563eb]' : 'bg-white text-black/60'
-                  }`}
-                >
-                  {isActive ? 'Active workspace' : 'Open workspace'}
-                </span>
-              </div>
-              <div className={`mt-4 text-[11px] font-semibold uppercase tracking-[0.08em] ${isActive ? 'text-white/45' : 'text-black/48'}`}>
-                Backend surfaces
-              </div>
-              <div className={`mt-2 text-sm leading-6 ${isActive ? 'text-white/72' : 'text-black/70'}`}>{workspace.backendSurface}</div>
-            </button>
-          );
-        })}
+      <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3 text-xs text-slate-600">
+        <div className="font-semibold uppercase tracking-[0.12em] text-slate-500">API base</div>
+        <div className="mt-1 truncate font-semibold text-slate-950">{apiBaseUrl}</div>
       </div>
-    </section>
+
+      <nav className="mt-5 space-y-5" aria-label="Admin workspaces">
+        {workspaceGroups.map((group) => (
+          <div key={group}>
+            <div className="px-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+              {group}
+            </div>
+            <div className="mt-2 space-y-1">
+              {workspaceConfigs
+                .filter((workspace) => workspace.group === group)
+                .map((workspace) => {
+                  const isActive = workspace.id === activeWorkspace;
+                  const Icon = workspace.icon;
+                  return (
+                    <button
+                      key={workspace.id}
+                      type="button"
+                      onClick={() => onWorkspaceChange(workspace.id)}
+                      className={`group flex w-full items-start gap-3 rounded-2xl px-3 py-3 text-left transition ${
+                        isActive
+                          ? 'bg-slate-950 text-white shadow-[0_14px_34px_rgba(15,23,42,0.22)]'
+                          : 'text-slate-700 hover:bg-slate-100 hover:text-slate-950'
+                      }`}
+                    >
+                      <span
+                        className={`mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                          isActive ? 'bg-white text-slate-950' : 'bg-white text-slate-500'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" aria-hidden="true" />
+                      </span>
+                      <span className="min-w-0">
+                        <span className="block text-sm font-semibold">{workspace.label}</span>
+                        <span
+                          className={`mt-1 line-clamp-2 block text-xs leading-5 ${
+                            isActive ? 'text-white/70' : 'text-slate-500'
+                          }`}
+                        >
+                          {workspace.summary}
+                        </span>
+                      </span>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+        ))}
+      </nav>
+
+      {activeConfig ? (
+        <div className="mt-5 rounded-2xl border border-sky-100 bg-sky-50 px-4 py-3 text-xs leading-5 text-slate-600">
+          <div className="font-semibold uppercase tracking-[0.12em] text-sky-700">
+            Active surface
+          </div>
+          <div className="mt-1 font-semibold text-slate-950">{activeConfig.label}</div>
+          <div className="mt-1">{activeConfig.backendSurface}</div>
+        </div>
+      ) : null}
+    </aside>
   );
 }

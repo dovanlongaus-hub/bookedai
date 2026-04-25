@@ -36,6 +36,12 @@ import {
 
 const productUrl = 'https://product.bookedai.au/';
 const demoLandingUrl = 'https://demo.bookedai.au/';
+const closingPitchImageUrl = '/branding/optimized/final-contact-proof-1400.webp';
+const closingPitchImageSrcSet =
+  '/branding/optimized/final-contact-proof-960.webp 960w, /branding/optimized/final-contact-proof-1400.webp 1400w';
+const chessScreenImageUrl = '/branding/optimized/chess-screen-proof-1400.webp';
+const chessScreenImageSrcSet =
+  '/branding/optimized/chess-screen-proof-960.webp 960w, /branding/optimized/chess-screen-proof-1400.webp 1400w';
 
 const pitchNavItems = [
   { id: 'hero', label: 'Overview' },
@@ -220,6 +226,55 @@ export function PitchDeckApp() {
           { label: 'Roadmap', href: roadmapHref },
         ]}
       />
+
+      <section aria-labelledby="pitch-chess-screen-title" className="relative mx-auto w-full max-w-7xl px-6 pt-6 lg:px-8 lg:pt-8">
+        <div className="overflow-hidden rounded-[1.75rem] border border-black/6 bg-[#0f172a] shadow-[0_32px_90px_rgba(15,23,42,0.16)]">
+          <div className="grid items-stretch xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.42fr)]">
+            <div className="relative flex items-center bg-[linear-gradient(135deg,#111827_0%,#182235_52%,#0f172a_100%)] p-3 sm:p-4 lg:p-5">
+              <div className="w-full overflow-hidden rounded-[1.35rem] border border-white/10 bg-[#e8edf5] shadow-[0_24px_64px_rgba(2,6,23,0.28)]">
+                <img
+                  src={chessScreenImageUrl}
+                  srcSet={chessScreenImageSrcSet}
+                  sizes="(min-width: 1280px) 58vw, calc(100vw - 3rem)"
+                  alt="Grandmaster Chess Academy booking flow in BookedAI"
+                  className="block aspect-[3/2] h-auto w-full object-contain object-center"
+                  loading="eager"
+                  width={1400}
+                  height={933}
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-col justify-between gap-6 bg-[linear-gradient(180deg,#111827_0%,#0f172a_100%)] p-5 text-white sm:p-6 lg:p-8">
+              <div>
+                <SignalPill className="w-fit border border-white/10 bg-white/[0.08] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#8EFCE0]">
+                  Chess_screen proof
+                </SignalPill>
+                <h2 id="pitch-chess-screen-title" className="mt-4 text-2xl font-semibold leading-tight tracking-[-0.045em] text-white sm:text-3xl lg:text-4xl">
+                  The buyer sees a working booking surface before the pitch begins.
+                </h2>
+                <p className="mt-4 text-sm leading-7 text-slate-300 sm:text-[15px]">
+                  Grandmaster Chess Academy shows the BookedAI loop in context: search intent, assessment,
+                  placement, booking posture, and follow-up evidence presented as one polished service journey.
+                </p>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
+                {[
+                  ['Tenant', 'GM Chess Academy'],
+                  ['Journey', 'Search to booking'],
+                  ['Runtime', 'API-backed demo'],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
+                    <div className="mt-1 text-sm font-semibold leading-6 text-white">{value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
 
       {/* ── 1. HERO ─────────────────────────────────────────────────── */}
       <section id="hero" className="relative mx-auto w-full max-w-7xl px-6 pt-6 lg:px-8 lg:pt-8">
@@ -862,40 +917,44 @@ export function PitchDeckApp() {
 
       {/* ── 10. FINAL CTA ───────────────────────────────────────────── */}
       <section className="mx-auto w-full max-w-7xl px-6 py-6 pb-12 lg:px-8 lg:pb-16">
-        <SectionCard className="overflow-hidden bg-[#1d1d1f] px-6 py-10 text-white sm:px-8 lg:px-12 lg:py-12">
-          <div className="grid gap-8 xl:grid-cols-[1fr_0.55fr] xl:items-center">
-            <div>
-              <SignalPill className="w-fit bg-white/10 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-white/64">
-                {ctaContent.kicker}
-              </SignalPill>
-              <h2 className="mt-5 max-w-2xl text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
-                Move from pitch to live revenue flow.
-              </h2>
-              <p className="mt-4 max-w-xl text-sm leading-7 text-white/58 sm:text-base">
-                {ctaContent.body}
-              </p>
+        <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f7fbff_48%,#eef6ff_100%)] p-0 shadow-[0_32px_90px_rgba(15,23,42,0.10)]">
+          <div className="p-3 sm:p-4 lg:p-5">
+            <div className="overflow-hidden rounded-[1.75rem] border border-black/8 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
+              <img
+                src={closingPitchImageUrl}
+                srcSet={closingPitchImageSrcSet}
+                sizes="(min-width: 1280px) 1120px, calc(100vw - 5rem)"
+                alt="BookedAI closing pitch visual proof"
+                className="block aspect-[3/2] h-auto w-full object-contain object-center"
+                loading="eager"
+                width={1400}
+                height={933}
+              />
             </div>
-
-            <div className="flex flex-col gap-3 sm:flex-row xl:flex-col">
-              <a
-                href={productUrl}
-                className="rounded-full bg-white px-6 py-3.5 text-center text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
-              >
-                Open Web App
-              </a>
-              <button
-                type="button"
-                onClick={() => openRegisterInterest('call_to_action', 'pitch_final_cta_sales')}
-                className="rounded-full border border-white/20 bg-white/8 px-6 py-3.5 text-center text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/12"
-              >
-                Talk to Sales
-              </button>
-              <a
-                href={roadmapHref}
-                className="rounded-full border border-white/10 px-6 py-3.5 text-center text-sm font-semibold text-white/52 transition hover:-translate-y-0.5"
-              >
-                {content.ui.roadmap}
-              </a>
+            <div className="flex min-w-0 flex-col gap-5 px-2 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:px-6">
+              <div className="min-w-0">
+                <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
+                  {ctaContent.kicker}
+                </SignalPill>
+                <h2 className="mt-4 max-w-2xl break-words text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f] sm:text-3xl">
+                  Move from pitch to live revenue flow.
+                </h2>
+              </div>
+              <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
+                <a
+                  href={productUrl}
+                  className="rounded-full bg-[#1d1d1f] px-6 py-3.5 text-center text-sm font-semibold text-white transition hover:-translate-y-0.5 whitespace-normal break-words"
+                >
+                  Open Web App
+                </a>
+                <button
+                  type="button"
+                  onClick={() => openRegisterInterest('call_to_action', 'pitch_final_cta_sales')}
+                  className="rounded-full border border-black/10 bg-white px-6 py-3.5 text-center text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5 whitespace-normal break-words"
+                >
+                  Talk to Sales
+                </button>
+              </div>
             </div>
           </div>
         </SectionCard>
@@ -906,6 +965,7 @@ export function PitchDeckApp() {
         onBookDemo={openProductDemo}
         startTrialLabel="Open SME Registration"
         bookDemoLabel="Open Web App"
+        showBrandCopy={false}
       />
     </main>
   );

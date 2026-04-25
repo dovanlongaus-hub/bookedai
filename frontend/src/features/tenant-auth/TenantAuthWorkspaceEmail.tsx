@@ -32,12 +32,6 @@ type TenantInviteContext = {
   role?: string | null;
 };
 
-const tenantAuthBenefits = [
-  'Sign in once and keep onboarding, catalog, billing, and team access in one workspace.',
-  'Use email code when you want a lightweight login without remembering a tenant password.',
-  'Use Google when you want the fastest sign-in or a simple first-time workspace creation path.',
-];
-
 function formatRoleLabel(role: string | null | undefined) {
   if (!role) {
     return 'Tenant user';
@@ -137,51 +131,43 @@ export function TenantAuthWorkspaceEmail({
       : authMode === 'claim'
         ? 'Accept invite with Google'
         : 'Continue with Google';
+  const emailValue =
+    authMode === 'create'
+      ? createAccountForm.email
+      : authMode === 'claim'
+        ? claimAccountForm.email
+        : emailSignInValue;
+  const emailSubmitDisabled =
+    authPending ||
+    !emailValue.trim() ||
+    (authMode === 'create' && !createAccountForm.business_name.trim());
 
   return (
-    <article className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(248,250,252,0.96)_100%)] p-6 shadow-[0_24px_60px_rgba(15,23,42,0.08)]">
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Auth workspace
-          </div>
-          {isGateway ? (
-            <h1 className="mt-2 text-3xl font-semibold tracking-tight text-slate-950">
-              One login portal for every tenant workspace
-            </h1>
-          ) : null}
+    <article className="overflow-hidden rounded-lg border border-slate-200 bg-white p-5 shadow-[0_20px_48px_rgba(15,23,42,0.08)] sm:p-6">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Tenant access</div>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-            {isGateway ? 'Tenant login and account gateway' : 'Tenant access and publishing'}
+            {session ? 'Workspace connected' : modeTitle(authMode)}
           </h2>
+          <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
+            {session
+              ? 'Your verified session is active for this tenant workspace.'
+              : modeDescription(authMode, isGateway)}
+          </p>
         </div>
-      </div>
-
-      <p className="mt-3 text-sm leading-6 text-slate-600">
-        {isGateway
-          ? 'One login portal for every tenant workspace. Use email code or Google, then continue into the right tenant.'
-          : 'Preview stays available here, while verified sign-in upgrades this workspace into a write-enabled operator session.'}
-      </p>
-
-      <div className="mt-5 rounded-[1.35rem] border border-sky-200 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.18),transparent_30%),linear-gradient(180deg,#f8fcff_0%,#eef6ff_100%)] px-4 py-4 shadow-[0_14px_34px_rgba(59,130,246,0.10)]">
-        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
-          {isGateway ? 'Gateway scope' : 'Tenant scope'}
-        </div>
-        <div className="mt-2 flex flex-wrap gap-2">
-          <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-semibold text-sky-700">
-            {tenantName}
-          </span>
-          <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-semibold text-sky-700">
-            {tenantSlug}
-          </span>
-          <span className="rounded-full border border-sky-200 bg-white px-3 py-1 text-xs font-semibold text-sky-700">
-            {session ? 'Authenticated write session' : 'Preview only'}
-          </span>
+        <div className="hidden rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-right sm:block">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+            {isGateway ? 'Gateway' : 'Tenant'}
+          </div>
+          <div className="mt-1 max-w-[12rem] truncate text-sm font-semibold text-slate-950">{tenantName}</div>
+          <div className="mt-0.5 max-w-[12rem] truncate text-xs text-slate-500">{tenantSlug}</div>
         </div>
       </div>
 
       {session ? (
         <>
-          <div className="mt-5 rounded-[1.25rem] border border-emerald-200 bg-emerald-50 px-4 py-4">
+          <div className="mt-5 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-4">
             <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
                 <div className="text-sm font-semibold text-emerald-900">
@@ -204,7 +190,7 @@ export function TenantAuthWorkspaceEmail({
             </div>
           </div>
 
-          <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-4">
+          <div className="mt-5 rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
             <div className="flex items-center justify-between gap-3">
               <div className="text-sm font-semibold text-slate-950">Onboarding progress</div>
               <div className="text-xs font-medium text-slate-600">{onboarding.progress.percent}%</div>
@@ -217,7 +203,7 @@ export function TenantAuthWorkspaceEmail({
         </>
       ) : (
         <>
-          <div className="mt-6 flex flex-wrap gap-2 rounded-[1.2rem] border border-slate-200/80 bg-white/80 p-2 shadow-[0_10px_26px_rgba(15,23,42,0.04)]">
+          <div className="mt-6 grid grid-cols-2 gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1">
             {(tenantRef
               ? [
                   { key: 'sign-in' as TenantAuthMode, label: 'Sign in' },
@@ -231,10 +217,10 @@ export function TenantAuthWorkspaceEmail({
                 key={item.key}
                 type="button"
                 onClick={() => setAuthMode(item.key)}
-                className={`rounded-full px-4 py-2.5 text-xs font-semibold transition ${
+                className={`rounded-md px-4 py-2.5 text-sm font-semibold transition ${
                   authMode === item.key
-                    ? 'bg-slate-950 text-white shadow-[0_12px_26px_rgba(15,23,42,0.18)]'
-                    : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-900'
+                    ? 'bg-slate-950 text-white shadow-[0_10px_22px_rgba(15,23,42,0.16)]'
+                    : 'text-slate-600 hover:bg-white hover:text-slate-950'
                 }`}
               >
                 {item.label}
@@ -242,17 +228,8 @@ export function TenantAuthWorkspaceEmail({
             ))}
           </div>
 
-          <div className="mt-5 rounded-[1.25rem] border border-slate-200 bg-white/85 px-4 py-4 shadow-[0_10px_22px_rgba(15,23,42,0.04)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-              {modeTitle(authMode)}
-            </div>
-            <div className="mt-2 text-sm leading-6 text-slate-600">
-              {modeDescription(authMode, isGateway)}
-            </div>
-          </div>
-
           {authMode === 'claim' && inviteContext?.email ? (
-            <div className="mt-5 rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-4">
+            <div className="mt-5 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">
                 Invite detected
               </div>
@@ -265,30 +242,31 @@ export function TenantAuthWorkspaceEmail({
             </div>
           ) : null}
 
-          <div className="mt-5 space-y-5">
-            <div className="relative overflow-hidden rounded-[1.4rem] border border-sky-200 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.22),transparent_26%),linear-gradient(135deg,rgba(255,255,255,1)_0%,rgba(239,246,255,1)_58%,rgba(224,242,254,0.9)_100%)] px-5 py-5 shadow-[0_18px_40px_rgba(14,116,144,0.12)]">
-              <div className="absolute right-4 top-4 rounded-full border border-sky-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">
-                Google
-              </div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
-                Recommended
-              </div>
-              <div className="mt-2 text-xl font-semibold tracking-tight text-slate-950">
-                {googleTitle}
-              </div>
-              <div className="mt-2 text-sm leading-6 text-slate-700">
-                Google sign-in stays on the same tenant form so operators can sign in quickly or create a new tenant workspace without switching flows.
+          <div className="mt-5 space-y-4">
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <div className="text-sm font-semibold text-slate-950">{googleTitle}</div>
+                  <div className="mt-1 text-xs leading-5 text-slate-500">
+                    {authMode === 'create'
+                      ? 'Creates the owner account and opens the new workspace.'
+                      : 'Uses the Google account linked to an active tenant membership.'}
+                  </div>
+                </div>
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-sm font-bold text-slate-700">
+                  G
+                </div>
               </div>
               {googleEnabled ? (
                 <>
-                  <div className="mt-4 flex flex-wrap items-center gap-3">
-                    <div className="min-w-[280px] rounded-[1rem] bg-white/80 p-1 shadow-[0_10px_24px_rgba(14,116,144,0.10)]">
+                  <div className="mt-4 grid gap-3">
+                    <div className="min-h-[44px] rounded-md bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.08)]">
                       {googleButtonSlot}
                     </div>
                     <button
                       type="button"
                       onClick={onPromptGoogle}
-                      className="inline-flex items-center gap-2 rounded-full border border-sky-200 bg-white px-4 py-2.5 text-sm font-semibold text-sky-900 transition hover:border-sky-300 hover:bg-sky-50"
+                      className="inline-flex items-center justify-center rounded-md border border-slate-200 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                     >
                       Use another Google account
                     </button>
@@ -305,15 +283,13 @@ export function TenantAuthWorkspaceEmail({
             </div>
 
             <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-gradient-to-r from-transparent via-slate-300 to-slate-200" />
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-                Or continue with email code
-              </div>
-              <div className="h-px flex-1 bg-gradient-to-l from-transparent via-slate-300 to-slate-200" />
+              <div className="h-px flex-1 bg-slate-200" />
+              <div className="text-xs font-semibold text-slate-400">or email code</div>
+              <div className="h-px flex-1 bg-slate-200" />
             </div>
 
             {authMode === 'sign-in' ? (
-              <form className="rounded-[1.25rem] border border-slate-200 bg-white/80 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] space-y-4" onSubmit={onRequestEmailCode}>
+              <form className="space-y-4 rounded-lg border border-slate-200 bg-white p-4" onSubmit={onRequestEmailCode}>
                 <label className="block">
                   <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                     Email
@@ -328,8 +304,8 @@ export function TenantAuthWorkspaceEmail({
                 </label>
                 <button
                   type="submit"
-                  disabled={authPending || !emailSignInValue.trim()}
-                  className={`booked-button ${authPending || !emailSignInValue.trim() ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
+                  disabled={emailSubmitDisabled}
+                  className={`booked-button w-full ${emailSubmitDisabled ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
                 >
                   Send login code
                 </button>
@@ -337,7 +313,7 @@ export function TenantAuthWorkspaceEmail({
             ) : null}
 
             {authMode === 'create' ? (
-              <form className="rounded-[1.25rem] border border-slate-200 bg-white/80 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] space-y-4" onSubmit={onRequestEmailCode}>
+              <form className="space-y-4 rounded-lg border border-slate-200 bg-white p-4" onSubmit={onRequestEmailCode}>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -390,8 +366,8 @@ export function TenantAuthWorkspaceEmail({
                 </div>
                 <button
                   type="submit"
-                  disabled={authPending || !createAccountForm.business_name.trim() || !createAccountForm.email.trim()}
-                  className={`booked-button ${authPending || !createAccountForm.business_name.trim() || !createAccountForm.email.trim() ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
+                  disabled={emailSubmitDisabled}
+                  className={`booked-button w-full ${emailSubmitDisabled ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
                 >
                   Email me a setup code
                 </button>
@@ -399,7 +375,7 @@ export function TenantAuthWorkspaceEmail({
             ) : null}
 
             {authMode === 'claim' ? (
-              <form className="rounded-[1.25rem] border border-slate-200 bg-white/80 p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)] space-y-4" onSubmit={onRequestEmailCode}>
+              <form className="space-y-4 rounded-lg border border-slate-200 bg-white p-4" onSubmit={onRequestEmailCode}>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">
                     <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
@@ -428,8 +404,8 @@ export function TenantAuthWorkspaceEmail({
                 </div>
                 <button
                   type="submit"
-                  disabled={authPending || !claimAccountForm.email.trim()}
-                  className={`booked-button ${authPending || !claimAccountForm.email.trim() ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
+                  disabled={emailSubmitDisabled}
+                  className={`booked-button w-full ${emailSubmitDisabled ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
                 >
                   Send invite code
                 </button>
@@ -437,7 +413,7 @@ export function TenantAuthWorkspaceEmail({
             ) : null}
 
             {codeMatchesMode ? (
-              <form className="rounded-[1.25rem] border border-emerald-200 bg-emerald-50 p-4 shadow-[0_10px_24px_rgba(16,185,129,0.08)] space-y-4" onSubmit={onVerifyEmailCode}>
+              <form className="space-y-4 rounded-lg border border-emerald-200 bg-emerald-50 p-4" onSubmit={onVerifyEmailCode}>
                 <div>
                   <div className="text-sm font-semibold text-emerald-950">Enter verification code</div>
                   <div className="mt-1 text-sm leading-6 text-emerald-900">
@@ -462,20 +438,12 @@ export function TenantAuthWorkspaceEmail({
                 <button
                   type="submit"
                   disabled={authPending || !emailCodeValue.trim()}
-                  className={`booked-button ${authPending || !emailCodeValue.trim() ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
+                  className={`booked-button w-full ${authPending || !emailCodeValue.trim() ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
                 >
                   Verify code
                 </button>
               </form>
             ) : null}
-          </div>
-
-          <div className="mt-6 grid gap-3">
-            {tenantAuthBenefits.map((item) => (
-              <div key={item} className="rounded-[1rem] border border-slate-200 bg-white/85 px-4 py-3 text-sm leading-6 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                {item}
-              </div>
-            ))}
           </div>
         </>
       )}
@@ -483,7 +451,7 @@ export function TenantAuthWorkspaceEmail({
       {authPending ? <div className="mt-4 text-sm text-slate-600">Verifying tenant account...</div> : null}
       {authError ? <div className="booked-alert-error mt-4">{authError}</div> : null}
       {tenantChoices.length ? (
-        <div className="mt-4 rounded-[1.25rem] border border-amber-200 bg-amber-50 px-4 py-4">
+        <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4">
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">
             Choose tenant workspace
           </div>

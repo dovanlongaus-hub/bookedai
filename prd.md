@@ -9,6 +9,8 @@ Latest phase-plan update: `2026-04-25`.
 The active next-phase implementation plan now lives in
 `docs/development/next-phase-implementation-plan-2026-04-25.md`.
 
+Latest tenant access update: `tenant.bookedai.au` is now the Google-first tenant gateway, with explicit sign-in versus create-account intent, email-code fallback, and backend protection against accidental workspace creation during Google sign-in.
+
 The next delivery wave should be read as:
 
 - `Phase 17`: full-flow stabilization across pitch registration, product booking, Thank You return, and downstream automation
@@ -449,6 +451,8 @@ Embedded, tenant, and admin deployments must support webhook and API-driven auto
 
 - enterprise-style login and navigation
 - menu-first information architecture
+- `admin.bookedai.au` must proxy `/api/*` to the backend before SPA fallback so login and admin reads cannot be intercepted by the static Vite shell
+- the shipped admin shell should use a compact sidebar workspace menu with grouped operator lanes, keeping the active workspace content visible without a large card selector pushing it down the page
 - tenant directory plus deeper tenant workspace
 - tenant branding and HTML content editing
 - tenant role and permission management

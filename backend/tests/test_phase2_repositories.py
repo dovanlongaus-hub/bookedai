@@ -20,6 +20,7 @@ from repositories.crm_repository import CrmSyncRepository
 from repositories.idempotency_repository import IdempotencyRepository
 from repositories.lead_repository import LeadRepository
 from repositories.outbox_repository import OutboxRepository
+from repositories.reporting_repository import ReportingRepository
 from repositories.webhook_repository import WebhookEventRepository
 
 
@@ -50,6 +51,63 @@ class AuditLogRepositoryTestCase(IsolatedAsyncioTestCase):
         self.assertIn("slug = :tenant_ref", str(statement))
         self.assertEqual(params["tenant_ref"], "default-production-tenant")
         self.assertEqual(params["payload"], json.dumps({"status": "captured"}))
+
+    async def test_list_recent_entries_casts_nullable_filters_for_asyncpg(self):
+        execute = AsyncMock(
+            return_value=SimpleNamespace(
+                mappings=lambda: SimpleNamespace(all=lambda: []),
+            )
+        )
+        repository = AuditLogRepository(
+            RepositoryContext(
+                session=SimpleNamespace(execute=execute),
+                tenant_id="default-production-tenant",
+            )
+        )
+
+        rows = await repository.list_recent_entries(limit=12)
+
+        self.assertEqual(rows, [])
+        statement = execute.await_args.args[0]
+        params = execute.await_args.args[1]
+        self.assertIn("cast(:tenant_ref as text) is null", str(statement))
+        self.assertIn("cast(:event_type as text) is null", str(statement))
+        self.assertIn("slug = :tenant_ref", str(statement))
+        self.assertEqual(params["tenant_ref"], "default-production-tenant")
+        self.assertIsNone(params["event_type"])
+
+
+class ReportingRepositoryTestCase(IsolatedAsyncioTestCase):
+    async def test_revenue_capture_metrics_casts_days_for_asyncpg(self):
+        execute = AsyncMock(
+            return_value=SimpleNamespace(
+                mappings=lambda: SimpleNamespace(
+                    one=lambda: {
+                        "total_sessions": 2,
+                        "confirmed_sessions": 1,
+                        "total_revenue_aud": 180,
+                        "avg_booking_value_aud": 180,
+                        "paid_bookings": 1,
+                        "chat_started": 2,
+                    }
+                ),
+            )
+        )
+        repository = ReportingRepository(
+            RepositoryContext(
+                session=SimpleNamespace(execute=execute),
+                tenant_id="default-production-tenant",
+            )
+        )
+
+        metrics = await repository.get_revenue_capture_metrics(days=30)
+
+        statement = execute.await_args.args[0]
+        params = execute.await_args.args[1]
+        self.assertIn("make_interval(days => cast(:days as integer))", str(statement))
+        self.assertEqual(params["days"], 30)
+        self.assertEqual(metrics["period_days"], 30)
+        self.assertEqual(metrics["bookings_confirmed"], 1)
 
 
 class OutboxRepositoryTestCase(IsolatedAsyncioTestCase):

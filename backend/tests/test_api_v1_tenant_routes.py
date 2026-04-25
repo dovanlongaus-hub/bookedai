@@ -1338,9 +1338,21 @@ class ApiV1TenantRoutesTestCase(TestCase):
                 "industry": "services",
             }
 
+        async def _load_tenant_membership(*_args, **_kwargs):
+            return {
+                "tenant_id": "tenant-test",
+                "tenant_slug": "default-production-tenant",
+                "email": "owner@example.com",
+                "role": "tenant_admin",
+                "status": "active",
+            }
+
         with patch("api.v1_tenant_handlers.get_session", _membership_session), patch(
             "api.v1_tenant_handlers._verify_google_identity_token",
             _verify_google_identity_token,
+        ), patch(
+            "api.v1_tenant_handlers._load_tenant_membership",
+            _load_tenant_membership,
         ), patch.object(
             TenantRepository,
             "resolve_tenant_id",
@@ -1421,6 +1433,47 @@ class ApiV1TenantRoutesTestCase(TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["data"]["tenant"]["slug"], "future-swim")
         self.assertEqual(payload["data"]["provider"], "google")
+
+    def test_tenant_google_auth_gateway_sign_in_without_membership_does_not_create_tenant(self):
+        @asynccontextmanager
+        async def _session(_session_factory):
+            yield _WritableFakeSession()
+
+        async def _verify_google_identity_token(*_args, **_kwargs):
+            return {
+                "email": "new-owner@example.com",
+                "name": "New Tenant Owner",
+                "picture_url": "https://example.com/new-avatar.png",
+                "google_sub": "google-sub-new",
+            }
+
+        async def _load_tenant_memberships_for_google_identity(*_args, **_kwargs):
+            return []
+
+        async def _create_tenant(*_args, **_kwargs):
+            raise AssertionError("sign-in intent must not create a new tenant")
+
+        with patch("api.v1_tenant_handlers.get_session", _session), patch(
+            "api.v1_tenant_handlers._verify_google_identity_token",
+            _verify_google_identity_token,
+        ), patch(
+            "api.v1_tenant_handlers._load_tenant_memberships_for_google_identity",
+            _load_tenant_memberships_for_google_identity,
+        ), patch.object(
+            TenantRepository,
+            "create_tenant",
+            _create_tenant,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/tenant/auth/google",
+                json={"id_token": "google-id-token", "auth_intent": "sign-in"},
+            )
+
+        self.assertEqual(response.status_code, 404)
+        payload = response.json()
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["error"]["code"], "tenant_google_membership_not_found")
 
     def test_tenant_google_auth_gateway_create_creates_new_tenant(self):
         @asynccontextmanager

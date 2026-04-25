@@ -17,7 +17,7 @@ export const brandColorTokens = {
 } as const;
 
 const BRAND_ASSET_VERSION = '20260421-branding-suite';
-const BRAND_UPLOADED_LOGO = 'https://upload.bookedai.au/images/0a14/VAEjorVtB4CBewa8CmRmRQ.png';
+const BRAND_UPLOADED_LOGO = '/branding/optimized/bookedai-logo-uploaded-420.webp';
 const BRAND_LOGO_LIGHT = BRAND_UPLOADED_LOGO;
 const BRAND_LOGO_DARK = BRAND_UPLOADED_LOGO;
 const BRAND_LOGO_BLACK = BRAND_UPLOADED_LOGO;

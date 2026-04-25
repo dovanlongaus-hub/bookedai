@@ -335,32 +335,34 @@ export function AdminPage() {
           onLogout={handleLogout}
         />
 
-        <AdminWorkspaceNav
-          activeWorkspace={activeWorkspace}
-          apiBaseUrl={apiBaseUrl}
-          onWorkspaceChange={changeWorkspace}
-        />
+        <div className="grid gap-6 xl:grid-cols-[320px_minmax(0,1fr)] xl:items-start">
+          <AdminWorkspaceNav
+            activeWorkspace={activeWorkspace}
+            apiBaseUrl={apiBaseUrl}
+            onWorkspaceChange={changeWorkspace}
+          />
 
-        <AdminWorkspaceInsights
-          activeWorkspace={activeWorkspace}
-          activePanel={activePanel}
-          bookingsTotal={bookingsTotal}
-          shadowStatus={bookingsShadowStatus}
-          tenantsCount={tenants.length}
-          selectedTenantName={selectedTenantDetail?.tenant.name ?? null}
-          selectedTenantMembersCount={selectedTenantDetail?.members.length ?? 0}
-          selectedTenantServicesCount={selectedTenantDetail?.services.length ?? 0}
-          portalSupportQueueCount={overview?.portal_support_queue?.length ?? 0}
-          importedServicesCount={importedServices.length}
-          partnersCount={partners.length}
-          configItemsCount={configItems.length}
-          apiRoutesCount={apiRoutes.length}
-          messagingCount={messagingItems.length}
-          messagingAttentionCount={messagingItems.filter((item) => item.needs_attention).length}
-          selectedBookingReference={selectedBooking?.booking.booking_reference ?? null}
-          selectedServiceId={selectedBooking?.booking.service_id ?? null}
-          onPanelNavigate={changePanel}
-        />
+          <div className="min-w-0 space-y-6">
+            <AdminWorkspaceInsights
+              activeWorkspace={activeWorkspace}
+              activePanel={activePanel}
+              bookingsTotal={bookingsTotal}
+              shadowStatus={bookingsShadowStatus}
+              tenantsCount={tenants.length}
+              selectedTenantName={selectedTenantDetail?.tenant.name ?? null}
+              selectedTenantMembersCount={selectedTenantDetail?.members.length ?? 0}
+              selectedTenantServicesCount={selectedTenantDetail?.services.length ?? 0}
+              portalSupportQueueCount={overview?.portal_support_queue?.length ?? 0}
+              importedServicesCount={importedServices.length}
+              partnersCount={partners.length}
+              configItemsCount={configItems.length}
+              apiRoutesCount={apiRoutes.length}
+              messagingCount={messagingItems.length}
+              messagingAttentionCount={messagingItems.filter((item) => item.needs_attention).length}
+              selectedBookingReference={selectedBooking?.booking.booking_reference ?? null}
+              selectedServiceId={selectedBooking?.booking.service_id ?? null}
+              onPanelNavigate={changePanel}
+            />
 
         {activeWorkspace === 'overview' ? (
           <section className="booked-page-grid xl:grid-cols-[minmax(0,1.35fr)_minmax(320px,0.9fr)]">
@@ -617,50 +619,46 @@ export function AdminPage() {
         ) : null}
 
         {activeWorkspace === 'catalog' ? (
-          <section className="booked-page-grid xl:grid-cols-[minmax(0,1.05fr)_minmax(320px,0.95fr)]">
-            <div className="space-y-6">
-              <div id="service-catalog">
-                <ServiceCatalogSection
-                  serviceImportForm={serviceImportForm}
-                  importedServices={importedServices}
-                  serviceQualityCounts={serviceQualityCounts}
-                  importingServices={importingServices}
-                  exportingQualityReport={exportingServiceQuality}
-                  serviceMessage={serviceMessage}
-                  onServiceImportFormChange={updateServiceImportForm}
-                  onSubmitImport={importServicesFromWebsite}
-                  onDeleteImportedService={(serviceRowId) => {
-                    void deleteImportedService(serviceRowId);
-                  }}
-                  onExportQualityReport={() => {
-                    void exportServiceQualityReport();
-                  }}
-                />
-              </div>
+          <section className="booked-page-grid">
+            <div id="partners">
+              <PartnersSection
+                partners={partners}
+                editingPartnerId={editingPartnerId}
+                partnerForm={partnerForm}
+                partnerMessage={partnerMessage}
+                savingPartner={savingPartner}
+                uploadingLogo={uploadingLogo}
+                uploadingImage={uploadingImage}
+                onPartnerFormChange={updatePartnerForm}
+                onEditPartner={editPartner}
+                onResetPartner={resetPartnerForm}
+                onUploadPartnerAsset={(file, kind) => {
+                  void uploadPartnerAsset(file, kind);
+                }}
+                onSavePartner={savePartner}
+                onDeletePartner={(partnerId) => {
+                  void deletePartner(partnerId);
+                }}
+              />
             </div>
 
-            <div className="space-y-6">
-              <div id="partners">
-                <PartnersSection
-                  partners={partners}
-                  editingPartnerId={editingPartnerId}
-                  partnerForm={partnerForm}
-                  partnerMessage={partnerMessage}
-                  savingPartner={savingPartner}
-                  uploadingLogo={uploadingLogo}
-                  uploadingImage={uploadingImage}
-                  onPartnerFormChange={updatePartnerForm}
-                  onEditPartner={editPartner}
-                  onResetPartner={resetPartnerForm}
-                  onUploadPartnerAsset={(file, kind) => {
-                    void uploadPartnerAsset(file, kind);
-                  }}
-                  onSavePartner={savePartner}
-                  onDeletePartner={(partnerId) => {
-                    void deletePartner(partnerId);
-                  }}
-                />
-              </div>
+            <div id="service-catalog">
+              <ServiceCatalogSection
+                serviceImportForm={serviceImportForm}
+                importedServices={importedServices}
+                serviceQualityCounts={serviceQualityCounts}
+                importingServices={importingServices}
+                exportingQualityReport={exportingServiceQuality}
+                serviceMessage={serviceMessage}
+                onServiceImportFormChange={updateServiceImportForm}
+                onSubmitImport={importServicesFromWebsite}
+                onDeleteImportedService={(serviceRowId) => {
+                  void deleteImportedService(serviceRowId);
+                }}
+                onExportQualityReport={() => {
+                  void exportServiceQualityReport();
+                }}
+              />
             </div>
           </section>
         ) : null}
@@ -851,6 +849,8 @@ export function AdminPage() {
             </aside>
           </section>
         ) : null}
+          </div>
+        </div>
       </div>
     </main>
   );

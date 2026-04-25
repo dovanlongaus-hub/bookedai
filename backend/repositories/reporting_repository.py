@@ -85,7 +85,7 @@ class ReportingRepository(BaseRepository):
                   from conversation_events
                   where source = 'booking_assistant'
                     and event_type = 'booking_session_created'
-                    and created_at >= now() - (:days || ' days')::interval
+                    and created_at >= now() - make_interval(days => cast(:days as integer))
                 ),
                 revenue_data as (
                   select
@@ -94,14 +94,14 @@ class ReportingRepository(BaseRepository):
                     count(*) as paid_bookings
                   from payment_intents
                   where status in ('paid', 'succeeded', 'completed')
-                    and created_at >= now() - (:days || ' days')::interval
+                    and created_at >= now() - make_interval(days => cast(:days as integer))
                 ),
                 chat_sessions as (
                   select count(distinct conversation_id) as chat_started
                   from conversation_events
                   where source = 'booking_assistant'
                     and event_type = 'booking_session_created'
-                    and created_at >= now() - (:days || ' days')::interval
+                    and created_at >= now() - make_interval(days => cast(:days as integer))
                 )
                 select
                   bs.total_sessions,

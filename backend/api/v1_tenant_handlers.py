@@ -455,7 +455,7 @@ async def tenant_email_code_verify(request: Request, payload: TenantEmailCodeVer
 async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestPayload):
     cfg: Settings = request.app.state.settings
     google_identity = await _verify_google_identity_token(cfg, id_token=payload.id_token)
-    auth_intent = str(payload.auth_intent or "create").strip().lower()
+    auth_intent = str(payload.auth_intent or ("sign-in" if payload.tenant_ref else "create")).strip().lower()
     if auth_intent not in {"sign-in", "create"}:
         return _error_response(
             ValidationAppError(
@@ -499,6 +499,26 @@ async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestP
                     actor_context=None,
                 )
 
+            existing_membership = await _load_tenant_membership(
+                session,
+                tenant_id=tenant_id,
+                email=google_identity["email"] or "",
+                statuses=("active",),
+            )
+            if auth_intent == "sign-in" and not existing_membership:
+                return _error_response(
+                    AppError(
+                        code="tenant_google_membership_not_found",
+                        message="No active tenant membership matches that Google account for this workspace. Create a new workspace from tenant.bookedai.au or ask an admin for an invite.",
+                        status_code=404,
+                    ),
+                    tenant_id=tenant_id,
+                    actor_context=None,
+                )
+
+            if existing_membership:
+                role = str(existing_membership.get("role") or role)
+
             membership = await _upsert_tenant_membership(
                 session,
                 tenant_profile=tenant_profile,
@@ -541,6 +561,17 @@ async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestP
                         auth_provider="google",
                     )
             else:
+                if auth_intent == "sign-in":
+                    return _error_response(
+                        AppError(
+                            code="tenant_google_membership_not_found",
+                            message="No active tenant workspace was found for that Google account. Use Create account to open a new workspace.",
+                            status_code=404,
+                        ),
+                        tenant_id=None,
+                        actor_context=None,
+                    )
+
                 normalized_business_name = _derive_google_tenant_business_name(
                     business_name=payload.business_name,
                     google_name=google_identity["name"],

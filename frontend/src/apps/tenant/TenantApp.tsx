@@ -1261,7 +1261,9 @@ export function TenantApp() {
             ? authContext.authMode === 'claim'
               ? 'create'
               : 'sign-in'
-            : 'create';
+            : authContext.authMode === 'create'
+              ? 'create'
+              : 'sign-in';
 
           void apiV1
             .tenantGoogleAuth({
@@ -2678,101 +2680,34 @@ export function TenantApp() {
 
     return (
       <main className="booked-admin-shell booked-page-shell text-slate-950">
-        <div className="booked-page-frame booked-page-stack">
-          <section className="overflow-hidden rounded-[2.25rem] border border-sky-100 bg-[radial-gradient(circle_at_top_left,rgba(72,123,255,0.18),transparent_30%),radial-gradient(circle_at_bottom_right,rgba(56,189,248,0.14),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.98),rgba(244,248,255,0.98))] p-6 text-[var(--apple-near-black)] shadow-[0_28px_80px_rgba(15,23,42,0.10)] lg:p-8">
-            <div className="flex flex-col gap-7 lg:flex-row lg:items-end lg:justify-between">
-              <div className="max-w-3xl">
-                <div className="inline-flex items-center rounded-full border border-sky-200 bg-white/85 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--apple-blue)] shadow-[0_10px_24px_rgba(59,130,246,0.10)] backdrop-blur">
-                  Shared tenant gateway
-                </div>
-                <h1 className="mt-4 max-w-2xl text-3xl font-semibold tracking-tight text-[var(--apple-near-black)] lg:text-[2.8rem] lg:leading-[1.02]">
-                  One polished sign-in flow for every tenant workspace
-                </h1>
-                <p className="mt-4 max-w-2xl text-[15px] leading-7 text-black/66">
-                  Create a new tenant, continue with Google, or return to an existing workspace
-                  from one canonical entry point at `tenant.bookedai.au`.
-                </p>
-                <div className="mt-5 flex flex-wrap gap-2.5">
-                  {[
-                    'Google-first access',
-                    'Shared tenant gateway',
-                    'Automatic workspace routing',
-                  ].map((item) => (
-                    <span
-                      key={item}
-                      className="rounded-full border border-sky-200 bg-white/82 px-3.5 py-1.5 text-xs font-semibold text-sky-800 shadow-[0_8px_20px_rgba(59,130,246,0.08)] backdrop-blur"
-                    >
-                      {item}
-                    </span>
-                  ))}
-                </div>
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-6xl items-center px-4 py-8 sm:px-6 lg:px-8">
+          <section className="grid w-full gap-8 lg:grid-cols-[minmax(0,1fr)_minmax(380px,440px)] lg:items-center">
+            <div className="max-w-2xl">
+              <div className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
+                tenant.bookedai.au
               </div>
-
-              <div className="grid gap-3 text-sm text-black/72 sm:grid-cols-2">
-                <div className="rounded-[1.35rem] border border-black/6 bg-white/78 px-4 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] backdrop-blur">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42">
-                    Entry point
+              <h1 className="mt-5 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+                Sign in to your BookedAI workspace
+              </h1>
+              <p className="mt-4 max-w-xl text-base leading-7 text-slate-600">
+                Use Google for the fastest verified access, create a new tenant account, or fall back to a one-time email code.
+              </p>
+              <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
+                {[
+                  ['Google first', 'Verified workspace access'],
+                  ['Email code', 'No password required'],
+                  ['Auto routing', 'Opens the right tenant'],
+                ].map(([label, detail]) => (
+                  <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+                    <div className="text-sm font-semibold text-slate-950">{label}</div>
+                    <div className="mt-1 text-xs leading-5 text-slate-500">{detail}</div>
                   </div>
-                  <div className="mt-2 text-lg font-semibold tracking-tight text-[var(--apple-near-black)]">
-                    tenant.bookedai.au
-                  </div>
-                  <div className="mt-2 text-xs leading-5 text-black/54">
-                    Shared tenant sign-in, Google access, and workspace creation
-                  </div>
-                </div>
-                <div className="rounded-[1.35rem] border border-black/6 bg-white/78 px-4 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.06)] backdrop-blur">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42">
-                    Release
-                  </div>
-                  <div className="mt-2 text-lg font-semibold tracking-tight text-[var(--apple-near-black)]">{releaseLabel}</div>
-                  <div className="mt-2 text-xs leading-5 text-black/54">Source {releaseVersion}</div>
-                </div>
+                ))}
+              </div>
+              <div className="mt-6 text-xs font-medium text-slate-400">
+                {releaseLabel} - Source {releaseVersion}
               </div>
             </div>
-          </section>
-
-          <section className="grid gap-6 xl:grid-cols-[1.02fr_0.98fr]">
-            <div className="space-y-6">
-              <article className="rounded-[1.85rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-6 shadow-[0_22px_52px_rgba(15,23,42,0.07)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Gateway flow
-                </div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                  One tenant entry point, three clean paths
-                </h2>
-                <div className="mt-5 grid gap-3">
-                  {[
-                    'Existing tenants can return with Google-first sign-in or password fallback.',
-                    'New tenants can create the workspace from the same gateway without switching surfaces.',
-                    'After authentication, BookedAI routes each operator into the correct tenant automatically.',
-                  ].map((item) => (
-                    <div
-                      key={item}
-                      className="rounded-[1.2rem] border border-slate-200 bg-white/88 px-4 py-4 text-sm leading-6 text-slate-600 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
-                    >
-                      {item}
-                    </div>
-                  ))}
-                </div>
-              </article>
-
-              <article className="rounded-[1.85rem] border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] p-6 shadow-[0_22px_52px_rgba(15,23,42,0.07)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  After sign-in
-                </div>
-                <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                  Straight into the right workspace
-                </h2>
-                <div className="mt-4 rounded-[1.2rem] border border-slate-200 bg-white/88 px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                  <p className="text-sm leading-6 text-slate-600">
-                    Successful authentication lands on `/tenant/&lt;slug&gt;`, so operators move from the
-                    shared gateway into overview, catalog, bookings, integrations, and billing
-                    without a second login step.
-                  </p>
-                </div>
-              </article>
-            </div>
-
             <TenantAuthWorkspaceEmail
               tenantName="BookedAI Tenant Gateway"
               tenantSlug="tenant.bookedai.au"
@@ -2851,7 +2786,7 @@ export function TenantApp() {
 
   const { overview, bookings, plugin, integrations, billing, onboarding, team, catalog } = state;
   const selectionService = selectedCatalogItem ? toBookingReadyServiceItem(selectedCatalogItem) : null;
-  const permissionMatrix = useMemo(buildTenantPermissionMatrix, []);
+  const permissionMatrix = buildTenantPermissionMatrix();
   const roleFirstLoginHint = inviteContext?.role ?? tenantMembershipRole;
   const tenantPanels: Array<{
     key: TenantPanel;
@@ -2927,18 +2862,12 @@ export function TenantApp() {
     ? overview.workspace.guides[panel === 'experience' ? 'experience' : panel as Exclude<typeof panel, 'leads' | 'operations'>]
     : undefined;
   const introPreview = stripHtmlPreview(overview.workspace.introduction_html);
-  const activationState = useMemo(
-    () => deriveTenantActivationState({ session, onboarding, overview }),
-    [session, onboarding, overview],
-  );
+  const activationState = deriveTenantActivationState({ session, onboarding, overview });
   const futureSwim = isFutureSwimTenant(overview.tenant);
-  const outstandingRevenueAud = useMemo(() => deriveOutstandingRevenueAud(billing), [billing]);
-  const paidRevenueAud = useMemo(() => derivePaidRevenueAud(billing, revenueMetrics), [billing, revenueMetrics]);
-  const sourceContribution = useMemo(() => deriveSourceContribution(overview), [overview]);
-  const revenueProofNarrative = useMemo(
-    () => buildRevenueProofNarrative(overview, billing, revenueMetrics),
-    [overview, billing, revenueMetrics],
-  );
+  const outstandingRevenueAud = deriveOutstandingRevenueAud(billing);
+  const paidRevenueAud = derivePaidRevenueAud(billing, revenueMetrics);
+  const sourceContribution = deriveSourceContribution(overview);
+  const revenueProofNarrative = buildRevenueProofNarrative(overview, billing, revenueMetrics);
 
   return (
     <main className="booked-admin-shell booked-page-shell text-slate-950">

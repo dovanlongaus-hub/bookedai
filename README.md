@@ -84,7 +84,7 @@ Production traffic is expected to follow this path:
 - `https://product.bookedai.au/` -> live product web runtime and booking-agent frontend
 - `https://demo.bookedai.au/` -> canonical public web entrypoint for the BookedAI demo experience
 - `https://portal.bookedai.au/` -> customer booking portal routes on the shared frontend plus backend proxy
-- `https://tenant.bookedai.au/` -> tenant auth gateway with email-first sign-in, email verification code flow, Google continuation, workspace creation, and catalog workspace on the shared frontend plus backend proxy
+- `https://tenant.bookedai.au/` -> tenant auth gateway with Google-first sign-in/create-account, email verification code fallback, explicit workspace routing, and catalog workspace on the shared frontend plus backend proxy
 - `https://supabase.bookedai.au/` -> Supabase Studio, Auth, REST, Storage via Kong
 - `https://n8n.bookedai.au/` -> n8n editor and webhooks
 - `https://hermes.bookedai.au/` -> Hermes knowledge/documentation service
