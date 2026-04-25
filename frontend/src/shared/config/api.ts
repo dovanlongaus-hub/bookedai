@@ -1,4 +1,8 @@
 export function getApiBaseUrl() {
+  if (typeof window !== 'undefined' && window.location.hostname === 'admin.bookedai.au') {
+    return '/api';
+  }
+
   const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/^['"]|['"]$/g, '');
   if (configuredBaseUrl) {
     try {
@@ -15,7 +19,6 @@ export function getApiBaseUrl() {
   if (
     typeof window !== 'undefined' &&
     (window.location.hostname === 'product.bookedai.au' ||
-      window.location.hostname === 'admin.bookedai.au' ||
       window.location.hostname === 'tenant.bookedai.au' ||
       window.location.hostname === 'futureswim.bookedai.au' ||
       window.location.hostname === 'ai.longcare.au')

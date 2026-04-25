@@ -39,6 +39,20 @@ function parseErrorMessage(payload: unknown, fallback: string) {
   return fallback;
 }
 
+function parseNetworkErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof TypeError && typeof error.message === 'string') {
+    const message = error.message.toLowerCase();
+    if (
+      message.includes('load failed') ||
+      message.includes('failed to fetch') ||
+      message.includes('networkerror')
+    ) {
+      return 'Could not reach the BookedAI admin API. Refresh and try again.';
+    }
+  }
+  return error instanceof Error && error.message.trim() ? error.message : fallback;
+}
+
 async function parseJsonOrNull(response: Response) {
   return response.json().catch(() => null);
 }
@@ -370,11 +384,16 @@ export async function loginAdmin(
   username: string,
   password: string,
 ) {
-  const response = await fetch(`${apiBaseUrl}/admin/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${apiBaseUrl}/admin/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+    });
+  } catch (error) {
+    throw new Error(parseNetworkErrorMessage(error, 'Login failed.'));
+  }
   const payload = (await parseJsonOrNull(response)) as LoginResponse | { detail?: string } | null;
   if (!response.ok) {
     throw new Error(parseErrorMessage(payload, 'Login failed.'));
