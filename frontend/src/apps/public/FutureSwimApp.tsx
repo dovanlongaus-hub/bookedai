@@ -349,7 +349,7 @@ export function FutureSwimApp() {
         {
           role: 'assistant',
           content:
-            'The live shortlist is temporarily unavailable, but you can still submit your enquiry below and the BookedAI workflow will record it for Future Swim follow-up.',
+            'The search is temporarily unavailable. You can still submit your enquiry below and the Future Swim team will be in touch.',
         },
       ]);
     } finally {
@@ -457,8 +457,8 @@ export function FutureSwimApp() {
 
       setLeadStatus(
         bookingReference
-          ? `Booking request captured with lead ${leadId} and reference ${bookingReference}. Future Swim can now continue follow-up from BookedAI.`
-          : `Enquiry captured with lead ${leadId}. Future Swim can now continue follow-up from BookedAI.`,
+          ? `Your booking request has been received. Reference: ${bookingReference}. The Future Swim team will be in touch soon.`
+          : `Your enquiry has been received. The Future Swim team will be in touch soon.`,
       );
       setFormState((current) => ({
         ...current,
@@ -501,13 +501,13 @@ export function FutureSwimApp() {
         <section className="mt-8 grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
           <div className="overflow-hidden rounded-[2.25rem] border border-[#d6eef6] bg-[linear-gradient(145deg,#0d3b63_0%,#0f5f89_48%,#1da0b8_100%)] p-8 text-white shadow-[0_36px_80px_rgba(9,45,71,0.22)] sm:p-10">
             <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/88 backdrop-blur">
-              Redesigned for families, sales conversion, and booking truth
+              Redesigned for families, with real bookings and current pricing
             </div>
             <h1 className="mt-6 max-w-4xl font-serif text-5xl leading-[0.95] tracking-[-0.05em] text-white sm:text-6xl lg:text-[4.6rem]">
               A calmer, more premium Future Swim website with BookedAI fully wired into the booking flow.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-white/82">
-              This experience is designed to feel like a serious swim-school brand, not a generic chatbot page. Parents can discover centres, see current catalogue pricing, ask for the right fit, and send an enquiry or booking request into the live BookedAI workflow.
+              This Future Swim experience combines calm, parent-focused design with a built-in AI receptionist. Discover centres, see current pricing, ask for the right fit, and send an enquiry or booking request.
             </p>
 
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
@@ -543,9 +543,9 @@ export function FutureSwimApp() {
           </div>
 
           <aside className="rounded-[2.25rem] border border-[#dbe9f3] bg-white/88 p-7 shadow-[0_30px_70px_rgba(17,50,74,0.08)] backdrop-blur sm:p-8">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0c7aae]">Operator truth</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0c7aae]">What makes this different</div>
             <h2 className="mt-3 font-serif text-4xl leading-tight tracking-[-0.04em] text-[#11324a]">
-              This page now behaves like a real booking surface.
+              Built for real families. Real bookings. Current pricing.
             </h2>
             <div className="mt-6 space-y-3">
               {reassurancePoints.map((item) => (
@@ -557,7 +557,7 @@ export function FutureSwimApp() {
             <div className="mt-6 rounded-[1.6rem] border border-[#ffe0d4] bg-[linear-gradient(180deg,#fff5ef_0%,#fffdfb_100%)] p-5">
               <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#d66f4b]">Pricing note</div>
               <p className="mt-3 text-sm leading-7 text-[#5f514d]">
-                Futureswim.com.au is currently protected by ModSecurity from this runtime, so the safest production move is to drive all visible price cards from the live Future Swim catalogue already seeded from their website pages, instead of keeping stale prices hardcoded in the UI.
+                All prices shown reflect the current Future Swim catalogue. Contact your preferred centre directly to confirm exact class fees and available spots.
               </p>
             </div>
           </aside>
@@ -565,10 +565,10 @@ export function FutureSwimApp() {
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
           <div className="rounded-[2rem] border border-[#dbe9f3] bg-white/88 p-7 shadow-[0_24px_60px_rgba(17,50,74,0.07)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0c7aae]">Receptionist search</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0c7aae]">Find your centre</div>
             <h2 className="mt-3 font-serif text-4xl tracking-[-0.04em] text-[#11324a]">Search the way a parent speaks</h2>
             <p className="mt-4 text-sm leading-7 text-[#57758b]">
-              Age, confidence level, suburb, weekend preference, and centre fit all flow into the tenant-scoped BookedAI search.
+              Tell us your child's age, confidence level, and preferred area. We'll shortlist the best-fit Future Swim centres for you.
             </p>
 
             <form className="mt-6" onSubmit={handleSearchSubmit}>
@@ -696,21 +696,21 @@ export function FutureSwimApp() {
 
         <section id="booking-flow" className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-[2rem] border border-[#cfe7df] bg-[linear-gradient(180deg,#ecfff7_0%,#f9fffd_100%)] p-7 shadow-[0_24px_60px_rgba(17,50,74,0.07)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0a8a69]">BookedAI flow coverage</div>
+            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0a8a69]">How it works</div>
             <h2 className="mt-3 font-serif text-4xl tracking-[-0.04em] text-[#11324a]">From parent request to booked follow-up</h2>
             <div className="mt-6 space-y-4 text-sm leading-7 text-[#426178]">
-              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">1. Search and recommendation stay tenant-scoped to Future Swim.</div>
+              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">1. Search stays focused on Future Swim only — no other providers are recommended.</div>
               <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">2. The parent selects a centre or lesson card with current pricing and source links.</div>
-              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">3. BookedAI captures contact details, notes, child age, and confidence context.</div>
-              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">4. With date and time provided, BookedAI creates both lead and booking intent via the public booking assistant API flow.</div>
-              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">5. Confirmation email can be sent immediately while Future Swim continues follow-up from BookedAI records.</div>
+              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">3. Fill in your contact details, child age, and any notes for the team.</div>
+              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">4. With a preferred date and time, a booking request is created and confirmed by email.</div>
+              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">5. A confirmation email is sent to you, and the Future Swim team follows up to confirm your spot.</div>
             </div>
           </div>
 
           <form onSubmit={handleInquirySubmit} className="rounded-[2rem] border border-[#ffdcd1] bg-[linear-gradient(180deg,#fff6f1_0%,#ffffff_100%)] p-7 shadow-[0_24px_60px_rgba(17,50,74,0.07)]">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#d66f4b]">Booking and enquiry capture</div>
+                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#d66f4b]">Your details</div>
                 <h2 className="mt-3 font-serif text-4xl tracking-[-0.04em] text-[#11324a]">Send the request into BookedAI</h2>
               </div>
               <div className="rounded-full bg-white/80 px-4 py-2 text-xs font-semibold text-[#7a5c53]">
@@ -777,7 +777,7 @@ export function FutureSwimApp() {
             />
 
             <div className="mt-4 rounded-[1.35rem] bg-white/80 px-4 py-4 text-sm leading-7 text-[#6a5a55]">
-              If you include both a preferred date and time, the form uses the full BookedAI public assistant lead + booking intent flow. Without them, it still captures a qualified enquiry for Future Swim follow-up.
+              Add a preferred date and time to lock in a booking request. Without them, your enquiry is still recorded and the team will follow up to find a suitable time.
             </div>
 
             <button
@@ -785,14 +785,14 @@ export function FutureSwimApp() {
               disabled={leadPending}
               className="mt-5 rounded-full bg-[#ff7b58] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_30px_rgba(255,123,88,0.2)] disabled:opacity-70"
             >
-              {leadPending ? 'Submitting to BookedAI...' : 'Capture enquiry and booking intent'}
+              {leadPending ? 'Submitting...' : 'Send booking request'}
             </button>
 
             {leadStatus ? (
               <div className="mt-4 rounded-[1.6rem] border border-[#b6e7d8] bg-[linear-gradient(135deg,#ecfff7_0%,#ffffff_100%)] px-5 py-5 text-[#0b6b56] shadow-[0_18px_36px_rgba(11,107,86,0.08)]">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.22em]">Thank you</div>
                 <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[#074d3f]">
-                  Your Future Swim booking request is captured.
+                  Your booking request has been received.
                 </div>
                 <p className="mt-2 text-sm leading-7">{leadStatus}</p>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
