@@ -1,5 +1,35 @@
 # Design System Inspired by Apple
 
+## 2026-04-25 Portal Workspace Override
+
+`portal.bookedai.au` should feel like a secure enterprise customer command center, not a generic booking receipt.
+
+- lead with booking-reference lookup, booking truth, payment posture, and support route in a compact first viewport
+- use a two-column desktop workspace: main booking/service/customer/timeline content plus a sticky action rail
+- keep request actions explicit and auditable: overview, edit, reschedule, pause, downgrade, and cancel are navigation states, while mutations remain queued support requests
+- use restrained white/slate surfaces, crisp borders, compact 8-16px radii, and icon-led labels for scanability
+- preserve mobile no-overflow behavior; stack the action rail after the main content and keep button labels short enough to wrap cleanly
+
+## 2026-04-25 Product Booking Flow Override
+
+`product.bookedai.au` and the shared public booking runtime should behave like a compact enterprise booking workspace.
+
+- show first useful matches while live search/ranking continues, with visible status and refinement chips in chat
+- keep result cards compact; put provider link, detail popup, contact, phone/SMS, and `Book` on one horizontal action row using icons where possible
+- clicking/selecting a result marks it active only; detail opens from the detail action, and the customer form opens only after an explicit booking action
+- confirmation is portal-first: booking code, QR to `portal.bookedai.au`, and compact portal/email/calendar/chat/home actions must stay on one responsive row without horizontal layout breakage
+- keep the thank-you confirmation visible for `16s` and allow the customer to continue chat/search from the same screen before auto-return
+
+## 2026-04-25 Tenant Gateway Override
+
+`tenant.bookedai.au` should behave like a simple enterprise access gateway, not a marketing page or a dense dashboard preview.
+
+- keep the first viewport focused on one decision: sign in or create account
+- make Google the primary path, with email code as the fallback
+- use restrained white and slate surfaces, 8-12px radii, and compact trust signals
+- avoid long instructional panels before authentication
+- preserve mobile legibility and no horizontal overflow at narrow widths
+
 ## 2026-04-24 Demo Workspace Override
 
 `demo.bookedai.au` currently follows a SaaS product-proof direction rather than a pure Apple-style marketing page. The active demo design rule is:

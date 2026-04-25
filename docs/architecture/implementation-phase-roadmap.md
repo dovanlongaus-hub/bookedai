@@ -38,6 +38,7 @@ This roadmap aligns with:
 - prioritize stable public, tenant, admin, search, payment, email-confirmation, and portal revisit flows ahead of feature breadth
 - prioritize direct revenue capture and booking conversion over brochure expansion
 - keep the public homepage lean so search, shortlist, booking, and confirmation have maximum practical space
+- treat the customer portal as a durable post-booking workspace: booking truth, payment posture, provider context, timeline, academy/customer-care context, and request-safe actions must stay visible and mobile-safe
 - treat mobile-first responsive execution as a hard requirement for any public conversion surface
 - ship the public revenue-engine narrative early
 - promote only the revenue claims that the product can support truthfully
@@ -48,6 +49,8 @@ This roadmap aligns with:
   `Freemium`, `Pro`, `Pro Max`, plus the explicit `First 10 SMEs` launch offer
 - build test runners as delivery infrastructure, not as end-of-program polish
 - make agent-triggered lifecycle actions auditable, replay-safe, and tenant-policy-aware
+- keep deployed subdomain routing explicit for product, tenant, portal, and admin surfaces; any host serving a frontend shell must proxy `/api/` to backend before SPA fallback so auth and runtime reads cannot be swallowed by static HTML
+- keep tenant account access explicit: Google sign-in must prove an active membership, while Google create-account is the intentional path for opening a new tenant workspace from `tenant.bookedai.au`
 
 ## Agent execution model
 
@@ -223,7 +226,8 @@ Planning update from `2026-04-25`:
 
 - the post-Sprint-16 execution wave is now tracked as `Phase 17` through `Phase 23`
 - the implementation bridge for that wave is `docs/development/next-phase-implementation-plan-2026-04-25.md`
-- `Phase 17` is the current closeout lane for the verified full-flow stabilization work: pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You screen, and `5s` return to the main BookedAI screen
+- `Phase 17` is the current closeout lane for the verified full-flow stabilization work: pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You screen, and `16s` return to the main BookedAI screen
+- `Phase 17` now also includes the enterprise product-booking UX guardrails: progressive first-result rendering during slow matching, compact result action rows, explicit select-versus-book separation, portal-first QR confirmation, and continue-chat behavior during the Thank You grace period
 - `Phase 18` through `Phase 23` should execute in this order: revenue-ops ledger control, customer-care/status agent, widget/plugin runtime, billing and receivables truth, multi-tenant template generalization, release governance and scale hardening
 
 | Phase | Name | Primary outcome |
@@ -523,6 +527,8 @@ Current implementation evidence:
 - the live public baseline changed again on `2026-04-20`: `bookedai.au` now serves the tighter `PublicApp` homepage runtime instead of the interim pitch-deck apex-domain routing
 - homepage CTA structure now routes primary trial intent into `product.bookedai.au`, while sales-contact intent continues into `register-interest` and `product` or `demo` remain the deeper proof and runtime surfaces
 - the homepage now includes larger revenue-engine branding, a reduced section stack, a clearer route menu, explicit Google register/login utility links, renamed pricing tiers `Freemium`, `Pro`, and `Pro Max`, and shorter copy tuned to both SME buyers and investor review
+- the top pitch proof band now treats the chess screenshot as a contained screen capture inside a professional padded frame, preserving the full image while still keeping the executive proof-card treatment
+- the pitch surface now uses uploaded visual proof assets both near the top of the narrative and in the final CTA section, with the closing image presented as a full-width 3:2 proof frame and the pitch footer simplified so verbose release/positioning copy does not crowd the bottom of the page
 - the registration and offer surfaces now expose `Advance Customize` as the custom commercial path above `Pro Max`, while still preserving backward-compatible upgrade query aliases behind the scenes
 - the product runtime now also includes direct `Start Free Trial` continuation into the same registration funnel, which keeps live-product evaluation and homepage conversion on one commercial path
 - responsive/build verification and live production redeploy were re-run against that newer homepage baseline on `2026-04-20`

@@ -32,9 +32,17 @@ This execution baseline now also assumes a dual-agent product direction:
 Latest next-phase update from `2026-04-25`:
 
 - the immediate execution plan after the full-flow QA pass is now documented in `docs/development/next-phase-implementation-plan-2026-04-25.md`
-- current closeout is `Phase 17 - Full-flow stabilization`, covering pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You confirmation, and return to the main BookedAI screen after `5s`
+- current closeout is `Phase 17 - Full-flow stabilization`, covering pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You confirmation, and return to the main BookedAI screen after `16s`
+- the product/public booking runtime should now treat slow matching as a progressive-search problem: show first useful local/catalog matches while live ranking continues, keep refinement suggestions visible in chat, and keep the user informed with active status copy
+- result selection and booking commitment are separate UX states: select marks a result active, detail opens from the detail icon, and the customer form opens only after an explicit `Book` action
+- confirmation must be portal-first: show booking reference, QR to `portal.bookedai.au`, compact email/calendar/chat/home actions, and a thank-you message that allows continued chat during the `16s` grace period
+- `portal.bookedai.au` now inherits that portal-first confirmation baseline as a real customer command center: lookup, booking/payment/support status, provider/customer detail, academy progress, timeline, and request-safe action rail must remain cohesive across desktop and mobile
 - the next implementation sequence is now `Phase 18` revenue-ops ledger control, `Phase 19` customer-care/status agent, `Phase 20` widget/plugin runtime, `Phase 21` billing and receivables truth, `Phase 22` reusable tenant templates, and `Phase 23` release governance
 - the public brand/menu and live booking lane were re-checked after the uploaded logo rollout: demo/product/pitch/tenant now render without horizontal overflow on mobile and desktop, the customer-agent live-read path falls back to the v1 matching/search contract when needed, and the live stack health gate passed after deployment
+- the pitch image layer now uses local optimized WebP assets for the uploaded logo, chess proof, final contact proof, and team imagery, keeping the visual redesign intact while avoiding multi-megabyte upload originals during production page load
+- `admin.bookedai.au` login recovery is now part of the current stabilization baseline: the admin host must proxy `/api/` to backend before frontend SPA fallback, and the shipped shared-frontend admin shell now uses a compact sidebar workspace layout grouped by `Operate`, `Tenants`, `Revenue`, and `Platform`
+- `tenant.bookedai.au` login is now part of the same stabilization baseline: the shipped tenant gateway is Google-first with email-code fallback, create-account is explicit, and Google sign-in no longer silently creates a tenant workspace when no active membership exists
+- the tenant live QA baseline now also includes `future-swim` workspace stability: audit-log nullable filters and revenue-metrics day windows are asyncpg-safe, the ready workspace no longer violates React hook ordering after loading/error states, and live API/browser checks pass for the shared gateway and tenant workspace
 
 ## Source-of-truth inputs
 

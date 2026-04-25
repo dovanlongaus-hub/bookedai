@@ -14,19 +14,42 @@ Latest public-search UX update date: `2026-04-25`.
 
 Current top product-surface priority: `responsive homepage web-app UX`.
 
+Latest customer portal enterprise workspace update from `2026-04-25`:
+
+- `portal.bookedai.au` now presents booking continuation as an enterprise customer workspace instead of a receipt-like review page: lookup, booking truth, payment posture, support route, provider details, customer details, academy progress, and timeline are arranged in a denser command-center layout
+- the portal action model is now clearer and more professional: overview/edit/reschedule/pause/downgrade/cancel share one navigation model, the right-side action rail stays visible on desktop, and closing a request composer returns the URL/action state to overview
+- customer-safe request flows remain on the existing backend contract; the redesign keeps `reschedule`, `cancel`, `pause`, and `downgrade` as queued/auditable requests rather than pretending instant mutation
+- added Playwright coverage for the portal workspace render, reschedule request submission, and mobile horizontal-overflow guard
+- verification passed with frontend production build, backend portal route tests through `.venv`, and focused Playwright portal smoke using an external preview server
+
 Latest public brand/menu and booking-flow QA note from `2026-04-25`:
 
+- `product.bookedai.au` and the shared public homepage booking runtime now show first likely local/catalog matches while live ranking continues, keeping the search surface useful during slower matching instead of waiting on a blank results state
+- shortlist result interaction is now explicit and enterprise-style: selecting a result only marks it active, detail opens only from the detail icon, and a compact one-row action strip exposes provider link, detail, contact, phone/SMS when available, and `Book`
+- the customer detail form now opens only after the user chooses `Book` for a selected result, so review/compare behavior stays separate from booking commitment
+- booking confirmation now uses the booking reference as the durable customer anchor, generates QR against `portal.bookedai.au` for that reference, shows compact portal/email/calendar/chat/home actions, and keeps the Thank You state visible for `16s` before returning to the main search screen
 - BookedAI public, product, demo, shared landing, and brand-kit logo paths now use the operator-provided uploaded logo asset, with cropped responsive logo frames so top-left branding stays visible without horizontal overflow
-- the public homepage now includes the operator-provided `Chess_screen` proof image before the hero prompt, framed as a professional chess academy product proof band that stays ahead of the main search-to-booking hero without creating horizontal overflow
+- the public homepage and pitch surface now include the operator-provided `Chess_screen` proof image before the hero prompt/overview, framed as a professional chess academy product proof band that stays ahead of the main search-to-booking narrative without creating horizontal overflow
+- the top `pitch.bookedai.au` chess proof image now sits in a padded professional screen frame with `object-contain` 3:2 sizing, so the image fits inside the card instead of being enlarged and cropped
+- `pitch.bookedai.au` now closes with the operator-provided uploaded visual proof image as a full-width 3:2 frame, with the old verbose footer positioning/release text hidden on the pitch page so the bottom of the page stays clean on mobile and desktop
+- the uploaded logo, chess proof, final contact proof, and pitch team images now have local optimized WebP variants under `frontend/public/branding/optimized/`, with `srcSet`/`sizes` on large proof images so browsers can choose smaller assets instead of downloading multi-megabyte upload originals
 - the shared landing header menu now exposes professional product paths by default: Product, Live Demo, Tenant Login, and Roadmap, using lucide iconography instead of hand-drawn menu glyphs
 - the public search workspace restored stable accessibility names for `Open Web App`, `Send search`, `Ready to receive`, and `Continue booking`, preserving the regression-tested homepage and booking flow after the app-shell redesign
 - homepage live-read search now falls back from the customer-agent turn endpoint to the established v1 matching/search path when the newer customer-agent turn is unavailable, so booking can continue through `lead + booking intent` instead of stalling
 - QA passed with production build, public homepage responsive Playwright coverage, and the live-read booking smoke that submits through the v1 booking intent path
 
+Latest tenant gateway update from `2026-04-25`:
+
+- `tenant.bookedai.au` now uses a simplified enterprise login layout with Google as the primary action, email-code fallback, and a compact create-account path instead of the previous guidance-heavy auth workspace
+- the frontend now sends the correct Google auth intent: gateway `Sign in` stays sign-in, gateway `Create account` creates a new tenant, and tenant-specific workspace URLs continue to sign in against that tenant scope
+- backend Google tenant auth now refuses to create a new tenant or membership when the request is explicitly a sign-in with no active membership, while preserving the dedicated Google create-account path for new tenant workspaces
+- live QA on `tenant.bookedai.au/future-swim` found and fixed two backend asyncpg typing failures in tenant audit/revenue reporting plus a React hook-order crash that blanked the workspace after data load
+- focused backend tenant auth tests, full backend tests, frontend typecheck/build, stack health, and live Playwright desktop/mobile tenant gateway + Future Swim workspace QA passed with no console errors and no mobile horizontal overflow
+
 Latest next-phase plan update from `2026-04-25`:
 
 - `docs/development/next-phase-implementation-plan-2026-04-25.md` is now the active implementation bridge for the next BookedAI phases
-- `Phase 17` closes the current full-flow stabilization baseline: pitch package registration, product booking, payment-intent preparation, follow-up automation, Thank You confirmation, and `5s` return to the main BookedAI screen
+- `Phase 17` closes the current full-flow stabilization baseline: pitch package registration, product booking, payment-intent preparation, follow-up automation, Thank You confirmation, and `16s` return to the main BookedAI screen
 - `Phase 18` through `Phase 23` are now ordered as revenue-ops ledger control, customer-care/status agent, widget/plugin runtime, billing and receivables truth, reusable multi-tenant templates, and release governance/scale hardening
 
 Latest Phase 18 implementation note from `2026-04-25`:
@@ -35,6 +58,14 @@ Latest Phase 18 implementation note from `2026-04-25`:
 - action-run responses now carry derived lifecycle event, dependency state, policy mode, approval requirement, and evidence summary fields without requiring a schema migration
 - admin Reliability can filter action runs by entity id, dependency state, and lifecycle event, then inspect policy/evidence summary beside input/result evidence
 - tenant workspace now includes a read-only `Ops` panel so tenants can see queued, failed, manual-review, sent, and completed BookedAI revenue-ops actions, including what lifecycle event triggered them and whether the action is policy-gated or approval-required
+
+Latest admin workspace recovery note from `2026-04-25`:
+
+- live `admin.bookedai.au` login failure was traced to routing: the admin host served the Vite admin shell for `/api/admin/login`, causing `POST /api/admin/login` to return frontend nginx `405` before it could reach FastAPI
+- `deploy/nginx/bookedai.au.conf` now gives the admin host an explicit `/api/` backend proxy, matching the other runtime hosts and restoring the path used by the shipped shared-frontend admin login
+- `frontend/nginx/default.conf` also proxies `/api/` to the backend before SPA fallback, so container-level or direct frontend-host deployments cannot intercept admin API calls as static HTML
+- the live proxy was restarted after container-level `nginx -t` passed; `admin.bookedai.au/api/health` now returns backend JSON and bad-password login probes return backend `401`, confirming the domain no longer swallows admin API requests into the frontend shell
+- `frontend/src/components/AdminPage.tsx` and `frontend/src/features/admin/workspace-nav.tsx` now arrange the shipped admin runtime as a sidebar-led workspace shell, grouping `Operate`, `Tenants`, `Revenue`, and `Platform` lanes while keeping active workspace content visible beside the menu
 
 Latest homepage AI-agent continuation note from `2026-04-25`:
 

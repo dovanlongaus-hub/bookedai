@@ -1,4 +1,21 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import {
+  ArrowRight,
+  CalendarClock,
+  CheckCircle2,
+  Clock3,
+  CreditCard,
+  HelpCircle,
+  Home,
+  Mail,
+  MapPin,
+  NotebookTabs,
+  RefreshCw,
+  ShieldCheck,
+  Sparkles,
+  UserRound,
+  XCircle,
+} from 'lucide-react';
 
 import { brandPreferredLogoPath } from '../../components/landing/data';
 import { BrandLockup } from '../../components/landing/ui/BrandLockup';
@@ -14,6 +31,50 @@ type PortalLoadState =
 type PortalRequestMode = 'reschedule' | 'cancel' | 'pause' | 'downgrade' | null;
 
 type PortalViewMode = 'overview' | 'edit' | 'reschedule' | 'cancel' | 'pause' | 'downgrade';
+
+const portalViewItems: Array<{
+  id: PortalViewMode;
+  label: string;
+  shortLabel: string;
+  body: string;
+}> = [
+  {
+    id: 'overview',
+    label: 'Overview',
+    shortLabel: 'Overview',
+    body: 'Booking reference, payment posture, provider details, and timeline.',
+  },
+  {
+    id: 'edit',
+    label: 'Edit request',
+    shortLabel: 'Edit',
+    body: 'Use one managed request path when details or preferences need to change.',
+  },
+  {
+    id: 'reschedule',
+    label: 'Reschedule',
+    shortLabel: 'Reschedule',
+    body: 'Request a new date or time and keep the original booking context.',
+  },
+  {
+    id: 'pause',
+    label: 'Pause plan',
+    shortLabel: 'Pause',
+    body: 'Ask for a temporary pause when a program should not be cancelled.',
+  },
+  {
+    id: 'downgrade',
+    label: 'Downgrade',
+    shortLabel: 'Downgrade',
+    body: 'Request a lighter plan or lower-frequency option for review.',
+  },
+  {
+    id: 'cancel',
+    label: 'Cancel',
+    shortLabel: 'Cancel',
+    body: 'Submit a cancellation request with support-visible context.',
+  },
+];
 
 function readPortalReferenceFromUrl() {
   if (typeof window === 'undefined') {
@@ -41,20 +102,6 @@ function readPortalViewFromUrl(): PortalViewMode {
   if (action === 'pause') return 'pause';
   if (action === 'downgrade') return 'downgrade';
   return 'overview';
-}
-
-function syncPortalReferenceToUrl(bookingReference: string) {
-  if (typeof window === 'undefined') {
-    return;
-  }
-
-  const url = new URL(window.location.href);
-  if (bookingReference.trim()) {
-    url.searchParams.set('booking_reference', bookingReference.trim());
-  } else {
-    url.searchParams.delete('booking_reference');
-  }
-  window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
 }
 
 function syncPortalRouteState(bookingReference: string, viewMode: PortalViewMode) {
@@ -155,6 +202,33 @@ function formatCreatedAt(value?: string | null) {
   } catch {
     return value;
   }
+}
+
+function bookingStatusLabel(status: string) {
+  if (status === 'captured') return 'Received';
+  if (status === 'confirmed') return 'Confirmed';
+  if (status === 'cancelled') return 'Cancelled';
+  if (status === 'completed') return 'Completed';
+  return status.replace(/_/g, ' ');
+}
+
+function paymentStatusLabel(status: string) {
+  if (status === 'pending') return 'Payment pending';
+  if (status === 'paid') return 'Paid';
+  if (status === 'requires_action') return 'Payment required';
+  if (status === 'refunded') return 'Refunded';
+  return status.replace(/_/g, ' ');
+}
+
+function bookingPathLabel(bookingPath?: string | null) {
+  if (bookingPath === 'instant_book') return 'Instant booking';
+  if (bookingPath === 'book_on_partner_site') return 'Partner booking';
+  if (bookingPath === 'request_callback') return 'Booking request';
+  return 'Booking request';
+}
+
+function viewTitle(viewMode: PortalViewMode) {
+  return portalViewItems.find((item) => item.id === viewMode)?.label || 'Booking overview';
 }
 
 export function PortalApp() {
@@ -341,9 +415,9 @@ export function PortalApp() {
   }, [detail?.booking.booking_reference]);
 
   return (
-    <main className="public-apple-shell min-h-screen text-[#172033]">
+    <main className="min-h-screen bg-[#f4f7fb] text-[#172033]">
       <section className="px-4 pt-4 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-[1240px] items-center justify-between gap-3 rounded-[1.4rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,253,0.96)_100%)] px-3 py-2 shadow-[0_18px_50px_rgba(15,23,42,0.10)] backdrop-blur">
+        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-3 rounded-[1.05rem] border border-slate-200 bg-white px-3 py-2 shadow-[0_16px_36px_rgba(15,23,42,0.08)]">
           <a href="/" className="min-w-0 rounded-[1.1rem] border border-black/6 bg-white px-2.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
             <BrandLockup
               logoSrc={brandPreferredLogoPath}
@@ -358,14 +432,14 @@ export function PortalApp() {
 
           <div className="flex items-center gap-2">
             {[
-              { label: 'Language: EN', href: '#portal-top' },
-              { label: 'Homepage', href: '/' },
+              { label: 'EN', href: '#portal-top' },
+              { label: 'Home', href: '/' },
               { label: 'Pitch', href: 'https://pitch.bookedai.au' },
             ].map((item) => (
               <a
                 key={item.label}
                 href={item.href}
-                className="hidden rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-950 sm:inline-flex"
+                className="hidden rounded-[0.8rem] border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:text-slate-950 sm:inline-flex"
               >
                 {item.label}
               </a>
@@ -375,44 +449,66 @@ export function PortalApp() {
       </section>
 
       <section id="portal-top" className="px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
-        <div className="mx-auto flex max-w-[1240px] flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="min-w-0">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#172033]/45">
-              Booking portal
+        <div className="mx-auto grid max-w-[1280px] gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(24rem,0.55fr)]">
+          <div className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] sm:p-6">
+            <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              Customer portal
             </div>
-            <h1 className="mt-2 text-2xl font-semibold tracking-tight sm:text-[2rem]">
-              Review your booking, payment, and next steps in one place.
+            <h1 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-[2rem]">
+              Manage booking status, payment, support, and change requests from one secure workspace.
             </h1>
-            <p className="mt-3 max-w-2xl text-sm leading-7 text-[#172033]/62">
-              Enter your booking reference to see the latest status, payment details, and any follow-up from the provider. You can also reschedule, edit, or cancel from here.
+            <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
+              Use the reference from your confirmation email to reopen the same booking record, review
+              provider context, and submit request-safe follow-up without starting a new conversation.
             </p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+              {[
+                { label: 'Booking truth', value: detail ? bookingStatusLabel(detail.booking.status) : 'Reference-led' },
+                { label: 'Payment posture', value: detail ? paymentStatusLabel(detail.payment.status) : 'Visible here' },
+                { label: 'Support route', value: detail?.support.contact_label || 'Provider-aware' },
+              ].map((item) => (
+                <div key={item.label} className="rounded-[1rem] border border-slate-200 bg-slate-50 px-4 py-3">
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">{item.label}</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-950">{item.value}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <form onSubmit={handleLookup} className="w-full max-w-[30rem] rounded-[1.75rem] border border-slate-200 bg-slate-50 p-3 shadow-[0_16px_40px_rgba(15,23,42,0.06)]">
-            <label className="block text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+          <form onSubmit={handleLookup} className="rounded-[1.4rem] border border-slate-200 bg-slate-950 p-4 text-white shadow-[0_18px_44px_rgba(15,23,42,0.16)] sm:p-5">
+            <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">
+              <NotebookTabs className="h-4 w-4" />
+              Booking lookup
+            </div>
+            <label className="mt-4 block text-sm font-semibold text-white">
               Booking reference
             </label>
-            <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+            <div className="mt-2 flex flex-col gap-2">
               <input
                 type="text"
                 value={lookupReference}
                 onChange={(event) => setLookupReference(event.target.value)}
-                placeholder="Enter booking reference"
-                className="min-h-[2.75rem] flex-1 rounded-[0.95rem] border border-slate-200 bg-white px-4 text-sm text-slate-900 outline-none ring-0 placeholder:text-slate-400 focus:border-[#0f62fe]"
+                placeholder="BR-2002"
+                className="min-h-[3rem] w-full rounded-[0.9rem] border border-white/10 bg-white px-4 text-sm text-slate-950 outline-none ring-0 placeholder:text-slate-400 focus:border-sky-300"
               />
               <button
                 type="submit"
-                className="booked-button"
+                className="inline-flex min-h-[3rem] items-center justify-center gap-2 rounded-[0.9rem] bg-[#0f62fe] px-4 text-sm font-semibold text-white transition hover:bg-[#0b57e3]"
               >
                 Review booking
+                <ArrowRight className="h-4 w-4" />
               </button>
             </div>
+            <p className="mt-4 text-xs leading-6 text-white/60">
+              Only dedicated `booking_reference` links are read by this portal, so tracker ids or release refs cannot open the wrong record.
+            </p>
           </form>
         </div>
       </section>
 
       <section className="px-4 py-6 sm:px-6 lg:px-8 lg:py-8">
-        <div className="mx-auto grid max-w-[1180px] gap-6 lg:grid-cols-[minmax(0,1.55fr)_minmax(20rem,0.95fr)]">
+        <div className="mx-auto grid max-w-[1280px] gap-6 lg:grid-cols-[minmax(0,1.52fr)_minmax(21rem,0.88fr)]">
           <div className="space-y-6">
             {loadState.status === 'idle' ? (
               <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
@@ -455,35 +551,19 @@ export function PortalApp() {
 
             {detail ? (
               <>
-                <section className="rounded-[1.6rem] border border-slate-200 bg-white p-4 shadow-[0_16px_44px_rgba(15,23,42,0.05)]">
+                <section className="rounded-[1.2rem] border border-slate-200 bg-white p-4 shadow-[0_16px_44px_rgba(15,23,42,0.05)]">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                        <Sparkles className="h-4 w-4" />
                         Manage booking
                       </div>
                       <div className="mt-1 text-sm font-semibold text-slate-900">
-                        {viewMode === 'overview'
-                          ? 'Booking overview'
-                          : viewMode === 'edit'
-                            ? 'Edit booking request'
-                            : viewMode === 'reschedule'
-                              ? 'Reschedule request'
-                              : viewMode === 'pause'
-                                ? 'Pause request'
-                                : viewMode === 'downgrade'
-                                  ? 'Downgrade request'
-                                  : 'Cancellation request'}
+                        {viewTitle(viewMode)}
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {[
-                        { id: 'overview', label: 'Overview' },
-                        { id: 'edit', label: 'Edit' },
-                        { id: 'reschedule', label: 'Reschedule' },
-                        { id: 'pause', label: 'Pause' },
-                        { id: 'downgrade', label: 'Downgrade' },
-                        { id: 'cancel', label: 'Cancel' },
-                      ].map((item) => {
+                      {portalViewItems.map((item) => {
                         const active = viewMode === item.id;
                         return (
                           <button
@@ -511,13 +591,13 @@ export function PortalApp() {
                               setRequestMode(null);
                               syncPortalRouteState(detail.booking.booking_reference, nextView);
                             }}
-                            className={`rounded-full px-3 py-2 text-[11px] font-semibold transition ${
+                            className={`rounded-[0.8rem] px-3 py-2 text-[11px] font-semibold transition ${
                               active
                                 ? 'bg-[#0f62fe] text-white'
                                 : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
                             }`}
                           >
-                            {item.label}
+                            {item.shortLabel}
                           </button>
                         );
                       })}
@@ -525,13 +605,15 @@ export function PortalApp() {
                   </div>
                 </section>
 
-                <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                <section className="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <div className="border-b border-slate-200 bg-[linear-gradient(120deg,#ffffff_0%,#eef6ff_50%,#f8fbff_100%)] px-5 py-5 sm:px-6">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                        <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                         Booking summary
                       </div>
-                      <h2 className="mt-3 text-[1.8rem] font-semibold tracking-tight">
+                      <h2 className="mt-3 text-[1.8rem] font-semibold tracking-tight text-slate-950">
                         {detail.booking.booking_reference}
                       </h2>
                       <p className="mt-2 text-sm leading-7 text-[#172033]/62">
@@ -539,27 +621,23 @@ export function PortalApp() {
                         {detail.service.business_name || 'the provider team'}.
                       </p>
                     </div>
-                    <div className="grid gap-2">
-                      <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                        {detail.booking.status === 'captured' ? 'Received'
-                          : detail.booking.status === 'confirmed' ? 'Confirmed'
-                          : detail.booking.status === 'cancelled' ? 'Cancelled'
-                          : detail.booking.status === 'completed' ? 'Completed'
-                          : detail.booking.status.replace(/_/g, ' ')}
+                    <div className="grid gap-2 sm:min-w-[12rem]">
+                      <span className="inline-flex items-center gap-2 rounded-[0.8rem] border border-emerald-200 bg-white px-3 py-2 text-xs font-semibold text-emerald-800">
+                        <CheckCircle2 className="h-3.5 w-3.5" />
+                        {bookingStatusLabel(detail.booking.status)}
                       </span>
-                      <span className="inline-flex rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-semibold text-slate-700">
-                        {detail.payment.status === 'pending' ? 'Payment pending'
-                          : detail.payment.status === 'paid' ? 'Paid'
-                          : detail.payment.status === 'requires_action' ? 'Payment required'
-                          : detail.payment.status === 'refunded' ? 'Refunded'
-                          : detail.payment.status.replace(/_/g, ' ')}
+                      <span className="inline-flex items-center gap-2 rounded-[0.8rem] border border-sky-200 bg-white px-3 py-2 text-xs font-semibold text-sky-800">
+                        <CreditCard className="h-3.5 w-3.5" />
+                        {paymentStatusLabel(detail.payment.status)}
                       </span>
                     </div>
                   </div>
+                  </div>
 
-                  <div className="mt-6 grid gap-4 md:grid-cols-3">
-                    <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                  <div className="grid gap-4 p-5 sm:p-6 md:grid-cols-2 xl:grid-cols-4">
+                    <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                        <CalendarClock className="h-4 w-4" />
                         Schedule
                       </div>
                       <div className="mt-2 text-sm font-semibold text-slate-900">
@@ -570,36 +648,36 @@ export function PortalApp() {
                         )}
                       </div>
                     </div>
-                    <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                    <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                        <CreditCard className="h-4 w-4" />
                         Payment
                       </div>
                       <div className="mt-2 text-sm font-semibold text-slate-900">
                         {formatMoney(detail.service, detail.payment)}
                       </div>
                     </div>
-                    <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                    <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                        <Clock3 className="h-4 w-4" />
                         Created
                       </div>
                       <div className="mt-2 text-sm font-semibold text-slate-900">
                         {formatCreatedAt(detail.booking.created_at)}
                       </div>
                     </div>
-                    <div className="rounded-[1.4rem] border border-slate-200 bg-slate-50 p-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                    <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                        <RefreshCw className="h-4 w-4" />
                         Booking type
                       </div>
                       <div className="mt-2 text-sm font-semibold text-slate-900">
-                        {detail.booking.booking_path === 'instant_book' ? 'Instant booking'
-                          : detail.booking.booking_path === 'book_on_partner_site' ? 'Partner booking'
-                          : detail.booking.booking_path === 'request_callback' ? 'Booking request'
-                          : 'Booking request'}
+                        {bookingPathLabel(detail.booking.booking_path)}
                       </div>
                     </div>
                   </div>
 
-                  <div className={`mt-6 rounded-[1.4rem] border px-4 py-4 ${statusSummaryClasses(detail.status_summary.tone)}`}>
+                  <div className={`mx-5 mb-5 rounded-[1rem] border px-4 py-4 sm:mx-6 sm:mb-6 ${statusSummaryClasses(detail.status_summary.tone)}`}>
                     <div className="text-sm font-semibold">{detail.status_summary.title}</div>
                     <div className="mt-1 text-sm leading-6 opacity-90">{detail.status_summary.body}</div>
                   </div>
@@ -652,8 +730,9 @@ export function PortalApp() {
                 </section>
 
                 <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
-                  <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                      <Home className="h-4 w-4" />
                       Provider and service
                     </div>
                     <h3 className="mt-3 text-xl font-semibold">{detail.service.service_name || 'Service details'}</h3>
@@ -661,16 +740,18 @@ export function PortalApp() {
                       {detail.service.summary || 'The provider will confirm the final service details directly.'}
                     </p>
                     <dl className="mt-6 grid gap-4 sm:grid-cols-2">
-                      <div>
-                        <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                      <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
+                        <dt className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                          <Home className="h-4 w-4" />
                           Business
                         </dt>
                         <dd className="mt-2 text-sm font-medium text-slate-900">
                           {detail.service.business_name || 'BookedAI provider'}
                         </dd>
                       </div>
-                      <div>
-                        <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                      <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
+                        <dt className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                          <MapPin className="h-4 w-4" />
                           Location
                         </dt>
                         <dd className="mt-2 text-sm font-medium text-slate-900">
@@ -685,7 +766,7 @@ export function PortalApp() {
                           </a>
                         ) : null}
                       </div>
-                      <div>
+                      <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
                         <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                           Category
                         </dt>
@@ -693,8 +774,9 @@ export function PortalApp() {
                           {detail.service.category || 'Service'}
                         </dd>
                       </div>
-                      <div>
-                        <dt className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                      <div className="rounded-[1rem] border border-slate-200 bg-slate-50 p-4">
+                        <dt className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                          <Clock3 className="h-4 w-4" />
                           Duration
                         </dt>
                         <dd className="mt-2 text-sm font-medium text-slate-900">
@@ -704,8 +786,9 @@ export function PortalApp() {
                     </dl>
                   </div>
 
-                  <div className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                      <UserRound className="h-4 w-4" />
                       Customer details
                     </div>
                     <dl className="mt-4 grid gap-4">
@@ -737,8 +820,9 @@ export function PortalApp() {
                   </div>
                 </section>
 
-                <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                    <RefreshCw className="h-4 w-4" />
                     Booking timeline
                   </div>
                   <div className="mt-5 space-y-4">
@@ -757,79 +841,49 @@ export function PortalApp() {
             ) : null}
           </div>
 
-          <aside className="space-y-6">
+          <aside className="space-y-6 lg:sticky lg:top-4 lg:self-start">
             {detail ? (
               <>
-                <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                    <HelpCircle className="h-4 w-4" />
                     What would you like to do?
                   </div>
                   <div className="mt-3 grid gap-3">
-                    {[
-                      {
-                        title: 'Overview',
-                        body: 'Review booking reference, payment, provider details, and timeline.',
-                        mode: 'overview' as const,
-                      },
-                      {
-                        title: 'Edit booking',
-                        body: 'Update your details or preferred time and resubmit directly from this portal.',
-                        mode: 'edit' as const,
-                      },
-                      {
-                        title: 'Reschedule',
-                        body: 'Request a new time and the provider will confirm the updated slot with you.',
-                        mode: 'reschedule' as const,
-                      },
-                      {
-                        title: 'Pause',
-                        body: 'Tell the academy when you need a temporary pause instead of dropping out.',
-                        mode: 'pause' as const,
-                      },
-                      {
-                        title: 'Downgrade',
-                        body: 'Request a lighter plan when schedule or budget changes.',
-                        mode: 'downgrade' as const,
-                      },
-                      {
-                        title: 'Cancel',
-                        body: 'Submit a cancellation request and the provider will confirm and process it.',
-                        mode: 'cancel' as const,
-                      },
-                    ].map((item) => {
-                      const active = viewMode === item.mode;
+                    {portalViewItems.map((item) => {
+                      const active = viewMode === item.id;
                       return (
                         <button
-                          key={item.title}
+                          key={item.id}
                           type="button"
                           onClick={() => {
-                            setViewMode(item.mode);
-                            if (item.mode === 'reschedule') {
+                            setViewMode(item.id);
+                            if (item.id === 'reschedule') {
                               openRequestComposer('reschedule');
                               return;
                             }
-                            if (item.mode === 'cancel') {
+                            if (item.id === 'cancel') {
                               openRequestComposer('cancel');
                               return;
                             }
-                            if (item.mode === 'pause') {
+                            if (item.id === 'pause') {
                               openRequestComposer('pause');
                               return;
                             }
-                            if (item.mode === 'downgrade') {
+                            if (item.id === 'downgrade') {
                               openRequestComposer('downgrade');
                               return;
                             }
                             setRequestMode(null);
-                            syncPortalRouteState(detail.booking.booking_reference, item.mode);
+                            syncPortalRouteState(detail.booking.booking_reference, item.id);
                           }}
-                          className={`rounded-[1.2rem] border px-4 py-3 text-left transition ${
+                          className={`rounded-[1rem] border px-4 py-3 text-left transition ${
                             active
-                              ? 'border-[#d2e3fc] bg-[#eef4ff]'
+                              ? 'border-[#0f62fe] bg-[#eef4ff]'
                               : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'
                           }`}
                         >
-                          <div className="text-sm font-semibold text-slate-900">{item.title}</div>
+                          <div className="text-sm font-semibold text-slate-900">{item.label}</div>
                           <div className="mt-1 text-xs leading-5 text-slate-600">{item.body}</div>
                         </button>
                       );
@@ -837,8 +891,9 @@ export function PortalApp() {
                   </div>
                 </section>
 
-                <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                    <ArrowRight className="h-4 w-4" />
                     Quick actions
                   </div>
                   <div className="mt-4 grid gap-3">
@@ -1003,7 +1058,11 @@ export function PortalApp() {
                         </button>
                         <button
                           type="button"
-                          onClick={() => setRequestMode(null)}
+                          onClick={() => {
+                            setRequestMode(null);
+                            setViewMode('overview');
+                            syncPortalRouteState(detail.booking.booking_reference, 'overview');
+                          }}
                           className="booked-button-secondary"
                         >
                           Close
@@ -1044,8 +1103,9 @@ export function PortalApp() {
                   </section>
                 ) : null}
 
-                <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                    <Mail className="h-4 w-4" />
                     Support
                   </div>
                   <div className="mt-3 text-lg font-semibold text-slate-900">
@@ -1056,15 +1116,16 @@ export function PortalApp() {
                     contact the support team using the details below.
                   </p>
                   <div className="mt-4 grid gap-2 text-sm text-slate-900">
-                    <a href={`mailto:${detail.support.contact_email}`} className="font-medium text-[#0f62fe]">
+                    <a href={`mailto:${detail.support.contact_email || 'support@bookedai.au'}`} className="font-medium text-[#0f62fe]">
                       {detail.support.contact_email || 'support@bookedai.au'}
                     </a>
                     <div>{detail.support.contact_phone || 'Phone support details will be confirmed directly if needed.'}</div>
                   </div>
                 </section>
 
-                <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                    <Home className="h-4 w-4" />
                     Need another booking?
                   </div>
                   <div className="mt-3 text-lg font-semibold text-slate-900">
@@ -1079,8 +1140,9 @@ export function PortalApp() {
                 </section>
 
                 {detail.booking.notes ? (
-                  <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                  <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                      <NotebookTabs className="h-4 w-4" />
                       Notes
                     </div>
                     <p className="mt-3 text-sm leading-7 text-[#172033]/62">{detail.booking.notes}</p>
@@ -1088,8 +1150,9 @@ export function PortalApp() {
                 ) : null}
               </>
             ) : (
-              <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+              <section className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                  <XCircle className="h-4 w-4" />
                   Portal actions
                 </div>
                 <p className="mt-3 text-sm leading-7 text-[#172033]/62">

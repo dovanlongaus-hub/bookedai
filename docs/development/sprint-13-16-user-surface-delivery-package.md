@@ -51,6 +51,9 @@ This package now also inherits one explicit AI-agent execution rule:
 
 Latest implementation continuation from `2026-04-25`:
 
+- `portal.bookedai.au` now has an enterprise workspace UI pass: secure lookup, booking/payment/support status cards, shared command navigation, sticky desktop action rail, service/customer panels, academy progress, and timeline all live in one customer-facing portal surface
+- portal request actions remain request-safe and auditable through the existing reschedule/cancel/pause/downgrade endpoints; the frontend now also resets request-composer URL state back to overview when the composer is closed
+- focused portal Playwright coverage now locks the render, reschedule submission, and mobile no-overflow acceptance path
 - the public customer-facing agent now has a backend turn contract at `POST /api/v1/agents/customer-turn`, returning reply, phase, missing context, suggestions, grounded search payload, and next-agent handoff metadata
 - the public homepage agent now renders an explicit chat thread with user turns, assistant replies, inline top-result cards, and quick suggestions that continue the search inside the conversation
 - the homepage live-read path now consumes that backend customer-turn contract before falling back to the earlier public assistant helper, so UI copy and result payloads come from one reusable agent contract
