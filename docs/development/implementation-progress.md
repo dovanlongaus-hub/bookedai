@@ -12,6 +12,15 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-26`
 
+Implementation update from `2026-04-26` (source review and confirmation email security hardening):
+
+- reviewed the active codebase through the installed architecture, backend security, API hardening, frontend/UI, DevOps, AI-agent, chat UI, and testing skill lenses, using `project.md` plus the current phase/sprint docs as the source-of-truth baseline
+- fixed a shared confirmation email HTML rendering risk in `backend/service_layer/communication_service.py`: customer/provider-controlled confirmation values are now HTML-escaped, `mailto:` support links are safely encoded, and payment/manage/public app links must be `http` or `https` before rendering into the email CTA
+- added regression coverage in `backend/tests/test_lifecycle_ops_service.py` proving script tags, HTML tags, injected image markup, and `javascript:` payment links do not render as active HTML/actions in confirmation emails
+- documented the review and next recommendations in `docs/development/source-code-review-and-security-hardening-2026-04-26.md`; the main follow-up is to fold HTML rendering, provider URL allowlisting, and customer-channel identity fixtures into Phase 23 release governance
+- verification passed with backend py_compile for communication/customer-agent modules, `.venv/bin/python -m pytest backend/tests/test_lifecycle_ops_service.py backend/tests/test_telegram_webhook_routes.py backend/tests/test_chat_send_routes.py -q` (`34 passed`), and `npm --prefix frontend exec tsc -- --noEmit`
+- published the closeout to Notion and Discord via `python3 scripts/telegram_workspace_ops.py sync-doc`; archive entry is `docs/development/telegram-sync/2026-04-26/135315-source-review-and-confirmation-email-security-hardening.md`
+
 Implementation planning update from `2026-04-26` (architecture, phase, sprint, and urgent execution lock):
 
 - added a refreshed whole-project architecture baseline to `project.md`, treating BookedAI as one AI Revenue Engine across customer acquisition surfaces, customer action channels, tenant surfaces, operator surfaces, FastAPI/backend contracts, revenue core, Messaging Automation Layer, data/integration rails, and governance/release discipline

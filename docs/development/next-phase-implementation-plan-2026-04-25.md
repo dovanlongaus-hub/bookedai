@@ -33,6 +33,7 @@ The latest verified baseline is:
 - the homepage customer-facing agent now keeps a visible chat thread and can spawn revenue-ops handoff actions after booking
 - the default BookedAI email sender and support fallback for bookedai.au flows is `info@bookedai.au`, including SMTP username/From defaults when explicit env overrides are omitted
 - the legacy homepage/product service booking session path now follows that same mailbox rule: public service bookings use `BOOKING_BUSINESS_EMAIL` / `info@bookedai.au` for customer confirmation copy, internal lead notification, follow-up links, response contact email, and workflow metadata; tenant-owned catalog emails are used only as internal CC recipients and tenant notification context
+- confirmation email HTML rendering is now part of the security baseline: customer/provider-controlled confirmation values are escaped before entering HTML, and confirmation CTA URLs must be `http` or `https` before rendering into the action link
 - tenant-owned service bookings should notify tenants through the Messaging Automation Layer, with Telegram tenant delivery as the first default channel and queued/manual-review posture when a tenant has not configured a Telegram chat id yet
 - the revenue-ops action ledger has admin visibility, dispatch, transition, and evidence inspection seams
 - the pitch and roadmap now visualize the implementation sequence and system architecture directly: `customer surfaces -> AI agents -> booking core -> operations truth`, plus Phase/Sprint `17-23` in the public roadmap dataset
