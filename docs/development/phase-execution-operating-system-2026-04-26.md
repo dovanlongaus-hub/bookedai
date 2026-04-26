@@ -163,14 +163,14 @@ The PM now treats `Sprint 19` as the immediate execution board.
 - Automated verification: `.venv/bin/python -m py_compile backend/api/route_handlers.py backend/repositories/idempotency_repository.py backend/repositories/webhook_repository.py`; `.venv/bin/python -m pytest backend/tests/test_whatsapp_webhook_routes.py backend/tests/test_telegram_webhook_routes.py -q` passed with `21 passed`.
 - Status: local P0-4 code and duplicate-event coverage closed; deploy-live and operator evidence drawer surfacing remain carried follow-ups.
 
-### `2026-04-26` Phase 23 P0-6/P0-7 CI And Env Guard Patch
+### `2026-04-26` Phase 23 P0-7 Env Guard Patch
 
-- Scope: DevOps/Live planning and patch surface for GitHub Actions CI parity plus `.env.production.example` checksum guard.
+- Scope: DevOps/Live planning and patch surface for `.env.production.example` checksum guard.
 - Owner lanes: DevOps/Live, QA/UAT, Security/Validation.
-- Implementation: added `.github/workflows/release-gate.yml` to install backend/frontend dependencies and run `bash scripts/run_release_gate.sh` on pull requests, `main` pushes, and manual dispatch; added `scripts/verify_env_production_example_checksum.sh` plus `checksums/env-production-example.sha256`; wired the checksum verification into the release gate before frontend/backend checks.
-- Local parity: the workflow deliberately calls the existing release gate instead of duplicating command lists; CI creates `.venv-backend` because the local gate already requires that path.
-- Policy/secrets: no repository secrets, deployment credentials, or branch protection settings were invented in code. Branch protection remains an operator/GitHub settings follow-up.
-- Status: P0-6/P0-7 patch is ready for local verification and GitHub execution; branch protection note remains carried until repository settings can be applied.
+- Implementation: added `scripts/verify_env_production_example_checksum.sh` plus `checksums/env-production-example.sha256`; wired the checksum verification into the release gate before frontend/backend checks.
+- Automated verification: `scripts/verify_env_production_example_checksum.sh`, `bash -n scripts/verify_env_production_example_checksum.sh scripts/run_release_gate.sh`, `git diff --check`, and `RUN_SEARCH_REPLAY_GATE=false bash scripts/run_release_gate.sh` all passed. The full gate covered checksum verification, frontend smoke lanes, tenant smoke, backend unittest (`49 tests`), and search eval (`14/14 passed`).
+- Policy/secrets: no repository secrets, deployment credentials, or branch protection settings were invented in code. GitHub Actions workflow publication remains an operator follow-up because the available GitHub token rejected workflow-file updates without `workflow` scope.
+- Status: P0-7 patch is verified; P0-6 CI remains carried until workflow publication and branch protection can be applied.
 
 ### `2026-04-26` Phase 19 P0-5 Public Assistant Tenant Validation
 

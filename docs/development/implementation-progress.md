@@ -12,12 +12,12 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-26`
 
-Implementation update from `2026-04-26` (Sprint 19 P0-6/P0-7 CI parity and env checksum guard):
+Implementation update from `2026-04-26` (Sprint 19 P0-7 env checksum guard):
 
-- added `.github/workflows/release-gate.yml` so GitHub Actions runs the existing `scripts/run_release_gate.sh` on pull requests, `main` pushes, and manual dispatch after installing backend/frontend dependencies and Chromium Playwright browsers
 - added `scripts/verify_env_production_example_checksum.sh` and `checksums/env-production-example.sha256` so changes to `.env.production.example` must intentionally refresh the checksum with `scripts/verify_env_production_example_checksum.sh --update`
-- wired the checksum guard into `scripts/run_release_gate.sh` before the frontend/backend release checks, keeping local and CI promotion gates aligned
-- documented that branch protection and required-check policy still belong in GitHub settings and were not invented in repo code
+- wired the checksum guard into `scripts/run_release_gate.sh` before the frontend/backend release checks, keeping local promotion gates aligned
+- GitHub Actions workflow publication remains a follow-up because the available GitHub token rejected workflow-file updates without `workflow` scope
+- verification passed with `scripts/verify_env_production_example_checksum.sh`, `bash -n scripts/verify_env_production_example_checksum.sh scripts/run_release_gate.sh`, `git diff --check`, and `RUN_SEARCH_REPLAY_GATE=false bash scripts/run_release_gate.sh`; the full release gate completed checksum verification, frontend smoke lanes, tenant smoke, backend unittest (`49 tests`), and search eval (`14/14 passed`)
 
 Implementation planning update from `2026-04-26` (PM phase execution operating system):
 
