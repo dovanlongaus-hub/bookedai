@@ -8,15 +8,135 @@ Current synchronized release baseline: `1.0.1-stable`.
 
 Latest infrastructure update date: `2026-04-16`.
 
-Latest product-surface update date: `2026-04-25`.
+Latest product-surface update date: `2026-04-26`.
 
 Latest public-search UX update date: `2026-04-25`.
 
 Current top product-surface priority: `responsive homepage web-app UX`.
 
+Current canonical roadmap reference: `docs/architecture/bookedai-master-roadmap-2026-04-26.md` is the single end-to-end roadmap from Phase 0 through Phase 23 plus the post-Sprint-22 horizon. It integrates the seven-lane review captured in `docs/development/full-stack-review-2026-04-26.md` (architecture+UAT, frontend UI/UX, corporate/business, backend, API+integrations, DevOps, conversational chat) and is the authoritative source when this document conflicts with detailed phase or sprint artifacts on roadmap-level questions.
+
+Current PM execution control: `docs/development/phase-execution-operating-system-2026-04-26.md` defines the agent-lane operating model, phase closeout gates, UAT standard, deploy-live standard, and active Sprint 19 execution board. Phase `0-16` remain historical baselines; active execution starts from Phase/Sprint `17-23` and every phase must close UAT, deployment, documentation, Notion/Discord, and next-phase handoff before moving forward.
+
+## Content, Wording, And Layout Baseline
+
+This section is the current master baseline for requirement-side and execution-side content planning. It applies the active content, launch, startup-validation, email, and experiment planning lens to the existing BookedAI roadmap without changing the technical phase boundaries.
+
+### Customer-facing message hierarchy
+
+BookedAI should lead with the customer outcome before the system architecture:
+
+1. `Capture every service enquiry before it goes cold.`
+2. `Turn the enquiry into a booking, payment posture, and follow-up record.`
+3. `Show owners what was won, what is at risk, and what needs human review.`
+
+The approved plain-English product line for planning and public copy is:
+
+`BookedAI turns missed service enquiries into booked revenue. It captures intent across chat, calls, email, web, and messaging apps, then helps book, follow up, track payment posture, and show operators what revenue was won or still needs action.`
+
+Use this shorter SME-facing hero when the page or deck needs a sharper first line:
+
+`Never lose a service enquiry to slow replies again. BookedAI turns chats, calls, emails, and website visits into confirmed booking paths, payment follow-up, and customer care.`
+
+Use this investor and judge-facing version when the audience needs to understand the big-tech/unicorn ambition:
+
+`BookedAI is an AI Revenue Engine for service businesses: an omnichannel agent layer that captures intent, creates booking references, tracks payment and follow-up posture, and records every revenue action in an auditable operating system.`
+
+Use `AI Revenue Engine` as the category and strategy label, but explain it with concrete booking outcomes before using internal terms such as ledger, orchestration, policy, or runtime.
+
+For investor and judging contexts, the pitch should make the financial logic explicit:
+
+- wedge: service SMEs already receive demand, but lose revenue through slow replies, abandoned booking paths, unpaid follow-up, and disconnected customer care
+- product: BookedAI turns those fragmented moments into one measurable booking and revenue workflow
+- AI innovation: omnichannel agent policy, identity-safe customer care, tenant-aware search, auditable action ledger, and reusable vertical templates
+- business model: setup fee, SaaS subscription, and performance-aligned commission or revenue share on booked revenue where appropriate
+- proof: live verticals, booking references, portal reopen, tenant Ops, messaging channel continuity, release gates, and operator evidence packs
+
+### Document layout rule
+
+Requirement and execution documents should now use the same reader order:
+
+1. customer problem and target segment
+2. promise and measurable outcome
+3. current shipped baseline
+4. next customer journey or operator workflow
+5. phase/sprint ownership
+6. acceptance gate and experiment metric
+7. release, content, email, and support follow-up
+
+Avoid opening planning sections with implementation inventory unless the reader is explicitly an engineer. Technical detail should follow the customer journey it supports.
+
+### Startup canvas and validation baseline
+
+BookedAI's first beachhead remains service SMEs with appointment, class, consultation, or enquiry workflows. The current `why now` is the convergence of customer messaging channels, AI-assisted search/intake, cheaper automation, and owner demand for measurable revenue instead of more dashboards.
+
+The active strategic trade-offs are:
+
+- prioritize service businesses with repeatable bookings before broad marketplace discovery
+- prioritize explicit booking consent over one-click automation
+- prioritize portal-grounded customer care over unsupported instant lifecycle changes
+- prioritize tenant-backed proof verticals before generic multi-industry templates
+- prioritize owned email/customer identity and audited side effects before paid acquisition scale
+
+The quarter-level North Star for planning is:
+
+`qualified enquiries that become traceable booking references with follow-up posture`.
+
+Supporting metrics:
+
+- search-to-booking-start rate
+- booking-start-to-reference-created rate
+- reference-to-portal-reopen rate
+- customer-care identity resolution rate
+- tenant notification configured/sent/manual-review rate
+- payment or receivable posture visibility rate
+
+### Content and launch baseline
+
+Content should be a painkiller, not a brochure. Every content plan must answer one operator anxiety: missed enquiries, slow replies, no-shows, unpaid bookings, disconnected follow-up, or not knowing whether marketing created revenue.
+
+The public content spine should use this order:
+
+- `Problem`: enquiries arrive across too many channels and go cold quickly
+- `Proof`: live search, booking reference, portal, Telegram/WhatsApp/customer-care, tenant Ops
+- `Offer`: first tenant/proof verticals, setup path, pricing posture, and operator support identity
+- `Trust`: release gates, audit records, support routes, security and no-fake-completion posture
+- `Next action`: search/book now, register interest, open portal, or talk to BookedAI Manager Bot
+
+Launches should be sequenced as soft launch first, hard launch second:
+
+- soft launch validates the live flow with proof verticals, screenshots, UAT, and operator closeout
+- hard launch turns that proof into one focused external story, one short video/demo path, one email sequence, and one measurable conversion goal
+
+### Email and lifecycle baseline
+
+Email planning should stay tied to the booking lifecycle, not generic newsletters. The first owned-audience flows are:
+
+- operator onboarding: welcome, catalog readiness, first booking proof, tenant notification setup
+- booking customer: confirmation, portal revisit, payment/help status, review/change-request follow-up
+- lead nurture: missed enquiry recovery, abandoned booking, proof vertical story, register-interest follow-up
+- tenant retention: weekly revenue proof, unresolved action ledger, billing/payment posture, support escalation summary
+
+Mailchimp-style campaign planning may be used later, but the current repo baseline should first define segments, tags, triggers, subject/preview copy, and revenue attribution fields in docs before any external campaign automation is considered live.
+
+### Experiment baseline
+
+New content or wording changes should include a behavior hypothesis in this format:
+
+`At least X% of Y will do Z within T after seeing the change.`
+
+Current priority hypotheses:
+
+- At least `12%` of homepage visitors who start a search will select a result or open details in the same session.
+- At least `25%` of customers who receive a booking reference will reopen the portal within `7 days`.
+- At least `40%` of tenant admins who see the revenue-ops variant will open an operational panel before leaving.
+- At least `15%` of warm leads receiving a proof-vertical email will click through to a live booking or register-interest path.
+
+Experiment docs must state the audience, metric, threshold, and hold condition before implementation begins.
+
 Latest Messaging Automation Layer update from `2026-04-26`:
 
-- Product requirement message now reads: `BookedAI connects every customer message — WhatsApp, SMS, Telegram, email and web chat — into one AI Revenue Engine that captures intent, books appointments, collects payment, follows up, and retains customers automatically.`
+- Product requirement message now reads: `BookedAI connects every customer message - WhatsApp, SMS, Telegram, email and web chat - into one AI Revenue Engine that captures intent, creates booking paths, supports payment and receivable follow-up, and records customer-care actions with operator-visible revenue evidence.`
 - This message is the planning bridge for the next roadmap slice: Phase 19 owns channel intake and shared booking-care policy, Phase 20 exposes the same engine through web chat/widget install paths, Phase 21 connects collection and receivable truth, Phase 22 extracts reusable tenant retention templates, and Phase 23 makes the full omnichannel journey release-gated.
 - BookedAI now has a shared backend `MessagingAutomationService` that centralizes customer-message handling for messaging channels instead of keeping the agent policy inside individual webhook handlers
 - OpenClaw now has a dedicated always-on customer manifest `bookedai-booking-customer-agent` (`BookedAI Booking Customer Agent`) for handling BookedAI customer requests across website chat and Telegram; it uses OpenAI auth through `OPENAI_API_KEY`, supports internet/public-web search through the BookedAI AI Engine, and has no repo-write, deploy, host-shell, or operator authority
@@ -29,6 +149,7 @@ Latest Messaging Automation Layer update from `2026-04-26`:
 - Telegram uses the provider path `Telegram Bot -> /api/webhooks/telegram or /api/webhooks/bookedai-telegram -> BookedAI AI Engine -> Telegram sendMessage reply`
 - Telegram is treated as a private customer thread: it may chat/search like the website, but booking-specific answers are loaded only by booking reference or a safe phone/email identity match supplied by that customer, never by Telegram chat id alone
 - the first priority channel for the shared layer is a separate customer-facing BookedAI Telegram bot: `/api/webhooks/bookedai-telegram` accepts Telegram Bot API updates, verifies `X-Telegram-Bot-Api-Secret-Token` when `BOOKEDAI_CUSTOMER_TELEGRAM_WEBHOOK_SECRET_TOKEN` is configured, runs the same booking-care/status policy as WhatsApp, and replies through `BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN`; `/api/webhooks/telegram` remains only a compatibility alias
+- the Evolution compatibility webhook is not the current outbound WhatsApp default, but inbound calls can be hardened with `WHATSAPP_EVOLUTION_WEBHOOK_SECRET`; when set, `/api/webhooks/evolution` requires an HMAC-SHA256 signature in `X-BookedAI-Signature` or `X-Hub-Signature-256`
 - live Telegram activation is complete: `@BookedAI_Manager_Bot` webhook is configured to `https://api.bookedai.au/api/webhooks/bookedai-telegram`, production backend reads the customer Telegram token from the live secret environment, and a controlled webhook-to-OpenAI-to-Telegram reply loop returned `200`
 - this Booking AI Agent is explicitly separate from OpenClaw and the operator Telegram path used to program, test, deploy, or administer the BookedAI repo; it must not share bot tokens, webhook routes, or elevated repo/host permissions with operator tooling
 - Telegram now acts as a BookedAI representative for new service enquiries: when a customer asks to find/search/book a service, it searches active BookedAI catalog records, returns the top service options with provider/location/price posture, and includes a prefilled web assistant link for continuing on `bookedai.au`
@@ -203,6 +324,7 @@ Latest WhatsApp customer-care update from `2026-04-26`:
 - BookedAI's runtime email sender identity now defaults SMTP username and From headers to `info@bookedai.au` whenever `EMAIL_SMTP_USERNAME` or `EMAIL_SMTP_FROM` are omitted, and customer-facing portal/support fallbacks now use that same address instead of `support@bookedai.au`.
 - Homepage/product service bookings through `/booking-assistant/session` now also route operational email through `BOOKING_BUSINESS_EMAIL` / `info@bookedai.au`; tenant-owned catalog emails such as Future Swim branch mailboxes stay in catalog data and are CC'd only on BookedAI's internal booking lead notification, while the customer-facing support/contact identity remains `info@bookedai.au`.
 - Confirmation email HTML rendering is now security-hardened: dynamic customer, provider, booking, support, and note values are escaped before entering HTML, support email links are encoded, and confirmation action URLs must be `http` or `https` before rendering.
+- Messaging Automation provider URLs are now release-gated: Telegram controls and web-chat-compatible service-search responses only carry `http` or `https` provider links, and the root gate includes dedicated confirmation-email, provider-URL, private-channel identity, chat-send, Telegram, and WhatsApp fixtures.
 - Tenant-owned homepage/product booking sessions now also notify the tenant through the Messaging Automation Layer, defaulting to Telegram tenant notification targets from tenant settings and recording a queued warning when no tenant Telegram chat id is configured yet.
 - `/api/webhooks/whatsapp` now does more than log configured Twilio/Meta inbound messages: when the runtime has a communication service, it resolves the returning customer by booking reference first, then by WhatsApp phone/email when unambiguous
 - BookedAI's default WhatsApp support identity is now the main number `+61455301335`, paired with `info@bookedai.au`; outbound booking confirmations tell customers they can reply on WhatsApp to ask any service question about an existing booking, including status, payment, provider, academy/report, support, reschedule, or cancellation review
@@ -211,6 +333,7 @@ Latest WhatsApp customer-care update from `2026-04-26`:
 - `python3 scripts/telegram_workspace_ops.py whatsapp-bot-status` now treats an Evolution fallback as a personal WhatsApp bridge and can downgrade readiness when the bridge connection state is not open, preventing operator checks from reporting the bot as safe to send while the QR session is disconnected
 - at the operator's request, Evolution has been temporarily removed from the live outbound send path and WhatsApp chat is now Twilio-only by default (`WHATSAPP_PROVIDER=twilio`, empty fallback), so outbound probes no longer fall through to Meta while the Cloud API number remains unregistered
 - direct provider probes after disabling Evolution show Meta Graph can read the BookedAI phone identity but message send returns `(#133010) Account not registered`, while Twilio remains the active default transport and currently records outbound attempts as queued/manual-review until the configured Twilio WhatsApp credentials/sender are repaired
+- Sprint 19 P0-2 provider posture is now documented in `docs/development/whatsapp-provider-posture-decision-2026-04-26.md`: WhatsApp inbound/policy remains active, outbound delivery is not production-ready until Twilio or Meta returns a verified send state, and customer/operator copy must show queued/manual-review honestly rather than claiming full WhatsApp delivery
 - public BookedAI contact links should open the Booking Customer Care Agent at `https://wa.me/61455301335`, keeping the customer-visible WhatsApp entrypoint aligned with the live agent identity
 - inbound WhatsApp replies are handled as a dedicated `BookedAI WhatsApp Booking Care Agent` for `bookedai.au`, grounded in the same portal booking snapshot used by `portal.bookedai.au`, including booking status, payment posture, support contact, service/provider context, academy/report context, and recent revenue-ops action state
 - clear customer requests to cancel or reschedule an existing booking now queue the same audited portal request records as the portal UI, instead of pretending the booking was changed instantly
@@ -952,6 +1075,8 @@ If yes, sync it back into `project.md`.
 - [BookedAI Product Requirements Document](./docs/architecture/bookedai-master-prd.md)
 - [SaaS Domain Foundation](./docs/architecture/saas-domain-foundation.md)
 - [Phase 0-1 Execution Blueprint](./docs/architecture/phase-0-1-execution-blueprint.md)
+- [BookedAI Master Roadmap (whole-project plan from Phase 0)](./docs/architecture/bookedai-master-roadmap-2026-04-26.md)
+- [Full-Stack Review and Next-Phase Plan (2026-04-26 seven-lane review)](./docs/development/full-stack-review-2026-04-26.md)
 - [Implementation Phase Roadmap](./docs/architecture/implementation-phase-roadmap.md)
 - [Master Execution Index](./docs/architecture/master-execution-index.md)
 - [MVP Sprint Execution Plan](./docs/architecture/mvp-sprint-execution-plan.md)

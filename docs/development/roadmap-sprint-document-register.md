@@ -2,7 +2,13 @@
 
 Date: `2026-04-22`
 
-Latest register update: `2026-04-25`.
+Latest register update: `2026-04-26`.
+
+Additional synchronization baseline from `2026-04-26`:
+
+- `docs/development/full-stack-review-2026-04-26.md`
+- this seven-lane review (architecture+UAT, frontend UI/UX, corporate/business, backend, API+integrations, DevOps, conversational chat) is now the canonical input for Sprint 19-22 (`2026-04-27 → 2026-05-24`) and overlays the existing `Phase 17-23` execution model without changing phase boundaries
+- the eight P0 items (`P0-1` through `P0-8`) and ten P1 items (`P1-1` through `P1-10`) tracked in this review are mapped onto `Phase 17`, `Phase 19`, `Phase 22`, and `Phase 23`; each closeout must update both this register and `docs/development/full-stack-review-2026-04-26.md`
 
 Additional synchronization baseline from `2026-04-25`:
 
@@ -35,6 +41,13 @@ Current post-Sprint-16 phase map:
 - `Phase 21`: billing, receivables, subscriptions, and commission truth
 - `Phase 22`: reusable multi-tenant templates, including reusable verified-tenant search/result/confirmation treatment after chess and Future Swim stay stable
 - `Phase 23`: release governance and scale hardening
+
+Current sprint sequencing overlay from `2026-04-26` (additive, does not replace the phase map):
+
+- `Sprint 19` `2026-04-27 → 2026-05-03` `Stabilize and Sign`: targets `Phase 17`, `Phase 19`, `Phase 23`; closes the eight P0 items from `docs/development/full-stack-review-2026-04-26.md`
+- `Sprint 20` `2026-05-04 → 2026-05-10` `First Real Revenue Loop`: targets `Phase 17`, `Phase 19`, `Phase 21`, `Phase 23`; documents one Future Swim revenue loop and activates the first A/B wave
+- `Sprint 21` `2026-05-11 → 2026-05-17` `Refactor and Coverage`: targets `Phase 19`, `Phase 22`, `Phase 23`; splits `tenant_app_service`, completes WhatsApp test parity, ships beta DB separation and image registry
+- `Sprint 22` `2026-05-18 → 2026-05-24` `Multi-tenant and Multi-channel`: targets `Phase 19`, `Phase 20`, `Phase 21`, `Phase 22`, `Phase 23`; ships SMS adapter, tenant_id validator with chaos test, Tenant Revenue Proof dashboard, A/B wave 2
 
 ## Purpose
 
@@ -511,3 +524,75 @@ The immediate next implementation wave should stay centered on:
 4. expanding search quality, recovery workflows, tenant supply truth, and commercial admin support
 5. progressively turning contract, integration, browser, and AI quality runners into real sprint gates instead of manual-only checks
 6. upgrading public, portal, tenant, admin, and billing surfaces so they behave like one coherent SaaS product system
+
+## Sprint 19-22 register entries (2026-04-26 review)
+
+These four sprints inherit the same documents already registered for Sprint 13-16 plus the new cross-stack review baseline.
+
+### Sprint 19
+
+- `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/development/next-phase-implementation-plan-2026-04-25.md`
+- `docs/development/full-stack-review-2026-04-26.md`
+- `docs/development/release-gate-checklist.md`
+- `docs/development/portal-bookedai-uat-ab-investor-review-2026-04-26.md`
+- `docs/development/admin-live-uat-2026-04-26.md`
+- `docs/development/tenant-live-uat-2026-04-26.md`
+- `docs/development/ci-cd-deployment-runbook.md`
+
+Focus:
+
+- close P0-1 to P0-8 from `docs/development/full-stack-review-2026-04-26.md`
+- P0-4 now has local backend coverage for inbound webhook idempotency across WhatsApp, Evolution, and customer Telegram; live deploy/evidence surfacing remains a closeout follow-up
+- ship `aria-describedby` phone helper and admin booking responsive `≤720px`
+- enforce CI gate on `main` and OpenClaw rootless posture
+
+### Sprint 20
+
+- `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/development/next-phase-implementation-plan-2026-04-25.md`
+- `docs/development/full-stack-review-2026-04-26.md`
+- `docs/development/future-swim-launch-runbook.md`
+- `docs/development/future-swim-production-activation-pack.md`
+- `docs/development/golden-tenant-activation-revenue-proof-loop-2026-04-23.md`
+- `docs/development/messaging-automation-telegram-first-2026-04-26.md`
+- `docs/development/whatsapp-twilio-default-2026-04-26.md`
+
+Focus:
+
+- document one Future Swim revenue loop end-to-end
+- activate first A/B wave (`AC-1`, `RT-1`, `RT-3`, `CH-1`)
+- bring up Prometheus/Grafana/AlertManager
+- publish first version of `Commercial and Compliance Checklist`
+
+### Sprint 21
+
+- `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/development/next-phase-implementation-plan-2026-04-25.md`
+- `docs/development/full-stack-review-2026-04-26.md`
+- `docs/development/backend-boundaries.md`
+- `docs/development/release-gate-checklist.md`
+
+Focus:
+
+- split `backend/service_layer/tenant_app_service.py` into bounded services with unit coverage
+- mirror the Telegram webhook test suite for WhatsApp
+- separate beta from production database; push images to a registry
+- ship `pitch-deck-rendering.spec.ts` and the `390px` breakpoint suite
+
+### Sprint 22
+
+- `docs/architecture/current-phase-sprint-execution-plan.md`
+- `docs/development/next-phase-implementation-plan-2026-04-25.md`
+- `docs/development/full-stack-review-2026-04-26.md`
+- `docs/architecture/auth-rbac-multi-tenant-security-strategy.md`
+- `docs/architecture/integration-hub-sync-architecture.md`
+- `docs/development/widget-plugin-multi-tenant-booking-architecture-2026-04-23.md`
+
+Focus:
+
+- `BaseRepository` tenant_id validator plus chaos test
+- SMS adapter at `/api/webhooks/sms`
+- Tenant Revenue Proof dashboard and tenant-workspace pricing/commission visibility
+- A/B wave 2 (`BC-2`, `CH-1`, `CH-3`)
+- public footer and tenant terms updates from the Sprint 20 compliance audit

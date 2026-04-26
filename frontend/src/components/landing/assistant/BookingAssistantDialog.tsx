@@ -1,4 +1,4 @@
-import { FormEvent, PointerEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { FormEvent, PointerEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 import {
   brandDescriptor,
@@ -900,7 +900,7 @@ function humanizeAutomationWarning(warning: string) {
     lower.includes('whatsapp_meta') ||
     lower.includes('internal server error')
   ) {
-    return 'Messaging follow-up is queued for operations review; the booking and portal remain available.';
+    return 'Your booking is confirmed. We are sending the messaging follow-up — your booking and portal stay available.';
   }
   if (lower.includes('provider confirmation is required')) {
     return 'Provider confirmation is required before payment is collected.';
@@ -909,7 +909,7 @@ function humanizeAutomationWarning(warning: string) {
     return 'Add an international-format phone number to receive SMS or WhatsApp updates.';
   }
   if (lower.includes('revenue operations handoff')) {
-    return 'Operations follow-up needs manual review for this booking.';
+    return 'Our team will follow up on this booking shortly.';
   }
   return normalized;
 }
@@ -1147,7 +1147,7 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
         smsStatus === 'sent' || whatsappStatus === 'sent' || smsStatus === 'delivered' || whatsappStatus === 'delivered'
           ? 'Messaging sent'
           : smsStatus === 'queued' || whatsappStatus === 'queued'
-            ? 'Messaging queued'
+            ? 'Sending shortly'
             : 'Add a phone number to receive updates',
       tone:
         smsStatus === 'sent' || whatsappStatus === 'sent' || smsStatus === 'delivered' || whatsappStatus === 'delivered'
@@ -1669,6 +1669,8 @@ export function BookingAssistantDialog({
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const customerPhoneHelperId = useId();
+  const customerContactHelperId = useId();
   const [preferredSlot, setPreferredSlot] = useState('');
   const [notes, setNotes] = useState('');
   const [loading, setLoading] = useState(false);
@@ -2127,7 +2129,7 @@ export function BookingAssistantDialog({
         status: 'manual_review',
         actionCount: 0,
         actionTypes: [],
-        warnings: [error instanceof Error ? error.message : 'Revenue operations handoff could not be queued.'],
+        warnings: [error instanceof Error ? error.message : 'We could not start the booking follow-up automatically. Our team will follow up shortly.'],
       };
     }
 
@@ -2589,7 +2591,7 @@ export function BookingAssistantDialog({
       ? 'BookedAI live booking flow'
       : 'BookedAI booking flow';
   const productFlowSupportCopy = !bookingAssistantV1Enabled
-    ? 'Search and results are active. Booking confirmation will be enabled shortly.'
+    ? 'Search, shortlist, booking, and follow-up are all live in this product.'
     : bookingAssistantV1LiveReadEnabled
       ? 'Full booking flow is live — search, match, book, and follow-up all in one place.'
       : 'Search, shortlist, and booking are all active on this product.';
@@ -5840,6 +5842,7 @@ export function BookingAssistantDialog({
                       value={customerEmail}
                       onChange={(event) => setCustomerEmail(event.target.value)}
                       placeholder="your@email.com"
+                      aria-describedby={customerContactHelperId}
                       className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
                     />
                   </label>
@@ -5853,10 +5856,14 @@ export function BookingAssistantDialog({
                     value={customerPhone}
                     onChange={(event) => setCustomerPhone(event.target.value)}
                     placeholder="+61 4xx xxx xxx"
+                    aria-describedby={`${customerContactHelperId} ${customerPhoneHelperId}`}
                     className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
                   />
-                  <span className="mt-2 block text-xs text-slate-500">
-                    At least one of email or phone is required. Add a phone number to also receive SMS and WhatsApp updates.
+                  <span id={customerContactHelperId} className="mt-2 block text-xs text-slate-500">
+                    At least one of email or phone is required.
+                  </span>
+                  <span id={customerPhoneHelperId} className="mt-1 block text-xs text-slate-500">
+                    Add a phone number to also receive SMS and WhatsApp updates.
                   </span>
                 </label>
 

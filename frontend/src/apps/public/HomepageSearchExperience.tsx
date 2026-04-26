@@ -3,6 +3,7 @@ import {
   FormEvent,
   KeyboardEvent as ReactKeyboardEvent,
   useEffect,
+  useId,
   useMemo,
   useRef,
   useState,
@@ -701,7 +702,7 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse): Book
         whatsappStatus === 'delivered'
           ? 'Messaging sent'
           : smsStatus === 'queued' || whatsappStatus === 'queued'
-            ? 'Messaging queued'
+            ? 'Sending shortly'
             : 'Awaiting phone-based follow-up',
       tone:
         smsStatus === 'sent' ||
@@ -1900,6 +1901,7 @@ export function HomepageSearchExperience({
   const [customerName, setCustomerName] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
+  const customerPhoneHelperId = useId();
   const [preferredSlot, setPreferredSlot] = useState(buildDefaultPreferredSlot());
   const [notes, setNotes] = useState('');
   const [submitError, setSubmitError] = useState('');
@@ -2425,7 +2427,7 @@ export function HomepageSearchExperience({
         status: 'manual_review',
         actionCount: 0,
         actionTypes: [],
-        warnings: [error instanceof Error ? error.message : 'Revenue operations handoff could not be queued.'],
+        warnings: [error instanceof Error ? error.message : 'We could not start the booking follow-up automatically. Our team will follow up shortly.'],
       };
     }
 
@@ -3192,7 +3194,7 @@ export function HomepageSearchExperience({
               detail:
                 results.length > 0
                   ? `${results.length} ranked option${results.length === 1 ? '' : 's'} ready above. Review, then continue.`
-                  : 'No strong match yet. Refine the request and search again.',
+                  : "Let's refine — tell me suburb, preferred time, or service detail to find the best fit.",
               tone: 'border-slate-900/8 bg-white/78 text-[#172033]/72',
             }
           : {
@@ -4504,10 +4506,11 @@ export function HomepageSearchExperience({
                     value={customerPhone}
                     onChange={(event) => setCustomerPhone(event.target.value)}
                     autoComplete="tel"
+                    aria-describedby={customerPhoneHelperId}
                     className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
                   />
                 </label>
-                <div className="-mt-2 text-[11px] leading-5 text-[#64748b]">
+                <div id={customerPhoneHelperId} className="-mt-2 text-[11px] leading-5 text-[#64748b]">
                   Email or phone is enough; phone enables SMS and WhatsApp updates.
                 </div>
 

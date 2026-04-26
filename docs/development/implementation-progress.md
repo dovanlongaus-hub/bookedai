@@ -12,6 +12,76 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-26`
 
+Implementation update from `2026-04-26` (Sprint 19 P0-6/P0-7 CI parity and env checksum guard):
+
+- added `.github/workflows/release-gate.yml` so GitHub Actions runs the existing `scripts/run_release_gate.sh` on pull requests, `main` pushes, and manual dispatch after installing backend/frontend dependencies and Chromium Playwright browsers
+- added `scripts/verify_env_production_example_checksum.sh` and `checksums/env-production-example.sha256` so changes to `.env.production.example` must intentionally refresh the checksum with `scripts/verify_env_production_example_checksum.sh --update`
+- wired the checksum guard into `scripts/run_release_gate.sh` before the frontend/backend release checks, keeping local and CI promotion gates aligned
+- documented that branch protection and required-check policy still belong in GitHub settings and were not invented in repo code
+
+Implementation planning update from `2026-04-26` (PM phase execution operating system):
+
+- added `docs/development/phase-execution-operating-system-2026-04-26.md` as the PM control document for executing BookedAI from historical Phase `0` through final Phase `23`
+- defined agent lanes for Product/PM, Frontend, Backend, Security/Validation, QA/UAT, DevOps/Live, Data/Revenue, and Content/GTM so work is assigned by responsibility and proof type
+- locked the phase closeout gate: requirement baseline, implementation, automated verification, UAT evidence, deploy-live when runtime changes, live smoke, progress/roadmap docs, Notion/Discord, and next-phase opening
+- mapped the active execution board to Sprint `19` P0/P1 items, with Phase `0-16` preserved as delivered baselines and active execution starting from Phase/Sprint `17-23`
+- synchronized the PM operating reference into `project.md` and `docs/architecture/bookedai-master-roadmap-2026-04-26.md`
+- published the closeout to Notion and Discord via `python3 scripts/telegram_workspace_ops.py sync-doc`; archive entry is `docs/development/telegram-sync/2026-04-26/143633-bookedai-pm-phase-execution-operating-system.md`
+
+Phase gate verification from `2026-04-26` (Sprint 19 P0-1 portal and booking continuity):
+
+- started active execution under the new PM operating board by checking the first Phase 17 P0 gate
+- backend focused verification passed with `.venv/bin/python -m pytest backend/tests/test_api_v1_portal_routes.py backend/tests/test_api_v1_booking_routes.py -q` (`17 passed`)
+- live stack health passed with `bash scripts/healthcheck_stack.sh` at `2026-04-26T14:37:15Z`
+- no deploy-live was needed because this pass only added PM control docs and ran verification; the next runtime change must still complete deploy-live plus live booking-to-portal smoke before phase advancement
+- published the verification closeout to Notion and Discord via `python3 scripts/telegram_workspace_ops.py sync-doc`; archive entry is `docs/development/telegram-sync/2026-04-26/143759-bookedai-sprint-19-p0-1-phase-gate-verification.md`
+
+Implementation planning update from `2026-04-26` (Sprint 19 P0-2 WhatsApp provider posture):
+
+- added `docs/development/whatsapp-provider-posture-decision-2026-04-26.md` to record the active WhatsApp provider decision for Phase 19
+- reconciled the older Evolution-primary README/project wording with the newer operator decision: Twilio is now the configured default, Evolution outbound fallback is disabled, Meta is blocked until registration completes, and Twilio remains queued/manual-review until credentials or sender posture are repaired
+- documented the release rule that WhatsApp inbound/policy can stay active, but outbound customer-visible delivery must not be claimed as production-ready until a provider returns a verified send/delivered state
+- updated `README.md`, `project.md`, and the PM operating board so P0-2 is `decision recorded, provider delivery still blocked`
+- published the P0-2 decision closeout to Notion and Discord via `python3 scripts/telegram_workspace_ops.py sync-doc`; archive entry is `docs/development/telegram-sync/2026-04-26/144011-bookedai-sprint-19-p0-2-whatsapp-provider-posture-decision.md`
+
+Implementation update from `2026-04-26` (Sprint 19 P1-7 frontend UI/UX stabilization):
+
+- closed the documented frontend P1-7 accessibility/mobile debt for the active Phase 17 stabilization lane
+- linked the product assistant phone helper text to the phone input with `aria-describedby` in `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx`, so assistive technology receives the email-or-phone requirement and SMS/WhatsApp guidance with the control
+- linked the homepage booking form phone helper with `aria-describedby` in `frontend/src/apps/public/HomepageSearchExperience.tsx`, matching the same accessibility contract on the public booking surface
+- replaced the admin bookings table horizontal-scroll fallback below `720px` with contained responsive booking cards, preserving the desktop grid while hiding the header and exposing per-field labels on narrow operator screens
+- tightened product fallback-mode copy so the product surface no longer says booking confirmation is “enabled shortly”; it now reflects the current search, booking, and follow-up baseline
+- verification passed with `npm --prefix frontend exec tsc -- --noEmit` and `cd frontend && npx playwright test tests/admin-bookings-filters.spec.ts --workers=1 --reporter=line` (`2 passed`)
+- attempted `cd frontend && npx playwright test tests/product-app-regression.spec.ts --workers=1 --reporter=line`; the run first exposed stale selectors that were updated, then the rerun was terminated with exit `143` while another workspace Playwright smoke/build lane was still active, so full product-suite rerun remains a follow-up before live promotion
+- published the partial closeout to Notion and Discord via `python3 scripts/telegram_workspace_ops.py sync-doc`; archive entry is `docs/development/telegram-sync/2026-04-26/150208-sprint-19-p1-7-frontend-ui-ux-stabilization.md`
+
+Implementation planning update from `2026-04-26` (SME, investor, judge, and financial wording upgrade):
+
+- upgraded the selected BookedAI messages across `project.md`, `prd.md`, `README.md`, `DESIGN.md`, `docs/architecture/bookedai-master-prd.md`, `docs/architecture/bookedai-master-roadmap-2026-04-26.md`, `docs/architecture/current-phase-sprint-execution-plan.md`, and `docs/development/next-phase-implementation-plan-2026-04-25.md`
+- set the SME-facing hero around the painkiller promise: `Never lose a service enquiry to slow replies again`, with booking path, payment follow-up, and customer care as the concrete outcomes
+- set the investor/judge narrative around the big-tech/startup thesis: BookedAI as an omnichannel agent layer that captures intent, creates booking references, tracks payment/follow-up posture, and records revenue actions in an auditable operating system
+- made the financial story explicit in the planning baseline: setup fee, SaaS subscription, and performance-aligned commission or revenue share where appropriate, backed by booking references, payment posture, portal reopen, tenant Ops, audit/action evidence, and release gates
+- tightened the omnichannel product requirement wording so it says BookedAI supports payment/receivable follow-up and records customer-care actions, avoiding overclaiming instant payment collection or lifecycle completion before backend state confirms it
+- published the closeout to Notion and Discord via `python3 scripts/telegram_workspace_ops.py sync-doc`; archive entry is `docs/development/telegram-sync/2026-04-26/143051-bookedai-sme-investor-judge-wording-upgrade.md`
+
+Implementation planning update from `2026-04-26` (content, wording, launch, and lifecycle planning alignment):
+
+- applied the requested content/startup/marketing/launch/email/experiment lenses to the active requirement and execution docs without changing the Phase `17-23` technical boundaries
+- added a master content baseline to `project.md`: customer-facing message hierarchy, document layout order, startup-canvas trade-offs, North Star/supporting metrics, launch cadence, lifecycle email scope, and XYZ-style experiment hypotheses
+- expanded `docs/architecture/bookedai-master-prd.md` with wording rules, a plain-English product message, working-backwards phase stories, content-market-fit topics, owned email segments, and experiment requirements
+- updated `docs/architecture/implementation-phase-roadmap.md`, `docs/architecture/current-phase-sprint-execution-plan.md`, and `docs/development/next-phase-implementation-plan-2026-04-25.md` so future plans lead with customer pain, shipped proof, measurable outcome, launch/email follow-up, and customer-safe copy before implementation inventory
+- current approved plain-English message for docs and public copy is now: `BookedAI turns missed service enquiries into booked revenue. It captures intent across chat, calls, email, web, and messaging apps, then helps book, follow up, track payment posture, and show operators what revenue was won or still needs action.`
+- published the closeout to Notion and Discord via `python3 scripts/telegram_workspace_ops.py sync-doc`; archive entry is `docs/development/telegram-sync/2026-04-26/141225-bookedai-content-wording-and-launch-planning-alignment.md`
+
+Implementation update from `2026-04-26` (Phase 23 release-gate security fixtures):
+
+- completed the recommended Phase 23 follow-up by adding `backend/tests/test_release_gate_security.py` and wiring it into `scripts/run_release_gate.sh`
+- added provider URL allowlisting inside `MessagingAutomationService`: Telegram result controls and chat-compatible service-search responses now only carry `http` or `https` provider URLs, while unsafe provider links are omitted or fall back to the BookedAI web assistant
+- expanded the root backend gate to run chat-send, Telegram webhook, and WhatsApp webhook fixtures so customer-channel identity policy, reply controls, callback handling, and messaging intake stay inside the normal promote-or-hold check
+- updated `docs/development/release-gate-checklist.md` and `docs/development/source-code-review-and-security-hardening-2026-04-26.md` to mark HTML rendering, provider URL allowlisting, and private-channel identity fixtures as closed gate additions
+- verification passed with `python3 -m py_compile backend/service_layer/messaging_automation_service.py backend/service_layer/communication_service.py backend/tests/test_release_gate_security.py`, `.venv/bin/python -m pytest backend/tests/test_release_gate_security.py backend/tests/test_telegram_webhook_routes.py backend/tests/test_chat_send_routes.py backend/tests/test_whatsapp_webhook_routes.py backend/tests/test_lifecycle_ops_service.py -q` (`45 passed`), `.venv/bin/python -m unittest backend.tests.test_release_gate_security backend.tests.test_chat_send_routes backend.tests.test_telegram_webhook_routes backend.tests.test_whatsapp_webhook_routes` (`22 tests`), `npm --prefix frontend exec tsc -- --noEmit`, and `RUN_SEARCH_REPLAY_GATE=false bash scripts/run_release_gate.sh` (`all checks passed`)
+- published the closeout to Notion and Discord via `python3 scripts/telegram_workspace_ops.py sync-doc`; archive entry is `docs/development/telegram-sync/2026-04-26/140825-phase-23-release-gate-security-fixtures-added.md`
+
 Implementation update from `2026-04-26` (source review and confirmation email security hardening):
 
 - reviewed the active codebase through the installed architecture, backend security, API hardening, frontend/UI, DevOps, AI-agent, chat UI, and testing skill lenses, using `project.md` plus the current phase/sprint docs as the source-of-truth baseline
@@ -82,7 +152,7 @@ Implementation update from `2026-04-26` (homepage service booking email recipien
 
 Implementation planning update from `2026-04-26` (omnichannel AI Revenue Engine product requirement):
 
-- added the product requirement message that BookedAI connects WhatsApp, SMS, Telegram, email, and web chat into one AI Revenue Engine that captures intent, books appointments, collects payment, follows up, and retains customers automatically
+- added the product requirement message that BookedAI connects WhatsApp, SMS, Telegram, email, and web chat into one AI Revenue Engine that captures intent, creates booking paths, supports payment and receivable follow-up, and records customer-care actions with operator-visible revenue evidence
 - aligned the requirement with the current Messaging Automation Layer baseline: channel webhooks normalize customer messages into Inbox/conversation events, the shared booking-care policy resolves intent and booking identity, and workflow/audit/outbox side effects drive follow-up, payment support, and retention actions
 - mapped the requirement into the active Phase 19-23 plan: Phase 19 owns omnichannel intake/status care, Phase 20 owns web-chat/widget distribution, Phase 21 owns payment and receivables continuity, Phase 22 owns reusable retention templates, and Phase 23 owns release-gated verification across the complete journey
 - synchronized the planning language into `project.md`, `README.md`, `DESIGN.md`, `docs/development/next-phase-implementation-plan-2026-04-25.md`, and `docs/architecture/current-phase-sprint-execution-plan.md`
@@ -2615,3 +2685,29 @@ Current execution has also been running through a specialist multi-agent pattern
   - update: added protected customer-agent health at `/api/customer-agent/health` and `/api/admin/customer-agent/health`, returning recent channel event counts, webhook pending posture, last reply/callback status, top failed identity-resolution reasons, and recent channel-session snapshots.
   - update: added `scripts/customer_agent_uat.py` as the first-class UAT runner for web chat search plus Telegram message/callback webhooks when customer Telegram test credentials are present; added the live-safe `chess-class-sydney-live-safe` search eval case to keep `Kids Chess Class - Sydney Pilot` first for `Find a chess class in Sydney this weekend`.
   - verification: `python3 -m py_compile backend/db.py backend/service_layer/messaging_automation_service.py backend/api/route_handlers.py backend/api/public_catalog_routes.py backend/api/admin_routes.py scripts/customer_agent_uat.py`; `.venv/bin/python scripts/run_search_eval_pack.py` (`14/14 passed`); `.venv/bin/python -m pytest backend/tests/test_telegram_webhook_routes.py backend/tests/test_booking_assistant_runtime.py backend/tests/test_chat_send_routes.py backend/tests/test_api_v1_search_routes.py::ApiV1SearchRoutesTestCase::test_customer_agent_turn_returns_reply_search_and_handoff -q` (`13 passed`); `.venv/bin/python -m pytest backend/tests/test_api_v1_routes.py backend/tests/test_lifecycle_ops_service.py -q` (`21 passed`); `bash scripts/run_release_gate.sh`; `python3 scripts/telegram_workspace_ops.py deploy-live`; `bash scripts/healthcheck_stack.sh`; `python3 scripts/customer_agent_uat.py --api-base https://api.bookedai.au` passed web-chat UAT with `Kids Chess Class - Sydney Pilot` first; protected health returned `401` for an invalid token and `200` for a valid admin token.
+- `2026-04-26`
+  - lane: `Cross-stack review and Sprint 19-22 plan integration`
+  - update: published `docs/development/full-stack-review-2026-04-26.md` capturing a seven-lane review (architecture+UAT, frontend UI/UX, corporate/business, backend, API+integrations, DevOps, conversational chat) with eight P0 items (`P0-1` portal `v1-*` snapshot 500, `P0-2` WhatsApp provider posture, `P0-3` Telegram/Evolution webhook HMAC, `P0-4` inbound webhook idempotency, `P0-5` `actor_context.tenant_id` validator, `P0-6` GitHub Actions CI, `P0-7` expanded `.env.production.example` with checksum guard, `P0-8` OpenClaw root drop), ten P1 items (`P1-1` to `P1-10`), a 16-experiment A/B testing matrix across acquisition/conversion/retention/conversational/tenant lanes, and a Sprint 19-22 sequencing overlay (`2026-04-27 → 2026-05-24`) mapped onto the existing `Phase 17-23` model.
+  - update: synchronized the canonical roadmap docs with the review: added the new doc to `docs/architecture/current-phase-sprint-execution-plan.md` source-of-truth inputs and added a Sprint 19-22 cross-stack execution overlay; added a `2026-04-26 Cross-Stack Review Integration` section in `docs/development/next-phase-implementation-plan-2026-04-25.md` with phase-level deltas for `Phase 17`, `Phase 18`, `Phase 19`, `Phase 20`, `Phase 20.5`, `Phase 21`, `Phase 22`, `Phase 23`; added the doc to `docs/development/roadmap-sprint-document-register.md` baseline plus per-sprint registers for Sprint 19-22; added a new `Cross-stack security and reliability gates (2026-04-26 review)` section to `docs/development/release-gate-checklist.md` with all P0 and P1 gate items.
+  - verification: documentation-only change; `ls docs/development/full-stack-review-2026-04-26.md` confirms the canonical doc is present; downstream closeouts must update both `docs/development/full-stack-review-2026-04-26.md` and the matching roadmap doc when a P0 or P1 lands.
+- `2026-04-26`
+  - lane: `Whole-project master roadmap consolidation`
+  - update: published `docs/architecture/bookedai-master-roadmap-2026-04-26.md` as the single end-to-end roadmap covering Phase 0 through Phase 23 plus the post-Sprint-22 horizon. The roadmap applies the seven-lane review retroactively to historical phases by anchoring each finding to the phase it originated in (`R1` portal continuity originated in Phase 7-8/Phase 9, `R2` channel parity in Phase 3/Phase 7, `R3` service-layer monolith in Phase 7, `R4` operational hygiene in Phase 6/Phase 9), then names the phase that resolves it (`Phase 17`, `Phase 19`, `Phase 22`, `Phase 23`). The roadmap also names the post-Sprint-22 horizon themes for `Sprint 23 Vertical Expansion` and `Sprint 24 Investor and Compliance Closeout`.
+  - update: synchronized the leadership-level documentation chain so the new master roadmap is the canonical reference. `docs/architecture/master-execution-index.md` now lists Phase 0 through Phase 23, Sprint 1 through Sprint 22 with phase targets, and adds leadership checkpoints at Sprint 19, Sprint 20, and Sprint 22. `docs/architecture/implementation-phase-roadmap.md` now has Phase 17-23 sections after Phase 9 and Sprint 17-22 entries appended to the recommended sprint mapping. `docs/architecture/solution-architecture-master-execution-plan.md` now has Phase 17-23 summaries after Phase 9 and Sprint 17-22 entries after Sprint 16. `prd.md` documentation rule now requires updating the master roadmap when phase scope, sprint sequencing, or the seven-lane review backlog changes. `project.md` now lists the master roadmap and the seven-lane review at the top of the documentation map.
+  - verification: documentation-only change; `ls docs/architecture/bookedai-master-roadmap-2026-04-26.md` confirms the canonical doc is present; subsequent closeouts must update the master roadmap whenever phase, sprint, or review-item status changes.
+- `2026-04-26`
+  - lane: `Sprint 19 P0-3 webhook signature hardening`
+  - update: kept the customer Telegram webhook on Telegram's official `X-Telegram-Bot-Api-Secret-Token` verification path and added Evolution webhook HMAC-SHA256 verification through `WHATSAPP_EVOLUTION_WEBHOOK_SECRET`. When configured, `/api/webhooks/evolution` now rejects missing/invalid `X-BookedAI-Signature` or `X-Hub-Signature-256` before parsing or processing the payload.
+  - update: added `WHATSAPP_EVOLUTION_WEBHOOK_SECRET` to env examples and aligned the release-gate wording so Telegram is tracked as token verification while Evolution is tracked as HMAC verification.
+  - verification: `.venv/bin/python -m py_compile backend/api/route_handlers.py backend/config.py`; `.venv/bin/python -m pytest backend/tests/test_whatsapp_webhook_routes.py backend/tests/test_telegram_webhook_routes.py backend/tests/test_config.py -q` (`23 passed`)
+- `2026-04-26`
+  - lane: `Sprint 19 P0-4 inbound webhook idempotency routing`
+  - update: inspected the existing inbound webhook foundation and found `webhook_events` plus `idempotency_keys` already present, with `/api/webhooks/whatsapp` using them for duplicate suppression while Telegram and Evolution still bypassed that shared gate.
+  - update: routed `/api/webhooks/bookedai-telegram`, `/api/webhooks/telegram`, and `/api/webhooks/evolution` through the same idempotency reservation and webhook-event processing ledger before downstream customer-care side effects; duplicate provider events now return `messages_processed: 0`.
+  - update: added `backend/migrations/sql/022_inbound_webhook_idempotency_evidence_indexes.sql` with additive status/scope indexes for later ledger evidence queries.
+  - verification: `.venv/bin/python -m py_compile backend/api/route_handlers.py backend/repositories/idempotency_repository.py backend/repositories/webhook_repository.py`; `.venv/bin/python -m pytest backend/tests/test_whatsapp_webhook_routes.py backend/tests/test_telegram_webhook_routes.py -q` (`21 passed`)
+- `2026-04-26`
+  - lane: `Sprint 19 P0-5 public assistant tenant validation`
+  - update: added a route-level tenant session check so public assistant v1 routes reject `actor_context.tenant_id` when it does not match the authenticated tenant session.
+  - update: kept `/api/chat/send` unchanged as the website AI Engine entrypoint because it does not accept `actor_context`; existing chat-send coverage still verifies the public web chat route.
+  - verification: `.venv/bin/python -m py_compile backend/api/v1_routes.py backend/api/v1_booking_handlers.py backend/api/route_handlers.py`; `.venv/bin/python -m pytest backend/tests/test_api_v1_booking_routes.py backend/tests/test_chat_send_routes.py -q` (`8 passed`); `.venv/bin/python -m pytest backend/tests/test_api_v1_search_routes.py -q` (`21 passed`)

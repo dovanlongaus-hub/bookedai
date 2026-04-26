@@ -13,19 +13,22 @@ Primary gate command:
 
 This command already runs:
 
-1. representative Playwright smoke suites for `legacy`, `live-read`, `admin-smoke`, and `tenant-smoke`, with each suite rebuilding under its own mode-specific frontend flags
-2. backend v1 route and lifecycle unit tests
-3. fixed-query search eval pack
+1. `.env.production.example` checksum verification against `checksums/env-production-example.sha256`
+2. representative Playwright smoke suites for `legacy`, `live-read`, `admin-smoke`, and `tenant-smoke`, with each suite rebuilding under its own mode-specific frontend flags
+3. backend v1 route, lifecycle, security, chat-send, Telegram webhook, and WhatsApp webhook unit tests
+4. Phase 23 capture-to-retention security fixtures for confirmation email HTML escaping, provider URL allowlisting, and private-channel identity policy
+5. fixed-query search eval pack
 
 When `RUN_SEARCH_REPLAY_GATE=true` is set, it also runs:
 
-5. production-shaped search replay gate
+6. production-shaped search replay gate
 
 The broader `@admin` regression suite remains separate from the release gate and should still be used for deeper admin passes.
 The broader `@legacy` and `@live-read` tagged suites also remain available for wider regression passes; the release gate now uses smaller representative slices so promote-or-hold checks stay stable enough to run repeatedly.
 For live-read specifically, the gate currently centers on the authoritative-write-boundary path rather than the more detailed request-counter assertions, because that narrower slice has proven more repeatable in chained rehearsal runs.
 The broader live-read regression lane now also includes a dedicated homepage truth check for `near me -> needs location -> no stale shortlist`, and that scenario should be treated as a required search-truth smoke case whenever homepage search-state logic changes.
 The tenant-smoke lane locks the tenant gateway's outcome-led copy, create-account path, Google re-verification chooser, and email-code accessible-name regression so `tenant.bookedai.au` remains safe as a public SaaS proof route.
+The backend gate now includes `backend.tests.test_release_gate_security`, `backend.tests.test_chat_send_routes`, `backend.tests.test_telegram_webhook_routes`, and `backend.tests.test_whatsapp_webhook_routes`, so message-intake, provider URL, and private-channel identity regressions are part of the normal promote-or-hold check.
 
 The frontend Playwright commands now clear the standard preview ports before each run, so the release gate is less likely to fail because a previous smoke pass left a local preview server behind.
 The root release gate no longer relies on one shared prebuilt `dist` for all smoke lanes; mode-specific rebuilds are required so `legacy` and `live-read` can exercise the correct public-assistant feature flags.
@@ -112,7 +115,38 @@ Before a live promotion is considered complete, confirm all of the following in 
 - `docs/development/implementation-progress.md` records the delivered result and, when relevant, the live promotion outcome
 - the requirement-facing or description-facing document for the affected module, workflow, or sprint has been updated
 - the matching roadmap, sprint, plan, or phase document has been updated
+- if the change closes a P0 or P1 from `docs/development/full-stack-review-2026-04-26.md`, that backlog item is marked closed in the same pass with a link to the implementation-progress entry
 - the release should be treated as `hold` if the code is ready but the documentation write-back is still missing
+
+## Cross-stack security and reliability gates (2026-04-26 review)
+
+These gates inherit from `docs/development/full-stack-review-2026-04-26.md` and apply to the canonical journey `Ask -> Match -> Compare -> Book -> Confirm -> Portal -> Follow-up`. Once each item ships, it must be exercised on every promote.
+
+- portal `GET /api/v1/portal/bookings/v1-{ref}` returns `200` for a fresh `v1-*` reference created in the same release; structured error envelope returns on degraded paths and CORS headers are present on error responses (`P0-1`)
+- WhatsApp outbound delivery has one documented active provider posture (Meta Cloud or Twilio) and the bot status command reports `attention required` only when the active provider is intentionally unconfigured (`P0-2`)
+- `/api/webhooks/telegram` and `/api/webhooks/bookedai-telegram` reject missing or invalid `X-Telegram-Bot-Api-Secret-Token` when configured; `/api/webhooks/evolution` rejects missing or invalid HMAC-SHA256 signatures when `WHATSAPP_EVOLUTION_WEBHOOK_SECRET` is configured (`P0-3`)
+- inbound webhook deliveries from Tawk, WhatsApp, Telegram, Evolution, and Zoho are deduplicated through the `webhook_events` table; a replayed delivery does not re-trigger downstream side effects (`P0-4`)
+- public assistant routes return `403` when `actor_context.tenant_id` does not match the authenticated session (`P0-5`)
+- `.github/workflows/release-gate.yml` blocks any PR or `main` push that fails the same root release gate used locally; `main` branch protection still needs to enforce the check in GitHub settings (`P0-6`)
+- `.env.production.example` has a committed SHA-256 baseline at `checksums/env-production-example.sha256`; `scripts/run_release_gate.sh` rejects drift unless the checksum is intentionally refreshed with `scripts/verify_env_production_example_checksum.sh --update`. Full required-vs-optional env markers remain a carried follow-up (`P0-7`)
+- the OpenClaw container does not run as `root`; the host mount is scoped to the BookedAI deploy directory; the operator authority boundary is documented in `deploy/openclaw/README.md` (`P0-8`)
+- tenant authenticated UAT for catalog edit, billing activation, and team controls is green and recorded (`P1-1`)
+- WhatsApp outbound replies carry inline action controls equivalent to the Telegram `View n` / `Book n` / `Find more` row, and the sender identity reflects `BookedAI Manager Bot` (`P1-2`)
+- WhatsApp webhook integration tests cover identity-gate, queued cancel, queued reschedule, and Internet expansion at parity with the Telegram suite (`P1-3`)
+- `backend/service_layer/tenant_app_service.py` is split into `tenant_overview_service`, `tenant_billing_service`, `tenant_catalog_service` and each has at least ten unit tests (`P1-4`)
+- `backend/api/route_handlers.py` does not run `session.execute(text(...))` for tenant-scoped reads; admin reads go through repository read models (`P1-5`)
+- the production beta runtime tier points at a beta database that is not the production database; tagged image rollback works in under five minutes on staging (`P1-6`)
+- the phone field in `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` links its helper text via `aria-describedby`; the admin booking table has a responsive card layout below `720px` (`P1-7`)
+- `frontend/src/apps/public/PitchDeckApp.tsx` has Playwright coverage at desktop and `390px` mobile (`P1-8`)
+- the Future Swim Miranda booking URL hotfix migration `020_future_swim_miranda_booking_url_hotfix.sql` is applied on production (`P1-9`)
+- customer-facing email templates are channel-aware; support copy names `info@bookedai.au` and the available chat channel (`P1-10`)
+- a `BaseRepository` validator fails any tenant-scoped query that is missing a `tenant_id` filter; a chaos test verifies the validator catches drift
+
+Closed gate additions:
+
+- `backend/tests/test_release_gate_security.py` now blocks confirmation email HTML injection, unsafe confirmation CTA links, unsafe provider URLs in Telegram/service-search controls, unsafe provider URLs in chat-compatible response payloads, and private-channel identity drift that would treat Telegram chat id as booking identity
+- `scripts/run_release_gate.sh` now runs the chat-send, Telegram webhook, and WhatsApp webhook fixtures alongside the v1/lifecycle/backend security tests, keeping customer-channel identity and reply-control regressions inside the root gate
+- `scripts/run_release_gate.sh` now verifies `.env.production.example` against `checksums/env-production-example.sha256` before running frontend/backend checks, and `.github/workflows/release-gate.yml` runs that same script in CI
 
 ## Collaboration handoff gate
 
@@ -182,3 +216,4 @@ Use the smallest rollback that restores operator clarity and release confidence:
 - [Rollout Feature Flags](./rollout-feature-flags.md)
 - [Implementation Progress](./implementation-progress.md)
 - [Next Sprint Protected Reauth Retry Gate Plan](./next-sprint-protected-reauth-retry-gate-plan.md)
+- [Full-Stack Review and Next-Phase Plan](./full-stack-review-2026-04-26.md)

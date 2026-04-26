@@ -2,7 +2,11 @@
 
 BookedAI is a Docker-based full-stack application for the `bookedai.au` domain, built around the product direction `BookedAI - The AI Revenue Engine for Service Businesses`, with self-hosted Supabase, n8n, and Hermes running on the same Docker host.
 
-Product requirement message: BookedAI connects every customer message — WhatsApp, SMS, Telegram, email and web chat — into one AI Revenue Engine that captures intent, books appointments, collects payment, follows up, and retains customers automatically.
+Product requirement message: BookedAI connects every customer message - WhatsApp, SMS, Telegram, email and web chat - into one AI Revenue Engine that captures intent, creates booking paths, supports payment and receivable follow-up, and records customer-care actions with operator-visible revenue evidence.
+
+Market-facing message: BookedAI turns missed service enquiries into booked revenue. It captures intent across chat, calls, email, web, and messaging apps, then helps book, follow up, track payment posture, and show operators what revenue was won or still needs action.
+
+Investor/judge message: BookedAI is an AI Revenue Engine for service businesses: an omnichannel agent layer that captures intent, creates booking references, tracks payment and follow-up posture, and records every revenue action in an auditable operating system.
 
 Customer-facing chat agent name: `BookedAI Manager Bot`.
 
@@ -130,11 +134,11 @@ Core production services defined in [`docker-compose.prod.yml`](/home/dovanlong/
 ## WhatsApp customer care
 
 - the customer-care policy is shared through `backend/service_layer/messaging_automation_service.py`, so WhatsApp and Telegram use the same booking reference resolution, 60-day conversation window, booking-intake reply, portal-grounded care answer, and request-safe cancellation/reschedule workflow trigger
-- `Evolution API personal WhatsApp QR session -> /api/webhooks/evolution` on the backend while WhatsApp Business verification is pending
-- `Twilio/Meta WhatsApp -> /api/webhooks/whatsapp` remains the business-provider path for later verified rollout
+- `Twilio/Meta WhatsApp -> /api/webhooks/whatsapp` is the business-provider path
+- `Evolution API personal WhatsApp QR session -> /api/webhooks/evolution` remains available as a compatibility/personal-bridge route, but it is not the current outbound default
 - the customer-facing runtime is the dedicated `BookedAI WhatsApp Booking Care Agent` for `bookedai.au`
 - the default BookedAI WhatsApp sender is `+61455301335`, with `info@bookedai.au` as the matching email support identity
-- personal WhatsApp through Evolution API is the intended primary outbound path for the near-term customer-care bot; Meta/WhatsApp Cloud API and Twilio remain provider paths for the later verified business rollout
+- current outbound posture is documented in `docs/development/whatsapp-provider-posture-decision-2026-04-26.md`: Twilio is the configured default, Evolution outbound fallback is disabled, Meta is blocked until account/number registration completes, and Twilio delivery remains queued/manual-review until credentials or sender posture are repaired
 - post-booking WhatsApp confirmation messages include the booking reference, portal link, and instruction to reply on WhatsApp for any service question about the existing booking, including status, payment, provider details, support, reschedule, or cancellation review
 - inbound messages are normalized, idempotency-checked, and stored as `whatsapp_inbound` events
 - when the communication service is configured, BookedAI resolves the booking by reference first, then by sender phone/email only when one safe booking is found
@@ -564,7 +568,7 @@ BookedAI currently uses a practical script-driven CI/CD model rather than a full
 
 Team summary:
 
-- validate locally and with `./scripts/run_release_gate.sh`
+- validate locally and with `./scripts/run_release_gate.sh`, which now includes Phase 23 security fixtures for confirmation email HTML escaping, provider URL allowlisting, private-channel identity policy, website chat, Telegram, and WhatsApp routes
 - rehearse on `beta.bookedai.au` with `bash scripts/deploy_beta.sh`
 - promote live from the Docker host with `bash scripts/deploy_live_host.sh`
 - verify health after deploy
@@ -667,12 +671,15 @@ EMAIL_IMAP_USERNAME=info@bookedai.au
 EMAIL_IMAP_PASSWORD=your-zoho-app-password
 EMAIL_IMAP_MAILBOX=INBOX
 EMAIL_IMAP_USE_SSL=true
-WHATSAPP_PROVIDER=evolution
+WHATSAPP_PROVIDER=twilio
 WHATSAPP_FALLBACK_PROVIDER=
 WHATSAPP_FROM_NUMBER=+61455301335
 WHATSAPP_EVOLUTION_API_URL=https://waba.bookedai.au
 WHATSAPP_EVOLUTION_API_KEY=your-evolution-api-key
 WHATSAPP_EVOLUTION_INSTANCE=bookedai
+WHATSAPP_EVOLUTION_WEBHOOK_SECRET=your-evolution-webhook-hmac-secret
+# Optional personal-bridge fallback only when explicitly approved:
+# WHATSAPP_FALLBACK_PROVIDER=evolution
 # Later, after WhatsApp Business verification:
 # WHATSAPP_PROVIDER=meta
 # WHATSAPP_FALLBACK_PROVIDER=twilio

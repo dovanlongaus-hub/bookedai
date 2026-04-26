@@ -477,9 +477,64 @@ Make commercial reporting and optimization safe to evolve.
 
 - changes to conversion, reporting, and recovery can ship with confidence
 
+## Phase 17 through Phase 23 — added 2026-04-26
+
+The full text of these phases is canonical in `docs/architecture/bookedai-master-roadmap-2026-04-26.md` and `docs/development/next-phase-implementation-plan-2026-04-25.md`. They are summarized here so this document remains a complete solution-architect view.
+
+### Phase 17 - Full-flow stabilization
+
+- objective: preserve the canonical journey `Ask -> Match -> Compare -> Book -> Confirm -> Portal -> Follow-up` across every customer-facing surface
+- in scope: portal `v1-*` continuity, mobile no-overflow at `390px`, accessible primary controls, compare-first result cards with explicit `Book` gate, progressive search loading
+- key deliverables: close `P0-1`, `P1-7`, `P1-8`, `P1-9` from the seven-lane review
+- exit criteria: portal UAT for fresh `v1-*` references is green; Playwright smoke at `390px` and desktop with no horizontal overflow
+
+### Phase 18 - Revenue-ops ledger control
+
+- objective: make post-booking revenue operations inspectable, dispatchable, tenant- and admin-safe
+- in scope: action-run filters, tenant-facing visibility, operator evidence drawers, policy metadata for auto-run vs approve-first
+- key deliverables: ledger queries inherit the tenant_id validator from Phase 22 once it ships; evidence drawers expose webhook idempotency state once `P0-4` lands
+- exit criteria: action queue tests cover dispatch, transition, idempotency, degraded provider states
+
+### Phase 19 - Customer-care and status agent
+
+- objective: one shared booking-care policy across WhatsApp, SMS, Telegram, email, and web chat under the `BookedAI Manager Bot` brand
+- in scope: `P0-2` provider posture decision, `P0-3` HMAC verification, `P0-4` inbound idempotency, `P0-5` `actor_context.tenant_id` validator, `P1-2` WhatsApp inline controls, `P1-3` test parity, `P1-10` channel-aware emails
+- key deliverables: full channel parity matrix; `location_posture` field added to chat response shape
+- exit criteria: replays do not re-trigger downstream side effects; ambiguous identity asks for booking reference instead of exposing data
+
+### Phase 20 - Widget and plugin runtime
+
+- objective: make the BookedAI customer-facing agent installable on SME-owned websites
+- in scope: tenant and origin scoped widget identity; embed-safe assistant shell; shared booking, payment, portal, revenue-ops handoff contracts
+- exit criteria: at least one tenant-branded widget completes search, booking, Thank You, and portal continuation
+
+### Phase 20.5 - Wallet and Stripe return continuity
+
+- objective: customer carries the booking outside the tab and the payment loop returns to a context-aware state
+- in scope: Apple Wallet `.pkpass`, Google Wallet pass, Stripe `success_url` → booking-aware return URL, portal auto-login self-test
+- exit criteria: Stripe-backed booking returns to the booking-aware URL; Wallet pass downloads from confirmation card on iOS Safari and Android Chrome
+
+### Phase 21 - Billing, receivables, and subscription truth
+
+- objective: connect customer payment state, tenant billing posture, commission, and subscription renewal into one auditable commercial layer
+- in scope: real subscription checkout and invoice linkage where supported; reminder and recovery actions; tenant billing summaries; admin reconciliation views; `Tenant Revenue Proof` dashboard; pricing/commission visibility in tenant workspace
+- exit criteria: payment and subscription states never overstate paid status; tenant and admin revenue summaries reconcile to the same source records
+
+### Phase 22 - Multi-tenant template generalization
+
+- objective: extract chess and Future Swim proof paths into reusable tenant templates
+- in scope: vertical template contracts; channel playbooks; reusable verified-tenant search-result contract; `P1-4` split `tenant_app_service.py`; `P1-5` move raw SQL out of `route_handlers.py`; `BaseRepository` tenant_id validator with chaos test; SMS adapter at `/api/webhooks/sms`
+- exit criteria: at least three vertical templates can reach booking and revenue-ops handoff
+
+### Phase 23 - Release governance and scale hardening
+
+- objective: make deployment, QA, observability, rollback, and documentation sync boring and repeatable
+- in scope: `P0-6` GitHub Actions CI gate; `P0-7` expanded `.env.production.example` with checksum guard; `P0-8` OpenClaw rootless posture; `P1-6` beta DB separation and image registry; bring up Prometheus, Grafana, AlertManager
+- exit criteria: release gate runs before production promotion and blocks regressions; failures identify the exact surface and lifecycle stage; docs updated in the same closeout
+
 ## 7. Sprint plan
 
-The recommended initial execution horizon is 16 sprints.
+The recommended initial execution horizon was 16 sprints; the program now extends to Sprint 22 with the `2026-04-26` cross-stack review overlay.
 
 ## Sprint 1 - Core plan reset
 
@@ -691,6 +746,82 @@ Focus:
 Outputs:
 
 - first scale-safe release baseline
+
+## Sprint 17 - Phase 17 full-flow stabilization
+
+Focus:
+
+- preserve canonical journey `Ask -> Match -> Compare -> Book -> Confirm -> Portal -> Follow-up`
+- portal-first Thank You that stays visible
+- portal auto-login for valid `v1-*` references
+- explicit `Book` gate before contact details
+
+Outputs:
+
+- stable baseline for the urgent execution lock
+
+## Sprint 18 - Phase 18 revenue-ops ledger control
+
+Focus:
+
+- action-run filters
+- tenant-facing visibility
+- operator evidence drawers
+- policy metadata for auto-run vs approve-first
+
+Outputs:
+
+- inspectable, dispatchable revenue-ops ledger
+
+## Sprint 19 - Stabilize and Sign (`2026-04-27 → 2026-05-03`)
+
+Focus:
+
+- close all eight P0 items from `docs/development/full-stack-review-2026-04-26.md`
+- ship `P1-7` accessibility and admin responsive
+
+Outputs:
+
+- portal `v1-*` UAT green; CI on main; OpenClaw rootless
+
+## Sprint 20 - First Real Revenue Loop (`2026-05-04 → 2026-05-10`)
+
+Focus:
+
+- one Future Swim revenue loop documented end-to-end
+- bring up Prometheus, Grafana, AlertManager
+- activate A/B `AC-1`, `RT-1`, `RT-3`, `CH-1`
+- publish v1 `Commercial and Compliance Checklist`
+
+Outputs:
+
+- first revenue-evidenced tenant trace; observability dashboards live
+
+## Sprint 21 - Refactor and Coverage (`2026-05-11 → 2026-05-17`)
+
+Focus:
+
+- close `P1-3`, `P1-4`, `P1-6`, `P1-8`, `P1-10`
+- add `location_posture` field unlocking `BC-1`
+- replace bare `except Exception` blocks with `IntegrationAppError`/`ValidationAppError`
+
+Outputs:
+
+- `tenant_app_service` shrunk; tagged image rollback under five minutes on staging
+
+## Sprint 22 - Multi-tenant and Multi-channel (`2026-05-18 → 2026-05-24`)
+
+Focus:
+
+- `BaseRepository` tenant_id validator with chaos test
+- SMS adapter at `/api/webhooks/sms`
+- `Tenant Revenue Proof` dashboard
+- pricing and commission visibility in tenant workspace
+- A/B wave 2 (`BC-2`, `CH-1`, `CH-3`)
+
+Outputs:
+
+- one new vertical reuses shared template path; SMS booking-care reachable; tenant revenue proof dashboard renders one tenant's real evidence
 
 ## 8. Team ownership model
 

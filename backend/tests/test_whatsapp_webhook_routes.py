@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+import hashlib
+import hmac
+import json
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -47,6 +50,7 @@ def create_test_app() -> FastAPI:
     app.state.session_factory = object()
     app.state.settings = SimpleNamespace(
         whatsapp_verify_token="verify-whatsapp-token",
+        whatsapp_evolution_webhook_secret="",
     )
     return app
 
@@ -227,6 +231,114 @@ class WhatsAppWebhookRoutesTestCase(TestCase):
                     "WaId": "61455301335",
                 },
             )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["messages_processed"], 0)
+        self.assertEqual(captured_calls, [])
+
+    def test_evolution_webhook_requires_valid_hmac_when_configured(self):
+        app = create_test_app()
+        app.state.settings.whatsapp_evolution_webhook_secret = "evolution-secret"
+        client = TestClient(app)
+        payload = {
+            "event": "messages.upsert",
+            "data": {
+                "key": {
+                    "fromMe": False,
+                    "remoteJid": "61455301335@s.whatsapp.net",
+                    "id": "EVT-1",
+                },
+                "message": {"conversation": "Hello"},
+                "pushName": "Long",
+            },
+        }
+
+        missing_response = client.post("/api/webhooks/evolution", json=payload)
+        wrong_response = client.post(
+            "/api/webhooks/evolution",
+            headers={"X-BookedAI-Signature": "sha256=bad"},
+            json=payload,
+        )
+
+        self.assertEqual(missing_response.status_code, 403)
+        self.assertEqual(wrong_response.status_code, 403)
+
+    def test_evolution_webhook_accepts_valid_hmac_signature(self):
+        captured_calls: list[dict[str, object]] = []
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        payload = {
+            "event": "messages.upsert",
+            "data": {
+                "key": {
+                    "fromMe": False,
+                    "remoteJid": "61455301335@s.whatsapp.net",
+                    "id": "EVT-1",
+                },
+                "message": {"conversation": "Need a booking"},
+                "messageType": "conversation",
+                "pushName": "Long",
+            },
+        }
+        body = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        signature = hmac.new(b"evolution-secret", body, hashlib.sha256).hexdigest()
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.settings.whatsapp_evolution_webhook_secret = "evolution-secret"
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/evolution",
+                headers={
+                    "Content-Type": "application/json",
+                    "X-BookedAI-Signature": f"sha256={signature}",
+                },
+                content=body,
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["messages_processed"], 1)
+        self.assertEqual(len(captured_calls), 1)
+        self.assertEqual(captured_calls[0]["metadata"]["provider"], "evolution")
+        self.assertEqual(captured_calls[0]["message"].sender_phone, "+61455301335")
+
+    def test_duplicate_evolution_event_is_ignored_by_idempotency_gate(self):
+        captured_calls: list[dict[str, object]] = []
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _register_whatsapp_webhook_event(*_args, **_kwargs):
+            return False, None, "tenant-test"
+
+        payload = {
+            "event": "messages.upsert",
+            "data": {
+                "key": {
+                    "fromMe": False,
+                    "remoteJid": "61455301335@s.whatsapp.net",
+                    "id": "EVT-1",
+                },
+                "message": {"conversation": "Need a booking"},
+                "messageType": "conversation",
+                "pushName": "Long",
+            },
+        }
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "api.route_handlers._register_whatsapp_webhook_event",
+            _register_whatsapp_webhook_event,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post("/api/webhooks/evolution", json=payload)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()["messages_processed"], 0)

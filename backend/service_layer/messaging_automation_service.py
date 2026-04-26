@@ -7,7 +7,7 @@ import re
 import unicodedata
 from datetime import UTC, datetime, timedelta
 from typing import Any
-from urllib.parse import urlencode
+from urllib.parse import urlencode, urlparse
 from uuid import uuid4
 
 from sqlalchemy import desc, func, or_, select
@@ -1137,7 +1137,7 @@ class MessagingAutomationService:
                 continue
             provider_name = str(item.get("provider_name") or "").strip()
             service_name = str(item.get("service_name") or "").strip()
-            source_url = str(item.get("source_url") or "").strip()
+            source_url = self._safe_http_url(item.get("source_url"))
             if not provider_name or not service_name or not source_url:
                 continue
             options.append(
@@ -1150,7 +1150,7 @@ class MessagingAutomationService:
                     "category": "",
                     "summary": str(item.get("summary") or "").strip(),
                     "location": str(item.get("location") or "").strip(),
-                    "booking_url": str(item.get("booking_url") or "").strip(),
+                    "booking_url": self._safe_http_url(item.get("booking_url")),
                     "source_url": source_url,
                     "price": "Check provider site for final pricing",
                     "duration_minutes": None,
@@ -1246,8 +1246,8 @@ class MessagingAutomationService:
                 "category": str(getattr(item, "category", "") or ""),
                 "summary": str(getattr(item, "summary", "") or ""),
                 "location": str(getattr(item, "location", "") or getattr(item, "venue_name", "") or ""),
-                "booking_url": str(getattr(item, "booking_url", "") or ""),
-                "source_url": str(getattr(item, "source_url", "") or ""),
+                "booking_url": self._safe_http_url(getattr(item, "booking_url", "")),
+                "source_url": self._safe_http_url(getattr(item, "source_url", "")),
                 "price": price,
                 "duration_minutes": getattr(item, "duration_minutes", None),
                 "tenant_id": str(getattr(item, "tenant_id", "") or ""),
@@ -1345,8 +1345,8 @@ class MessagingAutomationService:
                     "category": str(option.get("category") or ""),
                     "summary": str(option.get("summary") or ""),
                     "location": str(option.get("location") or ""),
-                    "booking_url": str(option.get("booking_url") or ""),
-                    "source_url": str(option.get("source_url") or ""),
+                    "booking_url": MessagingAutomationService._safe_http_url(option.get("booking_url")),
+                    "source_url": MessagingAutomationService._safe_http_url(option.get("source_url")),
                     "display_price": str(option.get("price") or ""),
                     "duration_minutes": option.get("duration_minutes"),
                     "tags": [str(option.get("source_type") or "service_catalog")],
@@ -1383,12 +1383,20 @@ class MessagingAutomationService:
         return build_qr_code_url(MessagingAutomationService._portal_booking_url(booking_reference))
 
     @staticmethod
+    def _safe_http_url(value: object) -> str:
+        candidate = str(value or "").strip()
+        parsed = urlparse(candidate)
+        if parsed.scheme in {"http", "https"} and parsed.netloc:
+            return candidate
+        return ""
+
+    @staticmethod
     def _service_option_url(query: str, option: dict[str, object]) -> str:
-        booking_url = str(option.get("booking_url") or "").strip()
-        source_url = str(option.get("source_url") or "").strip()
-        if booking_url.startswith(("https://", "http://")):
+        booking_url = MessagingAutomationService._safe_http_url(option.get("booking_url"))
+        source_url = MessagingAutomationService._safe_http_url(option.get("source_url"))
+        if booking_url:
             return booking_url
-        if source_url.startswith(("https://", "http://")):
+        if source_url:
             return source_url
         selected_service_id = str(option.get("service_id") or option.get("candidate_id") or "").strip()
         return MessagingAutomationService._bookedai_web_assistant_url(

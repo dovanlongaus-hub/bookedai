@@ -776,6 +776,41 @@ def _customer_telegram_webhook_secret(settings_obj: object) -> str:
     )
 
 
+def _normalize_sha256_signature_header(value: str) -> str:
+    normalized = str(value or "").strip()
+    if normalized.lower().startswith("sha256="):
+        normalized = normalized.split("=", 1)[1].strip()
+    return normalized.lower()
+
+
+def _verify_hmac_sha256_signature(*, body: bytes, secret: str, received_signature: str) -> bool:
+    normalized_secret = str(secret or "").strip()
+    normalized_received = _normalize_sha256_signature_header(received_signature)
+    if not normalized_secret or not normalized_received:
+        return False
+    expected = hmac.new(normalized_secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(normalized_received, expected)
+
+
+async def _verify_evolution_webhook_signature(request: Request) -> None:
+    expected_secret = str(
+        getattr(request.app.state.settings, "whatsapp_evolution_webhook_secret", "") or ""
+    ).strip()
+    if not expected_secret:
+        return
+    received_signature = (
+        request.headers.get("x-bookedai-signature")
+        or request.headers.get("x-hub-signature-256")
+        or ""
+    )
+    if not _verify_hmac_sha256_signature(
+        body=await request.body(),
+        secret=expected_secret,
+        received_signature=received_signature,
+    ):
+        raise HTTPException(status_code=403, detail="Evolution webhook signature mismatch")
+
+
 def _iter_meta_whatsapp_payload(
     payload: dict[str, object],
 ) -> list[tuple[TawkMessage, dict[str, object]]]:
@@ -861,6 +896,27 @@ async def _register_whatsapp_webhook_event(
     external_event_id: str | None,
     payload: dict[str, object],
 ) -> tuple[bool, int | None, str | None]:
+    return await _register_inbound_webhook_event(
+        session,
+        channel="whatsapp",
+        provider=provider,
+        external_event_id=external_event_id,
+        payload=payload,
+        route="/api/webhooks/whatsapp",
+    )
+
+
+async def _register_inbound_webhook_event(
+    session,
+    *,
+    channel: str,
+    provider: str,
+    external_event_id: str | None,
+    payload: dict[str, object],
+    route: str,
+) -> tuple[bool, int | None, str | None]:
+    normalized_channel = channel.strip() or "webhook"
+    normalized_provider = provider.strip() or "unknown"
     try:
         tenant_repository = TenantRepository(RepositoryContext(session=session))
         tenant_id = await tenant_repository.get_default_tenant_id()
@@ -874,7 +930,7 @@ async def _register_whatsapp_webhook_event(
         if external_event_id:
             reservation = await idempotency_repository.reserve_key(
                 tenant_id=tenant_id,
-                scope=f"whatsapp_inbound:{provider}",
+                scope=f"{normalized_channel}_inbound:{normalized_provider}",
                 idempotency_key=external_event_id,
                 response_json={"status": "received"},
             )
@@ -883,21 +939,21 @@ async def _register_whatsapp_webhook_event(
 
         event_id = await webhook_repository.record_event(
             tenant_id=tenant_id,
-            provider=f"whatsapp_{provider}",
+            provider=f"{normalized_channel}_{normalized_provider}",
             external_event_id=external_event_id,
             payload=payload,
         )
         return True, event_id, tenant_id
     except Exception as exc:
         logger.warning(
-            "whatsapp_webhook_foundation_record_failed",
+            "inbound_webhook_foundation_record_failed",
             extra={
-                "event_type": "whatsapp_webhook_foundation_record_failed",
+                "event_type": "inbound_webhook_foundation_record_failed",
                 "tenant_id": None,
                 "status": 0,
-                "route": "/api/webhooks/whatsapp",
+                "route": route,
                 "request_id": "",
-                "integration_name": "whatsapp",
+                "integration_name": normalized_channel,
                 "conversation_id": "",
                 "booking_reference": "",
                 "job_name": "",
@@ -917,6 +973,31 @@ async def _complete_whatsapp_webhook_event(
     external_event_id: str | None,
     response_payload: dict[str, object],
 ) -> None:
+    await _complete_inbound_webhook_event(
+        session,
+        event_id=event_id,
+        tenant_id=tenant_id,
+        channel="whatsapp",
+        provider=provider,
+        external_event_id=external_event_id,
+        response_payload=response_payload,
+        route="/api/webhooks/whatsapp",
+    )
+
+
+async def _complete_inbound_webhook_event(
+    session,
+    *,
+    event_id: int | None,
+    tenant_id: str | None,
+    channel: str,
+    provider: str,
+    external_event_id: str | None,
+    response_payload: dict[str, object],
+    route: str,
+) -> None:
+    normalized_channel = channel.strip() or "webhook"
+    normalized_provider = provider.strip() or "unknown"
     try:
         if event_id is not None:
             webhook_repository = WebhookEventRepository(
@@ -929,20 +1010,20 @@ async def _complete_whatsapp_webhook_event(
                 RepositoryContext(session=session, tenant_id=tenant_id)
             )
             await idempotency_repository.record_response(
-                scope=f"whatsapp_inbound:{provider}",
+                scope=f"{normalized_channel}_inbound:{normalized_provider}",
                 idempotency_key=external_event_id,
                 response_json=response_payload,
             )
     except Exception as exc:
         logger.warning(
-            "whatsapp_webhook_foundation_complete_failed",
+            "inbound_webhook_foundation_complete_failed",
             extra={
-                "event_type": "whatsapp_webhook_foundation_complete_failed",
+                "event_type": "inbound_webhook_foundation_complete_failed",
                 "tenant_id": tenant_id,
                 "status": 0,
-                "route": "/api/webhooks/whatsapp",
+                "route": route,
                 "request_id": "",
-                "integration_name": "whatsapp",
+                "integration_name": normalized_channel,
                 "conversation_id": "",
                 "booking_reference": "",
                 "job_name": "",
@@ -2557,12 +2638,32 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
         return {"status": "ignored", "messages_processed": 0}
 
     message, metadata = normalized
+    external_event_id = str(
+        payload.get("update_id")
+        or metadata.get("telegram_callback_query_id")
+        or (
+            f"{metadata.get('telegram_chat_id')}:{metadata.get('provider_message_id')}"
+            if metadata.get("telegram_chat_id") and metadata.get("provider_message_id")
+            else ""
+        )
+    ).strip() or None
     ai_reply: str | None = None
     care_metadata: dict[str, object] = {}
     delivery_metadata: dict[str, object] | None = None
     callback_ack_metadata: dict[str, object] | None = None
 
     async with get_session(request.app.state.session_factory) as session:
+        should_process, webhook_event_id, tenant_id = await _register_inbound_webhook_event(
+            session,
+            channel="telegram",
+            provider=str(metadata.get("provider") or "telegram_bot"),
+            external_event_id=external_event_id,
+            payload=_json_safe_value({**metadata, "telegram_update_id": payload.get("update_id")}),
+            route="/api/webhooks/bookedai-telegram",
+        )
+        if not should_process:
+            return {"status": "processed", "messages_processed": 0}
+
         try:
             callback_ack_metadata = await _answer_telegram_callback_query(
                 request,
@@ -2632,12 +2733,28 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                     }
                 ),
             )
+            await _complete_inbound_webhook_event(
+                session,
+                event_id=webhook_event_id,
+                tenant_id=tenant_id,
+                channel="telegram",
+                provider=str(metadata.get("provider") or "telegram_bot"),
+                external_event_id=external_event_id,
+                response_payload=_json_safe_value({
+                    "status": "processed",
+                    "message_id": message.message_id,
+                    "customer_care_status": care_metadata.get("customer_care_status"),
+                    "reply_delivery": delivery_metadata,
+                    "callback_ack": callback_ack_metadata,
+                }),
+                route="/api/webhooks/bookedai-telegram",
+            )
         except Exception as exc:
             logger.warning(
                 "telegram_webhook_processing_failed",
                 extra={
                     "event_type": "telegram_webhook_processing_failed",
-                    "tenant_id": None,
+                    "tenant_id": tenant_id,
                     "status": 0,
                     "route": "/api/webhooks/bookedai-telegram",
                     "request_id": "",
@@ -2655,6 +2772,8 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
 
 @api.post("/webhooks/evolution")
 async def evolution_webhook(request: Request) -> dict[str, object]:
+    await _verify_evolution_webhook_signature(request)
+
     try:
         payload = await request.json()
     except Exception:
@@ -2719,6 +2838,15 @@ async def evolution_webhook(request: Request) -> dict[str, object]:
     delivery_metadata: dict[str, object] | None = None
 
     async with get_session(request.app.state.session_factory) as session:
+        should_process, webhook_event_id, tenant_id = await _register_whatsapp_webhook_event(
+            session,
+            provider="evolution",
+            external_event_id=provider_message_id,
+            payload=metadata,
+        )
+        if not should_process:
+            return {"status": "processed", "messages_processed": 0}
+
         try:
             if hasattr(request.app.state, "communication_service"):
                 automation_result = await MessagingAutomationService(
@@ -2747,12 +2875,25 @@ async def evolution_webhook(request: Request) -> dict[str, object]:
                 workflow_status="answered" if ai_reply else "received",
                 metadata=_json_safe_value({**metadata, **care_metadata, "reply_delivery": delivery_metadata}),
             )
+            await _complete_whatsapp_webhook_event(
+                session,
+                event_id=webhook_event_id,
+                tenant_id=tenant_id,
+                provider="evolution",
+                external_event_id=provider_message_id,
+                response_payload=_json_safe_value({
+                    "status": "processed",
+                    "message_id": message.message_id,
+                    "customer_care_status": care_metadata.get("customer_care_status"),
+                    "reply_delivery": delivery_metadata,
+                }),
+            )
         except Exception as exc:
             logger.warning(
                 "evolution_webhook_processing_failed",
                 extra={
                     "event_type": "evolution_webhook_processing_failed",
-                    "tenant_id": None,
+                    "tenant_id": tenant_id,
                     "status": 0,
                     "route": "/api/webhooks/evolution",
                     "request_id": "",

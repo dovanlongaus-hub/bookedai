@@ -139,6 +139,7 @@ class Settings:
     whatsapp_evolution_api_url: str = ""
     whatsapp_evolution_api_key: str = ""
     whatsapp_evolution_instance: str = "bookedai"
+    whatsapp_evolution_webhook_secret: str = ""
     whatsapp_fallback_provider: str = ""
     bookedai_customer_telegram_bot_token: str = ""
     bookedai_customer_telegram_webhook_secret_token: str = ""
@@ -397,6 +398,7 @@ def get_settings() -> Settings:
         whatsapp_evolution_api_url=os.getenv("WHATSAPP_EVOLUTION_API_URL", ""),
         whatsapp_evolution_api_key=os.getenv("WHATSAPP_EVOLUTION_API_KEY", ""),
         whatsapp_evolution_instance=os.getenv("WHATSAPP_EVOLUTION_INSTANCE", "bookedai"),
+        whatsapp_evolution_webhook_secret=os.getenv("WHATSAPP_EVOLUTION_WEBHOOK_SECRET", ""),
         whatsapp_fallback_provider=os.getenv("WHATSAPP_FALLBACK_PROVIDER", ""),
         admin_username=os.getenv("ADMIN_USERNAME", "admin"),
         admin_password=os.getenv(

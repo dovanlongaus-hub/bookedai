@@ -14,7 +14,10 @@ The immediate design priority is to make BookedAI feel like one coherent AI Reve
 
 BookedAI's product surfaces should now express one connected revenue engine, not a set of disconnected channel bots.
 
-- primary product message: `BookedAI connects every customer message — WhatsApp, SMS, Telegram, email and web chat — into one AI Revenue Engine that captures intent, books appointments, collects payment, follows up, and retains customers automatically.`
+- primary product message: `BookedAI connects every customer message - WhatsApp, SMS, Telegram, email and web chat - into one AI Revenue Engine that captures intent, creates booking paths, supports payment and receivable follow-up, and records customer-care actions with operator-visible revenue evidence.`
+- SME-facing hero message: `Never lose a service enquiry to slow replies again. BookedAI turns chats, calls, emails, and website visits into confirmed booking paths, payment follow-up, and customer care.`
+- investor/judge message: `BookedAI is an AI Revenue Engine for service businesses: an omnichannel agent layer that captures intent, creates booking references, tracks payment and follow-up posture, and records every revenue action in an auditable operating system.`
+- pitch and design surfaces should make the financial model visible without sounding like a spreadsheet: setup fee, SaaS subscription, performance-aligned commission/revenue share where appropriate, and proof through booking references, payment posture, portal reopen, tenant Ops, and audit/action evidence
 - customer-facing copy should make the channel continuity tangible: web chat, WhatsApp, SMS, Telegram, and email all continue the same booking/payment/support story
 - customer-facing chat agent name is `BookedAI Manager Bot`; use it consistently across Telegram, WhatsApp, SMS, email, and web chat
 - default BookedAI customer booking support/contact copy should use `info@bookedai.au` and `+61455301335`, framed as available on Telegram, WhatsApp, or iMessage

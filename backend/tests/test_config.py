@@ -38,3 +38,11 @@ def test_customer_telegram_env_is_separate_from_operator_telegram(monkeypatch):
 
     assert settings.bookedai_customer_telegram_bot_token == "customer-token"
     assert settings.bookedai_customer_telegram_webhook_secret_token == "customer-secret"
+
+
+def test_evolution_webhook_secret_env_is_loaded(monkeypatch):
+    monkeypatch.setenv("WHATSAPP_EVOLUTION_WEBHOOK_SECRET", "evolution-webhook-secret")
+
+    settings = get_settings()
+
+    assert settings.whatsapp_evolution_webhook_secret == "evolution-webhook-secret"

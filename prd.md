@@ -56,6 +56,8 @@ It inherits authority from `project.md` and merges the active product requiremen
 
 If a downstream document conflicts with this PRD, follow `project.md` first, then this file, then the specialized document after it is synchronized.
 
+For the end-to-end execution plan covering Phase 0 through Phase 23 plus the post-Sprint-22 horizon, refer to `docs/architecture/bookedai-master-roadmap-2026-04-26.md`. The seven-lane review captured in `docs/development/full-stack-review-2026-04-26.md` is the canonical input for `Sprint 19 - 22`.
+
 ## 2. Product definition
 
 ### Product name
@@ -70,7 +72,15 @@ BookedAI
 
 ### Core positioning
 
-BookedAI helps service SMEs capture demand across web, search, chat, forms, calls, email, and follow-up moments, then convert that demand into bookings, payments, and measurable revenue.
+BookedAI turns missed service enquiries into booked revenue for service SMEs. It captures intent across web, search, chat, forms, calls, email, and messaging moments, then creates booking references, payment/follow-up posture, customer-care continuity, and measurable revenue evidence.
+
+For investor and judging contexts, BookedAI should be framed as an AI Revenue Engine rather than a booking widget: an omnichannel agent layer that captures intent, creates booking references, tracks payment and follow-up posture, and records every revenue action in an auditable operating system.
+
+The financial thesis is:
+
+- existing SME demand leaks through slow replies, fragmented channels, abandoned bookings, unpaid follow-up, and unclear ownership
+- BookedAI converts that leakage into traceable booking references, portal continuity, customer-care actions, tenant notifications, and revenue evidence
+- monetization can combine setup fee, SaaS subscription, and performance-aligned commission or revenue share on booked revenue where appropriate
 
 BookedAI should be built as a coordinated AI agent system with:
 
@@ -812,9 +822,10 @@ When requirement-side meaning changes:
 
 1. update `project.md` first if project scope or direction changed
 2. update this `prd.md`
-3. update the specialized requirement document
-4. update `docs/development/implementation-progress.md`
-5. update the matching roadmap or sprint artifact
+3. update `docs/architecture/bookedai-master-roadmap-2026-04-26.md` if the change affects phase scope, sprint sequencing, or the seven-lane review backlog
+4. update the specialized requirement document
+5. update `docs/development/implementation-progress.md`
+6. update the matching roadmap or sprint artifact
 
 ## 22. Summary statement
 

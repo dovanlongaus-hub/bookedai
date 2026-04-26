@@ -7,6 +7,9 @@ FRONTEND_DIR="$ROOT_DIR/frontend"
 BACKEND_PYTHON="$ROOT_DIR/.venv-backend/bin/python"
 RUN_SEARCH_REPLAY_GATE="${RUN_SEARCH_REPLAY_GATE:-false}"
 
+echo "[release-gate] production env example checksum"
+"$ROOT_DIR/scripts/verify_env_production_example_checksum.sh"
+
 echo "[release-gate] frontend build + smoke"
 (
   cd "$FRONTEND_DIR"
@@ -21,7 +24,13 @@ if [[ ! -x "$BACKEND_PYTHON" ]]; then
 fi
 
 echo "[release-gate] backend contract + lifecycle tests"
-"$BACKEND_PYTHON" -m unittest backend.tests.test_api_v1_routes backend.tests.test_lifecycle_ops_service
+"$BACKEND_PYTHON" -m unittest \
+  backend.tests.test_api_v1_routes \
+  backend.tests.test_lifecycle_ops_service \
+  backend.tests.test_release_gate_security \
+  backend.tests.test_chat_send_routes \
+  backend.tests.test_telegram_webhook_routes \
+  backend.tests.test_whatsapp_webhook_routes
 
 echo "[release-gate] backend search eval pack"
 "$BACKEND_PYTHON" "$ROOT_DIR/scripts/run_search_eval_pack.py"

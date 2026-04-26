@@ -43,15 +43,29 @@ BookedAI - The AI Revenue Engine for Service Businesses
 
 ### Core one-liner
 
-Capture demand from search, website, calls, email, and follow-up - then convert it into bookings and revenue automatically.
+Turn missed service enquiries into booked revenue across chat, calls, email, web, and messaging apps.
 
 ### Short pitch
 
-BookedAI helps service businesses answer faster, recover missed opportunities, and convert search traffic, calls, chats, emails, and website visitors into real bookings automatically.
+BookedAI helps service businesses stop losing enquiries to slow replies. It captures intent across customer channels, creates a clear booking path, follows up on payment and support, and shows operators what revenue was won or still needs action.
 
 ### Positioning statement
 
-BookedAI is a multi-channel AI revenue engine for appointment-based and enquiry-driven service businesses. It captures inbound demand, responds instantly, qualifies leads, books appointments, follows up automatically, connects to calendar, CRM, and payment systems, and helps operators see what revenue was generated, what was missed, and what can still be recovered.
+BookedAI is a multi-channel AI revenue engine for appointment-based and enquiry-driven service businesses. It captures inbound demand, responds while intent is high, qualifies leads, creates booking references, follows up on payment and support posture, connects to calendar, CRM, and communication systems, and helps operators see what revenue was won, what is at risk, and what can still be recovered.
+
+### Investor and judging narrative
+
+For investors, judges, and big-tech/startup audiences, BookedAI should be framed as more than a booking widget:
+
+`BookedAI is an AI Revenue Engine for service businesses: an omnichannel agent layer that captures intent, creates booking references, tracks payment and follow-up posture, and records every revenue action in an auditable operating system.`
+
+The financial story should be explicit:
+
+- the wedge is existing SME demand leaking through slow response, fragmented channels, abandoned bookings, unpaid follow-up, and unclear ownership
+- the product converts those leaks into traceable booking references, portal continuity, customer-care actions, tenant notifications, and revenue evidence
+- the moat is the connected operating layer: tenant-aware search, channel identity policy, auditable action ledger, CRM/email/payment side effects, reusable vertical templates, and release-gated evidence
+- the business model is setup fee plus SaaS subscription plus performance-aligned commission or revenue share on booked revenue where appropriate
+- the judge-facing proof should show live verticals, financial posture, operator dashboards, messaging continuity, and release-gate discipline rather than broad AI claims
 
 ### Current public experience baseline
 
@@ -157,6 +171,96 @@ Never miss a paying customer again.
 ### Commercial promise
 
 More bookings. Less admin. Clearer revenue visibility.
+
+## 4A. Messaging, content, and launch planning baseline
+
+This PRD now treats wording, content order, and launch planning as product requirements because BookedAI is sold through trust in the live booking journey.
+
+### Plain-English message
+
+Use this line when a document needs the shortest customer-facing explanation:
+
+`BookedAI turns missed service enquiries into booked revenue. It captures intent across chat, calls, email, web, and messaging apps, then helps book, follow up, track payment posture, and show operators what revenue was won or still needs action.`
+
+Use this shorter SME-facing hero when the first line needs more urgency:
+
+`Never lose a service enquiry to slow replies again. BookedAI turns chats, calls, emails, and website visits into confirmed booking paths, payment follow-up, and customer care.`
+
+Use `AI Revenue Engine` as the category label, but always pair it with concrete outcomes: faster response, booking reference, payment posture, portal revisit, customer-care follow-up, and operator visibility.
+
+### Wording rules
+
+- Lead with the biggest customer benefit before naming internal systems.
+- Prefer specific outcomes over broad claims: `booking reference created`, `portal reopened`, `manual-review state visible`, `tenant notified`.
+- Avoid unsupported superlatives such as `best`, `revolutionary`, or `fully automated`.
+- Do not claim instant cancellation, reschedule, payment, CRM, or provider changes unless the backend has completed that action; otherwise use `queued`, `manual review`, `request received`, or `support follow-up`.
+- Keep public and customer-channel copy short, active, and free of implementation labels such as `actor_context`, `booking_reference`, `runtime`, or `webhook`.
+- Keep investor/operator docs allowed to mention architecture, but only after the customer journey has been stated.
+
+### Recommended planning layout
+
+Future requirement and execution docs should use this order:
+
+1. customer problem and target segment
+2. product promise and measurable business outcome
+3. shipped baseline and proof already in repo
+4. next journey or workflow to improve
+5. phase/sprint owner
+6. acceptance gates and experiment metrics
+7. launch, lifecycle email, support, and documentation closeout
+
+### Working-backwards release story
+
+For each major phase, write the desired external story before implementation starts:
+
+- `Phase 19`: BookedAI Manager Bot can answer, search, and continue a booking across Telegram, WhatsApp, web chat, and portal without exposing the wrong customer's data.
+- `Phase 20`: a tenant can install the BookedAI customer agent on their own site and still keep booking, payment, and portal truth inside BookedAI.
+- `Phase 21`: owners can see whether bookings, payments, reminders, and receivables are actually moving revenue.
+- `Phase 22`: a new vertical can inherit a proven search, booking, care, retention, and launch template instead of rebuilding from scratch.
+- `Phase 23`: no capture-to-retention release promotes without proof across UI, API, channel identity, security, docs, and operator visibility.
+
+### Content-market fit
+
+BookedAI content should solve operator pain rather than describe AI in general. Priority topics:
+
+- missed enquiries and slow replies
+- search traffic that does not become booked revenue
+- booking confirmation and portal follow-up
+- payment/reminder/recovery posture
+- tenant notification and operational ownership
+- customer-care requests that need auditability
+
+Every public content asset should end with one clear action: start a search, register interest, reopen a booking, contact BookedAI Manager Bot, or inspect the architecture/roadmap.
+
+### Email and owned-audience planning
+
+Email is the owned customer channel for BookedAI lifecycle proof. The first documented segments are:
+
+- new SME/operator leads
+- tenant admins
+- booking customers
+- warm register-interest leads
+- at-risk or incomplete bookings
+- operator/support stakeholders
+
+Initial lifecycle campaigns should be planned around welcome/onboarding, booking confirmation, portal revisit, payment/help posture, abandoned booking recovery, and weekly tenant revenue proof. Mailchimp-style automation may be added later after the segment, trigger, subject, preview, CTA, and attribution fields are documented.
+
+### Experiment requirements
+
+Content and wording changes should carry a behavioral hypothesis:
+
+`At least X% of Y will do Z within T after seeing the change.`
+
+Minimum fields:
+
+- target audience
+- page/channel
+- variant or wording change
+- primary behavior metric
+- success threshold
+- hold condition
+
+Current default metrics are search start, result/detail open, booking start, booking reference created, portal reopen, register-interest submit, tenant panel open, and customer-care resolution/escalation.
 
 ## 5. Core business problem
 

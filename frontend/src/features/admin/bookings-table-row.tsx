@@ -19,20 +19,20 @@ export function AdminBookingTableRow({
     <button
       type="button"
       onClick={() => onSelectBooking(booking.booking_reference)}
-      className={`booked-admin-bookings-table w-full gap-3 border-t border-slate-200 px-4 py-4 text-left text-sm transition hover:bg-slate-50 ${
+      className={`booked-admin-bookings-table booked-admin-booking-row w-full gap-3 border-t border-slate-200 px-4 py-4 text-left text-sm transition hover:bg-slate-50 ${
         enhancedViewEnabled && isSelected ? 'bg-sky-50/70' : ''
       }`}
     >
-      <div>
+      <div data-label="Reference">
         <div className="break-words font-semibold text-slate-950">{booking.booking_reference}</div>
         <div className="mt-1 text-xs text-slate-500">{formatDateTime(booking.created_at)}</div>
       </div>
-      <div>
+      <div data-label="Industry">
         <span className="inline-flex rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-700">
           {booking.industry || 'General'}
         </span>
       </div>
-      <div>
+      <div data-label="Customer">
         <div className="break-words font-semibold text-slate-950">
           {booking.customer_name || 'Unknown customer'}
         </div>
@@ -40,7 +40,7 @@ export function AdminBookingTableRow({
           {booking.customer_email || 'No email'}
         </div>
       </div>
-      <div>
+      <div data-label="Service">
         <div className="break-words font-semibold text-slate-950">
           {booking.service_name || 'Unknown service'}
         </div>
@@ -48,8 +48,8 @@ export function AdminBookingTableRow({
           {[booking.requested_date, booking.requested_time].filter(Boolean).join(' ')}
         </div>
       </div>
-      <div className="font-semibold text-slate-950">{formatCurrency(booking.amount_aud)}</div>
-      <div>
+      <div data-label="Amount" className="font-semibold text-slate-950">{formatCurrency(booking.amount_aud)}</div>
+      <div data-label="Payment">
         <span
           className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${statusTone(booking.payment_status)}`}
         >

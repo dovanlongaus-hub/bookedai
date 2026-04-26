@@ -1,3 +1,16 @@
+# Phase 23 release-gate security fixtures added
+
+- Timestamp: 2026-04-26T14:08:25.306425+00:00
+- Source: docs/development/source-code-review-and-security-hardening-2026-04-26.md
+- Category: security
+- Status: completed
+
+## Summary
+
+Added Phase 23 release-gate security coverage: provider URLs in Messaging Automation are allowlisted to http/https, unsafe provider links are omitted or fall back to BookedAI handoff URLs, and the root release gate now runs dedicated security, chat-send, Telegram, and WhatsApp fixtures. Full release gate passed.
+
+## Details
+
 # Source Code Review And Security Hardening - 2026-04-26
 
 ## Scope

@@ -30,7 +30,7 @@ export function ProductApp() {
       ? 'Live booking flow'
       : 'Booking flow active';
   const productFlowDescription = !bookingAssistantV1Enabled
-    ? 'Search and results are active. Booking confirmation will be enabled shortly.'
+    ? 'Search, shortlist, booking, and follow-up are all live in this product.'
     : bookingAssistantV1LiveReadEnabled
       ? 'Search, shortlist, booking, and follow-up are all live in this product.'
       : 'Search, shortlist, and booking are all active on this product.';

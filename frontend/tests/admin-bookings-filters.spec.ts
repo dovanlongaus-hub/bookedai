@@ -317,4 +317,37 @@ test.describe('admin bookings filters', () => {
       'https://checkout.stripe.com/pay/cs_test_filtered',
     );
   });
+
+  test('admin bookings render as contained responsive cards on narrow operator screens @admin', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 640, height: 900 });
+    await stubAdminDashboard(page);
+
+    await page.goto('/admin');
+
+    const bookingsSection = page.locator('#bookings');
+    await expect(bookingsSection.getByRole('button', { name: /BR-ADMIN-1/i })).toBeVisible();
+
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+    expect(overflow).toBeLessThanOrEqual(1);
+    await expect(bookingsSection.locator('.booked-admin-bookings-header')).toBeHidden();
+
+    const firstBooking = bookingsSection.locator('.booked-admin-booking-row').first();
+    await expect(firstBooking).toBeVisible();
+    await expect(firstBooking.locator('[data-label="Reference"]')).toContainText('BR-ADMIN-1');
+    await expect(firstBooking.locator('[data-label="Payment"]')).toContainText('pending');
+    await expect
+      .poll(async () =>
+        firstBooking.evaluate((node) => {
+          const styles = window.getComputedStyle(node);
+          const rect = node.getBoundingClientRect();
+          return {
+            columns: styles.gridTemplateColumns.split(' ').length,
+            fitsViewport: rect.left >= 0 && rect.right <= window.innerWidth + 1,
+          };
+        }),
+      )
+      .toEqual({ columns: 1, fitsViewport: true });
+  });
 });

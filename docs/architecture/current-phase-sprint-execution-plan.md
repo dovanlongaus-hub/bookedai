@@ -29,12 +29,34 @@ This execution baseline now also assumes a dual-agent product direction:
 - a customer-facing `search and conversation agent`
 - a BookedAI-side `revenue operations agent` that continues from lead through retention, billing, reminders, CRM sync, and action orchestration
 
+## Content, Wording, And Layout Execution Overlay
+
+All active Phase/Sprint `17-23` work should now inherit this content-planning overlay:
+
+- open docs and user-facing plans with the customer problem, not the implementation module
+- use the SME message `Never lose a service enquiry to slow replies again` for public/buyer first-view copy
+- use the investor/judge message `an omnichannel agent layer that captures intent, creates booking references, tracks payment and follow-up posture, and records every revenue action in an auditable operating system` when explaining the big-tech/startup ambition
+- use the plain-English message `turn missed service enquiries into booked revenue` before using `AI Revenue Engine`
+- keep the layout order consistent: problem, promise, shipped proof, next workflow, owner phase/sprint, acceptance gate, launch/email/support follow-up
+- turn every content change into a measurable hypothesis with audience, metric, threshold, and hold condition
+- use proof verticals as launch assets only after soft-launch UAT has evidence; external hard-launch copy should reuse live screenshots, references, portal proof, and channel-care proof
+- keep lifecycle email planning attached to booking truth: confirmation, portal revisit, abandoned booking recovery, tenant revenue proof, and support escalation
+- use customer-safe wording for degraded providers: `queued`, `manual review`, `request received`, or `support follow-up`, not fake completion
+- keep financial clarity explicit for judges and investors: setup fee, SaaS subscription, performance-aligned commission/revenue share where appropriate, and proof through booking references, payment posture, tenant Ops, portal reopen, and audit/action evidence
+
+The current priority content hypotheses are:
+
+- at least `12%` of homepage visitors who start a search open a result detail or select a result in the same session
+- at least `25%` of customers who receive a booking reference reopen the portal within `7 days`
+- at least `40%` of tenant admins seeing the `revenue_ops` variant open an operational panel before leaving
+- at least `15%` of warm proof-vertical email recipients click through to a live booking or register-interest path
+
 Latest next-phase update from `2026-04-25`:
 
 - `2026-04-26` architecture/execution lock: BookedAI is now documented as one end-to-end AI Revenue Engine with customer acquisition surfaces, customer action channels, tenant surfaces, operator surfaces, FastAPI/backend contracts, revenue core, Messaging Automation Layer, data/integration rails, and governance/release gates. The active urgent execution order is UI/UX stabilization first, the standard booking flow second, and Messaging Automation Layer consolidation third.
 - The standard booking flow is now the sprint-level journey to preserve across all channels: `Ask -> Match -> Compare -> Book -> Confirm -> Portal -> Follow-up`. No surface should skip explicit booking intent, hide the durable booking reference, bypass the QR/portal handoff, or pretend that request-safe lifecycle actions completed instantly.
 - The active sprint map is now read as Sprint `17-23`: Sprint `17` stabilizes UI/UX and booking confirmation, Sprint `18` makes revenue-ops actions inspectable, Sprint `19` unifies customer-care messaging, Sprint `20` ships widget/plugin runtime, Sprint `20.5` adds wallet and Stripe return continuity, Sprint `21` closes billing/receivable truth, Sprint `22` extracts reusable tenant templates, and Sprint `23` enforces release governance and scale hardening.
-- Product requirement message added on `2026-04-26`: `BookedAI connects every customer message — WhatsApp, SMS, Telegram, email and web chat — into one AI Revenue Engine that captures intent, books appointments, collects payment, follows up, and retains customers automatically.`
+- Product requirement message added on `2026-04-26`: `BookedAI connects every customer message - WhatsApp, SMS, Telegram, email and web chat - into one AI Revenue Engine that captures intent, creates booking paths, supports payment and receivable follow-up, and records customer-care actions with operator-visible revenue evidence.`
 - The current Phase/Sprint plan now treats this as the cross-phase execution thread: Phase 19 normalizes omnichannel message intake and care policy, Phase 20 distributes web chat/widget entry, Phase 21 closes payment/receivable continuity, Phase 22 packages reusable retention templates, and Phase 23 release-gates the whole capture-to-retention loop.
 - BookedAI-managed customer booking support/contact defaults are now `info@bookedai.au` and `+61455301335` for Telegram, WhatsApp, or iMessage; this is the fallback for customer-booking channels even when provider catalog rows include separate contact details.
 - `2026-04-26` Messaging Automation Layer foundation has been added: a shared `MessagingAutomationService` now owns customer-message policy across channels, the customer-facing agent name is `BookedAI Manager Bot`, a separate customer-facing BookedAI Telegram bot is the first generalized webhook at `/api/webhooks/bookedai-telegram`, WhatsApp inbound processing now calls the same service instead of keeping channel-specific agent logic in the route handler, and Telegram now covers service search plus first chat booking-intent capture from `Book 1` style replies. Website chat now follows `Website Chat UI -> /api/chat/send -> BookedAI AI Engine -> web response` and is allowed to search all BookedAI catalog data plus public-web expansion, while Telegram follows `Telegram Bot -> /api/webhooks/telegram -> BookedAI AI Engine -> Telegram sendMessage` and is treated as a private customer thread whose booking-care answers require booking reference or safe phone/email identity. Telegram search replies now store the bookedai.au chat-compatible response shape and use native inline result controls: full results, per-option view, per-option book, and `Find more on Internet near me` expansion through the BookedAI service layer. This customer bot is not the OpenClaw/operator Telegram bot used for programming, deploy, or repo administration.
@@ -67,12 +89,14 @@ Latest next-phase update from `2026-04-25`:
 - `2026-04-26` outbound provider follow-up confirmed backend payload handling is no longer the primary blocker: Evolution v2 expects `text`, the backend now has a guarded legacy retry, and live readiness is blocked by instance `bookedai61481993178` staying in `connecting` state rather than `open`
 - the latest operator override temporarily removes Evolution from the outbound path, so the live transport order is Meta/WhatsApp Cloud first and Twilio second; current provider probes show Meta send blocked by `Account not registered` and Twilio blocked by `401 Authenticate`
 - BookedAI email sender identity is now standardized on `info@bookedai.au`; the backend defaults `EMAIL_SMTP_USERNAME` and `EMAIL_SMTP_FROM` to that address, and bookedai.au portal/support fallbacks use the same address for customer-visible email continuity
-- `2026-04-26` source review security hardening added HTML-safe confirmation email rendering: customer/provider-controlled confirmation values are escaped before entering HTML, support `mailto:` links are encoded, and confirmation CTA links must be `http` or `https` before rendering. This belongs in the Phase 23 release-governance checklist for future capture-to-retention hardening.
+- `2026-04-26` source review security hardening added HTML-safe confirmation email rendering and Phase 23 release-gate fixtures: customer/provider-controlled confirmation values are escaped before entering HTML, support `mailto:` links are encoded, confirmation CTA links must be `http` or `https`, provider URLs in Messaging Automation Telegram/chat responses are allowlisted to `http`/`https`, and the root gate now runs chat-send, Telegram, WhatsApp, and dedicated security fixtures before promotion.
 - `2026-04-26` homepage service-booking email alignment closed a remaining provider-email leak in the legacy `/booking-assistant/session` path: public homepage/product service bookings now use `BOOKING_BUSINESS_EMAIL` / `info@bookedai.au` for confirmation copy, internal lead notification, follow-up mailto links, response `contact_email`, and workflow metadata. When the selected service is tenant-owned and stores a tenant email, BookedAI CCs that email on the internal lead notification and also creates a Messaging Automation Layer tenant notification with Telegram as the default tenant channel.
 - Phase 19 now also has its first portal-native care turn: `portal.bookedai.au` can answer returning-customer payment, class/report, support, and lifecycle-action questions from booking-reference anchored portal truth, recent revenue-ops action runs, and request-safe next actions
 - the next operational step is now in place: portal care-turns with clear human-support/escalation or broken payment-link intent create a `support_request` audit/outbox case that admin Billing Support can review or escalate
 - OpenClaw runtime-admin repairs are now part of the operator reliability lane: `python3 scripts/telegram_workspace_ops.py fix-openclaw-approvals` restores durable exec approvals when `allow-always` fails because the effective policy is still `ask: always`
 - The same OpenClaw operator reliability lane now includes `python3 scripts/telegram_workspace_ops.py enable-openclaw-full-access` for trusted webchat/Telegram full-control mode when the operator explicitly wants OpenClaw to run host exec without per-command approval prompts
+- `2026-04-26` cross-stack review integration: the seven-lane review (architecture+UAT, frontend UI/UX, corporate/business, backend, API+integrations, DevOps, conversational chat) is now captured in `docs/development/full-stack-review-2026-04-26.md`. Findings have been mapped onto the existing `Phase 17-23` model without changing the phase boundaries; the new sprint sequencing for `2026-04-27 → 2026-05-24` (Sprint 19 `Stabilize and Sign`, Sprint 20 `First Real Revenue Loop`, Sprint 21 `Refactor and Coverage`, Sprint 22 `Multi-tenant and Multi-channel`) inherits the same phase model. The review also documents the canonical A/B testing matrix (acquisition, conversion, retention, conversational, tenant) using the existing `tenant_variant`/`portal_variant` telemetry pattern.
+- `2026-04-26` cross-stack review P0 backlog now feeds the urgent execution lock: portal `v1-*` snapshot 500 fix, WhatsApp provider posture decision, Telegram secret-token plus Evolution HMAC webhook verification, inbound webhook idempotency, public-route `actor_context.tenant_id` validator, GitHub Actions CI pipeline, expanded `.env.production.example` with checksum guard, and OpenClaw root/Docker-socket scope reduction must close before `2026-05-03` and are tracked under `Phase 17`, `Phase 19`, and `Phase 23` respectively in `docs/development/full-stack-review-2026-04-26.md`.
 
 ## Source-of-truth inputs
 
@@ -92,6 +116,7 @@ This execution baseline inherits from:
 - `docs/development/project-plan-code-audit-2026-04-19.md`
 - `docs/development/bookedai-chatbot-landing-implementation-plan.md`
 - `docs/development/bookedai-sample-video-brief.md`
+- `docs/development/full-stack-review-2026-04-26.md`
 
 ## Current implementation baseline
 
@@ -941,3 +966,43 @@ Next recommended sequence:
 2. Run a canonical booking-to-portal-to-follow-up trace with a new reference.
 3. Expand the shared messaging fixtures so Telegram, WhatsApp, web chat, and portal care prove the same policy.
 4. Backfill ledger evidence and release-gate checks before moving into widget/plugin distribution.
+
+## Sprint 19-22 cross-stack execution overlay (2026-04-26 review)
+
+The seven-lane review captured in `docs/development/full-stack-review-2026-04-26.md` overlays the `Phase 17-23` model with four practical sprints. This overlay is additive: it does not replace the phase plan, it tells operators which P0/P1 work to schedule first and where the A/B telemetry should activate.
+
+### Sprint 19 — `2026-04-27 → 2026-05-03` — Stabilize and Sign
+
+- target phases: `17`, `19`, `23`
+- close P0-1 (`portal v1-* snapshot 500`), P0-2 (`WhatsApp provider posture`), P0-3 (`Telegram secret-token + Evolution HMAC`), P0-4 (`webhook idempotency`), P0-5 (`actor_context.tenant_id validator`), P0-6 (`GitHub Actions CI`), P0-7 (`.env.production.example`), P0-8 (`OpenClaw root drop`)
+- ship P1-7 (`phone aria-describedby`, `admin booking responsive ≤720px`)
+- exit gate: portal UAT for fresh `v1-*` references is green; CI blocks lint/type/test failures; OpenClaw can no longer run host shell as root
+
+### Sprint 20 — `2026-05-04 → 2026-05-10` — First Real Revenue Loop
+
+- target phases: `17`, `19`, `21`, `23`
+- close P1-9 (`Future Swim Miranda URL hotfix`), P1-1 (`tenant authenticated UAT`), P1-2 (`WhatsApp inline controls + sender identity`), P1-5 (`route_handlers raw SQL → repos`)
+- one Future Swim revenue loop is documented end-to-end (lead, booking, payment, follow-up, dashboard snapshot)
+- bring up Prometheus/Grafana/AlertManager and route alerts through Discord
+- activate A/B experiments `AC-1`, `RT-1`, `RT-3`, `CH-1` using the existing `tenant_variant`/`portal_variant` telemetry pattern
+- publish first version of `Commercial and Compliance Checklist`
+- exit gate: at least four A/B experiments have ≥500 impressions per variant with a recorded decision; observability dashboards expose `5xx` rate, DB latency, queue lag
+
+### Sprint 21 — `2026-05-11 → 2026-05-17` — Refactor and Coverage
+
+- target phases: `19`, `22`, `23`
+- close P1-3 (`WhatsApp test parity with Telegram`), P1-4 (`tenant_app_service split`), P1-6 (`beta DB separation + image registry`), P1-8 (`pitch + 390px Playwright`), P1-10 (`channel-aware email templates`)
+- add `location_posture` field to chat response shape and propagate web/Telegram/WhatsApp; this unlocks `BC-1`
+- replace bare `except Exception` blocks in `service_layer/` with `IntegrationAppError`/`ValidationAppError` plus structured logging
+- exit gate: tenant_app_service is gone or shrunk to a thin shim; tagged image rollback works in <5 minutes on staging
+
+### Sprint 22 — `2026-05-18 → 2026-05-24` — Multi-tenant and Multi-channel
+
+- target phases: `19`, `20`, `21`, `22`, `23`
+- add `BaseRepository` validator that fails any tenant-scoped query missing a `tenant_id` filter
+- ship SMS adapter at `/api/webhooks/sms` reusing the shared identity/mutation policy
+- ship `Tenant Revenue Proof` dashboard (investor-only or limited tenant access) and tenant-workspace pricing/commission visibility
+- run A/B wave 2 (`BC-2`, `CH-1`, `CH-3`)
+- extend rate-limiting to `/api/leads`, `/api/pricing/consultation`, `/api/demo/*`, and webhooks
+- ship public footer and tenant terms updates from the Sprint 20 compliance audit
+- exit gate: one new vertical reuses the shared template path with no custom-only branch; SMS booking-care answer is reachable; tenant revenue proof dashboard renders one tenant's real evidence

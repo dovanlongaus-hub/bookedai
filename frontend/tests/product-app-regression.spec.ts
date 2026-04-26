@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import type { Route } from '@playwright/test';
 
 type ServiceCatalogItem = {
   id: string;
@@ -127,7 +128,7 @@ async function stubProductApis(
     });
   });
 
-  await page.route('**/api/booking-assistant/chat', async (route) => {
+  const fulfillChatSearch = async (route: Route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -140,7 +141,17 @@ async function stubProductApis(
         should_request_location: false,
       }),
     });
+  };
+
+  await page.route('**/api/booking-assistant/chat', fulfillChatSearch);
+  await page.route(/\/api\/chat\/send\/stream(?:\?.*)?$/, async (route) => {
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'error', detail: 'stream disabled in test' }),
+    });
   });
+  await page.route(/\/api\/chat\/send(?:\?.*)?$/, fulfillChatSearch);
 
   if (options.bookingSessionBody) {
     await page.route('**/api/booking-assistant/session', async (route) => {
@@ -173,14 +184,14 @@ async function openProductApp(
 ) {
   await stubProductApis(page, options);
   await page.goto('/product');
-  await expect(page.getByText(/Search, shortlist, booking/i).first()).toBeVisible();
-  await expect(page.locator('#booking-assistant-message-composer, #bookedai-search-assistant').first()).toBeVisible();
+  await expect(page.getByText(/Search, shortlist, book/i).first()).toBeVisible();
+  await expect(page.getByRole('textbox', { name: /Ask the booking assistant/i })).toBeVisible();
 }
 
 async function runAssistantSearch(page: Parameters<typeof test>[0]['page'], query: string) {
   const input = page.locator('#assistant-chat-input').first();
   await input.fill(query);
-  await page.getByRole('button', { name: /^Send$/i }).click();
+  await page.getByRole('button', { name: /^Send(?: search)?$/i }).click();
 }
 
 test.describe('product app regression', () => {
@@ -188,7 +199,7 @@ test.describe('product app regression', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openProductApp(page);
 
-    await expect(page.getByRole('button', { name: /Free Trial/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Free Trial', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /Start Free Trial/i })).toBeVisible();
     await expect(page.getByText(/Ready to use BookedAI for your business/i)).toBeVisible();
     await expect(page.getByText(/Search, shortlist, booking, and follow-up are all live/i)).toBeVisible();
@@ -223,6 +234,10 @@ test.describe('product app regression', () => {
     await expect(page.getByText(/Attendance summary/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /^Request attendance$/i }).first()).toBeVisible();
     await expect(page.getByText(/Ready to request/i)).toBeVisible();
+    const phoneInput = page.getByLabel(/^Phone$/i);
+    const helperId = await phoneInput.getAttribute('aria-describedby');
+    expect(helperId).toBeTruthy();
+    await expect(page.locator(`#${helperId}`)).toContainText(/email or phone is required/i);
 
     await page.getByLabel(/Name/i).fill('Event Attendee');
     await page.getByLabel(/Email/i).fill('attendee@example.com');
