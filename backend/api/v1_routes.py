@@ -13,7 +13,7 @@ from urllib.parse import quote, urlencode
 from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, Header, Request
+from fastapi import APIRouter, Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import String, and_, cast, desc, or_, select, text
@@ -1212,7 +1212,23 @@ async def _resolve_tenant_catalog_service(
 
 async def _resolve_tenant_id(request: Request, actor_context: ActorContextPayload | None) -> str | None:
     if actor_context and actor_context.tenant_id:
-        return actor_context.tenant_id
+        requested_tenant_id = str(actor_context.tenant_id or "").strip()
+        if requested_tenant_id:
+            tenant_session = await _resolve_tenant_session(
+                request,
+                authorization=request.headers.get("authorization"),
+            )
+            if tenant_session:
+                async with get_session(request.app.state.session_factory) as session:
+                    session_tenant_id = await TenantRepository(
+                        RepositoryContext(session=session)
+                    ).resolve_tenant_id(str(tenant_session.get("tenant_ref") or ""))
+                if not session_tenant_id or str(session_tenant_id).strip() != requested_tenant_id:
+                    raise HTTPException(
+                        status_code=403,
+                        detail="actor_context.tenant_id does not match the authenticated tenant session.",
+                    )
+            return requested_tenant_id
 
     tenant_ref = str(actor_context.tenant_ref or "").strip() if actor_context else ""
     if tenant_ref:

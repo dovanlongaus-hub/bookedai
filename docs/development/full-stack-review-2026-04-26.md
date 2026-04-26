@@ -109,7 +109,7 @@ A fourth structural risk sits across `backend` and `DevOps`:
   - owner: `Integrations`
   - files: `backend/service_layer/communication_service.py`, `backend/config.py`
   - phase: `Phase 19`
-- `P0-3` customer Telegram and Evolution webhook verification: Telegram secret-token verification is active; Evolution HMAC verification is implemented and enforced when `WHATSAPP_EVOLUTION_WEBHOOK_SECRET` is configured
+- `P0-3` customer Telegram and Evolution webhook verification: closed live on `2026-04-26`; Telegram secret-token verification and Evolution HMAC verification both reject missing credentials in production
   - owner: `Backend Security`
   - files: `backend/api/route_handlers.py`, `backend/api/webhook_routes.py`
   - phase: `Phase 19`

@@ -20,6 +20,7 @@ from api.v1_routes import (
     _search_terms,
 )
 from api.v1_router import router as v1_router
+from core.session_tokens import create_tenant_session_token
 from repositories.integration_repository import IntegrationRepository
 from service_layer.prompt9_matching_service import RankedServiceMatch
 from repositories.tenant_repository import TenantRepository
@@ -40,6 +41,8 @@ def create_test_app() -> FastAPI:
         admin_password="test-admin-password",
         admin_session_ttl_hours=8,
         google_oauth_client_id="google-client-id",
+        session_signing_secret="test-session-secret",
+        tenant_session_signing_secret="test-tenant-session-secret",
         stripe_secret_key="sk_test_bookedai",
         stripe_currency="aud",
         public_app_url="https://demo.bookedai.au",
@@ -133,6 +136,88 @@ class _WritableFakeSession:
 
 
 class Apiv1BookingRoutes(TestCase):
+    def test_public_assistant_rejects_actor_tenant_id_mismatched_to_tenant_session(self):
+        app = create_test_app()
+        session_token, _expires_at = create_tenant_session_token(
+            app.state.settings,
+            email="tenant@example.com",
+            tenant_ref="tenant-alpha",
+            name="Tenant Alpha",
+            picture_url=None,
+            google_sub=None,
+        )
+
+        async def _resolve_tenant_id(_self, tenant_ref):
+            if tenant_ref == "tenant-alpha":
+                return "tenant-alpha-id"
+            return None
+
+        with patch.object(TenantRepository, "resolve_tenant_id", _resolve_tenant_id):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/bookings/path/resolve",
+                headers={"Authorization": f"Bearer {session_token}"},
+                json={
+                    "candidate_id": "svc_123",
+                    "availability_state": "available",
+                    "booking_confidence": "high",
+                    "payment_option": "invoice_after_confirmation",
+                    "channel": "public_web",
+                    "actor_context": {
+                        "channel": "public_web",
+                        "tenant_id": "tenant-other-id",
+                    },
+                    "context": {
+                        "source_page": "/",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertIn("actor_context.tenant_id", response.json()["detail"])
+
+    def test_public_assistant_allows_actor_tenant_id_matching_tenant_session(self):
+        app = create_test_app()
+        session_token, _expires_at = create_tenant_session_token(
+            app.state.settings,
+            email="tenant@example.com",
+            tenant_ref="tenant-alpha",
+            name="Tenant Alpha",
+            picture_url=None,
+            google_sub=None,
+        )
+
+        async def _resolve_tenant_id(_self, tenant_ref):
+            if tenant_ref == "tenant-alpha":
+                return "tenant-alpha-id"
+            return None
+
+        with patch.object(TenantRepository, "resolve_tenant_id", _resolve_tenant_id):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/bookings/path/resolve",
+                headers={"Authorization": f"Bearer {session_token}"},
+                json={
+                    "candidate_id": "svc_123",
+                    "availability_state": "available",
+                    "booking_confidence": "high",
+                    "payment_option": "invoice_after_confirmation",
+                    "channel": "public_web",
+                    "actor_context": {
+                        "channel": "public_web",
+                        "tenant_id": "tenant-alpha-id",
+                    },
+                    "context": {
+                        "source_page": "/",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["meta"]["tenant_id"], "tenant-alpha-id")
+
     def test_create_booking_intent_records_phase2_audit_and_outbox_activity(self):
         captured_phase2_calls: list[dict[str, object]] = []
 

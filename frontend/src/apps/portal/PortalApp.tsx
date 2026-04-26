@@ -997,7 +997,7 @@ export function PortalApp() {
                         <p className="mt-3 text-sm leading-6 text-slate-700">{careTurn.reply}</p>
                         {careTurn.created_request ? (
                           <div className="mt-3 rounded-[0.85rem] border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-800">
-                            {careTurn.created_request.message ?? 'A support request has been queued for manual review.'}
+                            {careTurn.created_request.message ?? 'Your request is being reviewed. We will confirm the next step shortly.'}
                           </div>
                         ) : null}
                         <div className="mt-3 flex flex-wrap gap-2">

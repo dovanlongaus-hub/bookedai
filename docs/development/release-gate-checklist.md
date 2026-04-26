@@ -124,7 +124,7 @@ These gates inherit from `docs/development/full-stack-review-2026-04-26.md` and 
 
 - portal `GET /api/v1/portal/bookings/v1-{ref}` returns `200` for a fresh `v1-*` reference created in the same release; structured error envelope returns on degraded paths and CORS headers are present on error responses (`P0-1`)
 - WhatsApp outbound delivery has one documented active provider posture (Meta Cloud or Twilio) and the bot status command reports `attention required` only when the active provider is intentionally unconfigured (`P0-2`)
-- `/api/webhooks/telegram` and `/api/webhooks/bookedai-telegram` reject missing or invalid `X-Telegram-Bot-Api-Secret-Token` when configured; `/api/webhooks/evolution` rejects missing or invalid HMAC-SHA256 signatures when `WHATSAPP_EVOLUTION_WEBHOOK_SECRET` is configured (`P0-3`)
+- `/api/webhooks/telegram` and `/api/webhooks/bookedai-telegram` reject missing or invalid `X-Telegram-Bot-Api-Secret-Token` when configured; `/api/webhooks/evolution` rejects missing or invalid HMAC-SHA256 signatures when `WHATSAPP_EVOLUTION_WEBHOOK_SECRET` is configured (`P0-3`; closed live on `2026-04-26`)
 - inbound webhook deliveries from Tawk, WhatsApp, Telegram, Evolution, and Zoho are deduplicated through the `webhook_events` table; a replayed delivery does not re-trigger downstream side effects (`P0-4`)
 - public assistant routes return `403` when `actor_context.tenant_id` does not match the authenticated session (`P0-5`)
 - `.github/workflows/release-gate.yml` blocks any PR or `main` push that fails the same root release gate used locally; `main` branch protection still needs to enforce the check in GitHub settings (`P0-6`)

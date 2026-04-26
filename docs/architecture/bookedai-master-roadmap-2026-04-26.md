@@ -352,7 +352,7 @@ Active deliverables:
 Review-driven additions:
 
 - `P0-2` WhatsApp provider posture decision (Meta Cloud or Twilio default)
-- `P0-3` Telegram secret-token verification plus Evolution HMAC verification
+- `P0-3` Telegram secret-token verification plus Evolution HMAC verification (`closed live 2026-04-26`)
 - `P0-4` inbound webhook idempotency table and route gate landed locally for WhatsApp, Evolution, and customer Telegram; live deploy/evidence surfacing remains the follow-up
 - `P0-5` `actor_context.tenant_id` validator on public assistant routes
 - `P1-2` WhatsApp inline action controls and `BookedAI Manager Bot` sender identity alignment

@@ -27,6 +27,9 @@ class _FakeExecuteResult:
     def __init__(self, value=None):
         self._value = value
 
+    def scalar_one_or_none(self):
+        return self._value
+
     def scalars(self):
         return SimpleNamespace(all=lambda: [] if self._value is None else [self._value])
 
@@ -155,6 +158,45 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(captured_calls[0]["event_type"], "telegram_inbound")
         self.assertEqual(captured_calls[0]["ai_intent"], "booking_intake")
         self.assertEqual(captured_calls[0]["metadata"]["messaging_layer"]["channel"], "telegram")
+
+    def test_duplicate_telegram_event_is_ignored_by_idempotency_gate(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _register_inbound_webhook_event(*_args, **_kwargs):
+            return False, None, "tenant-test"
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "api.route_handlers._register_inbound_webhook_event",
+            _register_inbound_webhook_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 1000,
+                    "message": {
+                        "message_id": 7,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "I want to book chess class this week",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["messages_processed"], 0)
+        self.assertEqual(communication_service.sent, [])
+        self.assertEqual(captured_calls, [])
 
     def test_telegram_service_search_reply_returns_options_and_web_booking_link(self):
         captured_calls: list[dict[str, object]] = []

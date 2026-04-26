@@ -147,10 +147,11 @@ The PM now treats `Sprint 19` as the immediate execution board.
 - Scope: customer Telegram and Evolution inbound webhook verification.
 - Owner lanes: Backend, Security/Validation, QA/UAT, DevOps/Live.
 - Implementation: Telegram keeps the official Telegram Bot API secret-token check through `X-Telegram-Bot-Api-Secret-Token`; Evolution now supports `WHATSAPP_EVOLUTION_WEBHOOK_SECRET` and requires an HMAC-SHA256 signature in `X-BookedAI-Signature` or `X-Hub-Signature-256` when the secret is configured.
-- Automated verification: `.venv/bin/python -m py_compile backend/api/route_handlers.py backend/config.py`; `.venv/bin/python -m pytest backend/tests/test_whatsapp_webhook_routes.py backend/tests/test_telegram_webhook_routes.py backend/tests/test_config.py -q` passed with `23 passed`.
+- Automated verification: `.venv/bin/python -m py_compile backend/api/route_handlers.py backend/config.py`; `.venv/bin/python -m pytest backend/tests/test_whatsapp_webhook_routes.py backend/tests/test_telegram_webhook_routes.py backend/tests/test_config.py -q` passed with `23 passed`; security/backend release slice passed with `34 passed`; backend release unittest lane passed with `47 tests`; search eval passed `14/14`; tenant smoke passed `3 passed`.
 - UAT: missing/wrong Evolution HMAC requests return `403`, a correct HMAC request is processed and stored as `whatsapp_inbound`, and Telegram still rejects missing secret-token when configured.
-- Deploy-live: required because runtime code changed; promote after release/security slice passes.
-- Status: code and local UAT gate closed; live rollout evidence will be appended after deploy and stack smoke.
+- Deploy-live: completed through `python3 scripts/telegram_workspace_ops.py deploy-live`; backend, beta-backend, web, and beta-web were rebuilt/recreated and proxy restarted.
+- Live verification: `bash scripts/healthcheck_stack.sh` passed at `2026-04-26T15:17:38Z`; live missing-token Telegram probe returned `403` with `Telegram webhook token mismatch`; live missing-HMAC Evolution probe returned `403` with `Evolution webhook signature mismatch`; valid-token and valid-HMAC ignored-payload probes returned `200`.
+- Status: P0-3 is closed and live; P0-4 webhook idempotency is the next Phase 19 security item.
 
 ### `2026-04-26` Phase 19 P0-4 Inbound Webhook Idempotency Routing
 
