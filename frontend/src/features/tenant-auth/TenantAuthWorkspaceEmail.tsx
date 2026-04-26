@@ -74,6 +74,10 @@ export function TenantAuthWorkspaceEmail({
   importMessage,
   emailSignInValue,
   setEmailSignInValue,
+  passwordSignInEmail,
+  setPasswordSignInEmail,
+  passwordSignInValue,
+  setPasswordSignInValue,
   emailCodeValue,
   setEmailCodeValue,
   emailCodeDelivery,
@@ -87,6 +91,7 @@ export function TenantAuthWorkspaceEmail({
   onPromptGoogle,
   onRequestEmailCode,
   onVerifyEmailCode,
+  onPasswordSignIn,
   tenantChoices,
   onSelectTenantChoice,
   onSignOut,
@@ -104,6 +109,10 @@ export function TenantAuthWorkspaceEmail({
   importMessage: string | null;
   emailSignInValue: string;
   setEmailSignInValue: Dispatch<SetStateAction<string>>;
+  passwordSignInEmail: string;
+  setPasswordSignInEmail: Dispatch<SetStateAction<string>>;
+  passwordSignInValue: string;
+  setPasswordSignInValue: Dispatch<SetStateAction<string>>;
   emailCodeValue: string;
   setEmailCodeValue: Dispatch<SetStateAction<string>>;
   emailCodeDelivery: TenantEmailCodeDeliveryState | null;
@@ -117,6 +126,7 @@ export function TenantAuthWorkspaceEmail({
   onPromptGoogle: () => void;
   onRequestEmailCode: FormEventHandler<HTMLFormElement>;
   onVerifyEmailCode: FormEventHandler<HTMLFormElement>;
+  onPasswordSignIn: FormEventHandler<HTMLFormElement>;
   tenantChoices: Array<{ slug: string; label: string }>;
   onSelectTenantChoice: (tenantSlugValue: string) => void;
   onSignOut: () => void;
@@ -297,33 +307,83 @@ export function TenantAuthWorkspaceEmail({
 
             <div className="flex items-center gap-3">
               <div className="h-px flex-1 bg-slate-200" />
-              <div className="text-xs font-semibold text-slate-400">or email code</div>
+              <div className="text-xs font-semibold text-slate-400">or email sign-in</div>
               <div className="h-px flex-1 bg-slate-200" />
             </div>
 
             {authMode === 'sign-in' ? (
-              <form className="space-y-4 rounded-lg border border-slate-200 bg-white p-4" onSubmit={onRequestEmailCode}>
-                <label className="block">
-                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
-                    Email
+              <div className="grid gap-4 lg:grid-cols-2">
+                <form className="space-y-4 rounded-lg border border-slate-200 bg-white p-4" onSubmit={onRequestEmailCode}>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-950">Email code</div>
+                    <div className="mt-1 text-xs leading-5 text-slate-500">
+                      Get a one-time code by email and continue without using a password.
+                    </div>
                   </div>
-                  <input
-                    value={emailSignInValue}
-                    onChange={(event) => setEmailSignInValue(event.target.value)}
-                    placeholder="owner@example.com"
-                    className="booked-form-input"
-                    autoComplete="email"
-                  />
-                </label>
-                <button
-                  type="submit"
-                  disabled={emailSubmitDisabled}
-                  className={`booked-button w-full ${emailSubmitDisabled ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
-                >
-                  <span className="sm:hidden">Send code</span>
-                  <span className="hidden sm:inline">Send login code</span>
-                </button>
-              </form>
+                  <label className="block">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Email
+                    </div>
+                    <input
+                      value={emailSignInValue}
+                      onChange={(event) => setEmailSignInValue(event.target.value)}
+                      placeholder="owner@example.com"
+                      className="booked-form-input"
+                      autoComplete="email"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    aria-label="Send login code"
+                    disabled={emailSubmitDisabled}
+                    className={`booked-button w-full ${emailSubmitDisabled ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
+                  >
+                    <span aria-hidden="true" className="sm:hidden">Send code</span>
+                    <span aria-hidden="true" className="hidden sm:inline">Send login code</span>
+                  </button>
+                </form>
+
+                <form className="space-y-4 rounded-lg border border-slate-200 bg-white p-4" onSubmit={onPasswordSignIn}>
+                  <div>
+                    <div className="text-sm font-semibold text-slate-950">Email and password</div>
+                    <div className="mt-1 text-xs leading-5 text-slate-500">
+                      Sign in directly with the tenant email and password for this workspace.
+                    </div>
+                  </div>
+                  <label className="block">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Email
+                    </div>
+                    <input
+                      value={passwordSignInEmail}
+                      onChange={(event) => setPasswordSignInEmail(event.target.value)}
+                      placeholder="owner@example.com"
+                      className="booked-form-input"
+                      autoComplete="username"
+                    />
+                  </label>
+                  <label className="block">
+                    <div className="mb-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      Password
+                    </div>
+                    <input
+                      type="password"
+                      value={passwordSignInValue}
+                      onChange={(event) => setPasswordSignInValue(event.target.value)}
+                      placeholder="Enter tenant password"
+                      className="booked-form-input"
+                      autoComplete="current-password"
+                    />
+                  </label>
+                  <button
+                    type="submit"
+                    disabled={authPending || !passwordSignInEmail.trim() || !passwordSignInValue.trim()}
+                    className={`booked-button w-full ${authPending || !passwordSignInEmail.trim() || !passwordSignInValue.trim() ? 'cursor-not-allowed border-slate-200 bg-slate-200 text-slate-500 shadow-none' : ''}`}
+                  >
+                    Sign in with password
+                  </button>
+                </form>
+              </div>
             ) : null}
 
             {authMode === 'create' ? (

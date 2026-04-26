@@ -31,6 +31,19 @@ This execution baseline now also assumes a dual-agent product direction:
 
 Latest next-phase update from `2026-04-25`:
 
+- `2026-04-26` architecture/execution lock: BookedAI is now documented as one end-to-end AI Revenue Engine with customer acquisition surfaces, customer action channels, tenant surfaces, operator surfaces, FastAPI/backend contracts, revenue core, Messaging Automation Layer, data/integration rails, and governance/release gates. The active urgent execution order is UI/UX stabilization first, the standard booking flow second, and Messaging Automation Layer consolidation third.
+- The standard booking flow is now the sprint-level journey to preserve across all channels: `Ask -> Match -> Compare -> Book -> Confirm -> Portal -> Follow-up`. No surface should skip explicit booking intent, hide the durable booking reference, bypass the QR/portal handoff, or pretend that request-safe lifecycle actions completed instantly.
+- The active sprint map is now read as Sprint `17-23`: Sprint `17` stabilizes UI/UX and booking confirmation, Sprint `18` makes revenue-ops actions inspectable, Sprint `19` unifies customer-care messaging, Sprint `20` ships widget/plugin runtime, Sprint `20.5` adds wallet and Stripe return continuity, Sprint `21` closes billing/receivable truth, Sprint `22` extracts reusable tenant templates, and Sprint `23` enforces release governance and scale hardening.
+- Product requirement message added on `2026-04-26`: `BookedAI connects every customer message — WhatsApp, SMS, Telegram, email and web chat — into one AI Revenue Engine that captures intent, books appointments, collects payment, follows up, and retains customers automatically.`
+- The current Phase/Sprint plan now treats this as the cross-phase execution thread: Phase 19 normalizes omnichannel message intake and care policy, Phase 20 distributes web chat/widget entry, Phase 21 closes payment/receivable continuity, Phase 22 packages reusable retention templates, and Phase 23 release-gates the whole capture-to-retention loop.
+- BookedAI-managed customer booking support/contact defaults are now `info@bookedai.au` and `+61455301335` for Telegram, WhatsApp, or iMessage; this is the fallback for customer-booking channels even when provider catalog rows include separate contact details.
+- `2026-04-26` Messaging Automation Layer foundation has been added: a shared `MessagingAutomationService` now owns customer-message policy across channels, the customer-facing agent name is `BookedAI Manager Bot`, a separate customer-facing BookedAI Telegram bot is the first generalized webhook at `/api/webhooks/bookedai-telegram`, WhatsApp inbound processing now calls the same service instead of keeping channel-specific agent logic in the route handler, and Telegram now covers service search plus first chat booking-intent capture from `Book 1` style replies. Website chat now follows `Website Chat UI -> /api/chat/send -> BookedAI AI Engine -> web response` and is allowed to search all BookedAI catalog data plus public-web expansion, while Telegram follows `Telegram Bot -> /api/webhooks/telegram -> BookedAI AI Engine -> Telegram sendMessage` and is treated as a private customer thread whose booking-care answers require booking reference or safe phone/email identity. Telegram search replies now store the bookedai.au chat-compatible response shape and use native inline result controls: full results, per-option view, per-option book, and `Find more on Internet near me` expansion through the BookedAI service layer. This customer bot is not the OpenClaw/operator Telegram bot used for programming, deploy, or repo administration.
+- Telegram customer booking continuity now treats active-order search as a confirm-first state: when a returning customer asks for another option, `BookedAI Manager Bot` shows the current `portal.bookedai.au` order and QR, asks what should happen with the existing booking, then offers BookedAI.au search, Internet expansion, current-booking change, and return-to-order controls.
+- Telegram customer presentation now uses HTML-safe rich text and inline keyboard actions for the normal BookedAI Manager Bot flow, so service results and booking/order handoffs render as compact Telegram-native action cards instead of long plain-text blocks.
+- `2026-04-26` public/pitch video replacement has been applied: `bookedai.au` and `pitch.bookedai.au` now point their native pitch video embeds and direct video links to `https://upload.bookedai.au/videos/df25/8woKUebBF8HMMD_RMSA0LQ.mp4`, with direct byte-range media verification returning `206 video/mp4`.
+- `2026-04-26` tenant A/B acquisition telemetry has been implemented for the first tenant UAT experiment: `tenant.bookedai.au` supports `tenant_variant=control|revenue_ops`, persists the assignment, changes the gateway headline for the revenue-operations variant, and emits tenant acquisition events for variant assignment, auth mode, Google/email-code intent, panel navigation, and mobile detail expansion.
+- `2026-04-26` product UAT polish has been applied to the product runtime: `product.bookedai.au` now carries semantic heading landmarks, accessible names for icon-only controls, a full-width mobile prompt layout instead of a cropped carousel, `Price TBC` posture for zero/unknown prices, customer-safe automation warning copy, and the `bookedai-au` tenant runtime context needed for downstream revenue-ops handoffs.
+- `2026-04-26` homepage shortcut search speed has been improved for proof vertical discovery: Future Swim, Co Mai Hung Chess, and WSTI AI Event shortcuts now use exact search terms and the homepage runtime shows fast-preview results immediately from catalog/shortcut knowledge while live ranking and booking-path checks continue. Broad `near me` searches still require explicit location context before shortcut results can display.
 - the latest product/public search refinement keeps search results as the active surface after ranking: no automatic jump into booking, compact result cards for scanning, detail popup for full context, and explicit `Book` before customer details open
 - reviewed tenant matches must still live inside the same search-results surface; for chess tenant results, the card and selected-booking state show verified BookedAI tenant posture plus BookedAI booking, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit support
 - follow-up questions and suggested next prompts belong inside the BookedAI chat conversation as interactive chips so clarification continues with the customer-facing agent instead of appearing as a disconnected panel
@@ -45,13 +58,20 @@ Latest next-phase update from `2026-04-25`:
 - the public brand/menu and live booking lane were re-checked after the uploaded logo rollout: demo/product/pitch/tenant now render without horizontal overflow on mobile and desktop, the customer-agent live-read path falls back to the v1 matching/search contract when needed, and the live stack health gate passed after deployment
 - the pitch image layer now uses local optimized WebP assets for the uploaded logo, chess proof, final contact proof, and team imagery, keeping the visual redesign intact while avoiding multi-megabyte upload originals during production page load
 - `admin.bookedai.au` login recovery is now part of the current stabilization baseline: the admin host must proxy `/api/` to backend before frontend SPA fallback, the dedicated admin hostname must resolve frontend API calls to same-origin `/api` even when a global `VITE_API_BASE_URL` exists, and the shipped shared-frontend admin shell now uses a compact sidebar workspace layout grouped by `Operate`, `Tenants`, `Revenue`, and `Platform`
+- `admin.bookedai.au` has also received the follow-up investor/SME polish from the full UAT review: mobile header actions are calmer, booking search/table content stays contained, KPI cards explain revenue signals, and Reliability speaks in product-facing AI quality/automation language instead of prompt-internal labels
 - `tenant.bookedai.au` login is now part of the same stabilization baseline: the shipped tenant gateway is Google-first with email-code fallback, create-account is explicit, and Google sign-in no longer silently creates a tenant workspace when no active membership exists
 - the tenant live QA baseline now also includes `future-swim` workspace stability: audit-log nullable filters and revenue-metrics day windows are asyncpg-safe, the ready workspace no longer violates React hook ordering after loading/error states, and live API/browser checks pass for the shared gateway and tenant workspace
 - the pitch and roadmap now carry the current architecture and phase plan as user-visible code, not just docs: pitch shows the simplified `customer surfaces -> AI agents -> booking core -> operations truth` map, and the roadmap dataset exposes Phase/Sprint `17-23` for stabilization, revenue ops, customer care, widget runtime, billing truth, templates, and release governance
 - Phase 19 has now started through WhatsApp customer-care: configured inbound WhatsApp messages can resolve the correct booking, answer from portal booking/payment/support truth, and queue audited cancel or reschedule requests when the customer clearly asks to change an existing booking
-- Phase 19 WhatsApp transport now uses direct Meta/WhatsApp Cloud API as the intended primary path for `+61455301335`, with Twilio kept as a backup transport so customer-care delivery can continue during provider migration
+- Phase 19 WhatsApp transport keeps Meta/WhatsApp Cloud API as the intended verified-business path for `+61455301335`, while the near-term live fallback is the Evolution API personal WhatsApp QR-session bridge until business verification is complete
+- `2026-04-26` outbound provider follow-up confirmed backend payload handling is no longer the primary blocker: Evolution v2 expects `text`, the backend now has a guarded legacy retry, and live readiness is blocked by instance `bookedai61481993178` staying in `connecting` state rather than `open`
+- the latest operator override temporarily removes Evolution from the outbound path, so the live transport order is Meta/WhatsApp Cloud first and Twilio second; current provider probes show Meta send blocked by `Account not registered` and Twilio blocked by `401 Authenticate`
+- BookedAI email sender identity is now standardized on `info@bookedai.au`; the backend defaults `EMAIL_SMTP_USERNAME` and `EMAIL_SMTP_FROM` to that address, and bookedai.au portal/support fallbacks use the same address for customer-visible email continuity
+- `2026-04-26` homepage service-booking email alignment closed a remaining provider-email leak in the legacy `/booking-assistant/session` path: public homepage/product service bookings now use `BOOKING_BUSINESS_EMAIL` / `info@bookedai.au` for confirmation copy, internal lead notification, follow-up mailto links, response `contact_email`, and workflow metadata. When the selected service is tenant-owned and stores a tenant email, BookedAI CCs that email on the internal lead notification and also creates a Messaging Automation Layer tenant notification with Telegram as the default tenant channel.
 - Phase 19 now also has its first portal-native care turn: `portal.bookedai.au` can answer returning-customer payment, class/report, support, and lifecycle-action questions from booking-reference anchored portal truth, recent revenue-ops action runs, and request-safe next actions
 - the next operational step is now in place: portal care-turns with clear human-support/escalation or broken payment-link intent create a `support_request` audit/outbox case that admin Billing Support can review or escalate
+- OpenClaw runtime-admin repairs are now part of the operator reliability lane: `python3 scripts/telegram_workspace_ops.py fix-openclaw-approvals` restores durable exec approvals when `allow-always` fails because the effective policy is still `ask: always`
+- The same OpenClaw operator reliability lane now includes `python3 scripts/telegram_workspace_ops.py enable-openclaw-full-access` for trusted webchat/Telegram full-control mode when the operator explicitly wants OpenClaw to run host exec without per-command approval prompts
 
 ## Source-of-truth inputs
 
@@ -306,11 +326,11 @@ The post-release implementation order is now:
 
 1. finish `Phase 17` documentation and GitHub submission for the verified full-flow stabilization work
 2. extend `Phase 18` so admin and tenant operators can inspect, filter, dispatch, transition, and audit revenue-ops action runs, including lifecycle-event, dependency, policy, evidence-summary posture, and tenant-scoped automation connection/run controls
-3. implement `Phase 19` customer-care/status replies using booking, payment, subscription, report, communication, and action-run state
-4. implement `Phase 20` widget/plugin install identity for SME-owned websites and prove one tenant-branded embed flow end to end
-5. implement `Phase 21` billing, receivable, subscription, reminder, and commission truth after the ledger evidence model is stable
-6. generalize `Phase 22` templates from chess and Future Swim only after both verticals remain green through the release gate
-7. make `Phase 23` release governance the closeout requirement for every phase, including tests, traces, rollback notes, memory, Notion, and Discord sync
+3. implement `Phase 19` omnichannel customer-care/status replies using WhatsApp, SMS, Telegram, email, web chat, booking, payment, subscription, report, communication, and action-run state
+4. implement `Phase 20` widget/plugin/web-chat install identity for SME-owned websites and prove one tenant-branded embed flow enters the same AI Revenue Engine end to end
+5. implement `Phase 21` billing, receivable, subscription, reminder, collection, and commission truth after the ledger evidence model is stable
+6. generalize `Phase 22` templates from chess and Future Swim only after both verticals remain green through the release gate, including retention playbooks and channel-specific copy rules
+7. make `Phase 23` release governance the closeout requirement for every phase, including message-intake fixtures, booking/payment/follow-up traces, rollback notes, memory, Notion, and Discord sync
  
 
 ## Program status by phase
@@ -897,20 +917,26 @@ This plan should be considered correctly adopted when:
 
 ## Immediate next plan
 
-Current lane owner: `root Next.js admin Phase 3 tenant support`
+Current lane owner: `Phase 17-19 urgent product loop`
 
-Just completed:
+Current priority order:
 
-- dedicated `/admin/tenants` investigation workspace
-- audited `read_only` tenant support mode
-- deep links from admin investigation into tenant runtime `overview`, `billing`, `team`, and `integrations`
-- unified tenant investigation timeline across auth, billing, CRM, integrations, and support-session audit events
-- regression coverage for support-mode start/end contracts and tenant investigation timeline rendering
-- support-mode banner expansion across the main admin workspaces with return-to-investigation links
-- cross-surface return-link polish so tenant runtime can jump back into the originating admin investigation or admin workspace
+1. `UI/UX stabilization`
+   - homepage, product, tenant, portal, and admin must remain mobile-safe, accessible, scannable, and customer-safe in wording
+   - slow search must show progressive useful state, not blank or spinner-only waiting
+   - result cards must preserve compare-first behavior with explicit `Book`
+2. `Standard booking flow`
+   - preserve `Ask -> Match -> Compare -> Book -> Confirm -> Portal -> Follow-up`
+   - one fresh booking reference should prove confirmation, QR/portal, care-turn, tenant notification, and action/audit posture
+   - lifecycle changes remain request-safe until source-of-record state confirms completion
+3. `Messaging Automation Layer`
+   - website chat, Telegram, WhatsApp, portal care, tenant notifications, and later SMS/email should share one booking-care policy
+   - booking data loads only from explicit reference, signed portal context, or safe single email/phone match
+   - provider delivery posture should be visible as sent, queued, failed, manual-review, or unconfigured
 
 Next recommended sequence:
 
-1. `Tenant-support lane closeout`
-   - treat the read-only tenant support loop as a usable baseline across admin and tenant runtime
-   - only add more tenant-support behavior when a later approved slice needs deeper guided actions or stricter write blocking
+1. Finish the focused UI/UX smoke and polish pass.
+2. Run a canonical booking-to-portal-to-follow-up trace with a new reference.
+3. Expand the shared messaging fixtures so Telegram, WhatsApp, web chat, and portal care prove the same policy.
+4. Backfill ledger evidence and release-gate checks before moving into widget/plugin distribution.

@@ -3166,6 +3166,11 @@ async def integration_provider_statuses(request: Request):
     async with get_session(request.app.state.session_factory) as session:
         items = await build_integration_provider_statuses(session, tenant_id=tenant_id or "")
     communication_service: CommunicationService = request.app.state.communication_service
+    whatsapp_provider_name = (
+        communication_service.whatsapp_delivery_provider_name()
+        if hasattr(communication_service, "whatsapp_delivery_provider_name")
+        else communication_service.whatsapp_adapter.provider_name
+    )
     items.extend(
         [
             {
@@ -3176,7 +3181,7 @@ async def integration_provider_statuses(request: Request):
                 "updated_at": None,
             },
             {
-                "provider": communication_service.whatsapp_adapter.provider_name,
+                "provider": whatsapp_provider_name,
                 "status": "connected" if communication_service.whatsapp_configured() else "unconfigured",
                 "sync_mode": "bidirectional",
                 "safe_config": communication_service.whatsapp_safe_summary(),

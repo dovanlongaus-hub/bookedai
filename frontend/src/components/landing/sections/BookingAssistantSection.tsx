@@ -731,7 +731,7 @@ export function BookingAssistantSection({
     nextMessages: ChatMessage[],
     geoContext?: UserGeoContext | null,
   ) {
-    const response = await fetch(`${getApiBaseUrl()}/booking-assistant/chat`, {
+    const response = await fetch(`${getApiBaseUrl()}/chat/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

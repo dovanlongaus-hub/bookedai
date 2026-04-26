@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "updatedAt": "2026-04-24T00:50:18.655Z",
+  "updatedAt": "2026-04-26T05:09:24.838Z",
   "entries": {
     "memory:memory/2026-04-21.md:85:86": {
       "key": "memory:memory/2026-04-21.md:85:86",
@@ -839,6 +839,726 @@
         "dashboard/reporting",
         "won/l",
         "verification"
+      ]
+    },
+    "memory:memory/2026-04-21.md:200:204": {
+      "key": "memory:memory/2026-04-21.md:200:204",
+      "path": "memory/2026-04-21.md",
+      "startLine": 200,
+      "endLine": 204,
+      "source": "memory",
+      "snippet": "- Added admin-only tenant management backend surfaces in `backend/api/route_handlers.py` and `backend/api/admin_routes.py` for tenant directory/detail, profile updates, member access changes, and tenant-scoped service create/update/delete, with audit log events and HTML sanitization for tenant introduction content. - Extended the admin frontend shell with a new `tenants` workspace in `frontend/src/components/AdminPage.tsx`, `workspace-nav.tsx`, and `workspace-insights.tsx`, so admin now has a dedicated menu-first surface for tenant operations instead of mixing tenant controls into catalog or reliability flows. - Added `frontend/src/features/admin/tenant-management-section.tsx` plus new admin",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 2,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:36:02.078Z",
+      "lastRecalledAt": "2026-04-26T05:09:24.838Z",
+      "queryHashes": [
+        "cce1fe18fa8a",
+        "059b9b53659c"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "admin-only",
+        "backend/api/route-handlers.py",
+        "backend/api/admin-routes.py",
+        "directory/detail",
+        "tenant-scoped",
+        "create/update/delete",
+        "workspace-nav.tsx",
+        "workspace-insights.tsx"
+      ]
+    },
+    "memory:memory/2026-04-21.md:197:201": {
+      "key": "memory:memory/2026-04-21.md:197:201",
+      "path": "memory/2026-04-21.md",
+      "startLine": 197,
+      "endLine": 201,
+      "source": "memory",
+      "snippet": "- Followed the tenant enterprise slice with direct tenant catalog draft creation, a visible tenant permission matrix in the `Team` panel, and clearer in-product catalog workflow guidance so operators can create, edit, and publish services without falling back to admin. - Cleaned up the live Google-first tenant gateway so the old config-warning panel no longer shows when Google is active, and re-ordered GIS initialization in `TenantApp.tsx` to avoid the earlier render-before-initialize warning pattern. - Rebuilt and redeployed the follow-up tenant pass live; post-deploy checks again passed for `https://tenant.bookedai.au` and `https://api.bookedai.au/api/health`, and Playwright snapshots conf",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 2,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:36:02.078Z",
+      "lastRecalledAt": "2026-04-26T05:09:24.838Z",
+      "queryHashes": [
+        "cce1fe18fa8a",
+        "059b9b53659c"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "gateway",
+        "in-product",
+        "google-first",
+        "config-warning",
+        "re-ordered",
+        "tenantapp.tsx",
+        "render-before-initialize",
+        "follow-up"
+      ]
+    },
+    "memory:memory/2026-04-21.md:119:122": {
+      "key": "memory:memory/2026-04-21.md:119:122",
+      "path": "memory/2026-04-21.md",
+      "startLine": 119,
+      "endLine": 122,
+      "source": "memory",
+      "snippet": "- Synced adjacent landing and docs wording to the same tenant Google-auth model: `frontend/src/components/landing/data.ts`, `frontend/src/apps/tenant/TenantApp.tsx`, `docs/development/implementation-progress.md`, and `docs/architecture/implementation-phase-roadmap.md` now describe tenant Google entry as auth/workspace setup instead of older `Google register/login` wording. Re-verified with `npm --prefix frontend run build`. - Final source-of-truth wording sync: `README.md` now describes `tenant.bookedai.au` as the tenant auth gateway plus workspace creation/sign-in surface, and a follow-up grep over `README.md`, `project.md`, `docs/README.md`, and the touched tenant app copy no longer showed",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 2,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:36:02.078Z",
+      "lastRecalledAt": "2026-04-26T05:09:24.838Z",
+      "queryHashes": [
+        "cce1fe18fa8a",
+        "059b9b53659c"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "gateway",
+        "google-auth",
+        "auth/workspace",
+        "register/login",
+        "re-verified",
+        "source-of-truth",
+        "readme.md",
+        "tenant.bookedai.au"
+      ]
+    },
+    "memory:memory/2026-04-21.md:115:117": {
+      "key": "memory:memory/2026-04-21.md:115:117",
+      "path": "memory/2026-04-21.md",
+      "startLine": 115,
+      "endLine": 117,
+      "source": "memory",
+      "snippet": "- Updated tenant reporting semantics so overview and booking snapshots better reflect the newer lifecycle/payment statuses: `backend/repositories/reporting_repository.py` now counts `captured`, `engaged`, `payment_pending`, `scheduled`, `processed_by_n8n`, `triggered`, and `synced` as active lead states and treats `failed`/`expired`/`refunded` booking intents as closed; `backend/service_layer/tenant_app_service.py` now groups newer booking and payment states into tenant booking summary buckets instead of misclassifying them as `other`. - Adjusted Google tenant auth so first-time Google login can auto-create a tenant account when no membership exists: both `backend/api/v1_tenant_handlers.py`",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 2,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:36:02.078Z",
+      "lastRecalledAt": "2026-04-26T05:09:24.838Z",
+      "queryHashes": [
+        "cce1fe18fa8a",
+        "059b9b53659c"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "lifecycle/payment",
+        "payment-pending",
+        "processed-by-n8n",
+        "first-time",
+        "auto-create",
+        "updated",
+        "tenant",
+        "reporting"
+      ]
+    },
+    "memory:memory/2026-04-21.md:117:120": {
+      "key": "memory:memory/2026-04-21.md:117:120",
+      "path": "memory/2026-04-21.md",
+      "startLine": 117,
+      "endLine": 120,
+      "source": "memory",
+      "snippet": "- Aligned tenant auth frontend with the new Google auto-create behavior: `frontend/src/apps/tenant/TenantApp.tsx` now sends `auth_intent: 'create'` for gateway Google flows instead of forcing `sign-in`, and `frontend/src/features/tenant-auth/TenantAuthWorkspace.tsx` copy now explains that business name is optional because BookedAI can seed the initial workspace from the Google profile. Verified with `npm --prefix frontend run build`. - Follow-up tenant auth UX copy pass: adjusted remaining gateway wording so the UI speaks in terms of opening a new workspace instead of a separate account-creation step, and normalized the Google CTA text around continue/auto-create behavior. Re-verified with `",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 2,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:36:02.078Z",
+      "lastRecalledAt": "2026-04-26T05:09:24.838Z",
+      "queryHashes": [
+        "cce1fe18fa8a",
+        "059b9b53659c"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "gateway",
+        "auto-create",
+        "auth-intent",
+        "sign-in",
+        "follow-up",
+        "account-creation",
+        "continue/auto-create",
+        "re-verified"
+      ]
+    },
+    "memory:memory/2026-04-22.md:47:52": {
+      "key": "memory:memory/2026-04-22.md:47:52",
+      "path": "memory/2026-04-22.md",
+      "startLine": 47,
+      "endLine": 52,
+      "source": "memory",
+      "snippet": "- Extended that same Phase 4 lane into bookings with a dedicated booking detail workspace, linked-payment visibility, derived payment status, and booking timeline payloads in the repository and API. - Verification for the booking-coupling pass again passed with `node node_modules/typescript/bin/tsc --noEmit` and `node node_modules/next/dist/bin/next build`. - Synced tenant Google auth wording across current source-of-truth surfaces so repo/docs no longer describe the flow as `Google register/login`; updated `frontend/src/features/tenant-auth/TenantAuthWorkspace.tsx`, `frontend/src/apps/tenant/TenantApp.tsx`, `frontend/src/components/landing/data.ts`, `README.md`, `docs/development/implementa",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 2,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:36:02.078Z",
+      "lastRecalledAt": "2026-04-26T05:09:24.838Z",
+      "queryHashes": [
+        "cce1fe18fa8a",
+        "059b9b53659c"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "linked-payment",
+        "booking-coupling",
+        "node-modules/typescript/bin/tsc",
+        "node-modules/next/dist/bin/next",
+        "source-of-truth",
+        "repo/docs",
+        "register/login",
+        "readme.md"
+      ]
+    },
+    "memory:memory/2026-04-21.md:137:142": {
+      "key": "memory:memory/2026-04-21.md:137:142",
+      "path": "memory/2026-04-21.md",
+      "startLine": 137,
+      "endLine": 142,
+      "source": "memory",
+      "snippet": "- Added `AIMentorProApp` plus `partner-plugins/ai-mentor-pro-widget.js` so tenant 3 now has an official BookedAI plugin interface for `ai.longcare.au` with inline/modal embed support. - Tenant-scoped the plugin runtime through `tenant_ref = ai-mentor-doer`, `channel = embedded_widget`, and `deployment_mode = plugin_integrated`, and tightened v1 search plus legacy catalog/chat/session reads so the widget stays on the tenant's 10 AI mentoring products. - Frontend build passed and backend route-handler syntax verification passed after the AI Mentor Pro plugin/runtime changes. - Extended `tenant.bookedai.au` with a tenant-managed `Plugin` workspace backed by `tenant_settings`, so partner tenants",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:36:02.078Z",
+      "lastRecalledAt": "2026-04-26T03:36:02.078Z",
+      "queryHashes": [
+        "cce1fe18fa8a"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "ai.longcare.au",
+        "inline/modal",
+        "tenant-scoped",
+        "tenant-ref",
+        "ai-mentor-doer",
+        "embedded-widget",
+        "deployment-mode",
+        "plugin-integrated"
+      ]
+    },
+    "memory:memory/2026-04-22.md:173:178": {
+      "key": "memory:memory/2026-04-22.md:173:178",
+      "path": "memory/2026-04-22.md",
+      "startLine": 173,
+      "endLine": 178,
+      "source": "memory",
+      "snippet": "- Targeted verification passed with `npx prisma generate`, `npx prisma validate`, and direct `tsx` module-import checks for the new Campaigns slice. - Project-wide root `tsc --noEmit` and `next build` were re-run for this pass but timed out in this environment before returning either a clean success or a concrete compiler error. - Tenant auth is now moving under an explicit email-first rule: email is the primary identifier, email-code sign-in/create/claim routes now exist, and Google remains on the same tenant login form as the fast continuation path. - Added tenant verification-code persistence through `backend/migrations/sql/015_tenant_email_login_codes.sql` and the matching `TenantEmailLo",
+      "recallCount": 2,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 2,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:36:02.078Z",
+      "lastRecalledAt": "2026-04-26T05:09:24.838Z",
+      "queryHashes": [
+        "cce1fe18fa8a",
+        "059b9b53659c"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "module-import",
+        "project-wide",
+        "re-run",
+        "email-first",
+        "email-code",
+        "sign-in/create/claim",
+        "verification-code",
+        "targeted"
+      ]
+    },
+    "memory:memory/2026-04-22.md:117:121": {
+      "key": "memory:memory/2026-04-22.md:117:121",
+      "path": "memory/2026-04-22.md",
+      "startLine": 117,
+      "endLine": 121,
+      "source": "memory",
+      "snippet": "- Live Zoho CRM contact sync is now verified end-to-end: after passing `ZOHO_CRM_*` through `docker-compose.prod.yml` and fixing `crm_repository.update_sync_record_status(...)` for asyncpg-safe `last_synced_at` writes, `POST /api/v1/integrations/crm-sync/contact` returned `sync_status: synced` with Zoho external id `120818000000569001`, and the follow-up `crm-sync/status` read returned the persisted synced record. - Tightened the BookedAI workspace memory policy so dated memory notes must not keep routine shell history, raw command transcripts, git command sequences, or ordinary build/deploy logs; memory should keep decisions, outcomes, blockers, risks, and next steps unless a command reveal",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:36:02.078Z",
+      "lastRecalledAt": "2026-04-26T03:36:02.078Z",
+      "queryHashes": [
+        "cce1fe18fa8a"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "end-to-end",
+        "zoho-crm",
+        "docker-compose.prod.yml",
+        "asyncpg-safe",
+        "last-synced-at",
+        "sync-status",
+        "follow-up",
+        "crm-sync/status"
+      ]
+    },
+    "memory:memory/2026-04-22.md:120:127": {
+      "key": "memory:memory/2026-04-22.md:120:127",
+      "path": "memory/2026-04-22.md",
+      "startLine": 120,
+      "endLine": 127,
+      "source": "memory",
+      "snippet": "- Tenant Vite workspace calls now prefer the signed session tenant slug for authenticated reads and writes, reducing stale URL-context risk after login or redirect. - Verification for this tenant pass: `py_compile` passed for tenant handlers/service/tests, `frontend/tsc` passed, `npm --prefix frontend run build` passed; targeted pytest could not run because `pytest` is missing in the local Python runtime. - Tenant workspace now exposes section-level activity summaries for experience, plugin, billing, team, and integrations so operators can see `last updated` and `last edited by` without admin-only audit tooling. - Tenant billing and team forms now disable restricted fields directly, and inte",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:36:02.078Z",
+      "lastRecalledAt": "2026-04-26T03:36:02.078Z",
+      "queryHashes": [
+        "cce1fe18fa8a"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "url-context",
+        "py-compile",
+        "handlers/service/tests",
+        "frontend/tsc",
+        "section-level",
+        "admin-only",
+        "tenant",
+        "vite"
+      ]
+    },
+    "memory:memory/2026-04-26.md:50:54": {
+      "key": "memory:memory/2026-04-26.md:50:54",
+      "path": "memory/2026-04-26.md",
+      "startLine": 50,
+      "endLine": 54,
+      "source": "memory",
+      "snippet": "- enabled live tenant admin access for Co Mai Hung Chess: invited `chess@bookedai.au`, then repaired the broken claim path by inserting the password credential directly with Supabase superuser access so `chess@bookedai.au` / `[REDACTED_TENANT_PASSWORD]` now logs into tenant `co-mai-hung-chess-class` as `tenant_admin` - ran a live admin health/UAT pass against `admin.bookedai.au`: web app and core authenticated admin APIs returned healthy responses; detailed note saved to `docs/development/admin-live-uat-2026-04-26.md` - follow-up tenant admin access verified: `chess@bookedai.au` on tenant `co-mai-hung-chess-class` remains the active `tenant_admin` login with password `[REDACTED_TENANT_PASSWORD]`, after the live claim endpo",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:57:28.863Z",
+      "lastRecalledAt": "2026-04-26T03:57:28.863Z",
+      "queryHashes": [
+        "e364b49e304a"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "bookedai.au",
+        "co-mai-hung-chess-class",
+        "tenant-admin",
+        "health/uat",
+        "admin.bookedai.au",
+        "follow-up",
+        "enabled",
+        "live"
+      ]
+    },
+    "memory:memory/2026-04-26.md:23:28": {
+      "key": "memory:memory/2026-04-26.md:23:28",
+      "path": "memory/2026-04-26.md",
+      "startLine": 23,
+      "endLine": 28,
+      "source": "memory",
+      "snippet": "- enabled live tenant admin access for Co Mai Hung Chess: invited `chess@bookedai.au`, then repaired the broken claim path by inserting the password credential directly with Supabase superuser access so `chess@bookedai.au` / `[REDACTED_TENANT_PASSWORD]` now logs into tenant `co-mai-hung-chess-class` as `tenant_admin` - ran a live admin health/UAT pass against `admin.bookedai.au`: web app and core authenticated admin APIs returned healthy responses; detailed note saved to `docs/development/admin-live-uat-2026-04-26.md` - follow-up tenant admin access verified: `chess@bookedai.au` on tenant `co-mai-hung-chess-class` remains the active `tenant_admin` login with password `[REDACTED_TENANT_PASSWORD]`, after the live claim endpo",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T03:57:28.863Z",
+      "lastRecalledAt": "2026-04-26T03:57:28.863Z",
+      "queryHashes": [
+        "e364b49e304a"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "bookedai.au",
+        "co-mai-hung-chess-class",
+        "tenant-admin",
+        "health/uat",
+        "admin.bookedai.au",
+        "follow-up",
+        "enabled",
+        "live"
+      ]
+    },
+    "memory:memory/2026-04-25.md:316:320": {
+      "key": "memory:memory/2026-04-25.md:316:320",
+      "path": "memory/2026-04-25.md",
+      "startLine": 316,
+      "endLine": 320,
+      "source": "memory",
+      "snippet": "- verified `py_compile`, focused WhatsApp/communication/lifecycle tests (`28 passed`), live `whatsapp-bot-status` (`whatsapp_evolution`, Evolution webhook `200`, safe to send), and synced the OpenClaw runtime manifest through host-level execution. - attempted live WhatsApp send to `+61481993178`: backend recorded queued messages `e464080a-dcab-4611-9f7c-bff69c264dfe` and `eac0677a-bb9e-454e-9852-75b9f6787e63`, but Evolution could not send because the personal WhatsApp instance was still unpaired/`connecting`; Meta fallback returned HTTP `400`. - upgraded the Evolution container from `atendai/evolution-api:v2.2.3` to `evoapicloud/evolution-api:v2.3.6` because v2.2.3 reproduced the known `conn",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T04:16:49.661Z",
+      "lastRecalledAt": "2026-04-26T04:16:49.661Z",
+      "queryHashes": [
+        "bae26130137e"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "py-compile",
+        "whatsapp/communication/lifecycle",
+        "whatsapp-bot-status",
+        "whatsapp-evolution",
+        "host-level",
+        "atendai/evolution-api",
+        "v2.2.3",
+        "evoapicloud/evolution-api"
+      ]
+    },
+    "memory:memory/2026-04-25.md:95:102": {
+      "key": "memory:memory/2026-04-25.md:95:102",
+      "path": "memory/2026-04-25.md",
+      "startLine": 95,
+      "endLine": 102,
+      "source": "memory",
+      "snippet": "- Added OpenClaw/Telegram `whatsapp-bot-status` operator command for the WhatsApp bot; it checks OpenClaw gateway health, API health, provider status, and webhook verify-route reachability without sending messages. - Recreated the live OpenClaw gateway/CLI so `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` includes `whatsapp_bot_status`; verified inside `openclaw-bookedai-cli` from `/workspace/bookedai.au` with trusted actor `8426853622`. - Final readiness returned OK: OpenClaw live, API live, `whatsapp_twilio` connected, and WhatsApp verify route reached FastAPI with expected invalid-token `403`. - Discord closeout for the OpenClaw WhatsApp readiness command succeeded; Notion sync again returned HTTP 4",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T04:16:49.661Z",
+      "lastRecalledAt": "2026-04-26T04:16:49.661Z",
+      "queryHashes": [
+        "bae26130137e"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "gateway",
+        "openclaw/telegram",
+        "whatsapp-bot-status",
+        "verify-route",
+        "gateway/cli",
+        "openclaw-bookedai-cli",
+        "workspace/bookedai.au",
+        "whatsapp-twilio"
+      ]
+    },
+    "memory:memory/2026-04-25.md:227:234": {
+      "key": "memory:memory/2026-04-25.md:227:234",
+      "path": "memory/2026-04-25.md",
+      "startLine": 227,
+      "endLine": 234,
+      "source": "memory",
+      "snippet": "- Added OpenClaw/Telegram `whatsapp-bot-status` operator command for the WhatsApp bot; it checks OpenClaw gateway health, API health, provider status, and webhook verify-route reachability without sending messages. - Recreated the live OpenClaw gateway/CLI so `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` includes `whatsapp_bot_status`; verified inside `openclaw-bookedai-cli` from `/workspace/bookedai.au` with trusted actor `8426853622`. - Final readiness returned OK: OpenClaw live, API live, `whatsapp_twilio` connected, and WhatsApp verify route reached FastAPI with expected invalid-token `403`. - Discord closeout for the OpenClaw WhatsApp readiness command succeeded; Notion sync again returned HTTP 4",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T04:16:49.661Z",
+      "lastRecalledAt": "2026-04-26T04:16:49.661Z",
+      "queryHashes": [
+        "bae26130137e"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "gateway",
+        "openclaw/telegram",
+        "whatsapp-bot-status",
+        "verify-route",
+        "gateway/cli",
+        "openclaw-bookedai-cli",
+        "workspace/bookedai.au",
+        "whatsapp-twilio"
+      ]
+    },
+    "memory:memory/2026-04-25.md:106:112": {
+      "key": "memory:memory/2026-04-25.md:106:112",
+      "path": "memory/2026-04-25.md",
+      "startLine": 106,
+      "endLine": 112,
+      "source": "memory",
+      "snippet": "- refined public/product search cards with Google Maps actions, top-left thumbnails/preview fallbacks, faster staged search progress, and early-match copy while keeping clarification inside BookedAI chat - verified the search-card update with `npm --prefix frontend run build`; docs synchronized across PRD, DESIGN, phase roadmap, sprint package, roadmap register, and implementation progress - configured the live WhatsApp/Twilio runtime with a webhook verify token, synced the BookedAI WhatsApp Booking Care Agent manifest into OpenClaw via host-level execution, and redeployed live - post-deploy WhatsApp readiness passed: API and OpenClaw were live, `whatsapp_twilio` reported connected, invalid",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T04:16:49.661Z",
+      "lastRecalledAt": "2026-04-26T04:16:49.661Z",
+      "queryHashes": [
+        "bae26130137e"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "public/product",
+        "top-left",
+        "thumbnails/preview",
+        "early-match",
+        "search-card",
+        "whatsapp/twilio",
+        "host-level",
+        "post-deploy"
+      ]
+    },
+    "memory:memory/2026-04-25.md:238:244": {
+      "key": "memory:memory/2026-04-25.md:238:244",
+      "path": "memory/2026-04-25.md",
+      "startLine": 238,
+      "endLine": 244,
+      "source": "memory",
+      "snippet": "- refined public/product search cards with Google Maps actions, top-left thumbnails/preview fallbacks, faster staged search progress, and early-match copy while keeping clarification inside BookedAI chat - verified the search-card update with `npm --prefix frontend run build`; docs synchronized across PRD, DESIGN, phase roadmap, sprint package, roadmap register, and implementation progress - configured the live WhatsApp/Twilio runtime with a webhook verify token, synced the BookedAI WhatsApp Booking Care Agent manifest into OpenClaw via host-level execution, and redeployed live - post-deploy WhatsApp readiness passed: API and OpenClaw were live, `whatsapp_twilio` reported connected, invalid",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T04:16:49.661Z",
+      "lastRecalledAt": "2026-04-26T04:16:49.661Z",
+      "queryHashes": [
+        "bae26130137e"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "public/product",
+        "top-left",
+        "thumbnails/preview",
+        "early-match",
+        "search-card",
+        "whatsapp/twilio",
+        "host-level",
+        "post-deploy"
+      ]
+    },
+    "memory:memory/2026-04-25.md:324:327": {
+      "key": "memory:memory/2026-04-25.md:324:327",
+      "path": "memory/2026-04-25.md",
+      "startLine": 324,
+      "endLine": 327,
+      "source": "memory",
+      "snippet": "- after the operator still saw the WhatsApp linked-device rejection, created a completely separate Evolution instance `bookedai61455301335` and published `https://bookedai.au/whatsapp/bookedai61455301335-qr-latest.png`; if this fresh instance is also rejected, the blocker is likely WhatsApp-side linked-device/rate-limit policy for the number rather than stale Evolution instance state. - switched the OpenClaw WhatsApp Booking Agent test account to the alternate Australian number `+61481993178`: created Evolution instance `bookedai61481993178`, published QR `https://bookedai.au/whatsapp/bookedai61481993178-qr-latest.png`, updated live `.env` to `WHATSAPP_FROM_NUMBER=+61481993178` and `WHATSAPP",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T04:16:49.661Z",
+      "lastRecalledAt": "2026-04-26T04:16:49.661Z",
+      "queryHashes": [
+        "bae26130137e"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "linked-device",
+        "whatsapp-side",
+        "linked-device/rate-limit",
+        "whatsapp-from-number",
+        "the",
+        "operator",
+        "still",
+        "saw"
+      ]
+    },
+    "memory:memory/2026-04-25.md:111:116": {
+      "key": "memory:memory/2026-04-25.md:111:116",
+      "path": "memory/2026-04-25.md",
+      "startLine": 111,
+      "endLine": 116,
+      "source": "memory",
+      "snippet": "- attempted WhatsApp test send to `+61481993178`; BookedAI recorded the message as queued/manual-review, and direct Twilio verification returned HTTP `401` / code `20003 Authenticate`, so the current Twilio API key/secret or account pairing must be corrected before real sends work - switched the live WhatsApp customer-care sender from sandbox `whatsapp:+14155238886` to BookedAI number `+61455301335`, synced the OpenClaw manifest, redeployed live, and confirmed the backend container now has `WHATSAPP_FROM_NUMBER=+61455301335` - direct Twilio provider probe now uses `from=whatsapp:+61455301335` but still returns HTTP `401` / code `20003 Authenticate`, confirming the remaining blocker is Twilio",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T04:16:49.661Z",
+      "lastRecalledAt": "2026-04-26T04:16:49.661Z",
+      "queryHashes": [
+        "bae26130137e"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "queued/manual-review",
+        "key/secret",
+        "customer-care",
+        "whatsapp-from-number",
+        "attempted",
+        "whatsapp",
+        "test",
+        "send"
+      ]
+    },
+    "memory:memory/2026-04-25.md:243:248": {
+      "key": "memory:memory/2026-04-25.md:243:248",
+      "path": "memory/2026-04-25.md",
+      "startLine": 243,
+      "endLine": 248,
+      "source": "memory",
+      "snippet": "- attempted WhatsApp test send to `+61481993178`; BookedAI recorded the message as queued/manual-review, and direct Twilio verification returned HTTP `401` / code `20003 Authenticate`, so the current Twilio API key/secret or account pairing must be corrected before real sends work - switched the live WhatsApp customer-care sender from sandbox `whatsapp:+14155238886` to BookedAI number `+61455301335`, synced the OpenClaw manifest, redeployed live, and confirmed the backend container now has `WHATSAPP_FROM_NUMBER=+61455301335` - direct Twilio provider probe now uses `from=whatsapp:+61455301335` but still returns HTTP `401` / code `20003 Authenticate`, confirming the remaining blocker is Twilio",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T04:16:49.661Z",
+      "lastRecalledAt": "2026-04-26T04:16:49.661Z",
+      "queryHashes": [
+        "bae26130137e"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "queued/manual-review",
+        "key/secret",
+        "customer-care",
+        "whatsapp-from-number",
+        "attempted",
+        "whatsapp",
+        "test",
+        "send"
+      ]
+    },
+    "memory:memory/2026-04-26.md:56:60": {
+      "key": "memory:memory/2026-04-26.md:56:60",
+      "path": "memory/2026-04-26.md",
+      "startLine": 56,
+      "endLine": 60,
+      "source": "memory",
+      "snippet": "- ran live tenant preview UAT against `https://tenant.bookedai.au/future-swim` and `https://tenant.bookedai.au/co-mai-hung-chess-class` on desktop/mobile; preview shell, section navigation, and API-backed data all loaded with no horizontal overflow, with evidence under `output/playwright/tenant-live-uat-2026-04-26/` - captured tenant catalog/data truth for live UAT: Future Swim currently shows `6/6` search-ready published records with valid image URLs and mixed pricing copy, while Co Mai Hung Chess shows only `1/9` search-ready and most rows remain `review`/inactive without booking URLs - documented the tenant live UAT findings in `docs/development/tenant-live-uat-2026-04-26.md`; current ope",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T05:09:24.838Z",
+      "lastRecalledAt": "2026-04-26T05:09:24.838Z",
+      "queryHashes": [
+        "059b9b53659c"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "tenant.bookedai.au/future-swim",
+        "desktop/mobile",
+        "api-backed",
+        "catalog/data",
+        "6/6",
+        "search-ready",
+        "1/9",
+        "ran"
+      ]
+    },
+    "memory:memory/2026-04-26.md:59:63": {
+      "key": "memory:memory/2026-04-26.md:59:63",
+      "path": "memory/2026-04-26.md",
+      "startLine": 59,
+      "endLine": 63,
+      "source": "memory",
+      "snippet": "- continued live tenant UAT with Playwright against `https://tenant.bookedai.au/future-swim` and `https://tenant.bookedai.au/co-mai-hung-chess-class`; captured desktop/mobile evidence under `output/playwright/tenant-live-uat-2026-04-26/` and summarized findings in `docs/development/tenant-live-uat-2026-04-26.md` - live preview shell rendered broadly across Overview, Experience Studio, Catalog, Plugin, Bookings, Enquiries/Leads, Ops, Integrations, Billing, and Team with no horizontal overflow in the captured desktop/mobile passes - Future Swim preview looked materially healthier than Co Mai Hung Chess: `future-swim` showed `6/6` search-ready catalog rows with working image responses and reali",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T05:09:24.838Z",
+      "lastRecalledAt": "2026-04-26T05:09:24.838Z",
+      "queryHashes": [
+        "059b9b53659c"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "tenant.bookedai.au/future-swim",
+        "desktop/mobile",
+        "enquiries/leads",
+        "future-swim",
+        "6/6",
+        "search-ready",
+        "continued",
+        "live"
+      ]
+    },
+    "memory:memory/2026-04-21.md:190:194": {
+      "key": "memory:memory/2026-04-21.md:190:194",
+      "path": "memory/2026-04-21.md",
+      "startLine": 190,
+      "endLine": 194,
+      "source": "memory",
+      "snippet": "- Configured the shared BookedAI Google OAuth web client `1060951992040-ne31cd37bi707ctg85mcu840ucpa5rqr.apps.googleusercontent.com` into both frontend and backend env, redeployed live with `bash scripts/deploy_live_host.sh`, and verified that `tenant.bookedai.au` plus `api.bookedai.au/api/health` are live and that the served tenant bundle now contains the real Google client ID. - Live QA pass on `tenant.bookedai.au` now confirms the shared gateway renders a real Google button for both `Sign in` and `Create account` modes in Playwright headless, with `Sign in with Google` and `Sign up with Google` copy visible in the embedded Google Identity button. - Residual QA note: Google Identity Servic",
+      "recallCount": 1,
+      "dailyCount": 0,
+      "groundedCount": 0,
+      "totalScore": 1,
+      "maxScore": 1,
+      "firstRecalledAt": "2026-04-26T05:09:24.838Z",
+      "lastRecalledAt": "2026-04-26T05:09:24.838Z",
+      "queryHashes": [
+        "059b9b53659c"
+      ],
+      "recallDays": [
+        "2026-04-26"
+      ],
+      "conceptTags": [
+        "gateway",
+        "scripts/deploy-live-host.sh",
+        "tenant.bookedai.au",
+        "api.bookedai.au/api/health",
+        "configured",
+        "the",
+        "shared",
+        "bookedai"
       ]
     }
   }

@@ -190,15 +190,15 @@ Current production deploy behavior from the script includes:
 - checking or preparing `supabase/.env`
 - syncing app env from Supabase
 - ensuring Docker network presence
-- building `web`, `backend`, `beta-web`, and `beta-backend`
+- building `backend` and `beta-backend`, then `web`, then `beta-web` with `COMPOSE_PARALLEL_LIMIT` defaulting to `1`
 - checking or extending the Let's Encrypt certificate domain set
 - starting the Supabase compose stack
-- bringing up the full production compose stack with build
+- bringing up the full production compose stack from the already-built images
 - retrying the production compose bring-up with orphan cleanup if Docker Compose hits a transient recreate failure
 - restarting `proxy`
 - provisioning n8n workflows
 
-Because the production script builds both production and beta images, the release owner should treat it as a wider infra touch than a single-container restart.
+Because the production script builds both production and beta images, the release owner should treat it as a wider infra touch than a single-container restart. The sequential frontend build order is intentional: on the current VPS, parallel `web` and `beta-web` Docker builds can terminate with `exit code 143` under memory pressure.
 
 ### 6. Verify production
 

@@ -28,6 +28,22 @@ NON_DECISIVE_QUERY_TOKENS = {
     "morning", "afternoon", "evening", "night", "monday", "tuesday", "wednesday", "thursday",
     "friday", "saturday", "sunday", "am", "pm", "book", "booking", "need", "want", "looking",
     "find", "service", "services", "option", "options", "best", "good", "local", "nearby", "closest",
+    "a", "an", "the", "this", "that", "for", "to", "of",
+}
+
+GENERIC_CORE_INTENT_TOKENS = {
+    "activity",
+    "appointment",
+    "class",
+    "classes",
+    "coach",
+    "coaching",
+    "course",
+    "kids",
+    "lesson",
+    "lessons",
+    "session",
+    "sessions",
 }
 
 
@@ -270,7 +286,7 @@ def rank_services(
     }
     core_intent_tokens = {
         token
-        for token in intent_tokens
+        for token in query_tokens
         if token not in NON_DECISIVE_QUERY_TOKENS and token not in location_tokens
     }
     prefers_low_cost = bool(
@@ -288,11 +304,15 @@ def rank_services(
         category_tokens = {*CATEGORY_KEYWORDS.get(service.category, set()), *tokenize_text(service.category)}
         synonym_tokens = SERVICE_KEYWORD_SYNONYMS.get(service.id, set())
         aligned_tokens = service_tokens | service_tags | category_tokens | synonym_tokens
+        discriminating_aligned_tokens = service_tokens | service_tags | synonym_tokens
 
         overlap = len(intent_tokens & service_tokens)
         exact_tag_matches = len(intent_tokens & service_tags)
         category_overlap = len(intent_tokens & category_tokens)
         synonym_overlap = len(intent_tokens & synonym_tokens)
+        core_intent_overlap = len(core_intent_tokens & aligned_tokens)
+        discriminating_core_tokens = core_intent_tokens - GENERIC_CORE_INTENT_TOKENS
+        discriminating_core_overlap = len(discriminating_core_tokens & discriminating_aligned_tokens)
 
         phrase_bonus = 0
         category_score = 0
@@ -307,6 +327,8 @@ def rank_services(
                 category_score -= 12
 
         if not detected_categories and core_intent_tokens and not (core_intent_tokens & aligned_tokens):
+            continue
+        if discriminating_core_tokens and not discriminating_core_overlap:
             continue
 
         if service.name.lower() in query_lower:
@@ -495,6 +517,8 @@ def rank_services(
             + exact_tag_matches * 7
             + category_overlap * 6
             + synonym_overlap * 7
+            + core_intent_overlap * 8
+            + discriminating_core_overlap * 12
             + phrase_bonus
             + category_score
             + fit_bonus

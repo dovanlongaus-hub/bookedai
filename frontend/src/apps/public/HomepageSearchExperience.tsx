@@ -1658,6 +1658,105 @@ function extractQueryIntentTerms(query: string) {
   );
 }
 
+function hasExplicitSearchArea(query: string) {
+  return /\b(sydney|western sydney|startup hub|caringbah|kirrawee|leichhardt|miranda|rouse hill|st peters|parramatta|cbd|nsw)\b/i.test(query);
+}
+
+function getFastSearchIntent(query: string): 'swim' | 'chess' | 'wsti_event' | null {
+  if (hasNearMeIntent(query) && !hasExplicitSearchArea(query)) {
+    return null;
+  }
+  if (/\b(wsti|western sydney tech innovators|western sydney startup hub|startup hub|ai events?|ai meetup|tech innovators)\b/i.test(query)) {
+    return 'wsti_event';
+  }
+  if (/\b(co mai hung|mai hung|chess|grandmaster|woman grandmaster)\b/i.test(query)) {
+    return 'chess';
+  }
+  if (/\b(future swim|futureswim|swim|swimming|learn to swim|water familiarisation|stroke correction|pre-squad)\b/i.test(query)) {
+    return 'swim';
+  }
+  return null;
+}
+
+function buildWstiFastResult(): ServiceCatalogItem {
+  return {
+    id: 'event:https://www.meetup.com/western-sydney-tech-innovators/',
+    name: 'WSTI AI Events - Western Sydney Tech Innovators',
+    category: 'AI Event',
+    summary:
+      'Western Sydney Tech Innovators runs practical AI meetups, founder sessions, and community events connected to the Western Sydney Startup Hub.',
+    duration_minutes: 90,
+    amount_aud: 0,
+    image_url: '/wsti-logo.webp',
+    map_snapshot_url: null,
+    venue_name: 'Western Sydney Tech Innovators',
+    location: 'Western Sydney Startup Hub',
+    map_url: 'https://www.google.com/maps/search/?api=1&query=Western%20Sydney%20Startup%20Hub',
+    booking_url: 'https://www.meetup.com/western-sydney-tech-innovators/',
+    source_url: 'https://www.meetup.com/western-sydney-tech-innovators/',
+    tags: ['ai', 'event', 'events', 'wsti', 'western sydney', 'startup hub', 'meetup'],
+    featured: true,
+    distance_km: null,
+    source_type: 'shortcut',
+    source_label: 'WSTI Meetup',
+    why_this_matches:
+      'Fast shortcut match for WSTI, AI events, and Western Sydney Startup Hub searches while live event discovery refreshes.',
+    display_price: 'Details in follow-up',
+    price_posture: 'price_tbc',
+    booking_path_type: 'book_on_partner_site',
+    next_step: 'Open the WSTI event page to compare upcoming AI sessions.',
+    availability_state: 'partner_booking_only',
+    booking_confidence: 'medium',
+    trust_signal: 'WSTI shortcut',
+  };
+}
+
+function buildFastSearchPreviewResults(
+  query: string,
+  catalog: BookingAssistantCatalogResponse | null,
+) {
+  const intent = getFastSearchIntent(query);
+  if (!intent) {
+    return [] as ServiceCatalogItem[];
+  }
+
+  if (intent === 'wsti_event') {
+    const catalogMatches = (catalog?.services ?? []).filter((service) => {
+      const text = normalizeSearchText([
+        service.id,
+        service.name,
+        service.category,
+        service.summary,
+        service.venue_name,
+        service.location,
+        service.source_label,
+        ...service.tags,
+      ]);
+      return /\b(wsti|western sydney tech innovators|startup hub|ai event|ai meetup)\b/i.test(text);
+    });
+    return dedupeServices([buildWstiFastResult(), ...catalogMatches]).slice(0, 3);
+  }
+
+  const catalogMatches = (catalog?.services ?? []).filter((service) => {
+    const text = normalizeSearchText([
+      service.id,
+      service.name,
+      service.category,
+      service.summary,
+      service.venue_name,
+      service.location,
+      service.source_label,
+      ...service.tags,
+    ]);
+    if (intent === 'chess') {
+      return /\b(chess|co mai hung|grandmaster|strategy|tournament)\b/i.test(text);
+    }
+    return /\b(future swim|futureswim|swim|swimming|learn to swim|water familiarisation|stroke correction|pre-squad)\b/i.test(text);
+  });
+
+  return prioritizeSearchResults(catalogMatches, null, query).slice(0, 3);
+}
+
 function filterResultsByIntentTerms(
   services: ServiceCatalogItem[],
   query: string,
@@ -2077,7 +2176,7 @@ export function HomepageSearchExperience({
   }
 
   async function requestLegacySearch(query: string, nextGeoContext?: UserGeoContext | null) {
-    const response = await fetch(`${getApiBaseUrl()}/booking-assistant/chat`, {
+    const response = await fetch(`${getApiBaseUrl()}/chat/send`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2383,31 +2482,43 @@ export function HomepageSearchExperience({
     setBookingComposerOpen(false);
     setComposerCollapsed(false);
 
-    if (catalog?.services.length) {
-      const initialResults = prioritizeSearchResults(
-        filterResultsByIntentTerms(
-          catalog.services,
-          effectiveQuery,
-        ),
-        geoContext?.locality ?? null,
-        effectiveQuery,
-      ).slice(0, 3);
+    const fastPreviewResults = buildFastSearchPreviewResults(effectiveQuery, catalog);
+
+    if (fastPreviewResults.length > 0 || catalog?.services.length) {
+      const initialResults =
+        fastPreviewResults.length > 0
+          ? fastPreviewResults
+          : prioritizeSearchResults(
+              filterResultsByIntentTerms(
+                catalog?.services ?? [],
+                effectiveQuery,
+              ),
+              geoContext?.locality ?? null,
+              effectiveQuery,
+            ).slice(0, 3);
 
       if (initialResults.length > 0) {
         trackHomepageSearchEvent('homepage_top_research_visible', {
           query: trimmedQuery,
           result_count: initialResults.length,
-          mode: 'initial_catalog',
+          mode: fastPreviewResults.length > 0 ? 'fast_shortcut' : 'initial_catalog',
         });
         setResults(initialResults);
         setSelectedServiceId('');
-        setAssistantSummary('I am showing the first likely matches while live ranking, location, and booking-path checks continue.');
+        setAssistantSummary(
+          fastPreviewResults.length > 0
+            ? 'I am showing shortcut matches immediately while live ranking, event discovery, and booking-path checks continue.'
+            : 'I am showing the first likely matches while live ranking, location, and booking-path checks continue.',
+        );
         setAgentChatMessages((current) => [
           ...current,
           {
             id: createAgentChatMessageId('assistant'),
             role: 'assistant',
-            content: 'I am showing the first likely matches while live ranking continues. Add area, time, or a preference if you want me to tighten the search.',
+            content:
+              fastPreviewResults.length > 0
+                ? 'I found shortcut matches immediately for this search. I will keep checking live ranking and booking paths in the background.'
+                : 'I am showing the first likely matches while live ranking continues. Add area, time, or a preference if you want me to tighten the search.',
             resultIds: initialResults.map((item) => item.id),
             suggestions: deriveIntentSuggestions(trimmedQuery).slice(0, 3),
           },
@@ -2610,7 +2721,7 @@ export function HomepageSearchExperience({
             effectiveQuery,
             priorityIntentTerms,
           );
-      const prioritizedResults =
+      const rankedResults =
         liveRead.recommendedCandidateIds.length > 0
           ? intentFilteredResults
           : prioritizeSearchResults(
@@ -2619,6 +2730,10 @@ export function HomepageSearchExperience({
               effectiveQuery,
               priorityIntentTerms,
             );
+      const prioritizedResults =
+        rankedResults.length > 0 || !fastPreviewResults.length || shouldHoldResultsForLocation
+          ? rankedResults
+          : fastPreviewResults;
 
       const nextSuggestedId =
         prioritizedResults[0]?.id ??
@@ -2677,13 +2792,16 @@ export function HomepageSearchExperience({
           query: trimmedQuery,
           result_count: prioritizedResults.slice(0, 3).length,
           total_result_count: prioritizedResults.length,
-          mode: isLiveReadAuthoritative ? 'live_read' : 'legacy',
+          mode: rankedResults.length > 0 ? (isLiveReadAuthoritative ? 'live_read' : 'legacy') : 'fast_shortcut_final',
         });
       }
       setSearchWarnings([
         ...liveRead.warnings,
         ...(liveRead.bookingPathSummary?.warnings ?? []),
         ...(liveRead.trustSummary?.warnings ?? []),
+        ...(rankedResults.length === 0 && fastPreviewResults.length > 0
+          ? ['Showing fast BookedAI shortcut results while deeper ranking catches up.']
+          : []),
       ]);
       setLiveReadBookingSummary(
         liveRead.usedLiveRead

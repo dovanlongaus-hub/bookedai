@@ -198,6 +198,8 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
                 google_maps_static_api_key="",
                 google_oauth_client_id="",
                 booking_business_email="info@bookedai.au",
+                customer_booking_support_email="info@bookedai.au",
+                customer_booking_support_phone="+61481993178",
                 email_smtp_host="",
                 email_smtp_port=587,
                 email_smtp_username="",
@@ -716,6 +718,8 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
             google_maps_static_api_key="",
             google_oauth_client_id="",
             booking_business_email="info@bookedai.au",
+            customer_booking_support_email="info@bookedai.au",
+            customer_booking_support_phone="+61481993178",
             email_smtp_host="",
             email_smtp_port=587,
             email_smtp_username="",
@@ -870,6 +874,8 @@ def _build_test_settings(*, access_token: str = "") -> Settings:
         google_maps_static_api_key="",
         google_oauth_client_id="",
         booking_business_email="info@bookedai.au",
+        customer_booking_support_email="info@bookedai.au",
+        customer_booking_support_phone="+61481993178",
         email_smtp_host="",
         email_smtp_port=587,
         email_smtp_username="",
@@ -918,6 +924,46 @@ def _build_test_settings(*, access_token: str = "") -> Settings:
 
 
 class CommunicationServiceDeliveryFallbackTestCase(IsolatedAsyncioTestCase):
+    async def test_send_telegram_includes_html_parse_mode_when_requested(self):
+        settings = replace(
+            _build_test_settings(),
+            bookedai_customer_telegram_bot_token="telegram-token",
+        )
+        service = CommunicationService(settings)
+        captured_payload: dict[str, object] = {}
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                return None
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, **kwargs):
+                captured_payload["url"] = url
+                captured_payload["json"] = kwargs.get("json")
+                return httpx.Response(
+                    200,
+                    request=httpx.Request("POST", url),
+                    json={"ok": True, "result": {"message_id": 123}},
+                )
+
+        with patch("service_layer.communication_service.httpx.AsyncClient", _FakeAsyncClient):
+            result = await service.send_telegram(
+                chat_id="123456",
+                body="<b>BookedAI.au</b>",
+                parse_mode="HTML",
+                reply_markup={"inline_keyboard": [[{"text": "Open", "url": "https://bookedai.au"}]]},
+            )
+
+        self.assertEqual(result.delivery_status, "sent")
+        self.assertEqual(captured_payload["json"]["parse_mode"], "HTML")
+        self.assertEqual(captured_payload["json"]["text"], "<b>BookedAI.au</b>")
+        self.assertIn("reply_markup", captured_payload["json"])
+
     async def test_send_sms_downgrades_provider_auth_failure_to_queued_warning(self):
         settings = replace(
             _build_test_settings(),
@@ -1143,3 +1189,81 @@ class CommunicationServiceDeliveryFallbackTestCase(IsolatedAsyncioTestCase):
         self.assertEqual(result.provider_message_id, "SM789")
         self.assertTrue(result.warnings)
         self.assertIn("primary provider whatsapp_meta is unavailable", result.warnings[0])
+
+    async def test_send_whatsapp_evolution_retries_legacy_payload_when_v2_payload_fails(self):
+        settings = replace(
+            _build_test_settings(),
+            whatsapp_provider="evolution",
+            whatsapp_evolution_api_url="https://waba.bookedai.au",
+            whatsapp_evolution_api_key="evo-key",
+            whatsapp_evolution_instance="bookedai61481993178",
+        )
+        service = CommunicationService(settings)
+        test_case = self
+        captured_payloads: list[dict[str, object]] = []
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                return None
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, url, **kwargs):
+                test_case.assertEqual(
+                    url,
+                    "https://waba.bookedai.au/message/sendText/bookedai61481993178",
+                )
+                test_case.assertEqual(kwargs["headers"]["apikey"], "evo-key")
+                captured_payloads.append(kwargs["json"])
+                if len(captured_payloads) == 1:
+                    return httpx.Response(
+                        500,
+                        request=httpx.Request("POST", url),
+                        text="Internal Server Error",
+                    )
+                return httpx.Response(
+                    201,
+                    request=httpx.Request("POST", url),
+                    json={"key": {"id": "EVO123"}, "status": "PENDING"},
+                )
+
+        with patch("service_layer.communication_service.httpx.AsyncClient", _FakeAsyncClient):
+            result = await service.send_whatsapp(
+                to="+61400000000",
+                body="Hello from BookedAI on WhatsApp",
+            )
+
+        self.assertEqual(
+            captured_payloads,
+            [
+                {"number": "61400000000", "text": "Hello from BookedAI on WhatsApp"},
+                {
+                    "number": "61400000000",
+                    "textMessage": {"text": "Hello from BookedAI on WhatsApp"},
+                },
+            ],
+        )
+        self.assertEqual(result.provider, "whatsapp_evolution")
+        self.assertEqual(result.delivery_status, "sent")
+        self.assertEqual(result.provider_message_id, "EVO123")
+        self.assertTrue(result.warnings)
+        self.assertIn("legacy textMessage payload", result.warnings[-1])
+
+    async def test_whatsapp_delivery_provider_name_reports_configured_fallback(self):
+        settings = replace(
+            _build_test_settings(),
+            whatsapp_provider="meta",
+            whatsapp_fallback_provider="evolution",
+            whatsapp_meta_phone_number_id="",
+            whatsapp_meta_access_token="",
+            whatsapp_evolution_api_url="https://waba.bookedai.au",
+            whatsapp_evolution_api_key="evo-key",
+        )
+        service = CommunicationService(settings)
+
+        self.assertTrue(service.whatsapp_configured())
+        self.assertEqual(service.whatsapp_delivery_provider_name(), "whatsapp_evolution")

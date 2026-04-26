@@ -11,6 +11,7 @@ echo "[release-gate] frontend build + smoke"
 (
   cd "$FRONTEND_DIR"
   npm run test:playwright:smoke
+  npm run test:playwright:tenant-smoke
 )
 
 if [[ ! -x "$BACKEND_PYTHON" ]]; then

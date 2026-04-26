@@ -2,7 +2,20 @@
 
 BookedAI is a Docker-based full-stack application for the `bookedai.au` domain, built around the product direction `BookedAI - The AI Revenue Engine for Service Businesses`, with self-hosted Supabase, n8n, and Hermes running on the same Docker host.
 
+Product requirement message: BookedAI connects every customer message — WhatsApp, SMS, Telegram, email and web chat — into one AI Revenue Engine that captures intent, books appointments, collects payment, follows up, and retains customers automatically.
+
+Customer-facing chat agent name: `BookedAI Manager Bot`.
+
+Default BookedAI customer booking support identity: `info@bookedai.au` and `+61455301335` for Telegram, WhatsApp, or iMessage.
+
 Current application release baseline: `1.0.1-stable`.
+
+Current execution lock from `2026-04-26`:
+
+- BookedAI should be operated as one AI Revenue Engine across public/product/tenant/portal/admin surfaces, backend booking/revenue contracts, Messaging Automation Layer channels, and release-governance tooling.
+- The urgent implementation order is UI/UX stabilization first, the standard booking journey second, and Messaging Automation Layer consolidation third.
+- The standard booking journey is `Ask -> Match -> Compare -> Book -> Confirm -> Portal -> Follow-up`.
+- Active phase execution is Phase/Sprint `17-23`: full-flow stabilization, revenue-ops ledger control, customer-care/status agent, widget/plugin runtime, confirmation wallet plus Stripe return continuity, billing/receivables/subscription truth, multi-tenant templates, and release governance.
 
 Current public runtime decision:
 
@@ -12,7 +25,7 @@ Current public runtime decision:
 - `scripts/healthcheck_stack.sh` expects `bookedai.au` to serve the homepage shell directly and still probes `pitch.bookedai.au` as the deeper pitch surface.
 - `product.bookedai.au` is the deeper live product web runtime; search uses a ChatGPT-like composer, results stay results-first after ranking, and compact cards use detail popups, chat-based refinements, and explicit `Book` actions before customer details open.
 - chess searches can surface the reviewed BookedAI chess tenant in the normal result list with verified-tenant capability chips for booking, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit/revisit.
-- configured WhatsApp inbound messages now act as a customer-care channel: BookedAI resolves the booking, answers from portal booking/payment truth, and queues audited cancel or reschedule requests when customers ask to change an existing booking.
+- configured messaging channels now feed a shared Messaging Automation Layer: customer message -> channel webhook -> BookedAI Inbox (`conversation_events`) -> AI booking-care policy -> booking/payment/follow-up/retention workflow side effects -> provider reply. The separate customer-facing BookedAI Telegram bot is the first generalized channel at `/api/webhooks/bookedai-telegram`, while WhatsApp continues through `/api/webhooks/whatsapp` and `/api/webhooks/evolution`; SMS, email, and web chat should reuse this same engine as their adapters mature.
 - `/roadmap` exposes the active Phase/Sprint `17-23` plan for full-flow stabilization, revenue-ops control, customer care, widget runtime, billing truth, templates, and release governance.
 - native mobile is intentionally deferred to a later phase.
 
@@ -34,7 +47,7 @@ Top-level `/api/*` routers:
 
 - `backend/api/public_catalog_routes.py`: public catalog, booking assistant, pricing, and demo endpoints
 - `backend/api/upload_routes.py`: upload entrypoints under `/api/uploads/*`
-- `backend/api/webhook_routes.py`: Tawk, WhatsApp, and automation callbacks under `/api/webhooks/*` and `/api/automation/*`
+- `backend/api/webhook_routes.py`: Tawk, WhatsApp, Telegram, Evolution, and automation callbacks under `/api/webhooks/*` and `/api/automation/*`
 - `backend/api/admin_routes.py`: admin login, overview, bookings, catalog QA, and partner management
 - `backend/api/communication_routes.py`: email endpoints and Discord interactions
 
@@ -83,7 +96,7 @@ Implementation rules:
 
 Production traffic is expected to follow this path:
 
-- `https://bookedai.au/` -> canonical public redirect to `https://pitch.bookedai.au/`
+- `https://bookedai.au/` -> executive acquisition homepage with live search-to-booking workspace
 - `https://api.bookedai.au/*` -> FastAPI backend
 - `https://admin.bookedai.au/` -> admin-facing frontend routes behind the same proxy
 - `https://product.bookedai.au/` -> live product web runtime and booking-agent frontend
@@ -116,6 +129,7 @@ Core production services defined in [`docker-compose.prod.yml`](/home/dovanlong/
 
 ## WhatsApp customer care
 
+- the customer-care policy is shared through `backend/service_layer/messaging_automation_service.py`, so WhatsApp and Telegram use the same booking reference resolution, 60-day conversation window, booking-intake reply, portal-grounded care answer, and request-safe cancellation/reschedule workflow trigger
 - `Evolution API personal WhatsApp QR session -> /api/webhooks/evolution` on the backend while WhatsApp Business verification is pending
 - `Twilio/Meta WhatsApp -> /api/webhooks/whatsapp` remains the business-provider path for later verified rollout
 - the customer-facing runtime is the dedicated `BookedAI WhatsApp Booking Care Agent` for `bookedai.au`
@@ -126,9 +140,33 @@ Core production services defined in [`docker-compose.prod.yml`](/home/dovanlong/
 - when the communication service is configured, BookedAI resolves the booking by reference first, then by sender phone/email only when one safe booking is found
 - replies use portal booking truth, including booking status, payment posture, support contact, service/provider context, academy/report context, and revenue-ops action state
 - clear cancellation or reschedule messages queue the same audited portal requests as `portal.bookedai.au`, send or record an email confirmation, create a CRM task mirror, and become visible in the tenant booking request queue; unsupported or ambiguous cases ask for booking reference or human review
-- OpenClaw remains the trusted gateway/operator surface for deploying, supervising, and safely checking this dedicated AI agent through `bot.bookedai.au` and `scripts/telegram_workspace_ops.py`; the customer-facing WhatsApp bot itself is the FastAPI webhook plus provider adapter path above
-- the OpenClaw-owned agent manifest lives at `deploy/openclaw/agents/bookedai-whatsapp-booking-care-agent.json` and can be synced into the OpenClaw runtime with `python3 scripts/telegram_workspace_ops.py sync-openclaw-bookedai-agent`
-- operators can run `python3 scripts/telegram_workspace_ops.py whatsapp-bot-status` from OpenClaw or the repo to verify gateway health, API health, WhatsApp provider connectivity, and webhook route reachability without sending a customer message
+- this customer Booking AI Agent is named `BookedAI Manager Bot`; it is a customer-facing FastAPI/provider runtime and is separate from OpenClaw or the operator Telegram path used to program, test, deploy, or administer this repo
+- OpenClaw and `scripts/telegram_workspace_ops.py` remain operator tooling only; they must not share bot tokens, webhook routes, names, or permissions with `BookedAI Manager Bot`
+
+## Telegram customer care
+
+- Website chat uses the direct request path `Website Chat UI -> POST /api/chat/send -> BookedAI AI Engine -> web response`; the older `/api/booking-assistant/chat` route remains as a compatibility alias
+- Website demo/product chat is a public BookedAI web-user surface: it can search all BookedAI catalog data and, when enabled, expand to Internet/public-web results
+- Telegram uses the provider request path `Telegram Bot -> POST /api/webhooks/telegram or /api/webhooks/bookedai-telegram -> BookedAI AI Engine -> Telegram sendMessage reply`
+- Telegram is a private customer-thread surface: the customer can search and chat like the website, but booking-specific answers require a booking reference or a safe single phone/email identity match from that chat; Telegram chat id alone is not a booking identity
+- `Telegram Bot API -> /api/webhooks/bookedai-telegram` is the first priority channel for the customer-facing Messaging Automation Layer; `/api/webhooks/telegram` remains a compatibility alias
+- Telegram display name should be `BookedAI Manager Bot`
+- preferred Telegram username is `@BookedAI_Manager_Bot`; fallback usernames are `@BookedAIBookingBot`, `@BookedAIServiceBot`, then `@BookedAIHelpBot` if the preferred name is unavailable
+- configure `BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN` for outbound customer replies and optionally configure `BOOKEDAI_CUSTOMER_TELEGRAM_WEBHOOK_SECRET_TOKEN` for Telegram's `X-Telegram-Bot-Api-Secret-Token` webhook verification header
+- default support/contact for BookedAI-managed customer booking channels is `BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL=info@bookedai.au` and `BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_PHONE=+61455301335`; expose that phone as Telegram, WhatsApp, or iMessage-capable customer contact
+- intended customer webhook target: `https://api.bookedai.au/api/webhooks/bookedai-telegram`
+- live status: `@BookedAI_Manager_Bot` is active with Telegram webhook configured to the customer webhook target, and the production backend reads `BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN` from the live secret environment
+- do not use the OpenClaw/operator Telegram bot token here; this bot is only for BookedAI customer service search, booking, follow-up, billing reminders, reschedule/cancel requests, confirmation, and retention journeys
+- Telegram messages are stored as `telegram_inbound` conversation events, answered by the same booking-care/status agent as WhatsApp, and can queue audited cancellation or reschedule requests when the booking is safely resolved
+- Telegram service-search shortlist state is also mirrored into `messaging_channel_sessions`, so callback actions can recover the latest query/options/reply controls without depending only on event-history shape
+- new service-search messages are answered as BookedAI representative replies: the bot searches active catalog records, shows compact top options with provider/location/price/source posture, and includes Telegram inline controls for `Open full results in BookedAI`, `View n`, `Book n`, and optional `Find more on Internet near me`
+- service-search replies also store a `bookedai_chat_response` payload matching the public web chat structure (`reply`, `matched_services`, `matched_events`, `suggested_service_id`, and location posture) so Telegram results can be rendered by the same BookedAI API contract
+- customers can tap or send `Find more on Internet near me` to widen discovery through the configured BookedAI public search service; external results are labeled `public_web_search` and remain inside the BookedAI reply/booking flow
+- after a shortlist reply, customers can tap `Book 1` or answer `Book 1` with name plus email or phone and preferred time; BookedAI creates the contact, lead, booking intent, booking reference, portal link, and pending payment/follow-up state directly from Telegram
+- existing-booking questions remain scoped to that private channel and are loaded only by explicit booking reference or a safe single customer identity match from phone/email parsed from the customer message or provider metadata
+- operator activation helper: after `BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN` is present in the secret environment, run `python3 scripts/customer_telegram_bot_manager.py --get-me --activate-webhook --webhook-info`; after a user has pressed Start in Telegram, get a chat id with `python3 scripts/customer_telegram_bot_manager.py --recent-chats` and send a controlled test with `python3 scripts/customer_telegram_bot_manager.py --send-test-chat-id <chat_id>`
+- operator UAT helper: run `python3 scripts/customer_agent_uat.py --api-base https://api.bookedai.au` for the web-chat probe; set `BOOKEDAI_CUSTOMER_TELEGRAM_WEBHOOK_SECRET_TOKEN` and `BOOKEDAI_CUSTOMER_TELEGRAM_UAT_CHAT_ID` to include Telegram message/callback webhook probes without printing secrets
+- protected operator health is available at `/api/customer-agent/health` and `/api/admin/customer-agent/health` with admin authentication; it reports recent channel events, pending posture, last reply/callback status, identity-resolution failures, and recent channel-session snapshots
 
 AI provider:
 
@@ -236,14 +274,14 @@ python3 scripts/telegram_workspace_ops.py sync-repo-docs --skip-discord
 - `NOTION_API_TOKEN` plus either `NOTION_PARENT_PAGE_ID` or `NOTION_DATABASE_ID` if you want Telegram-driven change summaries written directly into Notion
 - optional `NOTION_VERSION` to override the default Notion API version used by the sync script
 - `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` with the Telegram user ids allowed to run elevated BookedAI workspace actions through `telegram_workspace_ops.py`
-- `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` to define which elevated Telegram actions are allowed, such as `build_frontend`, `deploy_live`, `test`, `workspace_write`, `repo_structure`, `host_command`, `host_shell`, `whatsapp_bot_status`, or `full_project`
+- `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` to define which elevated Telegram actions are allowed, such as `build_frontend`, `deploy_live`, `test`, `workspace_write`, `repo_structure`, `host_command`, `host_shell`, `openclaw_runtime_admin`, `whatsapp_bot_status`, or `full_project`
 - `ADMIN_API_TOKEN` for protected email admin routes
 - `ADMIN_PASSWORD` for admin login credentials
 - `ADMIN_BOOTSTRAP_PASSWORD` for explicitly enabled bootstrap-style admin login routes
 - optional `ADMIN_ENABLE_BOOTSTRAP_LOGIN=1` if you need the old password-based admin login as a break-glass path
 - optional `ADMIN_BOOTSTRAP_ALLOWED_EMAILS` as a comma-separated allowlist for bootstrap-eligible admin emails
 - `TAWK_WEBHOOK_SECRET` if you enable signature verification
-- `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_SMTP_PASSWORD`, `EMAIL_SMTP_FROM`
+- `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_SMTP_PASSWORD`, `EMAIL_SMTP_FROM`; if the username/from values are omitted, BookedAI defaults both sender identity fields to `info@bookedai.au`
 - `EMAIL_IMAP_HOST`, `EMAIL_IMAP_PORT`, `EMAIL_IMAP_USERNAME`, `EMAIL_IMAP_PASSWORD`
 - `ZOHO_CRM_CLIENT_ID`, `ZOHO_CRM_CLIENT_SECRET`, and `ZOHO_CRM_REFRESH_TOKEN` for durable Zoho CRM write-back
 - optional `ZOHO_CRM_ACCESS_TOKEN` for short-lived smoke tests only
@@ -480,6 +518,8 @@ python3 scripts/telegram_workspace_ops.py workspace-command --command "git mv ol
 python3 scripts/telegram_workspace_ops.py host-command --command "apt-get update"
 python3 scripts/telegram_workspace_ops.py host-shell --cwd / --command "docker ps && systemctl status nginx"
 python3 scripts/telegram_workspace_ops.py sync-openclaw-bookedai-agent
+python3 scripts/telegram_workspace_ops.py fix-openclaw-approvals
+python3 scripts/telegram_workspace_ops.py enable-openclaw-full-access
 python3 scripts/telegram_workspace_ops.py whatsapp-bot-status
 ```
 
@@ -491,7 +531,9 @@ The wrapper keeps the operator path explicit:
 - `workspace-command` runs a repo-scoped shell command so Telegram/OpenClaw can handle broader BookedAI changes, including file moves, refactors, and multi-surface rollout steps
 - `host-command` runs a host-level command through `sudo -n` only when the requested program is in the checked-in allowlist such as `apt-get`, `docker`, `systemctl`, `journalctl`, `service`, `timedatectl`, or `ufw`
 - `host-shell` runs a fully elevated host shell command from any server path and is the intended lane when trusted Telegram/OpenClaw operators need broad `host/elevated` access across the whole machine
-- `sync-openclaw-bookedai-agent` installs or updates the BookedAI WhatsApp Booking Care Agent manifest in the OpenClaw runtime config directory without adding schema-invalid entries to `openclaw.json`
+- `sync-openclaw-bookedai-agent` installs or updates the always-on `BookedAI Booking Customer Agent` manifest in the OpenClaw runtime config directory without adding schema-invalid entries to `openclaw.json`; use `--legacy-whatsapp-agent` only when syncing the older WhatsApp-specific care manifest
+- `fix-openclaw-approvals` aligns `tools.exec.ask` and the host `exec-approvals.json` defaults to `on-miss`, repairing the OpenClaw error `allow-always is unavailable because the effective policy requires approval every time` while keeping untrusted commands approval-gated
+- `enable-openclaw-full-access` is the trusted-operator break-glass posture for `bot.bookedai.au`: it sets OpenClaw exec to `security=full`, `ask=off`, `askFallback=full`, enables elevated access for webchat, enables elevated access for Telegram trusted ids, and sets `agents.defaults.elevatedDefault=full`; pass `--telegram-open` only if every Telegram sender should be allowed
 - `whatsapp-bot-status` runs the read-only WhatsApp bot readiness probe for OpenClaw, API health, provider status, and the active webhook route; for `whatsapp_evolution` it checks `/api/webhooks/evolution`, and for Meta/Twilio it checks `/api/webhooks/whatsapp`
 - when the wrapper is running inside the privileged OpenClaw CLI container, `deploy-live`, `host-command`, and `host-shell` now jump into the real host namespaces through `nsenter --target 1 ...`, so Docker, package managers, and system binaries resolve against the VPS itself instead of the container filesystem
 - `sync-doc` is the documentation or Notion or Discord path for Telegram change tracking
@@ -508,6 +550,7 @@ Telegram authorization for elevated actions:
 - `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS` controls which elevated actions that allowlist can run
 - the default checked-in operator baseline now includes trusted operator `8426853622` with full BookedAI workspace coverage for live deploy, test, repo-structure work, safe host commands, full host shell access, and broader project commands
 - the live OpenClaw Telegram channel is now also configured with `dmPolicy: allowlist` plus `allowFrom: ["8426853622"]`, so the trusted operator path no longer stops at DM pairing before elevated repo or host actions can run
+- the full-access OpenClaw runtime repair keeps Telegram on the trusted user allowlist by default; use `enable-openclaw-full-access --telegram-open` only for an intentionally public Telegram control surface
 - if your Telegram bridge can pass the actor id, use `--telegram-user-id` or set `BOOKEDAI_TELEGRAM_USER_ID` or `TELEGRAM_USER_ID`
 - inspect the current permission snapshot with:
 
@@ -697,6 +740,6 @@ curl -s \
 - `scripts/prepare_supabase_env.sh`: generates and patches `supabase/.env`
 - `scripts/sync_app_env_from_supabase.sh`: syncs app DB and API keys from `supabase/.env`
 - `scripts/deploy_beta.sh`: rebuilds and redeploys the beta staging runtime at `beta.bookedai.au`
-- `scripts/deploy_production.sh`: obtains Let's Encrypt certs, deploys both production and beta stacks, and retries production Compose bring-up with orphan cleanup if recreate fails transiently
+- `scripts/deploy_production.sh`: obtains Let's Encrypt certs, deploys both production and beta stacks, builds production and beta web images sequentially by default to avoid VPS memory-pressure `143` failures, and retries production Compose bring-up with orphan cleanup if recreate fails transiently
 - `scripts/healthcheck_stack.sh`: validates production Compose services, required Supabase containers, and HTTPS endpoints
 - `scripts/install_healthcheck_cron.sh`: installs recurring health check cron job

@@ -19,6 +19,7 @@ router = APIRouter(prefix="/api")
 
 router.add_api_route("/", handlers.api_root, methods=["GET"])
 router.add_api_route("/health", handlers.healthcheck, methods=["GET"])
+router.add_api_route("/customer-agent/health", handlers.customer_agent_health, methods=["GET"])
 router.add_api_route("/config", handlers.public_config, methods=["GET"])
 router.add_api_route(
     "/partners",
@@ -33,10 +34,21 @@ router.add_api_route(
     response_model=BookingAssistantCatalogResponse,
 )
 router.add_api_route(
+    "/chat/send",
+    handlers.booking_assistant_chat,
+    methods=["POST"],
+    response_model=BookingAssistantChatResponse,
+)
+router.add_api_route(
     "/booking-assistant/chat",
     handlers.booking_assistant_chat,
     methods=["POST"],
     response_model=BookingAssistantChatResponse,
+)
+router.add_api_route(
+    "/chat/send/stream",
+    handlers.booking_assistant_chat_stream,
+    methods=["POST"],
 )
 router.add_api_route(
     "/booking-assistant/chat/stream",

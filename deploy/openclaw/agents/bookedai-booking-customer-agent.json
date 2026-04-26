@@ -1,0 +1,126 @@
+{
+  "id": "bookedai-booking-customer-agent",
+  "name": "BookedAI Booking Customer Agent",
+  "workspace": "/workspace/bookedai.au",
+  "repoRoot": "/workspace/bookedai.au",
+  "skipBootstrap": true,
+  "model": {
+    "primary": "openai/gpt-5.4",
+    "fallback": "openai/gpt-5.4-mini",
+    "auth": "openai_env",
+    "requiredEnv": [
+      "OPENAI_API_KEY"
+    ]
+  },
+  "runtime": {
+    "surface": "omnichannel_customer_booking",
+    "publicHost": "bookedai.au",
+    "apiBase": "https://api.bookedai.au",
+    "chatEndpoint": "/api/chat/send",
+    "telegramWebhookPath": "/api/webhooks/bookedai-telegram",
+    "telegramCompatibilityWebhookPath": "/api/webhooks/telegram",
+    "webhookStatusCommand": "python3 scripts/customer_telegram_bot_manager.py --webhook-info",
+    "activationCommand": "python3 scripts/customer_telegram_bot_manager.py --get-me --activate-webhook --webhook-info",
+    "recentChatsCommand": "python3 scripts/customer_telegram_bot_manager.py --recent-chats"
+  },
+  "channels": {
+    "website": {
+      "entrypoint": "POST /api/chat/send",
+      "identityMode": "public_web_user",
+      "searchScope": [
+        "all_bookedai_catalog_data",
+        "bookedai_live_read",
+        "internet_public_web_when_enabled"
+      ],
+      "responseMode": "web_response"
+    },
+    "telegram": {
+      "botName": "BookedAI Manager Bot",
+      "username": "@BookedAI_Manager_Bot",
+      "entrypoint": "POST /api/webhooks/bookedai-telegram",
+      "compatibilityEntrypoint": "POST /api/webhooks/telegram",
+      "identityMode": "private_customer_thread",
+      "replyTransport": "Telegram Bot API sendMessage",
+      "requiredEnv": [
+        "BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN"
+      ],
+      "optionalEnv": [
+        "BOOKEDAI_CUSTOMER_TELEGRAM_WEBHOOK_SECRET_TOKEN"
+      ]
+    }
+  },
+  "scope": [
+    "answer customer questions on website chat and Telegram using the same BookedAI AI Engine policy",
+    "search all BookedAI service catalog data for public web demo/product users",
+    "expand search to public internet results when the customer asks for Internet or near-me search and the OpenAI-backed public search service is configured",
+    "return service shortlists in the BookedAI chat response shape: reply, matched_services, matched_events, suggested_service_id, and location posture",
+    "start booking intake by collecting service, location, preferred day/time, customer name, email, and phone context",
+    "create booking-intent handoff through BookedAI APIs rather than bypassing the platform",
+    "answer existing booking questions only from BookedAI booking truth when identity is safely resolved",
+    "queue cancellation and reschedule requests through audited BookedAI portal request APIs"
+  ],
+  "systemBoundary": {
+    "sourceOfTruth": [
+      "BookedAI catalog and tenant service records",
+      "BookAI public-web fallback results labeled as public_web_search",
+      "portal booking snapshot",
+      "payment posture",
+      "service/provider context",
+      "support contact",
+      "academy/report context",
+      "revenue-ops action state",
+      "audit/outbox request state"
+    ],
+    "identityPolicy": {
+      "website": "public web users may search broadly but do not receive private booking details without booking reference or verified contact identity",
+      "telegram": "private customer thread; load booking details only by booking_reference, single safe phone match, or single safe email match; never use telegram_chat_id alone as a booking identity"
+    },
+    "identityAnchorOrder": [
+      "booking_reference",
+      "single_safe_phone_match",
+      "single_safe_email_match"
+    ],
+    "guardrails": [
+      "do not expose booking detail when phone or email maps to multiple bookings",
+      "do not treat Telegram chat id or username as a booking identity",
+      "do not claim cancellation, reschedule, payment, refund, or provider-side confirmation until BookedAI or the provider confirms it",
+      "do not bypass BookedAI APIs, audit logs, outbox, CRM lifecycle sync, or tenant dashboard state",
+      "do not expose repository, deployment, host-shell, or OpenClaw operator capabilities to customers",
+      "clearly label public internet fallback results as sourced public-web options"
+    ]
+  },
+  "tools": {
+    "openai": {
+      "enabled": true,
+      "auth": "OPENAI_API_KEY",
+      "internetSearch": true
+    },
+    "bookedaiApi": {
+      "enabled": true,
+      "baseUrl": "https://api.bookedai.au",
+      "allowedEndpoints": [
+        "POST /api/chat/send",
+        "POST /api/webhooks/bookedai-telegram",
+        "POST /api/webhooks/telegram",
+        "POST /api/v1/agents/customer-turn",
+        "POST /api/v1/matching/search",
+        "POST /api/v1/leads",
+        "POST /api/v1/booking-intents",
+        "POST /api/v1/customer-care/turn"
+      ]
+    },
+    "elevated": {
+      "enabled": false,
+      "allowFrom": {}
+    }
+  },
+  "operatingMode": {
+    "alwaysOn": true,
+    "customerFacing": true,
+    "operatorFacing": false,
+    "separateFromOpenClawOperatorBot": true,
+    "noRepoWrite": true,
+    "noDeployAuthority": true,
+    "noHostShell": true
+  }
+}

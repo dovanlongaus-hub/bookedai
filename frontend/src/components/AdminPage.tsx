@@ -276,7 +276,10 @@ export function AdminPage() {
         return;
       }
 
-      target.scrollIntoView({ behavior: 'auto', block: 'start' });
+      const topbarOffset = 112;
+      const targetTop = target.getBoundingClientRect().top + window.scrollY;
+      const nextScrollTop = Math.max(targetTop - topbarOffset, 0);
+      window.scrollTo({ top: nextScrollTop, behavior: 'auto' });
 
       if (target instanceof HTMLElement) {
         const ensureFocus = () => {

@@ -146,7 +146,7 @@ async def build_admin_portal_support_queue(
               coalesce(c.email, pi.metadata_json->>'customer_email') as customer_email,
               smp.name as service_name,
               smp.business_name,
-              coalesce(smp.business_email, 'support@bookedai.au') as support_email
+              coalesce(smp.business_email, 'info@bookedai.au') as support_email
             from payment_intents pi
             join booking_intents bi
               on bi.id = pi.booking_intent_id

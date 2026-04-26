@@ -23,6 +23,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, func, select, text
 
 from config import Settings, get_settings
+from core.customer_booking_contact import DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
 from core.feature_flags import is_flag_enabled
 from core.logging import get_logger
 from core.session_tokens import (
@@ -32,6 +33,7 @@ from core.session_tokens import (
 )
 from db import (
     ConversationEvent,
+    MessagingChannelSession,
     PartnerProfile,
     ServiceMerchantProfile,
     TenantUserMembership,
@@ -138,6 +140,7 @@ from service_layer.lifecycle_ops_service import (
     orchestrate_email_sent_sync,
     orchestrate_lifecycle_email,
 )
+from service_layer.messaging_automation_service import MessagingAutomationService
 from service_layer.prompt9_semantic_search_service import Prompt9SemanticSearchService
 from service_layer.tenant_app_service import (
     build_portal_customer_care_turn,
@@ -693,6 +696,86 @@ def _extract_twilio_whatsapp_payload(payload: dict[str, object]) -> tuple[TawkMe
     return message, metadata
 
 
+def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, dict[str, object]] | None:
+    callback_query = payload.get("callback_query")
+    raw_message = payload.get("message") or payload.get("edited_message")
+    callback_data = ""
+    if isinstance(callback_query, dict):
+        raw_callback_message = callback_query.get("message")
+        if isinstance(raw_callback_message, dict):
+            raw_message = raw_callback_message
+        callback_data = str(callback_query.get("data") or "").strip()
+    if not isinstance(raw_message, dict):
+        return None
+    chat = raw_message.get("chat")
+    sender = callback_query.get("from") if isinstance(callback_query, dict) else raw_message.get("from")
+    if not isinstance(chat, dict):
+        return None
+    if not isinstance(sender, dict):
+        sender = {}
+
+    chat_id = str(chat.get("id") or "").strip()
+    if not chat_id:
+        return None
+    text_value = str(raw_message.get("text") or raw_message.get("caption") or "").strip()
+    if callback_data:
+        text_value = callback_data
+    user_location: dict[str, object] | None = None
+    location_payload = raw_message.get("location")
+    if isinstance(location_payload, dict):
+        latitude = location_payload.get("latitude")
+        longitude = location_payload.get("longitude")
+        if isinstance(latitude, (int, float)) and isinstance(longitude, (int, float)):
+            user_location = {"latitude": float(latitude), "longitude": float(longitude)}
+            if not text_value:
+                text_value = "Find more on Internet near me"
+    if not text_value:
+        text_value = "[Telegram message]"
+    first_name = str(sender.get("first_name") or "").strip()
+    last_name = str(sender.get("last_name") or "").strip()
+    username = str(sender.get("username") or "").strip()
+    sender_name = " ".join(part for part in (first_name, last_name) if part).strip() or username or None
+    provider_message_id = str(raw_message.get("message_id") or "").strip() or None
+    conversation_id = f"telegram:{chat_id}"
+    message = TawkMessage(
+        conversation_id=conversation_id,
+        message_id=provider_message_id,
+        text=text_value,
+        sender_name=sender_name,
+        metadata={
+            "channel": "telegram",
+            "provider": "telegram_bot",
+        },
+    )
+    metadata: dict[str, object] = {
+        "channel": "telegram",
+        "provider": "telegram_bot",
+        "direction": "inbound",
+        "provider_message_id": provider_message_id,
+        "conversation_id": conversation_id,
+        "telegram_chat_id": chat_id,
+        "telegram_user_id": str(sender.get("id") or "").strip() or None,
+        "telegram_username": username or None,
+        "chat_type": str(chat.get("type") or "").strip() or None,
+        "telegram_callback_query_id": (
+            str(callback_query.get("id") or "").strip()
+            if isinstance(callback_query, dict) and str(callback_query.get("id") or "").strip()
+            else None
+        ),
+        "callback_data": callback_data or None,
+        "user_location": user_location,
+        "raw_payload": raw_message,
+    }
+    return message, metadata
+
+
+def _customer_telegram_webhook_secret(settings_obj: object) -> str:
+    return (
+        str(getattr(settings_obj, "bookedai_customer_telegram_webhook_secret_token", "") or "").strip()
+        or str(getattr(settings_obj, "telegram_webhook_secret_token", "") or "").strip()
+    )
+
+
 def _iter_meta_whatsapp_payload(
     payload: dict[str, object],
 ) -> list[tuple[TawkMessage, dict[str, object]]]:
@@ -1015,7 +1098,7 @@ async def _build_whatsapp_customer_care_response(
     )
     if not care_turn:
         return (
-            f"I could not open booking {booking_reference}. Please check the reference or contact support@bookedai.au.",
+            f"I could not open booking {booking_reference}. Please check the reference or contact {DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL}.",
             {
                 "customer_care_status": "booking_not_found",
                 "booking_reference": booking_reference,
@@ -1100,6 +1183,149 @@ async def _send_whatsapp_customer_care_reply(
         }
 
 
+async def _send_messaging_customer_care_reply(
+    request: Request,
+    *,
+    channel: str,
+    to: str | None,
+    body: str | None,
+    reply_markup: dict[str, object] | None = None,
+    parse_mode: str | None = None,
+) -> dict[str, object] | None:
+    if not to or not body or not hasattr(request.app.state, "communication_service"):
+        return None
+    communication_service: CommunicationService = request.app.state.communication_service
+    automation_service = MessagingAutomationService()
+    try:
+        return await automation_service.send_reply(
+            communication_service,
+            channel=channel,
+            recipient=to,
+            body=body,
+            reply_markup=reply_markup,
+            parse_mode=parse_mode,
+        )
+    except Exception as exc:
+        logger.warning(
+            "messaging_customer_care_reply_failed",
+            extra={
+                "event_type": "messaging_customer_care_reply_failed",
+                "tenant_id": None,
+                "status": 0,
+                "route": f"/api/webhooks/{channel}",
+                "request_id": "",
+                "integration_name": channel,
+                "conversation_id": "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+        return {
+            "provider": channel,
+            "delivery_status": "failed",
+            "warnings": [str(exc)],
+        }
+
+
+async def _answer_telegram_callback_query(
+    request: Request,
+    *,
+    callback_query_id: str | None,
+    text: str | None = None,
+) -> dict[str, object] | None:
+    if not callback_query_id or not hasattr(request.app.state, "communication_service"):
+        return None
+    communication_service: CommunicationService = request.app.state.communication_service
+    if not hasattr(communication_service, "answer_telegram_callback_query"):
+        return None
+    try:
+        result = await communication_service.answer_telegram_callback_query(
+            callback_query_id=callback_query_id,
+            text=text,
+        )
+        return {
+            "provider": result.provider,
+            "delivery_status": result.delivery_status,
+            "provider_message_id": result.provider_message_id,
+            "warnings": result.warnings or [],
+        }
+    except Exception as exc:
+        logger.warning(
+            "telegram_callback_ack_failed",
+            extra={
+                "event_type": "telegram_callback_ack_failed",
+                "tenant_id": None,
+                "status": 0,
+                "route": "/api/webhooks/bookedai-telegram",
+                "request_id": "",
+                "integration_name": "telegram",
+                "conversation_id": "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+        return {
+            "provider": "telegram_bot",
+            "delivery_status": "failed",
+            "warnings": [str(exc)],
+        }
+
+
+async def _update_messaging_channel_session_delivery(
+    session,
+    *,
+    channel: str,
+    conversation_id: str | None,
+    ai_intent: str | None,
+    workflow_status: str | None,
+    reply_delivery: dict[str, object] | None,
+    callback_ack: dict[str, object] | None,
+) -> None:
+    if not conversation_id:
+        return
+    try:
+        result = await session.execute(
+            select(MessagingChannelSession)
+            .where(MessagingChannelSession.channel == channel)
+            .where(MessagingChannelSession.conversation_id == conversation_id)
+        )
+        rows = result.scalars().all()
+        row = rows[0] if rows else None
+        if not row:
+            row = MessagingChannelSession(channel=channel, conversation_id=conversation_id)
+            session.add(row)
+        if ai_intent:
+            row.last_ai_intent = ai_intent
+        if workflow_status:
+            row.last_workflow_status = workflow_status
+        if reply_delivery:
+            row.last_reply_delivery_json = reply_delivery
+        if callback_ack:
+            row.last_callback_ack_json = callback_ack
+        row.updated_at = func.now()
+    except Exception as exc:
+        logger.warning(
+            "messaging_channel_session_delivery_update_failed",
+            extra={
+                "event_type": "messaging_channel_session_delivery_update_failed",
+                "tenant_id": None,
+                "status": 0,
+                "route": "/api/webhooks/bookedai-telegram",
+                "request_id": "",
+                "integration_name": channel,
+                "conversation_id": conversation_id or "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+
+
 def _build_whatsapp_booking_request_email(
     *,
     queued_request: dict[str, object],
@@ -1146,18 +1372,20 @@ async def _finalize_whatsapp_booking_request_side_effects(
     tenant_id = str(queued_request.get("tenant_id") or "").strip() or None
     customer_email = str(queued_request.get("customer_email") or "").strip().lower()
     booking_business_email = str(
-        getattr(request.app.state.settings, "booking_business_email", "info@bookedai.au") or "info@bookedai.au"
+        getattr(request.app.state.settings, "customer_booking_support_email", "")
+        or getattr(request.app.state.settings, "booking_business_email", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL)
+        or DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
     ).strip().lower()
     support_email = (
         str(queued_request.get("support_email") or "").strip().lower()
         or booking_business_email
-        or "info@bookedai.au"
+        or DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
     )
     cc = [
         value
         for value in {
             support_email,
-            booking_business_email or "info@bookedai.au",
+            booking_business_email or DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
         }
         if value and value != customer_email
     ]
@@ -1430,6 +1658,103 @@ async def healthcheck() -> dict[str, str]:
     return {"status": "ok", "service": "backend"}
 
 
+@api.get("/customer-agent/health")
+async def customer_agent_health(
+    request: Request,
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+) -> dict[str, object]:
+    require_admin_access(request, x_admin_token=x_admin_token, authorization=authorization)
+    cutoff = datetime.now(UTC) - timedelta(hours=24)
+    async with get_session(request.app.state.session_factory) as session:
+        events = (
+            await session.execute(
+                select(ConversationEvent)
+                .where(ConversationEvent.source.in_(["telegram", "whatsapp", "sms", "email"]))
+                .where(ConversationEvent.created_at >= cutoff)
+                .order_by(desc(ConversationEvent.created_at))
+                .limit(250)
+            )
+        ).scalars().all()
+        sessions = (
+            await session.execute(
+                select(MessagingChannelSession)
+                .order_by(desc(MessagingChannelSession.updated_at))
+                .limit(50)
+            )
+        ).scalars().all()
+
+    by_channel: dict[str, int] = {}
+    failed_identity: dict[str, int] = {}
+    last_reply_status: dict[str, object] = {}
+    last_callback_ack_status: dict[str, object] = {}
+    pending_webhook_count = 0
+    for event in events:
+        channel = str(event.source or "unknown")
+        by_channel[channel] = by_channel.get(channel, 0) + 1
+        meta = event.metadata_json if isinstance(event.metadata_json, dict) else {}
+        if str(event.workflow_status or "") in {"received", "queued"}:
+            pending_webhook_count += 1
+        reply_delivery = meta.get("reply_delivery")
+        if isinstance(reply_delivery, dict) and channel not in last_reply_status:
+            last_reply_status[channel] = {
+                "delivery_status": reply_delivery.get("delivery_status"),
+                "provider": reply_delivery.get("provider"),
+                "warnings": reply_delivery.get("warnings") or [],
+                "conversation_id": event.conversation_id,
+                "created_at": event.created_at.isoformat(),
+            }
+        callback_ack = meta.get("callback_ack")
+        if isinstance(callback_ack, dict) and channel not in last_callback_ack_status:
+            last_callback_ack_status[channel] = {
+                "delivery_status": callback_ack.get("delivery_status"),
+                "provider": callback_ack.get("provider"),
+                "warnings": callback_ack.get("warnings") or [],
+                "conversation_id": event.conversation_id,
+                "created_at": event.created_at.isoformat(),
+            }
+        booking_resolution = meta.get("booking_resolution")
+        if isinstance(booking_resolution, dict):
+            reason = str(booking_resolution.get("resolved_by") or "").strip()
+            if reason and reason not in {"booking_reference", "safe_single_customer_identity_match"}:
+                failed_identity[reason] = failed_identity.get(reason, 0) + 1
+
+    session_snapshots = []
+    for row in sessions[:10]:
+        session_snapshots.append(
+            {
+                "channel": row.channel,
+                "conversation_id": row.conversation_id,
+                "tenant_id": row.tenant_id,
+                "service_search_query": row.service_search_query,
+                "service_options_count": len(row.service_options_json or []),
+                "last_ai_intent": row.last_ai_intent,
+                "last_workflow_status": row.last_workflow_status,
+                "last_reply_delivery": row.last_reply_delivery_json or {},
+                "last_callback_ack": row.last_callback_ack_json or {},
+                "updated_at": row.updated_at.isoformat() if row.updated_at else None,
+            }
+        )
+
+    return {
+        "status": "ok",
+        "agent": "BookedAI Manager Bot",
+        "window_hours": 24,
+        "webhook_pending_count": pending_webhook_count,
+        "recent_events": {
+            "total": len(events),
+            "by_channel": by_channel,
+        },
+        "last_reply_status": last_reply_status,
+        "last_callback_ack_status": last_callback_ack_status,
+        "top_failed_identity_resolution_reasons": [
+            {"reason": reason, "count": count}
+            for reason, count in sorted(failed_identity.items(), key=lambda item: item[1], reverse=True)[:5]
+        ],
+        "recent_channel_sessions": session_snapshots,
+    }
+
+
 @api.get("/config")
 async def public_config(request: Request) -> dict[str, str]:
     cfg: Settings = request.app.state.settings
@@ -1492,6 +1817,7 @@ async def booking_assistant_catalog(request: Request) -> BookingAssistantCatalog
     return booking_service.get_catalog(catalog)
 
 
+@api.post("/chat/send", response_model=BookingAssistantChatResponse)
 @api.post("/booking-assistant/chat", response_model=BookingAssistantChatResponse)
 async def booking_assistant_chat(
     request: Request,
@@ -1520,6 +1846,7 @@ async def booking_assistant_chat(
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
+@api.post("/chat/send/stream")
 @api.post("/booking-assistant/chat/stream")
 async def booking_assistant_chat_stream(
     request: Request,
@@ -1631,6 +1958,30 @@ async def booking_assistant_session(
         )
         normalized_email = (payload.customer_email or "").strip().lower()
         async with get_session(request.app.state.session_factory) as session:
+            tenant_notification_result: dict[str, object] | None = None
+            tenant_id = str(result.service.tenant_id or "").strip() or None
+            if tenant_id and hasattr(request.app.state, "communication_service"):
+                automation_service = MessagingAutomationService()
+                try:
+                    tenant_notification_result = await automation_service.send_tenant_booking_notification(
+                        session,
+                        request.app.state.communication_service,
+                        tenant_id=tenant_id,
+                        booking_reference=result.booking_reference,
+                        service_name=result.service.name,
+                        customer_name=payload.customer_name,
+                        requested_date=result.requested_date,
+                        requested_time=result.requested_time,
+                        timezone=result.timezone,
+                        portal_url=result.portal_url,
+                        tenant_email=result.service.business_email,
+                    )
+                except Exception as exc:
+                    tenant_notification_result = {
+                        "provider": "tenant_messaging",
+                        "delivery_status": "queued",
+                        "warnings": [f"tenant_notification_failed: {exc}"],
+                    }
             await store_event(
                 session,
                 source="booking_assistant",
@@ -1649,6 +2000,7 @@ async def booking_assistant_session(
                 metadata={
                     "booking_reference": result.booking_reference,
                     "service": result.service.model_dump(),
+                    "tenant_notification": tenant_notification_result,
                     "contact": {
                         "name": payload.customer_name,
                         "email": normalized_email or None,
@@ -2096,11 +2448,16 @@ async def whatsapp_webhook(request: Request) -> dict[str, object]:
             delivery_metadata: dict[str, object] | None = None
             try:
                 if hasattr(request.app.state, "communication_service"):
-                    ai_reply, care_metadata = await _build_whatsapp_customer_care_response(
+                    automation_result = await MessagingAutomationService(
+                        public_search_service=getattr(request.app.state, "openai_service", None)
+                    ).handle_customer_message(
                         session,
+                        channel="whatsapp",
                         message=message,
                         metadata=metadata,
                     )
+                    ai_reply = automation_result.ai_reply
+                    care_metadata = automation_result.metadata
                     lifecycle_metadata = await _finalize_whatsapp_booking_request_side_effects(
                         request,
                         session,
@@ -2111,10 +2468,21 @@ async def whatsapp_webhook(request: Request) -> dict[str, object]:
                     )
                     if lifecycle_metadata:
                         care_metadata["lifecycle_updates"] = lifecycle_metadata
-                    delivery_metadata = await _send_whatsapp_customer_care_reply(
+                    delivery_metadata = await _send_messaging_customer_care_reply(
                         request,
+                        channel="whatsapp",
                         to=str(metadata.get("sender_phone") or message.sender_phone or "").strip() or None,
                         body=ai_reply,
+                        reply_markup=(
+                            care_metadata.get("reply_controls", {}).get("telegram_reply_markup")
+                            if isinstance(care_metadata.get("reply_controls"), dict)
+                            else None
+                        ),
+                        parse_mode=(
+                            str(care_metadata.get("reply_controls", {}).get("telegram_parse_mode") or "").strip() or None
+                            if isinstance(care_metadata.get("reply_controls"), dict)
+                            else None
+                        ),
                     )
                 await store_event(
                     session,
@@ -2166,6 +2534,123 @@ async def whatsapp_webhook(request: Request) -> dict[str, object]:
             messages_processed += 1
 
     return {"status": "processed", "messages_processed": messages_processed}
+
+
+@api.post("/webhooks/telegram")
+@api.post("/webhooks/bookedai-telegram")
+async def telegram_webhook(request: Request) -> dict[str, object]:
+    expected_secret = _customer_telegram_webhook_secret(request.app.state.settings)
+    if expected_secret:
+        received_secret = str(request.headers.get("x-telegram-bot-api-secret-token") or "").strip()
+        if received_secret != expected_secret:
+            raise HTTPException(status_code=403, detail="Telegram webhook token mismatch")
+
+    try:
+        payload = await request.json()
+    except JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="Webhook payload must be valid JSON") from exc
+    if not isinstance(payload, dict):
+        raise HTTPException(status_code=400, detail="Telegram payload must be a JSON object")
+
+    normalized = _extract_telegram_payload(payload)
+    if normalized is None:
+        return {"status": "ignored", "messages_processed": 0}
+
+    message, metadata = normalized
+    ai_reply: str | None = None
+    care_metadata: dict[str, object] = {}
+    delivery_metadata: dict[str, object] | None = None
+    callback_ack_metadata: dict[str, object] | None = None
+
+    async with get_session(request.app.state.session_factory) as session:
+        try:
+            callback_ack_metadata = await _answer_telegram_callback_query(
+                request,
+                callback_query_id=str(metadata.get("telegram_callback_query_id") or "").strip() or None,
+                text="BookedAI is working on it...",
+            )
+            if hasattr(request.app.state, "communication_service"):
+                automation_result = await MessagingAutomationService(
+                    public_search_service=getattr(request.app.state, "openai_service", None)
+                ).handle_customer_message(
+                    session,
+                    channel="telegram",
+                    message=message,
+                    metadata=metadata,
+                )
+                ai_reply = automation_result.ai_reply
+                care_metadata = automation_result.metadata
+                lifecycle_metadata = await _finalize_whatsapp_booking_request_side_effects(
+                    request,
+                    session,
+                    queued_request=care_metadata.get("queued_request")
+                    if isinstance(care_metadata.get("queued_request"), dict)
+                    else None,
+                    customer_message=message.text,
+                )
+                if lifecycle_metadata:
+                    care_metadata["lifecycle_updates"] = lifecycle_metadata
+                delivery_metadata = await _send_messaging_customer_care_reply(
+                    request,
+                    channel="telegram",
+                    to=str(metadata.get("telegram_chat_id") or "").strip() or None,
+                    body=ai_reply,
+                    reply_markup=(
+                        care_metadata.get("reply_controls", {}).get("telegram_reply_markup")
+                        if isinstance(care_metadata.get("reply_controls"), dict)
+                        else None
+                    ),
+                    parse_mode=(
+                        str(care_metadata.get("reply_controls", {}).get("telegram_parse_mode") or "").strip() or None
+                        if isinstance(care_metadata.get("reply_controls"), dict)
+                        else None
+                    ),
+                )
+            await _update_messaging_channel_session_delivery(
+                session,
+                channel="telegram",
+                conversation_id=message.conversation_id,
+                ai_intent=str(care_metadata.get("customer_care_status") or "inbound_message"),
+                workflow_status="answered" if ai_reply else "received",
+                reply_delivery=delivery_metadata,
+                callback_ack=callback_ack_metadata,
+            )
+            await store_event(
+                session,
+                source="telegram",
+                event_type="telegram_inbound",
+                message=message,
+                ai_intent=str(care_metadata.get("customer_care_status") or "inbound_message"),
+                ai_reply=ai_reply,
+                workflow_status="answered" if ai_reply else "received",
+                metadata=_json_safe_value(
+                    {
+                        **metadata,
+                        **care_metadata,
+                        "reply_delivery": delivery_metadata,
+                        "callback_ack": callback_ack_metadata,
+                    }
+                ),
+            )
+        except Exception as exc:
+            logger.warning(
+                "telegram_webhook_processing_failed",
+                extra={
+                    "event_type": "telegram_webhook_processing_failed",
+                    "tenant_id": None,
+                    "status": 0,
+                    "route": "/api/webhooks/bookedai-telegram",
+                    "request_id": "",
+                    "integration_name": "telegram",
+                    "conversation_id": message.conversation_id or "",
+                    "booking_reference": "",
+                    "job_name": "",
+                    "job_id": "",
+                },
+                exc_info=exc,
+            )
+
+    return {"status": "processed", "messages_processed": 1}
 
 
 @api.post("/webhooks/evolution")
@@ -2236,13 +2721,19 @@ async def evolution_webhook(request: Request) -> dict[str, object]:
     async with get_session(request.app.state.session_factory) as session:
         try:
             if hasattr(request.app.state, "communication_service"):
-                ai_reply, care_metadata = await _build_whatsapp_customer_care_response(
+                automation_result = await MessagingAutomationService(
+                    public_search_service=getattr(request.app.state, "openai_service", None)
+                ).handle_customer_message(
                     session,
+                    channel="whatsapp",
                     message=message,
                     metadata=metadata,
                 )
-                delivery_metadata = await _send_whatsapp_customer_care_reply(
+                ai_reply = automation_result.ai_reply
+                care_metadata = automation_result.metadata
+                delivery_metadata = await _send_messaging_customer_care_reply(
                     request,
+                    channel="whatsapp",
                     to=message.sender_phone,
                     body=ai_reply,
                 )

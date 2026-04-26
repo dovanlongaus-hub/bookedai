@@ -88,18 +88,18 @@ export const languageOptions: Array<{ value: HomepageLocale; label: string }> = 
 ];
 
 const hotEnglishSuggestions: HomepageSuggestion[] = [
-  { label: 'Swim', query: 'Find a kids swim class near Caringbah this weekend.' },
-  { label: 'Chess', query: 'Find a kids chess class near Sydney this week.' },
-  { label: 'AI Event', query: 'Show upcoming AI events near Western Sydney this month.' },
+  { label: 'Future Swim', query: 'Find Future Swim kids swimming lessons near Caringbah this weekend.' },
+  { label: 'Co Mai Hung Chess', query: 'Book Co Mai Hung Chess Sydney pilot class this week.' },
+  { label: 'WSTI AI Event', query: 'Show WSTI AI events at Western Sydney Startup Hub this month.' },
   { label: 'AI Mentor 1-1', query: 'Book an AI Mentor 1-1 session for startup growth this week.' },
   { label: 'Haircut', query: 'Find a men\'s haircut near Sydney CBD this afternoon.' },
   { label: 'Restaurant', query: 'Find a restaurant near me tonight with live booking or call details.' },
 ];
 
 const hotVietnameseSuggestions: HomepageSuggestion[] = [
-  { label: 'Swim', query: 'Tìm lớp bơi cho trẻ em gần Caringbah vào cuối tuần này.' },
-  { label: 'Chess', query: 'Tìm lớp cờ vua cho trẻ em gần Sydney trong tuần này.' },
-  { label: 'AI Event', query: 'Tìm sự kiện AI sắp diễn ra gần Western Sydney trong tháng này.' },
+  { label: 'Future Swim', query: 'Tìm lớp bơi Future Swim cho trẻ em gần Caringbah vào cuối tuần này.' },
+  { label: 'Co Mai Hung Chess', query: 'Đặt lớp Co Mai Hung Chess Sydney pilot trong tuần này.' },
+  { label: 'WSTI AI Event', query: 'Tìm sự kiện AI WSTI tại Western Sydney Startup Hub trong tháng này.' },
   { label: 'AI Mentor 1-1', query: 'Đặt buổi AI Mentor 1-1 cho startup trong tuần này.' },
   { label: 'Haircut', query: 'Tìm lịch cắt tóc nam gần Sydney CBD vào chiều nay.' },
   { label: 'Restaurant', query: 'Tìm nhà hàng gần tôi tối nay có link đặt bàn hoặc số điện thoại để gọi đặt chỗ.' },

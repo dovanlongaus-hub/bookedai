@@ -1,17 +1,23 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import logging
 import re
 from string import Template
 
 import httpx
 
 from config import Settings
+from core.customer_booking_contact import (
+    DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
+    DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE,
+)
 from integrations.sms import SmsAdapter
 from integrations.whatsapp import WhatsAppAdapter
 
 
 PHONE_REGEX = re.compile(r"[^\d+]")
+HTTPX_LOGGER = logging.getLogger("httpx")
 
 
 @dataclass
@@ -34,7 +40,7 @@ BOOKEDAI_COMMUNICATION_TEMPLATES: dict[str, str] = {
         "Bookedai.au confirmed: ${service_name} for ${customer_name} on ${slot_label}. "
         "Ref ${booking_reference}. ${business_name} will handle the next step. "
         "Manage it here: ${manage_link}. Reply on WhatsApp to ask, reschedule, or request cancellation. "
-        "BookedAI support: +61455301335 or ${support_email}"
+        "BookedAI support: ${support_phone} or ${support_email}"
     ),
     "bookedai_demo_reminder": (
         "Bookedai.au: Hi ${customer_name}, your live demo is coming up at ${slot_label}. "
@@ -67,7 +73,8 @@ def render_bookedai_confirmation_email(
     booking_reference = _safe_value(variables, "booking_reference", "Pending reference")
     business_name = _safe_value(variables, "business_name", "Bookedai.au")
     venue_name = _safe_value(variables, "venue_name", business_name)
-    support_email = _safe_value(variables, "support_email", "info@bookedai.au")
+    support_email = _safe_value(variables, "support_email", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL)
+    support_phone = _safe_value(variables, "support_phone", DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE)
     payment_link = str((variables or {}).get("payment_link") or "").strip()
     manage_link = str((variables or {}).get("manage_link") or "").strip()
     timezone = _safe_value(variables, "timezone", "Australia/Sydney")
@@ -97,7 +104,7 @@ def render_bookedai_confirmation_email(
     text_lines.extend(
         [
             "",
-            f"Need help? Reply to {support_email}.",
+            f"Need help? Reply to {support_email} or message {support_phone} on Telegram, WhatsApp, or iMessage.",
             "Bookedai.au",
             "AI Receptionist & Booking for SMEs",
         ]
@@ -151,7 +158,8 @@ def render_bookedai_confirmation_email(
                   <a href="{primary_link}" style="display:inline-block;background:#0071e3;color:#ffffff;text-decoration:none;font-weight:700;border-radius:999px;padding:14px 22px;">{primary_label}</a>
                 </div>
                 <p style="margin:24px 0 0;font-size:14px;line-height:1.7;color:#6e6e73;">
-                  Need help? Reply to <a href="mailto:{support_email}" style="color:#0071e3;text-decoration:none;">{support_email}</a>.
+                  Need help? Reply to <a href="mailto:{support_email}" style="color:#0071e3;text-decoration:none;">{support_email}</a>
+                  or message {support_phone} on Telegram, WhatsApp, or iMessage.
                 </p>
               </td>
             </tr>
@@ -214,6 +222,22 @@ class CommunicationService:
             and fallback_provider != primary_provider
             and self._whatsapp_provider_configured(fallback_provider)
         )
+
+    def telegram_configured(self) -> bool:
+        return bool(self._customer_telegram_bot_token())
+
+    def whatsapp_delivery_provider_name(self) -> str:
+        primary_provider = self._normalize_provider_name(self.settings.whatsapp_provider)
+        fallback_provider = self._normalize_provider_name(self.settings.whatsapp_fallback_provider)
+        if self._whatsapp_provider_configured(primary_provider):
+            return f"whatsapp_{primary_provider}"
+        if (
+            fallback_provider
+            and fallback_provider != primary_provider
+            and self._whatsapp_provider_configured(fallback_provider)
+        ):
+            return f"whatsapp_{fallback_provider}"
+        return self.whatsapp_adapter.provider_name
 
     def sms_safe_summary(self) -> dict[str, object]:
         configured_fields: list[str] = []
@@ -285,7 +309,8 @@ class CommunicationService:
                 "slot_label": "To be confirmed",
                 "booking_reference": "Pending reference",
                 "business_name": "Bookedai.au",
-                "support_email": "info@bookedai.au",
+                "support_email": DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
+                "support_phone": DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE,
                 **(variables or {}),
             }
             return Template(template).safe_substitute(template_variables)
@@ -386,9 +411,126 @@ class CommunicationService:
             warnings=["WhatsApp provider is not fully configured; message was recorded for manual review."],
         )
 
+    async def send_telegram(
+        self,
+        *,
+        chat_id: str,
+        body: str | None = None,
+        template_key: str | None = None,
+        variables: dict[str, str] | None = None,
+        reply_markup: dict[str, object] | None = None,
+        parse_mode: str | None = None,
+    ) -> CommunicationSendResult:
+        recipient = str(chat_id or "").strip()
+        if not recipient:
+            raise ValueError("Telegram chat_id is required.")
+        rendered_body = self.render_template(
+            template_key=template_key,
+            variables=variables,
+            fallback_body=body,
+        )
+        bot_token = self._customer_telegram_bot_token()
+        if not bot_token:
+            return CommunicationSendResult(
+                provider="telegram_bot",
+                delivery_status="queued",
+                warnings=["Telegram bot token is not configured; message was recorded for manual review."],
+            )
+        async with httpx.AsyncClient(timeout=20) as client:
+            previous_httpx_level = HTTPX_LOGGER.level
+            HTTPX_LOGGER.setLevel(logging.WARNING)
+            try:
+                payload: dict[str, object] = {
+                    "chat_id": recipient,
+                    "text": rendered_body,
+                    "disable_web_page_preview": True,
+                }
+                if parse_mode:
+                    payload["parse_mode"] = parse_mode
+                if reply_markup:
+                    payload["reply_markup"] = reply_markup
+                response = await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendMessage",
+                    json=payload,
+                )
+                response.raise_for_status()
+            except httpx.HTTPStatusError as error:
+                status_code = error.response.status_code if error.response is not None else None
+                warning = "Telegram delivery is unavailable right now; the message was recorded for manual review."
+                if status_code is not None:
+                    warning = f"Telegram provider returned HTTP {status_code}; the message was recorded for manual review."
+                return CommunicationSendResult(
+                    provider="telegram_bot",
+                    delivery_status="queued",
+                    warnings=[warning],
+                )
+            finally:
+                HTTPX_LOGGER.setLevel(previous_httpx_level)
+        payload = response.json() if response.content else {}
+        result = payload.get("result") if isinstance(payload, dict) else {}
+        message_id = result.get("message_id") if isinstance(result, dict) else None
+        return CommunicationSendResult(
+            provider="telegram_bot",
+            delivery_status="sent",
+            provider_message_id=str(message_id) if message_id is not None else None,
+            warnings=[],
+        )
+
+    async def answer_telegram_callback_query(
+        self,
+        *,
+        callback_query_id: str,
+        text: str | None = None,
+    ) -> CommunicationSendResult:
+        callback_id = str(callback_query_id or "").strip()
+        if not callback_id:
+            raise ValueError("Telegram callback_query_id is required.")
+        bot_token = self._customer_telegram_bot_token()
+        if not bot_token:
+            return CommunicationSendResult(
+                provider="telegram_bot",
+                delivery_status="queued",
+                warnings=["Telegram bot token is not configured; callback acknowledgement was recorded for manual review."],
+            )
+        async with httpx.AsyncClient(timeout=20) as client:
+            previous_httpx_level = HTTPX_LOGGER.level
+            HTTPX_LOGGER.setLevel(logging.WARNING)
+            try:
+                payload: dict[str, object] = {"callback_query_id": callback_id}
+                if text:
+                    payload["text"] = text[:200]
+                response = await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/answerCallbackQuery",
+                    json=payload,
+                )
+                response.raise_for_status()
+            except httpx.HTTPStatusError as error:
+                status_code = error.response.status_code if error.response is not None else None
+                warning = "Telegram callback acknowledgement is unavailable right now."
+                if status_code is not None:
+                    warning = f"Telegram callback acknowledgement returned HTTP {status_code}."
+                return CommunicationSendResult(
+                    provider="telegram_bot",
+                    delivery_status="queued",
+                    warnings=[warning],
+                )
+            finally:
+                HTTPX_LOGGER.setLevel(previous_httpx_level)
+        return CommunicationSendResult(
+            provider="telegram_bot",
+            delivery_status="sent",
+            warnings=[],
+        )
+
     @staticmethod
     def _normalize_provider_name(value: str | None) -> str:
         return str(value or "").strip().lower()
+
+    def _customer_telegram_bot_token(self) -> str:
+        return (
+            str(getattr(self.settings, "bookedai_customer_telegram_bot_token", "") or "").strip()
+            or str(getattr(self.settings, "telegram_bot_token", "") or "").strip()
+        )
 
     def _whatsapp_provider_configured(self, provider: str) -> bool:
         if provider == "twilio":
@@ -469,32 +611,46 @@ class CommunicationService:
         api_key = self.settings.whatsapp_evolution_api_key
         number = to.lstrip("+").replace(" ", "")
         url = f"{base_url}/message/sendText/{instance}"
+        payloads = [
+            {"number": number, "text": body},
+            {"number": number, "textMessage": {"text": body}},
+        ]
+        warnings: list[str] = []
         try:
-            import httpx
             async with httpx.AsyncClient(timeout=15) as client:
-                response = await client.post(
-                    url,
-                    json={"number": number, "text": body},
-                    headers={"apikey": api_key, "Content-Type": "application/json"},
-                )
-                if response.status_code in {200, 201}:
-                    payload = response.json() if response.content else {}
-                    msg_id = str(payload.get("key", {}).get("id") or payload.get("id") or "")
-                    return CommunicationSendResult(
-                        provider="whatsapp_evolution",
-                        delivery_status="sent",
-                        provider_message_id=msg_id or None,
+                for index, payload_body in enumerate(payloads):
+                    response = await client.post(
+                        url,
+                        json=payload_body,
+                        headers={"apikey": api_key, "Content-Type": "application/json"},
                     )
-                return CommunicationSendResult(
-                    provider="whatsapp_evolution",
-                    delivery_status="queued",
-                    warnings=[f"Evolution API returned {response.status_code}: {response.text[:200]}"],
-                )
-        except Exception as exc:
+                    if response.status_code in {200, 201}:
+                        payload = response.json() if response.content else {}
+                        msg_id = str(payload.get("key", {}).get("id") or payload.get("id") or "")
+                        if index > 0:
+                            warnings.append("Evolution API accepted the legacy textMessage payload.")
+                        return CommunicationSendResult(
+                            provider="whatsapp_evolution",
+                            delivery_status="sent",
+                            provider_message_id=msg_id or None,
+                            warnings=warnings,
+                        )
+                    warnings.append(
+                        f"Evolution API attempt {index + 1} returned {response.status_code}: {response.text[:200]}"
+                    )
+                    if response.status_code not in {400, 422, 500}:
+                        break
             return CommunicationSendResult(
                 provider="whatsapp_evolution",
                 delivery_status="queued",
-                warnings=[f"Evolution API request failed: {exc}"],
+                warnings=warnings or ["Evolution API did not accept the message payload."],
+            )
+        except Exception as exc:
+            exception_message = str(exc).strip() or type(exc).__name__
+            return CommunicationSendResult(
+                provider="whatsapp_evolution",
+                delivery_status="queued",
+                warnings=[*warnings, f"Evolution API request failed: {exception_message}"],
             )
 
     @staticmethod

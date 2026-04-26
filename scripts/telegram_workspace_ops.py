@@ -15,7 +15,10 @@ from pathlib import Path
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DEFAULT_HOST_REPO_ROOT = Path("/home/dovanlong/BookedAI")
-DEFAULT_OPENCLAW_AGENT_SPEC = REPO_ROOT / "deploy/openclaw/agents/bookedai-whatsapp-booking-care-agent.json"
+DEFAULT_OPENCLAW_AGENT_SPEC = REPO_ROOT / "deploy/openclaw/agents/bookedai-booking-customer-agent.json"
+LEGACY_OPENCLAW_WHATSAPP_AGENT_SPEC = (
+    REPO_ROOT / "deploy/openclaw/agents/bookedai-whatsapp-booking-care-agent.json"
+)
 DEFAULT_TRUSTED_TELEGRAM_USER_IDS = {"8426853622"}
 DEFAULT_TELEGRAM_ALLOWED_ACTIONS = {
     "sync_doc",
@@ -28,6 +31,7 @@ DEFAULT_TELEGRAM_ALLOWED_ACTIONS = {
     "repo_structure",
     "host_command",
     "host_shell",
+    "openclaw_runtime_admin",
     "whatsapp_bot_status",
     "full_project",
 }
@@ -360,6 +364,51 @@ def _http_probe(url: str, *, timeout: float = 8.0) -> dict[str, object]:
         }
 
 
+def _http_probe_with_headers(
+    url: str,
+    *,
+    headers: dict[str, str],
+    timeout: float = 8.0,
+) -> dict[str, object]:
+    request = urllib.request.Request(
+        url,
+        headers={
+            "Accept": "application/json,text/plain,*/*",
+            "User-Agent": "BookedAI-OpenClaw-WhatsAppBotStatus/1.0",
+            **headers,
+        },
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            raw_body = response.read(4096).decode("utf-8", errors="replace")
+            try:
+                parsed_body: object = json.loads(raw_body)
+            except json.JSONDecodeError:
+                parsed_body = raw_body[:500]
+            return {
+                "ok": 200 <= response.status < 300,
+                "status_code": response.status,
+                "body": parsed_body,
+            }
+    except urllib.error.HTTPError as exc:
+        raw_body = exc.read(4096).decode("utf-8", errors="replace")
+        try:
+            parsed_body = json.loads(raw_body)
+        except json.JSONDecodeError:
+            parsed_body = raw_body[:500]
+        return {
+            "ok": False,
+            "status_code": exc.code,
+            "body": parsed_body,
+        }
+    except Exception as exc:
+        return {
+            "ok": False,
+            "status_code": None,
+            "error": str(exc),
+        }
+
+
 def _http_json_probe(url: str, *, payload: dict[str, object], timeout: float = 8.0) -> dict[str, object]:
     request = urllib.request.Request(
         url,
@@ -420,6 +469,45 @@ def _extract_whatsapp_provider_status(provider_payload: object) -> dict[str, obj
     return None
 
 
+def _read_dotenv_values(path: Path) -> dict[str, str]:
+    if not path.exists():
+        return {}
+    values: dict[str, str] = {}
+    for line in path.read_text().splitlines():
+        stripped = line.strip()
+        if not stripped or stripped.startswith("#") or "=" not in stripped:
+            continue
+        key, value = stripped.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key:
+            values[key] = value
+    return values
+
+
+def _extract_evolution_state(payload: object) -> str | None:
+    if not isinstance(payload, dict):
+        return None
+    instance = payload.get("instance")
+    if not isinstance(instance, dict):
+        return None
+    state = str(instance.get("state") or "").strip()
+    return state or None
+
+
+def _provider_mentions_evolution(provider_status: dict[str, object] | None) -> bool:
+    if not provider_status:
+        return False
+    provider = str(provider_status.get("provider") or "")
+    if provider == "whatsapp_evolution":
+        return True
+    safe_config = provider_status.get("safe_config")
+    notes = safe_config.get("notes") if isinstance(safe_config, dict) else None
+    if not isinstance(notes, list):
+        return False
+    return any("whatsapp_evolution" in str(note) for note in notes)
+
+
 def handle_whatsapp_bot_status(args: argparse.Namespace) -> int:
     api_base = args.api_base.rstrip("/")
     bot_base = args.bot_base.rstrip("/")
@@ -441,9 +529,39 @@ def handle_whatsapp_bot_status(args: argparse.Namespace) -> int:
     }
     provider_status = _extract_whatsapp_provider_status(probes["provider_status"].get("body"))
     provider_name = str(provider_status.get("provider") or "") if provider_status else ""
+    dotenv_values = _read_dotenv_values(REPO_ROOT / ".env")
+    evolution_base = (
+        os.getenv("WHATSAPP_EVOLUTION_STATUS_BASE_URL")
+        or dotenv_values.get("WHATSAPP_EVOLUTION_STATUS_BASE_URL")
+        or os.getenv("WHATSAPP_EVOLUTION_API_URL")
+        or dotenv_values.get("WHATSAPP_EVOLUTION_API_URL")
+        or ""
+    ).rstrip("/")
+    if evolution_base == "https://waba.bookedai.au":
+        evolution_base = "http://bookedai-evolution:8080"
+    evolution_instance = os.getenv("WHATSAPP_EVOLUTION_INSTANCE") or dotenv_values.get("WHATSAPP_EVOLUTION_INSTANCE") or ""
+    evolution_api_key = os.getenv("WHATSAPP_EVOLUTION_API_KEY") or dotenv_values.get("WHATSAPP_EVOLUTION_API_KEY") or ""
+    should_probe_evolution_state = bool(
+        _provider_mentions_evolution(provider_status)
+        and evolution_base
+        and evolution_instance
+        and evolution_api_key
+    )
+    if should_probe_evolution_state:
+        probes["evolution_connection_state"] = _http_probe_with_headers(
+            f"{evolution_base}/instance/connectionState/{evolution_instance}",
+            headers={"apikey": evolution_api_key},
+            timeout=args.timeout,
+        )
     verify_status_code = probes["whatsapp_verify_route"].get("status_code")
     evolution_webhook_status_code = probes["evolution_webhook_route"].get("status_code")
-    provider_uses_evolution = provider_name == "whatsapp_evolution"
+    provider_uses_evolution = _provider_mentions_evolution(provider_status)
+    evolution_state = _extract_evolution_state(
+        probes.get("evolution_connection_state", {}).get("body")
+        if isinstance(probes.get("evolution_connection_state"), dict)
+        else None
+    )
+    evolution_ready = evolution_state == "open" if should_probe_evolution_state else True
     channel_webhook_reaches_backend = (
         evolution_webhook_status_code == 200 if provider_uses_evolution else verify_status_code in {200, 403}
     )
@@ -465,6 +583,7 @@ def handle_whatsapp_bot_status(args: argparse.Namespace) -> int:
         "whatsapp_provider": provider_name or None,
         "whatsapp_provider_status": provider_status.get("status") if provider_status else "unknown",
         "personal_whatsapp_bridge": provider_uses_evolution,
+        "evolution_connection_state": evolution_state,
         "webhook_verify_reaches_backend": verify_status_code in {200, 403},
         "webhook_verify_probe_status_code": verify_status_code,
         "evolution_webhook_reaches_backend": evolution_webhook_status_code == 200,
@@ -476,6 +595,7 @@ def handle_whatsapp_bot_status(args: argparse.Namespace) -> int:
             and provider_status
             and provider_status.get("status") == "connected"
             and channel_webhook_reaches_backend
+            and evolution_ready
         ),
         "note": (
             "This is a read-only OpenClaw/operator readiness check for the dedicated BookedAI "
@@ -511,7 +631,12 @@ def resolve_openclaw_config_path(path_value: str | None) -> Path:
 
 
 def handle_sync_openclaw_bookedai_agent(args: argparse.Namespace) -> int:
-    spec_path = Path(args.spec).expanduser().resolve()
+    spec_value = (
+        str(LEGACY_OPENCLAW_WHATSAPP_AGENT_SPEC)
+        if getattr(args, "legacy_whatsapp_agent", False)
+        else args.spec
+    )
+    spec_path = Path(spec_value).expanduser().resolve()
     config_path = resolve_openclaw_config_path(args.config)
     if not spec_path.exists():
         raise ValueError(f"OpenClaw agent spec not found: {spec_path}")
@@ -564,6 +689,305 @@ def handle_sync_openclaw_bookedai_agent(args: argparse.Namespace) -> int:
             sort_keys=True,
         )
     )
+    return 0
+
+
+def _write_json_with_optional_backup(path: Path, payload: dict[str, object], *, no_backup: bool) -> bool:
+    previous = path.read_text() if path.exists() else None
+    rendered = json.dumps(payload, indent=2, sort_keys=False) + "\n"
+    if previous == rendered:
+        return False
+    if previous is not None and not no_backup:
+        timestamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
+        backup_path = path.with_name(f"{path.name}.bak.{timestamp}")
+        backup_path.write_text(previous)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(rendered)
+    return True
+
+
+def _load_json_object(path: Path, *, default: dict[str, object] | None = None) -> dict[str, object]:
+    try:
+        exists = path.exists()
+    except PermissionError as exc:
+        raise ValueError(
+            f"Cannot access {path}. Run this from the privileged OpenClaw CLI workspace "
+            "or pass explicit --config/--approvals paths that this user can read."
+        ) from exc
+    if not exists:
+        if default is not None:
+            return dict(default)
+        raise ValueError(f"JSON file not found: {path}")
+    try:
+        payload = json.loads(path.read_text())
+    except PermissionError as exc:
+        raise ValueError(
+            f"Cannot read {path}. Run this from the privileged OpenClaw CLI workspace "
+            "or pass explicit --config/--approvals paths that this user can read."
+        ) from exc
+    if not isinstance(payload, dict):
+        raise ValueError(f"Expected JSON object in {path}")
+    return payload
+
+
+def _set_if_different(target: dict[str, object], key: str, value: object, changes: list[str], label: str) -> None:
+    if target.get(key) != value:
+        target[key] = value
+        changes.append(f"{label}.{key}")
+
+
+def repair_openclaw_exec_approval_policy(
+    *,
+    config_path: Path,
+    approvals_path: Path,
+    ask: str,
+    no_backup: bool,
+    dry_run: bool,
+) -> dict[str, object]:
+    config = _load_json_object(config_path)
+    approvals = _load_json_object(approvals_path, default={"version": 1})
+    config_changes: list[str] = []
+    approvals_changes: list[str] = []
+
+    tools = config.setdefault("tools", {})
+    if not isinstance(tools, dict):
+        raise ValueError(f"Expected object at tools in {config_path}")
+    exec_config = tools.setdefault("exec", {})
+    if not isinstance(exec_config, dict):
+        raise ValueError(f"Expected object at tools.exec in {config_path}")
+    _set_if_different(exec_config, "ask", ask, config_changes, "tools.exec")
+    if "security" not in exec_config:
+        _set_if_different(exec_config, "security", "allowlist", config_changes, "tools.exec")
+    if "askFallback" not in exec_config:
+        _set_if_different(exec_config, "askFallback", "deny", config_changes, "tools.exec")
+
+    if approvals.get("version") is None:
+        _set_if_different(approvals, "version", 1, approvals_changes, "root")
+    defaults = approvals.setdefault("defaults", {})
+    if not isinstance(defaults, dict):
+        raise ValueError(f"Expected object at defaults in {approvals_path}")
+    _set_if_different(defaults, "ask", ask, approvals_changes, "defaults")
+    if "security" not in defaults:
+        _set_if_different(defaults, "security", "allowlist", approvals_changes, "defaults")
+    if "askFallback" not in defaults:
+        _set_if_different(defaults, "askFallback", "deny", approvals_changes, "defaults")
+
+    agents = approvals.get("agents")
+    if isinstance(agents, dict):
+        for agent_id, agent_config in agents.items():
+            if isinstance(agent_config, dict) and agent_config.get("ask") == "always":
+                _set_if_different(
+                    agent_config,
+                    "ask",
+                    ask,
+                    approvals_changes,
+                    f"agents.{agent_id}",
+                )
+
+    config_written = False
+    approvals_written = False
+    if not dry_run:
+        config_written = _write_json_with_optional_backup(config_path, config, no_backup=no_backup)
+        approvals_written = _write_json_with_optional_backup(approvals_path, approvals, no_backup=no_backup)
+
+    return {
+        "status": "ok",
+        "dry_run": dry_run,
+        "ask": ask,
+        "config_path": str(config_path),
+        "approvals_path": str(approvals_path),
+        "config_changes": config_changes,
+        "approvals_changes": approvals_changes,
+        "config_written": config_written,
+        "approvals_written": approvals_written,
+        "restart_required": bool(config_changes or approvals_changes),
+        "restart_hint": "Restart openclaw-bookedai-gateway and openclaw-bookedai-cli after applying runtime approval policy changes.",
+    }
+
+
+def enable_openclaw_full_access(
+    *,
+    config_path: Path,
+    approvals_path: Path,
+    telegram_allow_from: list[str],
+    webchat_allow_from: list[str],
+    no_backup: bool,
+    dry_run: bool,
+) -> dict[str, object]:
+    config = _load_json_object(config_path)
+    approvals = _load_json_object(approvals_path, default={"version": 1})
+    config_changes: list[str] = []
+    approvals_changes: list[str] = []
+
+    tools = config.setdefault("tools", {})
+    if not isinstance(tools, dict):
+        raise ValueError(f"Expected object at tools in {config_path}")
+    exec_config = tools.setdefault("exec", {})
+    if not isinstance(exec_config, dict):
+        raise ValueError(f"Expected object at tools.exec in {config_path}")
+    _set_if_different(exec_config, "host", "gateway", config_changes, "tools.exec")
+    _set_if_different(exec_config, "security", "full", config_changes, "tools.exec")
+    _set_if_different(exec_config, "ask", "off", config_changes, "tools.exec")
+    _set_if_different(exec_config, "askFallback", "full", config_changes, "tools.exec")
+
+    elevated_config = tools.setdefault("elevated", {})
+    if not isinstance(elevated_config, dict):
+        raise ValueError(f"Expected object at tools.elevated in {config_path}")
+    _set_if_different(elevated_config, "enabled", True, config_changes, "tools.elevated")
+    elevated_allow_from = elevated_config.setdefault("allowFrom", {})
+    if not isinstance(elevated_allow_from, dict):
+        raise ValueError(f"Expected object at tools.elevated.allowFrom in {config_path}")
+    _set_if_different(
+        elevated_allow_from,
+        "webchat",
+        webchat_allow_from,
+        config_changes,
+        "tools.elevated.allowFrom",
+    )
+    _set_if_different(
+        elevated_allow_from,
+        "telegram",
+        telegram_allow_from,
+        config_changes,
+        "tools.elevated.allowFrom",
+    )
+
+    agents = config.setdefault("agents", {})
+    if not isinstance(agents, dict):
+        raise ValueError(f"Expected object at agents in {config_path}")
+    agent_defaults = agents.setdefault("defaults", {})
+    if not isinstance(agent_defaults, dict):
+        raise ValueError(f"Expected object at agents.defaults in {config_path}")
+    _set_if_different(agent_defaults, "elevatedDefault", "full", config_changes, "agents.defaults")
+
+    channels = config.setdefault("channels", {})
+    if not isinstance(channels, dict):
+        raise ValueError(f"Expected object at channels in {config_path}")
+    telegram_config = channels.setdefault("telegram", {})
+    if not isinstance(telegram_config, dict):
+        raise ValueError(f"Expected object at channels.telegram in {config_path}")
+    if telegram_allow_from == ["*"]:
+        _set_if_different(telegram_config, "dmPolicy", "open", config_changes, "channels.telegram")
+        _set_if_different(telegram_config, "allowFrom", ["*"], config_changes, "channels.telegram")
+    else:
+        _set_if_different(telegram_config, "dmPolicy", "allowlist", config_changes, "channels.telegram")
+        _set_if_different(telegram_config, "allowFrom", telegram_allow_from, config_changes, "channels.telegram")
+
+    if approvals.get("version") is None:
+        _set_if_different(approvals, "version", 1, approvals_changes, "root")
+    defaults = approvals.setdefault("defaults", {})
+    if not isinstance(defaults, dict):
+        raise ValueError(f"Expected object at defaults in {approvals_path}")
+    _set_if_different(defaults, "security", "full", approvals_changes, "defaults")
+    _set_if_different(defaults, "ask", "off", approvals_changes, "defaults")
+    _set_if_different(defaults, "askFallback", "full", approvals_changes, "defaults")
+
+    approvals_agents = approvals.get("agents")
+    if isinstance(approvals_agents, dict):
+        for agent_id, agent_config in approvals_agents.items():
+            if isinstance(agent_config, dict):
+                _set_if_different(
+                    agent_config,
+                    "security",
+                    "full",
+                    approvals_changes,
+                    f"agents.{agent_id}",
+                )
+                _set_if_different(
+                    agent_config,
+                    "ask",
+                    "off",
+                    approvals_changes,
+                    f"agents.{agent_id}",
+                )
+                _set_if_different(
+                    agent_config,
+                    "askFallback",
+                    "full",
+                    approvals_changes,
+                    f"agents.{agent_id}",
+                )
+
+    config_written = False
+    approvals_written = False
+    if not dry_run:
+        config_written = _write_json_with_optional_backup(config_path, config, no_backup=no_backup)
+        approvals_written = _write_json_with_optional_backup(approvals_path, approvals, no_backup=no_backup)
+
+    return {
+        "status": "ok",
+        "dry_run": dry_run,
+        "mode": "full_access",
+        "config_path": str(config_path),
+        "approvals_path": str(approvals_path),
+        "telegram_allow_from": telegram_allow_from,
+        "webchat_allow_from": webchat_allow_from,
+        "config_changes": config_changes,
+        "approvals_changes": approvals_changes,
+        "config_written": config_written,
+        "approvals_written": approvals_written,
+        "restart_required": bool(config_changes or approvals_changes),
+        "restart_hint": "Restart openclaw-bookedai-gateway and openclaw-bookedai-cli after applying full-access runtime policy changes.",
+    }
+
+
+def handle_fix_openclaw_approvals(args: argparse.Namespace) -> int:
+    config_path = resolve_openclaw_config_path(args.config)
+    approvals_path = (
+        Path(args.approvals).expanduser().resolve()
+        if args.approvals
+        else config_path.parent / "exec-approvals.json"
+    )
+    result = repair_openclaw_exec_approval_policy(
+        config_path=config_path,
+        approvals_path=approvals_path,
+        ask=args.ask,
+        no_backup=args.no_backup,
+        dry_run=args.dry_run,
+    )
+    print(json.dumps(result, indent=2, sort_keys=True))
+    return 0
+
+
+def _resolve_openclaw_allow_from(
+    explicit: list[str] | None,
+    *,
+    default: list[str],
+    open_to_all: bool = False,
+) -> list[str]:
+    if open_to_all:
+        return ["*"]
+    if explicit:
+        parsed = [item.strip() for value in explicit for item in value.split(",") if item.strip()]
+        return parsed or list(default)
+    return list(default)
+
+
+def handle_enable_openclaw_full_access(args: argparse.Namespace) -> int:
+    config_path = resolve_openclaw_config_path(args.config)
+    approvals_path = (
+        Path(args.approvals).expanduser().resolve()
+        if args.approvals
+        else config_path.parent / "exec-approvals.json"
+    )
+    telegram_allow_from = _resolve_openclaw_allow_from(
+        args.telegram_allow_from,
+        default=sorted(get_trusted_telegram_user_ids()),
+        open_to_all=args.telegram_open,
+    )
+    webchat_allow_from = _resolve_openclaw_allow_from(
+        args.webchat_allow_from,
+        default=["*"],
+    )
+    result = enable_openclaw_full_access(
+        config_path=config_path,
+        approvals_path=approvals_path,
+        telegram_allow_from=telegram_allow_from,
+        webchat_allow_from=webchat_allow_from,
+        no_backup=args.no_backup,
+        dry_run=args.dry_run,
+    )
+    print(json.dumps(result, indent=2, sort_keys=True))
     return 0
 
 
@@ -678,12 +1102,58 @@ def build_parser() -> argparse.ArgumentParser:
 
     openclaw_agent_parser = subparsers.add_parser(
         "sync-openclaw-bookedai-agent",
-        help="Create or update the BookedAI WhatsApp Booking Care Agent in the OpenClaw runtime config.",
+        help="Create or update the BookedAI customer booking agent manifest in the OpenClaw runtime config.",
     )
     openclaw_agent_parser.add_argument("--spec", default=str(DEFAULT_OPENCLAW_AGENT_SPEC))
+    openclaw_agent_parser.add_argument(
+        "--legacy-whatsapp-agent",
+        action="store_true",
+        help="Sync the older WhatsApp-specific BookedAI booking care agent manifest.",
+    )
     openclaw_agent_parser.add_argument("--config")
     openclaw_agent_parser.add_argument("--no-backup", action="store_true")
     openclaw_agent_parser.set_defaults(handler=handle_sync_openclaw_bookedai_agent)
+
+    fix_openclaw_approvals_parser = subparsers.add_parser(
+        "fix-openclaw-approvals",
+        help="Repair OpenClaw exec approval policy so allow-always is not requested while effective ask mode is always.",
+    )
+    fix_openclaw_approvals_parser.add_argument("--config")
+    fix_openclaw_approvals_parser.add_argument("--approvals")
+    fix_openclaw_approvals_parser.add_argument(
+        "--ask",
+        choices=["on-miss", "off"],
+        default="on-miss",
+        help="Use on-miss to keep prompts only for untrusted commands; off disables prompts when paired with matching security policy.",
+    )
+    fix_openclaw_approvals_parser.add_argument("--dry-run", action="store_true")
+    fix_openclaw_approvals_parser.add_argument("--no-backup", action="store_true")
+    fix_openclaw_approvals_parser.set_defaults(handler=handle_fix_openclaw_approvals)
+
+    openclaw_full_access_parser = subparsers.add_parser(
+        "enable-openclaw-full-access",
+        help="Enable full OpenClaw elevated/exec access for trusted webchat and Telegram operators.",
+    )
+    openclaw_full_access_parser.add_argument("--config")
+    openclaw_full_access_parser.add_argument("--approvals")
+    openclaw_full_access_parser.add_argument(
+        "--telegram-allow-from",
+        action="append",
+        help="Telegram sender id allowlist. May be repeated or comma-separated. Defaults to BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS.",
+    )
+    openclaw_full_access_parser.add_argument(
+        "--telegram-open",
+        action="store_true",
+        help="Set Telegram dmPolicy=open and allowFrom=['*']. Use only if the bot should accept every Telegram sender.",
+    )
+    openclaw_full_access_parser.add_argument(
+        "--webchat-allow-from",
+        action="append",
+        help="Webchat sender allowlist. Defaults to '*', matching bot.bookedai.au operator webchat access.",
+    )
+    openclaw_full_access_parser.add_argument("--dry-run", action="store_true")
+    openclaw_full_access_parser.add_argument("--no-backup", action="store_true")
+    openclaw_full_access_parser.set_defaults(handler=handle_enable_openclaw_full_access)
 
     return parser
 
@@ -701,6 +1171,8 @@ def main() -> int:
         "host-shell": {"host_shell"},
         "whatsapp-bot-status": {"whatsapp_bot_status"},
         "sync-openclaw-bookedai-agent": {"workspace_write", "whatsapp_bot_status"},
+        "fix-openclaw-approvals": {"openclaw_runtime_admin"},
+        "enable-openclaw-full-access": {"openclaw_runtime_admin"},
     }
     required_actions = required_actions_by_command.get(args.command)
     if required_actions:

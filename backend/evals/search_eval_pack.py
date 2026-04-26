@@ -104,6 +104,16 @@ SEARCH_EVAL_SERVICES: list[SimpleNamespace] = [
         featured=True,
     ),
     _service(
+        service_id="co-mai-hung-chess-sydney-pilot-group",
+        name="Kids Chess Class - Sydney Pilot",
+        summary="Beginner-friendly chess class for children with Grandmaster coaching posture.",
+        category="Kids Services",
+        location="Sydney NSW 2000",
+        amount_aud=30,
+        tags=["kids", "children", "chess", "class", "lessons", "sydney"],
+        featured=True,
+    ),
+    _service(
         service_id="haircut-wedding-brisbane",
         name="Wedding Hair Styling",
         summary="Bridal and wedding hair styling near James Street and Fortitude Valley.",
@@ -226,6 +236,15 @@ SEARCH_EVAL_CASES: tuple[SearchEvalCase, ...] = (
         requested_category="Kids Services",
         budget={"max_aud": 40},
         expected_ids=("kids-swimming-lessons",),
+        require_location_match=True,
+    ),
+    SearchEvalCase(
+        name="chess-class-sydney-live-safe",
+        query="Find a chess class in Sydney this weekend",
+        location_hint="Sydney",
+        requested_category="Kids Services",
+        expected_ids=("co-mai-hung-chess-sydney-pilot-group",),
+        expected_top_id="co-mai-hung-chess-sydney-pilot-group",
         require_location_match=True,
     ),
     SearchEvalCase(

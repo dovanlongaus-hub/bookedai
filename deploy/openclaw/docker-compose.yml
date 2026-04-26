@@ -10,7 +10,7 @@ services:
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS: ${BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS:-8426853622}
-      BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS: ${BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS:-sync_doc,sync_repo_docs,build_frontend,deploy_live,test,workspace_write,repo_structure,host_command,host_shell,whatsapp_bot_status,full_project}
+      BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS: ${BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS:-sync_doc,sync_repo_docs,build_frontend,deploy_live,test,workspace_write,repo_structure,host_command,host_shell,openclaw_runtime_admin,whatsapp_bot_status,full_project}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
     volumes:
@@ -65,7 +65,7 @@ services:
       OPENCLAW_GATEWAY_TOKEN: ${OPENCLAW_GATEWAY_TOKEN}
       TELEGRAM_BOT_TOKEN: ${TELEGRAM_BOT_TOKEN}
       BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS: ${BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS:-8426853622}
-      BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS: ${BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS:-sync_doc,sync_repo_docs,build_frontend,deploy_live,test,workspace_write,repo_structure,host_command,host_shell,whatsapp_bot_status,full_project}
+      BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS: ${BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS:-sync_doc,sync_repo_docs,build_frontend,deploy_live,test,workspace_write,repo_structure,host_command,host_shell,openclaw_runtime_admin,whatsapp_bot_status,full_project}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
       ANTHROPIC_BASE_URL: ${ANTHROPIC_BASE_URL:-}
     volumes:

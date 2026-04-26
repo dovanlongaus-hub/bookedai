@@ -68,6 +68,8 @@ console.log(`[portal-auto-login] visiting ${targetUrl}`);
 
 let httpStatus = 0;
 let referenceVisible = false;
+let bookingLoaded = false;
+let errorStateVisible = false;
 let fatal = '';
 
 try {
@@ -77,6 +79,12 @@ try {
   await page.waitForTimeout(800);
   const bodyText = (await page.locator('body').innerText()).slice(0, 20000);
   referenceVisible = bodyText.includes(ref);
+  errorStateVisible = /BOOKING NOT AVAILABLE|Failed to fetch|We could not load/i.test(bodyText);
+  bookingLoaded =
+    referenceVisible &&
+    !errorStateVisible &&
+    /BOOKING TRUTH|PAYMENT POSTURE|PORTAL ACTIONS/i.test(bodyText) &&
+    /REQUEST RESCHEDULE|REQUEST CANCELLATION|CONTACT SUPPORT|COMPLETE PAYMENT/i.test(bodyText);
   await page.screenshot({ path: join(evidenceDir, 'portal-loaded.png'), fullPage: true });
   writeFileSync(join(evidenceDir, 'page-text.txt'), bodyText, 'utf8');
 } catch (error) {
@@ -90,6 +98,8 @@ const summary = {
   booking_reference: ref,
   http_status: httpStatus,
   reference_visible_in_dom: referenceVisible,
+  booking_loaded: bookingLoaded,
+  error_state_visible: errorStateVisible,
   console_errors: consoleErrors,
   fatal,
   evidence_dir: evidenceDir,
@@ -97,7 +107,7 @@ const summary = {
 };
 writeFileSync(join(evidenceDir, 'summary.json'), JSON.stringify(summary, null, 2), 'utf8');
 
-console.log(`[portal-auto-login] http_status=${httpStatus} reference_visible=${referenceVisible} console_errors=${consoleErrors.length}`);
+console.log(`[portal-auto-login] http_status=${httpStatus} reference_visible=${referenceVisible} booking_loaded=${bookingLoaded} error_state=${errorStateVisible} console_errors=${consoleErrors.length}`);
 console.log(`[portal-auto-login] evidence -> ${evidenceDir}`);
 
 if (fatal) {
@@ -110,6 +120,10 @@ if (httpStatus < 200 || httpStatus >= 400) {
 }
 if (!referenceVisible) {
   console.error('[portal-auto-login] FAIL: booking reference not visible in DOM (auto-login may not be wired through to a session-bound view)');
+  process.exit(1);
+}
+if (!bookingLoaded) {
+  console.error('[portal-auto-login] FAIL: booking reference is visible, but the portal did not render the booking workspace');
   process.exit(1);
 }
 if (consoleErrors.length > 0) {

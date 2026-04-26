@@ -35,23 +35,41 @@ docker compose --env-file deploy/openclaw/.env -f deploy/openclaw/docker-compose
 - The WhatsApp customer-care bot now has a read-only OpenClaw readiness check through `python3 scripts/telegram_workspace_ops.py whatsapp-bot-status`; it checks `bot.bookedai.au`, API health, the WhatsApp provider status, and the WhatsApp verify route without sending a customer message
 - The default trusted action vocabulary includes `whatsapp_bot_status`, so Telegram/OpenClaw operators can run that check without needing broader `host_shell` access
 - The gateway can take several minutes to complete a cold start while plugins and channels initialize, so the compose healthcheck keeps a 12 minute startup grace to avoid false `unhealthy` states during normal boot
+- If an approval action fails with `allow-always is unavailable because the effective policy requires approval every time`, run `python3 scripts/telegram_workspace_ops.py fix-openclaw-approvals` from the OpenClaw CLI workspace. It sets the requested `tools.exec.ask` and host `exec-approvals.json` defaults to `on-miss`, which keeps prompts for untrusted commands but makes durable allowlist approvals valid again. Restart `openclaw-bookedai-gateway` and `openclaw-bookedai-cli` after applying the repair.
+- For trusted full control from `bot.bookedai.au` webchat and Telegram, run `python3 scripts/telegram_workspace_ops.py enable-openclaw-full-access` from the OpenClaw CLI workspace. It sets `tools.exec.security=full`, `tools.exec.ask=off`, host approval defaults to full/off, `tools.elevated.enabled=true`, webchat elevated allowlist to `["*"]`, Telegram elevated allowlist to `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS`, and `agents.defaults.elevatedDefault="full"`. Add `--telegram-open` only if every Telegram sender should be allowed to control the bot.
 - Telegram defaults should stay on DM pairing for safety
 - OpenClaw Control UI is served directly by the Gateway on port `18789`
 - The intended public reverse-proxy host for that UI is `https://bot.bookedai.au/`
 - Optional Anthropic-native Claude access can be injected at runtime with `ANTHROPIC_API_KEY` and `ANTHROPIC_BASE_URL`; the compose stack forwards both into the gateway and CLI without requiring secrets in tracked docs.
 
-## WhatsApp bot operator check
+## Customer booking agent manifest
 
-The BookedAI WhatsApp agent is defined in the repo at:
+The always-on BookedAI customer booking agent is defined in the repo at:
 
 ```bash
-deploy/openclaw/agents/bookedai-whatsapp-booking-care-agent.json
+deploy/openclaw/agents/bookedai-booking-customer-agent.json
 ```
+
+It is the OpenClaw manifest for `BookedAI Booking Customer Agent`, a customer-facing agent that uses OpenAI auth from `OPENAI_API_KEY`, can search BookedAI service data, can widen service discovery to internet/public-web results through BookedAI's AI Engine when enabled, and serves website chat plus Telegram customer threads. It is not the OpenClaw operator/programming bot and has no repo-write, deploy, or host-shell authority.
 
 Sync the manifest into the OpenClaw runtime config directory with:
 
 ```bash
 python3 scripts/telegram_workspace_ops.py sync-openclaw-bookedai-agent
+```
+
+The older WhatsApp-specific care manifest remains available for compatibility:
+
+```bash
+python3 scripts/telegram_workspace_ops.py sync-openclaw-bookedai-agent --legacy-whatsapp-agent
+```
+
+## WhatsApp bot operator check
+
+The legacy BookedAI WhatsApp agent is defined in the repo at:
+
+```bash
+deploy/openclaw/agents/bookedai-whatsapp-booking-care-agent.json
 ```
 
 Run this from the repo directly, through Telegram, or from the OpenClaw CLI workspace mount:
@@ -68,4 +86,4 @@ Expected healthy posture:
 - the Evolution webhook route reaches FastAPI at `/api/webhooks/evolution`
 - when the runtime is switched back to Meta/Twilio Business messaging, the WhatsApp verify route reaches FastAPI and returns either the challenge for a valid token or `403` for the intentionally invalid probe token
 
-OpenClaw v2026.4.15 keeps `openclaw.json` agent runtime entries schema-strict, so the BookedAI WhatsApp agent is installed as an OpenClaw manifest under the runtime `agents/` directory and supervised through the operator command plus BookedAI API gateway. The current fast path is a personal WhatsApp QR-session bridge through Evolution API because Meta/WhatsApp Business verification can take longer than the product rollout. This check is intentionally read-only. Do not use it as a substitute for an approved end-to-end WhatsApp send test from the paired phone/session.
+OpenClaw v2026.4.15 keeps `openclaw.json` agent runtime entries schema-strict, so BookedAI customer agents are installed as OpenClaw manifests under the runtime `agents/` directory and supervised through the operator command plus BookedAI API gateway. The WhatsApp-specific check is intentionally read-only. Do not use it as a substitute for an approved end-to-end WhatsApp send test from the paired phone/session.

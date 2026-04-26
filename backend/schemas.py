@@ -490,7 +490,9 @@ class ServiceCatalogItem(BaseModel):
     id: str
     name: str
     category: str
+    tenant_id: str | None = Field(default=None, max_length=64)
     business_email: str | None = Field(default=None, max_length=255)
+    owner_email: str | None = Field(default=None, max_length=255)
     summary: str
     duration_minutes: int = Field(gt=0)
     amount_aud: float = Field(ge=0)

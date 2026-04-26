@@ -1,5 +1,27 @@
 # Design System Inspired by Apple
 
+## 2026-04-26 Urgent UI/UX And Booking Flow Override
+
+The immediate design priority is to make BookedAI feel like one coherent AI Revenue Engine across public, product, tenant, portal, admin, and messaging surfaces.
+
+- UI/UX stabilization comes first: no clipped panels, no accidental horizontal overflow, no hidden duplicate labels breaking accessibility, no spinner-only waiting, and no implementation-style copy in customer-facing areas.
+- The standard booking journey is `Ask -> Match -> Compare -> Book -> Confirm -> Portal -> Follow-up`; every surface must preserve explicit customer intent before booking, then show a durable booking reference, QR/portal handoff, email/calendar/chat continuity, and honest queued/manual-review states.
+- Search results must remain compare-first: compact cards, thumbnail/preview where useful, source/location/price/duration posture, maps/provider/detail actions, and an explicit `Book` action before customer details open.
+- Messaging surfaces must feel native to their channel while sharing the same policy: website chat can show richer visual cards, Telegram should use compact text plus inline controls, WhatsApp/SMS/email should stay concise, and portal care should show booking/payment/support state with request-safe actions.
+- Mobile verification is part of design completion, not a later QA task: each changed surface should be checked around `390px` with no horizontal overflow and with primary actions visible and tappable.
+
+## 2026-04-26 Omnichannel AI Revenue Engine Override
+
+BookedAI's product surfaces should now express one connected revenue engine, not a set of disconnected channel bots.
+
+- primary product message: `BookedAI connects every customer message — WhatsApp, SMS, Telegram, email and web chat — into one AI Revenue Engine that captures intent, books appointments, collects payment, follows up, and retains customers automatically.`
+- customer-facing copy should make the channel continuity tangible: web chat, WhatsApp, SMS, Telegram, and email all continue the same booking/payment/support story
+- customer-facing chat agent name is `BookedAI Manager Bot`; use it consistently across Telegram, WhatsApp, SMS, email, and web chat
+- default BookedAI customer booking support/contact copy should use `info@bookedai.au` and `+61455301335`, framed as available on Telegram, WhatsApp, or iMessage
+- UI proof should show the loop as `message -> intent -> booking -> payment -> follow-up -> retention`, with portal/admin evidence available for operators but concise replies for customers
+- channel-specific screens should avoid separate-bot vocabulary unless the provider requires it; the visible product is BookedAI's AI Revenue Engine with channel adapters
+- keep automation claims state-safe: say BookedAI records, queues, follows up, asks for payment, or escalates based on source-of-record truth; do not imply payment collected, appointment changed, or customer retained until the backend state confirms it
+
 ## 2026-04-25 Public Homepage Acquisition Override
 
 `bookedai.au` should now sell the whole product in the first minute while preserving a real product interaction on the page.
@@ -30,6 +52,25 @@ WhatsApp customer-care replies are a dedicated BookedAI booking-care agent exper
 - treat OpenClaw as the safe gateway/operator surface for supervising the agent, not as a customer-visible persona in the WhatsApp copy
 - keep `+61455301335` as the customer-visible WhatsApp identity while direct Meta delivery is primary and Twilio is only the backup transport
 - preserve concise, mobile-readable WhatsApp copy; long operational evidence belongs in portal/admin surfaces, not the chat reply
+
+## 2026-04-26 Messaging Automation Layer Override
+
+BookedAI messaging channels should feel like one consistent booking-care agent, not separate bots with different rules.
+
+- use `BookedAI Manager Bot` as the customer-facing agent name; on Telegram use display name `BookedAI Manager Bot` and preferred username `@BookedAI_Manager_Bot`
+- use the shared path: customer message, channel webhook, BookedAI Inbox, AI booking-care policy, workflow engine, booking/payment/CRM/follow-up side effects, then provider reply
+- route website chat through `Website Chat UI -> /api/chat/send -> BookedAI AI Engine -> web response`; keep `/api/booking-assistant/chat` only as a compatibility alias
+- treat website demo/product chat as a public web-user surface that can search the full BookedAI catalog and Internet/public-web expansion when enabled
+- route Telegram through `Telegram Bot -> /api/webhooks/telegram -> BookedAI AI Engine -> Telegram sendMessage reply`, with `/api/webhooks/bookedai-telegram` as the explicit customer-bot webhook target
+- treat Telegram as a private customer-thread surface: search can behave like website chat, but booking-care answers must require booking reference or safe phone/email identity, never Telegram chat id alone
+- prioritize Telegram first for generalized channel rollout because webhook setup and delivery feedback are simpler than WhatsApp business-provider activation
+- Telegram should behave as a concise BookedAI representative: search the catalog, show the best few service options, pair each result with native inline `View n` and `Book n` controls, offer full web booking continuation, expose a `Find more on Internet near me` expansion action through the BookedAI service layer, and accept a simple `Book 1` style chat booking handoff when contact details are present
+- Telegram result messages should stay plain-text and resilient rather than depending on fragile rich markup: short heading, `Search:` context, `Option n` sections, decision-critical facts, one booking instruction, then inline keyboard actions
+- format Telegram service-search results into the same response structure as bookedai.au chat (`reply`, `matched_services`, `matched_events`, `suggested_service_id`, and location posture) so chat surfaces stay interchangeable
+- keep this customer Booking AI Agent completely separate from OpenClaw/operator Telegram: no repo commands, no deploy authority, no host access, no programming persona, and no shared bot token
+- keep channel copy concise and customer-safe; operational evidence belongs in portal/admin, not chat
+- preserve the same policy across WhatsApp and Telegram: ask for a booking reference when identity is ambiguous, load booking data only from explicit booking reference or a safe single phone/email identity match for that customer's private channel, answer from portal booking truth when safely resolved, and queue auditable reschedule/cancel requests rather than claiming instant mutation
+- use the same future-facing model for Apple Messages, SMS, and email once provider adapters exist
 
 ## 2026-04-25 Pitch Architecture Visual Override
 

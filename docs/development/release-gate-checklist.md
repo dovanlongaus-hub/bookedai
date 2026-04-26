@@ -13,7 +13,7 @@ Primary gate command:
 
 This command already runs:
 
-1. representative Playwright smoke suites for `legacy`, `live-read`, and `admin-smoke`, with each suite rebuilding under its own mode-specific frontend flags
+1. representative Playwright smoke suites for `legacy`, `live-read`, `admin-smoke`, and `tenant-smoke`, with each suite rebuilding under its own mode-specific frontend flags
 2. backend v1 route and lifecycle unit tests
 3. fixed-query search eval pack
 
@@ -25,6 +25,7 @@ The broader `@admin` regression suite remains separate from the release gate and
 The broader `@legacy` and `@live-read` tagged suites also remain available for wider regression passes; the release gate now uses smaller representative slices so promote-or-hold checks stay stable enough to run repeatedly.
 For live-read specifically, the gate currently centers on the authoritative-write-boundary path rather than the more detailed request-counter assertions, because that narrower slice has proven more repeatable in chained rehearsal runs.
 The broader live-read regression lane now also includes a dedicated homepage truth check for `near me -> needs location -> no stale shortlist`, and that scenario should be treated as a required search-truth smoke case whenever homepage search-state logic changes.
+The tenant-smoke lane locks the tenant gateway's outcome-led copy, create-account path, Google re-verification chooser, and email-code accessible-name regression so `tenant.bookedai.au` remains safe as a public SaaS proof route.
 
 The frontend Playwright commands now clear the standard preview ports before each run, so the release gate is less likely to fail because a previous smoke pass left a local preview server behind.
 The root release gate no longer relies on one shared prebuilt `dist` for all smoke lanes; mode-specific rebuilds are required so `legacy` and `live-read` can exercise the correct public-assistant feature flags.

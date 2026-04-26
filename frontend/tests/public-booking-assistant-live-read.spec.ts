@@ -1192,6 +1192,169 @@ test.describe('public assistant rollout smoke', () => {
     ).toBeVisible();
   });
 
+  test('homepage shortcut searches show swim chess and WSTI matches before live ranking finishes @live-read', async ({
+    page,
+  }) => {
+    test.skip(!isLiveReadMode, 'Shortcut fast-preview assertions only apply to live-read mode.');
+    await page.setViewportSize({ width: 1440, height: 1200 });
+    const chessPilot = {
+      ...legacyService,
+      id: 'co-mai-hung-chess-sydney-pilot-group',
+      name: 'Co Mai Hung Chess Sydney Pilot',
+      category: 'Kids Services',
+      summary: 'Curated pilot chess class listing for Sydney families seeking beginner-friendly coaching.',
+      venue_name: 'Co Mai Hung Chess Class',
+      location: 'Sydney NSW',
+      booking_url: 'https://bookedai.au/?assistant=open',
+      tags: ['kids', 'children', 'chess', 'class', 'strategy', 'sydney'],
+      featured: true,
+    };
+    const swimService = {
+      ...legacyService,
+      id: 'future-swim-caringbah-kids-swimming-lessons',
+      name: 'Future Swim Caringbah Kids Swimming Lessons',
+      category: 'Kids Services',
+      summary: 'Small-class Future Swim kids swimming lessons in Caringbah.',
+      venue_name: 'Future Swim Caringbah',
+      location: 'Caringbah NSW',
+      booking_url: 'https://futureswim.com.au/locations/caringbah/',
+      tags: ['kids', 'children', 'future swim', 'swimming', 'swim', 'lessons', 'caringbah'],
+      featured: true,
+    };
+
+    await page.route('**/api/partners', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'ok', items: [] }),
+      });
+    });
+
+    await page.route('**/api/booking-assistant/catalog', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          business_email: 'info@bookedai.au',
+          stripe_enabled: false,
+          services: [swimService, chessPilot],
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/agents/customer-turn', async (route) => {
+      await route.fulfill({
+        status: 502,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'Slow customer agent in this test.' }),
+      });
+    });
+
+    let releaseMatchingSearch: (() => void) | null = null;
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await new Promise<void>((resolve) => {
+        releaseMatchingSearch = resolve;
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            request_id: 'match-slow',
+            candidates: [],
+            recommendations: [],
+            confidence: {
+              score: 0,
+              label: 'low',
+              reason: 'Slow live ranking returned no extra results.',
+              gating_state: 'low',
+              evidence: [],
+            },
+            warnings: [],
+            search_strategy: 'live_read',
+            query_context: {
+              near_me_requested: false,
+              location_permission_needed: false,
+              is_chat_style: false,
+              has_user_location: false,
+            },
+            booking_context: null,
+            query_understanding: null,
+            semantic_assist: null,
+            search_diagnostics: {},
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/booking-trust/checks', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            availability_state: 'availability_unknown',
+            verified: false,
+            booking_confidence: 'medium',
+            booking_path_options: ['request_callback'],
+            recommended_booking_path: 'request_callback',
+            warnings: [],
+            payment_allowed_now: false,
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/bookings/path/resolve', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            path_type: 'request_callback',
+            trust_confidence: 'medium',
+            warnings: [],
+            next_step: 'Confirm details with BookedAI.',
+            payment_allowed_before_confirmation: false,
+          },
+          meta: { version: 'v1', tenant_id: 'tenant-test' },
+        }),
+      });
+    });
+
+    await page.goto('/');
+    const assistantPane = page.locator('#bookedai-search-assistant');
+    await page.getByRole('button', { name: /Future Swim kids swimming lessons/i }).click();
+    await expect(assistantPane.getByText(/Future Swim Caringbah/i).first()).toBeVisible({
+      timeout: 1000,
+    });
+    releaseMatchingSearch?.();
+    await expect(assistantPane.getByText(/Showing fast BookedAI shortcut results/i)).toBeVisible({ timeout: 10000 });
+    await expect(assistantPane.getByRole('button', { name: 'Send search' })).toBeEnabled({ timeout: 10000 });
+
+    const homepageSearchInput = await getActiveAssistantInput(page);
+    await homepageSearchInput.fill('Show WSTI AI events at Western Sydney Startup Hub this month');
+    await homepageSearchInput.press('Enter');
+    await expect(assistantPane.getByText('WSTI AI Events - Western Sydney Tech Innovators', { exact: true })).toBeVisible({
+      timeout: 1000,
+    });
+    releaseMatchingSearch?.();
+    await expect(assistantPane.getByRole('button', { name: 'Send search' })).toBeEnabled({ timeout: 10000 });
+
+    await homepageSearchInput.fill('Book Co Mai Hung Chess Sydney pilot class this week');
+    await homepageSearchInput.press('Enter');
+    await expect(assistantPane.getByText(/Co Mai Hung Chess/i).first()).toBeVisible({
+      timeout: 1000,
+    });
+    releaseMatchingSearch?.();
+  });
+
   test('homepage runtime only shows tenant-backed results when tenant content matches the current query intent @live-read', async ({
     page,
   }) => {

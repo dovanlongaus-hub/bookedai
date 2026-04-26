@@ -31,6 +31,11 @@ class _FakeExecuteResult:
             all=lambda: [] if self._value is None else [self._value],
         )
 
+    def scalars(self):
+        return SimpleNamespace(
+            all=lambda: [] if self._value is None else [self._value],
+        )
+
 
 async def _fake_execute(*_args, **_kwargs):
     return _FakeExecuteResult()
@@ -263,13 +268,13 @@ class WhatsAppWebhookRoutesTestCase(TestCase):
             "api.route_handlers.store_event",
             _store_event,
         ), patch(
-            "api.route_handlers.resolve_customer_care_booking_reference",
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
             _resolve_customer_care_booking_reference,
         ), patch(
-            "api.route_handlers.build_portal_customer_care_turn",
+            "service_layer.messaging_automation_service.build_portal_customer_care_turn",
             _build_portal_customer_care_turn,
         ), patch(
-            "api.route_handlers.queue_portal_booking_request",
+            "service_layer.messaging_automation_service.queue_portal_booking_request",
             _queue_portal_booking_request,
         ):
             app = create_test_app()
@@ -318,7 +323,7 @@ class WhatsAppWebhookRoutesTestCase(TestCase):
             "api.route_handlers.store_event",
             _store_event,
         ), patch(
-            "api.route_handlers.resolve_customer_care_booking_reference",
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
             _resolve_customer_care_booking_reference,
         ):
             app = create_test_app()
@@ -406,13 +411,13 @@ class WhatsAppWebhookRoutesTestCase(TestCase):
             "api.route_handlers.store_event",
             _store_event,
         ), patch(
-            "api.route_handlers.resolve_customer_care_booking_reference",
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
             _resolve_customer_care_booking_reference,
         ), patch(
-            "api.route_handlers.build_portal_customer_care_turn",
+            "service_layer.messaging_automation_service.build_portal_customer_care_turn",
             _build_portal_customer_care_turn,
         ), patch(
-            "api.route_handlers.queue_portal_booking_request",
+            "service_layer.messaging_automation_service.queue_portal_booking_request",
             _queue_portal_booking_request,
         ), patch(
             "api.route_handlers.orchestrate_lifecycle_email",

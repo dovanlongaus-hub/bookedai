@@ -500,9 +500,13 @@ function buildLiveReadAssistantReply(params: {
 
   if (!params.rankedCount) {
     const warningLine = params.warnings[0] ?? 'I could not find a strong relevant match for that request.';
+    const needsLocation = params.normalizedQuery?.toLowerCase().includes('near me') || !params.inferredLocation;
+    const nextStep = needsLocation
+      ? 'Share a suburb or allow location access and I will rerun the search.'
+      : 'Try adding a suburb, preferred time, or provider name and I will rerun the search.';
     return descriptor
-      ? `${warningLine} I stayed grounded to ${descriptor}, so I am not showing unrelated stored results.`
-      : `${warningLine} I am not showing unrelated stored results.`;
+      ? `${warningLine} I stayed grounded to ${descriptor}, so I am not showing unrelated stored results. ${nextStep}`
+      : `${warningLine} I am not showing unrelated stored results. ${nextStep}`;
   }
 
   const shownCount = Math.min(params.rankedCount, CHAT_RESULT_BATCH_SIZE);
@@ -584,11 +588,11 @@ function buildAuthoritativeBookingIntentResult(params: {
   const { authoritativeResult, selectedService, requestedDate, requestedTime, customerEmail, trustWarnings, nextStep } = params;
   const bookingReference =
     authoritativeResult.bookingReference?.trim() || authoritativeResult.bookingIntentId;
-  const amountLabel =
-    typeof selectedService.amount_aud === 'number' && Number.isFinite(selectedService.amount_aud)
-      ? `A$${selectedService.amount_aud}`
-      : 'TBC';
-  const detailLine = nextStep?.trim() || trustWarnings[0] || 'We will confirm the final slot with the provider.';
+  const amountLabel = formatServicePrice(selectedService);
+  const rawDetailLine = nextStep?.trim() || trustWarnings[0] || 'We will confirm the final slot with the provider.';
+  const detailLine = rawDetailLine.toLowerCase().includes('candidate not found')
+    ? 'Provider confirmation is required before final slot and payment collection.'
+    : rawDetailLine;
 
   return {
     status: 'ok',
@@ -872,6 +876,50 @@ function formatPrice(amount: number) {
   }).format(amount);
 }
 
+function formatServicePrice(service: Pick<ServiceCatalogItem, 'amount_aud' | 'price_posture'>) {
+  const posture = service.price_posture?.trim();
+  if (posture) {
+    return posture;
+  }
+  if (typeof service.amount_aud === 'number' && Number.isFinite(service.amount_aud) && service.amount_aud > 0) {
+    return formatPrice(service.amount_aud);
+  }
+  return 'Price TBC';
+}
+
+function humanizeAutomationWarning(warning: string) {
+  const normalized = warning.trim();
+  const lower = normalized.toLowerCase();
+  if (!normalized) {
+    return null;
+  }
+  if (
+    lower.includes('task_provider_http_error') ||
+    lower.includes('evolution api returned') ||
+    lower.includes('connection closed') ||
+    lower.includes('whatsapp_meta') ||
+    lower.includes('internal server error')
+  ) {
+    return 'Messaging follow-up is queued for operations review; the booking and portal remain available.';
+  }
+  if (lower.includes('provider confirmation is required')) {
+    return 'Provider confirmation is required before payment is collected.';
+  }
+  if (lower.includes('requires an international-format phone number')) {
+    return 'Add an international-format phone number to receive SMS or WhatsApp updates.';
+  }
+  if (lower.includes('revenue operations handoff')) {
+    return 'Operations follow-up needs manual review for this booking.';
+  }
+  return normalized;
+}
+
+function humanizeAutomationWarnings(warnings: string[]) {
+  return Array.from(
+    new Set(warnings.map(humanizeAutomationWarning).filter((warning): warning is string => Boolean(warning))),
+  );
+}
+
 function getServiceInitials(service: ServiceCatalogItem) {
   const source = service.venue_name || service.name || service.category || 'AI';
   return source
@@ -1038,7 +1086,7 @@ function buildReadyToBookSummary(service: ServiceCatalogItem, userQuery: string)
 
 function buildReadyToBookConfidence(service: ServiceCatalogItem, userQuery: string) {
   return [
-    formatPrice(service.amount_aud),
+    formatServicePrice(service),
     `${service.duration_minutes} min`,
     buildBestForLabel(service, userQuery),
   ]
@@ -2163,7 +2211,7 @@ export function BookingAssistantDialog({
     nextMessages: ChatMessage[],
     geoContext?: UserGeoContext | null,
   ) {
-    const response = await fetch(buildAssistantApiUrl('/booking-assistant/chat'), {
+    const response = await fetch(buildAssistantApiUrl('/chat/send'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -2217,7 +2265,7 @@ export function BookingAssistantDialog({
       user_locality: geoContext?.locality ?? userGeoContext?.locality ?? null,
     });
 
-    const response = await fetch(buildAssistantApiUrl('/booking-assistant/chat/stream'), {
+    const response = await fetch(buildAssistantApiUrl('/chat/send/stream'), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
@@ -3939,6 +3987,7 @@ export function BookingAssistantDialog({
                   <button
                     type="button"
                     onClick={onClose}
+                    aria-label={isProductAppLayout ? `Back to ${closeLabel ?? brandName}` : closeLabel ?? (standalone ? 'Back' : hasConversationStarted ? 'Close assistant' : 'Close')}
                     className={`rounded-full border border-slate-200 bg-white font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 ${
                       standalone
                         ? isProductAppLayout
@@ -4331,17 +4380,20 @@ export function BookingAssistantDialog({
 
                       <div className={`mt-3 ${
                         isCompactMobileViewport
-                          ? '-mx-1 flex gap-2 overflow-x-auto px-1 pb-1'
+                          ? 'grid grid-cols-1 gap-2'
                         : 'grid grid-cols-1 gap-2 sm:grid-cols-2'
                       }`}>
-                        {(isProductAppLayout ? popupShortcutTopics.slice(0, 4) : popupShortcutTopics).map((topic) => (
+                        {(isProductAppLayout
+                          ? popupShortcutTopics.slice(0, isCompactMobileViewport ? 2 : 4)
+                          : popupShortcutTopics
+                        ).map((topic) => (
                           <button
                               key={`welcome-${topic.label}`}
                               type="button"
                               onClick={() => void sendChatMessage(topic.prompt)}
                               className={`rounded-[1.1rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] text-left transition hover:border-slate-300 hover:shadow-[0_10px_26px_rgba(15,23,42,0.08)] ${
                                 isCompactMobileViewport
-                                ? 'w-[80vw] max-w-[16rem] min-w-[12.5rem] shrink-0 px-3 py-2.5'
+                                ? 'w-full px-3 py-2.5'
                                 : 'px-3 py-3'
                             }`}
                           >
@@ -4359,6 +4411,11 @@ export function BookingAssistantDialog({
                           </button>
                         ))}
                       </div>
+                      {isCompactMobileViewport && isProductAppLayout ? (
+                        <div className="mt-2 text-[11px] leading-5 text-slate-500">
+                          More examples appear after you start a search; type anything you want to book.
+                        </div>
+                      ) : null}
                     </div>
                   </div>
                 ) : null}
@@ -4421,7 +4478,7 @@ export function BookingAssistantDialog({
                             serviceName: service.name,
                           });
                           const serviceFacts = [
-                            formatPrice(service.amount_aud),
+                            formatServicePrice(service),
                             `${service.duration_minutes} min`,
                             buildServiceLocationLabel(service),
                             buildBookabilityLabel(service),
@@ -4687,7 +4744,7 @@ export function BookingAssistantDialog({
                       </div>
                       <div className="text-[10px] text-emerald-700">
                         {selectedService
-                          ? `${formatPrice(selectedService.amount_aud)} · ${selectedService.duration_minutes} min — review booking below`
+                          ? `${formatServicePrice(selectedService)} · ${selectedService.duration_minutes} min — review booking below`
                           : selectedEvent
                             ? `${formatEventDate(selectedEvent.start_at)} — review booking below`
                             : 'Review booking below'}
@@ -4711,7 +4768,7 @@ export function BookingAssistantDialog({
                         </div>
                         <div className="mt-1 flex flex-wrap gap-1">
                           {selectedService ? [
-                            formatPrice(selectedService.amount_aud),
+                            formatServicePrice(selectedService),
                             `${selectedService.duration_minutes} min`,
                             buildServiceDistanceLabel(selectedService),
                           ].map((fact) => (
@@ -4772,6 +4829,7 @@ export function BookingAssistantDialog({
                     <button
                       type="button"
                       onClick={toggleVoiceCapture}
+                      aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
                       className={`rounded-full font-semibold transition ${
                         isListening
                           ? 'booking-listening bg-rose-600 text-white hover:bg-rose-500'
@@ -4790,6 +4848,7 @@ export function BookingAssistantDialog({
                     <button
                       type="submit"
                       disabled={chatLoading || !chatInput.trim()}
+                      aria-label="Send search"
                       className={`rounded-full bg-slate-950 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 ${
                         isProductAppLayout || shouldUseCompactPopupMobileUI ? 'flex h-10 min-w-10 shrink-0 items-center justify-center px-3 py-0 text-[11px]' : 'w-full px-5 py-3 text-sm sm:w-auto'
                       }`}
@@ -4908,7 +4967,7 @@ export function BookingAssistantDialog({
                       </div>
                       {hasSelectionReadyForBooking && selectedService ? (
                         <div className="mt-0.5 text-[11px] text-slate-500">
-                          {formatPrice(selectedService.amount_aud)} · {selectedService.duration_minutes} min
+                          {formatServicePrice(selectedService)} · {selectedService.duration_minutes} min
                         </div>
                       ) : null}
                     </div>
@@ -5209,7 +5268,7 @@ export function BookingAssistantDialog({
                         serviceName: service.name,
                       });
                       const serviceFacts = [
-                        formatPrice(service.amount_aud),
+                        formatServicePrice(service),
                         `${service.duration_minutes} min`,
                         buildServiceLocationLabel(service),
                         buildBookabilityLabel(service),
@@ -5358,7 +5417,7 @@ export function BookingAssistantDialog({
                             </div>
                             <div className="shrink-0 text-right">
                               <div className="text-sm font-semibold">
-                                {formatPrice(service.amount_aud)}
+                                {formatServicePrice(service)}
                               </div>
                               <div className={`mt-1 text-[11px] ${isSelected ? 'text-white/60' : 'text-slate-500'}`}>
                                 {isSelected ? 'Selected' : `Option ${index + 1}`}
@@ -5400,7 +5459,7 @@ export function BookingAssistantDialog({
                               </div>
                             </div>
                             <div className="text-right text-sm font-semibold">
-                              {formatPrice(service.amount_aud)}
+                              {formatServicePrice(service)}
                             </div>
                           </div>
                           <div className="mt-2 text-xs opacity-80">
@@ -5498,7 +5557,7 @@ export function BookingAssistantDialog({
                         <div>
                           <div className="font-semibold">{selectedService.name}</div>
                           <div className="mt-1 text-xs text-emerald-800">
-                            {selectedService.category} • {selectedService.duration_minutes} min • {formatPrice(selectedService.amount_aud)}
+                            {selectedService.category} • {selectedService.duration_minutes} min • {formatServicePrice(selectedService)}
                           </div>
                         </div>
                         <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white">✓ Selected</span>
@@ -5581,7 +5640,7 @@ export function BookingAssistantDialog({
                                 Price
                               </div>
                               <div className="mt-1 text-sm font-semibold text-slate-950">
-                                {formatPrice(selectedService.amount_aud)}
+                                {formatServicePrice(selectedService)}
                               </div>
                             </div>
                             <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
@@ -5868,7 +5927,7 @@ export function BookingAssistantDialog({
                         </div>
                         <div className="mt-0.5 text-[11px] text-slate-500">
                           {selectedService
-                            ? `${formatPrice(selectedService.amount_aud)} • ${selectedService.duration_minutes} min${selectedService.location ? ` • ${selectedService.location}` : ''}`
+                            ? `${formatServicePrice(selectedService)} • ${selectedService.duration_minutes} min${selectedService.location ? ` • ${selectedService.location}` : ''}`
                             : `${selectedEvent ? formatEventDate(selectedEvent.start_at) : ''}${selectedEvent && (selectedEvent.venue_name || selectedEvent.location) ? ` • ${[selectedEvent.venue_name, selectedEvent.location].filter(Boolean).join(' • ')}` : ''}`}
                         </div>
                       </div>
@@ -5918,7 +5977,7 @@ export function BookingAssistantDialog({
                           </div>
                           <div className="mt-0.5 line-clamp-1 text-[10px] leading-4 text-slate-500">
                             {selectedService
-                              ? `${formatPrice(selectedService.amount_aud)} • ${selectedService.duration_minutes} min • ${buildBestForLabel(selectedService, latestCustomerRequirement)}`
+                              ? `${formatServicePrice(selectedService)} • ${selectedService.duration_minutes} min • ${buildBestForLabel(selectedService, latestCustomerRequirement)}`
                               : selectedEvent
                                 ? `${formatEventDate(selectedEvent.start_at)} • ${selectedEvent.organizer || 'Event organiser'}`
                                 : ''}
@@ -6317,21 +6376,25 @@ export function BookingAssistantDialog({
                         </div>
                       ))}
                     </div>
-                    {(result.automation?.paymentIntent?.warnings?.length ||
-                      result.automation?.lifecycleEmail?.warnings?.length ||
-                      result.automation?.sms?.warnings?.length ||
-                      result.automation?.whatsapp?.warnings?.length) ? (
+                    {humanizeAutomationWarnings([
+                      ...(result.automation?.paymentIntent?.warnings ?? []),
+                      ...(result.automation?.lifecycleEmail?.warnings ?? []),
+                      ...(result.automation?.sms?.warnings ?? []),
+                      ...(result.automation?.whatsapp?.warnings ?? []),
+                      ...(result.automation?.revenueOps?.warnings ?? []),
+                    ]).length ? (
                       <div className="mt-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-3">
                         <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700">
                           Action may be required
                         </div>
                         <div className="mt-2 space-y-1 text-[11px] leading-5 text-amber-900">
-                          {[
+                          {humanizeAutomationWarnings([
                             ...(result.automation?.paymentIntent?.warnings ?? []),
                             ...(result.automation?.lifecycleEmail?.warnings ?? []),
                             ...(result.automation?.sms?.warnings ?? []),
                             ...(result.automation?.whatsapp?.warnings ?? []),
-                          ].map((warning, index) => (
+                            ...(result.automation?.revenueOps?.warnings ?? []),
+                          ]).map((warning, index) => (
                             <div key={`automation-warning-${index}`}>{warning}</div>
                           ))}
                         </div>
@@ -6576,7 +6639,7 @@ export function BookingAssistantDialog({
                             Price
                           </div>
                           <div className="mt-1 text-sm font-semibold text-slate-950">
-                            {formatPrice(previewService.amount_aud)}
+                            {formatServicePrice(previewService)}
                           </div>
                         </div>
                         <div className="rounded-[1rem] bg-slate-50 px-3 py-3">

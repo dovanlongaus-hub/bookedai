@@ -4,16 +4,18 @@ test.describe('tenant gateway', () => {
   test('shared tenant gateway renders sign-in and create-account entry points', async ({
     page,
   }, testInfo) => {
-    await page.goto('/tenant');
+    await page.goto('/tenant?tenant_variant=control');
 
     await expect(
-      page.getByRole('heading', { name: 'One login portal for every tenant workspace' }),
+      page.getByRole('heading', { name: 'Run bookings, enquiries, and follow-up from one tenant workspace' }),
     ).toBeVisible();
     await expect(
-      page.getByRole('heading', { name: 'Tenant login and account gateway' }),
+      page.getByRole('heading', { name: 'Access your tenant workspace' }),
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Create account', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Send login code' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Send codeSend login code/ })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Create account', exact: true }).click();
 
@@ -25,6 +27,41 @@ test.describe('tenant gateway', () => {
     await page.screenshot({
       path: testInfo.outputPath('tenant-gateway-create-account.png'),
       fullPage: true,
+    });
+  });
+
+  test('tenant gateway revenue-ops variant assigns and tracks acquisition events', async ({
+    page,
+  }) => {
+    await page.goto('/tenant?tenant_variant=revenue_ops');
+
+    await expect(
+      page.getByRole('heading', { name: 'Turn every enquiry into tracked revenue operations' }),
+    ).toBeVisible();
+    await expect(page.getByText('which revenue actions are ready to run')).toBeVisible();
+
+    const assignedEvent = await page.evaluate(() =>
+      (window as Window & { __bookedaiTenantEvents?: Array<Record<string, unknown>> })
+        .__bookedaiTenantEvents?.find((event) => event.event === 'tenant_variant_assigned'),
+    );
+    expect(assignedEvent).toMatchObject({
+      event: 'tenant_variant_assigned',
+      source: 'bookedai_tenant',
+      variant: 'revenue_ops',
+      surface: 'tenant_gateway',
+    });
+
+    await page.getByRole('button', { name: 'Create account', exact: true }).click();
+
+    const authModeEvent = await page.evaluate(() =>
+      (window as Window & { __bookedaiTenantEvents?: Array<Record<string, unknown>> })
+        .__bookedaiTenantEvents?.find((event) => event.event === 'tenant_auth_mode_changed'),
+    );
+    expect(authModeEvent).toMatchObject({
+      event: 'tenant_auth_mode_changed',
+      variant: 'revenue_ops',
+      from_auth_mode: 'sign-in',
+      to_auth_mode: 'create',
     });
   });
 

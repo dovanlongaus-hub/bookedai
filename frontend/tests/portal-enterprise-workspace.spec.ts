@@ -138,7 +138,7 @@ test.describe('customer portal workspace', () => {
   test('renders an enterprise booking command center and submits reschedule', async ({ page }) => {
     await page.goto('/portal?booking_reference=BR-PORTAL-UI');
 
-    await expect(page.getByRole('heading', { name: /Manage booking status/ })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Review your booking/ })).toBeVisible();
     await expect(page.getByText('BR-PORTAL-UI').first()).toBeVisible();
     await expect(page.getByText('Payment required').first()).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Grandmaster Chess Trial' })).toBeVisible();
@@ -152,6 +152,41 @@ test.describe('customer portal workspace', () => {
     await page.getByRole('button', { name: 'Submit request' }).click();
 
     await expect(page.getByText('Your reschedule request has been recorded for manual review.')).toBeVisible();
+  });
+
+  test('exposes the status-first action order and portal funnel telemetry', async ({ page }) => {
+    await page.goto('/portal?booking_reference=BR-PORTAL-UI&portal_variant=status_first');
+
+    const actionRail = page.getByRole('complementary').locator('section').filter({ hasText: 'What would you like to do?' });
+    await expect(actionRail.getByRole('button', { name: /Status/ })).toBeVisible();
+    await expect(actionRail.getByRole('button', { name: /Pay/ })).toBeVisible();
+    await expect(actionRail.getByRole('button', { name: /Reschedule/ })).toBeVisible();
+    await expect(actionRail.getByRole('button', { name: /Ask for help/ })).toBeVisible();
+    await expect(actionRail.getByRole('button', { name: /Change plan/ })).toBeVisible();
+    await expect(actionRail.getByRole('button', { name: /Cancel/ })).toBeVisible();
+
+    const visibleLabels = await actionRail.getByRole('button').evaluateAll((buttons) =>
+      buttons.map((button) => button.querySelector('div')?.textContent?.trim()).filter(Boolean),
+    );
+    expect(visibleLabels).toEqual(['Status', 'Pay', 'Reschedule', 'Ask for help', 'Change plan', 'Cancel']);
+
+    await expect
+      .poll(async () =>
+        page.evaluate(() =>
+          ((window as typeof window & { __bookedaiPortalEvents?: Array<Record<string, unknown>> }).__bookedaiPortalEvents ?? []).some(
+            (event) => event.event === 'portal_booking_loaded' && event.variant === 'status_first',
+          ),
+        ),
+      )
+      .toBe(true);
+
+    await actionRail.getByRole('button', { name: /Pay/ }).click();
+    const clickedPay = await page.evaluate(() =>
+      ((window as typeof window & { __bookedaiPortalEvents?: Array<Record<string, unknown>> }).__bookedaiPortalEvents ?? []).some(
+        (event) => event.event === 'portal_action_nav_clicked' && event.view === 'pay',
+      ),
+    );
+    expect(clickedPay).toBe(true);
   });
 
   test('keeps the portal layout inside the mobile viewport', async ({ page }) => {

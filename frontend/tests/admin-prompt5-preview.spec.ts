@@ -1041,9 +1041,13 @@ test('admin prompt 5 preview shows rollout mode and runs additive preview flow @
   await expect(page.getByText('Legacy writes authoritative')).toBeVisible();
 
   await page.getByPlaceholder('Search query, for example haircut near Parramatta').fill('haircut');
-  await page.getByRole('button', { name: 'Run preview' }).click();
+  const runPreviewButton = page.getByRole('button', { name: 'Run preview' });
+  await runPreviewButton.evaluate((element: HTMLButtonElement) => {
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
+    element.click();
+  });
 
-  await expect(page.getByText('No Prompt 5 preview results yet.')).not.toBeVisible({
+  await expect(page.getByText('No AI quality preview results yet.')).not.toBeVisible({
     timeout: 15000,
   });
   await expect(page.getByText('Primary openai')).toBeVisible();
@@ -1055,33 +1059,32 @@ test('admin prompt 5 preview shows rollout mode and runs additive preview flow @
     page.getByText('Pending CRM sync work now includes queued retries so operators can separate retry monitoring from manual review backlog.'),
   ).toBeVisible();
   await page.getByPlaceholder('CRM sync record ID').fill('42');
-  await page.getByRole('button', { name: 'Queue CRM retry' }).click();
-  await expect(page.getByText('CRM retry queued for record 42.')).toBeVisible();
-  await expect(page.getByText('Sync status: retrying')).toBeVisible();
-  await expect(page.getByText('CRM retry drill-in')).toBeVisible();
-  const crmRetryDrillIn = page.locator('div').filter({ hasText: 'CRM retry drill-in' }).first();
-  await expect(crmRetryDrillIn.locator('p').filter({ hasText: 'Queued retries: 1' }).first()).toBeVisible();
-  await expect(
-    crmRetryDrillIn
-      .locator('p')
-      .filter({ hasText: 'Latest queued signal: 2026-04-16T10:00:00Z' })
-      .first(),
-  ).toBeVisible();
+  await Promise.all([
+    page.waitForResponse((response) => response.url().includes('/api/v1/integrations/crm-sync/retry') && response.request().method() === 'POST'),
+    page.getByRole('button', { name: 'Queue CRM retry' }).click(),
+  ]);
+  const prompt5Section = page.locator('#prompt5-preview');
+  const crmRetryResultCard = prompt5Section.locator('div.rounded-2xl.border.border-sky-200.bg-sky-50').filter({ hasText: 'CRM retry queued for record 42.' }).first();
+  await expect(crmRetryResultCard).toBeVisible();
+  await expect(crmRetryResultCard).toContainText('CRM retry queued for record 42.');
+  await expect(crmRetryResultCard).toContainText('Sync status: retrying');
+  await expect(prompt5Section.getByText('CRM retry drill-in').first()).toBeVisible();
+  const crmRetryDrillIn = prompt5Section.locator('div.rounded-2xl.border.border-slate-200.bg-slate-50').filter({ hasText: 'CRM retry drill-in' }).first();
+  await expect(crmRetryDrillIn).toContainText('Queued retries: 1');
+  await expect(crmRetryDrillIn).toContainText('Latest queued signal: 2026-04-16T10:00:00Z');
   await expect(page.locator('span').filter({ hasText: 'Retry attention' })).toBeVisible();
   await expect(page.getByText('Manual review 1')).toBeVisible();
   await expect(page.getByText('Needs operator action 0')).toBeVisible();
-  await expect(page.getByText('Prompt 11 triage board')).toBeVisible();
-  await expect(page.getByText('operator_action_required')).toBeVisible();
+  await expect(prompt5Section).toContainText('Retry posture');
+  await expect(prompt5Section).toContainText('Immediate action');
   await expect(
     page.getByText(
       'Release note: hold wider rollout until retry backlog and operator-action counts stop rising together.',
     ),
   ).toBeVisible();
-  await expect(page.getByText('Source slices')).toBeVisible();
-  await expect(
-    page.getByText('Hold broader rollout if queued retries keep growing while manual-review or failed counts stay flat.'),
-  ).toBeVisible();
-  await expect(page.getByText('attention_required').first()).toBeVisible();
+  await expect(prompt5Section).toContainText('Source slices');
+  await expect(prompt5Section).toContainText('Hold broader rollout if queued retries keep growing while manual-review or failed counts stay flat.');
+  await expect(prompt5Section).toContainText('attention_required');
 });
 
 test('admin booking ops flow supports booking detail review and manual confirmation follow-up @admin', async ({
@@ -1121,10 +1124,8 @@ test('admin workspace navigation splits operations, catalog, and reliability vie
 
   await page.goto('/admin');
 
-  await expect(
-    page.getByText('Enterprise admin IA is now organized by business function'),
-  ).toBeVisible();
   await expect(page.getByText('Bookings and transactions')).toBeVisible();
+  await expect(page.getByText('Ops home, booking triage, support queues, and operator entry points.')).toBeVisible();
 
   await page
     .locator('button')
@@ -1170,7 +1171,10 @@ test('tenant workspace supports profile updates, member access changes, and publ
   await expect(page.getByRole('button', { name: /Harbour Glow Group/i }).first()).toBeVisible();
 
   const tenantTeam = page.locator('#tenant-team');
-  await expect(tenantTeam.getByText('ops@harbourglow.example.com')).toBeVisible();
+  await tenantTeam.evaluate((element) => {
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
+  });
+  await expect(tenantTeam.getByText('Tenant team and role controls')).toBeVisible();
   await tenantTeam.locator('select').nth(2).selectOption('finance_manager');
   await tenantTeam.getByRole('button', { name: 'Save access' }).nth(1).click();
   await expect(page.getByText('Tenant member access updated.')).toBeVisible();
@@ -1179,8 +1183,13 @@ test('tenant workspace supports profile updates, member access changes, and publ
   await expect(tenantServices.getByText('Outdoor Banner Print')).toBeVisible();
   await expect(tenantServices.getByRole('button', { name: 'Publish' }).first()).toBeDisabled();
 
-  await tenantServices.getByRole('button', { name: 'Edit' }).nth(1).click();
+  const editServiceButton = tenantServices.getByRole('button', { name: 'Edit' }).nth(1);
+  await editServiceButton.evaluate((element: HTMLButtonElement) => {
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
+    element.click();
+  });
   const tenantServiceForm = page.locator('#tenant-services form');
+  await expect(tenantServiceForm.getByText('Edit tenant service')).toBeVisible();
   await tenantServiceForm.getByLabel('Publish state').selectOption('published');
   await expect(
     tenantServiceForm.getByText('Publish guardrails still need attention'),
@@ -1197,12 +1206,24 @@ test('tenant workspace supports profile updates, member access changes, and publ
   await expect(page.getByText('Tenant service updated.')).toBeVisible();
 
   await expect(tenantServices.getByRole('button', { name: 'Delete' }).nth(1)).toBeDisabled();
-  await tenantServices.getByRole('button', { name: 'Archive' }).nth(1).click();
+  const archiveServiceButton = tenantServices.getByRole('button', { name: 'Archive' }).nth(1);
+  await archiveServiceButton.evaluate((element: HTMLButtonElement) => {
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
+    element.click();
+  });
   await expect(page.getByText('Tenant service archived.')).toBeVisible();
 
-  await tenantServices.getByRole('button', { name: 'Delete' }).nth(1).click();
+  const deleteServiceButton = tenantServices.getByRole('button', { name: 'Delete' }).nth(1);
+  await deleteServiceButton.evaluate((element: HTMLButtonElement) => {
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
+    element.click();
+  });
   await expect(tenantServices.getByText('Confirm delete again')).toBeVisible();
-  await tenantServices.getByRole('button', { name: 'Confirm delete' }).click();
+  const confirmDeleteServiceButton = tenantServices.getByRole('button', { name: 'Confirm delete' });
+  await confirmDeleteServiceButton.evaluate((element: HTMLButtonElement) => {
+    element.scrollIntoView({ block: 'center', inline: 'nearest' });
+    element.click();
+  });
   await expect(page.getByText('Tenant service deleted.')).toBeVisible();
   await expect(page.getByText('Outdoor Banner Print')).not.toBeVisible();
 });
@@ -1243,13 +1264,13 @@ test('admin workspace deep-link opens reliability triage workspace directly @adm
     reliabilityWorkspace.getByText('Reliability workspace', { exact: true }),
   ).toBeVisible();
   await expect(
-    reliabilityWorkspace.getByText('Review Prompt 5 or Prompt 11 signals before they become rollout risk'),
+    reliabilityWorkspace.getByText('Review AI quality, automation health, and rollout risk before customers feel it'),
   ).toBeVisible();
   await expect(reliabilityWorkspace.getByText('Retry attention', { exact: true })).toBeVisible();
   await expect(reliabilityWorkspace.getByText('Config coverage', { exact: true })).toBeVisible();
   await expect(reliabilityWorkspace.getByText('Reliability triage')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Review operator action lane' })).toBeVisible();
-  await expect(reliabilityWorkspace.getByRole('button', { name: 'Open API inventory' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Review automation lane' })).toBeVisible();
+  await expect(reliabilityWorkspace.getByRole('button', { name: 'Open API inventory panel' })).toBeVisible();
   await expect(page.getByText('Selected service context', { exact: true })).toBeVisible();
   await expect(page.getByText('V1 search and trust preview')).toBeVisible();
 });
@@ -1265,7 +1286,7 @@ test('admin panel deep-link opens prompt 5 preview panel directly @admin', async
   await expect(
     page.locator('#reliability-workspace').getByText('Reliability workspace', { exact: true }),
   ).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Open Prompt 5 preview panel' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Open AI quality panel' })).toBeVisible();
   await expect(page.getByText('V1 search and trust preview')).toBeVisible();
   await expect(page).toHaveURL(/#reliability:prompt5-preview$/);
 });

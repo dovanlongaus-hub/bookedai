@@ -8,6 +8,12 @@ from uuid import UUID
 import httpx
 from sqlalchemy import desc, select, text
 
+from core.customer_booking_contact import (
+    DEFAULT_CUSTOMER_BOOKING_SUPPORT_CHANNELS,
+    DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
+    DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE,
+    customer_booking_support_label,
+)
 from db import ServiceMerchantProfile
 from repositories.academy_repository import AcademyRepository
 from repositories.audit_repository import AuditLogRepository
@@ -1369,6 +1375,19 @@ def _coerce_json_object(value: object) -> dict:
     return {}
 
 
+async def _rollback_best_effort_session(session) -> None:
+    rollback = getattr(session, "rollback", None)
+    if rollback is None:
+        return
+
+    try:
+        result = rollback()
+        if hasattr(result, "__await__"):
+            await result
+    except Exception:
+        return
+
+
 async def build_portal_booking_snapshot(session, *, booking_reference: str) -> dict:
     normalized_reference = str(booking_reference or "").strip()
     if not normalized_reference:
@@ -1384,28 +1403,32 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
     booking_intent_id = str(booking_row.get("booking_intent_id") or "").strip()
     payment_row = None
     if _is_uuid_like(booking_intent_id):
-        payment_result = await session.execute(
-            text(
-                """
-                select
-                  pi.id::text as payment_intent_id,
-                  pi.payment_option,
-                  pi.status,
-                  pi.amount_aud,
-                  pi.currency,
-                  pi.payment_url,
-                  pi.external_session_id,
-                  pi.metadata_json,
-                  pi.created_at::text as created_at
-                from payment_intents pi
-                where pi.booking_intent_id = cast(:booking_intent_id as uuid)
-                order by pi.created_at desc
-                limit 1
-                """
-            ),
-            {"booking_intent_id": booking_intent_id},
-        )
-        payment_row = payment_result.mappings().first()
+        try:
+            payment_result = await session.execute(
+                text(
+                    """
+                    select
+                      pi.id::text as payment_intent_id,
+                      pi.payment_option,
+                      pi.status,
+                      pi.amount_aud,
+                      pi.currency,
+                      pi.payment_url,
+                      pi.external_session_id,
+                      pi.metadata_json,
+                      pi.created_at::text as created_at
+                    from payment_intents pi
+                    where pi.booking_intent_id = cast(:booking_intent_id as uuid)
+                    order by pi.created_at desc
+                    limit 1
+                    """
+                ),
+                {"booking_intent_id": booking_intent_id},
+            )
+            payment_row = payment_result.mappings().first()
+        except Exception:
+            await _rollback_best_effort_session(session)
+            payment_row = None
     payment_row = payment_row or {}
 
     booking_metadata = _coerce_json_object(booking_row.get("metadata_json"))
@@ -1427,6 +1450,7 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
             booking_reference=normalized_reference,
         )
     except Exception:
+        await _rollback_best_effort_session(session)
         academy_student_row = None
         academy_report_row = None
 
@@ -1449,11 +1473,8 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
     can_request_pause = has_academy_report_preview and booking_status.lower() not in {"cancelled", "completed"}
     can_request_downgrade = has_academy_report_preview and booking_status.lower() not in {"cancelled", "completed"}
 
-    support_email = (
-        str(booking_row.get("business_email") or "").strip().lower()
-        or str(booking_row.get("owner_email") or "").strip().lower()
-        or "support@bookedai.au"
-    )
+    support_email = DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
+    support_phone = DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE
     booking_closed = booking_status.lower() in {"cancelled", "completed"}
     payment_failed = payment_status.lower() in {"failed", "requires_action", "payment_follow_up_required"}
     payment_complete = payment_status.lower() in {"paid", "succeeded", "completed"}
@@ -1506,7 +1527,7 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
         {
             "id": "contact_support",
             "label": "Contact support",
-            "description": "Get help from the business or BookedAI support team.",
+            "description": "Get help from the BookedAI customer booking support team.",
             "enabled": True,
             "href": f"mailto:{support_email}?subject=Booking%20support%20{normalized_reference}",
             "note": None,
@@ -1577,24 +1598,28 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
         )
 
     if _is_uuid_like(booking_intent_id):
-        audit_result = await session.execute(
-            text(
-                """
-                select
-                  id,
-                  event_type,
-                  payload,
-                  created_at::text as created_at
-                from audit_logs
-                where entity_id = :entity_id
-                  and event_type like 'portal.%'
-                order by created_at desc, id desc
-                limit 5
-                """
-            ),
-            {"entity_id": booking_intent_id},
-        )
-        audit_rows = list(audit_result.mappings().all())
+        try:
+            audit_result = await session.execute(
+                text(
+                    """
+                    select
+                      id,
+                      event_type,
+                      payload,
+                      created_at::text as created_at
+                    from audit_logs
+                    where entity_id = :entity_id
+                      and event_type like 'portal.%'
+                    order by created_at desc, id desc
+                    limit 5
+                    """
+                ),
+                {"entity_id": booking_intent_id},
+            )
+            audit_rows = list(audit_result.mappings().all())
+        except Exception:
+            await _rollback_best_effort_session(session)
+            audit_rows = []
         for item in reversed(audit_rows):
             event_type = str(item.get("event_type") or "").strip()
             created_at = str(item.get("created_at") or "").strip()
@@ -1675,8 +1700,9 @@ async def build_portal_booking_snapshot(session, *, booking_reference: str) -> d
         ],
         "support": {
             "contact_email": support_email,
-            "contact_phone": None,
-            "contact_label": booking_row.get("business_name") or "BookedAI support",
+            "contact_phone": support_phone,
+            "contact_label": customer_booking_support_label(),
+            "contact_channels": list(DEFAULT_CUSTOMER_BOOKING_SUPPORT_CHANNELS),
         },
         "academy_report_preview": booking_metadata.get("academy_report_preview")
         if isinstance(booking_metadata.get("academy_report_preview"), dict)
@@ -1798,8 +1824,9 @@ def _build_customer_care_reply(*, message: str, snapshot: dict, action_summary: 
             f" BookedAI also has {action_summary['total']} revenue-ops action"
             f"{'' if action_summary['total'] == 1 else 's'} tracking follow-up behind the scenes."
         )
-    if support.get("contact_email"):
-        reply += f" Support contact: {support.get('contact_email')}."
+    support_email = str(support.get("contact_email") or DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL).strip()
+    support_phone = str(support.get("contact_phone") or DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE).strip()
+    reply += f" Support contact: {support_email} or {support_phone} on Telegram, WhatsApp, or iMessage."
     return phase, reply
 
 
@@ -1883,6 +1910,7 @@ async def build_portal_customer_care_turn(
             limit=8,
         )
     except Exception:
+        await _rollback_best_effort_session(session)
         action_runs = []
 
     action_summary = _summarize_portal_action_runs(action_runs)
@@ -1907,6 +1935,7 @@ async def build_portal_customer_care_turn(
                     f"{f' for {support_email}' if support_email else ''}."
                 )
         except Exception:
+            await _rollback_best_effort_session(session)
             created_request = {
                 "request_status": "manual_review_required",
                 "request_type": "support_request",
@@ -2101,11 +2130,7 @@ async def queue_portal_booking_request(
     normalized_reference = str(booking_row.get("booking_reference") or booking_reference).strip()
     tenant_id = str(booking_row.get("tenant_id") or "").strip() or None
     booking_intent_id = str(booking_row.get("booking_intent_id") or "").strip() or None
-    support_email = (
-        str(booking_row.get("business_email") or "").strip().lower()
-        or str(booking_row.get("owner_email") or "").strip().lower()
-        or "support@bookedai.au"
-    )
+    support_email = DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
 
     safe_request_type = request_type.strip().lower()
     request_payload = {

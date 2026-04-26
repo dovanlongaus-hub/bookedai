@@ -643,6 +643,7 @@ export interface PortalBookingSupport {
   contact_email?: string | null;
   contact_phone?: string | null;
   contact_label?: string | null;
+  contact_channels?: string[] | null;
 }
 
 export interface PortalBookingStatusSummary {

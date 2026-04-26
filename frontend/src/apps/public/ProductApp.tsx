@@ -16,6 +16,10 @@ import {
   isPublicBookingAssistantV1Enabled,
   isPublicBookingAssistantV1LiveReadEnabled,
 } from '../../shared/config/publicBookingAssistant';
+import {
+  BOOKEDAI_PUBLIC_TENANT_REF,
+  createPublicAssistantRuntimeConfig,
+} from '../../shared/runtime/publicAssistantRuntime';
 
 export function ProductApp() {
   const bookingAssistantV1Enabled = isPublicBookingAssistantV1Enabled();
@@ -31,6 +35,16 @@ export function ProductApp() {
       ? 'Search, shortlist, booking, and follow-up are all live in this product.'
       : 'Search, shortlist, and booking are all active on this product.';
   const productFlowSteps = ['Search', 'Match', 'Book', 'Follow-up'];
+  const productRuntimeConfig = createPublicAssistantRuntimeConfig({
+    channel: 'public_web',
+    tenantRef: BOOKEDAI_PUBLIC_TENANT_REF,
+    deploymentMode: 'standalone_app',
+    widgetId: 'bookedai-product-live-flow',
+    source: 'bookedai_product',
+    medium: 'bookedai_owned_website',
+    campaign: 'bookedai_product_live_flow',
+    surface: 'bookedai_product_assistant',
+  });
 
   function openRegisterInterest() {
     if (typeof window === 'undefined') {
@@ -56,7 +70,9 @@ export function ProductApp() {
 
   return (
     <main className="booked-shell min-h-screen min-h-[100svh] overflow-x-hidden md:min-h-[100dvh]">
+      <h1 className="sr-only">BookedAI live revenue flow</h1>
       <section className="relative flex min-h-[100svh] flex-col md:min-h-[100dvh]">
+        <h2 className="sr-only">Search, shortlist, book, and follow up</h2>
         <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-28 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.12),transparent_62%)] sm:h-40" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-36 bg-[linear-gradient(180deg,rgba(255,255,255,0),rgba(237,242,249,0.9))]" />
 
@@ -163,6 +179,7 @@ export function ProductApp() {
               isOpen
               standalone
               layoutMode="product_app"
+              runtimeConfig={productRuntimeConfig}
               closeLabel={brandDomainLabel}
               onClose={() => {
                 window.location.href = brandHomeUrl;

@@ -181,7 +181,9 @@ def _service_catalog_item(
     id: str,
     name: str,
     category: str,
+    tenant_id: str | None = None,
     business_email: str | None = None,
+    owner_email: str | None = None,
     summary: str,
     duration_minutes: int,
     amount_aud: float,
@@ -204,7 +206,9 @@ def _service_catalog_item(
         id=id,
         name=name,
         category=category,
+        tenant_id=tenant_id,
         business_email=business_email,
+        owner_email=owner_email,
         summary=summary,
         duration_minutes=duration_minutes,
         amount_aud=amount_aud,
@@ -2677,10 +2681,18 @@ class BookingAssistantService:
 
         booking_reference = f"BAI-{uuid4().hex[:8].upper()}"
         portal_url = build_customer_portal_url(self.CUSTOMER_PORTAL_BASE_URL, booking_reference)
-        business_recipient = (
-            (service.business_email or "").strip().lower() or self.settings.booking_business_email
+        info_recipient = self.settings.booking_business_email.strip().lower() or "info@bookedai.au"
+        business_recipient = info_recipient
+        tenant_id = str(service.tenant_id or "").strip() or None
+        tenant_notification_email = (
+            str(service.business_email or "").strip().lower()
+            if tenant_id
+            else ""
         )
-        info_recipient = self.settings.booking_business_email.strip().lower()
+        if tenant_notification_email == info_recipient:
+            tenant_notification_email = ""
+        customer_confirmation_cc = [info_recipient]
+        internal_notification_cc = [tenant_notification_email] if tenant_notification_email else []
         amount_label = "Details in follow-up" if is_event_request else format_amount(service.amount_aud)
 
         payment_status = "payment_follow_up_required"
@@ -2747,7 +2759,7 @@ class BookingAssistantService:
                 if normalized_email:
                     await email_service.send_email(
                         to=[normalized_email],
-                        cc=[business_recipient, info_recipient],
+                        cc=customer_confirmation_cc,
                         subject=f"BookedAI booking request {booking_reference}",
                         text=build_booking_customer_confirmation_text(
                             booking_reference=booking_reference,
@@ -2765,7 +2777,7 @@ class BookingAssistantService:
                     )
                 await email_service.send_email(
                     to=[business_recipient],
-                    cc=[info_recipient],
+                    cc=internal_notification_cc,
                     subject=f"New BookedAI booking lead {booking_reference}",
                     text=build_booking_internal_notification_text(
                         booking_reference=booking_reference,
@@ -2815,6 +2827,11 @@ class BookingAssistantService:
                     "booking_reference": booking_reference,
                     "service_id": service.id,
                     "business_email": business_recipient,
+                    "tenant_id": tenant_id,
+                    "tenant_notification_email": tenant_notification_email or None,
+                    "tenant_notification_channels": (
+                        ["telegram", "email_cc"] if tenant_notification_email else ["telegram"]
+                    ),
                     "portal_url": portal_url,
                     "meeting_status": meeting_status,
                     "meeting_join_url": meeting_join_url,

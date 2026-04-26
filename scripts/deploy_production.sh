@@ -72,7 +72,13 @@ bash scripts/sync_app_env_from_supabase.sh
 mkdir -p deploy/certbot/www
 docker network create bookedai_internal >/dev/null 2>&1 || true
 
-docker compose -f docker-compose.prod.yml --env-file .env build web backend beta-web beta-backend
+DEPLOY_COMPOSE_PARALLEL_LIMIT="${DEPLOY_COMPOSE_PARALLEL_LIMIT:-1}"
+export COMPOSE_PARALLEL_LIMIT="${COMPOSE_PARALLEL_LIMIT:-${DEPLOY_COMPOSE_PARALLEL_LIMIT}}"
+
+echo "Building production images with COMPOSE_PARALLEL_LIMIT=${COMPOSE_PARALLEL_LIMIT}."
+docker compose -f docker-compose.prod.yml --env-file .env build backend beta-backend
+docker compose -f docker-compose.prod.yml --env-file .env build web
+docker compose -f docker-compose.prod.yml --env-file .env build beta-web
 
 CERT_PATH="/etc/letsencrypt/live/${DOMAIN_ROOT}/fullchain.pem"
 NEEDS_CERT_UPDATE="false"
@@ -128,11 +134,11 @@ docker compose \
   --env-file "${SUPABASE_ENV_FILE}" \
   up -d
 
-if ! docker compose -f docker-compose.prod.yml --env-file .env up -d --build; then
+if ! docker compose -f docker-compose.prod.yml --env-file .env up -d --no-build; then
   echo "Production compose up failed; retrying with orphan cleanup..." >&2
   docker compose -f docker-compose.prod.yml --env-file .env ps >&2 || true
   docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
-  docker compose -f docker-compose.prod.yml --env-file .env up -d --build --remove-orphans
+  docker compose -f docker-compose.prod.yml --env-file .env up -d --no-build --remove-orphans
 fi
 docker compose -f docker-compose.prod.yml --env-file .env restart proxy
 

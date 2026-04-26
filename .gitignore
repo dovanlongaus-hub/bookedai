@@ -9,6 +9,7 @@ __pycache__/
 .playwright-cli/
 .claude/
 .codex-tmp-venv/
+.local/
 .venv*/
 .pytest_cache/
 artifacts/

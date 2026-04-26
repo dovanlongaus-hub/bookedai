@@ -3,7 +3,7 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import JSON, DateTime, Float, Integer, String, Text, func, text
+from sqlalchemy import JSON, DateTime, Float, Integer, String, Text, UniqueConstraint, func, text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -33,6 +33,36 @@ class ConversationEvent(Base):
     metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
+class MessagingChannelSession(Base):
+    __tablename__ = "messaging_channel_sessions"
+    __table_args__ = (
+        UniqueConstraint("channel", "conversation_id", name="uq_messaging_channel_sessions_channel_conversation"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    channel: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    conversation_id: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
+    tenant_id: Mapped[str | None] = mapped_column(String(64), index=True)
+    customer_identity_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    service_search_query: Mapped[str | None] = mapped_column(Text)
+    service_options_json: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list)
+    reply_controls_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    last_ai_intent: Mapped[str | None] = mapped_column(String(100), index=True)
+    last_workflow_status: Mapped[str | None] = mapped_column(String(100), index=True)
+    last_reply_delivery_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    last_callback_ack_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    metadata_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False,
     )
 
 

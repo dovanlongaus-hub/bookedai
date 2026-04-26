@@ -29,14 +29,73 @@ import type {
 type PortalLoadState =
   | { status: 'idle' }
   | { status: 'loading'; bookingReference: string }
-  | { status: 'error'; bookingReference: string; message: string }
+  | { status: 'error'; bookingReference: string; message: string; recoverable?: boolean }
   | { status: 'ready'; bookingReference: string; detail: PortalBookingDetailResponse };
 
 type PortalRequestMode = 'reschedule' | 'cancel' | 'pause' | 'downgrade' | null;
 
-type PortalViewMode = 'overview' | 'edit' | 'reschedule' | 'cancel' | 'pause' | 'downgrade';
+type PortalViewMode =
+  | 'overview'
+  | 'status'
+  | 'pay'
+  | 'edit'
+  | 'reschedule'
+  | 'cancel'
+  | 'pause'
+  | 'downgrade'
+  | 'change_plan'
+  | 'help';
+type PortalExperimentVariant = 'control' | 'status_first';
+type PortalEventWindow = Window & {
+  dataLayer?: Array<Record<string, unknown>>;
+  __bookedaiPortalEvents?: Array<Record<string, unknown>>;
+};
 
 const portalViewItems: Array<{
+  id: PortalViewMode;
+  label: string;
+  shortLabel: string;
+  body: string;
+}> = [
+  {
+    id: 'status',
+    label: 'Status',
+    shortLabel: 'Status',
+    body: 'Booking reference, schedule, payment posture, provider details, and timeline.',
+  },
+  {
+    id: 'pay',
+    label: 'Pay',
+    shortLabel: 'Pay',
+    body: 'Review the current payment state and complete checkout when a secure link is available.',
+  },
+  {
+    id: 'reschedule',
+    label: 'Reschedule',
+    shortLabel: 'Reschedule',
+    body: 'Request a new date or time and keep the original booking context.',
+  },
+  {
+    id: 'help',
+    label: 'Ask for help',
+    shortLabel: 'Help',
+    body: 'Ask the booking-care agent or contact support without losing this booking context.',
+  },
+  {
+    id: 'change_plan',
+    label: 'Change plan',
+    shortLabel: 'Change plan',
+    body: 'For academy or subscription bookings, request pause or a lighter plan for review.',
+  },
+  {
+    id: 'cancel',
+    label: 'Cancel',
+    shortLabel: 'Cancel',
+    body: 'Submit a cancellation request with support-visible context.',
+  },
+];
+
+const controlPortalViewItems: Array<{
   id: PortalViewMode;
   label: string;
   shortLabel: string;
@@ -79,6 +138,55 @@ const portalViewItems: Array<{
     body: 'Submit a cancellation request with support-visible context.',
   },
 ];
+const portalViewTitleItems = [...portalViewItems, ...controlPortalViewItems];
+const PORTAL_VARIANT_QUERY_PARAM = 'portal_variant';
+const PORTAL_VARIANT_STORAGE_KEY = 'bookedai.portal.variant';
+const BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL = 'info@bookedai.au';
+const BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_PHONE = '+61455301335';
+const BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_CHANNELS = 'Telegram, WhatsApp, or iMessage';
+
+function isPortalExperimentVariant(value: string | null | undefined): value is PortalExperimentVariant {
+  return value === 'control' || value === 'status_first';
+}
+
+function resolvePortalVariant(): PortalExperimentVariant {
+  if (typeof window === 'undefined') {
+    return 'status_first';
+  }
+
+  const url = new URL(window.location.href);
+  const queryVariant = url.searchParams.get(PORTAL_VARIANT_QUERY_PARAM);
+  if (isPortalExperimentVariant(queryVariant)) {
+    window.localStorage.setItem(PORTAL_VARIANT_STORAGE_KEY, queryVariant);
+    return queryVariant;
+  }
+
+  const storedVariant = window.localStorage.getItem(PORTAL_VARIANT_STORAGE_KEY);
+  if (isPortalExperimentVariant(storedVariant)) {
+    return storedVariant;
+  }
+
+  const defaultVariant: PortalExperimentVariant = 'status_first';
+  window.localStorage.setItem(PORTAL_VARIANT_STORAGE_KEY, defaultVariant);
+  return defaultVariant;
+}
+
+function trackPortalEvent(eventName: string, payload: Record<string, unknown> = {}) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  const eventWindow = window as PortalEventWindow;
+  const eventPayload = {
+    event: eventName,
+    source: 'bookedai_portal',
+    timestamp: new Date().toISOString(),
+    ...payload,
+  };
+  eventWindow.__bookedaiPortalEvents = [...(eventWindow.__bookedaiPortalEvents ?? []), eventPayload];
+  eventWindow.dataLayer = eventWindow.dataLayer ?? [];
+  eventWindow.dataLayer.push(eventPayload);
+  window.dispatchEvent(new CustomEvent('bookedai:portal-event', { detail: eventPayload }));
+}
 
 function readPortalReferenceFromUrl() {
   if (typeof window === 'undefined') {
@@ -95,17 +203,22 @@ function readPortalReferenceFromUrl() {
 
 function readPortalViewFromUrl(): PortalViewMode {
   if (typeof window === 'undefined') {
-    return 'overview';
+    return 'status';
   }
 
   const url = new URL(window.location.href);
-  const action = (url.searchParams.get('action') || url.searchParams.get('view') || 'overview').trim().toLowerCase();
+  const action = (url.searchParams.get('action') || url.searchParams.get('view') || 'status').trim().toLowerCase();
+  if (action === 'overview') return 'overview';
+  if (action === 'status') return 'status';
+  if (action === 'pay' || action === 'payment') return 'pay';
   if (action === 'edit') return 'edit';
   if (action === 'reschedule') return 'reschedule';
   if (action === 'cancel') return 'cancel';
   if (action === 'pause') return 'pause';
   if (action === 'downgrade') return 'downgrade';
-  return 'overview';
+  if (action === 'help' || action === 'support') return 'help';
+  if (action === 'change_plan' || action === 'change-plan') return 'change_plan';
+  return 'status';
 }
 
 function syncPortalRouteState(bookingReference: string, viewMode: PortalViewMode) {
@@ -120,13 +233,36 @@ function syncPortalRouteState(bookingReference: string, viewMode: PortalViewMode
     url.searchParams.delete('booking_reference');
   }
 
-  if (viewMode === 'overview') {
+  if (viewMode === 'overview' || viewMode === 'status') {
     url.searchParams.delete('action');
   } else {
     url.searchParams.set('action', viewMode);
   }
 
   window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`);
+}
+
+function normalizePortalLoadError(error: unknown) {
+  const message = error instanceof Error ? error.message.trim() : '';
+  const recoverableMessages = new Set([
+    '',
+    'Failed to fetch',
+    'NetworkError when attempting to fetch resource.',
+    'Load failed',
+  ]);
+
+  if (recoverableMessages.has(message)) {
+    return {
+      recoverable: true,
+      message:
+        'We could not refresh the latest details yet. Try again in a moment, or contact BookedAI support with this reference so we can continue the same request.',
+    };
+  }
+
+  return {
+    recoverable: false,
+    message,
+  };
 }
 
 function formatDateTime(dateValue?: string | null, timeValue?: string | null, timezone?: string | null) {
@@ -232,12 +368,14 @@ function bookingPathLabel(bookingPath?: string | null) {
 }
 
 function viewTitle(viewMode: PortalViewMode) {
-  return portalViewItems.find((item) => item.id === viewMode)?.label || 'Booking overview';
+  return portalViewTitleItems.find((item) => item.id === viewMode)?.label || 'Booking overview';
 }
 
 export function PortalApp() {
   const initialReference = useMemo(() => readPortalReferenceFromUrl(), []);
   const initialViewMode = useMemo(() => readPortalViewFromUrl(), []);
+  const portalVariant = useMemo(() => resolvePortalVariant(), []);
+  const activePortalViewItems = portalVariant === 'control' ? controlPortalViewItems : portalViewItems;
   const [lookupReference, setLookupReference] = useState(initialReference);
   const [requestMode, setRequestMode] = useState<PortalRequestMode>(null);
   const [viewMode, setViewMode] = useState<PortalViewMode>(initialViewMode);
@@ -275,16 +413,27 @@ export function PortalApp() {
           bookingReference: initialReference,
           detail: envelope.data,
         });
+        trackPortalEvent('portal_booking_loaded', {
+          variant: portalVariant,
+          booking_reference: initialReference,
+          booking_status: envelope.data.booking.status,
+          payment_status: envelope.data.payment.status,
+          source: 'initial_reference',
+        });
       } catch (error) {
         if (cancelled) {
           return;
         }
-        const message =
-          error instanceof Error ? error.message : 'We could not load that booking reference right now.';
+        const errorState = normalizePortalLoadError(error);
         setLoadState({
           status: 'error',
           bookingReference: initialReference,
-          message,
+          ...errorState,
+        });
+        trackPortalEvent('portal_lookup_failed', {
+          variant: portalVariant,
+          booking_reference: initialReference,
+          recoverable: errorState.recoverable,
         });
       }
     }
@@ -294,12 +443,16 @@ export function PortalApp() {
     return () => {
       cancelled = true;
     };
-  }, [initialReference]);
+  }, [initialReference, portalVariant]);
 
   async function handleLookup(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const normalizedReference = lookupReference.trim();
     syncPortalRouteState(normalizedReference, viewMode);
+    trackPortalEvent('portal_lookup_submitted', {
+      variant: portalVariant,
+      has_reference: Boolean(normalizedReference),
+    });
 
     if (!normalizedReference) {
       setLoadState({ status: 'idle' });
@@ -323,13 +476,24 @@ export function PortalApp() {
         bookingReference: normalizedReference,
         detail: envelope.data,
       });
+      trackPortalEvent('portal_booking_loaded', {
+        variant: portalVariant,
+        booking_reference: normalizedReference,
+        booking_status: envelope.data.booking.status,
+        payment_status: envelope.data.payment.status,
+        source: 'manual_lookup',
+      });
     } catch (error) {
-      const message =
-        error instanceof Error ? error.message : 'We could not load that booking reference right now.';
+      const errorState = normalizePortalLoadError(error);
       setLoadState({
         status: 'error',
         bookingReference: normalizedReference,
-        message,
+        ...errorState,
+      });
+      trackPortalEvent('portal_lookup_failed', {
+        variant: portalVariant,
+        booking_reference: normalizedReference,
+        recoverable: errorState.recoverable,
       });
     }
   }
@@ -338,10 +502,12 @@ export function PortalApp() {
 
   function openRequestComposer(mode: Exclude<PortalRequestMode, null>) {
     setRequestMode(mode);
-    setViewMode(mode);
+    const routeViewMode = mode === 'pause' || mode === 'downgrade' ? 'change_plan' : mode;
+    setViewMode(routeViewMode);
     if (detail?.booking.booking_reference) {
-      syncPortalRouteState(detail.booking.booking_reference, mode);
+      syncPortalRouteState(detail.booking.booking_reference, routeViewMode);
     }
+    trackPortalEvent('portal_request_composer_opened', { variant: portalVariant, mode });
     setRequestMessage(null);
     setRequestError(null);
     setRequestNote('');
@@ -383,12 +549,18 @@ export function PortalApp() {
 
       setRequestMessage(envelope.data.message);
       setRequestMode(null);
-      setViewMode('overview');
-      syncPortalRouteState(detail.booking.booking_reference, 'overview');
+      setViewMode('status');
+      syncPortalRouteState(detail.booking.booking_reference, 'status');
+      trackPortalEvent('portal_request_submitted', {
+        variant: portalVariant,
+        request_type: envelope.data.request_type,
+        booking_reference: detail.booking.booking_reference,
+      });
     } catch (error) {
       setRequestError(
         error instanceof Error ? error.message : 'We could not submit that portal request right now.',
       );
+      trackPortalEvent('portal_request_failed', { variant: portalVariant, mode: requestMode });
     } finally {
       setSubmittingRequest(false);
     }
@@ -415,8 +587,15 @@ export function PortalApp() {
         return;
       }
       setCareTurn(envelope.data);
+      trackPortalEvent('portal_care_turn_completed', {
+        variant: portalVariant,
+        phase: envelope.data.phase,
+        booking_reference: detail.booking.booking_reference,
+        created_request: Boolean(envelope.data.created_request),
+      });
     } catch (error) {
       setCareError(error instanceof Error ? error.message : 'The customer-care agent could not answer right now.');
+      trackPortalEvent('portal_care_turn_failed', { variant: portalVariant });
     } finally {
       setCareLoading(false);
     }
@@ -451,6 +630,37 @@ export function PortalApp() {
     syncPortalRouteState(detail.booking.booking_reference, initialViewMode);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [detail?.booking.booking_reference]);
+
+  function handlePortalViewSelect(nextView: PortalViewMode) {
+    if (!detail) {
+      return;
+    }
+
+    setViewMode(nextView);
+    trackPortalEvent('portal_action_nav_clicked', {
+      variant: portalVariant,
+      view: nextView,
+      booking_reference: detail.booking.booking_reference,
+    });
+
+    if (nextView === 'reschedule') {
+      openRequestComposer('reschedule');
+      return;
+    }
+
+    if (nextView === 'cancel') {
+      openRequestComposer('cancel');
+      return;
+    }
+
+    if (nextView === 'pause' || nextView === 'downgrade') {
+      openRequestComposer(nextView);
+      return;
+    }
+
+    setRequestMode(null);
+    syncPortalRouteState(detail.booking.booking_reference, nextView);
+  }
 
   return (
     <main className="min-h-screen bg-[#f4f7fb] text-[#172033]">
@@ -494,11 +704,12 @@ export function PortalApp() {
               Customer portal
             </div>
             <h1 className="mt-4 max-w-3xl text-2xl font-semibold tracking-tight text-slate-950 sm:text-[2rem]">
-              Manage booking status, payment, support, and change requests from one secure workspace.
+              Review your booking and request changes in one place.
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              Use the reference from your confirmation email to reopen the same booking record, review
-              provider context, and submit request-safe follow-up without starting a new conversation.
+              Enter the reference from your confirmation email or QR code. We will show the latest
+              booking status, payment step, provider details, and safe options to reschedule, change,
+              cancel, or ask for help.
             </p>
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               {[
@@ -539,7 +750,8 @@ export function PortalApp() {
               </button>
             </div>
             <p className="mt-4 text-xs leading-6 text-white/60">
-              Only dedicated `booking_reference` links are read by this portal, so tracker ids or release refs cannot open the wrong record.
+              Use the booking reference from your confirmation email or QR code. Marketing links and
+              internal release IDs cannot open customer booking records.
             </p>
           </form>
         </div>
@@ -578,12 +790,55 @@ export function PortalApp() {
             {loadState.status === 'error' ? (
               <section className="rounded-[2rem] border border-rose-200 bg-rose-50 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.04)]">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">
-                  Booking not available
+                  {loadState.recoverable ? 'Reference saved' : 'Booking not available'}
                 </div>
                 <h2 className="mt-3 text-xl font-semibold text-rose-950">
-                  We could not load {loadState.bookingReference}
+                  {loadState.recoverable
+                    ? 'Your booking reference is saved'
+                    : `We could not load ${loadState.bookingReference}`}
                 </h2>
                 <p className="mt-3 text-sm leading-7 text-rose-800/80">{loadState.message}</p>
+                {loadState.recoverable ? (
+                  <div className="mt-5 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLookupReference(loadState.bookingReference);
+                        setLoadState({ status: 'loading', bookingReference: loadState.bookingReference });
+                        void apiV1
+                          .getPortalBookingDetail(loadState.bookingReference)
+                          .then((envelope) => {
+                            if (envelope.status !== 'ok') {
+                              return;
+                            }
+                            setLoadState({
+                              status: 'ready',
+                              bookingReference: loadState.bookingReference,
+                              detail: envelope.data,
+                            });
+                          })
+                          .catch((error) => {
+                            setLoadState({
+                              status: 'error',
+                              bookingReference: loadState.bookingReference,
+                              ...normalizePortalLoadError(error),
+                            });
+                          });
+                      }}
+                      className="inline-flex min-h-[2.75rem] items-center gap-2 rounded-[0.9rem] bg-rose-700 px-4 text-sm font-semibold text-white transition hover:bg-rose-800"
+                    >
+                      <RefreshCw className="h-4 w-4" />
+                      Try again
+                    </button>
+                    <a
+                      href={`mailto:${BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL}?subject=Booking%20support%20${encodeURIComponent(loadState.bookingReference)}`}
+                      className="inline-flex min-h-[2.75rem] items-center gap-2 rounded-[0.9rem] border border-rose-200 bg-white px-4 text-sm font-semibold text-rose-900 transition hover:border-rose-300"
+                    >
+                      <Mail className="h-4 w-4" />
+                      Contact support
+                    </a>
+                  </div>
+                ) : null}
               </section>
             ) : null}
 
@@ -601,34 +856,13 @@ export function PortalApp() {
                       </div>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                      {portalViewItems.map((item) => {
+                      {activePortalViewItems.map((item) => {
                         const active = viewMode === item.id;
                         return (
                           <button
-                            key={item.id}
+                            key={`${item.label}-${item.id}`}
                             type="button"
-                            onClick={() => {
-                              const nextView = item.id as PortalViewMode;
-                              setViewMode(nextView);
-                              if (nextView === 'reschedule') {
-                                openRequestComposer('reschedule');
-                                return;
-                              }
-                              if (nextView === 'cancel') {
-                                openRequestComposer('cancel');
-                                return;
-                              }
-                              if (nextView === 'pause') {
-                                openRequestComposer('pause');
-                                return;
-                              }
-                              if (nextView === 'downgrade') {
-                                openRequestComposer('downgrade');
-                                return;
-                              }
-                              setRequestMode(null);
-                              syncPortalRouteState(detail.booking.booking_reference, nextView);
-                            }}
+                            onClick={() => handlePortalViewSelect(item.id)}
                             className={`rounded-[0.8rem] px-3 py-2 text-[11px] font-semibold transition ${
                               active
                                 ? 'bg-[#0f62fe] text-white'
@@ -776,6 +1010,66 @@ export function PortalApp() {
                       </div>
                     ) : null}
                   </div>
+
+                  {viewMode === 'pay' ? (
+                    <div className="mt-6 rounded-[1.4rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                        Payment status
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-slate-900">
+                        {paymentStatusLabel(detail.payment.status)}
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-600">
+                        {detail.payment.payment_url
+                          ? 'Use the secure payment action in the side rail to complete checkout for this booking.'
+                          : 'No active payment link is available yet. The provider or BookedAI support can confirm the next payment step.'}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {viewMode === 'help' ? (
+                    <div className="mt-6 rounded-[1.4rem] border border-sky-200 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                        Ask for help
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-slate-900">
+                        Ask the customer-care agent above or contact {detail.support.contact_label}.
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-600">
+                        Support messages keep this booking reference attached, so staff can review the same status, payment, and request context.
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {viewMode === 'change_plan' ? (
+                    <div className="mt-6 rounded-[1.4rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                        Change plan
+                      </div>
+                      <div className="mt-2 text-sm font-semibold text-slate-900">
+                        Use pause or downgrade only when this booking has an academy or subscription plan attached.
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-600">
+                        These actions stay request-safe: the portal queues a review instead of changing the provider record instantly.
+                      </div>
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => openRequestComposer('pause')}
+                          className="rounded-[0.9rem] border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300"
+                        >
+                          Request pause
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openRequestComposer('downgrade')}
+                          className="rounded-[0.9rem] border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300"
+                        >
+                          Request lighter plan
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
 
                   {viewMode === 'edit' ? (
                     <div className="mt-6 rounded-[1.4rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4">
@@ -945,33 +1239,13 @@ export function PortalApp() {
                     What would you like to do?
                   </div>
                   <div className="mt-3 grid gap-3">
-                    {portalViewItems.map((item) => {
+                    {activePortalViewItems.map((item) => {
                       const active = viewMode === item.id;
                       return (
                         <button
-                          key={item.id}
+                          key={`${item.label}-${item.id}`}
                           type="button"
-                          onClick={() => {
-                            setViewMode(item.id);
-                            if (item.id === 'reschedule') {
-                              openRequestComposer('reschedule');
-                              return;
-                            }
-                            if (item.id === 'cancel') {
-                              openRequestComposer('cancel');
-                              return;
-                            }
-                            if (item.id === 'pause') {
-                              openRequestComposer('pause');
-                              return;
-                            }
-                            if (item.id === 'downgrade') {
-                              openRequestComposer('downgrade');
-                              return;
-                            }
-                            setRequestMode(null);
-                            syncPortalRouteState(detail.booking.booking_reference, item.id);
-                          }}
+                          onClick={() => handlePortalViewSelect(item.id)}
                           className={`rounded-[1rem] border px-4 py-3 text-left transition ${
                             active
                               ? 'border-[#0f62fe] bg-[#eef4ff]'
@@ -1155,8 +1429,8 @@ export function PortalApp() {
                           type="button"
                           onClick={() => {
                             setRequestMode(null);
-                            setViewMode('overview');
-                            syncPortalRouteState(detail.booking.booking_reference, 'overview');
+                            setViewMode('status');
+                            syncPortalRouteState(detail.booking.booking_reference, 'status');
                           }}
                           className="booked-button-secondary"
                         >
@@ -1211,10 +1485,18 @@ export function PortalApp() {
                     contact the support team using the details below.
                   </p>
                   <div className="mt-4 grid gap-2 text-sm text-slate-900">
-                    <a href={`mailto:${detail.support.contact_email || 'support@bookedai.au'}`} className="font-medium text-[#0f62fe]">
-                      {detail.support.contact_email || 'support@bookedai.au'}
+                    <a href={`mailto:${detail.support.contact_email || BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL}`} className="font-medium text-[#0f62fe]">
+                      {detail.support.contact_email || BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL}
                     </a>
-                    <div>{detail.support.contact_phone || 'Phone support details will be confirmed directly if needed.'}</div>
+                    <a
+                      href={`sms:${(detail.support.contact_phone || BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_PHONE).replace(/[^\d+]/g, '')}`}
+                      className="font-medium text-[#0f62fe]"
+                    >
+                      {detail.support.contact_phone || BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_PHONE}
+                    </a>
+                    <div className="text-xs text-slate-500">
+                      Available for {BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_CHANNELS}.
+                    </div>
                   </div>
                 </section>
 

@@ -26,7 +26,7 @@ const chessScreenImageSrcSet =
 const tenantPreviewImageUrl = '/branding/optimized/tenant-login-hero-1400.webp';
 const tenantPreviewImageSrcSet =
   '/branding/optimized/tenant-login-hero-960.webp 960w, /branding/optimized/tenant-login-hero-1400.webp 1400w';
-const pitchVideoUrl = 'https://upload.bookedai.au/videos/e3d3/e0FeUWfasDxUbrvxObhHcw.mp4';
+const pitchVideoUrl = 'https://upload.bookedai.au/videos/df25/8woKUebBF8HMMD_RMSA0LQ.mp4';
 
 type HomepageExperimentVariant = 'control' | 'product_first';
 
@@ -39,9 +39,10 @@ const HOMEPAGE_VARIANT_STORAGE_KEY = 'bookedai.homepage.variant';
 const HOMEPAGE_VARIANT_QUERY_PARAM = 'homepage_variant';
 
 const suggestedSearches = [
-  'Book a kids chess class near Sydney this week',
-  'Find private swim coaching near Caringbah',
-  'Book an AI mentor session for startup growth',
+  'Book Co Mai Hung Chess Sydney pilot class this week',
+  'Find Future Swim kids swimming lessons near Caringbah this weekend',
+  'Show WSTI AI events at Western Sydney Startup Hub this month',
+  'Book an AI Mentor 1-1 session for startup growth this week',
   'Find a premium haircut near Sydney CBD today',
 ];
 
@@ -131,7 +132,7 @@ const customerPoints = [
 ] as const;
 
 const proofRows = [
-  ['Grandmaster Chess', 'Search to class booking', 'Verified tenant'],
+  ['Co Mai Hung Chess', 'Verified tenant booking', 'Grandmaster proof'],
   ['Future Swim', 'Tenant ops visibility', 'Vertical proof'],
   ['WhatsApp Care', 'Booking status and changes', 'Care agent'],
 ] as const;

@@ -5,6 +5,11 @@ from urllib.parse import urlparse
 
 from dotenv import load_dotenv
 
+from core.customer_booking_contact import (
+    DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
+    DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE,
+)
+
 
 BACKEND_ROOT = Path(__file__).resolve().parent
 PROJECT_ROOT = BACKEND_ROOT.parent
@@ -135,6 +140,12 @@ class Settings:
     whatsapp_evolution_api_key: str = ""
     whatsapp_evolution_instance: str = "bookedai"
     whatsapp_fallback_provider: str = ""
+    bookedai_customer_telegram_bot_token: str = ""
+    bookedai_customer_telegram_webhook_secret_token: str = ""
+    telegram_bot_token: str = ""
+    telegram_webhook_secret_token: str = ""
+    customer_booking_support_email: str = DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
+    customer_booking_support_phone: str = DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -323,12 +334,20 @@ def get_settings() -> Settings:
         ),
         google_maps_static_api_key=os.getenv("GOOGLE_MAPS_STATIC_API_KEY", ""),
         google_oauth_client_id=os.getenv("GOOGLE_OAUTH_CLIENT_ID", ""),
-        booking_business_email=os.getenv("BOOKING_BUSINESS_EMAIL", "info@bookedai.au"),
+        booking_business_email=os.getenv("BOOKING_BUSINESS_EMAIL", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL),
+        customer_booking_support_email=os.getenv(
+            "BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL",
+            os.getenv("BOOKING_BUSINESS_EMAIL", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL),
+        ),
+        customer_booking_support_phone=os.getenv(
+            "BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_PHONE",
+            os.getenv("WHATSAPP_FROM_NUMBER", DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE),
+        ),
         email_smtp_host=os.getenv("EMAIL_SMTP_HOST", ""),
         email_smtp_port=env_int("EMAIL_SMTP_PORT", 587),
-        email_smtp_username=os.getenv("EMAIL_SMTP_USERNAME", ""),
+        email_smtp_username=os.getenv("EMAIL_SMTP_USERNAME", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL),
         email_smtp_password=os.getenv("EMAIL_SMTP_PASSWORD", ""),
-        email_smtp_from=os.getenv("EMAIL_SMTP_FROM", ""),
+        email_smtp_from=os.getenv("EMAIL_SMTP_FROM", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL),
         email_smtp_use_tls=env_bool("EMAIL_SMTP_USE_TLS", False),
         email_smtp_use_starttls=env_bool("EMAIL_SMTP_USE_STARTTLS", True),
         email_imap_host=os.getenv("EMAIL_IMAP_HOST", ""),
@@ -361,10 +380,20 @@ def get_settings() -> Settings:
             "WHATSAPP_TWILIO_API_KEY_SECRET",
             os.getenv("SMS_TWILIO_API_KEY_SECRET", ""),
         ),
-        whatsapp_from_number=os.getenv("WHATSAPP_FROM_NUMBER", "+61455301335"),
+        whatsapp_from_number=os.getenv("WHATSAPP_FROM_NUMBER", DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE),
         whatsapp_meta_phone_number_id=os.getenv("WHATSAPP_META_PHONE_NUMBER_ID", ""),
         whatsapp_meta_access_token=os.getenv("WHATSAPP_META_ACCESS_TOKEN", ""),
         whatsapp_verify_token=os.getenv("WHATSAPP_VERIFY_TOKEN", ""),
+        bookedai_customer_telegram_bot_token=os.getenv(
+            "BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN",
+            os.getenv("TELEGRAM_BOT_TOKEN", ""),
+        ),
+        bookedai_customer_telegram_webhook_secret_token=os.getenv(
+            "BOOKEDAI_CUSTOMER_TELEGRAM_WEBHOOK_SECRET_TOKEN",
+            os.getenv("TELEGRAM_WEBHOOK_SECRET_TOKEN", ""),
+        ),
+        telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
+        telegram_webhook_secret_token=os.getenv("TELEGRAM_WEBHOOK_SECRET_TOKEN", ""),
         whatsapp_evolution_api_url=os.getenv("WHATSAPP_EVOLUTION_API_URL", ""),
         whatsapp_evolution_api_key=os.getenv("WHATSAPP_EVOLUTION_API_KEY", ""),
         whatsapp_evolution_instance=os.getenv("WHATSAPP_EVOLUTION_INSTANCE", "bookedai"),

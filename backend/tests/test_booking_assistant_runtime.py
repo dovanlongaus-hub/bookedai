@@ -33,3 +33,15 @@ class BookingAssistantRuntimeTestCase(TestCase):
 
         self.assertTrue(ranked)
         self.assertIn('swim', ranked[0].service.name.lower())
+
+    def test_rank_services_prioritizes_discriminating_chess_intent_over_generic_kids_location_matches(self):
+        ranked = rank_services(
+            'Find a chess class in Sydney this weekend',
+            services=SERVICE_CATALOG,
+            max_service_matches=6,
+            generic_match_tokens=GENERIC_MATCH_TOKENS,
+        )
+
+        self.assertTrue(ranked)
+        self.assertIn('chess', ranked[0].service.name.lower())
+        self.assertTrue(all('swim' not in item.service.name.lower() for item in ranked[:2]))

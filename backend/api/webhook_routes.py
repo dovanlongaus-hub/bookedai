@@ -28,6 +28,16 @@ router.add_api_route(
     methods=["POST"],
 )
 router.add_api_route(
+    "/webhooks/telegram",
+    handlers.telegram_webhook,
+    methods=["POST"],
+)
+router.add_api_route(
+    "/webhooks/bookedai-telegram",
+    handlers.telegram_webhook,
+    methods=["POST"],
+)
+router.add_api_route(
     "/automation/booking-callback",
     handlers.booking_callback,
     methods=["POST"],

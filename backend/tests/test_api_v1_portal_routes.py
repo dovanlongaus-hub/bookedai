@@ -473,3 +473,154 @@ class ApiV1PortalRoutesTestCase(TestCase):
 
         self.assertEqual(snapshot["booking"]["booking_reference"], "v1-cb79f8e371")
         self.assertEqual(snapshot["payment"]["status"], "pending")
+        self.assertEqual(snapshot["support"]["contact_email"], "info@bookedai.au")
+        self.assertEqual(snapshot["support"]["contact_phone"], "+61455301335")
+        self.assertEqual(snapshot["support"]["contact_channels"], ["Telegram", "WhatsApp", "iMessage"])
+
+    def test_build_portal_booking_snapshot_rolls_back_failed_optional_academy_lookup(self):
+        class _PortalSnapshotSession:
+            def __init__(self):
+                self.calls = 0
+                self.rollback_calls = 0
+
+            async def execute(self, *_args, **_kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    return _FakeExecuteResult(
+                        {
+                            "booking_intent_id": "7beeae98-15e0-4059-8f5c-78a6cff1c95f",
+                            "tenant_id": "45cc9423-01f2-4f26-9abe-8f19a2735f40",
+                            "booking_reference": "v1-2fd9f35965",
+                            "service_name": "Portal UAT request",
+                            "service_id": None,
+                            "requested_date": None,
+                            "requested_time": None,
+                            "timezone": "Australia/Sydney",
+                            "booking_path": "request_callback",
+                            "confidence_level": "low",
+                            "status": "captured",
+                            "payment_dependency_state": "pending",
+                            "metadata_json": {"notes": "Portal UAT request"},
+                            "created_at": "2026-04-26T01:12:28Z",
+                            "customer_name": "BookedAI UAT",
+                            "customer_email": "portal.uat@example.com",
+                            "customer_phone": None,
+                            "business_name": None,
+                            "business_email": None,
+                            "owner_email": None,
+                            "category": None,
+                            "summary": None,
+                            "service_amount_aud": None,
+                            "currency_code": None,
+                            "display_price": None,
+                            "duration_minutes": None,
+                            "venue_name": None,
+                            "location": None,
+                            "map_url": None,
+                            "booking_url": None,
+                            "image_url": None,
+                        }
+                    )
+                if self.calls == 2:
+                    return _FakeExecuteResult(None)
+                if self.calls == 3:
+                    return _FakeExecuteResult(None)
+                raise AssertionError(f"Unexpected execute call {self.calls}")
+
+            async def rollback(self):
+                self.rollback_calls += 1
+
+        class _FailingAcademyRepository:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            async def get_student_by_booking_reference(self, **_kwargs):
+                raise RuntimeError("optional academy lookup failed")
+
+            async def get_latest_report_preview(self, **_kwargs):
+                raise RuntimeError("optional academy report lookup failed")
+
+        session = _PortalSnapshotSession()
+        with patch.object(tenant_app_service, "AcademyRepository", _FailingAcademyRepository):
+            snapshot = asyncio.run(
+                build_portal_booking_snapshot(session, booking_reference="v1-2fd9f35965")
+            )
+
+        self.assertEqual(snapshot["booking"]["booking_reference"], "v1-2fd9f35965")
+        self.assertEqual(snapshot["status_summary"]["title"], "Booking under review")
+        self.assertEqual(session.rollback_calls, 1)
+
+    def test_build_portal_booking_snapshot_degrades_failed_optional_payment_and_audit_lookups(self):
+        class _PortalSnapshotSession:
+            def __init__(self):
+                self.calls = 0
+                self.rollback_calls = 0
+
+            async def execute(self, *_args, **_kwargs):
+                self.calls += 1
+                if self.calls == 1:
+                    return _FakeExecuteResult(
+                        {
+                            "booking_intent_id": "7beeae98-15e0-4059-8f5c-78a6cff1c95f",
+                            "tenant_id": "45cc9423-01f2-4f26-9abe-8f19a2735f40",
+                            "booking_reference": "v1-db55e991fd",
+                            "service_name": "Kids Swimming Lessons - Caringbah",
+                            "service_id": "future-swim-caringbah-kids-swimming-lessons",
+                            "requested_date": "2026-04-26",
+                            "requested_time": "03:15",
+                            "timezone": "Australia/Sydney",
+                            "booking_path": "request_callback",
+                            "confidence_level": "high",
+                            "status": "captured",
+                            "payment_dependency_state": "pending",
+                            "metadata_json": {"notes": "Portal should load even if optional mirrors fail."},
+                            "created_at": "2026-04-26T01:18:00Z",
+                            "customer_name": "BookedAI UAT Test",
+                            "customer_email": "qa+uat-20260426@bookedai.au",
+                            "customer_phone": "+61400000000",
+                            "business_name": "Future Swim",
+                            "business_email": "caringbah@futureswim.com.au",
+                            "owner_email": None,
+                            "category": "Kids Services",
+                            "summary": "Small-class kids swimming lessons in Caringbah.",
+                            "service_amount_aud": 30,
+                            "currency_code": "AUD",
+                            "display_price": "A$30",
+                            "duration_minutes": 30,
+                            "venue_name": "Future Swim Caringbah",
+                            "location": "85 Cawarra Road, Caringbah, Sydney NSW 2229",
+                            "map_url": "https://www.google.com/maps/search/?api=1&query=Future%20Swim%20Caringbah",
+                            "booking_url": "https://futureswim.com.au/locations/caringbah/",
+                            "image_url": None,
+                        }
+                    )
+                if self.calls == 2:
+                    raise RuntimeError("optional payment lookup failed")
+                if self.calls == 3:
+                    raise RuntimeError("optional audit lookup failed")
+                raise AssertionError(f"Unexpected execute call {self.calls}")
+
+            async def rollback(self):
+                self.rollback_calls += 1
+
+        class _EmptyAcademyRepository:
+            def __init__(self, *_args, **_kwargs):
+                pass
+
+            async def get_student_by_booking_reference(self, **_kwargs):
+                return None
+
+            async def get_latest_report_preview(self, **_kwargs):
+                return None
+
+        session = _PortalSnapshotSession()
+        with patch.object(tenant_app_service, "AcademyRepository", _EmptyAcademyRepository):
+            snapshot = asyncio.run(
+                build_portal_booking_snapshot(session, booking_reference="v1-db55e991fd")
+            )
+
+        self.assertEqual(snapshot["booking"]["booking_reference"], "v1-db55e991fd")
+        self.assertEqual(snapshot["service"]["service_name"], "Kids Swimming Lessons - Caringbah")
+        self.assertEqual(snapshot["payment"]["status"], "pending")
+        self.assertEqual(snapshot["status_timeline"][0]["id"], "booking_created")
+        self.assertEqual(session.rollback_calls, 2)

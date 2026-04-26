@@ -39,7 +39,8 @@ sys.modules["service_layer.event_store"] = event_store_module
 sys.modules["service_layer.n8n_service"] = n8n_service_module
 
 from config import get_settings
-from schemas import BookingAssistantChatMessage, BookingAssistantSessionRequest
+from schemas import BookingAssistantChatMessage, BookingAssistantSessionRequest, ServiceCatalogItem
+from service_layer.messaging_automation_service import MessagingAutomationService
 from services import BookingAssistantService, OpenAIService
 
 
@@ -53,8 +54,10 @@ class BookingAssistantServiceTestCase(IsolatedAsyncioTestCase):
         self.service = BookingAssistantService(get_settings())
 
     async def test_create_session_supports_event_attendance_requests(self):
-        email_service = AsyncMock()
-        email_service.smtp_configured.return_value = False
+        email_service = types.SimpleNamespace(
+            smtp_configured=lambda: False,
+            send_email=AsyncMock(),
+        )
         n8n_service = AsyncMock()
         n8n_service.trigger_booking.return_value = 'event_attendance_requested'
 
@@ -92,6 +95,77 @@ class BookingAssistantServiceTestCase(IsolatedAsyncioTestCase):
         self.assertEqual(result.payment_url, '')
         self.assertEqual(result.calendar_add_url, 'https://events.example.com/demo-night')
         self.assertIn('attendance request', result.confirmation_message.lower())
+
+    async def test_create_session_routes_service_booking_email_to_bookedai_mailbox(self):
+        settings = replace(
+            self.service.settings,
+            booking_business_email="info@bookedai.au",
+        )
+        service = BookingAssistantService(settings)
+        email_service = types.SimpleNamespace(
+            smtp_configured=lambda: True,
+            send_email=AsyncMock(),
+        )
+        n8n_service = AsyncMock()
+        n8n_service.trigger_booking.return_value = "queued"
+        catalog_service = ServiceCatalogItem(
+            id="future-swim-caringbah-kids-swimming-lessons",
+            name="Kids swimming lessons",
+            category="Kids Services",
+            tenant_id="tenant-future-swim",
+            business_email="caringbah@futureswim.com.au",
+            summary="Future Swim service imported into the BookedAI catalog.",
+            duration_minutes=30,
+            amount_aud=32,
+            currency_code="AUD",
+            display_price="$32",
+        )
+
+        result = await service.create_session(
+            BookingAssistantSessionRequest(
+                service_id=catalog_service.id,
+                customer_name="Aus Tester",
+                customer_email="aus@example.com",
+                requested_date="2026-05-01",
+                requested_time="09:00",
+                timezone="Australia/Sydney",
+                notes="Homepage booking smoke.",
+            ),
+            email_service=email_service,
+            n8n_service=n8n_service,
+            services=[catalog_service],
+        )
+
+        self.assertEqual(result.contact_email, "info@bookedai.au")
+        customer_email_call = email_service.send_email.await_args_list[0].kwargs
+        internal_email_call = email_service.send_email.await_args_list[1].kwargs
+        self.assertEqual(customer_email_call["to"], ["aus@example.com"])
+        self.assertEqual(customer_email_call["cc"], ["info@bookedai.au"])
+        self.assertIn("info@bookedai.au", customer_email_call["text"])
+        self.assertNotIn("futureswim.com.au", customer_email_call["text"])
+        self.assertEqual(internal_email_call["to"], ["info@bookedai.au"])
+        self.assertEqual(internal_email_call["cc"], ["caringbah@futureswim.com.au"])
+        workflow_payload = n8n_service.trigger_booking.await_args.args[0]
+        self.assertEqual(workflow_payload.metadata["business_email"], "info@bookedai.au")
+        self.assertEqual(
+            workflow_payload.metadata["tenant_notification_email"],
+            "caringbah@futureswim.com.au",
+        )
+
+    def test_tenant_notification_targets_prefers_telegram_chat_ids_from_settings(self):
+        targets = MessagingAutomationService._tenant_notification_targets(
+            {
+                "messaging_automation": {
+                    "tenant_notifications": {
+                        "telegram_chat_id": "111",
+                        "telegram_chat_ids": ["222", "111"],
+                    }
+                },
+                "telegram_chat_id": "333",
+            }
+        )
+
+        self.assertEqual(targets["telegram"], ["111", "222", "333"])
 
     def test_should_search_ai_events_requires_explicit_event_intent(self):
         self.assertFalse(

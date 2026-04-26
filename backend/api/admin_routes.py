@@ -92,6 +92,11 @@ router.add_api_route(
     response_model=AdminMessagingActionResponse,
 )
 router.add_api_route(
+    "/admin/customer-agent/health",
+    handlers.customer_agent_health,
+    methods=["GET"],
+)
+router.add_api_route(
     "/admin/services",
     handlers.admin_services,
     methods=["GET"],
