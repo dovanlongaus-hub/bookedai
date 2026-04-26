@@ -43,6 +43,7 @@ This roadmap aligns with:
 - keep physical-place search cards inspectable from the list: show a top-left thumbnail/preview and expose Google Maps for the specific mapped place or a venue/location/service fallback query
 - keep the public homepage persuasive for both investors and customers: the first viewport should explain the revenue-engine thesis, show real vertical/product proof, and then expose the live search-to-booking workspace instead of making visitors infer the company story from the composer alone
 - keep the latest homepage proof-board pattern intact: contained product imagery, visual `Wedge`/`Proof`/`Moat`/`Scale` signals, demand-to-booking workflow steps, and regression-safe `Open Web App` CTA language
+- keep pitch video assets visible but not dominant: homepage and pitch should expose the latest uploaded pitch video early with native controls, while the live product and deeper deck remain the primary next actions
 - make slow search feel progressive by showing early useful matches and faster staged progress language while deeper maps, booking-path, and fit checks continue
 - when public/product search returns a reviewed BookedAI tenant, such as the chess tenant, keep it inside the normal result list but mark it as tenant-verified and expose the richer enabled actions: BookedAI booking, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit/revisit
 - treat the customer portal as a durable post-booking workspace: booking truth, payment posture, provider context, timeline, academy/customer-care context, and request-safe actions must stay visible and mobile-safe
@@ -58,7 +59,7 @@ This roadmap aligns with:
 - make agent-triggered lifecycle actions auditable, replay-safe, and tenant-policy-aware
 - keep deployed subdomain routing explicit for product, tenant, portal, and admin surfaces; any host serving a frontend shell must proxy `/api/` to backend before SPA fallback so auth and runtime reads cannot be swallowed by static HTML
 - keep tenant account access explicit: Google sign-in must prove an active membership, while Google create-account is the intentional path for opening a new tenant workspace from `tenant.bookedai.au`
-- keep the public roadmap and pitch architecture visualization aligned with the real implementation sequence; the pitch-level diagram should remain a simple `demand -> qualification -> booking -> ops ledger` flow, while the roadmap should expose the current Phase/Sprint `17-23` plan directly in code
+- keep the public roadmap and pitch architecture visualization aligned with the real implementation sequence; the pitch-level architecture should stay as one compact image with short support rails, while the standalone `/architecture` page carries deeper technical detail and the roadmap exposes the current Phase/Sprint `17-23` plan directly in code
 
 ## Agent execution model
 
@@ -241,7 +242,7 @@ Planning update from `2026-04-25`:
 
 - the post-Sprint-16 execution wave is now tracked as `Phase 17` through `Phase 23`
 - the implementation bridge for that wave is `docs/development/next-phase-implementation-plan-2026-04-25.md`
-- `Phase 17` is the current closeout lane for the verified full-flow stabilization work: pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You screen, and `16s` return to the main BookedAI screen
+- `Phase 17` is the current closeout lane for the verified full-flow stabilization work: pitch package registration, product booking, payment-intent preparation, communication best-effort work, and a persistent portal-first Thank You screen that no longer auto-returns to the main BookedAI screen
 - `Phase 17` now also includes the enterprise product-booking UX guardrails: progressive first-result rendering during slow matching, compact result action rows, explicit select-versus-book separation, portal-first QR confirmation, and continue-chat behavior during the Thank You grace period
 - `Phase 18` through `Phase 23` should execute in this order: revenue-ops ledger control, customer-care/status agent, widget/plugin runtime, billing and receivables truth, multi-tenant template generalization, release governance and scale hardening
 - `Phase 19` has a portal-native implementation slice: returning customers can now ask a booking-reference anchored status agent about payment, academy/report context, support, and enabled lifecycle actions from inside `portal.bookedai.au`, with answers grounded in portal booking truth and recent revenue-ops action runs
@@ -249,7 +250,7 @@ Planning update from `2026-04-25`:
 
 | Phase | Name | Primary outcome |
 |---|---|---|
-| 17 | Full-flow stabilization | verified pitch and product journeys complete through booking, Thank You, auto-return, and downstream handoff without customer-visible loading failure |
+| 17 | Full-flow stabilization | verified pitch and product journeys complete through booking, persistent Thank You confirmation, and downstream handoff without customer-visible loading failure |
 | 18 | Revenue-ops ledger control | post-booking actions become tenant/admin visible, dispatchable, auditable, and policy-aware |
 | 19 | Customer-care and status agent | returning customers can ask about booking, payment, subscription, report, or support state from verified lifecycle truth |
 | 20 | Widget and plugin runtime | the BookedAI agent can run safely on SME-owned websites with tenant, origin, source, and campaign context preserved |

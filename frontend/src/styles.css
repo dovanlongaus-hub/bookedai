@@ -647,3 +647,52 @@
     animation: bookedaiTypingDot 1.1s ease-in-out 0.32s infinite;
   }
 }
+
+
+@media print {
+  body {
+    background: #ffffff !important;
+  }
+
+  .booked-shell .booking-handoff,
+  .booked-shell .booked-button,
+  .booked-shell .booked-button-secondary,
+  .booked-shell button[type="button"]:not(.booked-print-keep),
+  .booked-shell .booked-confirmation-share-row,
+  .booked-shell .booked-print-hide,
+  .booked-shell nav,
+  .booked-shell aside,
+  .booked-shell form {
+    display: none !important;
+  }
+
+  .booked-shell {
+    background: #ffffff !important;
+  }
+
+  .booked-shell main,
+  .booked-shell section {
+    background: #ffffff !important;
+    box-shadow: none !important;
+    min-height: auto !important;
+  }
+
+  [data-print-keep] {
+    display: block !important;
+    page-break-inside: avoid;
+  }
+
+  [data-print-keep] img {
+    max-width: 240px;
+    height: auto;
+  }
+
+  [data-print-keep] a {
+    color: #0f172a !important;
+    text-decoration: underline;
+  }
+
+  @page {
+    margin: 16mm;
+  }
+}

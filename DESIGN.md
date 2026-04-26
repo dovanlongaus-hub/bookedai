@@ -68,7 +68,7 @@ WhatsApp customer-care replies are a dedicated BookedAI booking-care agent exper
 - clicking/selecting a result marks it active only; detail opens from the detail action, and the customer form opens only after an explicit booking action
 - keep all clarification questions and suggested next prompts inside the BookedAI chat conversation as interactive agent chips
 - confirmation is portal-first: booking code, QR to `portal.bookedai.au`, and compact portal/email/calendar/chat/home actions must stay on one responsive row without horizontal layout breakage; tenant matches should also name Stripe/QR payment posture and WhatsApp Agent follow-up when those channels are enabled
-- keep the thank-you confirmation visible for `16s` and allow the customer to continue chat/search from the same screen before auto-return
+- keep the thank-you confirmation visible until the customer chooses another action; do not auto-return to the main screen after booking, and do not show a countdown chip
 
 ## 2026-04-25 Verified Tenant Search Requirement
 

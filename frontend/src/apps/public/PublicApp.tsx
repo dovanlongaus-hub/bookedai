@@ -8,6 +8,7 @@ import {
   CircleDollarSign,
   Gauge,
   MessageSquareText,
+  PlayCircle,
   Radar,
   ShieldCheck,
   Sparkles,
@@ -25,6 +26,7 @@ const chessScreenImageSrcSet =
 const tenantPreviewImageUrl = '/branding/optimized/tenant-login-hero-1400.webp';
 const tenantPreviewImageSrcSet =
   '/branding/optimized/tenant-login-hero-960.webp 960w, /branding/optimized/tenant-login-hero-1400.webp 1400w';
+const pitchVideoUrl = 'https://upload.bookedai.au/videos/e3d3/e0FeUWfasDxUbrvxObhHcw.mp4';
 
 type HomepageExperimentVariant = 'control' | 'product_first';
 
@@ -45,6 +47,7 @@ const suggestedSearches = [
 
 const navLinks = [
   { label: 'Live product', href: '#live-product' },
+  { label: 'Pitch video', href: '#pitch-video' },
   { label: 'Why now', href: '#why-bookedai' },
   { label: 'Architecture', href: '/architecture' },
   { label: 'Roadmap', href: roadmapHref },
@@ -460,6 +463,55 @@ export function PublicApp() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="pitch-video" className="px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-[1440px] gap-5 rounded-[2rem] border border-[#172033] bg-[#101827] p-4 text-white shadow-[0_30px_90px_rgba(23,32,51,0.2)] sm:p-6 lg:grid-cols-[0.62fr_1.38fr] lg:items-center lg:p-8">
+          <div className="p-1 sm:p-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#8efce0]">
+              <PlayCircle className="h-4 w-4" aria-hidden="true" />
+              Pitch video
+            </div>
+            <h2 className="mt-5 max-w-xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-white sm:text-4xl">
+              Watch the story, then try the live booking system.
+            </h2>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
+              The video gives visitors a fast investor and buyer overview before they compare the
+              live product, architecture, and operating proof below.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a
+                href={pitchVideoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-[#172033] transition hover:bg-[#eef4f2]"
+              >
+                Open video
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </a>
+              <button
+                type="button"
+                onClick={() => navigateTo(pitchDeckHref, 'homepage_pitch_clicked', { surface: 'pitch_video' })}
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-white/18 bg-white/[0.08] px-5 py-3 text-sm font-bold text-white transition hover:bg-white/[0.14]"
+              >
+                Full pitch
+                <BarChart3 className="h-4 w-4" aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+
+          <div className="overflow-hidden rounded-[1.6rem] border border-white/12 bg-black shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
+            <video
+              className="aspect-video w-full bg-black object-contain"
+              controls
+              preload="metadata"
+              playsInline
+            >
+              <source src={pitchVideoUrl} type="video/mp4" />
+              <a href={pitchVideoUrl}>Open the BookedAI pitch video</a>
+            </video>
           </div>
         </div>
       </section>

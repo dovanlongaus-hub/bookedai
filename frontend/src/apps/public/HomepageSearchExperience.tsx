@@ -1806,7 +1806,6 @@ export function HomepageSearchExperience({
   const [submitError, setSubmitError] = useState('');
   const [submitLoading, setSubmitLoading] = useState(false);
   const [result, setResult] = useState<BookingAssistantSessionResponse | null>(null);
-  const [thankYouReturnCountdown, setThankYouReturnCountdown] = useState(16);
   const [bookingComposerOpen, setBookingComposerOpen] = useState(false);
   const [, setComposerCollapsed] = useState(false);
   const [voiceSupported, setVoiceSupported] = useState(false);
@@ -1937,26 +1936,6 @@ export function HomepageSearchExperience({
       setComposerCollapsed(false);
     }
   }, [currentQuery, result]);
-
-  useEffect(() => {
-    if (!result) {
-      setThankYouReturnCountdown(16);
-      return;
-    }
-
-    setThankYouReturnCountdown(16);
-    const countdownInterval = window.setInterval(() => {
-      setThankYouReturnCountdown((current) => Math.max(0, current - 1));
-    }, 1000);
-    const returnTimer = window.setTimeout(() => {
-      returnToHomepageSearch();
-    }, 16000);
-
-    return () => {
-      window.clearInterval(countdownInterval);
-      window.clearTimeout(returnTimer);
-    };
-  }, [result?.booking_reference]);
 
   useEffect(() => {
     if (!result || announcedBookingReferenceRef.current === result.booking_reference) {
@@ -4476,7 +4455,7 @@ export function HomepageSearchExperience({
                     </p>
                     <p className="mt-2 text-sm leading-6 text-white/78">{result.confirmation_message}</p>
                     <div className="mt-3 inline-flex rounded-full bg-white/14 px-3 py-1.5 text-[11px] font-semibold text-white/90 ring-1 ring-white/14">
-                      Returning to the main BookedAI screen in {thankYouReturnCountdown}s
+                      Scan the QR or open the portal. This confirmation stays here as long as you need it.
                     </div>
                     <div className="mt-4 rounded-[1rem] bg-white/12 px-3 py-3 ring-1 ring-white/12">
                       <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">

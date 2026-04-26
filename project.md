@@ -32,6 +32,7 @@ Latest public homepage investor/customer redesign from `2026-04-25`:
 - top results are framed as `Top research` inside the assistant bubble, with the best three summarized in-chat and actions to open details, Google Maps, provider link, call, mail, select, or book without breaking the conversation flow
 - live-read candidate data is enriched from the public catalog when possible, and missing booking-critical facts now remain explicit (`Price not listed`, `Duration TBD`, `Location TBD`) so customers and investors see a trustworthy search state rather than silent data loss
 - the live-read Playwright booking smoke now verifies that full friendly flow from query through selected match, booking form, authoritative v1 booking intent, portal confirmation, follow-up copy, and no horizontal overflow before a homepage release can pass
+- the latest pitch video at `https://upload.bookedai.au/videos/e3d3/e0FeUWfasDxUbrvxObhHcw.mp4` is now embedded with native controls on both `bookedai.au` and `pitch.bookedai.au`, giving visitors an early watchable overview before they continue into live product proof or the deeper deck
 
 Latest portal customer-care status-agent update from `2026-04-25`:
 
@@ -84,6 +85,8 @@ Latest roadmap and pitch architecture visualization update from `2026-04-25`:
 - `/architecture` is now a standalone big-tech-style architecture showcase page with a board-level revenue-engine diagram, system lane map, design capability cards, real product proof imagery, and enterprise posture section for technical buyers and investors
 - the pitch architecture visual is now a professional multi-layer infographic rather than only `demand -> qualification -> booking -> ops ledger`; it groups customer surfaces, AI orchestration, revenue transaction core, operations control, partner/integration rails, and infrastructure/technology stack directly inside the pitch
 - the pitch infographic explicitly maps BookedAI surfaces, customer/revenue/care agents, booking/payment/portal/email-calendar modules, tenant/admin/action-ledger controls, Stripe, Meta WhatsApp, Twilio, n8n, CRM/webhook recovery, OpenClaw, Telegram, Notion, Discord, React/TypeScript/Vite/Tailwind, FastAPI, Supabase/Postgres, Docker Compose, Nginx, and Cloudflare DNS/TLS
+- the pitch architecture block has been tightened again into a compact architecture image plus four readable support rails, and the bottom CTA/footer are lighter so the removed `AI Revenue Engine for Service Businesses` brand-copy block no longer appears on the pitch page
+- live deployment for that pitch polish completed on `2026-04-25`; stack health passed, live pitch desktop/mobile smoke confirmed the architecture image is present, the removed footer text is absent, `390px` mobile has no horizontal overflow, and the uploaded pitch video still serves byte ranges as `video/mp4`
 - pitch and homepage navigation now expose the architecture showcase so investors can inspect the team's system-design capability without forcing the main pitch page back into a long technical scroll
 - live verification passes for both `https://bookedai.au/architecture` and `https://pitch.bookedai.au/architecture` on desktop/mobile, including loaded proof images, no console/page/request errors, and no horizontal overflow
 - pricing now appears immediately after product proof, so buyers see commercial terms before deeper platform explanation
@@ -106,7 +109,7 @@ Latest public brand/menu and booking-flow QA note from `2026-04-25`:
 - `product.bookedai.au` and the shared public homepage booking runtime now show first likely local/catalog matches while live ranking continues, keeping the search surface useful during slower matching instead of waiting on a blank results state
 - shortlist result interaction is now explicit and enterprise-style: selecting a result only marks it active, detail opens only from the detail icon, and a compact one-row action strip exposes provider link, detail, contact, phone/SMS when available, and `Book`
 - the customer detail form now opens only after the user chooses `Book` for a selected result, so review/compare behavior stays separate from booking commitment
-- booking confirmation now uses the booking reference as the durable customer anchor, generates QR against `portal.bookedai.au` for that reference, shows compact portal/email/calendar/chat/home actions, and keeps the Thank You state visible for `16s` before returning to the main search screen
+- booking confirmation now uses the booking reference as the durable customer anchor, generates QR against `portal.bookedai.au` for that reference, shows compact portal/email/calendar/chat/home actions, and keeps the Thank You state visible until the customer chooses another action; the homepage booking flow no longer auto-returns to the main search screen or shows a countdown chip
 - BookedAI public, product, demo, shared landing, and brand-kit logo paths now use the operator-provided uploaded logo asset, with cropped responsive logo frames so top-left branding stays visible without horizontal overflow
 - the public homepage and pitch surface now include the operator-provided `Chess_screen` proof image before the hero prompt/overview, framed as a professional chess academy product proof band that stays ahead of the main search-to-booking narrative without creating horizontal overflow
 - the top `pitch.bookedai.au` chess proof image now sits in a padded professional screen frame with `object-contain` 3:2 sizing, so the image fits inside the card instead of being enlarged and cropped
@@ -129,7 +132,7 @@ Latest tenant gateway update from `2026-04-25`:
 Latest next-phase plan update from `2026-04-25`:
 
 - `docs/development/next-phase-implementation-plan-2026-04-25.md` is now the active implementation bridge for the next BookedAI phases
-- `Phase 17` closes the current full-flow stabilization baseline: pitch package registration, product booking, payment-intent preparation, follow-up automation, Thank You confirmation, and `16s` return to the main BookedAI screen
+- `Phase 17` closes the current full-flow stabilization baseline: pitch package registration, product booking, payment-intent preparation, follow-up automation, and a persistent portal-first Thank You confirmation that no longer auto-returns to the main BookedAI screen
 - `Phase 18` through `Phase 23` are now ordered as revenue-ops ledger control, customer-care/status agent, widget/plugin runtime, billing and receivables truth, reusable multi-tenant templates, and release governance/scale hardening
 
 Latest Phase 18 implementation note from `2026-04-25`:
@@ -1729,7 +1732,6 @@ The chess revenue-ops ledger now has a more operator-ready admin surface inside 
 The customer-facing booking flow now has a consistent end state after a booking or qualified booking enquiry is captured:
 
 - homepage search, product/embedded assistant, Future Swim tenant runtime, and Grandmaster Chess tenant runtime now show a prominent Thank You confirmation after the booking/enquiry result
-- the Thank You state includes a 5-second countdown and an immediate return action
-- after the countdown, the surface returns to the main BookedAI screen automatically
-- homepage search resets back to the main search state, product/embedded assistant returns through the existing main-site close path, and tenant runtimes reset their form state and scroll back to the top
-- live product verification created booking `v1-ce0d20a95d` and observed `200` responses for the lead, booking intent, payment intent, email, SMS, and WhatsApp automation steps before the auto-return
+- the Thank You state no longer includes a countdown or automatic return; the customer can keep the booking reference, QR, portal actions, and follow-up details visible as long as needed
+- homepage search keeps the confirmation state in place after booking rather than resetting back to the main search state automatically
+- earlier live product verification created booking `v1-ce0d20a95d` and observed `200` responses for the lead, booking intent, payment intent, email, SMS, and WhatsApp automation steps; the current UX contract keeps that confirmation visible until the customer leaves or starts another action

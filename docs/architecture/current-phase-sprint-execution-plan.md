@@ -35,11 +35,11 @@ Latest next-phase update from `2026-04-25`:
 - reviewed tenant matches must still live inside the same search-results surface; for chess tenant results, the card and selected-booking state show verified BookedAI tenant posture plus BookedAI booking, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit support
 - follow-up questions and suggested next prompts belong inside the BookedAI chat conversation as interactive chips so clarification continues with the customer-facing agent instead of appearing as a disconnected panel
 - the immediate execution plan after the full-flow QA pass is now documented in `docs/development/next-phase-implementation-plan-2026-04-25.md`
-- current closeout is `Phase 17 - Full-flow stabilization`, covering pitch package registration, product booking, payment-intent preparation, communication best-effort work, Thank You confirmation, and return to the main BookedAI screen after `16s`
+- current closeout is `Phase 17 - Full-flow stabilization`, covering pitch package registration, product booking, payment-intent preparation, communication best-effort work, and a persistent portal-first Thank You confirmation that does not auto-return to the main BookedAI screen
 - the product/public booking runtime should now treat slow matching as a progressive-search problem: show first useful local/catalog matches while live ranking continues, keep refinement suggestions visible in chat, and keep the user informed with active status copy
 - result selection and booking commitment are separate UX states: select marks a result active, detail opens from the detail icon, and the customer form opens only after an explicit `Book` action
 - product assistant event selections are now part of the same stabilization baseline: choosing an event posts a real `/booking-assistant/session` request with synthetic `event:<url>` identity plus event metadata, and the backend must preserve that as an attendance-request confirmation path without pretending the flow is a normal Stripe-backed service booking
-- confirmation must be portal-first: show booking reference, QR to `portal.bookedai.au`, compact email/calendar/chat/home actions, and a thank-you message that allows continued chat during the `16s` grace period
+- confirmation must be portal-first: show booking reference, QR to `portal.bookedai.au`, compact email/calendar/chat/home actions, and a thank-you message that stays visible until the customer chooses another action
 - `portal.bookedai.au` now inherits that portal-first confirmation baseline as a real customer command center: lookup, booking/payment/support status, provider/customer detail, academy progress, timeline, and request-safe action rail must remain cohesive across desktop and mobile
 - the next implementation sequence is now `Phase 18` revenue-ops ledger control, `Phase 19` customer-care/status agent, `Phase 20` widget/plugin runtime, `Phase 21` billing and receivables truth, `Phase 22` reusable tenant templates, and `Phase 23` release governance
 - the public brand/menu and live booking lane were re-checked after the uploaded logo rollout: demo/product/pitch/tenant now render without horizontal overflow on mobile and desktop, the customer-agent live-read path falls back to the v1 matching/search contract when needed, and the live stack health gate passed after deployment
@@ -593,9 +593,13 @@ Implemented evidence:
 - browser search smoke coverage
 - `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` now records the current product-route interaction truth:
   - shortlist before booking
-  - preview popup with tenant or provider detail
+  - preview popup with tenant or provider detail rendered as a `fixed inset-0` viewport-level modal with internal scroll
   - explicit booking commit from preview
-  - confirmed state after submit
+  - confirmed state after submit, with no auto-homepage redirect; the QR + portal-auto-login hero stays in view until the customer leaves the page on their own
+  - product-app surface (`product.bookedai.au`) flows as a single scrollable column with progressive disclosure so the chat panel, the booking form, and the workflow guide reveal in sequence rather than as overlapping panels
+  - search resolving state is a multi-stage stepper with skeleton result placeholders, replacing the previous static spinner
+  - confirmation QR is generated locally via `frontend/src/shared/utils/qrCode.ts` (the `qrcode` npm package) so the surface no longer hard-depends on `api.qrserver.com` at runtime; the third-party URL stays as a fallback only
+  - confirmation hero exposes copy-to-clipboard for the booking reference and portal URL plus a QR PNG download, so the customer can hand the booking off through other channels without retyping anything
 
 Remaining gaps:
 
@@ -792,7 +796,7 @@ Must deliver next:
 - cross-lane release thresholds
 - rollback discipline for tenant and commercial lanes
 - scale-readiness and operational confidence review
-- final wording, visual, and proof-pack polish across homepage, pitch, and promo-video assets so the public narrative and shipped product evidence stay aligned
+- final wording, visual, pitch-video placement, and proof-pack polish across homepage, pitch, and promo-video assets so the public narrative and shipped product evidence stay aligned
 
 ## Detailed next execution order
 

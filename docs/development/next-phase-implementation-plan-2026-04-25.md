@@ -23,7 +23,7 @@ The latest verified baseline is:
 
 - pitch package registration completes from `pitch.bookedai.au` through `/register-interest`
 - product booking completes from `product.bookedai.au` through search, match, booking intent, payment intent, and communication best-effort work
-- booking success now shows a portal-first Thank You state and returns to the main BookedAI screen after `16s`
+- booking success now shows a portal-first Thank You state that stays visible until the customer chooses another action; the homepage booking flow no longer auto-returns to the main BookedAI screen
 - reviewed chess tenant search now has an explicit design contract: tenant-backed results stay in the normal shortlist, show verified BookedAI tenant capability chips, and continue into booking/payment/QR/calendar/email/WhatsApp/portal only after an explicit `Book` action
 - public/product search cards now require top-left thumbnail/preview treatment, Google Maps actions for physical places, faster staged progress copy, and early-match visibility while deeper checks continue
 - the homepage customer-facing agent now keeps a visible chat thread and can spawn revenue-ops handoff actions after booking
@@ -39,21 +39,35 @@ Objective:
 
 Deliverables:
 
-- preserve the `search -> match -> book -> pay/prepare payment -> follow up -> Thank You -> return home` customer journey
+- preserve the `search -> match -> book -> pay/prepare payment -> follow up -> Thank You -> stay-on-confirmation` customer journey; auto-redirect from Thank You back to homepage is removed so the customer keeps the QR/portal handoff in view until they choose to leave
 - preserve results-first search behavior, including reviewed tenant matches; tenant matches may show richer verified capability chips but must not auto-jump to booking
 - preserve result-card inspection basics: thumbnail/preview, direct or fallback Google Maps, provider/detail actions, early-match rendering, and chat-based refinement prompts
 - preserve portal-first tenant confirmation: booking reference, QR to `portal.bookedai.au`, Stripe/QR/manual payment posture, email/calendar actions, WhatsApp Agent follow-up, and portal review/edit/reschedule/cancel links
+- product-app surface (`product.bookedai.au`) must use a single scrollable column with progressive disclosure: chat-first welcome state, animated multi-stage search progress (no static spinner) with skeleton placeholder cards, booking form revealed only after a result is selected, and confirmation hero only after submit; bottom-sheet drag/overlay behaviors must stay removed
+- the booking confirmation hero must surface QR + portal auto-login as the primary action: enlarged scannable QR (≥ `128px`), `Open booking portal` link, copy-to-clipboard on booking reference and portal link, `Save PNG` download for the QR image, and an explicit `Auto-login link with reference` chip so the customer understands the link carries identity
+- QR codes must be generated in-process via the `qrcode` npm package (`frontend/src/shared/utils/qrCode.ts`), not via the third-party `api.qrserver.com` runtime call, so confirmation does not depend on external service availability; the legacy URL stays as the fallback path only
+- preview/details popup must render as a true viewport-level modal (`fixed inset-0`) with internal scroll so long content stays inspectable without being clipped by the parent panel
 - keep package registration resilient when calendar, Stripe, event-store, or dual-write side effects degrade
 - keep public booking confirmation immediate while downstream automation runs best effort
-- maintain compact mobile UI for package boxes, result cards, forms, and action controls
+- maintain compact mobile UI for package boxes, result cards, forms, and action controls; product-app mobile must not have a fixed bottom bar that overlays content
 - keep the pitch architecture visual current whenever the agent, booking, tenant/admin, or integration boundaries change
+- remove the dead product bottom-sheet code that backed the previous overlay UX (`productSheetDragOffset`, `productSheetDragStateRef`, `handleProductSheetPointer*`, `isCompactProductBottomBarVisible`, `thankYouReturnCountdown`, and the `productBookingSheetPeek/Half`, `productSheetVisibleHeight`, `productSheetOpenRatio`, `compactProductFooterOffset` calculations) and keep the assistant component free of the old swipe/auto-redirect behavior
 
 Acceptance gates:
 
 - backend booking tests pass
 - frontend production build passes
-- live browser smoke reaches Thank You and auto-return
+- live browser smoke reaches Thank You and stays on the QR/portal hero (no automatic homepage redirect)
+- preview popup opens with full content visible and scrollable on `390px` mobile and tablet widths
+- product-app stepper completes the search progression and a placeholder skeleton row is visible while results stream in
+- copy-to-clipboard for booking reference and portal link succeeds in production browsers; QR PNG download produces a valid file with the booking reference in its name
 - no horizontal overflow on pitch, product, demo, or registration mobile views
+
+Mobile UAT verification (must run on at least one real device per family before promotion):
+
+- iOS Safari at `390px`: sticky composer behaves with software keyboard, scrollable chat does not lose position when keyboard opens, QR card stays inside viewport on landscape
+- Android Chrome at `360px`: bottom safe-area insets are respected, no fixed-position chrome covers the booking form, modal preview can be dismissed by tapping the backdrop
+- iPadOS Safari (split view): the dialog is centered, side-by-side desktop grid kicks in at the right breakpoint, and the QR/portal block does not push booking form below fold without user scroll
 
 ## Phase 18 - Revenue-Ops Ledger Control
 
@@ -142,6 +156,25 @@ Acceptance gates:
 - at least one tenant-branded widget can complete search, booking, Thank You, and portal continuation
 - origin and tenant scoping are visible in logs and action runs
 - cross-origin behavior is covered by CORS and browser smoke tests
+
+## Phase 20.5 - Confirmation Wallet And Stripe Return Continuity
+
+Objective:
+
+- extend the post-booking handoff so the customer can carry the booking outside the browser tab and the payment loop returns the customer to a context-aware state rather than dumping them on the homepage
+
+Deliverables:
+
+- Apple Wallet `.pkpass` and Google Wallet pass generation for confirmed bookings, anchored on the booking reference and tenant brand, with a `Save to wallet` button on the confirmation hero next to the existing QR and copy controls
+- Stripe checkout `success_url` should resolve to a booking-aware return URL (for example `https://product.bookedai.au/booking/{booking_reference}` or `https://portal.bookedai.au/?booking_reference=...`) so the customer lands back inside the booking story instead of the homepage
+- portal auto-login verification: confirm that `https://portal.bookedai.au/?booking_reference={ref}` resolves a portal session for the matched booking without requiring the customer to type the reference again, and document the resolution path so support knows what to recreate when the link breaks
+- a self-test command or smoke step that opens the auto-login URL, asserts the booking is bound to the session, and records evidence under `frontend/output/playwright/`
+
+Acceptance gates:
+
+- a Stripe-backed booking returns the customer to the booking-aware URL (not the public homepage) after a successful test charge
+- a Wallet pass downloads from the confirmation card on iOS Safari and Android Chrome and opens correctly in the platform Wallet app
+- portal auto-login smoke records a passing run with screenshots, JSON status, and reference-bound state
 
 ## Phase 21 - Billing, Receivables, And Subscription Truth
 

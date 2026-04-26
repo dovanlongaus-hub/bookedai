@@ -36,15 +36,14 @@ import {
 const productUrl = 'https://product.bookedai.au/';
 const demoLandingUrl = 'https://demo.bookedai.au/';
 const architectureUrl = '/architecture';
-const closingPitchImageUrl = '/branding/optimized/final-contact-proof-1400.webp';
-const closingPitchImageSrcSet =
-  '/branding/optimized/final-contact-proof-960.webp 960w, /branding/optimized/final-contact-proof-1400.webp 1400w';
+const pitchVideoUrl = 'https://upload.bookedai.au/videos/e3d3/e0FeUWfasDxUbrvxObhHcw.mp4';
 const chessScreenImageUrl = '/branding/optimized/chess-screen-proof-1400.webp';
 const chessScreenImageSrcSet =
   '/branding/optimized/chess-screen-proof-960.webp 960w, /branding/optimized/chess-screen-proof-1400.webp 1400w';
 
 const pitchNavItems = [
   { id: 'hero', label: 'Overview' },
+  { id: 'pitch-video', label: 'Pitch Video' },
   { id: 'proof', label: 'Product' },
   { id: 'problem', label: 'Problem' },
   { id: 'solution', label: 'Solution' },
@@ -141,56 +140,19 @@ const architectureCapabilityCards = [
   ['Enterprise posture', 'Tenant boundaries, policy gates, audit trails, and fallback rails are visible by design.'],
 ];
 
-const architectureLayers = [
-  {
-    eyebrow: 'Layer 01',
-    title: 'Customer demand surfaces',
-    summary: 'Where intent enters the BookedAI system.',
-    tone: 'border-sky-200 bg-sky-50',
-    rail: 'bg-sky-500',
-    modules: ['bookedai.au', 'product.bookedai.au', 'demo/widget', 'portal.bookedai.au', 'WhatsApp entry'],
-  },
-  {
-    eyebrow: 'Layer 02',
-    title: 'AI orchestration layer',
-    summary: 'Turns raw messages into structured commercial intent.',
-    tone: 'border-violet-200 bg-violet-50',
-    rail: 'bg-violet-500',
-    modules: ['Customer-turn agent', 'Search and match', 'Qualification policy', 'Revenue-ops agent', 'Care/status agent'],
-  },
-  {
-    eyebrow: 'Layer 03',
-    title: 'Revenue transaction core',
-    summary: 'Creates durable booking, payment, and confirmation state.',
-    tone: 'border-emerald-200 bg-emerald-50',
-    rail: 'bg-emerald-500',
-    modules: ['Lead capture', 'Booking intent', 'Payment intent', 'QR portal return', 'Email/calendar'],
-  },
-  {
-    eyebrow: 'Layer 04',
-    title: 'Operations control plane',
-    summary: 'Makes every handoff inspectable by the tenant and BookedAI team.',
-    tone: 'border-amber-200 bg-amber-50',
-    rail: 'bg-amber-500',
-    modules: ['Tenant Ops', 'Admin Reliability', 'Action ledger', 'Support queue', 'Manual review'],
-  },
+const architectureImageNodes = [
+  ['Capture', 'Web, product, widget, WhatsApp'],
+  ['Orchestrate', 'Customer AI + matching policy'],
+  ['Convert', 'Lead, booking, payment posture'],
+  ['Operate', 'Tenant Ops + admin action ledger'],
 ];
 
-const architectureIntegrationRails = [
-  ['Payments', 'Stripe checkout, QR transfer posture, invoice readiness'],
-  ['Messaging', 'Meta WhatsApp primary, Twilio fallback, email lifecycle'],
-  ['Workflow', 'n8n automation, CRM tasks, webhook/outbox recovery'],
-  ['Operator AI', 'OpenClaw, Telegram commands, Notion and Discord closeout'],
+const architectureSupportRails = [
+  ['Customer surfaces', 'bookedai.au, product, demo, portal, widget'],
+  ['Agent layer', 'customer turn, revenue ops, care/status'],
+  ['Revenue core', 'lead, booking intent, payment, email/calendar'],
+  ['Control plane', 'tenant ops, admin reliability, audit ledger'],
 ];
-
-const architectureStackGroups = [
-  ['Frontend', 'React', 'TypeScript', 'Vite', 'Tailwind'],
-  ['Backend', 'FastAPI', 'Pydantic', 'service layer', 'API v1'],
-  ['Data', 'Supabase', 'Postgres', 'audit/outbox', 'storage'],
-  ['Runtime', 'Docker Compose', 'Nginx', 'Cloudflare DNS/TLS', 'health checks'],
-];
-
-const architectureFlowMarkers = ['Demand', 'AI decision', 'Booking state', 'Ops truth'];
 
 function VisualChip({
   children,
@@ -212,11 +174,146 @@ function VisualChip({
   );
 }
 
+function PitchVideoSection() {
+  return (
+    <section id="pitch-video" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+      <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#101827_0%,#172033_52%,#123b3a_100%)] p-0 text-white shadow-[0_32px_90px_rgba(15,23,42,0.16)]">
+        <div className="grid gap-0 xl:grid-cols-[0.82fr_1.18fr] xl:items-stretch">
+          <div className="flex flex-col justify-between gap-6 p-6 sm:p-8 lg:p-10">
+            <div>
+              <SignalPill className="w-fit border border-white/12 bg-white/10 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#8efce0]">
+                Pitch video
+              </SignalPill>
+              <h2 className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
+                Watch the BookedAI story before diving into the deck.
+              </h2>
+              <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
+                A short visual walkthrough for the commercial narrative: customer demand, AI booking,
+                operator visibility, and why the platform is built around revenue truth.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-3">
+              <a
+                href={pitchVideoUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#172033] transition hover:-translate-y-0.5 hover:bg-[#eef4f2]"
+              >
+                Open video
+              </a>
+              <a
+                href={productUrl}
+                className="rounded-full border border-white/16 bg-white/[0.08] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/[0.14]"
+              >
+                Try product
+              </a>
+            </div>
+          </div>
+          <div className="bg-black/24 p-3 sm:p-4 lg:p-5">
+            <div className="overflow-hidden rounded-[1.6rem] border border-white/12 bg-black shadow-[0_24px_70px_rgba(0,0,0,0.28)]">
+              <video
+                className="aspect-video w-full bg-black object-contain"
+                controls
+                preload="metadata"
+                playsInline
+              >
+                <source src={pitchVideoUrl} type="video/mp4" />
+                <a href={pitchVideoUrl}>Open the BookedAI pitch video</a>
+              </video>
+            </div>
+          </div>
+        </div>
+      </SectionCard>
+    </section>
+  );
+}
+
+function ArchitectureSnapshotImage() {
+  return (
+    <div
+      role="img"
+      aria-label="BookedAI architecture image showing capture, AI orchestration, booking conversion, and operations control"
+      className="overflow-hidden rounded-[1.45rem] border border-slate-900 bg-slate-950 shadow-[0_24px_64px_rgba(15,23,42,0.18)]"
+    >
+      <svg
+        viewBox="0 0 980 560"
+        className="block h-auto w-full"
+        fill="none"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <rect width="980" height="560" fill="#07111f" />
+        <path d="M0 0H980V560H0V0Z" fill="url(#pitchArchitectureBg)" />
+        <defs>
+          <linearGradient id="pitchArchitectureBg" x1="74" y1="28" x2="902" y2="546" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#0f766e" stopOpacity="0.42" />
+            <stop offset="0.48" stopColor="#172554" stopOpacity="0.84" />
+            <stop offset="1" stopColor="#312e81" stopOpacity="0.54" />
+          </linearGradient>
+          <linearGradient id="pitchArchitectureCore" x1="305" y1="150" x2="674" y2="430" gradientUnits="userSpaceOnUse">
+            <stop stopColor="#22d3ee" />
+            <stop offset="0.5" stopColor="#60a5fa" />
+            <stop offset="1" stopColor="#8b5cf6" />
+          </linearGradient>
+        </defs>
+
+        <rect x="48" y="42" width="884" height="476" rx="42" fill="white" fillOpacity="0.08" stroke="white" strokeOpacity="0.16" />
+        <text x="84" y="94" fill="#a7f3d0" fontSize="18" fontWeight="700" letterSpacing="4">
+          BOOKEDAI ARCHITECTURE
+        </text>
+        <text x="84" y="130" fill="white" fontSize="34" fontWeight="700">
+          Revenue engine from demand to operator truth
+        </text>
+
+        <rect x="308" y="166" width="364" height="216" rx="34" fill="url(#pitchArchitectureCore)" fillOpacity="0.95" />
+        <rect x="332" y="190" width="316" height="168" rx="26" fill="#061525" fillOpacity="0.72" stroke="white" strokeOpacity="0.2" />
+        <text x="490" y="240" textAnchor="middle" fill="white" fontSize="30" fontWeight="800">
+          AI Revenue Core
+        </text>
+        <text x="490" y="277" textAnchor="middle" fill="#dbeafe" fontSize="18" fontWeight="600">
+          {'qualify -> book -> follow up'}
+        </text>
+        <text x="490" y="316" textAnchor="middle" fill="#a7f3d0" fontSize="16" fontWeight="700" letterSpacing="2.4">
+          AUDITABLE · TENANT-SAFE · API-BACKED
+        </text>
+
+        {architectureImageNodes.map(([title, body], index) => {
+          const positions = [
+            { x: 84, y: 200 },
+            { x: 84, y: 350 },
+            { x: 722, y: 200 },
+            { x: 722, y: 350 },
+          ] as const;
+          const { x, y } = positions[index];
+          const lineStart = index < 2 ? x + 218 : 672;
+          const lineEnd = index < 2 ? 308 : x - 18;
+          return (
+            <g key={title}>
+              <path d={`M${lineStart} ${y + 50}H${lineEnd}`} stroke="#93c5fd" strokeOpacity="0.58" strokeWidth="3" strokeLinecap="round" />
+              <rect x={x} y={y} width="218" height="102" rx="22" fill="white" fillOpacity="0.1" stroke="white" strokeOpacity="0.18" />
+              <text x={x + 24} y={y + 42} fill="white" fontSize="22" fontWeight="800">
+                {title}
+              </text>
+              <text x={x + 24} y={y + 73} fill="#cbd5e1" fontSize="14" fontWeight="600">
+                {body}
+              </text>
+            </g>
+          );
+        })}
+
+        <rect x="84" y="440" width="812" height="46" rx="23" fill="white" fillOpacity="0.1" stroke="white" strokeOpacity="0.16" />
+        <text x="490" y="470" textAnchor="middle" fill="#e0f2fe" fontSize="16" fontWeight="700">
+          Stripe · WhatsApp · n8n · CRM · FastAPI · Supabase · Docker · Cloudflare
+        </text>
+      </svg>
+    </div>
+  );
+}
+
 function PitchArchitectureFlowVisual() {
   return (
     <section id="architecture" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
       <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_44%,#eef6ff_70%,#f7f4ff_100%)] px-5 py-6 shadow-[0_28px_80px_rgba(15,23,42,0.10)] sm:px-7 lg:px-8 lg:py-8">
-        <div className="grid gap-8 xl:grid-cols-[0.62fr_1.38fr] xl:items-start">
+        <div className="grid gap-8 xl:grid-cols-[0.58fr_1.42fr] xl:items-start">
           <div>
             <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
               Architecture image
@@ -257,111 +354,18 @@ function PitchArchitectureFlowVisual() {
             </div>
           </div>
 
-          <figure
-            aria-label="BookedAI professional architecture infographic showing linked product surfaces, AI agents, revenue core, operations modules, integrations, and infrastructure"
-            className="rounded-[1.85rem] border border-black/6 bg-white/78 p-3 shadow-[0_22px_58px_rgba(15,23,42,0.08)] sm:p-4"
-          >
-            <div className="rounded-[1.55rem] border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_100%)] p-4 sm:p-5">
-              <div className="flex flex-col justify-between gap-3 border-b border-slate-200 pb-4 sm:flex-row sm:items-center">
-                <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
-                    BookedAI platform architecture
+          <figure className="rounded-[1.85rem] border border-black/6 bg-white/78 p-3 shadow-[0_22px_58px_rgba(15,23,42,0.08)] sm:p-4">
+            <ArchitectureSnapshotImage />
+            <figcaption className="mt-4 grid gap-3 md:grid-cols-2">
+              {architectureSupportRails.map(([title, body]) => (
+                <div key={title} className="min-w-0 rounded-[1.1rem] border border-slate-200 bg-white px-4 py-3">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1459c7]">
+                    {title}
                   </div>
-                  <figcaption className="mt-1 text-lg font-semibold tracking-[-0.04em] text-slate-950 sm:text-2xl">
-                    Customer demand {'->'} AI revenue engine {'->'} booking truth {'->'} operator control
-                  </figcaption>
+                  <div className="mt-1 text-sm leading-6 text-slate-700">{body}</div>
                 </div>
-                <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
-                  Designed system
-                </div>
-              </div>
-
-              <div className="mt-5 grid gap-2 sm:grid-cols-4">
-                {architectureFlowMarkers.map((marker, index) => (
-                  <div key={marker} className="relative rounded-full border border-slate-200 bg-white px-3 py-2 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
-                    {index < architectureFlowMarkers.length - 1 ? (
-                      <div className="absolute left-[calc(100%+0.08rem)] top-1/2 hidden h-px w-2 -translate-y-1/2 bg-slate-300 sm:block" />
-                    ) : null}
-                    {marker}
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-5 grid gap-3">
-                {architectureLayers.map((layer) => (
-                  <article
-                    key={layer.title}
-                    className={`grid gap-3 rounded-[1.25rem] border ${layer.tone} p-3 shadow-[0_10px_28px_rgba(15,23,42,0.035)] lg:grid-cols-[0.28fr_0.72fr] lg:items-center`}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className={`mt-1 h-11 w-1.5 shrink-0 rounded-full ${layer.rail}`} />
-                      <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                          {layer.eyebrow}
-                        </div>
-                        <h3 className="mt-1 text-base font-semibold tracking-[-0.03em] text-slate-950">
-                          {layer.title}
-                        </h3>
-                        <p className="mt-1 text-xs leading-5 text-slate-600">{layer.summary}</p>
-                      </div>
-                    </div>
-                    <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-5">
-                      {layer.modules.map((item) => (
-                        <div
-                          key={item}
-                          className="min-w-0 break-words rounded-[0.9rem] border border-white/80 bg-white/88 px-3 py-2 text-[11px] font-semibold leading-5 text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)] [overflow-wrap:anywhere]"
-                        >
-                          {item}
-                        </div>
-                      ))}
-                    </div>
-                  </article>
-                ))}
-              </div>
-
-              <div className="mt-4 grid gap-3 lg:grid-cols-[1.05fr_0.95fr]">
-                <div className="rounded-[1.25rem] border border-slate-200 bg-white p-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Partner and integration rails
-                  </div>
-                  <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                    {architectureIntegrationRails.map(([title, body]) => (
-                      <div key={title} className="rounded-[1rem] border border-slate-200 bg-slate-50 px-3 py-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-900">
-                          {title}
-                        </div>
-                        <div className="mt-1 text-xs leading-5 text-slate-600">{body}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="rounded-[1.25rem] border border-slate-900 bg-slate-950 p-4 text-white">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-cyan-200">
-                    Infrastructure and technology stack
-                  </div>
-                  <div className="mt-3 grid gap-2">
-                    {architectureStackGroups.map(([title, ...items]) => (
-                      <div key={title} className="rounded-[1rem] border border-white/10 bg-white/7 px-3 py-3">
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-white">
-                          {title}
-                        </div>
-                        <div className="mt-2 flex flex-wrap gap-1.5">
-                          {items.map((item) => (
-                            <span
-                              key={item}
-                              className="min-w-0 break-words rounded-full border border-white/10 bg-white/8 px-2.5 py-1 text-[10px] font-semibold text-slate-300 [overflow-wrap:anywhere]"
-                            >
-                              {item}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </div>
+              ))}
+            </figcaption>
           </figure>
         </div>
       </SectionCard>
@@ -707,6 +711,8 @@ export function PitchDeckApp() {
       </section>
 
       <ChessProofSection />
+
+      <PitchVideoSection />
 
       {/* ── 2. PROBLEM ──────────────────────────────────────────────── */}
       <section id="problem" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
@@ -1164,45 +1170,34 @@ export function PitchDeckApp() {
       </section>
 
       {/* ── 10. FINAL CTA ───────────────────────────────────────────── */}
-      <section className="mx-auto w-full max-w-7xl px-6 py-6 pb-12 lg:px-8 lg:pb-16">
-        <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f7fbff_48%,#eef6ff_100%)] p-0 shadow-[0_32px_90px_rgba(15,23,42,0.10)]">
-          <div className="p-3 sm:p-4 lg:p-5">
-            <div className="overflow-hidden rounded-[1.75rem] border border-black/8 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.14)]">
-              <img
-                src={closingPitchImageUrl}
-                srcSet={closingPitchImageSrcSet}
-                sizes="(min-width: 1280px) 1120px, calc(100vw - 5rem)"
-                alt="BookedAI closing pitch visual proof"
-                className="block aspect-[3/2] h-auto w-full object-contain object-center"
-                loading="eager"
-                width={1400}
-                height={933}
-              />
+      <section className="mx-auto w-full max-w-7xl px-6 py-5 lg:px-8">
+        <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#101827_0%,#172033_54%,#0f766e_140%)] px-5 py-6 text-white shadow-[0_24px_70px_rgba(15,23,42,0.14)] sm:px-7 lg:px-8">
+          <div className="grid min-w-0 gap-5 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+            <div className="min-w-0">
+              <SignalPill className="w-fit border border-white/12 bg-white/10 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#8efce0]">
+                {ctaContent.kicker}
+              </SignalPill>
+              <h2 className="mt-4 max-w-2xl break-words text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
+                Move from pitch to live revenue flow.
+              </h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
+                Open the product, review the architecture, or register the business for launch setup.
+              </p>
             </div>
-            <div className="flex min-w-0 flex-col gap-5 px-2 py-6 sm:flex-row sm:items-center sm:justify-between sm:px-4 lg:px-6">
-              <div className="min-w-0">
-                <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-                  {ctaContent.kicker}
-                </SignalPill>
-                <h2 className="mt-4 max-w-2xl break-words text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f] sm:text-3xl">
-                  Move from pitch to live revenue flow.
-                </h2>
-              </div>
-              <div className="flex shrink-0 flex-col gap-3 sm:flex-row">
-                <a
-                  href={productUrl}
-                  className="rounded-full bg-[#1d1d1f] px-6 py-3.5 text-center text-sm font-semibold text-white transition hover:-translate-y-0.5 whitespace-normal break-words"
-                >
-                  Open Web App
-                </a>
-                <button
-                  type="button"
-                  onClick={() => openRegisterInterest('call_to_action', 'pitch_final_cta_sales')}
-                  className="rounded-full border border-black/10 bg-white px-6 py-3.5 text-center text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5 whitespace-normal break-words"
-                >
-                  Talk to Sales
-                </button>
-              </div>
+            <div className="flex min-w-0 flex-col gap-3 sm:flex-row md:justify-end">
+              <a
+                href={productUrl}
+                className="rounded-full bg-white px-5 py-3 text-center text-sm font-semibold text-[#172033] transition hover:-translate-y-0.5 hover:bg-[#eef4f2]"
+              >
+                Open Web App
+              </a>
+              <button
+                type="button"
+                onClick={() => openRegisterInterest('call_to_action', 'pitch_final_cta_sales')}
+                className="rounded-full border border-white/16 bg-white/[0.08] px-5 py-3 text-center text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/[0.14]"
+              >
+                Talk to Sales
+              </button>
             </div>
           </div>
         </SectionCard>
@@ -1214,6 +1209,7 @@ export function PitchDeckApp() {
         startTrialLabel="Open SME Registration"
         bookDemoLabel="Open Web App"
         showBrandCopy={false}
+        compact
       />
     </main>
   );

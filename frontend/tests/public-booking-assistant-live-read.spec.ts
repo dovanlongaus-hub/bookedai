@@ -2906,6 +2906,8 @@ test.describe('public assistant rollout smoke', () => {
     await expect(page.getByText('shadow-ref', { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/Booking request captured in v1\./)).toBeVisible();
     await expect(page.getByText(/Your booking code, portal QR, and follow-up path are ready/i)).toBeVisible();
+    await expect(page.getByText(/Returning to the main BookedAI screen/i)).toHaveCount(0);
+    await expect(page.getByText(/This confirmation stays here as long as you need it/i)).toBeVisible();
     await expect(page.getByText('Scan to open booking')).toBeVisible();
     await expect(page.getByText('Review booking').first()).toBeVisible();
     await expect(page.getByText('Edit and submit').first()).toBeVisible();
@@ -2914,6 +2916,9 @@ test.describe('public assistant rollout smoke', () => {
     await expect.poll(async () =>
       page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
     ).toBe(true);
+    await page.waitForTimeout(3200);
+    await expect(page.getByText('shadow-ref', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/Returning to the main BookedAI screen/i)).toHaveCount(0);
     expect(legacySessionRequests).toBe(0);
     await expect.poll(() => shadowLeadRequests).toBe(1);
     await expect.poll(() => shadowBookingIntentRequests).toBe(1);

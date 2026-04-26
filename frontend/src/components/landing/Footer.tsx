@@ -28,6 +28,7 @@ type FooterProps = {
   startTrialLabel?: string;
   bookDemoLabel?: string;
   showBrandCopy?: boolean;
+  compact?: boolean;
 };
 
 export function Footer({
@@ -36,14 +37,15 @@ export function Footer({
   startTrialLabel = 'Open Web App',
   bookDemoLabel = 'Talk to Sales',
   showBrandCopy = true,
+  compact = false,
 }: FooterProps) {
   const releaseBadgeLabel = getReleaseBadgeLabel();
   const releaseVersionLabel = getReleaseVersionLabel();
 
   return (
-    <footer className="mx-auto w-full max-w-7xl px-6 pb-12 pt-6 lg:px-8">
-      <div className="template-card overflow-hidden border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] px-6 py-8 shadow-[0_24px_64px_rgba(15,23,42,0.06)] lg:px-8">
-        <div className={`grid gap-6 ${showBrandCopy ? 'lg:grid-cols-[1.05fr_0.95fr]' : 'lg:grid-cols-[0.72fr_1.28fr]'} lg:items-start`}>
+    <footer className={`mx-auto w-full max-w-7xl px-6 lg:px-8 ${compact ? 'pb-8 pt-3' : 'pb-12 pt-6'}`}>
+      <div className={`template-card overflow-hidden border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] shadow-[0_24px_64px_rgba(15,23,42,0.06)] ${compact ? 'px-4 py-5 sm:px-5' : 'px-6 py-8 lg:px-8'}`}>
+        <div className={`grid gap-6 ${showBrandCopy ? 'lg:grid-cols-[1.05fr_0.95fr]' : compact ? 'lg:grid-cols-[auto_minmax(0,1fr)]' : 'lg:grid-cols-[0.72fr_1.28fr]'} lg:items-start`}>
           <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
             <div className="flex w-fit max-w-full shrink-0 items-center overflow-hidden rounded-[1.25rem] border border-black/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.68)_0%,rgba(248,250,252,0.9)_100%)] px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
               <BrandLockup
@@ -70,25 +72,27 @@ export function Footer({
             )}
           </div>
 
-          <div className="grid gap-4">
-            <div className="grid gap-3 sm:grid-cols-3">
-              {[
-                ['Buying ladder', 'Starter -> Pro -> Pro Max'],
-                ['Commercial model', 'Scoped setup + monthly + commission'],
-                ['Entry layer', '49$+'],
-              ].map(([label, value]) => (
-                <div key={label} className="rounded-[1.25rem] border border-black/6 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">{value}</div>
-                </div>
-              ))}
-            </div>
+          <div className={`grid gap-4 ${compact ? 'lg:justify-items-end' : ''}`}>
+            {!compact && (
+              <div className="grid gap-3 sm:grid-cols-3">
+                {[
+                  ['Buying ladder', 'Starter -> Pro -> Pro Max'],
+                  ['Commercial model', 'Scoped setup + monthly + commission'],
+                  ['Entry layer', '49$+'],
+                ].map(([label, value]) => (
+                  <div key={label} className="rounded-[1.25rem] border border-black/6 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div>
+                    <div className="mt-2 text-sm font-semibold text-slate-950">{value}</div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             <div className="flex flex-wrap gap-3 text-sm">
               <button
                 type="button"
                 onClick={onStartTrial}
-                className="booked-button inline-flex items-center justify-center gap-2 px-4 py-2 font-semibold"
+                className="booked-button inline-flex min-w-0 items-center justify-center gap-2 whitespace-normal px-4 py-2 text-center font-semibold"
               >
                 <ArrowRight className="h-4 w-4" aria-hidden="true" />
                 {startTrialLabel}
@@ -96,7 +100,7 @@ export function Footer({
               <button
                 type="button"
                 onClick={onBookDemo}
-                className="booked-button-secondary inline-flex items-center justify-center gap-2 px-4 py-2 font-medium"
+                className="booked-button-secondary inline-flex min-w-0 items-center justify-center gap-2 whitespace-normal px-4 py-2 text-center font-medium"
               >
                 <MessageCircle className="h-4 w-4" aria-hidden="true" />
                 {bookDemoLabel}
@@ -105,7 +109,7 @@ export function Footer({
           </div>
         </div>
 
-        <div className="mt-6 flex flex-col gap-3 border-t border-black/8 pt-6 text-sm text-black/60 md:flex-row md:items-center md:justify-between">
+        <div className={`${compact ? 'mt-4 pt-4 text-xs' : 'mt-6 pt-6 text-sm'} flex flex-col gap-3 border-t border-black/8 text-black/60 md:flex-row md:items-center md:justify-between`}>
           <div className="flex flex-wrap items-center gap-3">
             <a href={`mailto:${brandContactEmail}`} className="template-link transition hover:underline">
               {brandContactEmail}
@@ -122,26 +126,28 @@ export function Footer({
               </SocialLink>
             </div>
           </div>
-          <div className="flex flex-wrap gap-4">
-            <a href={productHref} className="template-link transition hover:underline">
+          <div className={`flex flex-wrap ${compact ? 'gap-3' : 'gap-4'}`}>
+            <a href={productHref} className="template-link break-words transition hover:underline">
               Web App
             </a>
-            <a href={roadmapHref} className="template-link transition hover:underline">
+            <a href={roadmapHref} className="template-link break-words transition hover:underline">
               Roadmap
             </a>
-            <a href={tenantHref} className="template-link transition hover:underline">
+            <a href={tenantHref} className="template-link break-words transition hover:underline">
               Tenant Workspace
             </a>
-            <a href={adminHref} className="template-link transition hover:underline">
+            <a href={adminHref} className="template-link break-words transition hover:underline">
               Admin Login
             </a>
-            <a href={googleRegisterHref} className="template-link transition hover:underline">
-              Google Register
-            </a>
-            <a href={privacyHref} className="template-link transition hover:underline">
+            {!compact && (
+              <a href={googleRegisterHref} className="template-link break-words transition hover:underline">
+                Google Register
+              </a>
+            )}
+            <a href={privacyHref} className="template-link break-words transition hover:underline">
               Privacy Policy
             </a>
-            <a href={termsHref} className="template-link transition hover:underline">
+            <a href={termsHref} className="template-link break-words transition hover:underline">
               Terms of Service
             </a>
           </div>

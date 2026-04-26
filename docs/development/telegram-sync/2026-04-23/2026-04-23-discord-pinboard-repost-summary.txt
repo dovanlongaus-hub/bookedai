@@ -1,0 +1,10 @@
+BookedAI 23 April change summary for the Discord pin board:
+
+1. Production infrastructure recovered after the host/IP move: Cloudflare origin handling, Supabase Kong startup, health checks, proxy, public surfaces, and backend health returned to green.
+2. Auth and security posture hardened: admin/tenant sessions stopped falling back to admin token/password, root admin moved to email-code login, bootstrap login became break-glass only, and legacy tenant-membership compatibility was added.
+3. OpenClaw/Telegram became a real host-control lane: trusted actor 8426853622 is allowlisted, host-shell/full_project are enabled, nsenter targets the VPS host, and deploy-live works from /workspace/bookedai.au.
+4. Release flow was promoted back to main, missing files were restored, builds/tests were validated where available, completed branches were cleaned, and live deploys reactivated n8n workflow stwMomWRq2qJoaTy.
+5. Admin productization advanced: enterprise admin lanes, Messaging foundation, read-model Billing/Integrations/Audit summaries, and controlled Settings/Leads handoff planning plus first slices landed.
+6. The web-first Golden Tenant Activation + Revenue Proof Loop was locked, with Future Swim primary and tenant activation, billing truth, conversion aftermath, and revenue proof visibility moved forward.
+7. Public surfaces were realigned: bookedai.au became the product-first homepage, pitch.bookedai.au became the deeper narrative surface, slow-search UX improved, and degraded booking submit gained safe fallback behavior.
+8. The architecture direction was captured as an embeddable multi-tenant booking/runtime layer for SME-owned websites, not only a central marketplace.

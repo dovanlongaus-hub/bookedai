@@ -39,6 +39,16 @@ import {
   downloadQrCodePng,
   generateQrCodeDataUrl,
 } from '../../../shared/utils/qrCode';
+import {
+  buildIcsContent,
+  downloadIcsFile,
+  parseBookingDateTime,
+} from '../../../shared/utils/calendar';
+import {
+  buildMailtoUrl,
+  isWebShareAvailable,
+  shareWithFallback,
+} from '../../../shared/utils/share';
 
 type ServiceCatalogItem = {
   id: string;
@@ -1617,18 +1627,18 @@ export function BookingAssistantDialog({
   const [catalogError, setCatalogError] = useState('');
   const [submitError, setSubmitError] = useState('');
   const [result, setResult] = useState<BookingAssistantSessionResponse | null>(null);
-  const [thankYouReturnCountdown, setThankYouReturnCountdown] = useState(5);
   const [isListening, setIsListening] = useState(false);
   const [voiceError, setVoiceError] = useState('');
   const [voiceRepliesEnabled, setVoiceRepliesEnabled] = useState(false);
   const [activeMobilePanel, setActiveMobilePanel] = useState<'chat' | 'booking'>('chat');
   const [productSheetSnap, setProductSheetSnap] = useState<ProductSheetSnap>('peek');
+  const [, setProductSheetDragOffset] = useState(0);
   const [productModuleTab, setProductModuleTab] = useState<ProductModuleTab>('overview');
-  const [productSheetDragOffset, setProductSheetDragOffset] = useState(0);
+  const [, setIsCompactProductBottomBarVisible] = useState(false);
+  const [, setThankYouReturnCountdown] = useState(0);
   const [selectionAnimationKey, setSelectionAnimationKey] = useState(0);
   const [workflowHandoffKey, setWorkflowHandoffKey] = useState(0);
   const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
-  const [isCompactProductBottomBarVisible, setIsCompactProductBottomBarVisible] = useState(true);
   const [previewService, setPreviewService] = useState<ServiceCatalogItem | null>(null);
   const [bookingQrDataUrl, setBookingQrDataUrl] = useState('');
   const [copyState, setCopyState] = useState<{ kind: 'reference' | 'portal' | null; ts: number }>({
@@ -1650,21 +1660,6 @@ export function BookingAssistantDialog({
     bookingRequestSummary: string | null;
   } | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
-  const productSheetDragStateRef = useRef<{
-    pointerId: number | null;
-    startY: number;
-    lastOffset: number;
-    lastClientY: number;
-    lastTimestamp: number;
-    velocityY: number;
-  }>({
-    pointerId: null,
-    startY: 0,
-    lastOffset: 0,
-    lastClientY: 0,
-    lastTimestamp: 0,
-    velocityY: 0,
-  });
   const dialogBodyRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
   const compactProductScrollTopRef = useRef(0);
@@ -1693,7 +1688,6 @@ export function BookingAssistantDialog({
     setActiveMobilePanel('chat');
     setProductSheetSnap('peek');
     setProductModuleTab('overview');
-    setIsCompactProductBottomBarVisible(true);
     onClose();
 
     if (typeof window !== 'undefined') {
@@ -2585,44 +2579,6 @@ export function BookingAssistantDialog({
   ]);
 
   useEffect(() => {
-    if (!isProductAppLayout || !isCompactMobileViewport) {
-      setIsCompactProductBottomBarVisible(true);
-      compactProductScrollTopRef.current = 0;
-      return;
-    }
-
-    const scrollNode = dialogBodyRef.current;
-    if (!scrollNode) {
-      return;
-    }
-
-    compactProductScrollTopRef.current = scrollNode.scrollTop;
-    setIsCompactProductBottomBarVisible(true);
-
-    const handleScroll = () => {
-      const nextTop = scrollNode.scrollTop;
-      const delta = nextTop - compactProductScrollTopRef.current;
-
-      if (nextTop <= 24 || delta < -8) {
-        setIsCompactProductBottomBarVisible(true);
-      } else if (delta > 12 && nextTop > 120) {
-        setIsCompactProductBottomBarVisible(false);
-      }
-
-      compactProductScrollTopRef.current = nextTop;
-    };
-
-    scrollNode.addEventListener('scroll', handleScroll, { passive: true });
-    return () => scrollNode.removeEventListener('scroll', handleScroll);
-  }, [isCompactMobileViewport, isProductAppLayout]);
-
-  useEffect(() => {
-    if (isProductAppLayout && isCompactMobileViewport && (chatLoading || isListening || !hasConversationStarted)) {
-      setIsCompactProductBottomBarVisible(true);
-    }
-  }, [chatLoading, hasConversationStarted, isCompactMobileViewport, isListening, isProductAppLayout]);
-
-  useEffect(() => {
     if (!chatLoading || !pendingSearchQuery.trim()) {
       setSearchProgressStageIndex(0);
       setShowDelayedSearchNudge(false);
@@ -2676,37 +2632,6 @@ export function BookingAssistantDialog({
     [processSteps],
   );
   const progressPercent = Math.round((completedStepCount / processSteps.length) * 100);
-  const productBookingSheetPeek = shouldUseProductBottomNav
-    ? 0
-    : hasSelectionReadyForBooking
-      ? 104
-      : 84;
-  const compactProductFooterOffset = shouldUseProductBottomNav
-    ? hasSelectionReadyForBooking
-      ? 124
-      : 92
-    : productBookingSheetPeek + 38;
-  const productBookingSheetHalf = isCompactMobileViewport ? 214 : 328;
-  const productSheetVisibleHeight =
-    productSheetSnap === 'full'
-      ? viewportSize.height || 0
-      : productSheetSnap === 'half'
-        ? productBookingSheetHalf
-        : productBookingSheetPeek;
-  const productSheetOpenRatio = Math.max(
-    0,
-    Math.min(
-      1,
-      productSheetVisibleHeight && viewportSize.height
-        ? productSheetVisibleHeight /
-            Math.max(viewportSize.height * 0.86, productSheetVisibleHeight)
-        : productSheetSnap === 'full'
-          ? 1
-          : productSheetSnap === 'half'
-            ? 0.64
-            : 0.28,
-    ),
-  );
   const bookingJourneySteps = useMemo(
     () =>
       buildBookingJourneySteps({
@@ -2803,7 +2728,6 @@ export function BookingAssistantDialog({
 
   useEffect(() => {
     if (!result) {
-      setThankYouReturnCountdown(5);
       return;
     }
 
@@ -2817,10 +2741,6 @@ export function BookingAssistantDialog({
       bookingConfirmedSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }, 140);
   }, [isProductAppLayout, result]);
-
-  useEffect(() => {
-    setThankYouReturnCountdown(0);
-  }, [result?.booking_reference]);
 
   useEffect(() => {
     if (!result) {
@@ -2866,6 +2786,110 @@ export function BookingAssistantDialog({
     const portalUrl = getBookingPortalUrl(result);
     await downloadQrCodePng(portalUrl, `bookedai-${result.booking_reference}.png`);
   }
+
+  function buildBookingShareSummary(): { title: string; body: string; url: string } | null {
+    if (!result) {
+      return null;
+    }
+    const portalUrl = getBookingPortalUrl(result);
+    const lines = [
+      `Booking confirmed: ${result.service?.name ?? 'BookedAI booking'}`,
+      `Reference: ${result.booking_reference}`,
+    ];
+    if (result.requested_date && result.requested_time) {
+      lines.push(`When: ${result.requested_date} ${result.requested_time} ${result.timezone ?? ''}`.trim());
+    }
+    if (result.amount_label) {
+      lines.push(`Price: ${result.amount_label}`);
+    }
+    const venueLine = result.service?.venue_name || result.service?.location;
+    if (venueLine) {
+      lines.push(`Where: ${venueLine}`);
+    }
+    if (result.payment_url) {
+      lines.push(`Payment: ${result.payment_url}`);
+    }
+    lines.push(`Portal (auto-login): ${portalUrl}`);
+    return {
+      title: `BookedAI ${result.booking_reference}`,
+      body: lines.join('\n'),
+      url: portalUrl,
+    };
+  }
+
+  async function handleShareBooking() {
+    const summary = buildBookingShareSummary();
+    if (!summary) {
+      return;
+    }
+    const outcome = await shareWithFallback({
+      title: summary.title,
+      text: summary.body,
+      url: summary.url,
+    });
+    if (outcome === 'unsupported') {
+      const ok = await copyTextToClipboard(`${summary.body}`);
+      if (ok) {
+        setCopyState({ kind: 'portal', ts: Date.now() });
+        window.setTimeout(() => {
+          setCopyState((current) => (current.kind === 'portal' ? { kind: null, ts: 0 } : current));
+        }, 1800);
+      }
+    }
+  }
+
+  function handleEmailBooking() {
+    const summary = buildBookingShareSummary();
+    if (!summary) {
+      return;
+    }
+    const mailto = buildMailtoUrl({
+      subject: summary.title,
+      body: summary.body,
+    });
+    window.location.href = mailto;
+  }
+
+  function handleAddToCalendar() {
+    if (!result || !result.service) {
+      return;
+    }
+    const startsAt = parseBookingDateTime(
+      result.requested_date,
+      result.requested_time,
+    );
+    if (!startsAt) {
+      return;
+    }
+    const portalUrl = getBookingPortalUrl(result);
+    const description = [
+      `Reference: ${result.booking_reference}`,
+      result.amount_label ? `Price: ${result.amount_label}` : null,
+      result.payment_url ? `Payment: ${result.payment_url}` : null,
+      `Portal (auto-login): ${portalUrl}`,
+    ]
+      .filter(Boolean)
+      .join('\n');
+    const ics = buildIcsContent({
+      uid: result.booking_reference,
+      title: `BookedAI: ${result.service.name}`,
+      description,
+      location: result.service.venue_name ?? result.service.location ?? undefined,
+      url: portalUrl,
+      startsAt,
+      durationMinutes: result.service.duration_minutes,
+      organizerEmail: result.contact_email ?? 'info@bookedai.au',
+    });
+    downloadIcsFile(`bookedai-${result.booking_reference}.ics`, ics);
+  }
+
+  const canAddToCalendar = Boolean(
+    result?.service && result?.requested_date && parseBookingDateTime(
+      result.requested_date,
+      result.requested_time,
+    ),
+  );
+  const canShareBooking = Boolean(result);
 
   function scrollToProductSection(tab: ProductModuleTab) {
     const sectionMap = {
@@ -2921,7 +2945,6 @@ export function BookingAssistantDialog({
     if (isProductAppLayout) {
       setProductSheetSnap('peek');
     }
-    setIsCompactProductBottomBarVisible(true);
     window.setTimeout(() => {
       dialogBodyRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
       chatInputRef.current?.focus();
@@ -3055,84 +3078,6 @@ export function BookingAssistantDialog({
         ) : null}
       </div>
     );
-  }
-
-  function handleProductSheetPointerDown(event: PointerEvent<HTMLDivElement>) {
-    if (!isProductAppLayout) {
-      return;
-    }
-
-    productSheetDragStateRef.current = {
-      pointerId: event.pointerId,
-      startY: event.clientY,
-      lastOffset: 0,
-      lastClientY: event.clientY,
-      lastTimestamp: event.timeStamp,
-      velocityY: 0,
-    };
-    event.currentTarget.setPointerCapture(event.pointerId);
-  }
-
-  function handleProductSheetPointerMove(event: PointerEvent<HTMLDivElement>) {
-    if (!isProductAppLayout) {
-      return;
-    }
-
-    const dragState = productSheetDragStateRef.current;
-    if (dragState.pointerId !== event.pointerId) {
-      return;
-    }
-
-    const deltaY = event.clientY - dragState.startY;
-    const nextOffset =
-      productSheetSnap === 'full'
-        ? Math.max(0, deltaY)
-        : Math.min(0, deltaY);
-
-    const deltaTime = Math.max(1, event.timeStamp - dragState.lastTimestamp);
-    dragState.velocityY = (event.clientY - dragState.lastClientY) / deltaTime;
-    dragState.lastClientY = event.clientY;
-    dragState.lastTimestamp = event.timeStamp;
-
-    dragState.lastOffset = nextOffset;
-    setProductSheetDragOffset(nextOffset);
-  }
-
-  function handleProductSheetPointerEnd(event: PointerEvent<HTMLDivElement>) {
-    if (!isProductAppLayout) {
-      return;
-    }
-
-    const dragState = productSheetDragStateRef.current;
-    if (dragState.pointerId !== event.pointerId) {
-      return;
-    }
-
-    event.currentTarget.releasePointerCapture(event.pointerId);
-    const lastOffset = dragState.lastOffset;
-    const velocityY = dragState.velocityY;
-
-    if (velocityY <= -0.35 || lastOffset <= -120) {
-      const nextSnap = productSheetSnap === 'peek' ? 'half' : 'full';
-      setProductSheetSnap(nextSnap);
-      setActiveMobilePanel('booking');
-    } else if (velocityY >= 0.35 || lastOffset >= 72) {
-      const nextSnap = productSheetSnap === 'full' ? 'half' : 'peek';
-      setProductSheetSnap(nextSnap);
-      setActiveMobilePanel(nextSnap === 'peek' ? 'chat' : 'booking');
-    } else {
-      setActiveMobilePanel(productSheetSnap === 'peek' ? 'chat' : 'booking');
-    }
-
-    productSheetDragStateRef.current = {
-      pointerId: null,
-      startY: 0,
-      lastOffset: 0,
-      lastClientY: 0,
-      lastTimestamp: 0,
-      velocityY: 0,
-    };
-    setProductSheetDragOffset(0);
   }
 
   async function sendChatMessage(message: string) {
@@ -4812,7 +4757,6 @@ export function BookingAssistantDialog({
                         type="text"
                         value={chatInput}
                         onChange={(event) => setChatInput(event.target.value)}
-                        onFocus={() => setIsCompactProductBottomBarVisible(true)}
                         placeholder={
                           showProductWelcomeState
                             ? 'Try: best swim lesson near Caringbah this weekend'
@@ -6007,14 +5951,19 @@ export function BookingAssistantDialog({
               {result ? (
                 <div
                   ref={bookingConfirmedSectionRef}
+                  data-print-keep="booking-confirmation"
                   className="mt-5 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_45px_rgba(15,23,42,0.06)]"
                 >
                   {/* Thank You hero — QR + portal prominent */}
-                  <div className="mb-5 overflow-hidden rounded-[1.6rem] bg-[linear-gradient(155deg,#052e16_0%,#064e3b_48%,#0f766e_100%)] px-5 py-5 text-white shadow-[0_18px_44px_rgba(6,78,59,0.22)]">
+                  <section
+                    aria-labelledby="booking-confirmation-heading"
+                    role="region"
+                    className="mb-5 overflow-hidden rounded-[1.6rem] bg-[linear-gradient(155deg,#052e16_0%,#064e3b_48%,#0f766e_100%)] px-5 py-5 text-white shadow-[0_18px_44px_rgba(6,78,59,0.22)]"
+                  >
                     <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 ring-1 ring-emerald-400/30">
+                          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 ring-1 ring-emerald-400/30" aria-hidden="true">
                             <span className="text-lg">✓</span>
                           </div>
                           <div className="min-w-0">
@@ -6022,9 +5971,9 @@ export function BookingAssistantDialog({
                               Booking secured
                             </div>
                             <div className="flex items-center gap-2">
-                              <div className="text-xl font-bold tracking-tight text-white">
+                              <h2 id="booking-confirmation-heading" className="text-xl font-bold tracking-tight text-white">
                                 {result.booking_reference}
-                              </div>
+                              </h2>
                               <button
                                 type="button"
                                 onClick={() => handleCopyBookingValue('reference')}
@@ -6119,9 +6068,48 @@ export function BookingAssistantDialog({
                         Back to homepage
                       </button>
                     </div>
-                  </div>
 
-                  <div className="overflow-hidden rounded-[1.5rem] bg-[linear-gradient(135deg,#0f172a_0%,#111827_38%,#0f766e_100%)] p-4 text-white">
+                    <div className="booked-confirmation-share-row mt-3 flex flex-wrap gap-1.5">
+                      {canAddToCalendar ? (
+                        <button
+                          type="button"
+                          onClick={handleAddToCalendar}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/95 ring-1 ring-white/15 transition hover:bg-white/16"
+                          aria-label="Download calendar invite (.ics)"
+                        >
+                          📅 Add to calendar
+                        </button>
+                      ) : null}
+                      {canShareBooking && isWebShareAvailable() ? (
+                        <button
+                          type="button"
+                          onClick={handleShareBooking}
+                          className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/95 ring-1 ring-white/15 transition hover:bg-white/16"
+                          aria-label="Share booking via system share sheet"
+                        >
+                          📤 Share
+                        </button>
+                      ) : null}
+                      <button
+                        type="button"
+                        onClick={handleEmailBooking}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/95 ring-1 ring-white/15 transition hover:bg-white/16"
+                        aria-label="Email this booking"
+                      >
+                        ✉️ Email
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => window.print()}
+                        className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/95 ring-1 ring-white/15 transition hover:bg-white/16"
+                        aria-label="Print booking confirmation"
+                      >
+                        🖨️ Print
+                      </button>
+                    </div>
+                  </section>
+
+                  <div className="booked-print-hide overflow-hidden rounded-[1.5rem] bg-[linear-gradient(135deg,#0f172a_0%,#111827_38%,#0f766e_100%)] p-4 text-white">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="min-w-0">
                         <div className="inline-flex rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-100">

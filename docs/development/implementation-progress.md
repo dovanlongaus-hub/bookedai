@@ -12,6 +12,36 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-25`
 
+Implementation update from `2026-04-25` (homepage booking confirmation persistence and A/B funnel tracking):
+
+- removed the homepage booking-confirmation auto-return timer from `frontend/src/apps/public/HomepageSearchExperience.tsx`, so the Thank You state, booking reference, portal QR, and follow-up actions remain visible until the customer chooses another action
+- replaced the previous countdown chip with persistent portal/QR guidance and added Playwright assertions that `Returning to the main BookedAI screen` is absent after booking and still absent after a wait
+- added homepage experiment/funnel telemetry hooks around the product-first variant, primary CTA focus, suggested-search clicks, search start, top research visibility, result selection, booking start, and booking submission so investor/customer conversion behavior can be compared without adding an external analytics dependency
+- verification passed with frontend typecheck, production build, homepage responsive/A-B Playwright coverage, live-read booking smoke, legacy homepage smoke, and backend v1 booking route tests
+
+Implementation update from `2026-04-25` (product app scrollable layout, search stepper, QR wallet handoff, and dead-bottom-sheet cleanup):
+
+- reworked `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` and `frontend/src/apps/public/ProductApp.tsx` so `product.bookedai.au` is now a single scrollable column instead of a fixed-height shell with a draggable bottom sheet; the chat panel and search composer flow naturally with the page, and the booking panel appears below the chat only after the customer has selected a result
+- progressive disclosure now drives what is visible at each stage on `product.bookedai.au`: the booking panel stays hidden until the customer has started a conversation, the booking form/shortlist stays hidden until a result is selected, and the workflow/process step guide stays hidden until a booking has been submitted, so the chat-first flow is no longer overlapped by guidance panels at first paint
+- replaced the static spinner inside the search resolving panel with an animated multi-stage stepper: progress bar from `0%` to `100%`, `Step N/4` counter, per-stage status pills with completed/active/pending visual states, and three skeleton placeholder result cards while the real results stream in, so the customer sees concrete progress instead of a generic loading icon
+- removed the booking-confirmation auto-redirect timer entirely, so the Thank You hero stays in view until the customer leaves; the previous `Returning to the main BookedAI screen in 5s` chip is replaced with a `Scan the QR or open the portal — your booking stays here as long as you need it` hint
+- enlarged the confirmation QR (`128px` mobile, `144px` tablet/desktop) and made the QR card itself an `Open booking portal` link, with an `Auto-login link with reference {booking_reference}` chip making the portal handoff explicit; portal URL still routes through `https://portal.bookedai.au/?booking_reference=...` for reference-bound auto-login
+- added `Copy` for the booking reference, `Copy portal link` for the portal URL, and `Save PNG` for the QR image to the confirmation hero, so the customer can hand the booking off through other channels without retyping anything
+- introduced `frontend/src/shared/utils/qrCode.ts` to generate QR codes locally via the `qrcode` npm package with an in-memory cache, and wired both the confirmation hero and the secondary booking-portal card to use the locally generated data URL with the legacy `api.qrserver.com` URL kept only as a fallback so confirmation no longer hard-depends on a third-party runtime
+- moved the result preview popup to a viewport-level `fixed inset-0` modal with internal scrolling and a `max-h-[90dvh]` cap, so `View details` now reliably renders the full content (image, summary, price, duration, location, why-it-matches, provider details, confidence chips, action buttons) instead of being clipped by the booking panel container
+- removed the dead bottom-sheet code that backed the previous overlay UX: `productSheetDragOffset`, `productSheetDragStateRef`, `handleProductSheetPointerDown/Move/End`, `isCompactProductBottomBarVisible`, `thankYouReturnCountdown`, and the related `productBookingSheetPeek/Half`, `productSheetVisibleHeight`, `productSheetOpenRatio`, and `compactProductFooterOffset` calculations, so the assistant component no longer carries the swipe/auto-redirect machinery that the new flow does not use
+- documented the next-phase deliverables in `docs/development/next-phase-implementation-plan-2026-04-25.md` (`Phase 17` extended; new `Phase 20.5 - Confirmation Wallet And Stripe Return Continuity`) and the QA criteria in `docs/development/sprint-13-16-user-surface-delivery-package.md` so subsequent UAT runs and Stripe/Wallet/portal-auto-login follow-up are tracked beside the rest of the customer-surface work
+- verification: `cd frontend && npx vite build` passes (`✓ built in 25.94s`); production bundle `BookingAssistantDialog-*.js` shrinks from `175.77 kB` to `175.02 kB` after dead-code cleanup while the new QR utility and stepper UI fit inside the same chunk
+- follow-ups still open: verify `portal.bookedai.au/?booking_reference=...` actually resolves a portal session under the production session policy, run the Stripe `success_url` swap so payment completion returns to a booking-aware URL instead of the public homepage, generate Apple/Google Wallet passes for confirmed bookings, and run the new flow on real iOS Safari and Android Chrome devices before promotion
+
+Implementation update from `2026-04-25` (public pitch video placement):
+
+- added the uploaded pitch video `https://upload.bookedai.au/videos/e3d3/e0FeUWfasDxUbrvxObhHcw.mp4` as a native controlled video section on `pitch.bookedai.au`
+- placed the pitch video after the hero/chess proof area on the pitch surface so investors and buyers can watch the story before continuing into problem, solution, product proof, pricing, and architecture
+- added the same video to `bookedai.au` directly after the opening hero/proof block and before the `Why BookedAI` narrative so homepage visitors can watch the short overview before trying the live product
+- updated homepage and pitch navigation to expose the `Pitch video` anchor, while preserving direct open-video fallback links for browsers that prefer a separate media tab
+- verification passed with `cd frontend && ./node_modules/.bin/tsc --noEmit --pretty false`, `npm --prefix frontend run build`, live deploy through `python3 scripts/telegram_workspace_ops.py deploy-live`, stack healthcheck, production Playwright smoke on `https://bookedai.au/` and `https://pitch.bookedai.au/`, and direct media checks confirming the uploaded MP4 returns `video/mp4` with byte-range support
+
 Implementation update from `2026-04-25` (homepage chat inline results and booking-flow regression):
 
 - reworked `frontend/src/apps/public/HomepageSearchExperience.tsx` so homepage assistant results render as compact booking cards inside the chat bubble instead of relying on a detached shortlist after the conversation
@@ -222,7 +252,7 @@ Implementation update from `2026-04-25` (product booking flow enterprise UX pass
 - changed shortlist behavior so selecting a result marks it active without opening the detail popup or jumping to the customer form; detail, provider link, contact, phone/SMS, and `Book` now sit in one compact responsive icon/action row per result
 - changed booking commitment so the customer detail form opens only from explicit `Book this match`/`Book` actions, preserving compare/review behavior before the customer commits
 - changed the booking confirmation QR fallback to always target `portal.bookedai.au` with the booking reference, then added compact portal, email, calendar, chat, and home actions beside the confirmation state
-- extended the Thank You auto-return from `5s` to `16s` and added a chat continuation message so customers can keep searching or ask for help while the confirmation remains visible
+- superseded the earlier Thank You auto-return behavior: the booking confirmation now stays visible until the customer chooses another action, while chat continuation remains available from the same confirmed-booking context
 - verified with `.venv/bin/python -m pytest backend/tests/test_api_v1_booking_routes.py backend/tests/test_api_v1_search_routes.py backend/tests/test_api_v1_communication_routes.py -q`, `npm --prefix frontend run build`, and `PLAYWRIGHT_SKIP_BUILD=1 npm --prefix frontend run test:playwright:live-read`
 
 Implementation update from `2026-04-25` (tenant gateway Google-first login and account creation):
@@ -274,7 +304,7 @@ Planning and execution synchronization update from `2026-04-25` (next phase plan
 - added `docs/development/next-phase-implementation-plan-2026-04-25.md` as the executable bridge for the next BookedAI phases after the full-flow QA and Thank You handoff work
 - locked the next phase sequence as `Phase 17` full-flow stabilization, `Phase 18` revenue-ops ledger control, `Phase 19` customer-care/status agent, `Phase 20` widget/plugin runtime, `Phase 21` billing and receivables truth, `Phase 22` reusable multi-tenant templates, and `Phase 23` release governance
 - updated `prd.md`, `docs/architecture/implementation-phase-roadmap.md`, and `docs/architecture/current-phase-sprint-execution-plan.md` so the roadmap, PRD, and execution plan all point to the same implementation order
-- the current verified release baseline remains the live pitch/product full-flow path with booking success, Thank You confirmation, `16s` return to main BookedAI screen, and downstream revenue-ops handoff
+- the current verified release baseline remains the live pitch/product full-flow path with booking success, persistent portal-first Thank You confirmation, and downstream revenue-ops handoff
 
 Implementation update from `2026-04-25` (Phase 18 revenue-ops ledger tenant visibility):
 
@@ -2336,3 +2366,9 @@ Current execution has also been running through a specialist multi-agent pattern
   - update: fixed a form accessibility issue found by the new full-flow regression: phone helper text now sits outside the `<label>`, so `Email` and `Phone` accessible names stay distinct.
   - update: escaped the pitch architecture arrow text so Docker/Node 20 production builds no longer fail on JSX `>` parsing.
   - verification: `npm --prefix frontend exec tsc -- --noEmit`; `npm --prefix frontend run build`; `npm --prefix frontend run test:playwright:live-read`; `npm --prefix frontend run test:playwright:legacy`; production deploy through the host wrapper; `bash scripts/healthcheck_stack.sh`; live public-surface smoke across home/product/pitch/roadmap/tenant/portal/admin; live homepage smoke confirmed the rail/copy render, clean console/request state, and no mobile overflow
+- `2026-04-25`
+  - lane: `Pitch architecture and bottom-section overflow polish`
+  - update: tightened `frontend/src/apps/public/PitchDeckApp.tsx` so the pitch architecture section now includes a compact SVG architecture image plus four short support rails instead of dense nested chip grids that could create low-value mobile scroll.
+  - update: simplified the final pitch CTA into a short dark band and added a compact shared-footer mode for the pitch page, removing the verbose brand-positioning block and reducing bottom-page text pressure.
+  - verification: `npm --prefix frontend run build`; local Playwright preview smoke at `390x844` and `1440x950` showed `scrollWidth === clientWidth`, no overflowing elements, no console/page errors, and the removed brand-copy text absent from the pitch page body.
+  - live deploy: `python3 scripts/telegram_workspace_ops.py deploy-live`; `bash scripts/healthcheck_stack.sh`; live Playwright desktop/mobile pitch smoke confirmed the architecture image is present, removed footer text is absent, no horizontal overflow remains, and the uploaded pitch video still serves `206 video/mp4` byte ranges.

@@ -74,7 +74,7 @@ Next phase carry-forward from `2026-04-25`:
 
 - `docs/development/next-phase-implementation-plan-2026-04-25.md` is now the implementation bridge after Sprint 16
 - Sprint 13-16 completion should hand directly into `Phase 17` full-flow stabilization closeout, then `Phase 18` revenue-ops ledger control, `Phase 19` customer-care/status agent, `Phase 20` widget/plugin runtime, `Phase 21` billing and receivables truth, `Phase 22` reusable templates, and `Phase 23` release governance
-- every user-surface phase must preserve the verified booking success behavior: show a Thank You state after booking, keep downstream automation best-effort, and return to the main BookedAI screen after `5s`
+- every user-surface phase must preserve the verified booking success behavior: show a persistent Thank You state after booking, keep downstream automation best-effort, and let the customer leave or start another action explicitly instead of auto-returning to the main BookedAI screen
 - Phase 18 has now started in code: tenant users can open an `Ops` workspace panel to inspect BookedAI revenue-ops action state, while admin Reliability gained deeper entity, dependency, and lifecycle-event filters for the same ledger
 - Phase 18 action responses now include derived lifecycle event, dependency state, policy mode, approval requirement, and evidence summary fields so tenant/admin surfaces can explain what BookedAI did after capture without parsing raw action JSON first
 
@@ -205,6 +205,23 @@ Follow-up completion update on `2026-04-24`:
 - `HomepageSearchExperience.tsx` now carries the calmer visual treatment into the main interaction surface, keeping chat, shortlist, and booking side-by-side on desktop and stacked cleanly on mobile
 - this is the current homepage inheritance for the next sprint pass: keep public homepage work simple, chat-first, and booking-visible rather than returning to a multi-section marketing page
 - the immediate continuation now also locks the booking form behind match selection, with the empty booking panel explaining the `send request -> review matches -> choose option` sequence; this keeps the first screen conversational while still showing where booking will happen
+
+Product-app surface UAT criteria locked on `2026-04-25` (`product.bookedai.au`):
+
+- the surface must be a single scrollable column on mobile; no overlapping bottom sheets, no fixed bottom navigation that covers content, no chat-blur overlay when the booking panel is in view
+- progressive disclosure must hold: welcome state shows only the chat composer with quick suggestion chips; results render inline in the chat; the booking form panel stays hidden until a result is explicitly selected; the workflow/process step guide stays hidden until a booking has been submitted
+- the search resolving state must show an animated multi-stage stepper with `Step N/4` counter, per-stage status (completed, active, pending), a continuous progress bar, and three skeleton placeholder cards while results stream in; static spinners as the only progress indicator are not acceptable
+- the `View details` popup must open as a viewport-level `fixed inset-0` modal with internal scroll capped at `90dvh`; the popup must show full content (image, summary, price, duration, location, why-it-matches, provider details, action buttons) without being clipped by the parent panel
+- the booking confirmation hero must be QR + portal led: enlarged QR (≥ `128px` mobile, `144px` tablet/desktop), `Open booking portal` action, `Auto-login link with reference {booking_reference}` chip, copy-to-clipboard buttons for the booking reference and the portal link, and a `Save PNG` download for the QR; the booking confirmation must not auto-redirect to the homepage
+- the QR code must be generated locally through the `qrcode` npm package, with the legacy `api.qrserver.com` URL kept only as a fallback, so confirmation does not depend on a third-party runtime call to render
+- mobile UAT must run on a real iOS Safari device at `390px`, a real Android Chrome device at `360px`, and an iPadOS Safari split view before promotion; all three must pass the progressive-disclosure, sticky composer behavior, modal preview content, and QR/copy/download interaction checks
+
+Open follow-ups inherited into the next sprint:
+
+- verify that `https://portal.bookedai.au/?booking_reference={ref}` actually resolves a portal session under the production session policy, and document the auto-login resolution path
+- swap the Stripe checkout `success_url` so successful payments return to a booking-aware URL such as `https://portal.bookedai.au/?booking_reference=...` or `https://product.bookedai.au/booking/{booking_reference}` instead of the public homepage
+- generate Apple Wallet `.pkpass` and Google Wallet passes for confirmed bookings and add a `Save to wallet` button beside the QR/copy/download controls on the confirmation hero
+- run the new product-app flow on real iOS Safari and Android Chrome devices and capture the evidence under `frontend/output/playwright/` before the next deployment
 
 ## Portal
 
@@ -1057,4 +1074,4 @@ This package should be considered successfully executed when:
 - `2026-04-24`: the full go-live gate passed for the active public/admin proof surfaces after fixing demo CORS and chess DNS. Verification covered backend booking/payment, portal, pricing/register, academy/revenue-ops tests, frontend build, demo Playwright regression, live deploy, stack healthcheck, API health, demo CORS preflight, revenue-ops API, and browser smoke across demo, pitch/register, product, admin, and chess with no horizontal overflow or non-ignorable console/network errors.
 - `2026-04-24`: `pitch.bookedai.au` package booking received a live deep-QA closeout: pricing CTAs route to the pitch-host registration app, the package form submits through production pricing consultation without load failure, and mobile layout polish removed the fixed CTA overlay plus tightened package-card/footer wrapping. Verification included frontend build, pricing resilience test, live deploy, stack healthcheck, pitch-origin CORS preflight, desktop/tablet/mobile Playwright screenshots, and mobile confirmation `CONS-022CCEA9`.
 - `2026-04-24`: the admin Reliability revenue-ops ledger received the next operator polish pass: tenant-wide summary counts are separated from active filters, operators can search by student or booking reference, action cards can expand input/result evidence, and compact icon-led controls now cover refresh, dispatch, complete, and manual review. Live API probing also found and fixed a migration grant gap for `agent_action_runs` / `academy_subscription_intents`, so `GET /api/v1/agent-actions` and `POST /api/v1/agent-actions/dispatch` now return success envelopes in production.
-- `2026-04-24`: the full BookedAI booking flow now includes the requested post-booking Thank You handoff. Homepage search, product/embedded assistant, Future Swim, and Grandmaster Chess booking surfaces show a confirmation screen with a 5-second countdown, then return to the main screen automatically. Live product QA created booking `v1-ce0d20a95d`, confirmed lead/booking/payment/email/SMS/WhatsApp APIs all returned `200`, and verified the countdown plus auto-return behavior with Playwright.
+- `2026-04-24`: the full BookedAI booking flow added the requested post-booking Thank You handoff. The original countdown/auto-return behavior has since been superseded by the current persistent confirmation contract: the booking reference, QR portal, and follow-up actions stay visible until the customer chooses another action. Live product QA created booking `v1-ce0d20a95d` and confirmed lead/booking/payment/email/SMS/WhatsApp APIs all returned `200`.
