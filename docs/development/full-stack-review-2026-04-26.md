@@ -319,6 +319,93 @@ Whenever a P0 or P1 from this document is delivered, the closeout pass must upda
 - `docs/development/release-gate-checklist.md` if a new gate or threshold is introduced
 - `docs/architecture/current-phase-sprint-execution-plan.md` and `docs/development/next-phase-implementation-plan-2026-04-25.md` for any phase-level scope or sequencing change
 
+## 2026-04-26 UI/UX/Designer/Marketing review addendum
+
+A second-pass review on `2026-04-26` ran four parallel deep dives (UI/UX full-flow walkthrough, frontend code-quality + A11y + mobile-safety, designer tokens + hierarchy + brand consistency, marketing wording + CTA + value proposition) across all seven web apps. The pass produced ≥45 NEW findings beyond the original seven-lane review and is consolidated below.
+
+### Cross-cutting themes (T1-T10)
+
+- `T1` async state lies and jargon leak — `queued`, `manual review`, `Revenue operations handoff` were leaking to customer copy. Closed in Tier 1 quick-wins on `2026-04-26`.
+- `T2` payment posture lacks visual hierarchy — confirmation hero does not visually distinguish Stripe ready vs QR transfer vs manual review. Tracked as `FX-1` and pairs with `BC-2`.
+- `T3` mobile 390px-720px is a dead zone — admin table `min-width: 860px`, sticky sidebars overlap CTA, button `min-height: 40px` shortfall fixed in Tier 1. Larger responsive table fix tracked as `FX-3`.
+- `T4` accessibility debt at scale — `text-[10px]` 942 instances, button touch-target shortfall (closed in Tier 1), missing `htmlFor` (verified: implicit-label pattern is correct).
+- `T5` component drift cross-app — booking confirmation card has 3 implementations across Homepage, Dialog, Demo; status badge has zero shared component.
+- `T6` design token drift — 619 raw hex outside the token system, 22 box-shadow + 153 arbitrary `shadow-[]`, 518 arbitrary `rounded-[]`, two competing CSS systems (`minimal-bento` vs `bookedai-brand-kit`).
+- `T7` trust elements missing — no testimonial, live booking count, SLA, or social proof in hero or pricing.
+- `T8` network resilience zero — 47 fetch calls without AbortController or timeout; mobile 3G hangs indefinitely.
+- `T9` bundle monolith risk — `BookingAssistantDialog.tsx` 6000 LOC, `TenantApp.tsx` 4900 LOC, no code-split.
+- `T10` empty/loading/error states are bland — generic copy without recovery path.
+
+### Tier 1 quick-wins delivered on 2026-04-26 (CLOSED)
+
+These shipped inline and need release-gate verification on next Sprint 19 run.
+
+- `QW-1` removed jargon from customer copy: `Messaging follow-up is queued for operations review` → `Your booking is confirmed. We are sending the messaging follow-up — your booking and portal stay available.`; `Messaging queued` → `Sending shortly`; `Revenue operations handoff could not be queued.` → `We could not start the booking follow-up automatically. Our team will follow up shortly.`; `A support request has been queued for manual review.` → `Your request is being reviewed. We will confirm the next step shortly.`. Files: `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx`, `frontend/src/apps/portal/PortalApp.tsx`, `frontend/src/apps/public/HomepageSearchExperience.tsx`.
+- `QW-2` added shared `customerContactHelperId` so both email and phone fields announce `At least one of email or phone is required.` via `aria-describedby`. File: `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx`.
+- `QW-3` bumped `.booked-button { min-height }` from `40px` to `44px` to satisfy WCAG 2.5.5 touch target. File: `frontend/src/theme/minimal-bento-template.css`.
+- `QW-4` added `role="region"` and `aria-label="Admin bookings table"` to the admin booking table wrapper so screen readers do not skip the structure. File: `frontend/src/features/admin/bookings-table-chrome.tsx`.
+- `QW-5` verified — the existing `<label class="block"><div>caption</div><input/></label>` pattern is the WAI-ARIA implicit-label pattern; accessible-name computation is correct. No code change needed.
+- `QW-6` upgraded hero headline from `Turn enquiries into booked revenue with one modern operating system.` (vague, B2B) to `Never lose a service enquiry again.` (concrete, SME pain). File: `frontend/src/components/landing/data.ts`.
+- `QW-7` upgraded primary CTA from `Open Web App` (passive) to `Try BookedAI Free` and secondary from `Talk to Sales` to `Schedule a Consultation` (outcome-driven, lower friction). File: `frontend/src/components/landing/data.ts`.
+- `QW-8` upgraded empty-state copy from `No strong match yet. BookedAI stays precise instead of forcing a weak recommendation.` (passive, no next action) to `Let's refine your request — tell us a suburb, preferred time, or service detail and we will find the best fit.`. Files: `frontend/src/apps/public/homepageContent.ts`, `frontend/src/apps/public/HomepageSearchExperience.tsx`.
+
+### Tier 2 — Sprint 19 / Sprint 20 fix backlog (FX-1 to FX-7, NEW P1)
+
+Each of these is a discrete PR-sized fix; assignment recorded against the existing Phase model.
+
+- `FX-1` payment-state badge component — create `PaymentStateBadge.tsx` with four variants (`Stripe ready` green, `QR transfer` amber, `Manual review` orange, `Pending` slate). Apply across `HomepageSearchExperience`, `BookingAssistantDialog`, `PortalApp`. Pairs with `BC-2` A/B. Phase: `17`.
+- `FX-2` AbortController + 30s timeout on `frontend/src/shared/api/client.ts` — wrap all 47 fetch calls so mobile 3G no longer hangs indefinitely. Phase: `19`.
+- `FX-3` admin booking responsive card layout `390px-720px` — replace forced horizontal scroll with stacked card layout below `720px`, table at `≥860px`. Phase: `17`.
+- `FX-4` destructive action confirmation modal — cancel booking, logout, downgrade in `PortalApp.tsx` and `TenantApp.tsx` must show modal confirm before submission. Phase: `17`.
+- `FX-5` focus restoration on dialog close — capture and restore focus when `BookingAssistantDialog` closes; add `data-autofocus-return` pattern. Phase: `17`.
+- `FX-6` tenant session expiry 5-minute warning + extend button — proactive guard before silent expiry mid-edit. File: `frontend/src/features/tenant-auth/TenantAuthWorkspaceEmail.tsx`. Phase: `19`.
+- `FX-7` portal `booking_reference` URL canonicalization — normalize four param sources (`booking_reference`, `bookingReference`, query, hash) into one canonical form; warn on conflict. File: `frontend/src/apps/portal/PortalApp.tsx`. Phase: `17`.
+
+### Tier 3 — Sprint 21 / Sprint 22 refactor backlog (RF-1 to RF-10, NEW P2)
+
+- `RF-1` ESLint rule blocks raw hex in `className`; migrate 619 hex usages to design tokens. Phase: `22`.
+- `RF-2` shadow consolidation — reduce 22 CSS shadows + 153 arbitrary `shadow-[]` to four semantic slots (card, glow, float, none). Phase: `22`.
+- `RF-3` border-radius cleanup — replace 16 CSS + 518 arbitrary `rounded-[]` with five tokens (micro `5px`, standard `8px`, comfortable `14px`, large `24px`, pill `999px`). Phase: `22`.
+- `RF-4` button consolidation — merge 12 button styles (`booked-button`, `booked-button-secondary`, `bookedai-saas-button-primary`, `bookedai-saas-button-secondary`, inline pill, etc.) into four (primary, secondary, tertiary, ghost). Phase: `22`.
+- `RF-5` code-split `BookingAssistantDialog.tsx` (6K LOC) into four lazy-loaded chunks (`AssistantSearch`, `BookingForm`, `Confirmation`, `WorkflowGuide`). Phase: `22`.
+- `RF-6` code-split `TenantApp.tsx` (4.9K LOC) into bounded modules per workspace nav. Phase: `22`.
+- `RF-7` reusable `BookingConfirmationPanel` component — replace three duplicate implementations across Homepage, Dialog, Demo. Phase: `22`.
+- `RF-8` empty-state pattern library — illustration plus headline plus body plus CTA template applied to Tenant `no bookings`, Admin `no leads`, Portal `reference not found`. Phase: `22`.
+- `RF-9` pricing tier persona reframe — `Solo` / `Growing studio` / `Clinic` / `Enterprise` instead of feature lists. Phase: `21`.
+- `RF-10` Pitch deck Playwright coverage at `1440px` desktop and `390px` mobile. Phase: `17` (already tracked as `P1-8`).
+
+### A/B matrix expansion (16 → 24)
+
+Eight new experiments added beyond the original 16. Telemetry contract is the same query-parameter-plus-`localStorage` pattern documented above.
+
+#### Conversion-copy wave
+
+- `CW-1` hero headline — control: `Turn enquiries into booked revenue with one modern operating system.` (legacy, kept for measurement); variant: `Never lose a service enquiry again. Turn customer messages into confirmed bookings, every time.` Metric: hero scroll plus search start. MDE: `+18%`. Surface: `bookedai.au`.
+- `CW-2` primary CTA verb — control: `Open Web App`; variant: `Try BookedAI Free`. Metric: CTA click rate. MDE: `+15%`. Surface: hero, pricing, final CTA.
+- `CW-3` empty search-state — control: `No strong match yet. BookedAI stays precise instead of forcing a weak recommendation.`; variant: `Let's refine your request — tell us a suburb, preferred time, or service detail and we will find the best fit.`. Metric: refinement input rate. MDE: `+25%`. Surface: homepage chat empty state.
+- `CW-4` payment confirmation copy — control: `Messaging follow-up is queued for operations review`; variant: `Your confirmation is on the way. Check portal.bookedai.au or reply with questions.`. Metric: support inquiry rate. MDE: `-20%`. Surface: confirmation hero.
+- `CW-5` cancel-request portal copy — control: `A support request has been queued for manual review.`; variant: `Your cancel request is being reviewed. We will confirm within 1 hour.`. Metric: support escalation rate. MDE: `-12%`. Surface: portal care turn.
+- `CW-6` pricing tier framing — control: feature list; variant: persona-based (`Solo` / `Growing studio` / `Clinic` / `Enterprise`). Metric: tier select clarity. MDE: `+10%`. Surface: pricing.
+
+#### Designer-system wave
+
+- `DS-1` payment posture badge — control: text-only; variant: colored badge plus icon (`Stripe ready` green, `QR transfer` amber, `Manual review` orange). Metric: portal completion within seven days. MDE: `+14%`. Pairs with `FX-1`.
+- `DS-2` empty-state hero — control: text only; variant: illustration plus headline plus CTA. Metric: re-engagement rate. MDE: `+8%`. Pairs with `RF-8`.
+
+### A/B activation cadence (cumulative)
+
+- Wave 1 in `Sprint 20`: `AC-1`, `RT-1`, `RT-3`, `CH-1`, plus the new `CW-1`, `CW-2`, `CW-3` (homepage copy refresh now safe to A/B because the new copy already shipped via `QW-6`/`QW-7`/`QW-8`).
+- Wave 2 in `Sprint 22`: `BC-2`, `CH-1`, `CH-3`, plus the new `CW-4`, `CW-5`, `DS-1`, `DS-2` (these depend on `FX-1` payment-state badge and the shared empty-state pattern from `RF-8`).
+- Continuing experiment `CW-6` runs in `Sprint 21` once the pricing reframe in `RF-9` ships.
+
+### Phase rollup of new backlog items
+
+- Phase `17` adds: `FX-1`, `FX-3`, `FX-4`, `FX-5`, `FX-7`, `RF-10`
+- Phase `19` adds: `FX-2`, `FX-6`
+- Phase `21` adds: `RF-9`
+- Phase `22` adds: `RF-1`, `RF-2`, `RF-3`, `RF-4`, `RF-5`, `RF-6`, `RF-7`, `RF-8`
+
 ## Change log
 
 - `2026-04-26` initial publication after the seven-lane review
+- `2026-04-26` UI/UX/Designer/Marketing review addendum: ≥45 new findings, eight Tier 1 quick-wins shipped (`QW-1` to `QW-8`), seven Tier 2 fixes (`FX-1` to `FX-7`) and ten Tier 3 refactors (`RF-1` to `RF-10`) added to the backlog, A/B matrix expanded from 16 to 24 experiments

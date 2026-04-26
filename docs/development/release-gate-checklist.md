@@ -204,6 +204,24 @@ Use the smallest rollback that restores operator clarity and release confidence:
 3. fall back from `./scripts/run_release_gate.sh` to manual command sequencing only if the script itself is the issue
 4. do not revert legacy-authoritative write boundaries as part of a UI-only rollback
 
+## UI/UX and copy gates (2026-04-26 review addendum)
+
+These gates inherit from the `2026-04-26 UI/UX/Designer/Marketing review addendum` in `docs/development/full-stack-review-2026-04-26.md`. The Tier 1 quick-wins shipped on `2026-04-26` and must stay green on every promote.
+
+- customer-facing copy must not contain implementation jargon (`queued`, `manual review`, `Revenue operations handoff`, `outbox`, `dispatch`, `actor_context`); grep on production build artifacts must return zero hits inside customer surfaces (`QW-1`)
+- the booking form phone and email fields share `aria-describedby` so both fields announce `At least one of email or phone is required.` to assistive technology (`QW-2`)
+- `.booked-button` (and any extending button class) has `min-height: 44px` to satisfy WCAG 2.5.5 touch-target size (`QW-3`)
+- the admin booking table wrapper has `role="region"` and `aria-label="Admin bookings table"` so screen readers do not skip the structure (`QW-4`)
+- the public homepage hero shows the upgraded outcome-driven headline (`Never lose a service enquiry again.`) and the primary CTA reads `Try BookedAI Free` (not `Open Web App`) (`QW-6`, `QW-7`)
+- the homepage empty search state shows the refinement prompt (`Let's refine your request — tell us a suburb, preferred time, or service detail`) instead of `No strong match yet` (`QW-8`)
+- when `FX-1` payment-state badge ships, the confirmation hero must show one of `Stripe ready` (green), `QR transfer` (amber), `Manual review` (orange), or `Pending` (slate); text-only payment posture is treated as a regression
+- when `FX-2` ships, all `frontend/src/shared/api/client.ts` fetch calls carry `AbortController` and a 30-second timeout; mobile 3G test must complete the canonical journey within 60 seconds without a hung request
+- when `FX-3` ships, the admin booking table renders as stacked cards below the `720px` viewport without forced horizontal scroll
+- when `FX-4` ships, every destructive action (cancel booking, logout, downgrade) shows a confirmation modal that names the booking reference before submission
+- when `FX-5` ships, closing the booking dialog restores focus to the trigger element via `data-autofocus-return`
+- when `FX-6` ships, the tenant workspace surfaces a session-expiry warning at the five-minute threshold with an `Extend session` button
+- when `FX-7` ships, the portal canonicalizes `booking_reference`, `bookingReference`, query, and hash into a single param and warns on conflict
+
 ## Current lane mapping
 
 - `Member I`: owns the overall release-gate standard and promote-or-hold discipline

@@ -595,6 +595,64 @@ Whenever a P0 or P1 from `docs/development/full-stack-review-2026-04-26.md` is d
 - the corresponding `R1`/`R2`/`R3`/`R4` cross-cutting note marked as resolved
 - a change-log entry at the bottom of this document
 
+## 2026-04-26 UI/UX + Designer + Marketing review integration
+
+A second-pass review on `2026-04-26` ran four parallel deep dives (UI/UX walkthrough, frontend code-quality + A11y + mobile, designer tokens + hierarchy + brand, marketing wording + CTA) across all seven web apps. Full canonical detail in `docs/development/full-stack-review-2026-04-26.md` under section `2026-04-26 UI/UX/Designer/Marketing review addendum`. The integration into this master roadmap is summarized below.
+
+### Tier 1 quick-wins delivered (CLOSED on `2026-04-26`)
+
+Eight inline fixes shipped in the same closeout pass:
+
+- `QW-1` jargon stripped from customer-facing copy (`queued`, `manual review`, `Revenue operations handoff` → customer-safe alternatives)
+- `QW-2` shared `aria-describedby` for email and phone fields in the booking form
+- `QW-3` `.booked-button { min-height: 44px }` to satisfy WCAG 2.5.5 touch target
+- `QW-4` `role="region"` and `aria-label` on the admin booking table wrapper
+- `QW-5` verified — implicit-label pattern is WAI-ARIA correct, no change needed
+- `QW-6` hero headline upgrade (`Turn enquiries into booked revenue with one modern operating system.` → `Never lose a service enquiry again.`)
+- `QW-7` primary CTA upgrade (`Open Web App` → `Try BookedAI Free`; `Talk to Sales` → `Schedule a Consultation`)
+- `QW-8` empty search-state copy upgrade (`No strong match yet` → `Let's refine your request — tell us a suburb, preferred time, or service detail`)
+
+These are recorded as `closed` and need release-gate verification on the next Sprint 19 run.
+
+### Tier 2 — added to Phase 17 / Phase 19 backlog (FX-1 to FX-7, NEW P1)
+
+These items are scheduled across `Sprint 19` and `Sprint 20` overlays alongside the existing P0 closeout work.
+
+- `FX-1` payment-state badge component (Stripe ready / QR transfer / Manual review / Pending) → Phase `17`, pairs with `BC-2` and the new `DS-1` A/B experiment
+- `FX-2` AbortController + 30-second timeout on all 47 fetch calls in `frontend/src/shared/api/client.ts` → Phase `19`
+- `FX-3` admin booking responsive card layout for the `390px-720px` viewport gap → Phase `17`
+- `FX-4` destructive action confirmation modal for cancel, logout, downgrade in portal and tenant → Phase `17`
+- `FX-5` focus restoration on dialog close via a `data-autofocus-return` pattern → Phase `17`
+- `FX-6` tenant session expiry five-minute warning plus extend button → Phase `19`
+- `FX-7` portal `booking_reference` URL canonicalization for the four param sources → Phase `17`
+
+### Tier 3 — added to Phase 21 / Phase 22 backlog (RF-1 to RF-10, NEW P2)
+
+- `RF-1` ESLint rule blocks raw hex in `className`; migrate `619` raw hex usages to design tokens → Phase `22`
+- `RF-2` shadow consolidation, `22 + 153` distinct shadows → four semantic slots → Phase `22`
+- `RF-3` border-radius cleanup, `16 + 518` arbitrary radii → five tokens → Phase `22`
+- `RF-4` button consolidation, `12` styles → four primary/secondary/tertiary/ghost → Phase `22`
+- `RF-5` code-split `BookingAssistantDialog.tsx` (6K LOC) into four lazy chunks → Phase `22`
+- `RF-6` code-split `TenantApp.tsx` (4.9K LOC) into bounded modules per workspace nav → Phase `22`
+- `RF-7` reusable `BookingConfirmationPanel` replacing three duplicate implementations → Phase `22`
+- `RF-8` empty-state pattern library with illustration plus headline plus CTA → Phase `22`
+- `RF-9` pricing tier persona reframe (`Solo` / `Growing studio` / `Clinic` / `Enterprise`) → Phase `21`
+- `RF-10` Pitch deck Playwright coverage at `1440px` desktop and `390px` mobile → Phase `17` (already tracked as `P1-8`)
+
+### A/B matrix expansion (16 → 24)
+
+Eight new experiments added beyond the original sixteen, all using the same telemetry contract documented above:
+
+- conversion-copy wave (`CW-1` hero headline, `CW-2` primary CTA verb, `CW-3` empty-state, `CW-4` payment confirmation, `CW-5` cancel-request copy, `CW-6` pricing persona)
+- designer-system wave (`DS-1` payment-posture badge, `DS-2` empty-state hero with illustration)
+
+Updated cumulative cadence:
+
+- Wave 1 in `Sprint 20`: `AC-1`, `RT-1`, `RT-3`, `CH-1`, plus `CW-1`, `CW-2`, `CW-3` — the new copy already shipped via `QW-6`/`QW-7`/`QW-8`, so A/B can run against the legacy variant for measurement
+- Wave 2 in `Sprint 22`: `BC-2`, `CH-1`, `CH-3`, plus `CW-4`, `CW-5`, `DS-1`, `DS-2` — these depend on `FX-1` payment-state badge and the shared empty-state pattern from `RF-8`
+- Continuing experiment `CW-6` runs in `Sprint 21` once `RF-9` pricing reframe ships
+
 ## Change log
 
 - `2026-04-26` initial publication, integrating the seven-lane review across the whole project arc from Phase 0 through the post-Sprint-22 horizon
+- `2026-04-26` UI/UX + Designer + Marketing review integration: eight Tier 1 quick-wins shipped (`QW-1` to `QW-8`), seven Tier 2 fixes (`FX-1` to `FX-7`) and ten Tier 3 refactors (`RF-1` to `RF-10`) added to the Phase 17/19/21/22 backlog, A/B matrix expanded from sixteen to twenty-four experiments
