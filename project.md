@@ -279,7 +279,7 @@ Latest public homepage investor/customer redesign from `2026-04-25`:
 - top results are framed as `Top research` inside the assistant bubble, with the best three summarized in-chat and actions to open details, Google Maps, provider link, call, mail, select, or book without breaking the conversation flow
 - live-read candidate data is enriched from the public catalog when possible, and missing booking-critical facts now remain explicit (`Price not listed`, `Duration TBD`, `Location TBD`) so customers and investors see a trustworthy search state rather than silent data loss
 - the live-read Playwright booking smoke now verifies that full friendly flow from query through selected match, booking form, authoritative v1 booking intent, portal confirmation, follow-up copy, and no horizontal overflow before a homepage release can pass
-- the latest pitch video at `https://upload.bookedai.au/videos/df25/8woKUebBF8HMMD_RMSA0LQ.mp4` is now embedded with native controls on both `bookedai.au` and `pitch.bookedai.au`, giving visitors an early watchable overview before they continue into live product proof or the deeper deck
+- the latest pitch video at `https://upload.bookedai.au/videos/2cc8/fxu3H6DZDcFOvpjc9UlOmQ.mp4` is now embedded with native controls on both `bookedai.au` and `pitch.bookedai.au`, giving visitors an early watchable overview before they continue into live product proof or the deeper deck
 
 Latest portal customer-care status-agent update from `2026-04-25`:
 

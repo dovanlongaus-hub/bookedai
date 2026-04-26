@@ -12,6 +12,13 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-26`
 
+Implementation update from `2026-04-26` (public pitch video replacement refresh):
+
+- replaced the homepage and pitch embedded MP4 with `https://upload.bookedai.au/videos/2cc8/fxu3H6DZDcFOvpjc9UlOmQ.mp4`
+- updated both `bookedai.au` (`PublicApp.tsx`) and `pitch.bookedai.au` (`PitchDeckApp.tsx`) to use the same refreshed uploaded video URL for native playback and direct fallback links
+- direct media verification confirmed the replacement MP4 returns `206`, `content-type: video/mp4`, and byte-range support
+- verification passed with frontend TypeScript, production build, live deploy through `python3 scripts/telegram_workspace_ops.py deploy-live`, stack healthcheck, and live bundle checks confirming both production chunks now contain the refreshed MP4 URL
+
 Implementation update from `2026-04-26` (Sprint 19 P0-7 env checksum guard):
 
 - added `scripts/verify_env_production_example_checksum.sh` and `checksums/env-production-example.sha256` so changes to `.env.production.example` must intentionally refresh the checksum with `scripts/verify_env_production_example_checksum.sh --update`
