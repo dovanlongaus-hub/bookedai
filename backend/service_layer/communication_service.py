@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from html import escape
 import logging
 import re
 from string import Template
+from urllib.parse import quote, urlparse
 
 import httpx
 
@@ -62,6 +64,25 @@ def _safe_value(variables: dict[str, str] | None, key: str, fallback: str) -> st
     return value or fallback
 
 
+def _html_value(value: str) -> str:
+    return escape(str(value or ""), quote=True)
+
+
+def _safe_http_url(value: str, fallback: str) -> str:
+    candidate = str(value or "").strip()
+    parsed = urlparse(candidate)
+    if parsed.scheme in {"http", "https"} and parsed.netloc:
+        return candidate
+    return fallback
+
+
+def _safe_mailto_href(email: str) -> str:
+    normalized_email = str(email or "").strip()
+    if not normalized_email or any(character in normalized_email for character in "\r\n"):
+        normalized_email = DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
+    return f"mailto:{quote(normalized_email, safe='@.+_-')}"
+
+
 def render_bookedai_confirmation_email(
     *,
     variables: dict[str, str] | None,
@@ -79,10 +100,23 @@ def render_bookedai_confirmation_email(
     manage_link = str((variables or {}).get("manage_link") or "").strip()
     timezone = _safe_value(variables, "timezone", "Australia/Sydney")
     additional_note = str((variables or {}).get("additional_note") or "").strip()
-    app_url = str(public_app_url or "https://bookedai.au").rstrip("/")
+    app_url = _safe_http_url(str(public_app_url or "").rstrip("/"), "https://bookedai.au").rstrip("/")
     logo_url = f"{app_url}/branding/bookedai-mark-gradient.png?v=20260418-brand-system"
-    primary_link = payment_link or manage_link or app_url
+    primary_link = _safe_http_url(payment_link or manage_link or app_url, app_url)
     primary_label = "Complete next step" if payment_link else "Open Bookedai.au"
+    safe_customer_name = _html_value(customer_name)
+    safe_service_name = _html_value(service_name)
+    safe_slot_label = _html_value(slot_label)
+    safe_timezone = _html_value(timezone)
+    safe_booking_reference = _html_value(booking_reference)
+    safe_business_name = _html_value(business_name)
+    safe_venue_name = _html_value(venue_name)
+    safe_support_email = _html_value(support_email)
+    safe_support_phone = _html_value(support_phone)
+    safe_additional_note = _html_value(additional_note)
+    safe_logo_url = _html_value(logo_url)
+    safe_primary_link = _html_value(primary_link)
+    safe_mailto_href = _html_value(_safe_mailto_href(support_email))
 
     text_lines = [
         f"Hi {customer_name},",
@@ -123,7 +157,7 @@ def render_bookedai_confirmation_email(
                 <table role="presentation" cellspacing="0" cellpadding="0">
                   <tr>
                     <td style="width:56px;height:56px;border-radius:18px;background:#f5f5f7;padding:6px;">
-                      <img src="{logo_url}" alt="Bookedai.au logo" width="44" height="44" style="display:block;width:44px;height:44px;object-fit:contain;" />
+                      <img src="{safe_logo_url}" alt="Bookedai.au logo" width="44" height="44" style="display:block;width:44px;height:44px;object-fit:contain;" />
                     </td>
                     <td style="padding-left:16px;">
                       <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#0071e3;">AI Receptionist & Booking for SMEs</div>
@@ -132,7 +166,7 @@ def render_bookedai_confirmation_email(
                   </tr>
                 </table>
                 <p style="margin:18px 0 0;font-size:16px;line-height:1.7;color:#3a3a3c;">
-                  Hi {customer_name}, your next step with <strong>{service_name}</strong> is now confirmed and ready to move forward.
+                  Hi {safe_customer_name}, your next step with <strong>{safe_service_name}</strong> is now confirmed and ready to move forward.
                 </p>
               </td>
             </tr>
@@ -143,23 +177,23 @@ def render_bookedai_confirmation_email(
                     <td style="padding:20px;">
                       <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#0071e3;">Confirmation summary</div>
                       <div style="padding-top:14px;font-size:16px;line-height:1.8;color:#1d1d1f;">
-                        <div><strong>Service:</strong> {service_name}</div>
-                        <div><strong>Schedule:</strong> {slot_label}</div>
-                        <div><strong>Timezone:</strong> {timezone}</div>
-                        <div><strong>Booking reference:</strong> {booking_reference}</div>
-                        <div><strong>Handled by:</strong> {business_name}</div>
-                        <div><strong>Location:</strong> {venue_name}</div>
+                        <div><strong>Service:</strong> {safe_service_name}</div>
+                        <div><strong>Schedule:</strong> {safe_slot_label}</div>
+                        <div><strong>Timezone:</strong> {safe_timezone}</div>
+                        <div><strong>Booking reference:</strong> {safe_booking_reference}</div>
+                        <div><strong>Handled by:</strong> {safe_business_name}</div>
+                        <div><strong>Location:</strong> {safe_venue_name}</div>
                       </div>
                     </td>
                   </tr>
                 </table>
-                {"<p style='margin:18px 0 0;font-size:14px;line-height:1.7;color:#3a3a3c;'><strong>Additional note:</strong> " + additional_note + "</p>" if additional_note else ""}
+                {"<p style='margin:18px 0 0;font-size:14px;line-height:1.7;color:#3a3a3c;'><strong>Additional note:</strong> " + safe_additional_note + "</p>" if additional_note else ""}
                 <div style="padding-top:24px;">
-                  <a href="{primary_link}" style="display:inline-block;background:#0071e3;color:#ffffff;text-decoration:none;font-weight:700;border-radius:999px;padding:14px 22px;">{primary_label}</a>
+                  <a href="{safe_primary_link}" style="display:inline-block;background:#0071e3;color:#ffffff;text-decoration:none;font-weight:700;border-radius:999px;padding:14px 22px;">{primary_label}</a>
                 </div>
                 <p style="margin:24px 0 0;font-size:14px;line-height:1.7;color:#6e6e73;">
-                  Need help? Reply to <a href="mailto:{support_email}" style="color:#0071e3;text-decoration:none;">{support_email}</a>
-                  or message {support_phone} on Telegram, WhatsApp, or iMessage.
+                  Need help? Reply to <a href="{safe_mailto_href}" style="color:#0071e3;text-decoration:none;">{safe_support_email}</a>
+                  or message {safe_support_phone} on Telegram, WhatsApp, or iMessage.
                 </p>
               </td>
             </tr>

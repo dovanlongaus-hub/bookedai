@@ -801,6 +801,33 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
         self.assertIn("BookedAI remote demo", rendered.html)
         self.assertIn("https://bookedai.au/pay/BK-123", rendered.html)
 
+    async def test_render_bookedai_confirmation_email_escapes_html_values_and_rejects_unsafe_links(self):
+        rendered = render_bookedai_confirmation_email(
+            variables={
+                "customer_name": "<script>alert(1)</script>",
+                "service_name": "Chess & Swim <b>Trial</b>",
+                "slot_label": "16 Apr <now>",
+                "timezone": "Australia/Sydney",
+                "booking_reference": "BK-<123>",
+                "business_name": "BookedAI <Ops>",
+                "venue_name": "Remote & online",
+                "support_email": "info@bookedai.au",
+                "payment_link": "javascript:alert(1)",
+                "additional_note": "Bring <img src=x onerror=alert(1)>",
+            },
+            public_app_url="https://bookedai.au",
+        )
+
+        self.assertNotIn("<script>", rendered.html)
+        self.assertNotIn("<b>Trial</b>", rendered.html)
+        self.assertNotIn("<img src=x", rendered.html)
+        self.assertNotIn("javascript:alert(1)", rendered.html)
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt;", rendered.html)
+        self.assertIn("Chess &amp; Swim &lt;b&gt;Trial&lt;/b&gt;", rendered.html)
+        self.assertIn("BK-&lt;123&gt;", rendered.html)
+        self.assertIn('href="https://bookedai.au"', rendered.html)
+        self.assertIn("Bring &lt;img src=x onerror=alert(1)&gt;", rendered.html)
+
 
 def _build_test_settings(*, access_token: str = "") -> Settings:
     return Settings(
