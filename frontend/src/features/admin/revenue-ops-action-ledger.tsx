@@ -258,14 +258,14 @@ export function RevenueOpsActionLedger({
   ]);
 
   return (
-    <section className="rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_24px_60px_rgba(15,23,42,0.06)] sm:p-6">
+    <section className="min-w-0 rounded-[2rem] border border-slate-200 bg-white p-5 shadow-[0_24px_60px_rgba(15,23,42,0.06)] sm:p-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Revenue operations ledger
+            Automation control ledger
           </div>
           <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
-            Agent actions ready for operator control
+            Revenue actions ready for operator control
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             {selectedTenantRef
@@ -339,11 +339,11 @@ export function RevenueOpsActionLedger({
             </button>
           ))}
         </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center">
           <select
             value={actionFilter}
             onChange={(event) => setActionFilter(event.target.value)}
-            className="min-h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-slate-400"
+            className="min-h-10 w-full min-w-0 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-slate-400 sm:w-auto"
           >
             <option value="">All action types</option>
             {actionFilters.map((actionType) => (
@@ -355,7 +355,7 @@ export function RevenueOpsActionLedger({
           <select
             value={dependencyFilter}
             onChange={(event) => setDependencyFilter(event.target.value)}
-            className="min-h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-slate-400"
+            className="min-h-10 w-full min-w-0 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-slate-400 sm:w-auto"
           >
             <option value="">All dependencies</option>
             {dependencyFilters.map((dependency) => (
@@ -367,7 +367,7 @@ export function RevenueOpsActionLedger({
           <select
             value={lifecycleFilter}
             onChange={(event) => setLifecycleFilter(event.target.value)}
-            className="min-h-10 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-slate-400"
+            className="min-h-10 w-full min-w-0 rounded-full border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 outline-none transition focus:border-slate-400 sm:w-auto"
           >
             <option value="">All lifecycle events</option>
             {lifecycleFilters.map((eventName) => (

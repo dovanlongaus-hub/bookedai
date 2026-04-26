@@ -58,8 +58,8 @@ export function ReliabilityWorkspace({
         onPanelNavigate={onPanelNavigate}
       />
 
-      <section className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
-        <div className="space-y-6">
+      <section className="grid min-w-0 gap-6 xl:grid-cols-[minmax(0,1.05fr)_minmax(0,0.95fr)]">
+        <div className="min-w-0 space-y-6">
           <RevenueOpsActionLedger selectedTenantRef={selectedTenantRef} />
 
           <section
@@ -77,14 +77,14 @@ export function ReliabilityWorkspace({
                 fallback={
                   <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.06)]">
                     <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-                      Prompt 5 preview
+                      AI quality preview
                     </div>
                     <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
                       Loading operator-action panel
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
                       The heaviest reliability read path now loads separately so config and
-                      contract drill-downs do not pay for the Prompt 5 preview bundle up front.
+                      contract drill-downs do not pay for the AI quality bundle up front.
                     </p>
                   </section>
                 }
@@ -94,16 +94,16 @@ export function ReliabilityWorkspace({
             ) : (
               <StandbyPanelCard
                 eyebrow="Operator action lane"
-                title="Prompt 5 preview now stays on standby until this lane is active"
-                detail="Keep the heaviest reliability preview out of the initial config-risk or contract-review path, then jump back into Prompt 5 only when the drill-down needs additive operator diagnostics."
-                actionLabel="Open operator-action module"
+                title="AI quality review stays on standby until this lane is active"
+                detail="Keep the heaviest reliability preview out of the initial config-risk or contract-review path, then open AI quality only when operators need deeper booking and automation diagnostics."
+                actionLabel="Open AI quality module"
                 onOpen={() => onPanelNavigate('prompt5-preview')}
               />
             )}
           </section>
         </div>
 
-        <div className="space-y-6">
+        <div className="min-w-0 space-y-6">
           <section
             id="live-configuration"
             tabIndex={-1}

@@ -24,7 +24,7 @@ export function AdminBookingTableRow({
       }`}
     >
       <div>
-        <div className="font-semibold text-slate-950">{booking.booking_reference}</div>
+        <div className="break-words font-semibold text-slate-950">{booking.booking_reference}</div>
         <div className="mt-1 text-xs text-slate-500">{formatDateTime(booking.created_at)}</div>
       </div>
       <div>
@@ -33,13 +33,15 @@ export function AdminBookingTableRow({
         </span>
       </div>
       <div>
-        <div className="font-semibold text-slate-950">
+        <div className="break-words font-semibold text-slate-950">
           {booking.customer_name || 'Unknown customer'}
         </div>
-        <div className="mt-1 text-xs text-slate-500">{booking.customer_email || 'No email'}</div>
+        <div className="mt-1 break-words text-xs text-slate-500">
+          {booking.customer_email || 'No email'}
+        </div>
       </div>
       <div>
-        <div className="font-semibold text-slate-950">
+        <div className="break-words font-semibold text-slate-950">
           {booking.service_name || 'Unknown service'}
         </div>
         <div className="mt-1 text-xs text-slate-500">

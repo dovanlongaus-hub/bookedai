@@ -310,16 +310,16 @@ export function AdminWorkspaceInsights({
           Reliability workspace
         </div>
         <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
-          Review Prompt 5 or Prompt 11 signals before they become rollout risk
+          Review AI quality, automation health, and rollout risk before customers feel it
         </h2>
         <div className="mt-5 grid gap-4 md:grid-cols-4">
-          <InsightCard label="Retry attention" value={shadowStatus} detail="Use compare health plus Prompt 11 preview as the first triage frame." />
+          <InsightCard label="Retry attention" value={shadowStatus} detail="Use booking compare health plus action readiness as the first triage frame." />
           <InsightCard label="Config coverage" value={`${configItemsCount} items`} detail="Current admin-visible configuration inventory." />
           <InsightCard label="API inventory" value={`${apiRoutesCount} routes`} detail="Backend surfaces exposed to the reliability workspace." />
           <InsightCard
             label="Selected service context"
             value={selectedServiceId ?? 'No selected service'}
-            detail="Prompt 5 preview inherits this context when a booking is selected."
+            detail="The AI quality review inherits this context when a booking is selected."
           />
         </div>
         <div className="mt-5 rounded-[1.6rem] border border-violet-200 bg-violet-50 p-4">
@@ -332,9 +332,9 @@ export function AdminWorkspaceInsights({
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
             <TriageLaunchCard
               label="Operator action lane"
-              value="Prompt 11 triage and retry posture"
-              detail="Open Prompt 5 and Prompt 11 reliability reads when operators need to review retry posture or immediate action items."
-              actionLabel="Review operator action lane"
+              value="Automation triage and retry posture"
+              detail="Open the action lane when operators need to review retry posture or immediate customer-care work."
+              actionLabel="Review automation lane"
               isActive={activePanel === 'prompt5-preview'}
               onClick={() => onPanelNavigate('prompt5-preview')}
             />
@@ -358,7 +358,7 @@ export function AdminWorkspaceInsights({
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
           <PanelLink
-            label="Open Prompt 5 preview panel"
+            label="Open AI quality panel"
             isActive={activePanel === 'prompt5-preview'}
             onClick={() => onPanelNavigate('prompt5-preview')}
           />

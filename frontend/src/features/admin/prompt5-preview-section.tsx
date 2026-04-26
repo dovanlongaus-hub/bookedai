@@ -329,13 +329,13 @@ export function Prompt5PreviewSection({
       <div className="flex flex-col gap-3">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
-            Prompt 5 Preview
+            AI quality preview
           </div>
           <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
             V1 search and trust preview
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Run the additive Prompt 5 v1 matching and booking-trust flow without changing the
+            Run the additive AI matching and booking-trust flow without changing the
             current admin source-of-truth.
           </p>
           <div className="mt-4 rounded-[1.5rem] border border-slate-200 bg-slate-50 px-4 py-3">
@@ -471,7 +471,7 @@ export function Prompt5PreviewSection({
                 />
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                  No Prompt 5 preview results yet.
+                  No AI quality preview results yet.
                 </div>
               )}
             </div>
@@ -568,7 +568,7 @@ export function Prompt5PreviewSection({
                           <p key={warning}>{warning}</p>
                         ))
                       ) : (
-                        <p>No warnings returned by the Prompt 5 preview.</p>
+                        <p>No warnings returned by the AI quality preview.</p>
                       )}
                     </div>
                   </div>
@@ -576,7 +576,7 @@ export function Prompt5PreviewSection({
               </div>
             ) : (
               <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                Run a Prompt 5 preview to inspect the current booking-trust output.
+                Run an AI quality preview to inspect the current booking-trust output.
               </div>
             )}
           </div>
@@ -1127,7 +1127,7 @@ export function Prompt5PreviewSection({
 
           <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">
             <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-              Prompt 11 triage board
+              Automation triage board
             </div>
             {triageSnapshot ? (
               <div className="mt-3 space-y-3">
@@ -1136,7 +1136,7 @@ export function Prompt5PreviewSection({
                     <div>
                       <div className="font-semibold text-slate-950">Triage status</div>
                       <p className="mt-2 leading-6">
-                        Prompt 11 now groups additive reliability reads into operator lanes instead of
+                        Automation triage now groups additive reliability reads into operator lanes instead of
                         leaving admin to infer posture from raw attention rows alone.
                       </p>
                     </div>
@@ -1211,7 +1211,7 @@ export function Prompt5PreviewSection({
                       ))
                     ) : (
                       <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                        No Prompt 11 source slices returned yet.
+                        No automation source slices returned yet.
                       </div>
                     )}
                   </div>
@@ -1219,7 +1219,7 @@ export function Prompt5PreviewSection({
               </div>
             ) : (
               <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                No Prompt 11 triage snapshot returned yet.
+                No automation triage snapshot returned yet.
               </div>
             )}
           </div>
@@ -1273,7 +1273,7 @@ export function Prompt5PreviewSection({
                 ))
               ) : (
                 <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-4 py-6 text-sm text-slate-500">
-                  No Prompt 11 attention items returned yet.
+                  No automation attention items returned yet.
                 </div>
               )}
             </div>
@@ -1325,7 +1325,7 @@ export function Prompt5PreviewSection({
                 <div className="rounded-2xl border border-slate-200 bg-white p-4 text-sm text-slate-600">
                   <div className="font-semibold text-slate-950">{reconciliationDetails.status}</div>
                   <p className="mt-2">
-                    Section-level view of Prompt 10 and Prompt 11 operational state.
+                    Section-level view of booking recovery and automation operational state.
                   </p>
                 </div>
                 {reconciliationDetails.sections.map((section) => (

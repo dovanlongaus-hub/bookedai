@@ -43,7 +43,7 @@ function buildMode(
       checklist: [
         `Check the ${configItemsCount} visible configuration items for missing coverage or masked values that need refresh.`,
         'Confirm integration provider status and sync mode still match the intended rollout posture.',
-        'Hold user-facing rollout if config drift explains the operator issue more directly than Prompt 11 attention.',
+        'Hold user-facing rollout if config drift explains the operator issue more directly than automation attention.',
       ],
       primaryActionLabel: 'Open live configuration',
       primaryPanel: 'live-configuration',
@@ -70,17 +70,17 @@ function buildMode(
 
   return {
     badge: 'Operator action',
-    title: 'Review Prompt 11 triage and Prompt 5 preview from the same reliability lane',
+    title: 'Review automation triage and AI quality from the same reliability lane',
     detail:
-      'Use this drill-down when operators need to inspect retry posture, Prompt 11 action lanes, and the selected service context before changing rollout posture.',
+      'Use this drill-down when operators need to inspect retry posture, automation action lanes, and the selected service context before changing rollout posture.',
     checklist: [
-      `Check Prompt 11 triage and retry posture for the current service context: ${selectedServiceId ?? 'no selected service'}.`,
-      'Use Prompt 5 preview to inspect additive search, trust, booking path, and lifecycle signals without touching authoritative writes.',
+      `Check automation triage and retry posture for the current service context: ${selectedServiceId ?? 'no selected service'}.`,
+      'Use AI quality preview to inspect additive search, trust, booking path, and lifecycle signals without touching authoritative writes.',
       'Escalate config or contract review only if the operator-action lane does not explain the issue clearly enough.',
     ],
-    primaryActionLabel: 'Open Prompt 5 preview',
+    primaryActionLabel: 'Open AI quality preview',
     primaryPanel: 'prompt5-preview',
-    summary: 'Prompt 11 triage, retry posture, and additive Prompt 5 diagnostics stay together in this lane.',
+    summary: 'Automation triage, retry posture, and additive AI quality diagnostics stay together in this lane.',
   };
 }
 

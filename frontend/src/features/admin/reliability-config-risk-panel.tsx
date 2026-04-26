@@ -34,7 +34,7 @@ export function ReliabilityConfigRiskPanel({
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               This lane is optimized for secrets, provider toggles, masked values, and
               environment-specific drift that can explain reliability issues faster than changing
-              Prompt 11 or operator workflow.
+              automation or operator workflow.
             </p>
           </div>
           <div className="rounded-[1.25rem] border border-amber-200 bg-white px-4 py-3 text-sm text-slate-700">

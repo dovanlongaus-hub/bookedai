@@ -1,3 +1,16 @@
+# Admin investor SME polish follow-up
+
+- Timestamp: 2026-04-26T01:44:20.231139+00:00
+- Source: docs/development/admin-enterprise-workspace-shell-closeout-2026-04-25.md
+- Category: development
+- Status: completed
+
+## Summary
+
+Admin investor/SME polish is implemented: mobile header/session layout is calmer, KPI cards explain revenue signals, booking search/table containment is improved, and Reliability now uses product-facing AI quality/automation language. Verified with frontend typecheck, Vite production build, hosted HTML generation, and local Playwright desktop/mobile layout probes.
+
+## Details
+
 # Admin Enterprise Workspace Shell Closeout
 
 Date: `2026-04-25`

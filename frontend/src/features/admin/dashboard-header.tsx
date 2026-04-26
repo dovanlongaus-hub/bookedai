@@ -1,5 +1,6 @@
 import {
   Bell,
+  Info,
   LogOut,
   RefreshCw,
   Settings,
@@ -28,6 +29,16 @@ export function AdminDashboardHeader({
   onLogout,
 }: AdminDashboardHeaderProps) {
   const primaryMetrics = metrics.slice(0, 4);
+  const metricDetails: Record<string, string> = {
+    'Bookings captured':
+      'Total booking records visible in the admin feed. Use this as the top-line volume signal.',
+    'AI capture rate (30d)':
+      'Share of recent customer sessions that became a captured booking signal in the last 30 days.',
+    'Missed revenue (30d)':
+      'Estimated revenue at risk from sessions that did not convert into confirmed booking flow.',
+    'Stripe-ready checkouts':
+      'Bookings that have enough payment posture to move into checkout or payment follow-up.',
+  };
 
   return (
     <header className="booked-admin-topbar">
@@ -57,7 +68,7 @@ export function AdminDashboardHeader({
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+      <div className="booked-admin-topbar-actions">
         <div className="hidden items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 md:flex">
           <ShieldCheck className="h-4 w-4" aria-hidden="true" />
           Live secure
@@ -78,16 +89,16 @@ export function AdminDashboardHeader({
         >
           <Bell className="h-4 w-4" aria-hidden="true" />
         </button>
-        <div className="flex max-w-[18rem] items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 py-2 text-xs shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+        <div className="booked-admin-session-card">
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-xl bg-slate-950 text-white">
             <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
           </span>
           <span className="min-w-0">
-            <span className="block truncate font-semibold text-slate-950">
+            <span className="booked-admin-session-primary">
               Signed in as {username}
               {sessionExpiry ? ` until ${formatDateTime(sessionExpiry)}` : ''}
             </span>
-            <span className="block truncate text-slate-500">
+            <span className="booked-admin-session-secondary">
               {sessionExpiry ? 'Protected admin session' : 'Session active'}
             </span>
           </span>
@@ -119,9 +130,13 @@ export function AdminDashboardHeader({
             <article
               key={metric.label}
               className={`booked-admin-topbar-metric ${metricToneClass(metric.tone)}`}
+              title={metricDetails[metric.label]}
             >
-              <div className="truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-black/45">
-                {metric.label}
+              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-black/45">
+                <span className="min-w-0 truncate">{metric.label}</span>
+                {metricDetails[metric.label] ? (
+                  <Info className="h-3 w-3 shrink-0 text-slate-400" aria-hidden="true" />
+                ) : null}
               </div>
               <div className="mt-1 truncate text-lg font-semibold tracking-tight text-slate-950">
                 {metric.value}

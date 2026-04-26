@@ -40,14 +40,14 @@ export function AdminBookingsFiltersBar({
   onSubmitSearch,
 }: AdminBookingsFiltersBarProps) {
   return (
-    <div className="flex flex-col gap-4 lg:flex-1 lg:items-end">
-      <form className="flex gap-3" onSubmit={onSubmitSearch}>
+    <div className="min-w-0 flex flex-col gap-4 lg:flex-1 lg:items-end">
+      <form className="flex w-full min-w-0 flex-col gap-3 sm:flex-row lg:w-auto" onSubmit={onSubmitSearch}>
         <input
           type="search"
           value={searchQuery}
           onChange={(event) => onSearchQueryChange(event.target.value)}
           placeholder="Search by reference, customer, or email"
-          className="w-full min-w-[260px] rounded-full border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400"
+          className="w-full min-w-0 rounded-full border border-slate-200 px-4 py-3 text-sm outline-none transition focus:border-sky-400 sm:min-w-[260px]"
         />
         <button
           type="submit"
@@ -57,7 +57,7 @@ export function AdminBookingsFiltersBar({
         </button>
       </form>
 
-      <div className="mt-4 grid gap-3 md:grid-cols-6">
+      <div className="mt-4 grid w-full min-w-0 gap-3 md:grid-cols-6">
         <input
           type="date"
           value={dateFrom}

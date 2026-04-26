@@ -87,7 +87,7 @@ const workspaceConfigs: WorkspaceConfig[] = [
   {
     id: 'reliability',
     label: 'Reliability',
-    summary: 'Prompt previews, config visibility, route inventory, and action ledger.',
+    summary: 'AI quality, config visibility, route inventory, and action ledger.',
     backendSurface: '/api/admin/config, /api/admin/apis',
     group: 'Platform',
     icon: Gauge,
