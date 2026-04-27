@@ -4,7 +4,12 @@ import {
   roadmapContent,
   technicalArchitectureContent,
 } from '../../components/landing/data';
-import type { RoadmapPhase, RoadmapSprint, RoadmapStatus } from '../../components/landing/data';
+import type {
+  RoadmapContent,
+  RoadmapPhase,
+  RoadmapSprint,
+  RoadmapStatus,
+} from '../../components/landing/data';
 import { Footer } from '../../components/landing/Footer';
 import { Header } from '../../components/landing/Header';
 import { CallToActionSection } from '../../components/landing/sections/CallToActionSection';
@@ -107,6 +112,8 @@ export function RoadmapApp({ onStartTrial, onBookDemo }: RoadmapAppProps) {
         onBookDemo={onBookDemo}
       />
 
+      <RoadmapSyncedVisuals content={roadmapContent} />
+
       <div className="pt-6">
         <RoadmapSection
           content={roadmapContent}
@@ -126,6 +133,181 @@ export function RoadmapApp({ onStartTrial, onBookDemo }: RoadmapAppProps) {
 
       <Footer onStartTrial={onStartTrial} onBookDemo={onBookDemo} />
     </main>
+  );
+}
+
+type RoadmapSyncedVisualsProps = {
+  content: RoadmapContent;
+};
+
+function RoadmapSyncedVisuals({ content }: RoadmapSyncedVisualsProps) {
+  const updatedLabel = content.lastUpdated ?? '2026-04-27';
+  const tenantCases = content.tenantCases ?? [];
+  const milestones = content.milestones ?? [];
+  const channelNote = content.channelScopeNote;
+
+  return (
+    <>
+      <section
+        aria-label="Sprint to Go-Live timeline"
+        className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-8 lg:py-16"
+      >
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-600">
+              Synced roadmap · {updatedLabel}
+            </div>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+              Sprint to Go-Live
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
+              2026-04-11 → 2026-04-30 — Phase 0 to GO-LIVE LOCK in 20 days. 13 active phases tracked
+              against M-01 demo (Wed) and M-02 hard milestone (Thu).
+            </p>
+          </div>
+          <a
+            href="/roadmap/pre-golive-2026-04-11-to-04-30.svg"
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open SVG
+          </a>
+        </div>
+
+        <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-white p-3 shadow-[0_18px_48px_rgba(15,23,42,0.06)] sm:p-4">
+          <img
+            src="/roadmap/pre-golive-2026-04-11-to-04-30.svg"
+            alt="BookedAI Sprint to Go-Live timeline showing 13 phases from 2026-04-11 to 2026-04-30 with milestones M-01 demo and M-02 go-live"
+            className="h-auto w-full"
+            loading="lazy"
+          />
+        </div>
+      </section>
+
+      <section
+        aria-label="Master roadmap eight weeks to production scale"
+        className="mx-auto w-full max-w-7xl px-6 py-12 lg:px-8 lg:py-16"
+      >
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
+              Master roadmap · 8 weeks
+            </div>
+            <h2 className="mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
+              Master Roadmap to Production Scale
+            </h2>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-slate-600 sm:text-base">
+              2026-04-11 (Phase 0) → 2026-06-07 (Phase 23 closeout). Five workstream lanes — Pre
+              Go-Live, Go-Live Sprint, Post Go-Live, Communication Layer, and Tenant Runtimes —
+              with milestone diamonds M-01 through M-11.
+            </p>
+          </div>
+          <a
+            href="/roadmap/master-roadmap-2026-04-11-to-06-07.svg"
+            className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Open SVG
+          </a>
+        </div>
+
+        <div className="mt-6 rounded-[1.75rem] border border-slate-200 bg-white p-3 shadow-[0_18px_48px_rgba(15,23,42,0.06)] sm:p-4">
+          <img
+            src="/roadmap/master-roadmap-2026-04-11-to-06-07.svg"
+            alt="BookedAI Master Roadmap from 2026-04-11 Phase 0 reset through 2026-06-07 Phase 23 closeout, organized in five workstream swim lanes with milestones M-01 through M-11 and a hard GO-LIVE LOCK on 2026-04-30"
+            className="h-auto w-full"
+            loading="lazy"
+          />
+        </div>
+
+        {tenantCases.length > 0 || milestones.length > 0 || channelNote ? (
+          <div className="mt-8 grid gap-4 lg:grid-cols-3">
+            {tenantCases.length > 0 ? (
+              <article className="rounded-[1.5rem] border border-amber-200 bg-amber-50/60 p-5">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-amber-700">
+                  3-tenant go-live roster
+                </div>
+                <ul className="mt-3 space-y-3">
+                  {tenantCases.map((tenant) => (
+                    <li key={tenant.name} className="rounded-[1.1rem] border border-amber-200 bg-white px-4 py-3">
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-sm font-semibold text-slate-950">{tenant.name}</div>
+                        <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-800">
+                          {tenant.channel}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm leading-6 text-slate-600">{tenant.summary}</p>
+                      {tenant.embedHref ? (
+                        <a
+                          href={tenant.embedHref}
+                          className="mt-2 inline-flex text-xs font-semibold text-sky-700 underline-offset-4 hover:underline"
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          Open embed link
+                        </a>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ) : null}
+
+            {milestones.length > 0 ? (
+              <article className="rounded-[1.5rem] border border-rose-200 bg-rose-50/60 p-5 lg:col-span-1">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-rose-700">
+                  Milestone calendar
+                </div>
+                <ul className="mt-3 space-y-2">
+                  {milestones.map((milestone) => (
+                    <li
+                      key={milestone.id}
+                      className={`rounded-[1.1rem] border px-4 py-2 ${
+                        milestone.hard
+                          ? 'border-rose-300 bg-rose-100'
+                          : 'border-rose-200 bg-white'
+                      }`}
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2">
+                        <div className="text-sm font-semibold text-slate-950">
+                          {milestone.id}
+                          {milestone.hard ? (
+                            <span className="ml-2 rounded-full bg-rose-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white">
+                              Hard
+                            </span>
+                          ) : null}
+                        </div>
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                          {milestone.date}
+                        </span>
+                      </div>
+                      <div className="mt-1 text-xs leading-5 text-slate-600">{milestone.title}</div>
+                    </li>
+                  ))}
+                </ul>
+              </article>
+            ) : null}
+
+            {channelNote ? (
+              <article className="rounded-[1.5rem] border border-violet-200 bg-violet-50/60 p-5">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">
+                  Communication scope · CR-010
+                </div>
+                <p className="mt-3 text-sm leading-7 text-slate-700">{channelNote}</p>
+                <ul className="mt-3 space-y-2 text-xs leading-5 text-slate-600">
+                  <li><strong className="text-slate-900">Telegram</strong> — primary channel at go-live (P0)</li>
+                  <li><strong className="text-slate-900">WhatsApp</strong> — inbound retained, outbound research M-09</li>
+                  <li><strong className="text-slate-900">iMessage</strong> — feasibility memo M-10</li>
+                  <li><strong className="text-slate-900">SMS</strong> — adapter via Phase 22 / M-11</li>
+                </ul>
+              </article>
+            ) : null}
+          </div>
+        ) : null}
+      </section>
+    </>
   );
 }
 

@@ -817,6 +817,36 @@ SERVICE_CATALOG: list[ServiceCatalogItem] = [
         ],
         featured=True,
     ),
+    _service_catalog_item(
+        id="ai-mentor-private-first-ai-app-60",
+        name="AI Mentor 1-1: Your First AI App in 60 Minutes",
+        category="Education",
+        summary="Private 1-1 mentoring session to build a working AI app around your own idea in one focused hour. Convert AI to your DOER.",
+        duration_minutes=60,
+        amount_aud=180,
+        image_url=None,
+        venue_name="AI Mentor Remote Studio",
+        location="Online / Remote",
+        latitude=None,
+        longitude=None,
+        booking_url="https://ai.longcare.au",
+        tags=[
+            "ai",
+            "mentor",
+            "mentoring",
+            "private",
+            "1-1",
+            "session",
+            "startup",
+            "growth",
+            "app build",
+            "prototype",
+            "doer",
+            "online",
+            "remote",
+        ],
+        featured=True,
+    ),
 ]
 
 EMAIL_PATTERN = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
@@ -2560,7 +2590,7 @@ class BookingAssistantService:
             should_search_ai_events=self._should_search_ai_events(message),
         )
 
-        if wants_events and not wants_services:
+        if wants_events and not wants_services and matched_events:
             return BookingAssistantChatResponse(
                 status="ok",
                 reply=self._build_ai_events_reply(message, matched_events),

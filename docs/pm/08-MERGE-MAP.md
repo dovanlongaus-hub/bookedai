@@ -99,6 +99,11 @@ When a source doc changes:
 4. Keep the original source doc link intact.
 5. Do not copy long raw logs into the PM pack.
 
+## 7. Roadmap-Synced Pack Cross-Reference (added 2026-04-27)
+
+The synchronized phase + roadmap SSOT lives at [`roadmap-synced/`](roadmap-synced/00-README.md). It supplements (does not replace) this merge map and `03-EXECUTION-PLAN.md`. For phase numbering, sprint mapping, dates, status, and per-phase deliverable detail anchored at `2026-04-27`, consult [`roadmap-synced/01-MASTER-ROADMAP-SYNCED.md`](roadmap-synced/01-MASTER-ROADMAP-SYNCED.md) and the corresponding [`roadmap-synced/phases/phase-NN-detail.md`](roadmap-synced/phases/) file. Doc authority labels for the underlying source documents are catalogued in [`roadmap-synced/03-DOC-AUTHORITY-MAP.md`](roadmap-synced/03-DOC-AUTHORITY-MAP.md).
+
 ## Changelog
 
+- `2026-04-27` added Section 7 cross-reference to the new `docs/pm/roadmap-synced/` pack (synchronized SSOT for phase + sprint + roadmap as of `2026-04-27`).
 - `2026-04-26` initial merge map created for PM pack traceability and conflict resolution.

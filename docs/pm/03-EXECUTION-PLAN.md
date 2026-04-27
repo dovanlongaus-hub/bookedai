@@ -1,5 +1,24 @@
 # BookedAI Execution Plan (03) — Phases 0-23 + Post-22 Horizon
 
+> ## DATE RE-ANCHOR — 2026-04-27
+>
+> The dates in the body of this document reflect the original PM pack publication on `2026-04-26`. **The new authoritative date anchors are**:
+>
+> - **Phase 0 start**: `2026-04-11`
+> - **M-01 Chess+Swim demo**: `2026-04-29`
+> - **M-02 GO-LIVE LOCK**: `2026-04-30`
+> - **Final phase end (Phase 23)**: `2026-06-07`
+> - **Total project duration**: 8 weeks (58 days)
+> - **Post-go-live cadence**: weekly (Mon→Sun)
+>
+> **For the canonical phase timeline, Gantt, and per-phase detail, read [`roadmap-synced/01-MASTER-ROADMAP-SYNCED.md`](./roadmap-synced/01-MASTER-ROADMAP-SYNCED.md)** as Single Source of Truth from this date forward.
+>
+> **For implementation/fix plan to hit go-live**, read [`roadmap-synced/08-IMPLEMENT-FIX-PLAN.md`](./roadmap-synced/08-IMPLEMENT-FIX-PLAN.md).
+>
+> **For Vision/Target/Milestones**, read [`roadmap-synced/04-VISION-TARGET-MILESTONES.md`](./roadmap-synced/04-VISION-TARGET-MILESTONES.md).
+>
+> The dates listed in the body sections below are RETAINED for historical traceability but are SUPERSEDED by the synced pack.
+
 Date: `2026-04-26` (today). Status: `active execution baseline`.
 
 Hợp nhất từ:
@@ -85,7 +104,7 @@ Nguồn: [12-architecture-review-findings.md](../architecture/archimate/12-archi
 ### Phase 17 — Full-Flow Stabilization
 
 - **Theme**: Lock UI/UX, search, booking, confirmation, QR/portal stability + mobile no-overflow at 390px.
-- **Target plateau**: Canonical journey `Ask → Match → Compare → Book → Confirm → Portal → Follow-up` xanh trên public + product + portal + tenant + admin + pitch.
+- **Target plateau**: Canonical journey `Chat/Ask → Search/Match → Preview/Compare → Select → Book → Confirm/Payment posture → Portal/Thank You → Calendar/CRM/email/messaging → Customer care` xanh trên public + product + portal + tenant + admin + pitch.
 - **Start**: `2026-04-13` (Sprint 17 mở). **End**: `2026-05-03` (Sprint 19 đóng).
 - **Entry criteria**:
   - Sprint 16 release-hardening closeout đã ký.
