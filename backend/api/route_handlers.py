@@ -786,6 +786,29 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
             "provider": "telegram_bot",
         },
     )
+    chat_type = str(chat.get("type") or "").strip().lower() or None
+    is_group_chat = chat_type in {"group", "supergroup"}
+    is_channel_chat = chat_type == "channel"
+
+    # Group-mode addressing detection: a private chat is always addressed to
+    # the bot. In a group, the bot only responds when explicitly mentioned,
+    # replied to, or invoked via /command@BotUsername. Use the ORIGINAL
+    # message text (not text_value, which has been rewritten for /start
+    # deep-link payloads — that rewrite would erase entity offsets).
+    addressed_to_bot = True
+    addressed_via: str | None = None
+    if is_group_chat:
+        original_text = str(raw_message.get("text") or raw_message.get("caption") or "").strip()
+        addressed_to_bot, addressed_via = _telegram_message_is_addressed_to_bot(
+            raw_message=raw_message,
+            text_value=original_text,
+            callback_data=callback_data,
+        )
+    elif is_channel_chat:
+        # Channels are broadcast-only. Don't respond.
+        addressed_to_bot = False
+        addressed_via = "channel_broadcast_no_reply"
+
     metadata: dict[str, object] = {
         "channel": "telegram",
         "provider": "telegram_bot",
@@ -796,7 +819,11 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
         "telegram_user_id": str(sender.get("id") or "").strip() or None,
         "telegram_username": username or None,
         "telegram_language_code": language_code,
-        "chat_type": str(chat.get("type") or "").strip() or None,
+        "chat_type": chat_type,
+        "is_group_chat": is_group_chat,
+        "is_channel_chat": is_channel_chat,
+        "addressed_to_bot": addressed_to_bot,
+        "addressed_via": addressed_via,
         "telegram_callback_query_id": (
             str(callback_query.get("id") or "").strip()
             if isinstance(callback_query, dict) and str(callback_query.get("id") or "").strip()
@@ -809,6 +836,58 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
         "raw_payload": raw_message,
     }
     return message, metadata
+
+
+def _telegram_message_is_addressed_to_bot(
+    *,
+    raw_message: dict[str, object],
+    text_value: str,
+    callback_data: str,
+) -> tuple[bool, str | None]:
+    """Decide whether a group-chat message is addressed to the bot.
+
+    Returns (addressed, via). `via` is a short tag for telemetry:
+      - "callback_query": user tapped an inline button on the bot's message
+      - "reply_to_bot": user replied to a bot message
+      - "mention_entity": Telegram parsed a @BookedAI_Manager_Bot entity
+      - "command_with_bot_suffix": /search@BookedAI_Manager_Bot ...
+      - "mention_text_match": fallback substring match against bot username
+      - None: not addressed
+    """
+    if callback_data:
+        return True, "callback_query"
+
+    reply_to = raw_message.get("reply_to_message")
+    if isinstance(reply_to, dict):
+        reply_from = reply_to.get("from")
+        if isinstance(reply_from, dict) and bool(reply_from.get("is_bot")):
+            return True, "reply_to_bot"
+
+    bot_username = "BookedAI_Manager_Bot"
+    bot_username_lower = bot_username.lower()
+
+    entities = raw_message.get("entities")
+    if isinstance(entities, list):
+        for entity in entities:
+            if not isinstance(entity, dict):
+                continue
+            entity_type = str(entity.get("type") or "").strip().lower()
+            offset = int(entity.get("offset") or 0)
+            length = int(entity.get("length") or 0)
+            if length <= 0:
+                continue
+            slice_text = text_value[offset : offset + length]
+            if entity_type == "mention" and slice_text.lower() == f"@{bot_username_lower}":
+                return True, "mention_entity"
+            if entity_type == "bot_command" and slice_text.lower().endswith(
+                f"@{bot_username_lower}"
+            ):
+                return True, "command_with_bot_suffix"
+
+    if f"@{bot_username_lower}" in text_value.lower():
+        return True, "mention_text_match"
+
+    return False, None
 
 
 def _customer_telegram_webhook_secret(settings_obj: object) -> str:
@@ -2921,6 +3000,20 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
         return {"status": "ignored", "messages_processed": 0}
 
     message, metadata = normalized
+
+    # Group/channel mode: in a Telegram group or channel the bot only responds
+    # when explicitly addressed (mention, reply-to-bot, /command@BotUsername,
+    # or callback). All other group messages are ignored so the bot doesn't
+    # spam staff coordination groups it has been added to.
+    if not bool(metadata.get("addressed_to_bot", True)):
+        return {
+            "status": "ignored",
+            "messages_processed": 0,
+            "reason": str(metadata.get("addressed_via") or "group_no_mention")
+            if metadata.get("is_channel_chat")
+            else "group_no_mention",
+        }
+
     external_event_id = str(
         payload.get("update_id")
         or metadata.get("telegram_callback_query_id")
@@ -3021,16 +3114,29 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                             **existing_updates,
                             "support_handoff": handoff_metadata,
                         }
+                reply_markup = (
+                    care_metadata.get("reply_controls", {}).get("telegram_reply_markup")
+                    if isinstance(care_metadata.get("reply_controls"), dict)
+                    else None
+                )
+                if bool(metadata.get("is_group_chat")) and isinstance(reply_markup, dict):
+                    # Persistent reply keyboards are intrusive in group chats —
+                    # they show up for everyone. Strip the `keyboard` field but
+                    # keep inline keyboards (per-message, on the bot's reply only).
+                    reply_markup = {
+                        key: value
+                        for key, value in reply_markup.items()
+                        if key
+                        not in {"keyboard", "resize_keyboard", "is_persistent", "input_field_placeholder"}
+                    }
+                    if not reply_markup:
+                        reply_markup = None
                 delivery_metadata = await _send_messaging_customer_care_reply(
                     request,
                     channel="telegram",
                     to=str(metadata.get("telegram_chat_id") or "").strip() or None,
                     body=ai_reply,
-                    reply_markup=(
-                        care_metadata.get("reply_controls", {}).get("telegram_reply_markup")
-                        if isinstance(care_metadata.get("reply_controls"), dict)
-                        else None
-                    ),
+                    reply_markup=reply_markup,
                     parse_mode=(
                         str(care_metadata.get("reply_controls", {}).get("telegram_parse_mode") or "").strip() or None
                         if isinstance(care_metadata.get("reply_controls"), dict)

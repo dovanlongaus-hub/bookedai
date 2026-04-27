@@ -1566,3 +1566,204 @@ class TelegramWebhookRoutesTestCase(TestCase):
         )
         self.assertFalse(MessagingAutomationService._is_handoff_claimed({}))
         self.assertFalse(MessagingAutomationService._is_handoff_claimed(None))
+
+    def test_telegram_group_chat_without_mention_is_ignored(self):
+        """Group chat: bot stays silent unless explicitly addressed."""
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 12001,
+                    "message": {
+                        "message_id": 101,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": -1001234567890, "type": "supergroup", "title": "Chess staff"},
+                        "text": "Hey everyone, what's for lunch?",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "ignored")
+        self.assertEqual(body["messages_processed"], 0)
+        self.assertEqual(body["reason"], "group_no_mention")
+        self.assertEqual(communication_service.sent, [])
+        self.assertEqual(captured_calls, [])
+
+    def test_telegram_group_chat_with_mention_entity_is_handled(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **_kwargs):
+            return {"booking_reference": None, "resolved_by": "no_safe_match", "candidate_count": 0}
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 12002,
+                    "message": {
+                        "message_id": 102,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": -1001234567890, "type": "supergroup"},
+                        "text": "@BookedAI_Manager_Bot find a chess class in Sydney",
+                        "entities": [
+                            {"type": "mention", "offset": 0, "length": 21},
+                        ],
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["messages_processed"], 1)
+        self.assertEqual(len(communication_service.sent), 1)
+        self.assertEqual(
+            captured_calls[0]["metadata"]["addressed_via"], "mention_entity"
+        )
+        self.assertTrue(captured_calls[0]["metadata"]["is_group_chat"])
+
+    def test_telegram_group_chat_reply_to_bot_is_handled(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **_kwargs):
+            return {"booking_reference": None, "resolved_by": "no_safe_match", "candidate_count": 0}
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 12003,
+                    "message": {
+                        "message_id": 103,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": -1001234567890, "type": "supergroup"},
+                        "text": "thanks!",
+                        "reply_to_message": {
+                            "message_id": 99,
+                            "from": {"id": 7777, "is_bot": True, "username": "BookedAI_Manager_Bot"},
+                            "text": "Here are 3 chess classes in Sydney…",
+                        },
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["messages_processed"], 1)
+        self.assertEqual(captured_calls[0]["metadata"]["addressed_via"], "reply_to_bot")
+
+    def test_telegram_group_chat_strips_persistent_keyboard_from_reply(self):
+        """Group reply must NOT carry a persistent ReplyKeyboardMarkup."""
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 12004,
+                    "message": {
+                        "message_id": 104,
+                        "from": {"id": 999, "first_name": "Long", "language_code": "en-AU"},
+                        "chat": {"id": -1001234567890, "type": "supergroup"},
+                        "text": "/start@BookedAI_Manager_Bot",
+                        "entities": [
+                            {"type": "bot_command", "offset": 0, "length": 28},
+                        ],
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(communication_service.sent), 1)
+        markup = communication_service.sent[0].get("reply_markup")
+        # Welcome reply normally carries a `keyboard` (persistent ReplyKeyboardMarkup).
+        # In group context that field MUST be stripped to avoid spamming all members.
+        if markup is not None:
+            self.assertNotIn("keyboard", markup)
+            self.assertNotIn("is_persistent", markup)
+            self.assertNotIn("input_field_placeholder", markup)
+
+    def test_telegram_channel_chat_is_ignored(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 12005,
+                    "message": {
+                        "message_id": 105,
+                        "chat": {"id": -1009999999999, "type": "channel", "title": "BookedAI Updates"},
+                        "text": "Channel broadcast message",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "ignored")
+        self.assertEqual(body["messages_processed"], 0)
+        self.assertEqual(body["reason"], "channel_broadcast_no_reply")
+        self.assertEqual(communication_service.sent, [])
