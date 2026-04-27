@@ -86,7 +86,7 @@ export function ServiceCatalogSection({
             {counts.search_ready_records}
           </div>
           <p className="mt-1 text-sm text-emerald-800">
-            Records ready to surface in chat search without operator cleanup.
+            Records ready to surface in chat search without team cleanup.
           </p>
         </div>
         <div className="rounded-[1.5rem] border border-amber-200 bg-amber-50 px-4 py-4">

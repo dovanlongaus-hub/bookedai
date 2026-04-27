@@ -93,11 +93,11 @@ export function MessagingWorkspace({
         <section id="messaging-list" className="template-card p-6">
           <div className="template-kicker text-sm tracking-[0.14em]">Messaging workspace</div>
           <h2 className="template-title mt-3 text-2xl font-semibold text-[#1d1d1f]">
-            Review delivery posture before operators retry or escalate
+            Review delivery posture before the team retries or escalates
           </h2>
           <p className="template-body mt-2 max-w-3xl text-sm leading-7">
             This lane keeps email, SMS or WhatsApp dispatch, CRM outreach posture, and outbox retry
-            state visible from one operator surface. Start with the list, then open the detail panel
+            state visible in one team workspace. Start with the list, then open the detail panel
             before triggering a retry or marking manual follow-up.
           </p>
 
@@ -219,7 +219,7 @@ export function MessagingWorkspace({
               </div>
 
               <label className="mt-5 block text-sm font-medium text-slate-700">
-                Operator note
+                Team note
                 <textarea
                   value={actionNote}
                   onChange={(event) => setActionNote(event.target.value)}

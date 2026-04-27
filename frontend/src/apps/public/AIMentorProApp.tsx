@@ -195,10 +195,10 @@ export function AIMentorProApp() {
               Tenant-scoped AI mentoring search, booking, payment, and follow-up.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-              This runtime turns <span className="font-semibold text-slate-900">AI Mentor Pro</span> into a
+              This experience turns <span className="font-semibold text-slate-900">AI Mentor Pro</span> into a
               BookedAI-powered SME surface. Visitors can chat, search the 10 AI mentoring offers, move into
-              booking, trigger payment-ready handoff, and route the lead into email, CRM, and WhatsApp-aware
-              operator flows from one tenant-scoped product.
+              booking, trigger payment-ready follow-through, and route the lead into email, CRM, and WhatsApp-aware
+              business flows from one tenant-scoped product.
             </p>
 
             <div className="mt-7 flex flex-wrap gap-3">
@@ -217,7 +217,7 @@ export function AIMentorProApp() {
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
               {[
                 'Chat + tenant-first search',
-                'Booking + payment handoff',
+                'Booking + payment follow-through',
                 'Email / CRM / WhatsApp ready',
               ].map((item) => (
                 <div

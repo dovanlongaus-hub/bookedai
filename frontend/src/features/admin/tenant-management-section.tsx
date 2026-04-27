@@ -297,7 +297,7 @@ export function TenantManagementSection({
                   />
                   <GuideCallout
                     title="Content"
-                    body="Use HTML intro for customer-facing presentation copy, and the guide fields for operator-facing admin instructions."
+                    body="Use HTML intro for customer-facing presentation copy, and the guide fields for team-facing admin instructions."
                   />
                   <GuideCallout
                     title="Governance"

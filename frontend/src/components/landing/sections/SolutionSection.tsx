@@ -69,7 +69,7 @@ export function SolutionSection({
                 </div>
               </div>
               <div className="rounded-full bg-[#1d1d1f] px-3 py-1 text-[11px] font-semibold text-white">
-                Operator visible
+                Team visible
               </div>
             </div>
 

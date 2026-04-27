@@ -118,7 +118,7 @@ export function DemoLandingApp() {
               <div className="sticky top-6 grid gap-4">
                 <DemoFlowRail stage={flowStage} booking={experience.booking} />
                 <div className="bookedai-saas-glass rounded-[24px] p-5">
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8EFCE0]">Operator proof</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8EFCE0]">Business proof</div>
                   <div className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
                     Full academy loop in one session
                   </div>

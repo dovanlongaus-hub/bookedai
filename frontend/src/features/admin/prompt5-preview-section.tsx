@@ -638,7 +638,7 @@ export function Prompt5PreviewSection({
                       <div>
                         <div className="font-semibold text-slate-950">CRM retry drill-in</div>
                         <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                          Operator follow-up
+                          Team follow-up
                         </div>
                       </div>
                       <span className="rounded-full bg-sky-100 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">
@@ -662,7 +662,7 @@ export function Prompt5PreviewSection({
                         Manual review {crmManualReviewCount}
                       </span>
                       <span className="rounded-full bg-rose-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-rose-700">
-                        Needs operator action {crmFailedCount}
+                        Needs team action {crmFailedCount}
                       </span>
                     </div>
                     <p className="mt-3 leading-6">
@@ -829,7 +829,7 @@ export function Prompt5PreviewSection({
                   <div className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="font-semibold text-slate-950">Runtime activity</div>
+                        <div className="font-semibold text-slate-950">Product activity</div>
                         <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                           Job runs, outbox, and webhook feed
                         </div>
@@ -870,7 +870,7 @@ export function Prompt5PreviewSection({
                           <div>
                             <div className="font-semibold">Failed outbox recovery</div>
                             <div className="mt-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
-                              Operator replay lane
+                              Team replay lane
                             </div>
                           </div>
                           <span className="rounded-full bg-white px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700 ring-1 ring-amber-200">
@@ -961,7 +961,7 @@ export function Prompt5PreviewSection({
                         ))
                       ) : (
                         <div className="rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-                          No runtime activity items returned yet.
+                          No product activity items returned yet.
                         </div>
                       )}
                     </div>
@@ -1136,7 +1136,7 @@ export function Prompt5PreviewSection({
                     <div>
                       <div className="font-semibold text-slate-950">Triage status</div>
                       <p className="mt-2 leading-6">
-                        Automation triage now groups additive reliability reads into operator lanes instead of
+                        Automation triage now groups additive reliability reads into team lanes instead of
                         leaving admin to infer posture from raw attention rows alone.
                       </p>
                     </div>
@@ -1150,7 +1150,7 @@ export function Prompt5PreviewSection({
                     title="Immediate action"
                     tone="rose"
                     items={triageSnapshot.triageLanes.immediateAction}
-                    emptyLabel="No operator-action items."
+                    emptyLabel="No team-action items."
                   />
                   <TriageLaneCard
                     title="Monitor"
@@ -1179,7 +1179,7 @@ export function Prompt5PreviewSection({
                   <p className="mt-3 leading-6">{triageSnapshot.retryPosture.operatorNote}</p>
                   <p className="mt-2 leading-6">
                     {triageSnapshot.retryPosture.holdRecommended
-                      ? 'Release note: hold wider rollout until retry backlog and operator-action counts stop rising together.'
+                      ? 'Release note: hold wider rollout until retry backlog and team-action counts stop rising together.'
                       : 'Release note: retry lane can remain additive while backlog stays bounded and failures remain flat.'}
                   </p>
                 </div>
@@ -1316,7 +1316,7 @@ export function Prompt5PreviewSection({
                       </span>
                     </div>
                     <p className="mt-2">
-                      Pending CRM sync work now includes queued retries so operators can separate
+                      Pending CRM sync work now includes queued retries so teams can separate
                       retry monitoring from manual review backlog.
                     </p>
                     <p className="mt-2">Retrying items visible in `pending`: {crmRetryDetail.pendingCount}</p>

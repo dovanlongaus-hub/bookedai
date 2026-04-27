@@ -17,11 +17,11 @@ const deploymentModes = [
   },
   {
     title: 'Linked full BookedAI portal',
-    body: 'Connect the launch flow into the wider BookedAI portal when the business is ready for deeper lifecycle, tenant, and operator workflows.',
+    body: 'Connect the launch flow into the wider BookedAI portal when the business is ready for deeper lifecycle, tenant, and team workflows.',
   },
   {
-    title: 'Operator handoff included',
-    body: 'Booking capture, payment-ready flow, confirmation email, and basic operator handoff stay connected from the first rollout.',
+    title: 'Team follow-through included',
+    body: 'Booking capture, payment-ready flow, confirmation email, and team follow-through stay connected from the first rollout.',
   },
 ];
 
@@ -33,7 +33,7 @@ const implementationSignals = [
 
 const rolloutPhases = [
   { title: 'Launch now', body: 'Go live as a standalone website flow or dedicated booking app.' },
-  { title: 'Qualify fast', body: 'Keep setup, subscription, and buyer handoff inside one BookedAI-owned path.' },
+  { title: 'Qualify fast', body: 'Keep setup, subscription, and the buyer next step inside one BookedAI-owned path.' },
   { title: 'Expand later', body: 'Add portal, CRM, calendar, payment, and deeper automation when the rollout is ready.' },
 ];
 

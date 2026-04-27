@@ -64,7 +64,7 @@ export function RecentEventsSection({ recentEvents }: RecentEventsSectionProps) 
     <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.06)]">
       <h2 className="text-xl font-bold">Recent communication and system events</h2>
       <p className="mt-2 text-sm leading-6 text-slate-600">
-        Track inbound WhatsApp, outbound follow-up, and the adjacent system events operators need
+        Track inbound WhatsApp, outbound follow-up, and the adjacent system events teams need
         to review in one place.
       </p>
       {communicationEvents.length ? (

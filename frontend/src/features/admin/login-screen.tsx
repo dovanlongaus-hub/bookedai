@@ -41,7 +41,7 @@ export function AdminLoginScreen({
             </div>
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold">admin.bookedai.au</div>
-              <div className="truncate text-xs text-slate-400">Revenue operations control plane</div>
+              <div className="truncate text-xs text-slate-400">Revenue operations workspace</div>
             </div>
           </div>
           <div className="hidden items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-2 text-xs font-semibold text-emerald-100 sm:flex">
@@ -66,11 +66,11 @@ export function AdminLoginScreen({
                   />
                 </div>
                 <h1 className="mt-7 max-w-4xl text-4xl font-semibold leading-[1.02] tracking-tight text-white sm:text-5xl lg:text-6xl">
-                  Command center for bookings, revenue flow, and operator intelligence.
+                  Owner dashboard for bookings, revenue flow, and team follow-through.
                 </h1>
                 <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300">
-                  {brandName} gives internal operators a clean control layer for live bookings,
-                  payment posture, messaging, tenant support, and reliability review.
+                  {brandName} gives service teams one clear workspace for live bookings,
+                  payment posture, customer messages, tenant support, and reliability review.
                 </p>
                 <div className="mt-5 text-xs font-semibold uppercase tracking-[0.18em] text-sky-200/80">
                   {brandDescriptor}
@@ -79,9 +79,9 @@ export function AdminLoginScreen({
 
               <div className="grid gap-3">
                 {[
-                  { label: 'Booking ops', value: 'Live queue', icon: Activity },
+                  { label: 'Booking queue', value: 'Live queue', icon: Activity },
                   { label: 'Revenue posture', value: 'Payment ready', icon: BadgeCheck },
-                  { label: 'Platform control', value: 'API-backed', icon: ServerCog },
+                  { label: 'Platform health', value: 'API-backed', icon: ServerCog },
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
@@ -116,8 +116,7 @@ export function AdminLoginScreen({
                 </div>
                 <h2 className="mt-5 text-3xl font-semibold tracking-tight">Access workspace</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Authenticate with the internal admin credential to open the BookedAI operator
-                  workspace.
+                  Sign in with the admin credential to open the BookedAI business workspace.
                 </p>
               </div>
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-sky-50 text-sky-700">

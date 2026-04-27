@@ -31,7 +31,7 @@ const workspaceConfigs: WorkspaceConfig[] = [
   {
     id: 'overview',
     label: 'Overview',
-    summary: 'Ops home, booking triage, support queues, and operator entry points.',
+    summary: 'Business home, booking triage, support queues, and team entry points.',
     backendSurface: '/api/admin/overview, /api/admin/bookings',
     group: 'Operate',
     icon: LayoutDashboard,
@@ -55,7 +55,7 @@ const workspaceConfigs: WorkspaceConfig[] = [
   {
     id: 'tenants',
     label: 'Tenants',
-    summary: 'Tenant directory, health posture, and handoff into editing.',
+    summary: 'Tenant directory, health posture, and path into editing.',
     backendSurface: '/api/admin/tenants',
     group: 'Tenants',
     icon: Building2,
@@ -87,7 +87,7 @@ const workspaceConfigs: WorkspaceConfig[] = [
   {
     id: 'reliability',
     label: 'Reliability',
-    summary: 'AI quality, config visibility, route inventory, and action ledger.',
+    summary: 'AI quality, config visibility, route inventory, and action log.',
     backendSurface: '/api/admin/config, /api/admin/apis',
     group: 'Platform',
     icon: Gauge,
@@ -95,7 +95,7 @@ const workspaceConfigs: WorkspaceConfig[] = [
   {
     id: 'audit-activity',
     label: 'Audit & Activity',
-    summary: 'Recent communications, handoff context, and chronology.',
+    summary: 'Recent communications, follow-up context, and chronology.',
     backendSurface: '/api/admin/overview recent_events',
     group: 'Platform',
     icon: FileClock,

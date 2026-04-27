@@ -51,7 +51,7 @@ export function AdminWorkspaceInsights({
           Overview workspace
         </div>
         <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
-          Start from the ops home, then move operators into the next action
+          Start from the business home, then move the team into the next action
         </h2>
         <div className="mt-5 grid gap-4 md:grid-cols-4">
           <InsightCard label="Bookings workspace" value={`${bookingsTotal} visible`} detail="Current query and filter result set." />
@@ -59,7 +59,7 @@ export function AdminWorkspaceInsights({
           <InsightCard
             label="Support queue"
             value={`${portalSupportQueueCount} queued`}
-            detail="Portal requests plus payment attention items visible to operators."
+            detail="Portal requests plus payment attention items visible to the team."
           />
           <InsightCard
             label="Booking focus"
@@ -147,7 +147,7 @@ export function AdminWorkspaceInsights({
           Manage each enterprise tenant as a clear operating surface
         </h2>
         <div className="mt-5 grid gap-4 md:grid-cols-4">
-          <InsightCard label="Tenant directory" value={`${tenantsCount} tenants`} detail="Every tenant stays available from one internal control surface." />
+          <InsightCard label="Tenant directory" value={`${tenantsCount} tenants`} detail="Every tenant stays available from one trusted workspace." />
           <InsightCard label="Current tenant" value={selectedTenantName ?? 'No tenant selected'} detail="Profile, branding, HTML content, and access changes follow this context." />
           <InsightCard label="Team access" value={`${selectedTenantMembersCount} members`} detail="Use role and status controls to move tenant ownership safely." />
           <InsightCard label="Tenant catalog" value={`${selectedTenantServicesCount} services`} detail="Products and services can be edited directly without leaving admin." />
@@ -160,7 +160,7 @@ export function AdminWorkspaceInsights({
             Update tenant identity first, then roles, then publishable catalog data
           </h3>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            This keeps branding, HTML introduction, and team permissions aligned before operators
+            This keeps branding, HTML introduction, and team permissions aligned before the team
             change customer-facing products or services.
           </p>
         </div>
@@ -233,7 +233,7 @@ export function AdminWorkspaceInsights({
           Billing support
         </div>
         <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
-          Keep payment attention and customer follow-up in one operator lane
+          Keep payment attention and customer follow-up in one team lane
         </h2>
         <div className="mt-5 grid gap-4 md:grid-cols-4">
           <InsightCard label="Support queue" value={`${portalSupportQueueCount} queued`} detail="Portal and payment attention items stay together for review." />
@@ -267,7 +267,7 @@ export function AdminWorkspaceInsights({
           Integrations
         </div>
         <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
-          Review CRM, email, webhook, and provider posture before operators intervene
+          Review CRM, email, webhook, and provider posture before the team intervenes
         </h2>
         <div className="mt-5 grid gap-4 md:grid-cols-4">
           <InsightCard label="Recent events" value={`${Math.min(4, portalSupportQueueCount + 4)} surfaced`} detail="Use communication and system events as the current integration pulse." />
@@ -277,7 +277,7 @@ export function AdminWorkspaceInsights({
         </div>
         <div className="mt-5 rounded-[1.6rem] border border-emerald-200 bg-emerald-50 p-4">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-            Operator guidance
+            Team guidance
           </div>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             Treat this lane as the cross-system review surface for Zoho, email, webhook, and
@@ -331,9 +331,9 @@ export function AdminWorkspaceInsights({
           </h3>
           <div className="mt-4 grid gap-3 lg:grid-cols-3">
             <TriageLaunchCard
-              label="Operator action lane"
+              label="Team action lane"
               value="Automation triage and retry posture"
-              detail="Open the action lane when operators need to review retry posture or immediate customer-care work."
+              detail="Open the action lane when the team needs to review retry posture or immediate customer-care work."
               actionLabel="Review automation lane"
               isActive={activePanel === 'prompt5-preview'}
               onClick={() => onPanelNavigate('prompt5-preview')}
@@ -387,12 +387,12 @@ export function AdminWorkspaceInsights({
           Messaging workspace
         </div>
         <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
-          Review communication posture before operators retry or escalate
+          Review communication posture before the team retries or escalates
         </h2>
         <div className="mt-5 grid gap-4 md:grid-cols-4">
           <InsightCard label="Visible messages" value={`${messagingCount}`} detail="Cross-channel items loaded into the current admin workspace." />
           <InsightCard label="Needs attention" value={`${messagingAttentionCount}`} detail="Failed, retrying, pending, or manual-review communication posture." />
-          <InsightCard label="Tenant linkage" value={selectedTenantName ?? 'Platform-wide'} detail="Tenant selection can narrow operator review without hiding cross-tenant issues." />
+          <InsightCard label="Tenant linkage" value={selectedTenantName ?? 'Platform-wide'} detail="Tenant selection can narrow team review without hiding cross-tenant issues." />
           <InsightCard label="Action posture" value="Read-first" detail="Open detail first, then retry or mark manual follow-up when the record is eligible." />
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
@@ -421,13 +421,13 @@ export function AdminWorkspaceInsights({
           Audit and activity
         </div>
         <h2 className="mt-3 text-2xl font-bold tracking-tight text-slate-950">
-          Keep operator chronology easy to review before handoff or escalation
+          Keep customer and system history easy to review before follow-up or escalation
         </h2>
         <div className="mt-5 grid gap-4 md:grid-cols-4">
-          <InsightCard label="Recent events" value="Live activity feed" detail="Inbound, outbound, and system events stay available for operator replay." />
+          <InsightCard label="Recent events" value="Live activity feed" detail="Inbound, outbound, and system events stay available for team review." />
           <InsightCard label="Support queue linkage" value={`${portalSupportQueueCount} queue items`} detail="Use queue state to understand whether follow-up remains open or already resolved." />
           <InsightCard label="Current booking" value={selectedBookingReference ?? 'No booking selected'} detail="Audit review can still pivot straight into booking detail when needed." />
-          <InsightCard label="Tenant scope" value={selectedTenantName ?? 'Platform-wide'} detail="The same audit lane can review cross-tenant or one-tenant operator activity." />
+          <InsightCard label="Tenant scope" value={selectedTenantName ?? 'Platform-wide'} detail="The same audit lane can review cross-tenant or one-tenant team activity." />
         </div>
         <div className="mt-5 flex flex-wrap gap-3">
           <PanelLink
@@ -452,7 +452,7 @@ export function AdminWorkspaceInsights({
         Review admin-visible configuration and contracts before rollout-safe changes
       </h2>
       <div className="mt-5 grid gap-4 md:grid-cols-4">
-        <InsightCard label="Config items" value={`${configItemsCount}`} detail="Environment-backed provider and runtime visibility exposed to admin." />
+        <InsightCard label="Config items" value={`${configItemsCount}`} detail="Environment-backed provider and configuration visibility exposed to admin." />
         <InsightCard label="API routes" value={`${apiRoutesCount}`} detail="Use the route inventory when a rollout needs contract confirmation." />
         <InsightCard label="Selected service" value={selectedServiceId ?? 'No selected service'} detail="Service context remains available while checking platform posture." />
         <InsightCard label="Admin posture" value="Read-first" detail="Keep platform review safe and explicit before touching tenant-facing flows." />

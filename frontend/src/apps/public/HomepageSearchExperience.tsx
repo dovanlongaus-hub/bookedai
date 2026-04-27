@@ -1228,14 +1228,14 @@ function buildBookingFlowSteps(params: {
     },
     {
       id: 'request',
-      label: 'BookedAI handoff',
+      label: 'BookedAI booking flow',
       detail: params.result
         ? `Booking ${params.result.booking_reference} is ready with portal, follow-up, and next actions.`
         : params.submitLoading
-          ? 'Submitting your booking request and preparing the handoff.'
+          ? 'Submitting your booking request and preparing the next step.'
           : params.selectedService
             ? 'Confirm your details below and BookedAI will create the booking request.'
-            : 'The handoff activates after you select a result and confirm the request.',
+            : 'The next step activates after you select a result and confirm the request.',
       state: params.result ? 'complete' : params.submitLoading || params.selectedService ? 'active' : 'pending',
     },
   ];
@@ -1996,7 +1996,7 @@ export function HomepageSearchExperience({
       setBookingReturnNotice({
         tone: 'success',
         title: 'Payment complete',
-        body: `Booking ${bookingRef} has been sent through payment, confirmation, and workflow handoff.`,
+        body: `Booking ${bookingRef} has been sent through payment, confirmation, and follow-up.`,
       });
       return;
     }
@@ -4919,7 +4919,7 @@ export function HomepageSearchExperience({
                   ? 'A calendar event has been created and included in the booking flow. After payment, Stripe returns the customer to the homepage while the booking stays logged for follow-up.'
                   : result.calendar_add_url
                     ? 'A calendar action is ready immediately and is also included in the booking email. After payment, the booking stays logged for follow-up.'
-                    : 'The booking is confirmed, email handoff is ready, and operations follow-up has already been prepared.'}
+                    : 'The booking is confirmed, the email is ready, and follow-up has already been prepared.'}
               </p>
             </div>
           ) : null}
@@ -4965,7 +4965,7 @@ export function HomepageSearchExperience({
                 {previewService.venue_name || previewService.source_label || previewService.name}
               </div>
               <p className="mt-1 text-sm leading-6 text-[#5f6368]">
-                {previewService.location || 'Location details are confirmed during booking handoff.'}
+                {previewService.location || 'Location details are confirmed during booking confirmation.'}
               </p>
               <p className="mt-3 text-sm leading-6 text-[#5f6368]">
                 {previewService.summary || 'BookedAI matched this option as a relevant next step for the enquiry.'}

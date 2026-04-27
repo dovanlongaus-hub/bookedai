@@ -6,12 +6,12 @@ const summarySignals = [
   {
     label: 'Web-first delivery',
     title: 'The homepage now sells one responsive web product instead of implying a native-first roadmap',
-    body: 'The story is anchored to the live web runtime already running on bookedai.au, so what buyers see matches what the team can ship and improve now.',
+    body: 'The story is anchored to the live web product already running on bookedai.au, so what buyers see matches what the team can ship and improve now.',
     tone: 'from-[#eef6ff] to-white',
   },
   {
     label: 'SME clarity',
-    title: 'The value proposition lands as one browser-based workflow teams can deploy immediately',
+    title: 'The value proposition lands as one browser-based product teams can deploy immediately',
     body: 'The strongest cues now focus on responsive access, conversion continuity, and commercial visibility rather than app-format ambiguity.',
     tone: 'from-[#effcf5] to-white',
   },
@@ -27,7 +27,7 @@ const workflowColumns = [
   {
     step: '01',
     title: 'Capture demand',
-    body: 'Homepage, product runtime, chat, and search feed one visible intent lane across desktop and mobile web.',
+    body: 'Homepage, product, chat, and search feed one visible intent lane across desktop and mobile web.',
     chips: ['Homepage', 'Mobile web', 'Desktop web'],
   },
   {
@@ -39,13 +39,13 @@ const workflowColumns = [
   {
     step: '03',
     title: 'Convert to booking',
-    body: 'Booking handoff, payment posture, and follow-up remain connected.',
+    body: 'Booking flow, payment posture, and follow-up remain connected.',
     chips: ['Booking', 'Payment', 'Follow-up'],
   },
   {
     step: '04',
     title: 'Operate with control',
-    body: 'Teams share tenant state, audit visibility, and workflow control in one system before native channels are added.',
+    body: 'Teams share tenant state, audit visibility, and clear business control in one system before native channels are added.',
     chips: ['Tenant', 'Admin', 'Audit'],
   },
 ];
@@ -81,7 +81,7 @@ export function HomepageExecutiveBoardSection() {
               A homepage that makes the responsive web app the clear product, right away.
             </h2>
             <p className="mt-4 max-w-[35rem] text-[1rem] leading-7 text-slate-600">
-              The opening experience is now filtered around the signals that matter most to SMEs and investors: the live web runtime is the real product, it works responsively across screen sizes, and native mobile is a later phase rather than a distracting parallel promise.
+              The opening experience is now filtered around the signals that matter most to SMEs and investors: the live web product is the real product, it works responsively across screen sizes, and native mobile is a later phase rather than a distracting parallel promise.
             </p>
 
             <div className="mt-6 grid gap-3">
@@ -107,7 +107,7 @@ export function HomepageExecutiveBoardSection() {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Visual workflow
+                    Visual flow
                   </div>
                   <div className="mt-2 text-[1.35rem] font-semibold tracking-[-0.04em] text-slate-950">
                     BookedAI web app in one scan

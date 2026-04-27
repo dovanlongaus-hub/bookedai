@@ -117,9 +117,9 @@ export function getHomepageContent(locale: HomepageLocale): HomepageContent {
       menuSections: [
         {
           id: 'platform',
-          eyebrow: 'Chat Revenue Platform',
-          title: 'Homepage hiện là landing page chính cho conversational revenue flow',
-          body: 'BookedAI.au không chỉ là search runtime. Trang chủ giờ giải thích luôn cách hội thoại, qualification, booking path và revenue outcome được nối thành một hệ thống.',
+          eyebrow: 'Revenue Workflow',
+          title: 'Homepage hiện là landing page chính cho revenue flow',
+          body: 'BookedAI.au now shows how conversation, qualification, booking flow, and revenue outcome connect in one system.',
           points: [
             'Hero cho thấy conversational preview thay vì chỉ một ô search.',
             'Capability cards, integrations và CTA đều bám theo cùng một thông điệp doanh thu.',
@@ -129,12 +129,12 @@ export function getHomepageContent(locale: HomepageLocale): HomepageContent {
         {
           id: 'revenue',
           eyebrow: 'Revenue Engine',
-          title: 'BookedAI là cỗ máy kiếm tiền cho service SMEs',
+          title: 'BookedAI.au is a revenue engine for service SMEs',
           body: brandPositioning,
           points: [
             'Search intent đi vào từ một ô truy vấn duy nhất.',
             'Kết quả được xếp hạng và đưa thẳng sang hành động booking.',
-            'Thanh toán, xác nhận và handoff được nối liên tục để tránh mất lead nóng.',
+            'Thanh toán, xác nhận và bước tiếp theo được nối liên tục để tránh mất lead nóng.',
           ],
         },
         {
@@ -158,7 +158,7 @@ export function getHomepageContent(locale: HomepageLocale): HomepageContent {
           points: [
             'Search-first acquisition surface.',
             'AI-guided shortlist và booking path.',
-            'Payment, confirmation, và operator handoff cùng một luồng.',
+            'Payment, confirmation, và team follow-through cùng một luồng.',
           ],
         },
         {
@@ -169,7 +169,7 @@ export function getHomepageContent(locale: HomepageLocale): HomepageContent {
           points: [
             'Giảm friction ở màn đầu.',
             'Tăng tỷ lệ chuyển đổi từ search sang booked.',
-            'Tạo visibility tốt hơn cho operator về demand thật.',
+            'Tạo góc nhìn rõ hơn cho team về demand thật.',
           ],
         },
         {
@@ -202,7 +202,7 @@ export function getHomepageContent(locale: HomepageLocale): HomepageContent {
         bookingPanelTitle: 'Booking',
         bookingPanelEmpty: 'Chọn một kết quả để tiếp tục booking.',
         bookingPanelSelected: 'Đã chọn',
-        bookingPanelHelper: 'Luồng booking dùng cùng logic API với assistant cũ nhưng giao diện này là homepage search runtime mới hoàn toàn.',
+        bookingPanelHelper: 'This booking flow uses the live product logic while keeping the homepage experience fast and clear.',
         bookingButton: 'Tiếp tục booking',
         bookingSubmitting: 'Đang tạo booking...',
         bookingSuccessTitle: 'Booking đã sẵn sàng',
@@ -212,14 +212,14 @@ export function getHomepageContent(locale: HomepageLocale): HomepageContent {
         pitchDeck: 'pitch.bookedai.au',
         roadmap: 'Roadmap',
         menuTitle: 'Navigation',
-        menuBody: 'Dùng menu này để điều hướng giữa live search, roadmap, demo và các lớp giải thích sâu hơn của BookedAI.au.',
+        menuBody: 'Use this menu to move between live search, roadmap, demo, and the main BookedAI.au story.',
         statusLive: 'Live search',
         nameLabel: 'Tên',
         emailLabel: 'Email',
         phoneLabel: 'Số điện thoại',
         dateTimeLabel: 'Thời gian mong muốn',
         notesLabel: 'Ghi chú booking',
-        notesPlaceholder: 'Bổ sung yêu cầu, khung giờ hoặc bối cảnh để operator chuẩn bị tốt hơn.',
+        notesPlaceholder: 'Bổ sung yêu cầu, khung giờ hoặc bối cảnh để team chuẩn bị tốt hơn.',
         summaryTitle: 'Tóm tắt',
         noMatchTitle: 'Chưa có match đủ mạnh',
         noMatchBody: 'BookedAI sẽ ưu tiên độ chính xác hơn là gợi ý sai domain.',
@@ -248,9 +248,9 @@ export function getHomepageContent(locale: HomepageLocale): HomepageContent {
     menuSections: [
       {
         id: 'platform',
-        eyebrow: 'Chat Revenue Platform',
-        title: 'The homepage is now the primary conversational landing surface',
-        body: 'BookedAI.au no longer needs to behave like a stripped-down search runtime. The homepage now carries the product story, conversational proof, and commercial CTA in one place.',
+        eyebrow: 'Revenue Workflow',
+        title: 'The homepage is now the primary landing surface for the revenue flow',
+        body: 'The homepage now carries the product story, customer proof, and commercial CTA in one place.',
         points: [
           'The hero shows a conversational preview instead of only a search shell.',
           'Capability, integration, and outcome sections all point back to revenue.',
@@ -260,12 +260,12 @@ export function getHomepageContent(locale: HomepageLocale): HomepageContent {
       {
         id: 'revenue',
         eyebrow: 'Revenue Engine',
-        title: 'BookedAI is a revenue engine for service SMEs',
+        title: 'BookedAI.au is a revenue engine for service SMEs',
         body: brandPositioning,
         points: [
           'Search intent enters through a single query box.',
           'Results are ranked and pushed directly toward booking action.',
-          'Payment, confirmation, and handoff stay connected so warm leads are not lost.',
+          'Payment, confirmation, and the next step stay connected so warm leads are not lost.',
         ],
       },
       {
@@ -289,7 +289,7 @@ export function getHomepageContent(locale: HomepageLocale): HomepageContent {
         points: [
           'A search-first acquisition surface.',
           'An AI-guided shortlist and booking path.',
-          'Payment, confirmation, and operator handoff in one continuous flow.',
+          'Payment, confirmation, and team follow-through in one continuous flow.',
         ],
       },
       {
@@ -300,7 +300,7 @@ export function getHomepageContent(locale: HomepageLocale): HomepageContent {
         points: [
           'Lower friction on the first screen.',
           'Higher conversion from search to booked.',
-          'Clearer demand visibility for the operator team.',
+          'Clearer demand visibility for the business team.',
         ],
       },
       {

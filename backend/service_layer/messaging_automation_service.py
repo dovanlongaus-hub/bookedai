@@ -115,6 +115,79 @@ class MessagingAutomationService:
             customer_phone=customer_phone,
         )
 
+        locale = self._resolve_locale(metadata.get("telegram_language_code"))
+
+        if (
+            normalized_channel == "telegram"
+            and str(metadata.get("start_command_kind") or "") == "welcome"
+        ):
+            return self._build_welcome_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+                locale=locale,
+            )
+
+        slash_intent = self._slash_command_intent(message.text)
+        if slash_intent == "help":
+            return self._build_welcome_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+                locale=locale,
+            )
+        if slash_intent == "search":
+            return self._build_search_prompt_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+                locale=locale,
+            )
+        if slash_intent == "mybookings":
+            return self._build_my_bookings_prompt_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+                locale=locale,
+            )
+        if slash_intent == "cancel":
+            return self._build_cancel_prompt_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+                locale=locale,
+            )
+        if slash_intent == "support":
+            return self._build_support_handoff_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+                locale=locale,
+            )
+
+        keyboard_intent = self._reply_keyboard_intent(message.text)
+        if keyboard_intent == "search":
+            return self._build_search_prompt_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+                locale=locale,
+            )
+        if keyboard_intent == "mybookings":
+            return self._build_my_bookings_prompt_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+                locale=locale,
+            )
+        if keyboard_intent == "support":
+            return self._build_support_handoff_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+                locale=locale,
+            )
+
         history = await self._load_conversation_history(
             session,
             channel=normalized_channel,
@@ -937,6 +1010,34 @@ class MessagingAutomationService:
         return options[offset]
 
     @staticmethod
+    def _parse_slash_command(message: str) -> tuple[str | None, str]:
+        text = str(message or "").strip()
+        if not text.startswith("/"):
+            return None, ""
+        parts = text.split(maxsplit=1)
+        head = parts[0]
+        args = parts[1].strip() if len(parts) > 1 else ""
+        if "@" in head:
+            head = head.split("@", 1)[0]
+        head = head.lower()
+        mapping = {
+            "/help": "help",
+            "/start": "help",
+            "/search": "search",
+            "/find": "search",
+            "/mybookings": "mybookings",
+            "/booking": "mybookings",
+            "/cancel": "cancel",
+            "/support": "support",
+        }
+        return mapping.get(head), args
+
+    @classmethod
+    def _slash_command_intent(cls, message: str) -> str | None:
+        intent, _ = cls._parse_slash_command(message)
+        return intent
+
+    @staticmethod
     def _is_booking_intake_intent(message: str) -> bool:
         normalized = unicodedata.normalize("NFKD", str(message or "").strip().lower())
         ascii_text = "".join(ch for ch in normalized if not unicodedata.combining(ch))
@@ -1516,7 +1617,7 @@ class MessagingAutomationService:
         return "\n".join(
             [
                 f"<b>{BOOKEDAI_CUSTOMER_PROJECT_NAME}: current order found</b>",
-                f"<b>Current order</b>: {MessagingAutomationService._html(booking_reference)}",
+                f"<b>Current order</b>: <code>{MessagingAutomationService._html(booking_reference)}</code>",
                 f"<b>Portal</b>: <a href=\"{MessagingAutomationService._html(portal_url)}\">open order</a>",
                 f"<b>QR</b>: <a href=\"{MessagingAutomationService._html(qr_url)}\">open QR code</a>",
                 "",
@@ -1782,7 +1883,7 @@ class MessagingAutomationService:
         reply = (
             f"<b>{BOOKEDAI_CUSTOMER_PROJECT_NAME}: booking request started</b>\n"
             f"<b>Service</b>: {self._html(service_name)}\n"
-            f"<b>Reference</b>: {self._html(booking_reference)}\n"
+            f"<b>Reference</b>: <code>{self._html(booking_reference)}</code> (tap to copy)\n"
             "<b>Status</b>: booking captured, payment pending\n"
             f"<b>Portal</b>: <a href=\"{self._html(portal_url)}\">open order</a>\n"
             f"<b>QR</b>: <a href=\"{self._html(qr_code_url)}\">open QR code</a>\n"
@@ -1865,3 +1966,297 @@ class MessagingAutomationService:
             "If you already booked, send the booking reference and I can check status, payment, "
             f"reschedule, or cancellation options. {channel_hint} You can also continue at https://bookedai.au."
         )
+
+    def _build_welcome_result(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        identity_metadata: dict[str, object],
+        locale: str = "en",
+    ) -> MessagingAutomationResult:
+        sender_name = str(message.sender_name or "").strip()
+        greeting = (
+            self._localized("welcome_greeting_named", locale, name=sender_name)
+            if sender_name
+            else self._localized("welcome_greeting_anonymous", locale)
+        )
+        body = self._localized("welcome", locale, greeting=greeting)
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="welcome",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "welcome",
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_reply_markup": self._home_reply_keyboard(locale),
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    def _build_search_prompt_result(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        identity_metadata: dict[str, object],
+        locale: str = "en",
+    ) -> MessagingAutomationResult:
+        body = self._localized("search_prompt", locale)
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="search_prompt",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "search_prompt",
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_reply_markup": self._home_reply_keyboard(locale),
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    def _build_my_bookings_prompt_result(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        identity_metadata: dict[str, object],
+        locale: str = "en",
+    ) -> MessagingAutomationResult:
+        body = self._localized("mybookings_prompt", locale)
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="needs_booking_reference",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "needs_booking_reference",
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_reply_markup": self._home_reply_keyboard(locale),
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    def _build_cancel_prompt_result(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        identity_metadata: dict[str, object],
+        locale: str = "en",
+    ) -> MessagingAutomationResult:
+        body = self._localized("cancel_prompt", locale)
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="needs_booking_reference",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "needs_booking_reference",
+                "cancel_intent_pending": True,
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_reply_markup": self._home_reply_keyboard(locale),
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    def _build_support_handoff_result(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        identity_metadata: dict[str, object],
+        locale: str = "en",
+    ) -> MessagingAutomationResult:
+        body = self._localized(
+            "support_handoff",
+            locale,
+            support_email=DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
+        )
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="support_handoff",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "support_handoff",
+                "human_handoff_requested": True,
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_reply_markup": self._home_reply_keyboard(locale),
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    SUPPORTED_LOCALES = ("en", "vi")
+    DEFAULT_LOCALE = "en"
+
+    LOCALIZED_COPY: dict[str, dict[str, str]] = {
+        "welcome": {
+            "en": (
+                "{greeting} I'm <b>BookedAI Manager Bot</b>. "
+                "I can find and book services for you across Australia and online.\n\n"
+                "Try one of these:\n"
+                "• Tap <b>Find a service</b> below\n"
+                "• Or type what you want, e.g. <i>Find a chess class in Sydney this weekend</i>\n"
+                "• Send /mybookings to see your active bookings\n"
+                "• Send /help anytime to see what I can do"
+            ),
+            "vi": (
+                "{greeting} Mình là <b>BookedAI Manager Bot</b>. "
+                "Mình giúp bạn tìm và đặt dịch vụ ở Úc và online.\n\n"
+                "Bạn có thể:\n"
+                "• Bấm <b>Tìm dịch vụ</b> bên dưới\n"
+                "• Hoặc gõ điều bạn muốn, ví dụ <i>Tìm lớp cờ vua ở Sydney cuối tuần này</i>\n"
+                "• Gõ /mybookings để xem các booking đang có\n"
+                "• Gõ /help bất cứ lúc nào để xem mình hỗ trợ được gì"
+            ),
+        },
+        "welcome_greeting_named": {
+            "en": "Hi {name},",
+            "vi": "Chào {name},",
+        },
+        "welcome_greeting_anonymous": {
+            "en": "Hi there,",
+            "vi": "Xin chào,",
+        },
+        "search_prompt": {
+            "en": (
+                "What would you like to find? Reply with the service plus location and time, for example:\n"
+                "• <i>Find a chess class in Sydney this weekend</i>\n"
+                "• <i>Massage in Surry Hills tomorrow afternoon</i>\n"
+                "• <i>AI Mentor 1-1 session next week</i>"
+            ),
+            "vi": (
+                "Bạn muốn tìm gì? Trả lời theo dạng dịch vụ + địa điểm + thời gian, ví dụ:\n"
+                "• <i>Tìm lớp cờ vua ở Sydney cuối tuần này</i>\n"
+                "• <i>Massage ở Surry Hills chiều mai</i>\n"
+                "• <i>AI Mentor 1-1 tuần sau</i>"
+            ),
+        },
+        "mybookings_prompt": {
+            "en": (
+                "To pull up your booking I need one of:\n"
+                "• your booking reference (looks like <code>v1-xxxxxx</code>)\n"
+                "• the email used to book\n"
+                "• the phone number used to book\n\n"
+                "Reply with one of those and I'll show the booking and the actions available."
+            ),
+            "vi": (
+                "Để mở booking của bạn, mình cần một trong các thông tin sau:\n"
+                "• mã booking (dạng <code>v1-xxxxxx</code>)\n"
+                "• email đã dùng khi đặt\n"
+                "• số điện thoại đã dùng khi đặt\n\n"
+                "Bạn gửi mình một trong các thông tin trên là mình mở được booking và các thao tác đi kèm."
+            ),
+        },
+        "cancel_prompt": {
+            "en": (
+                "I can request a cancellation for you. Please reply with the booking reference "
+                "(<code>v1-xxxxxx</code>) or the email/phone used to book, and I'll route the cancel "
+                "request to the provider. If the booking is already paid, refund handling is provider-led."
+            ),
+            "vi": (
+                "Mình có thể gửi yêu cầu hủy giúp bạn. Bạn gửi mình mã booking "
+                "(<code>v1-xxxxxx</code>) hoặc email/số điện thoại đã đặt, mình sẽ chuyển yêu cầu hủy "
+                "cho nhà cung cấp. Nếu đã thanh toán, việc hoàn tiền do nhà cung cấp xử lý."
+            ),
+        },
+        "support_handoff": {
+            "en": (
+                "I've flagged this conversation for a BookedAI human teammate. "
+                "Someone will jump in here within business hours.\n\n"
+                "If it's urgent, email <b>{support_email}</b> with your booking reference and the "
+                "question. Meanwhile I'll keep listening here."
+            ),
+            "vi": (
+                "Mình đã chuyển hội thoại này tới đội hỗ trợ BookedAI. "
+                "Có người sẽ vào trả lời bạn trong giờ làm việc.\n\n"
+                "Nếu gấp, bạn email <b>{support_email}</b> kèm mã booking và câu hỏi. "
+                "Trong lúc đó mình vẫn theo dõi tin nhắn ở đây."
+            ),
+        },
+        "keyboard_find_service": {"en": "Find a service", "vi": "Tìm dịch vụ"},
+        "keyboard_my_bookings": {"en": "My bookings", "vi": "Booking của tôi"},
+        "keyboard_talk_support": {"en": "Talk to support", "vi": "Gặp hỗ trợ"},
+        "keyboard_placeholder": {
+            "en": "Tell me what you want to book…",
+            "vi": "Bạn muốn đặt gì? Gõ vào đây…",
+        },
+    }
+
+    @classmethod
+    def _resolve_locale(cls, language_code: str | None) -> str:
+        raw = str(language_code or "").strip().lower()
+        if not raw:
+            return cls.DEFAULT_LOCALE
+        primary = raw.split("-", 1)[0].split("_", 1)[0]
+        if primary in cls.SUPPORTED_LOCALES:
+            return primary
+        return cls.DEFAULT_LOCALE
+
+    @classmethod
+    def _localized(cls, key: str, locale: str, **format_args: str) -> str:
+        catalog = cls.LOCALIZED_COPY.get(key) or {}
+        text = catalog.get(locale) or catalog.get(cls.DEFAULT_LOCALE) or ""
+        if format_args and text:
+            try:
+                return text.format(**format_args)
+            except (KeyError, IndexError):
+                return text
+        return text
+
+    @classmethod
+    def _home_reply_keyboard(cls, locale: str = DEFAULT_LOCALE) -> dict[str, object]:
+        return {
+            "keyboard": [
+                [
+                    {"text": cls._localized("keyboard_find_service", locale)},
+                    {"text": cls._localized("keyboard_my_bookings", locale)},
+                ],
+                [{"text": cls._localized("keyboard_talk_support", locale)}],
+            ],
+            "resize_keyboard": True,
+            "is_persistent": True,
+            "input_field_placeholder": cls._localized("keyboard_placeholder", locale),
+        }
+
+    @classmethod
+    def _reply_keyboard_intent(cls, message: str) -> str | None:
+        text = str(message or "").strip().lower()
+        if not text:
+            return None
+        mapping = {
+            "find a service": "search",
+            "find service": "search",
+            "my bookings": "mybookings",
+            "mybookings": "mybookings",
+            "talk to support": "support",
+            "support": "support",
+            # Vietnamese keyboard labels (and tolerated variants)
+            "tìm dịch vụ": "search",
+            "tim dich vu": "search",
+            "booking của tôi": "mybookings",
+            "booking cua toi": "mybookings",
+            "gặp hỗ trợ": "support",
+            "gap ho tro": "support",
+            "hỗ trợ": "support",
+            "ho tro": "support",
+        }
+        return mapping.get(text)

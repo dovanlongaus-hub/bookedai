@@ -62,7 +62,7 @@ export function AdminDashboardHeader({
             {brandName} enterprise admin
           </h1>
           <p className="mt-1 hidden max-w-3xl text-sm leading-6 text-slate-500 lg:block">
-            Revenue readiness, tenant operations, workflow callbacks, inbox visibility, and live
+            Revenue readiness, tenant operations, booking callbacks, inbox visibility, and live
             configuration for {brandDomainLabel}.
           </p>
         </div>

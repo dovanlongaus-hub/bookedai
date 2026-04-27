@@ -46,33 +46,33 @@ const solutionJourney = [
   {
     step: '03',
     title: 'The best option moves forward',
-    body: 'Tenant and service context stay attached so the booking handoff does not lose momentum or business meaning.',
+    body: 'Tenant and service context stay attached so the booking flow does not lose momentum or business meaning.',
     chips: ['Tenant context', 'Service match', 'Trust signals'],
     tone: 'from-[#f0fdf4] to-white',
   },
   {
     step: '04',
     title: 'Booking and follow-up stay connected',
-    body: 'Payment, portal, notifications, and operator workflow continue in one path instead of turning into manual cleanup.',
+    body: 'Payment, portal, notifications, and team follow-up continue in one path instead of turning into manual cleanup.',
     chips: ['Payment', 'Portal', 'Follow-up'],
     tone: 'from-[#fff7ed] to-white',
   },
 ];
 
-const operatorOutcomes = [
+const businessOutcomes = [
   {
     title: 'For SMEs',
     body: 'Easy to explain, easy to launch, and easier to trust because the path from enquiry to booking is visible.',
     chips: ['Lower friction', 'Faster conversion', 'Less manual follow-up'],
   },
   {
-    title: 'For operators',
+    title: 'For service teams',
     body: 'Teams can see what is happening, what is qualified, and what needs intervention without digging through fragmented tools.',
-    chips: ['Visible state', 'Role-safe control', 'Operational clarity'],
+    chips: ['Visible state', 'Role-safe review', 'Operational clarity'],
   },
   {
     title: 'For investors',
-    body: 'The platform reads as a scalable operating model with real surfaces, a real workflow plane, and a clear revenue narrative.',
+    body: 'The platform reads as a scalable booking business with real product surfaces, clear delivery paths, and a credible revenue narrative.',
     chips: ['System depth', 'Commercial logic', 'Scale posture'],
   },
 ];
@@ -134,7 +134,7 @@ function SolutionInfographic() {
             Visual solution map
           </div>
           <h3 className="mt-2 font-['Space_Grotesk'] text-[2rem] font-semibold tracking-[-0.05em] text-slate-950">
-            From customer intent to revenue workflow in one image
+            From customer intent to revenue flow in one image
           </h3>
         </div>
         <SignalPill className="bg-slate-950 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-white">
@@ -146,7 +146,7 @@ function SolutionInfographic() {
         <svg
           viewBox="0 0 1240 760"
           role="img"
-          aria-label="BookedAI solution overview from demand capture through AI qualification, booking handoff, and operator workflow"
+          aria-label="BookedAI solution overview from demand capture through AI qualification, booking flow, and team follow-up"
           className="h-auto w-full"
         >
           <defs>
@@ -206,7 +206,7 @@ function SolutionInfographic() {
           <rect x="932" y="124" width="220" height="108" rx="24" fill="#ffffff" stroke="#a7f3d0" />
           <circle cx="966" cy="158" r="18" fill="#dcfce7" />
           <path d="M956 158h20M962 166l14-16" stroke="#059669" strokeWidth="2.4" strokeLinecap="round" strokeLinejoin="round" />
-          <text x="996" y="150" fill="#0f172a" fontSize="24" fontWeight="700">Booking handoff</text>
+          <text x="996" y="150" fill="#0f172a" fontSize="24" fontWeight="700">Booking flow</text>
           <text x="996" y="180" fill="#475569" fontSize="16">Tenant selected, payment,</text>
           <text x="996" y="202" fill="#475569" fontSize="16">portal, follow-up ready</text>
 
@@ -229,7 +229,7 @@ function SolutionInfographic() {
           <text x="819" y="414" fill="#0f172a" fontSize="14" fontWeight="700">Follow-up rules</text>
 
           <rect x="454" y="448" width="478" height="52" rx="18" fill="#ffffff" stroke="rgba(15,23,42,0.08)" />
-          <text x="484" y="480" fill="#475569" fontSize="16">Operators see qualification, conversion risk, and next actions in one shared operating lane.</text>
+          <text x="484" y="480" fill="#475569" fontSize="16">Teams see qualification, conversion risk, and next actions in one shared operating lane.</text>
           <path d="M388 442H442" stroke="#34d399" strokeWidth="3.2" strokeLinecap="round" markerEnd="url(#arrow-emerald)" />
 
           <text x="68" y="594" fill="#64748b" fontSize="15" fontWeight="700" letterSpacing="2.8">FLOW 3 · RUN THE SYSTEM</text>
@@ -357,7 +357,7 @@ export function ProductProofSection({
           </div>
 
           <div className="mt-5 grid gap-4 md:grid-cols-3">
-            {operatorOutcomes.map((item) => (
+            {businessOutcomes.map((item) => (
               <SectionCard
                 key={item.title}
                 className="rounded-[1.8rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-5 shadow-[0_16px_38px_rgba(15,23,42,0.04)]"

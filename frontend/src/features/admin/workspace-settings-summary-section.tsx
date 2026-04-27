@@ -47,7 +47,7 @@ export function WorkspaceSettingsSummarySection({
             Keep tenant-facing configuration in one trusted workspace
           </h2>
           <p className="mt-3 text-sm leading-7 text-slate-600">
-            Use the shipped shell to review posture and diagnostics, then open the root settings workspace for tenant-scoped edits like branding, branches, billing baseline, and plugin runtime controls.
+            Use the shipped workspace to review posture and diagnostics, then open root settings for tenant-scoped edits like branding, branches, billing baseline, and plugin controls.
           </p>
         </div>
 
@@ -92,7 +92,7 @@ export function WorkspaceSettingsSummarySection({
           detail={billingGuide || 'Use root settings to confirm subscription, invoice, and gateway baseline for this tenant.'}
         />
         <SummaryCard
-          label="Plugin runtime"
+          label="Plugin controls"
           value={pluginGuide ? 'Configured' : 'Needs review'}
           detail={pluginGuide || integrationsGuide || 'Review tenant-facing plugin controls and integrations attention from the promoted settings path.'}
         />

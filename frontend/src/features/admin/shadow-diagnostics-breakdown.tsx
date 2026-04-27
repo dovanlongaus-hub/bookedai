@@ -35,7 +35,7 @@ export function ShadowDiagnosticsBreakdown({
             Mismatch breakdown
           </div>
           <p className="mt-1 text-xs text-slate-500">
-            Lifecycle drift buckets are split out for operators, with field parity shown separately.
+            Lifecycle drift buckets are split out for team review, with field parity shown separately.
           </p>
         </div>
         <div className="text-xs font-medium text-slate-500">{totalMismatch} total mismatches</div>

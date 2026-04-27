@@ -136,7 +136,7 @@ export function CallToActionSection({
 
             <div className="grid gap-3 sm:grid-cols-3">
               {[
-                'Built for service operators who need a cleaner revenue workflow, not only a front-end assistant.',
+                'Built for service teams who need a cleaner revenue flow, not only a front-end assistant.',
                 'Starts with one clean BookedAI-owned buying flow instead of a heavy rollout.',
                 'Keeps setup, monthly layer, and performance logic readable to both buyers and investors.',
               ].map((item) => (

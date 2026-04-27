@@ -222,8 +222,8 @@ export function RevenueOpsActionLedger({
         status,
         note:
           status === 'completed'
-            ? 'Operator accepted the revenue operations action from the admin ledger.'
-            : 'Operator moved this action into manual review from the admin ledger.',
+            ? 'Team accepted the revenue action from the admin action log.'
+            : 'Team moved this action into manual review from the admin action log.',
         result: {
           operator_surface: 'admin_reliability_revenue_ops_ledger',
         },
@@ -262,10 +262,10 @@ export function RevenueOpsActionLedger({
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-            Automation control ledger
+            Automation action log
           </div>
           <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
-            Revenue actions ready for operator control
+            Revenue actions ready for team review
           </h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
             {selectedTenantRef
@@ -283,7 +283,7 @@ export function RevenueOpsActionLedger({
             type="button"
             onClick={() => void loadActions()}
             disabled={loading}
-            title="Refresh ledger"
+            title="Refresh action log"
             className="inline-flex min-h-10 items-center justify-center gap-2 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-white disabled:cursor-not-allowed disabled:opacity-60"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} aria-hidden="true" />

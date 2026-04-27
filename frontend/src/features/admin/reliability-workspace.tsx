@@ -80,7 +80,7 @@ export function ReliabilityWorkspace({
                       AI quality preview
                     </div>
                     <h2 className="mt-2 text-xl font-bold tracking-tight text-slate-950">
-                      Loading operator-action panel
+                      Loading team-action panel
                     </h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
                       The heaviest reliability read path now loads separately so config and
@@ -93,9 +93,9 @@ export function ReliabilityWorkspace({
               </Suspense>
             ) : (
               <StandbyPanelCard
-                eyebrow="Operator action lane"
+                eyebrow="Team action lane"
                 title="AI quality review stays on standby until this lane is active"
-                detail="Keep the heaviest reliability preview out of the initial config-risk or contract-review path, then open AI quality only when operators need deeper booking and automation diagnostics."
+                detail="Keep the heaviest reliability preview out of the initial config-risk or contract-review path, then open AI quality only when the team needs deeper booking and automation diagnostics."
                 actionLabel="Open AI quality module"
                 onOpen={() => onPanelNavigate('prompt5-preview')}
               />

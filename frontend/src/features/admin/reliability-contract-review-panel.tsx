@@ -13,11 +13,11 @@ export function ReliabilityContractReviewPanel({
   const additiveV1Routes = apiRoutes.filter((route) => route.path.includes('/api/v1/')).length;
   const operatorNote =
     additiveV1Routes > 0
-      ? `Contract review shows ${additiveV1Routes} additive v1 routes already visible, so operator follow-up should focus on missing panel coverage or route expectations before asking for a backend rewrite.`
-      : 'No additive v1 routes are visible in this inventory, so operator follow-up should confirm whether the current admin surface is pointing at the correct backend contract path.';
+      ? `Contract review shows ${additiveV1Routes} additive v1 routes already visible, so team follow-up should focus on missing panel coverage or route expectations before asking for a backend rewrite.`
+      : 'No additive v1 routes are visible in this inventory, so team follow-up should confirm whether the current admin view is pointing at the correct backend contract path.';
   const exportCue =
     additiveV1Routes > 0
-      ? `Export cue: ${additiveV1Routes} additive v1 routes are visible alongside ${protectedRoutes} protected admin routes; hold rollout only if the needed operator path is still missing from this inventory.`
+      ? `Export cue: ${additiveV1Routes} additive v1 routes are visible alongside ${protectedRoutes} protected admin routes; hold rollout only if the needed team path is still missing from this inventory.`
       : 'Export cue: route coverage is incomplete for additive reliability review; confirm API exposure before widening rollout or triaging provider behavior.';
 
   return (
@@ -29,11 +29,11 @@ export function ReliabilityContractReviewPanel({
               Contract review drill-down
             </div>
             <h2 className="mt-2 text-2xl font-bold tracking-tight text-slate-950">
-              Confirm route coverage and additive v1 exposure before blaming operator flow
+              Confirm route coverage and additive v1 exposure before blaming the team flow
             </h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               This lane is optimized for backend surface visibility, route access posture, and
-              additive contract gaps that can block reliability triage even when the operator flow
+              additive contract gaps that can block reliability triage even when the team flow
               itself is behaving as designed.
             </p>
           </div>
@@ -53,7 +53,7 @@ export function ReliabilityContractReviewPanel({
         <div className="mt-5 grid gap-4 xl:grid-cols-2">
           <div className="rounded-[1.5rem] border border-sky-200 bg-white p-5">
             <div className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
-              Operator note
+              Team note
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-700">{operatorNote}</p>
           </div>

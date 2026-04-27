@@ -13,8 +13,8 @@ export function ReliabilityConfigRiskPanel({
   const categories = [...new Set(configItems.map((item) => item.category))];
   const operatorNote =
     unsetItems > 0
-      ? `Config risk still needs follow-up: ${unsetItems} entries are not set and ${protectedItems} protected values may need an operator refresh before rollout expands.`
-      : `Config risk is narrower now, but ${protectedItems} protected values still need operator verification before rollout expands.`;
+      ? `Config risk still needs follow-up: ${unsetItems} entries are not set and ${protectedItems} protected values may need a team refresh before rollout expands.`
+      : `Config risk is narrower now, but ${protectedItems} protected values still need team verification before rollout expands.`;
   const exportCue =
     unsetItems > 0
       ? `Export cue: hold wider rollout until ${unsetItems} unset configuration entries are reconciled and provider coverage is confirmed across ${categories.length} categories.`
@@ -34,7 +34,7 @@ export function ReliabilityConfigRiskPanel({
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
               This lane is optimized for secrets, provider toggles, masked values, and
               environment-specific drift that can explain reliability issues faster than changing
-              automation or operator workflow.
+              automation or team workflow.
             </p>
           </div>
           <div className="rounded-[1.25rem] border border-amber-200 bg-white px-4 py-3 text-sm text-slate-700">
@@ -53,7 +53,7 @@ export function ReliabilityConfigRiskPanel({
         <div className="mt-5 grid gap-4 xl:grid-cols-2">
           <div className="rounded-[1.5rem] border border-amber-200 bg-white p-5">
             <div className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
-              Operator note
+              Team note
             </div>
             <p className="mt-3 text-sm leading-6 text-slate-700">{operatorNote}</p>
           </div>

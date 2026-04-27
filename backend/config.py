@@ -143,6 +143,7 @@ class Settings:
     whatsapp_fallback_provider: str = ""
     bookedai_customer_telegram_bot_token: str = ""
     bookedai_customer_telegram_webhook_secret_token: str = ""
+    bookedai_support_telegram_chat_ids: str = ""
     telegram_bot_token: str = ""
     telegram_webhook_secret_token: str = ""
     customer_booking_support_email: str = DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
@@ -397,6 +398,9 @@ def get_settings() -> Settings:
         bookedai_customer_telegram_webhook_secret_token=os.getenv(
             "BOOKEDAI_CUSTOMER_TELEGRAM_WEBHOOK_SECRET_TOKEN",
             os.getenv("TELEGRAM_WEBHOOK_SECRET_TOKEN", ""),
+        ),
+        bookedai_support_telegram_chat_ids=os.getenv(
+            "BOOKEDAI_SUPPORT_TELEGRAM_CHAT_IDS", ""
         ),
         telegram_bot_token=os.getenv("TELEGRAM_BOT_TOKEN", ""),
         telegram_webhook_secret_token=os.getenv("TELEGRAM_WEBHOOK_SECRET_TOKEN", ""),

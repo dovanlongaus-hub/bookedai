@@ -178,7 +178,7 @@ export function buildIntegrationLaneSummaries(
       id: 'messaging',
       label: 'Messaging',
       count: counts.messaging,
-      detail: 'Email, SMS, and WhatsApp touches remain visible before operators intervene.',
+      detail: 'Email, SMS, and WhatsApp touches remain visible before the team intervenes.',
     },
     {
       id: 'payments',
@@ -238,7 +238,7 @@ export function buildIntegrationAttentionItems(
         createdAt: item.created_at,
         detail:
           formatQueueDetail(item) ||
-          'Operator follow-up remains open for this queue item.',
+          'Team follow-up remains open for this queue item.',
       };
     });
 
@@ -310,7 +310,7 @@ export function buildAuditChronology(
     createdAt: item.created_at,
     detail:
       formatQueueDetail(item) ||
-      'Queue context is available even before operators open the booking detail panel.',
+      'Queue context is available even before the team opens the booking detail panel.',
   }));
 
   return [...eventItems, ...queueEntries]

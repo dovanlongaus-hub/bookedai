@@ -31,7 +31,7 @@ const leakageMap = [
 
 const commercialTruths = [
   'Slow response increases CAC pressure.',
-  'Weak qualification burns operator time.',
+  'Weak qualification burns team time.',
   'No booking path leaves revenue invisible.',
 ];
 

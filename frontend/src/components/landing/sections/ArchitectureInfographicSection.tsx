@@ -5,8 +5,8 @@ import { SignalPill } from '../ui/SignalPill';
 
 const operatingSignals = [
   'One commercial system from acquisition to booking and follow-up',
-  'Clear role separation so buyers, operators, and partners each get the right experience',
-  'A visible operating model that turns conversations into auditable revenue workflow',
+  'Clear role separation so buyers, teams, and partners each get the right experience',
+  'A visible business model that turns conversations into auditable revenue flow',
 ];
 
 const salesDeckStages = [
@@ -23,12 +23,12 @@ const salesDeckStages = [
   {
     label: '03',
     title: 'Convert to booking',
-    body: 'Tenant and operator surfaces turn guided conversations into booking-ready action and visible lifecycle state.',
+    body: 'Tenant and team workspaces turn guided conversations into booking-ready action and visible lifecycle state.',
   },
   {
     label: '04',
     title: 'Run the business',
-    body: 'CRM, messaging, workflow, and cloud infrastructure keep follow-up, reporting, and reliability moving underneath.',
+    body: 'CRM, messaging, business flow, and cloud infrastructure keep follow-up, reporting, and reliability moving underneath.',
   },
 ];
 
@@ -42,14 +42,14 @@ const deckTheses = [
   },
   {
     title: 'Why this wins',
-    body: 'BookedAI does not stop at conversation. It connects acquisition, qualification, operator review, booking state, and business follow-through in one commercial system.',
+    body: 'BookedAI does not stop at conversation. It connects acquisition, qualification, team review, booking state, and business follow-through in one commercial system.',
     tone:
       'border-sky-200 bg-[linear-gradient(180deg,#eef6ff_0%,#ffffff_100%)]',
     accent: 'text-sky-700',
   },
   {
     title: 'Why it scales',
-    body: 'Role boundaries, workflow automation, tenant-safe control, and cloud-backed infrastructure let the product expand without turning into an opaque black box.',
+    body: 'Role boundaries, business automation, tenant-safe review, and cloud-backed infrastructure let the product expand without turning into an opaque black box.',
     tone:
       'border-emerald-200 bg-[linear-gradient(180deg,#effcf5_0%,#ffffff_100%)]',
     accent: 'text-emerald-700',
@@ -91,9 +91,9 @@ const roleCards = [
   },
   {
     eyebrow: 'Automation owner',
-    title: 'AI + Workflow Runtime',
-    body: 'Handles reasoning, routing, follow-up, and workflow execution across the revenue journey.',
-    chips: ['OpenAI', 'n8n', 'Workflow rules'],
+    title: 'AI + Business Automation',
+    body: 'Handles reasoning, routing, follow-up, and process execution across the revenue journey.',
+    chips: ['OpenAI', 'n8n', 'Business rules'],
     tone: 'from-[#eef2ff] via-white to-[#f8faff]',
     accent: 'text-indigo-700',
   },
@@ -141,7 +141,7 @@ const architectureLayers = [
     summary:
       'Tenant routing, actor-aware sessions, RBAC, portal limits, and admin-safe access rules make each workspace explicit and govern what each role can see or change.',
     capabilities: ['Multi-tenant routing', 'Actor-specific sessions', 'RBAC', 'Portal boundaries', 'Audit posture'],
-    roleFocus: 'Tenant Admin, Operator, Finance, Internal Support',
+    roleFocus: 'Tenant Admin, Service Team, Finance, Support',
     shellClassName:
       'border-emerald-200 bg-[linear-gradient(180deg,#effcf5_0%,#ffffff_100%)]',
     badgeClassName: 'bg-emerald-600 text-white',
@@ -156,18 +156,18 @@ const architectureLayers = [
       },
       {
         title: 'Role model',
-        items: ['Tenant admin', 'Operator', 'Finance manager', 'Internal admin'],
+        items: ['Tenant admin', 'Service team', 'Finance manager', 'Admin support'],
       },
     ],
   },
   {
     id: 'L3',
-    name: 'BookedAI Revenue Orchestration Core',
+    name: 'BookedAI Revenue Coordination Core',
     ownership: 'Capture, qualify, match, book, recover',
     summary:
-      'This is the system brain that turns enquiry signals into structured booking state, next-best actions, and visible revenue workflow for operators.',
-    capabilities: ['Intent capture', 'Qualification', 'Service matching', 'Booking lifecycle', 'Revenue recovery', 'Operator review'],
-    roleFocus: 'AI Runtime, Tenant Team, Admin Support',
+      'This is the system brain that turns enquiry signals into structured booking state, next-best actions, and visible revenue flow for teams.',
+    capabilities: ['Intent capture', 'Qualification', 'Service matching', 'Booking lifecycle', 'Revenue recovery', 'Team review'],
+    roleFocus: 'AI Product, Tenant Team, Admin Support',
     shellClassName:
       'border-slate-900 bg-[linear-gradient(135deg,#0f172a_0%,#111827_58%,#172554_100%)] text-white',
     badgeClassName: 'bg-white text-slate-950',
@@ -177,11 +177,11 @@ const architectureLayers = [
         items: ['Intent detection', 'Qualification', 'Customer context'],
       },
       {
-        title: 'Booking control',
+        title: 'Booking review',
         items: ['Service matching', 'Booking lifecycle', 'Recovery rules'],
       },
       {
-        title: 'Operator visibility',
+        title: 'Team visibility',
         items: ['Review queue', 'Revenue state', 'Audit-ready events'],
       },
     ],
@@ -193,7 +193,7 @@ const architectureLayers = [
     summary:
       'n8n, Zoho CRM, email, webhook connectors, uploads, and downstream service actions extend the core engine into real operational follow-through.',
     capabilities: ['n8n automation', 'Zoho CRM sync', 'Email delivery', 'Webhook actions', 'Upload surface', 'Provider connectors'],
-    roleFocus: 'Automation Runtime, CRM, Messaging, Partners',
+    roleFocus: 'Automation, CRM, Messaging, Partners',
     shellClassName:
       'border-amber-200 bg-[linear-gradient(180deg,#fff7ed_0%,#ffffff_100%)]',
     badgeClassName: 'bg-amber-500 text-white',
@@ -215,7 +215,7 @@ const architectureLayers = [
   {
     id: 'L5',
     name: 'Data, API, Observability, and Cloud Foundation',
-    ownership: 'Persistence, runtime, security, and scale',
+    ownership: 'Persistence, reliability, security, and scale',
     summary:
       'FastAPI, Supabase/Postgres, storage, GCP, environment controls, and model infrastructure hold the state model together and keep the platform production-safe.',
     capabilities: ['FastAPI API', 'Supabase + Postgres', 'Storage', 'GCP hosting', 'Telemetry', 'OpenAI model services'],
@@ -225,7 +225,7 @@ const architectureLayers = [
     badgeClassName: 'bg-slate-900 text-white',
     subframes: [
       {
-        title: 'Application runtime',
+        title: 'Application services',
         items: ['FastAPI backend', 'API routing', 'Hosted app services'],
       },
       {
@@ -246,7 +246,7 @@ const governanceCards = [
     body: 'Buyers can immediately see how BookedAI moves from enquiry capture to booked revenue without getting lost in backend detail.',
   },
   {
-    title: 'Operator confidence',
+    title: 'Team confidence',
     body: 'Tenant and admin roles work from visible operational state instead of disconnected chat fragments or hidden automation.',
   },
   {
@@ -261,7 +261,7 @@ const foundationCards = [
     body: 'React + TypeScript + Tailwind render the homepage, product proof, mobile-friendly booking flows, admin console, tenant workspace, and portal surface.',
   },
   {
-    title: 'Backend application runtime',
+    title: 'Backend application services',
     body: 'FastAPI route modules provide public, tenant, admin, communication, upload, and webhook entrypoints behind one API boundary.',
   },
   {
@@ -274,11 +274,11 @@ const foundationCards = [
   },
   {
     title: 'Cloud and delivery foundation',
-    body: 'GCP hosting, storage, networking, deployment lanes, and runtime configuration hold the platform together in production.',
+    body: 'GCP hosting, storage, networking, deployment lanes, and configuration hold the platform together in production.',
   },
   {
     title: 'AI reasoning and automation',
-    body: 'OpenAI services support intent understanding, structured extraction, reasoning, and workflow-safe handoff logic.',
+    body: 'OpenAI services support intent understanding, structured extraction, reasoning, and flow-safe follow-up logic.',
   },
 ];
 
@@ -293,7 +293,7 @@ const platformBadges = [
 const closingPanelPoints = [
   'Captures demand from the surfaces customers already use',
   'Converts conversations into structured booking operations',
-  'Gives operators, partners, and admins role-safe control',
+  'Gives teams, partners, and admins role-safe review',
   'Runs on recognizable AI, cloud, data, and workflow infrastructure',
 ];
 
@@ -357,7 +357,7 @@ function InvestorArchitectureImage() {
 
       <p className="mt-3 max-w-3xl text-sm leading-6 text-slate-600">
         This image is designed for a quick investor read: customer demand enters through visible
-        surfaces, the BookedAI revenue engine structures and routes it, operator workflows keep it
+        surfaces, the BookedAI revenue engine structures and routes it, team workflows keep it
         controlled, and AI plus cloud infrastructure keep the entire system reliable underneath.
       </p>
 
@@ -409,7 +409,7 @@ function InvestorArchitectureImage() {
             <rect x="344" y="40" width="552" height="238" rx="34" fill="url(#engine)" />
             <text x="382" y="86" fill="#bfdbfe" fontSize="18" fontWeight="700" letterSpacing="3">BOOKEDAI REVENUE ENGINE</text>
             <text x="382" y="128" fill="#ffffff" fontSize="36" fontWeight="700">AI qualification to booking control</text>
-            <text x="382" y="166" fill="rgba(255,255,255,0.78)" fontSize="20">Intent capture, shortlist ranking, booking handoff, follow-up state, and audit-ready events.</text>
+            <text x="382" y="166" fill="rgba(255,255,255,0.78)" fontSize="20">Intent capture, shortlist ranking, booking flow, follow-up state, and audit-ready events.</text>
 
             <rect x="382" y="194" width="148" height="54" rx="20" fill="rgba(255,255,255,0.12)" stroke="rgba(255,255,255,0.16)" />
             <text x="410" y="227" fill="#ffffff" fontSize="18" fontWeight="700">Intent + fit</text>
@@ -548,7 +548,7 @@ export function ArchitectureInfographicSection({
               </div>
 
               <h3 className="mt-5 font-['Space_Grotesk'] text-[1.9rem] font-semibold tracking-[-0.06em] text-white sm:text-[2.35rem]">
-                BookedAI connects marketing, AI qualification, booking operations, and follow-up in one operating model.
+                BookedAI connects marketing, AI qualification, booking operations, and follow-up in one business model.
               </h3>
 
               <div className="mt-5 grid gap-3">
@@ -614,7 +614,7 @@ export function ArchitectureInfographicSection({
                 },
                 {
                   title: 'Infrastructure',
-                  body: 'APIs, data, workflow, and AI services keep the runtime reliable underneath.',
+                  body: 'APIs, data, business flow, and AI services keep the product reliable underneath.',
                   items: ['FastAPI', 'Supabase', 'n8n', 'OpenAI'],
                 },
               ].map((item, index) => (
@@ -684,7 +684,7 @@ export function ArchitectureInfographicSection({
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                    Operating Model
+                    Business Model
                   </div>
                   <h3 className="mt-2 font-['Space_Grotesk'] text-[2.1rem] font-semibold tracking-[-0.05em] text-slate-950">
                     The flow from demand capture to reliable delivery
@@ -918,7 +918,7 @@ export function ArchitectureInfographicSection({
                   BookedAI is not just an assistant layer. It becomes the operating layer for service revenue.
                 </h3>
                 <p className="mt-4 max-w-[44rem] text-[1.02rem] leading-8 text-white/76">
-                  The pitch is simple: bring demand in, qualify it fast, convert it into booking-ready action, keep operators in control, and run the entire motion on infrastructure that buyers and partners can trust.
+                  The pitch is simple: bring demand in, qualify it fast, convert it into booking-ready action, keep teams in control, and run the entire motion on infrastructure that buyers and partners can trust.
                 </p>
               </div>
 

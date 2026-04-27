@@ -32,12 +32,32 @@ if [[ -z "$JS_PATH" ]]; then
 fi
 
 echo "Bundle: $JS_PATH"
-BUNDLE_CONTENT="$(curl -L --max-time 20 -s "${BASE_URL%/}$JS_PATH")"
+INDEX_BUNDLE_CONTENT="$(curl -L --max-time 20 -s "${BASE_URL%/}$JS_PATH")"
+ASSET_PATHS="$(
+  {
+    printf '%s\n' "$JS_PATH"
+    grep -Eo 'assets/[A-Za-z0-9._-]+\.js' <<<"$INDEX_BUNDLE_CONTENT" | sed 's#^#/#'
+  } | sort -u
+)"
+
+APP_BUNDLE_CONTENT=""
+HOMEPAGE_BUNDLE_CONTENT=""
+while IFS= read -r asset_path; do
+  [[ -z "$asset_path" ]] && continue
+  printf 'Scanning: %s\n' "$asset_path"
+  asset_content="$(curl -L --max-time 20 -s "${BASE_URL%/}$asset_path")"
+  APP_BUNDLE_CONTENT+=$'\n'
+  APP_BUNDLE_CONTENT+="$asset_content"
+  if [[ "$asset_path" == *"/PublicApp-"* || "$asset_path" == *"/homepageContent-"* || "$asset_path" == "$JS_PATH" ]]; then
+    HOMEPAGE_BUNDLE_CONTENT+=$'\n'
+    HOMEPAGE_BUNDLE_CONTENT+="$asset_content"
+  fi
+done <<<"$ASSET_PATHS"
 
 check_contains() {
   local needle="$1"
   local label="$2"
-  if grep -Fq "$needle" <<<"$BUNDLE_CONTENT"; then
+  if grep -Fq "$needle" <<<"$APP_BUNDLE_CONTENT"; then
     echo "PASS $label"
   else
     echo "FAIL $label"
@@ -48,7 +68,7 @@ check_contains() {
 check_absent() {
   local needle="$1"
   local label="$2"
-  if grep -Fq "$needle" <<<"$BUNDLE_CONTENT"; then
+  if grep -Fq "$needle" <<<"$HOMEPAGE_BUNDLE_CONTENT"; then
     echo "FAIL unexpected: $label"
     return 1
   else
@@ -61,7 +81,7 @@ for pair in \
   "Turn more website visitors, calls, and enquiries into confirmed bookings.:::hero headline" \
   "The AI revenue engine for service businesses:::hero eyebrow" \
   "Start in product:::primary hero CTA" \
-  "Start with BookedAI.au:::final CTA" \
+  "Start with BookedAI:::final CTA" \
   "Product proof:::proof section label" \
   "Ready to move faster?:::final section eyebrow" \
   "What matters most:::top signal label" \
