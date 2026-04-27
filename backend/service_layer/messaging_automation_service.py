@@ -22,6 +22,11 @@ from repositories.tenant_repository import TenantRepository
 from schemas import TawkMessage
 from service_layer.calls_scheduling import build_qr_code_url
 from service_layer.communication_service import CommunicationService
+from service_layer.messaging_experiments import (
+    assign_arm,
+    experiment_arm_summary,
+    merge_assignments,
+)
 from service_layer.tenant_app_service import (
     build_portal_customer_care_turn,
     infer_portal_request_type_from_message,
@@ -117,24 +122,81 @@ class MessagingAutomationService:
 
         locale = self._resolve_locale(metadata.get("telegram_language_code"))
 
+        # Load any prior experiment arm assignments so we can keep them sticky
+        # for returning conversations and persist any new arms before the bot's
+        # first reply on this conversation goes out.
+        prior_channel_state = await self._load_channel_session_state(
+            session,
+            channel=normalized_channel,
+            conversation_id=conversation_key,
+        )
+        existing_assignments = (
+            prior_channel_state.get("session_metadata") or {}
+        ).get("experiment_assignments") or {}
+        if not isinstance(existing_assignments, dict):
+            existing_assignments = {}
+        welcome_arm = assign_arm(
+            "welcome_copy_v1",
+            conversation_key,
+            existing_assignments=existing_assignments,
+        )
+        merged_assignments = merge_assignments(
+            existing_assignments,
+            {"welcome_copy_v1": welcome_arm},
+        )
+
+        # Phase C: route_handlers._apply_handoff_session_context has already
+        # consumed the customer_handoff_sessions row (if any) and rewritten
+        # message.text in place. We just need to map the residual
+        # start_command_kind back to a downstream-friendly value so the rest of
+        # the pipeline doesn't see "handoff_session" — it should behave as if
+        # the customer had typed the recovered context themselves (booking-ref
+        # → booking-care, service_query → search, empty/unknown → welcome).
+        if (
+            normalized_channel == "telegram"
+            and str(metadata.get("start_command_kind") or "") == "handoff_session"
+        ):
+            payload = metadata.get("handoff_session_payload")
+            if isinstance(payload, dict):
+                if str(payload.get("booking_reference") or "").strip():
+                    metadata["start_command_kind"] = "booking_reference"
+                elif str(payload.get("service_query") or "").strip() or str(
+                    payload.get("service_slug") or ""
+                ).strip():
+                    metadata["start_command_kind"] = "service_search"
+                else:
+                    metadata["start_command_kind"] = "welcome"
+            else:
+                metadata["start_command_kind"] = "welcome"
+
         if (
             normalized_channel == "telegram"
             and str(metadata.get("start_command_kind") or "") == "welcome"
         ):
-            return self._build_welcome_result(
+            return await self._build_welcome_result(
+                session,
                 channel=normalized_channel,
+                conversation_id=conversation_key,
+                tenant_id=str(metadata.get("tenant_ref") or "").strip() or None,
                 message=message,
                 identity_metadata=identity_metadata,
                 locale=locale,
+                welcome_arm=welcome_arm,
+                experiment_assignments=merged_assignments,
             )
 
         slash_intent = self._slash_command_intent(message.text)
         if slash_intent == "help":
-            return self._build_welcome_result(
+            return await self._build_welcome_result(
+                session,
                 channel=normalized_channel,
+                conversation_id=conversation_key,
+                tenant_id=str(metadata.get("tenant_ref") or "").strip() or None,
                 message=message,
                 identity_metadata=identity_metadata,
                 locale=locale,
+                welcome_arm=welcome_arm,
+                experiment_assignments=merged_assignments,
             )
         if slash_intent == "search":
             return self._build_search_prompt_result(
@@ -193,11 +255,9 @@ class MessagingAutomationService:
             channel=normalized_channel,
             conversation_id=conversation_key,
         )
-        channel_state = await self._load_channel_session_state(
-            session,
-            channel=normalized_channel,
-            conversation_id=conversation_key,
-        )
+        # Reuse the channel state we loaded above for experiment assignment so
+        # we don't issue a duplicate query against MessagingChannelSession.
+        channel_state = prior_channel_state
         prior_booking_reference = self._latest_booking_reference(history)
         prior_service_query = self._latest_service_query(history) or str(
             channel_state.get("service_search_query") or ""
@@ -784,6 +844,9 @@ class MessagingAutomationService:
             ),
             "customer_identity": (
                 row.customer_identity_json if isinstance(row.customer_identity_json, dict) else {}
+            ),
+            "session_metadata": (
+                row.metadata_json if isinstance(row.metadata_json, dict) else {}
             ),
         }
 
@@ -1967,13 +2030,18 @@ class MessagingAutomationService:
             f"reschedule, or cancellation options. {channel_hint} You can also continue at https://bookedai.au."
         )
 
-    def _build_welcome_result(
+    async def _build_welcome_result(
         self,
+        session,
         *,
         channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
         message: TawkMessage,
         identity_metadata: dict[str, object],
         locale: str = "en",
+        welcome_arm: str = "control",
+        experiment_assignments: dict[str, str] | None = None,
     ) -> MessagingAutomationResult:
         sender_name = str(message.sender_name or "").strip()
         greeting = (
@@ -1981,7 +2049,33 @@ class MessagingAutomationService:
             if sender_name
             else self._localized("welcome_greeting_anonymous", locale)
         )
-        body = self._localized("welcome", locale, greeting=greeting)
+        body_key = "welcome_copy_concise" if welcome_arm == "concise" else "welcome"
+        body = self._localized(body_key, locale, greeting=greeting)
+        assignments = experiment_assignments or {"welcome_copy_v1": welcome_arm}
+        experiments_summary = experiment_arm_summary(assignments)
+        reply_controls = {
+            "telegram_reply_markup": self._home_reply_keyboard(locale),
+            "telegram_parse_mode": "HTML",
+        }
+        # Persist the assignment before the bot's first reply on this
+        # conversation goes out so analytics can attribute the welcome reply
+        # back to the assigned arm.
+        await self._upsert_channel_session_state(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=identity_metadata,
+            service_search_query=None,
+            service_options=[],
+            reply_controls=reply_controls,
+            last_ai_intent="welcome",
+            last_workflow_status="answered",
+            metadata={
+                "source": "welcome",
+                "experiment_assignments": assignments,
+            },
+        )
         return MessagingAutomationResult(
             ai_reply=body,
             ai_intent="welcome",
@@ -1991,10 +2085,8 @@ class MessagingAutomationService:
                 "customer_identity": identity_metadata,
                 "customer_care_status": "welcome",
                 "locale": locale,
-                "reply_controls": {
-                    "telegram_reply_markup": self._home_reply_keyboard(locale),
-                    "telegram_parse_mode": "HTML",
-                },
+                "reply_controls": reply_controls,
+                "experiments": experiments_summary,
             },
         )
 
@@ -2126,6 +2218,20 @@ class MessagingAutomationService:
                 "• Hoặc gõ điều bạn muốn, ví dụ <i>Tìm lớp cờ vua ở Sydney cuối tuần này</i>\n"
                 "• Gõ /mybookings để xem các booking đang có\n"
                 "• Gõ /help bất cứ lúc nào để xem mình hỗ trợ được gì"
+            ),
+        },
+        "welcome_copy_concise": {
+            "en": (
+                "{greeting} I'm <b>BookedAI Manager Bot</b>.\n"
+                "Tap <b>Find a service</b> below, or tell me what you want — "
+                "for example, <i>chess class in Sydney this weekend</i>.\n"
+                "Send /mybookings to see active bookings or /help for more."
+            ),
+            "vi": (
+                "{greeting} Mình là <b>BookedAI Manager Bot</b>.\n"
+                "Bấm <b>Tìm dịch vụ</b> bên dưới, hoặc gõ điều bạn muốn — "
+                "ví dụ <i>lớp cờ vua ở Sydney cuối tuần này</i>.\n"
+                "Gõ /mybookings để xem booking hiện có hoặc /help để biết thêm."
             ),
         },
         "welcome_greeting_named": {

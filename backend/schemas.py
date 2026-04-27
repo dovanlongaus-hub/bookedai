@@ -63,6 +63,26 @@ class TawkWebhookResponse(BaseModel):
     workflow_status: str | None = None
 
 
+class CreateCustomerHandoffSessionRequest(BaseModel):
+    """Public-app payload to mint a Telegram deep-link with pre-filled context."""
+
+    source: str | None = Field(default=None, max_length=50)
+    booking_reference: str | None = Field(default=None, max_length=64)
+    service_query: str | None = Field(default=None, max_length=300)
+    service_slug: str | None = Field(default=None, max_length=120)
+    location_hint: str | None = Field(default=None, max_length=120)
+    locale: str | None = Field(default=None, max_length=12)
+    notes: str | None = Field(default=None, max_length=500)
+    selected_service_ids: list[str] = Field(default_factory=list, max_length=10)
+
+
+class CreateCustomerHandoffSessionResponse(BaseModel):
+    status: str
+    session_id: str
+    deeplink: str
+    expires_at: str
+
+
 class EmailStatusResponse(BaseModel):
     smtp_configured: bool
     imap_configured: bool
