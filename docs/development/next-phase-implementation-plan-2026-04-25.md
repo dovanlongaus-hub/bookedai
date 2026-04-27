@@ -190,29 +190,29 @@ The seven-lane review captured in `docs/development/full-stack-review-2026-04-26
 - `P1-1` complete the authenticated tenant write-path UAT (catalog edit, billing activation, team controls) after the email-code login round-trip
 - `P1-7` accessibility and mobile breakpoint debt: local implementation now links phone field guidance via `aria-describedby` and converts the admin booking table into responsive cards below `720px`; full product regression rerun remains required before live promotion
 - `P1-8` add Playwright coverage for `frontend/src/apps/public/PitchDeckApp.tsx` at desktop and `390px` mobile
-- `P1-9` apply `backend/migrations/sql/020_future_swim_miranda_booking_url_hotfix.sql` from a host with database access
+- `P1-9` closed live on `2026-04-26`: `backend/migrations/sql/020_future_swim_miranda_booking_url_hotfix.sql` was applied to the Future Swim Miranda row after pre-check confirmed the old branch URL returned `404`; live catalog now points to `https://futureswim.com.au/locations/`
 - A/B activation: `AC-1`, `AC-2`, `AC-3`, `BC-1`, `BC-3`, `BC-4`, `RT-1`, `RT-2`, `RT-3`
 
 ### Delta for Phase 18 — Revenue-Ops Ledger Control
 
 - preserve the existing P18 deliverables; layer the tenant-id query validator from `Phase 22` plan onto the action ledger queries when the validator ships, so no new ledger code can be merged without tenant scoping
-- ledger evidence drawers should now expose webhook idempotency state once `P0-4` lands so operators can see whether an inbound provider event was deduplicated
+- ledger evidence drawers should now expose webhook idempotency state; P0-4 route-level idempotency and the additive evidence indexes are live, while the operator evidence drawer remains the carried UI follow-up
 
 ### Delta for Phase 19 — Customer-Care And Status Agent
 
 - `P0-2` resolve the WhatsApp provider posture: either complete Meta Cloud business registration for `+61455301335` or document Twilio as the active default with a sandbox-vs-production matrix
 - `P0-3` enforce Telegram's official webhook secret-token verification for `/api/webhooks/telegram` and `/api/webhooks/bookedai-telegram`, and add HMAC-SHA256 verification for the Evolution webhook when `WHATSAPP_EVOLUTION_WEBHOOK_SECRET` is configured
-- `P0-4` introduce a `webhook_events` idempotency table and route Tawk, WhatsApp, Telegram, Evolution, and Zoho through it
-- `P0-5` add a `_resolve_tenant_id` validator on the public assistant routes that rejects any `actor_context.tenant_id` that does not match the authenticated session
+- `P0-4` route WhatsApp, customer Telegram, and Evolution through the shared `webhook_events`/`idempotency_keys` gate; code, duplicate-event tests, and additive evidence indexes are live, with Telegram customer UAT and the operator evidence drawer carried
+- `P0-5` closed live: `_resolve_tenant_id` rejects any `actor_context.tenant_id` that does not match the authenticated tenant session, and live smoke returned `403`
 - `P1-2` ship inline action controls on WhatsApp outbound replies and align the sender identity to `BookedAI Manager Bot`
-- `P1-3` mirror the Telegram webhook test suite for WhatsApp (identity-gate, queued cancel, queued reschedule, Internet expansion)
+- `P1-3` closed locally: WhatsApp webhook tests now mirror Telegram coverage for identity-gate, queued cancel, queued reschedule, and Internet expansion
 - `P1-10` make customer-facing email templates channel-aware so support copy names `info@bookedai.au` and the available chat channel
 - A/B activation: `CH-1`, `CH-2`, `CH-3`, `CH-4`, `CH-5`
 - schema delta: add `location_posture` to the chat response shape and propagate through web, Telegram, WhatsApp; this unlocks `BC-1`
 
 ### Delta for Phase 20 — Widget And Plugin Runtime
 
-- precondition: `P0-3`, `P0-4`, `P0-5`, `P1-2` must be live before the widget runtime can extend the same shared messaging policy to embedded surfaces
+- precondition: `P0-3` and `P0-5` are live; `P0-4` code/indexes are live but still needs Telegram customer UAT and evidence-drawer surfacing; `P1-2` remains open before the widget runtime can extend the same shared messaging policy to embedded surfaces
 - when shipping the widget, reuse the same A/B telemetry contract documented in `docs/development/full-stack-review-2026-04-26.md` so embed-mode experiments do not require a separate analytics path
 
 ### Delta for Phase 20.5 — Confirmation Wallet And Stripe Return Continuity
@@ -236,7 +236,8 @@ The seven-lane review captured in `docs/development/full-stack-review-2026-04-26
 
 - `P0-6` add `.github/workflows/ci.yml` covering lint, type-check, backend unit tests, frontend build, and image build, plus branch protection on `main`
 - `P0-7` expand `.env.production.example` to mirror `.env.example` with explicit `required` vs `optional` markers and add a checksum/diff guard to `scripts/deploy_production.sh`
-- `P0-8` drop OpenClaw root, scope the host mount to the BookedAI deploy directory, document the operator authority boundary in `deploy/openclaw/README.md`
+- `P0-8` closed live on `2026-04-26`: drop OpenClaw root by default, remove default hostfs/Docker-socket mounts, remove full host actions from the default Telegram vocabulary, document the operator boundary in `deploy/openclaw/README.md`, recreate the live OpenClaw stack, and verify gateway health plus reduced-authority operator smoke
+- `P1-8` closed locally on `2026-04-26`: add pitch deck Playwright coverage for desktop investor view, `390px` mobile containment, no horizontal overflow, and refreshed video source; promote with the next frontend release gate
 - `P1-6` separate the production beta runtime tier from the production database, then push backend and frontend images to a registry (`git-sha` plus `latest` tags) so rollback is a tag swap rather than a rebuild
 - bring up Prometheus, Grafana, and AlertManager with a documented alert path through Discord, then add PagerDuty (or equivalent) for `5xx` rate, DB offline, and disk pressure
 - the release-gate checklist must record the new webhook signature, idempotency, and tenant_id validator gates as required for promote
@@ -522,7 +523,7 @@ Inherits the canonical phase model above. Each sprint maps onto the existing `Ph
 
 - Sprint 19 (`2026-04-27 → 2026-05-03`) `Stabilize and Sign`: close the eight P0 items (`P0-1` to `P0-8`); ship `P1-7` (A11y phone helper, admin booking responsive); exit gate is portal `v1-*` UAT green, CI blocks failures, OpenClaw rootless.
 - Sprint 20 (`2026-05-04 → 2026-05-10`) `First Real Revenue Loop`: close `P1-1`, `P1-2`, `P1-5`, `P1-9`; document one Future Swim revenue loop end-to-end; bring up observability stack; activate A/B `AC-1`, `RT-1`, `RT-3`, `CH-1`; publish v1 of the Commercial and Compliance Checklist.
-- Sprint 21 (`2026-05-11 → 2026-05-17`) `Refactor and Coverage`: close `P1-3`, `P1-4`, `P1-6`, `P1-8`, `P1-10`; add `location_posture` field unlocking `BC-1`; replace bare except blocks; tagged image rollback verified on staging.
+- Sprint 21 (`2026-05-11 → 2026-05-17`) `Refactor and Coverage`: `P1-3` is already closed locally; close `P1-4`, `P1-6`, `P1-10`; keep `P1-8` live-promotion coverage in the frontend gate; add `location_posture` field unlocking `BC-1`; replace bare except blocks; tagged image rollback verified on staging.
 - Sprint 22 (`2026-05-18 → 2026-05-24`) `Multi-tenant and Multi-channel`: tenant_id validator with chaos test; SMS adapter; Tenant Revenue Proof dashboard; pricing/commission visibility in tenant workspace; A/B wave 2 (`BC-2`, `CH-1`, `CH-3`); rate-limiting on remaining public endpoints; compliance terms updates from Sprint 20 audit.
 
 ## Verification Plan

@@ -736,7 +736,7 @@ Preserve the canonical customer journey `Ask -> Match -> Compare -> Book -> Conf
 - progressive search loading with skeleton and staged status
 - accessibility (`P1-7` phone `aria-describedby`) and admin booking responsive `≤720px`
 - `P1-8` `PitchDeckApp.tsx` Playwright coverage
-- `P1-9` Future Swim Miranda URL hotfix migration apply
+- `P1-9` Future Swim Miranda URL hotfix migration apply (`closed live 2026-04-26`)
 
 ### Exit criteria
 
@@ -776,8 +776,8 @@ One shared booking-care policy across WhatsApp, SMS, Telegram, email, and web ch
 
 - `P0-2` WhatsApp provider posture decision (Meta Cloud or Twilio)
 - `P0-3` HMAC verification for Telegram and Evolution webhooks
-- `P0-4` inbound webhook idempotency
-- `P0-5` `actor_context.tenant_id` validator on public assistant routes
+- `P0-4` inbound webhook idempotency (`code/indexes live; Telegram UAT/evidence drawer carried`)
+- `P0-5` `actor_context.tenant_id` validator on public assistant routes (`closed live 2026-04-26`)
 - `P1-2` WhatsApp inline action controls and sender identity alignment
 - `P1-3` WhatsApp webhook test parity with Telegram
 - `P1-10` channel-aware customer-facing email templates

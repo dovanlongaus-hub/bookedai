@@ -103,12 +103,14 @@ The PM now treats `Sprint 19` as the immediate execution board.
 | `P0-1` | portal `v1-*` snapshot UAT remains green for fresh references | `17` | Backend, QA/UAT, DevOps/Live | API test, live portal smoke, progress closeout |
 | `P0-2` | WhatsApp provider posture decision | `19` | Product/PM, Backend, DevOps/Live | decision recorded in `docs/development/whatsapp-provider-posture-decision-2026-04-26.md`; provider delivery still blocked until Twilio/Meta repair |
 | `P0-3` | Telegram/Evolution webhook signature verification | `19` | Backend, Security/Validation, QA/UAT | Telegram token tests, Evolution HMAC tests, release gate, live deploy |
-| `P0-4` | inbound webhook idempotency table and routing | `19`, `23` | Backend, Data/Revenue, QA/UAT | migration, duplicate-event tests, ledger evidence plan |
-| `P0-5` | public assistant `actor_context.tenant_id` validator | `19`, `22` | Backend, Security/Validation | rejection tests and route coverage |
+| `P0-4` | inbound webhook idempotency table and routing | `19`, `23` | Backend, Data/Revenue, QA/UAT | code/indexes live; Telegram UAT chat id and evidence drawer remain carried |
+| `P0-5` | public assistant `actor_context.tenant_id` validator | `19`, `22` | Backend, Security/Validation | closed live with tenant mismatch smoke |
 | `P0-6` | GitHub Actions CI | `23` | DevOps/Live, QA/UAT | workflow file, local parity, branch protection note |
 | `P0-7` | expanded `.env.production.example` and checksum guard | `23` | DevOps/Live, Security/Validation | env diff/checksum test |
 | `P0-8` | reduce OpenClaw root/Docker-socket scope | `23` | DevOps/Live, Security/Validation | README boundary, live/operator smoke |
 | `P1-7` | phone `aria-describedby` and admin booking responsive cards | `17`, `8` | Frontend, QA/UAT | Playwright desktop/mobile coverage |
+| `P1-3` | WhatsApp webhook parity with Telegram suite | `19`, `23` | Backend, QA/UAT | closed locally with identity, cancel, reschedule, Internet expansion tests |
+| `FX-2` | shared API 30-second timeout | `19` | Frontend, QA/UAT | shared-client pass closed live; direct fetch cleanup carried |
 
 ## Execution Log
 
@@ -161,7 +163,7 @@ The PM now treats `Sprint 19` as the immediate execution board.
 - Implementation: Telegram and Evolution now reserve an inbound idempotency key before customer-care side effects, record the inbound `webhook_events` row, mark processed after storage/reply handling, and return `messages_processed: 0` for duplicate provider events.
 - Migration: `backend/migrations/sql/022_inbound_webhook_idempotency_evidence_indexes.sql` adds additive evidence indexes for webhook status and idempotency scope queries.
 - Automated verification: `.venv/bin/python -m py_compile backend/api/route_handlers.py backend/repositories/idempotency_repository.py backend/repositories/webhook_repository.py`; `.venv/bin/python -m pytest backend/tests/test_whatsapp_webhook_routes.py backend/tests/test_telegram_webhook_routes.py -q` passed with `21 passed`.
-- Status: local P0-4 code and duplicate-event coverage closed; deploy-live and operator evidence drawer surfacing remain carried follow-ups.
+- Status: P0-4 route-level idempotency code, duplicate-event coverage, and additive evidence indexes are live. Telegram customer UAT still needs a real `BOOKEDAI_CUSTOMER_TELEGRAM_UAT_CHAT_ID`, and operator evidence drawer surfacing remains the carried UI follow-up.
 
 ### `2026-04-26` Phase 23 P0-7 Env Guard Patch
 
@@ -172,13 +174,44 @@ The PM now treats `Sprint 19` as the immediate execution board.
 - Policy/secrets: no repository secrets, deployment credentials, or branch protection settings were invented in code. GitHub Actions workflow publication remains an operator follow-up because the available GitHub token rejected workflow-file updates without `workflow` scope.
 - Status: P0-7 patch is verified; P0-6 CI remains carried until workflow publication and branch protection can be applied.
 
+### `2026-04-26` Phase 23 P0-8 OpenClaw Rootless Boundary
+
+- Scope: reduce default OpenClaw operator privilege and make full host shell access explicit rather than ambient.
+- Owner lanes: DevOps/Live, Security/Validation.
+- Implementation: `openclaw-cli` now runs as `OPENCLAW_CLI_USER=1000:1000` by default, no longer declares `privileged`, `pid: host`, `/hostfs`, or `/var/run/docker.sock`, and no longer grants `host_shell`, `openclaw_runtime_admin`, or `full_project` in the default Telegram/OpenClaw action vocabulary.
+- Operator boundary: `host-shell` now requires `BOOKEDAI_ENABLE_HOST_SHELL=1` before execution; allowlisted `host-command`, repo-scoped commands, deploy helpers, and read-only bot status remain the normal surfaces.
+- Automated verification: Python compile for `scripts/telegram_workspace_ops.py`, host-shell negative gate, permissions snapshot, and OpenClaw compose config checks passed.
+- Live rollout: OpenClaw compose was recreated on the VPS through allowlisted `host-command`; gateway health returned `{"ok":true,"status":"live"}` after cold start.
+- Operator smoke: `openclaw-cli` runs as uid `1000`, has no `/hostfs` or `/var/run/docker.sock`, live permissions exclude `host_shell` and `full_project`, and `host-shell` is rejected unless `BOOKEDAI_ENABLE_HOST_SHELL=1` is explicitly set.
+- Status: P0-8 is closed live. Future host-level deploys through OpenClaw require an explicit break-glass session or a host-side operator path; they are not part of the default Telegram action posture.
+
 ### `2026-04-26` Phase 19 P0-5 Public Assistant Tenant Validation
 
 - Scope: public assistant `actor_context.tenant_id` validation for authenticated tenant sessions.
 - Owner lanes: Backend, Security/Validation.
 - Implementation: `_resolve_tenant_id` now checks a valid tenant Bearer session before trusting a supplied `actor_context.tenant_id`; mismatches return `403`. `/api/chat/send` remains unchanged because it does not accept `actor_context`.
 - Automated verification: `.venv/bin/python -m py_compile backend/api/v1_routes.py backend/api/v1_booking_handlers.py backend/api/route_handlers.py`; `.venv/bin/python -m pytest backend/tests/test_api_v1_booking_routes.py backend/tests/test_chat_send_routes.py -q` passed with `8 passed`; `.venv/bin/python -m pytest backend/tests/test_api_v1_search_routes.py -q` passed with `21 passed`.
-- Status: local P0-5 rejection and matching-session coverage closed; deploy-live and live smoke remain pending if this patch is promoted.
+- Live smoke: authenticated against the live tenant password endpoint and posted a mismatched public assistant booking-path request; production returned `403` with `actor_context.tenant_id does not match the authenticated tenant session.`
+- Verification refresh: `.venv/bin/python -m pytest backend/tests/test_api_v1_booking_routes.py backend/tests/test_api_v1_search_routes.py -q` passed with `28 passed`.
+- Status: P0-5 is closed live.
+
+### `2026-04-26` Phase 17 P1-9 Future Swim Miranda URL Hotfix
+
+- Scope: replace the published Future Swim Miranda booking/source URL that pointed to a dead branch page.
+- Owner lanes: Backend, Data/Revenue, DevOps/Live, QA/UAT.
+- Pre-check: `https://futureswim.com.au/locations/miranda/` returned `404`; `https://futureswim.com.au/locations/` returned `200`; the live catalog row still exposed the dead Miranda URL.
+- Rollout: applied the targeted live SQL update from `backend/migrations/sql/020_future_swim_miranda_booking_url_hotfix.sql` against `service_merchant_profiles` for `future-swim-miranda-kids-swimming-lessons`; the update returned `UPDATE 1`.
+- Live smoke: the live DB row now has `booking_url` and `source_url` set to `https://futureswim.com.au/locations/`; the public catalog API now returns the updated `booking_url`.
+- Status: P1-9 is closed live.
+
+### `2026-04-26` Phase 19 P1-3 WhatsApp Parity And FX-2 Shared Timeout
+
+- Scope: close the locally testable messaging parity gap and reduce frontend API hang risk through the shared typed client.
+- Owner lanes: Backend, Frontend, QA/UAT.
+- Implementation: `backend/tests/test_whatsapp_webhook_routes.py` now mirrors Telegram coverage for missing-identity booking-care prompts, queued cancellation, queued reschedule, and Internet expansion. `frontend/src/shared/api/client.ts` now exposes `fetchWithTimeout()` and routes `apiRequest()` through a 30-second timeout with caller abort-signal forwarding.
+- Automated verification: `.venv/bin/python -m py_compile backend/tests/test_whatsapp_webhook_routes.py`; `.venv/bin/python -m pytest backend/tests/test_whatsapp_webhook_routes.py backend/tests/test_telegram_webhook_routes.py -q` passed with `24 passed`; `npm --prefix frontend exec tsc -- --noEmit`; `npm --prefix frontend run build`; `RUN_SEARCH_REPLAY_GATE=false bash scripts/run_release_gate.sh` passed.
+- Deploy-live: completed through `python3 scripts/telegram_workspace_ops.py deploy-live`; `bash scripts/healthcheck_stack.sh` passed at `2026-04-26T23:38:05Z`; public/product/pitch/tenant/admin hosts returned `200`, and the live bookedai.au bundle contains the timeout-enabled shared client chunk.
+- Status: P1-3 is closed locally. FX-2 shared-client first pass is closed live; direct `fetch` callers and mobile slow-network Playwright coverage remain carried follow-ups before claiming all 47 fetch paths are covered.
 
 ## UAT Standard
 

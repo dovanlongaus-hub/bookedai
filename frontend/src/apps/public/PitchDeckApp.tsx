@@ -36,7 +36,7 @@ import {
 const productUrl = 'https://product.bookedai.au/';
 const demoLandingUrl = 'https://demo.bookedai.au/';
 const architectureUrl = '/architecture';
-const pitchVideoUrl = 'https://upload.bookedai.au/videos/2cc8/fxu3H6DZDcFOvpjc9UlOmQ.mp4';
+const pitchVideoUrl = 'https://upload.bookedai.au/videos/0cfb/LCpooAUVSsL24QXMvIBR0A.mp4';
 const chessScreenImageUrl = '/branding/optimized/chess-screen-proof-1400.webp';
 const chessScreenImageSrcSet =
   '/branding/optimized/chess-screen-proof-960.webp 960w, /branding/optimized/chess-screen-proof-1400.webp 1400w';

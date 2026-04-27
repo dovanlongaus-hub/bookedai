@@ -2,7 +2,7 @@
 
 Date: `2026-04-17`
 
-Document status: `ready for explicit signoff`
+Document status: `closed historical baseline; explicit signoff superseded by 2026-04-26 master roadmap done-baseline status`
 
 ## 1. Purpose
 
@@ -22,9 +22,9 @@ This review should be read together with:
 
 Current recommendation:
 
-- `Phase 0 is materially complete in documentation and planning`
-- `Phase 0 is ready for explicit owner signoff`
-- `Sprint 2 can proceed once signoff responsibility is acknowledged against the checklist below`
+- `Phase 0 is complete as the historical planning baseline`
+- `Sprint 1 is treated as closed/green by the 2026-04-26 master roadmap`
+- `Active execution should continue through the Phase 17-23 operating board unless a source-of-truth conflict is found`
 
 This is not a claim that every future detail is final.
 

@@ -2,7 +2,7 @@
 
 Date: `2026-04-17`
 
-Document status: `active sprint checklist`
+Document status: `closed historical checklist; superseded for active execution by the 2026-04-26 phase operating system`
 
 ## 1. Purpose
 

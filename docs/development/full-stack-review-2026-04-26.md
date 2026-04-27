@@ -113,11 +113,11 @@ A fourth structural risk sits across `backend` and `DevOps`:
   - owner: `Backend Security`
   - files: `backend/api/route_handlers.py`, `backend/api/webhook_routes.py`
   - phase: `Phase 19`
-- `P0-4` no inbound webhook idempotency; introduce a `webhook_events` table with provider id and processed flag, and route Tawk, WhatsApp, Telegram, Evolution, and Zoho through it
+- `P0-4` inbound webhook idempotency route gate and evidence indexes are now live for WhatsApp, customer Telegram, and Evolution; Telegram customer UAT and the operator evidence drawer remain carried follow-ups
   - owner: `Backend`
   - files: new `backend/repositories/webhook_idempotency_repository.py`, `backend/api/webhook_routes.py`
   - phase: `Phase 19`
-- `P0-5` public assistant routes accept `actor_context.tenant_id` from the client without validating it against the authenticated session; add a `_resolve_tenant_id` validator that rejects mismatches with `403`
+- `P0-5` public assistant tenant validation is closed live: `_resolve_tenant_id` rejects `actor_context.tenant_id` mismatches with `403` when a tenant session is authenticated
   - owner: `Backend Security`
   - files: `backend/api/v1_routes.py`
   - phase: `Phase 19`
@@ -129,7 +129,7 @@ A fourth structural risk sits across `backend` and `DevOps`:
   - owner: `DevOps`
   - files: `.env.production.example`, `scripts/deploy_production.sh`
   - phase: `Phase 23`
-- `P0-8` OpenClaw runtime runs as `root` with the host Docker socket mounted; drop root, scope the mount to the BookedAI deploy directory, document the operator authority boundary
+- `P0-8` OpenClaw runtime root/Docker-socket scope: closed live on `2026-04-26`. `openclaw-cli` is rootless by default, hostfs/Docker socket mounts are removed, full host actions are removed from the default Telegram vocabulary, `host-shell` requires `BOOKEDAI_ENABLE_HOST_SHELL=1`, VPS compose was recreated, gateway health passed, and operator smoke verified the reduced authority.
   - owner: `DevOps Security`
   - files: `deploy/openclaw/docker-compose.yml`, `deploy/openclaw/README.md`
   - phase: `Phase 23`
@@ -144,7 +144,7 @@ A fourth structural risk sits across `backend` and `DevOps`:
   - owner: `Chat`
   - files: `backend/service_layer/messaging_automation_service.py`, `backend/service_layer/communication_service.py`
   - phase: `Phase 19`
-- `P1-3` WhatsApp webhook integration tests are shallow; mirror the Telegram suite for identity-gate, queued cancel, queued reschedule, and Internet expansion
+- `P1-3` WhatsApp webhook integration parity is closed locally: the suite now covers identity-gate, queued cancel, queued reschedule, and Internet expansion alongside the Telegram suite
   - owner: `QA`
   - files: `backend/tests/test_whatsapp_webhook_routes.py`
   - phase: `Phase 19`
@@ -164,11 +164,11 @@ A fourth structural risk sits across `backend` and `DevOps`:
   - owner: `Frontend`
   - files: `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx`, `frontend/src/theme/minimal-bento-template.css`, `frontend/src/components/AdminPage.tsx`
   - phase: `Phase 17`
-- `P1-8` `frontend/src/apps/public/PitchDeckApp.tsx` has no Playwright coverage; add a `pitch-deck-rendering.spec.ts` covering desktop and `390px` mobile, plus `1440px` desktop investor view
+- `P1-8` `frontend/src/apps/public/PitchDeckApp.tsx` Playwright coverage: closed locally on `2026-04-26` with `frontend/tests/pitch-deck-rendering.spec.ts` covering `1440px` desktop investor view, `390px` mobile containment, key pitch sections, architecture visual, refreshed MP4 source, and no horizontal overflow. Live promotion follows the next frontend release gate.
   - owner: `QA`
   - files: new `frontend/tests/pitch-deck-rendering.spec.ts`
   - phase: `Phase 17`
-- `P1-9` Future Swim Miranda booking URL returns `404` in browser; apply `backend/migrations/sql/020_future_swim_miranda_booking_url_hotfix.sql` on a host with database access
+- `P1-9` Future Swim Miranda booking URL hotfix is closed live: the dead `/locations/miranda/` URL was replaced with `https://futureswim.com.au/locations/`
   - owner: `Tenant Ops`
   - files: `backend/migrations/sql/020_future_swim_miranda_booking_url_hotfix.sql`
   - phase: `Phase 17`
@@ -223,9 +223,9 @@ Theme: close all P0 reliability and security gaps before any new feature lands.
 - portal P0-1: fix the v1 reference snapshot path and re-run the portal A/B baseline UAT
 - WhatsApp P0-2: confirm the active outbound path (Meta Cloud or Twilio) and document the matrix
 - security P0-3 and P0-4: keep Telegram secret-token verification, add Evolution HMAC verification, then ship the inbound idempotency table
-- security P0-5: add the `_resolve_tenant_id` validator on the public assistant routes
+- security P0-5: keep the live `_resolve_tenant_id` validator on the public assistant routes in regression coverage
 - DevOps P0-6 and P0-7: ship `.github/workflows/ci.yml` and the expanded `.env.production.example` with checksum guard
-- DevOps P0-8: drop OpenClaw root, scope the mount, document the operator authority boundary
+- DevOps P0-8: closed live; keep future host deploy/admin work behind explicit break-glass or host-side operator controls
 - frontend P1-7: ship `aria-describedby` for the phone helper and the admin booking responsive card breakpoint
 
 Exit criteria:
@@ -239,7 +239,7 @@ Exit criteria:
 
 Theme: produce one fully traced Future Swim revenue loop and turn on the first batch of A/B experiments.
 
-- Future Swim: complete one real lead-to-booking-to-payment-to-follow-up loop with documented metrics; apply migration `020_future_swim_miranda_booking_url_hotfix.sql` (`P1-9`) before customer-visible probes
+- Future Swim: complete one real lead-to-booking-to-payment-to-follow-up loop with documented metrics; the `020` Miranda URL hotfix is already live, so customer-visible probes should use the corrected locations URL
 - tenant UAT P1-1: complete the authenticated tenant write-path UAT for catalog, billing, and team
 - A/B activation: ship assignment/telemetry/exposure log for `AC-1`, `RT-1`, `RT-3`, `CH-1`
 - backend P1-5: migrate the remaining raw SQL out of `route_handlers.py` into repository read models
@@ -259,10 +259,10 @@ Theme: reduce backend monolith risk and extend test coverage so the next vertica
 
 - backend P1-4: split `tenant_app_service.py` into the three bounded services
 - backend hygiene: replace bare `except Exception` blocks in service layer with `IntegrationAppError` / `ValidationAppError` plus structured logging
-- chat P1-3: ship the WhatsApp webhook integration tests at parity with Telegram
+- chat P1-3: WhatsApp webhook integration tests are closed locally at Telegram parity
 - chat schema: add a `location_posture` field to the chat response shape and propagate through web, Telegram, and WhatsApp; this unlocks `BC-1`
 - DevOps P1-6: separate beta from production database, push images to a registry with `git-sha` and `latest` tags
-- frontend P1-8: ship `pitch-deck-rendering.spec.ts` and the `390px` breakpoint suite for tenant and admin
+- frontend P1-8: pitch deck coverage is closed locally; keep tenant/admin `390px` suite expansion in the broader Sprint 21 coverage lane
 
 Exit criteria:
 
@@ -332,7 +332,7 @@ A second-pass review on `2026-04-26` ran four parallel deep dives (UI/UX full-fl
 - `T5` component drift cross-app — booking confirmation card has 3 implementations across Homepage, Dialog, Demo; status badge has zero shared component.
 - `T6` design token drift — 619 raw hex outside the token system, 22 box-shadow + 153 arbitrary `shadow-[]`, 518 arbitrary `rounded-[]`, two competing CSS systems (`minimal-bento` vs `bookedai-brand-kit`).
 - `T7` trust elements missing — no testimonial, live booking count, SLA, or social proof in hero or pricing.
-- `T8` network resilience zero — 47 fetch calls without AbortController or timeout; mobile 3G hangs indefinitely.
+- `T8` network resilience — shared typed API calls now have a live 30-second timeout; remaining direct `fetch` paths are still tracked for cleanup.
 - `T9` bundle monolith risk — `BookingAssistantDialog.tsx` 6000 LOC, `TenantApp.tsx` 4900 LOC, no code-split.
 - `T10` empty/loading/error states are bland — generic copy without recovery path.
 
@@ -353,13 +353,13 @@ These shipped inline and need release-gate verification on next Sprint 19 run.
 
 Each of these is a discrete PR-sized fix; assignment recorded against the existing Phase model.
 
-- `FX-1` payment-state badge component — create `PaymentStateBadge.tsx` with four variants (`Stripe ready` green, `QR transfer` amber, `Manual review` orange, `Pending` slate). Apply across `HomepageSearchExperience`, `BookingAssistantDialog`, `PortalApp`. Pairs with `BC-2` A/B. Phase: `17`.
-- `FX-2` AbortController + 30s timeout on `frontend/src/shared/api/client.ts` — wrap all 47 fetch calls so mobile 3G no longer hangs indefinitely. Phase: `19`.
-- `FX-3` admin booking responsive card layout `390px-720px` — replace forced horizontal scroll with stacked card layout below `720px`, table at `≥860px`. Phase: `17`.
-- `FX-4` destructive action confirmation modal — cancel booking, logout, downgrade in `PortalApp.tsx` and `TenantApp.tsx` must show modal confirm before submission. Phase: `17`.
-- `FX-5` focus restoration on dialog close — capture and restore focus when `BookingAssistantDialog` closes; add `data-autofocus-return` pattern. Phase: `17`.
-- `FX-6` tenant session expiry 5-minute warning + extend button — proactive guard before silent expiry mid-edit. File: `frontend/src/features/tenant-auth/TenantAuthWorkspaceEmail.tsx`. Phase: `19`.
-- `FX-7` portal `booking_reference` URL canonicalization — normalize four param sources (`booking_reference`, `bookingReference`, query, hash) into one canonical form; warn on conflict. File: `frontend/src/apps/portal/PortalApp.tsx`. Phase: `17`.
+- `FX-1` payment-state badge component — create `PaymentStateBadge.tsx` with four variants (`Stripe ready` green, `QR transfer` amber, `Manual review` orange, `Pending` slate). Apply across `HomepageSearchExperience`, `BookingAssistantDialog`, `PortalApp`. Pairs with `BC-2` A/B. Phase: `17`. **Status: open.**
+- `FX-2` AbortController + 30s timeout on `frontend/src/shared/api/client.ts` — **CLOSED LIVE `2026-04-26`**: shared `apiRequest` and a new exported `fetchWithTimeout` helper now wrap fetch with an `AbortController`, honour any caller-supplied `signal`, and raise an `ApiClientError` with status `0` and a customer-safe timeout message after `API_REQUEST_DEFAULT_TIMEOUT_MS = 30_000`. Direct `fetch` cleanup in admin uploads, streaming, and legacy public fetch paths is a carried follow-up tracked under the same backlog id. Phase: `19`.
+- `FX-3` admin booking responsive card layout `390px-720px` — replace forced horizontal scroll with stacked card layout below `720px`, table at `≥860px`. Phase: `17`. **Status: open.**
+- `FX-4` destructive action confirmation modal — cancel booking, logout, downgrade in `PortalApp.tsx` and `TenantApp.tsx` must show modal confirm before submission. Phase: `17`. **Status: open.**
+- `FX-5` focus restoration on dialog close — **CLOSED `2026-04-26`**: a new `dialogTriggerElementRef` captures `document.activeElement` when `BookingAssistantDialog` opens (skipped for `standalone` and `embedded` mounts that do not have a single popup-style trigger) and restores focus to the same element on close, with `preventScroll: true` and a `document.body.contains(...)` safety check so a removed trigger does not throw. Phase: `17`.
+- `FX-6` tenant session expiry 5-minute warning + extend button — proactive guard before silent expiry mid-edit. File: `frontend/src/features/tenant-auth/TenantAuthWorkspaceEmail.tsx`. Phase: `19`. **Status: open.**
+- `FX-7` portal `booking_reference` URL canonicalization — **CLOSED LIVE `2026-04-27`**: `readPortalReferenceFromUrl()` in `frontend/src/apps/portal/PortalApp.tsx` now normalizes four sources (`booking_reference`, `bookingReference`, `ref`, and a `readPortalReferenceFromHash()` helper that accepts `#v1-xxxx` or `#booking_reference=v1-xxxx`/`#ref=v1-xxxx`), keeps the first non-empty value as the canonical reference, emits a `console.warn` when a conflicting alternative is present, and rewrites the browser URL to a single `booking_reference` query param after load. Playwright now covers camelCase, hash, and conflicting-source links; live smoke passed against `portal.bookedai.au` with `v1-db55e991fd`. Phase: `17`.
 
 ### Tier 3 — Sprint 21 / Sprint 22 refactor backlog (RF-1 to RF-10, NEW P2)
 

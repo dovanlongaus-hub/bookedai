@@ -1712,6 +1712,7 @@ export function BookingAssistantDialog({
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const dialogBodyRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
+  const dialogTriggerElementRef = useRef<HTMLElement | null>(null);
   const compactProductScrollTopRef = useRef(0);
   const bookingPanelRef = useRef<HTMLDivElement | null>(null);
   const bookingScrollRef = useRef<HTMLDivElement | null>(null);
@@ -2362,6 +2363,29 @@ export function BookingAssistantDialog({
       window.removeEventListener('keydown', handleKeyDown);
     };
   }, [hideCloseControl, isOpen, onClose, standalone]);
+
+  useEffect(() => {
+    if (standalone || embedded) {
+      return;
+    }
+    if (isOpen) {
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement) {
+        dialogTriggerElementRef.current = activeElement;
+      }
+      return;
+    }
+    const triggerElement = dialogTriggerElementRef.current;
+    if (!triggerElement) {
+      return;
+    }
+    if (typeof document === 'undefined' || !document.body.contains(triggerElement)) {
+      dialogTriggerElementRef.current = null;
+      return;
+    }
+    triggerElement.focus({ preventScroll: true });
+    dialogTriggerElementRef.current = null;
+  }, [embedded, isOpen, standalone]);
 
   useEffect(() => {
     if (

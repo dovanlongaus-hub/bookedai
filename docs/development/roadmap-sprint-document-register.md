@@ -104,14 +104,14 @@ Additional synchronization baseline from `2026-04-24`:
 - `backend/repositories/academy_repository.py`
 - `backend/service_layer/academy_service.py`
 
-Current whole-program interpretation locked from `2026-04-22`:
+Historical whole-program interpretation locked from `2026-04-22`:
 
 - the planning chain should be summarized as:
   - `Sprint 1-3 baseline lock`
   - `Sprint 4-7 truth, reporting, and workflow foundations`
   - `Sprint 8-10 tenant and admin implemented foundations`
   - `Sprint 11-16 user-surface SaaS completion and release hardening`
-- current active sprint truth should be summarized as:
+- the then-active sprint truth was summarized as:
   - `Sprint 13-14 active`
   - `Sprint 15-16 planned, with some implementation overlap already present from current tenant and admin work`
 - the next-phase cadence now inherits the corrected April 2026 deadline set:
@@ -543,7 +543,12 @@ These four sprints inherit the same documents already registered for Sprint 13-1
 Focus:
 
 - close P0-1 to P0-8 from `docs/development/full-stack-review-2026-04-26.md`
-- P0-4 now has local backend coverage for inbound webhook idempotency across WhatsApp, Evolution, and customer Telegram; live deploy/evidence surfacing remains a closeout follow-up
+- P0-4 now has backend coverage and live evidence indexes for inbound webhook idempotency across WhatsApp, Evolution, and customer Telegram; Telegram customer UAT chat-id proof and operator evidence drawer surfacing remain carried follow-ups
+- P0-5 is closed live after the production tenant-mismatch smoke returned `403`
+- P1-9 Future Swim Miranda URL hotfix is closed live; the public catalog points at `https://futureswim.com.au/locations/`
+- P1-3 WhatsApp webhook parity is closed locally; identity-gate, queued cancel, queued reschedule, and Internet expansion are now covered beside the Telegram suite
+- FX-2 shared typed API timeout is closed live for `frontend/src/shared/api/client.ts`; direct `fetch` cleanup remains in the Phase 19 reliability backlog
+- FX-7 portal URL canonicalization is closed live; `booking_reference`, `bookingReference`, `ref`, and hash links now resolve to one canonical `booking_reference` URL, with Playwright coverage for camelCase, hash, and conflict cases plus live `portal.bookedai.au` smoke
 - ship `aria-describedby` phone helper and admin booking responsive `≤720px`
 - enforce CI gate on `main` and OpenClaw rootless posture
 

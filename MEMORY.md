@@ -17,6 +17,7 @@
 - Trusted Telegram actor ids come from `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS`
 - Allowed elevated action scope comes from `BOOKEDAI_TELEGRAM_ALLOWED_ACTIONS`
 - Full-server Telegram/OpenClaw host execution now uses `python3 scripts/telegram_workspace_ops.py host-shell --cwd / --command "..."`
+- OpenClaw host shell is break-glass only in repo defaults: `BOOKEDAI_ENABLE_HOST_SHELL=1` is required, root/full-host/Docker-socket compose access is removed from the default CLI posture, and `host_shell`/`openclaw_runtime_admin`/`full_project` are not default Telegram actions
 - Live Telegram DM access is now allowlist-based for trusted actor `8426853622`, not pairing-gated
 - `openclaw-cli` now auto-restarts through compose if it loses the first gateway connect race
 - Host execution from the OpenClaw CLI container now enters the real VPS namespaces through `nsenter --target 1 ...`
@@ -48,3 +49,6 @@
 - Preserve context between Telegram requests
 - Keep project docs aligned with the actual code and deployment state
 - Use `project.md` as the first document to consult and the first document to update when scope or direction changes
+- Latest Sprint 19 security closeouts: P0-5 tenant validator is live; P0-4 idempotency code and DB evidence indexes are live, with Telegram UAT chat-id proof/evidence drawer carried
+- Latest Phase 17 data closeout: P1-9 Future Swim Miranda catalog URL now points to `https://futureswim.com.au/locations/`
+- Latest Phase 17 portal closeout: FX-7 is closed live; portal booking links from `booking_reference`, `bookingReference`, `ref`, or hash are canonicalized back to one `booking_reference` URL after load, with Playwright coverage and live `portal.bookedai.au` smoke for camelCase, hash, and conflict cases

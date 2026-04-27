@@ -2,7 +2,7 @@
 
 Date: `2026-04-17`
 
-Document status: `active execution package`
+Document status: `done historical baseline; superseded for active execution by docs/architecture/bookedai-master-roadmap-2026-04-26.md`
 
 ## 1. Purpose
 

@@ -125,20 +125,20 @@ These gates inherit from `docs/development/full-stack-review-2026-04-26.md` and 
 - portal `GET /api/v1/portal/bookings/v1-{ref}` returns `200` for a fresh `v1-*` reference created in the same release; structured error envelope returns on degraded paths and CORS headers are present on error responses (`P0-1`)
 - WhatsApp outbound delivery has one documented active provider posture (Meta Cloud or Twilio) and the bot status command reports `attention required` only when the active provider is intentionally unconfigured (`P0-2`)
 - `/api/webhooks/telegram` and `/api/webhooks/bookedai-telegram` reject missing or invalid `X-Telegram-Bot-Api-Secret-Token` when configured; `/api/webhooks/evolution` rejects missing or invalid HMAC-SHA256 signatures when `WHATSAPP_EVOLUTION_WEBHOOK_SECRET` is configured (`P0-3`; closed live on `2026-04-26`)
-- inbound webhook deliveries from Tawk, WhatsApp, Telegram, Evolution, and Zoho are deduplicated through the `webhook_events` table; a replayed delivery does not re-trigger downstream side effects (`P0-4`)
-- public assistant routes return `403` when `actor_context.tenant_id` does not match the authenticated session (`P0-5`)
+- inbound webhook deliveries from WhatsApp, customer Telegram, and Evolution are deduplicated through the `webhook_events`/`idempotency_keys` gate; duplicate-event tests and live evidence indexes are in place, with Telegram customer UAT/evidence drawer still carried (`P0-4`)
+- public assistant routes return `403` when `actor_context.tenant_id` does not match the authenticated session (`P0-5`; closed live on `2026-04-26`)
 - `.github/workflows/release-gate.yml` blocks any PR or `main` push that fails the same root release gate used locally; `main` branch protection still needs to enforce the check in GitHub settings (`P0-6`)
 - `.env.production.example` has a committed SHA-256 baseline at `checksums/env-production-example.sha256`; `scripts/run_release_gate.sh` rejects drift unless the checksum is intentionally refreshed with `scripts/verify_env_production_example_checksum.sh --update`. Full required-vs-optional env markers remain a carried follow-up (`P0-7`)
-- the OpenClaw container does not run as `root`; the host mount is scoped to the BookedAI deploy directory; the operator authority boundary is documented in `deploy/openclaw/README.md` (`P0-8`)
+- the OpenClaw CLI container does not run as `root` by default, does not mount `/hostfs` or `/var/run/docker.sock` by default, and `host-shell` is blocked unless `BOOKEDAI_ENABLE_HOST_SHELL=1` is set for an explicit break-glass session; the operator authority boundary is documented in `deploy/openclaw/README.md` (`P0-8`; closed live on `2026-04-26`)
 - tenant authenticated UAT for catalog edit, billing activation, and team controls is green and recorded (`P1-1`)
 - WhatsApp outbound replies carry inline action controls equivalent to the Telegram `View n` / `Book n` / `Find more` row, and the sender identity reflects `BookedAI Manager Bot` (`P1-2`)
-- WhatsApp webhook integration tests cover identity-gate, queued cancel, queued reschedule, and Internet expansion at parity with the Telegram suite (`P1-3`)
+- WhatsApp webhook integration tests cover identity-gate, queued cancel, queued reschedule, and Internet expansion at parity with the Telegram suite (`P1-3`; closed locally on `2026-04-26`)
 - `backend/service_layer/tenant_app_service.py` is split into `tenant_overview_service`, `tenant_billing_service`, `tenant_catalog_service` and each has at least ten unit tests (`P1-4`)
 - `backend/api/route_handlers.py` does not run `session.execute(text(...))` for tenant-scoped reads; admin reads go through repository read models (`P1-5`)
 - the production beta runtime tier points at a beta database that is not the production database; tagged image rollback works in under five minutes on staging (`P1-6`)
 - the phone field in `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` links its helper text via `aria-describedby`; the admin booking table has a responsive card layout below `720px` (`P1-7`)
-- `frontend/src/apps/public/PitchDeckApp.tsx` has Playwright coverage at desktop and `390px` mobile (`P1-8`)
-- the Future Swim Miranda booking URL hotfix migration `020_future_swim_miranda_booking_url_hotfix.sql` is applied on production (`P1-9`)
+- `frontend/src/apps/public/PitchDeckApp.tsx` has Playwright coverage at `1440px` desktop and `390px` mobile through `frontend/tests/pitch-deck-rendering.spec.ts` (`P1-8`; closed locally on `2026-04-26`)
+- the Future Swim Miranda booking URL hotfix migration `020_future_swim_miranda_booking_url_hotfix.sql` is applied on production (`P1-9`; closed live on `2026-04-26`)
 - customer-facing email templates are channel-aware; support copy names `info@bookedai.au` and the available chat channel (`P1-10`)
 - a `BaseRepository` validator fails any tenant-scoped query that is missing a `tenant_id` filter; a chaos test verifies the validator catches drift
 
@@ -215,12 +215,12 @@ These gates inherit from the `2026-04-26 UI/UX/Designer/Marketing review addendu
 - the public homepage hero shows the upgraded outcome-driven headline (`Never lose a service enquiry again.`) and the primary CTA reads `Try BookedAI Free` (not `Open Web App`) (`QW-6`, `QW-7`)
 - the homepage empty search state shows the refinement prompt (`Let's refine your request — tell us a suburb, preferred time, or service detail`) instead of `No strong match yet` (`QW-8`)
 - when `FX-1` payment-state badge ships, the confirmation hero must show one of `Stripe ready` (green), `QR transfer` (amber), `Manual review` (orange), or `Pending` (slate); text-only payment posture is treated as a regression
-- when `FX-2` ships, all `frontend/src/shared/api/client.ts` fetch calls carry `AbortController` and a 30-second timeout; mobile 3G test must complete the canonical journey within 60 seconds without a hung request
+- `frontend/src/shared/api/client.ts` shared typed API calls carry `AbortController` and a 30-second timeout (`FX-2`; first pass closed live on `2026-04-26`); remaining direct `fetch` paths need cleanup before claiming all 47 calls are covered
 - when `FX-3` ships, the admin booking table renders as stacked cards below the `720px` viewport without forced horizontal scroll
 - when `FX-4` ships, every destructive action (cancel booking, logout, downgrade) shows a confirmation modal that names the booking reference before submission
 - when `FX-5` ships, closing the booking dialog restores focus to the trigger element via `data-autofocus-return`
 - when `FX-6` ships, the tenant workspace surfaces a session-expiry warning at the five-minute threshold with an `Extend session` button
-- when `FX-7` ships, the portal canonicalizes `booking_reference`, `bookingReference`, query, and hash into a single param and warns on conflict
+- `FX-7` portal URL canonicalization is closed live on `2026-04-27`: portal links using `booking_reference`, `bookingReference`, `ref`, or hash resolve to the same booking, rewrite to one `booking_reference` param after load, and warn on conflict; live smoke must continue covering conflict cleanup after each portal routing change
 
 ## Current lane mapping
 

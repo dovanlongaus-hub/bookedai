@@ -154,7 +154,7 @@ async function stubProductApis(
   await page.route(/\/api\/chat\/send(?:\?.*)?$/, fulfillChatSearch);
 
   if (options.bookingSessionBody) {
-    await page.route('**/api/booking-assistant/session', async (route) => {
+    await page.route(/\/(?:api\/)?booking-assistant\/session(?:\?.*)?$/, async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -224,7 +224,27 @@ test.describe('product app regression', () => {
 
   test('event selection uses attendance wording and can submit without service selection', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1100 });
-    await openProductApp(page, { events: [demoEvent] });
+    await openProductApp(page, {
+      events: [demoEvent],
+      bookingSessionBody: {
+        ...demoBookingSession,
+        booking_reference: 'EVT-3004',
+        service: {
+          ...demoService,
+          id: 'event:https://events.example.com/bookedai-demo-night',
+          name: 'BookedAI Demo Night',
+          category: 'Event',
+          summary: 'Live product walkthrough and Q&A.',
+          amount_aud: 0,
+          venue_name: 'BookedAI HQ',
+          location: 'Sydney',
+        },
+        amount_aud: 0,
+        amount_label: 'Price TBC',
+        confirmation_message: 'Your attendance request has been recorded.',
+        contact_email: 'attendee@example.com',
+      },
+    });
 
     await runAssistantSearch(page, 'BookedAI demo event in Sydney');
     await expect(page.getByRole('button', { name: /Book this event/i })).toBeVisible();
@@ -234,13 +254,13 @@ test.describe('product app regression', () => {
     await expect(page.getByText(/Attendance summary/i)).toBeVisible();
     await expect(page.getByRole('button', { name: /^Request attendance$/i }).first()).toBeVisible();
     await expect(page.getByText(/Ready to request/i)).toBeVisible();
-    const phoneInput = page.getByLabel(/^Phone$/i);
+    const phoneInput = page.getByRole('textbox', { name: /Phone/i });
     const helperId = await phoneInput.getAttribute('aria-describedby');
     expect(helperId).toBeTruthy();
-    await expect(page.locator(`#${helperId}`)).toContainText(/email or phone is required/i);
+    await expect(page.getByText(/At least one of email or phone is required/i)).toBeVisible();
 
     await page.getByLabel(/Name/i).fill('Event Attendee');
-    await page.getByLabel(/Email/i).fill('attendee@example.com');
+    await page.getByRole('textbox', { name: 'Email', exact: true }).fill('attendee@example.com');
     await page.getByRole('button', { name: /^Request attendance$/i }).first().click();
 
     await expect(page.getByText(/Request, follow-up, and confirmation status/i)).toBeVisible();
@@ -260,9 +280,9 @@ test.describe('product app regression', () => {
     await page.getByRole('button', { name: /Select & book|Select to book/i }).click();
 
     await page.getByLabel(/Name/i).fill('Test Customer');
-    await page.getByLabel(/Email/i).fill('customer@example.com');
+    await page.getByRole('textbox', { name: 'Email', exact: true }).fill('customer@example.com');
     await page.getByLabel(/Preferred time/i).fill('2026-05-02T11:00');
-    await page.getByRole('button', { name: /^Book now$/i }).first().click();
+    await page.getByRole('button', { name: /^Confirm Booking Request$/i }).click();
 
     await expect(page.getByText(/Request, follow-up, and confirmation status/i)).toBeVisible();
     await expect(page.getByText(/What happened after your request was confirmed/i)).toBeVisible();

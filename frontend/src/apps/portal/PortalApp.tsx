@@ -188,17 +188,58 @@ function trackPortalEvent(eventName: string, payload: Record<string, unknown> = 
   window.dispatchEvent(new CustomEvent('bookedai:portal-event', { detail: eventPayload }));
 }
 
+function readPortalReferenceFromHash(hash: string): string {
+  if (!hash) {
+    return '';
+  }
+  const stripped = hash.startsWith('#') ? hash.slice(1) : hash;
+  if (!stripped) {
+    return '';
+  }
+  if (stripped.includes('=')) {
+    try {
+      const params = new URLSearchParams(stripped);
+      const candidate =
+        params.get('booking_reference') ||
+        params.get('bookingReference') ||
+        params.get('ref') ||
+        '';
+      return candidate.trim();
+    } catch {
+      return '';
+    }
+  }
+  if (/^v\d+-/i.test(stripped)) {
+    return stripped.trim();
+  }
+  return '';
+}
+
 function readPortalReferenceFromUrl() {
   if (typeof window === 'undefined') {
     return '';
   }
 
   const url = new URL(window.location.href);
-  return (
-    url.searchParams.get('booking_reference') ||
-    url.searchParams.get('bookingReference') ||
-    ''
-  ).trim();
+  const candidates = [
+    (url.searchParams.get('booking_reference') || '').trim(),
+    (url.searchParams.get('bookingReference') || '').trim(),
+    (url.searchParams.get('ref') || '').trim(),
+    readPortalReferenceFromHash(url.hash),
+  ].filter((value) => value.length > 0);
+
+  if (candidates.length === 0) {
+    return '';
+  }
+
+  const canonical = candidates[0];
+  const conflicting = candidates.find((value) => value !== canonical);
+  if (conflicting && typeof console !== 'undefined') {
+    console.warn(
+      `[bookedai-portal] booking reference conflict in URL — using "${canonical}", ignoring "${conflicting}". Provide one of booking_reference, bookingReference, ref, or hash.`,
+    );
+  }
+  return canonical;
 }
 
 function readPortalViewFromUrl(): PortalViewMode {
@@ -232,6 +273,9 @@ function syncPortalRouteState(bookingReference: string, viewMode: PortalViewMode
   } else {
     url.searchParams.delete('booking_reference');
   }
+  url.searchParams.delete('bookingReference');
+  url.searchParams.delete('ref');
+  url.hash = '';
 
   if (viewMode === 'overview' || viewMode === 'status') {
     url.searchParams.delete('action');

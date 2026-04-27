@@ -96,19 +96,76 @@ export class ApiClientError extends Error {
   }
 }
 
-export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(buildApiUrl(path), init);
-  const body = await parseResponseBody(response);
+export const API_REQUEST_DEFAULT_TIMEOUT_MS = 30_000;
 
-  if (!response.ok) {
-    throw new ApiClientError(
-      resolveApiErrorMessage(body, `API request failed: ${response.status}`),
-      response.status,
-      body,
-    );
+export async function fetchWithTimeout(
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = API_REQUEST_DEFAULT_TIMEOUT_MS,
+): Promise<Response> {
+  const controller = new AbortController();
+  const callerSignal = init.signal;
+  let didTimeout = false;
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
+
+  const abortFromCaller = () => {
+    if (!controller.signal.aborted) {
+      controller.abort(callerSignal?.reason);
+    }
+  };
+
+  if (callerSignal?.aborted) {
+    abortFromCaller();
+  } else {
+    callerSignal?.addEventListener('abort', abortFromCaller, { once: true });
   }
 
-  return body as T;
+  if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+    timeoutId = setTimeout(() => {
+      didTimeout = true;
+      controller.abort(new DOMException('Request timed out', 'TimeoutError'));
+    }, timeoutMs);
+  }
+
+  try {
+    return await fetch(input, {
+      ...init,
+      signal: controller.signal,
+    });
+  } catch (error) {
+    if (didTimeout) {
+      throw new ApiClientError(
+        `Network request timed out after ${Math.round(timeoutMs / 1000)} seconds. Please try again.`,
+        0,
+        null,
+      );
+    }
+    throw error;
+  } finally {
+    if (timeoutId !== null) {
+      clearTimeout(timeoutId);
+    }
+    callerSignal?.removeEventListener('abort', abortFromCaller);
+  }
+}
+
+export async function apiRequest<T>(path: string, init?: RequestInit): Promise<T> {
+  const response = await fetchWithTimeout(buildApiUrl(path), init);
+  try {
+    const body = await parseResponseBody(response);
+
+    if (!response.ok) {
+      throw new ApiClientError(
+        resolveApiErrorMessage(body, `API request failed: ${response.status}`),
+        response.status,
+        body,
+      );
+    }
+
+    return body as T;
+  } catch (error) {
+    throw error;
+  }
 }
 
 export async function apiFetch<T>(path: string, init?: RequestInit): Promise<T> {

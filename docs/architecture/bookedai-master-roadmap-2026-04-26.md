@@ -304,7 +304,7 @@ Review-driven additions:
 - `P0-1` portal `v1-*` snapshot 500 fix
 - `P1-7` accessibility (phone `aria-describedby`) and admin booking responsive `≤720px`
 - `P1-8` `PitchDeckApp.tsx` Playwright coverage
-- `P1-9` Future Swim Miranda URL hotfix migration apply
+- `P1-9` Future Swim Miranda URL hotfix migration apply (`closed live 2026-04-26`)
 
 A/B activation in this phase:
 
@@ -353,10 +353,10 @@ Review-driven additions:
 
 - `P0-2` WhatsApp provider posture decision (Meta Cloud or Twilio default)
 - `P0-3` Telegram secret-token verification plus Evolution HMAC verification (`closed live 2026-04-26`)
-- `P0-4` inbound webhook idempotency table and route gate landed locally for WhatsApp, Evolution, and customer Telegram; live deploy/evidence surfacing remains the follow-up
-- `P0-5` `actor_context.tenant_id` validator on public assistant routes
+- `P0-4` inbound webhook idempotency route gate and evidence indexes are live for WhatsApp, Evolution, and customer Telegram; Telegram UAT chat-id proof and evidence-drawer surfacing remain the follow-up
+- `P0-5` `actor_context.tenant_id` validator on public assistant routes (`closed live 2026-04-26`)
 - `P1-2` WhatsApp inline action controls and `BookedAI Manager Bot` sender identity alignment
-- `P1-3` WhatsApp webhook test parity with Telegram suite
+- `P1-3` WhatsApp webhook test parity with Telegram suite (`closed locally 2026-04-26`)
 - `P1-10` channel-aware email templates with `info@bookedai.au` and chat-channel mention
 
 A/B activation in this phase:
@@ -388,7 +388,7 @@ Deliverables:
 
 Review-driven preconditions:
 
-- `P0-3`, `P0-4`, `P0-5`, `P1-2` must be live before the widget runtime extends the same shared messaging policy to embedded surfaces
+- `P0-3` and `P0-5` are live; `P0-4` code/indexes are live with Telegram UAT/evidence-drawer follow-up; `P1-2` must still close before the widget runtime extends the same shared messaging policy to embedded surfaces
 
 Source documents:
 
@@ -518,7 +518,7 @@ This plan is the canonical forward execution path. The same content is reflected
 ### Sprint 20 — `2026-05-04 → 2026-05-10` — First Real Revenue Loop
 
 - target phases: `17`, `19`, `21`, `23`
-- close `P1-1`, `P1-2`, `P1-5`, `P1-9`
+- close `P1-1`, `P1-2`, `P1-5`; `P1-9` is already closed live from the Sprint 19 carry-forward pass
 - one Future Swim revenue loop documented end-to-end
 - bring up Prometheus, Grafana, AlertManager
 - activate A/B `AC-1`, `RT-1`, `RT-3`, `CH-1`
@@ -528,7 +528,7 @@ This plan is the canonical forward execution path. The same content is reflected
 ### Sprint 21 — `2026-05-11 → 2026-05-17` — Refactor and Coverage
 
 - target phases: `19`, `22`, `23`
-- close `P1-3`, `P1-4`, `P1-6`, `P1-8`, `P1-10`
+- close `P1-4`, `P1-6`, `P1-10`; `P1-3` is already closed locally and `P1-8` has local pitch coverage awaiting promotion
 - ship `location_posture` field unlocking `BC-1`
 - replace bare `except Exception` blocks with `IntegrationAppError`/`ValidationAppError` plus structured logging
 - exit gate: `tenant_app_service` shrunk to a thin shim; tagged image rollback under five minutes on staging
@@ -618,13 +618,13 @@ These are recorded as `closed` and need release-gate verification on the next Sp
 
 These items are scheduled across `Sprint 19` and `Sprint 20` overlays alongside the existing P0 closeout work.
 
-- `FX-1` payment-state badge component (Stripe ready / QR transfer / Manual review / Pending) → Phase `17`, pairs with `BC-2` and the new `DS-1` A/B experiment
-- `FX-2` AbortController + 30-second timeout on all 47 fetch calls in `frontend/src/shared/api/client.ts` → Phase `19`
-- `FX-3` admin booking responsive card layout for the `390px-720px` viewport gap → Phase `17`
-- `FX-4` destructive action confirmation modal for cancel, logout, downgrade in portal and tenant → Phase `17`
-- `FX-5` focus restoration on dialog close via a `data-autofocus-return` pattern → Phase `17`
-- `FX-6` tenant session expiry five-minute warning plus extend button → Phase `19`
-- `FX-7` portal `booking_reference` URL canonicalization for the four param sources → Phase `17`
+- `FX-1` payment-state badge component (Stripe ready / QR transfer / Manual review / Pending) → Phase `17`, pairs with `BC-2` and the new `DS-1` A/B experiment — **open**
+- `FX-2` AbortController + 30-second timeout in `frontend/src/shared/api/client.ts` shared typed API client → Phase `19` — **CLOSED LIVE `2026-04-26`**: `apiRequest` plus exported `fetchWithTimeout` helper raise `ApiClientError` on timeout; direct-fetch cleanup in admin uploads, streaming, and legacy public fetch paths is a carried follow-up
+- `FX-3` admin booking responsive card layout for the `390px-720px` viewport gap → Phase `17` — **open**
+- `FX-4` destructive action confirmation modal for cancel, logout, downgrade in portal and tenant → Phase `17` — **open**
+- `FX-5` focus restoration on dialog close via a `dialogTriggerElementRef` pattern → Phase `17` — **CLOSED `2026-04-26`**: capture `document.activeElement` on open, restore with `preventScroll: true` on close, skip standalone/embedded mounts
+- `FX-6` tenant session expiry five-minute warning plus extend button → Phase `19` — **open**
+- `FX-7` portal `booking_reference` URL canonicalization for the four param sources → Phase `17` — **CLOSED LIVE `2026-04-27`**: `readPortalReferenceFromUrl()` now reads `booking_reference`, `bookingReference`, `ref`, and a `#v1-xxxx` / `#param=value` hash form, picks the first non-empty value as canonical, `console.warn`s on any conflict, and rewrites the browser URL back to one `booking_reference` param after load; Playwright covers camelCase, hash, and conflict cases, and live smoke passed on `portal.bookedai.au`
 
 ### Tier 3 — added to Phase 21 / Phase 22 backlog (RF-1 to RF-10, NEW P2)
 

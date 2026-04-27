@@ -30,10 +30,7 @@ DEFAULT_TELEGRAM_ALLOWED_ACTIONS = {
     "workspace_write",
     "repo_structure",
     "host_command",
-    "host_shell",
-    "openclaw_runtime_admin",
     "whatsapp_bot_status",
-    "full_project",
 }
 HOST_COMMAND_ALLOWED_PROGRAMS = {
     "apt",
@@ -54,6 +51,15 @@ class TelegramAuthorizationError(RuntimeError):
 
 def should_use_nsenter_host_exec() -> bool:
     return Path("/hostfs").exists() and shutil.which("nsenter") is not None
+
+
+def is_host_shell_enabled() -> bool:
+    return os.getenv("BOOKEDAI_ENABLE_HOST_SHELL", "").strip().lower() in {
+        "1",
+        "true",
+        "yes",
+        "on",
+    }
 
 
 def build_host_exec_prefix() -> list[str]:
@@ -77,6 +83,10 @@ def run_host_command(command: list[str]) -> int:
 
 
 def run_host_shell(command: str, *, cwd: Path | None = None) -> int:
+    if not is_host_shell_enabled():
+        raise ValueError(
+            "host-shell is disabled. Set BOOKEDAI_ENABLE_HOST_SHELL=1 only for an explicit break-glass operator session."
+        )
     shell_command = command if not cwd else f"cd {shlex.quote(str(cwd))} && {command}"
     host_command = [*build_host_exec_prefix(), "/bin/bash", "-lc", shell_command]
     if os.geteuid() == 0:
@@ -143,6 +153,7 @@ def permissions_snapshot(actor_id: str | None) -> dict[str, object]:
         "trusted_user_ids": sorted(trusted_ids),
         "allowed_actions": sorted(allowed_actions),
         "actor_is_trusted": bool(actor_id and actor_id in trusted_ids),
+        "host_shell_enabled": is_host_shell_enabled(),
     }
 
 

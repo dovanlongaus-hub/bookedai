@@ -109,9 +109,22 @@ const portalBookingPayload = {
 
 test.describe('customer portal workspace', () => {
   test.beforeEach(async ({ page }) => {
-    await page.route('**/api/v1/portal/bookings/BR-PORTAL-UI', async (route) => {
+    await page.route('**/api/v1/portal/bookings/*', async (route) => {
       if (route.request().method() === 'GET') {
-        await route.fulfill({ json: portalBookingPayload });
+        const requestUrl = new URL(route.request().url());
+        const bookingReference = decodeURIComponent(requestUrl.pathname.split('/').pop() || 'BR-PORTAL-UI');
+        await route.fulfill({
+          json: {
+            ...portalBookingPayload,
+            data: {
+              ...portalBookingPayload.data,
+              booking: {
+                ...portalBookingPayload.data.booking,
+                booking_reference: bookingReference,
+              },
+            },
+          },
+        });
         return;
       }
 
@@ -196,5 +209,63 @@ test.describe('customer portal workspace', () => {
     await expect(page.getByText('BR-PORTAL-UI').first()).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(1);
+  });
+
+  test('canonicalizes booking reference from camelCase query param', async ({ page }) => {
+    const requestedReferences: string[] = [];
+    page.on('request', (request) => {
+      const match = request.url().match(/\/api\/v1\/portal\/bookings\/([^/?#]+)/);
+      if (match && request.method() === 'GET') {
+        requestedReferences.push(decodeURIComponent(match[1]));
+      }
+    });
+
+    await page.goto('/portal?bookingReference=BR-CAMEL');
+
+    await expect(page.getByText('BR-CAMEL').first()).toBeVisible();
+    expect(requestedReferences).toContain('BR-CAMEL');
+    await expect
+      .poll(() => page.evaluate(() => window.location.search))
+      .toContain('booking_reference=BR-CAMEL');
+    expect(await page.evaluate(() => window.location.search)).not.toContain('bookingReference');
+    expect(await page.evaluate(() => window.location.hash)).toBe('');
+  });
+
+  test('canonicalizes booking reference from URL hash', async ({ page }) => {
+    const requestedReferences: string[] = [];
+    page.on('request', (request) => {
+      const match = request.url().match(/\/api\/v1\/portal\/bookings\/([^/?#]+)/);
+      if (match && request.method() === 'GET') {
+        requestedReferences.push(decodeURIComponent(match[1]));
+      }
+    });
+
+    await page.goto('/portal#booking_reference=BR-HASH');
+
+    await expect(page.getByText('BR-HASH').first()).toBeVisible();
+    expect(requestedReferences).toContain('BR-HASH');
+    await expect
+      .poll(() => page.evaluate(() => window.location.search))
+      .toContain('booking_reference=BR-HASH');
+    expect(await page.evaluate(() => window.location.hash)).toBe('');
+  });
+
+  test('prefers canonical booking_reference when URL sources conflict', async ({ page }) => {
+    const warnings: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'warning') {
+        warnings.push(message.text());
+      }
+    });
+
+    await page.goto('/portal?booking_reference=BR-FIRST&bookingReference=BR-SECOND#booking_reference=BR-HASH');
+
+    await expect(page.getByText('BR-FIRST').first()).toBeVisible();
+    await expect
+      .poll(() => warnings.some((warning) => warning.includes('booking reference conflict in URL')))
+      .toBe(true);
+    expect(await page.evaluate(() => window.location.search)).toContain('booking_reference=BR-FIRST');
+    expect(await page.evaluate(() => window.location.search)).not.toContain('bookingReference');
+    expect(await page.evaluate(() => window.location.hash)).toBe('');
   });
 });

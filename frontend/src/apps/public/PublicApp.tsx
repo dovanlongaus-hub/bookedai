@@ -26,7 +26,7 @@ const chessScreenImageSrcSet =
 const tenantPreviewImageUrl = '/branding/optimized/tenant-login-hero-1400.webp';
 const tenantPreviewImageSrcSet =
   '/branding/optimized/tenant-login-hero-960.webp 960w, /branding/optimized/tenant-login-hero-1400.webp 1400w';
-const pitchVideoUrl = 'https://upload.bookedai.au/videos/2cc8/fxu3H6DZDcFOvpjc9UlOmQ.mp4';
+const pitchVideoUrl = 'https://upload.bookedai.au/videos/0cfb/LCpooAUVSsL24QXMvIBR0A.mp4';
 
 type HomepageExperimentVariant = 'control' | 'product_first';
 

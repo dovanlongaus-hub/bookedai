@@ -562,3 +562,197 @@ class WhatsAppWebhookRoutesTestCase(TestCase):
         lifecycle = captured_calls[0]["metadata"]["lifecycle_updates"]
         self.assertEqual(lifecycle["email_confirmation"]["delivery_status"], "sent")
         self.assertEqual(lifecycle["crm_sync"]["task"]["record_id"], 55)
+
+    def test_whatsapp_booking_status_without_safe_match_asks_for_reference(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeWhatsAppCommunicationService()
+        captured_resolutions: list[dict[str, object]] = []
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **kwargs):
+            captured_resolutions.append(kwargs)
+            return {
+                "booking_reference": None,
+                "resolved_by": "no_safe_match",
+                "candidate_count": 0,
+            }
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/whatsapp",
+                data={
+                    "Body": "Can you check my booking status?",
+                    "From": "whatsapp:+61455301335",
+                    "To": "whatsapp:+14155238886",
+                    "ProfileName": "Long",
+                    "MessageSid": "SM127",
+                    "WaId": "61455301335",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["messages_processed"], 1)
+        self.assertEqual(captured_resolutions[0]["customer_phone"], "+61455301335")
+        self.assertEqual(captured_resolutions[0]["customer_email"], None)
+        self.assertIn("booking reference", communication_service.sent[0]["body"])
+        self.assertIn("email/phone", communication_service.sent[0]["body"])
+        self.assertEqual(captured_calls[0]["metadata"]["customer_identity"]["identity_type"], "phone")
+        self.assertEqual(
+            captured_calls[0]["metadata"]["customer_identity"]["booking_data_policy"],
+            "load_by_booking_reference_or_safe_single_phone_email_match_only",
+        )
+
+    def test_whatsapp_webhook_queues_reschedule_request(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeWhatsAppCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **_kwargs):
+            return {
+                "booking_reference": "v1-bookedai-789",
+                "resolved_by": "message_booking_reference",
+                "candidate_count": 1,
+            }
+
+        async def _build_portal_customer_care_turn(*_args, **_kwargs):
+            return {
+                "booking_reference": "v1-bookedai-789",
+                "phase": "support_request_help",
+                "reply": "Booking v1-bookedai-789 for Swim Trial supports reschedule review.",
+                "next_actions": [
+                    {"id": "request_reschedule", "label": "Request reschedule", "enabled": True}
+                ],
+            }
+
+        async def _queue_portal_booking_request(*_args, **_kwargs):
+            return {
+                "request_status": "queued",
+                "request_type": "reschedule_request",
+                "booking_reference": "v1-bookedai-789",
+                "message": "Your reschedule request has been recorded for review.",
+            }
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ), patch(
+            "service_layer.messaging_automation_service.build_portal_customer_care_turn",
+            _build_portal_customer_care_turn,
+        ), patch(
+            "service_layer.messaging_automation_service.queue_portal_booking_request",
+            _queue_portal_booking_request,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/whatsapp",
+                data={
+                    "Body": "Please reschedule booking v1-bookedai-789 to next week",
+                    "From": "whatsapp:+61455301335",
+                    "To": "whatsapp:+14155238886",
+                    "ProfileName": "Long",
+                    "MessageSid": "SM128",
+                    "WaId": "61455301335",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["messages_processed"], 1)
+        self.assertIn("v1-bookedai-789", communication_service.sent[0]["body"])
+        self.assertIn("reschedule request", communication_service.sent[0]["body"])
+        self.assertEqual(
+            captured_calls[0]["metadata"]["queued_request"]["request_type"],
+            "reschedule_request",
+        )
+
+    def test_whatsapp_can_expand_service_search_to_public_web(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeWhatsAppCommunicationService()
+        captured_resolutions: list[dict[str, object]] = []
+
+        class _FakePublicSearchService:
+            async def search_public_service_candidates(self, **kwargs):
+                self.kwargs = kwargs
+                return [
+                    {
+                        "candidate_id": "web-swim-1",
+                        "provider_name": "Sydney Swim Studio",
+                        "service_name": "Kids swim class",
+                        "summary": "Public web result with a booking page.",
+                        "location": "Sydney",
+                        "source_url": "https://example.com/swim",
+                        "booking_url": "https://example.com/swim/book",
+                        "contact_phone": "+61255550000",
+                        "match_score": 0.71,
+                        "why_this_matches": "Matches kids swim classes in Sydney.",
+                    }
+                ]
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **kwargs):
+            captured_resolutions.append(kwargs)
+            return {
+                "booking_reference": None,
+                "resolved_by": "no_safe_match",
+                "candidate_count": 0,
+            }
+
+        async def _search_service_options(*_args, **_kwargs):
+            return []
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ), patch(
+            "service_layer.messaging_automation_service.MessagingAutomationService._search_service_options",
+            _search_service_options,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            app.state.openai_service = _FakePublicSearchService()
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/whatsapp",
+                data={
+                    "Body": "Find kids swim class in Sydney on Internet near me, email parent@example.com",
+                    "From": "whatsapp:+61455301335",
+                    "To": "whatsapp:+14155238886",
+                    "ProfileName": "Long",
+                    "MessageSid": "SM129",
+                    "WaId": "61455301335",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["messages_processed"], 1)
+        self.assertIn("BookedAI found options, including Internet results.", communication_service.sent[0]["body"])
+        self.assertIn("Kids swim class", communication_service.sent[0]["body"])
+        self.assertEqual(captured_resolutions[0]["customer_email"], "parent@example.com")
+        self.assertEqual(captured_calls[0]["metadata"]["customer_identity"]["identity_type"], "email")
+        self.assertEqual(captured_calls[0]["metadata"]["service_options"][0]["source_type"], "public_web_search")
+        self.assertEqual(
+            captured_calls[0]["metadata"]["bookedai_chat_response"]["matched_services"][0]["tags"],
+            ["public_web_search"],
+        )
