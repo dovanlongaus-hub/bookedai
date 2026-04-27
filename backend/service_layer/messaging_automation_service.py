@@ -132,6 +132,50 @@ class MessagingAutomationService:
                 message=message,
                 identity_metadata=identity_metadata,
             )
+        if slash_intent == "search":
+            return self._build_search_prompt_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+            )
+        if slash_intent == "mybookings":
+            return self._build_my_bookings_prompt_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+            )
+        if slash_intent == "cancel":
+            return self._build_cancel_prompt_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+            )
+        if slash_intent == "support":
+            return self._build_support_handoff_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+            )
+
+        keyboard_intent = self._reply_keyboard_intent(message.text)
+        if keyboard_intent == "search":
+            return self._build_search_prompt_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+            )
+        if keyboard_intent == "mybookings":
+            return self._build_my_bookings_prompt_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+            )
+        if keyboard_intent == "support":
+            return self._build_support_handoff_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+            )
 
         history = await self._load_conversation_history(
             session,
@@ -1920,15 +1964,6 @@ class MessagingAutomationService:
             "• Send /mybookings to see your active bookings\n"
             "• Send /help anytime to see what I can do"
         )
-        reply_keyboard = {
-            "keyboard": [
-                [{"text": "Find a service"}, {"text": "My bookings"}],
-                [{"text": "Talk to support"}],
-            ],
-            "resize_keyboard": True,
-            "is_persistent": True,
-            "input_field_placeholder": "Tell me what you want to book…",
-        }
         return MessagingAutomationResult(
             ai_reply=body,
             ai_intent="welcome",
@@ -1938,8 +1973,149 @@ class MessagingAutomationService:
                 "customer_identity": identity_metadata,
                 "customer_care_status": "welcome",
                 "reply_controls": {
-                    "telegram_reply_markup": reply_keyboard,
+                    "telegram_reply_markup": self._home_reply_keyboard(),
                     "telegram_parse_mode": "HTML",
                 },
             },
         )
+
+    def _build_search_prompt_result(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        identity_metadata: dict[str, object],
+    ) -> MessagingAutomationResult:
+        body = (
+            "What would you like to find? Reply with the service plus location and time, for example:\n"
+            "• <i>Find a chess class in Sydney this weekend</i>\n"
+            "• <i>Massage in Surry Hills tomorrow afternoon</i>\n"
+            "• <i>AI Mentor 1-1 session next week</i>"
+        )
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="search_prompt",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "search_prompt",
+                "reply_controls": {
+                    "telegram_reply_markup": self._home_reply_keyboard(),
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    def _build_my_bookings_prompt_result(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        identity_metadata: dict[str, object],
+    ) -> MessagingAutomationResult:
+        body = (
+            "To pull up your booking I need one of:\n"
+            "• your booking reference (looks like <code>v1-xxxxxx</code>)\n"
+            "• the email used to book\n"
+            "• the phone number used to book\n\n"
+            "Reply with one of those and I'll show the booking and the actions available."
+        )
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="needs_booking_reference",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "needs_booking_reference",
+                "reply_controls": {
+                    "telegram_reply_markup": self._home_reply_keyboard(),
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    def _build_cancel_prompt_result(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        identity_metadata: dict[str, object],
+    ) -> MessagingAutomationResult:
+        body = (
+            "I can request a cancellation for you. Please reply with the booking reference "
+            "(<code>v1-xxxxxx</code>) or the email/phone used to book, and I'll route the cancel "
+            "request to the provider. If the booking is already paid, refund handling is provider-led."
+        )
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="needs_booking_reference",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "needs_booking_reference",
+                "cancel_intent_pending": True,
+                "reply_controls": {
+                    "telegram_reply_markup": self._home_reply_keyboard(),
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    def _build_support_handoff_result(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        identity_metadata: dict[str, object],
+    ) -> MessagingAutomationResult:
+        body = (
+            "I've flagged this conversation for a BookedAI human teammate. "
+            "Someone will jump in here within business hours.\n\n"
+            f"If it's urgent, email <b>{DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL}</b> with your booking "
+            "reference and the question. Meanwhile I'll keep listening here."
+        )
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="support_handoff",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "support_handoff",
+                "human_handoff_requested": True,
+                "reply_controls": {
+                    "telegram_reply_markup": self._home_reply_keyboard(),
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    @staticmethod
+    def _home_reply_keyboard() -> dict[str, object]:
+        return {
+            "keyboard": [
+                [{"text": "Find a service"}, {"text": "My bookings"}],
+                [{"text": "Talk to support"}],
+            ],
+            "resize_keyboard": True,
+            "is_persistent": True,
+            "input_field_placeholder": "Tell me what you want to book…",
+        }
+
+    @staticmethod
+    def _reply_keyboard_intent(message: str) -> str | None:
+        text = str(message or "").strip().lower()
+        if not text:
+            return None
+        mapping = {
+            "find a service": "search",
+            "find service": "search",
+            "my bookings": "mybookings",
+            "mybookings": "mybookings",
+            "talk to support": "support",
+            "support": "support",
+        }
+        return mapping.get(text)

@@ -1343,6 +1343,65 @@ async def _send_messaging_customer_care_reply(
         }
 
 
+def _bookedai_support_telegram_chat_ids(settings_obj: object) -> list[str]:
+    raw = str(getattr(settings_obj, "bookedai_support_telegram_chat_ids", "") or "").strip()
+    if not raw:
+        return []
+    return [item.strip() for item in raw.split(",") if item.strip()]
+
+
+async def _notify_bookedai_support_handoff(
+    request: Request,
+    *,
+    message: TawkMessage,
+    metadata: dict[str, object],
+) -> dict[str, object] | None:
+    chat_ids = _bookedai_support_telegram_chat_ids(request.app.state.settings)
+    if not chat_ids or not hasattr(request.app.state, "communication_service"):
+        return None
+    communication_service: CommunicationService = request.app.state.communication_service
+    customer_chat_id = str(metadata.get("telegram_chat_id") or "").strip() or "unknown"
+    customer_username = str(metadata.get("telegram_username") or "").strip()
+    customer_handle = f"@{customer_username}" if customer_username else customer_chat_id
+    sender_name = str(message.sender_name or "").strip() or "Telegram customer"
+    message_text = str(message.text or "").strip()[:400]
+    body = (
+        "BookedAI support handoff requested\n"
+        f"Customer: {sender_name} ({customer_handle})\n"
+        f"Chat id: {customer_chat_id}\n\n"
+        f"Last message:\n{message_text or '[no text]'}\n\n"
+        f"Reply via the BookedAI Manager Bot conversation: tg://user?id={customer_chat_id}"
+    )
+    deliveries: list[dict[str, object]] = []
+    for chat_id in chat_ids:
+        try:
+            result = await communication_service.send_telegram(
+                chat_id=chat_id,
+                body=body,
+            )
+            deliveries.append(
+                {
+                    "chat_id": chat_id,
+                    "delivery_status": result.delivery_status,
+                    "provider_message_id": result.provider_message_id,
+                    "warnings": result.warnings or [],
+                }
+            )
+        except Exception as exc:
+            deliveries.append(
+                {
+                    "chat_id": chat_id,
+                    "delivery_status": "failed",
+                    "warnings": [str(exc)],
+                }
+            )
+    return {
+        "channel": "telegram",
+        "targets": len(chat_ids),
+        "deliveries": deliveries,
+    }
+
+
 async def _send_telegram_chat_action(
     request: Request,
     *,
@@ -1514,7 +1573,7 @@ def _build_whatsapp_booking_request_email(
     return subject, body
 
 
-async def _finalize_whatsapp_booking_request_side_effects(
+async def _finalize_messaging_queued_request_side_effects(
     request: Request,
     session,
     *,
@@ -2754,7 +2813,7 @@ async def whatsapp_webhook(request: Request) -> dict[str, object]:
                     )
                     ai_reply = automation_result.ai_reply
                     care_metadata = automation_result.metadata
-                    lifecycle_metadata = await _finalize_whatsapp_booking_request_side_effects(
+                    lifecycle_metadata = await _finalize_messaging_queued_request_side_effects(
                         request,
                         session,
                         queued_request=care_metadata.get("queued_request")
@@ -2919,7 +2978,7 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                         **existing_updates,
                         **booking_intent_updates,
                     }
-                lifecycle_metadata = await _finalize_whatsapp_booking_request_side_effects(
+                lifecycle_metadata = await _finalize_messaging_queued_request_side_effects(
                     request,
                     session,
                     queued_request=care_metadata.get("queued_request")
@@ -2937,6 +2996,22 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                         **existing_updates,
                         **lifecycle_metadata,
                     }
+                if bool(care_metadata.get("human_handoff_requested")):
+                    handoff_metadata = await _notify_bookedai_support_handoff(
+                        request,
+                        message=message,
+                        metadata=metadata,
+                    )
+                    if handoff_metadata:
+                        existing_updates = (
+                            care_metadata.get("lifecycle_updates")
+                            if isinstance(care_metadata.get("lifecycle_updates"), dict)
+                            else {}
+                        )
+                        care_metadata["lifecycle_updates"] = {
+                            **existing_updates,
+                            "support_handoff": handoff_metadata,
+                        }
                 delivery_metadata = await _send_messaging_customer_care_reply(
                     request,
                     channel="telegram",

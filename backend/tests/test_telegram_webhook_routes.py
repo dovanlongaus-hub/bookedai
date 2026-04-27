@@ -784,7 +784,7 @@ class TelegramWebhookRoutesTestCase(TestCase):
             "api.route_handlers._finalize_messaging_booking_intent_side_effects",
             _finalize_booking_intent,
         ), patch(
-            "api.route_handlers._finalize_whatsapp_booking_request_side_effects",
+            "api.route_handlers._finalize_messaging_queued_request_side_effects",
             _finalize_queued_request,
         ):
             app = create_test_app()
@@ -1274,3 +1274,218 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertIn("<code>", body)
         self.assertIn("</code>", body)
         self.assertIn("(tap to copy)", body)
+
+    def test_telegram_search_slash_returns_search_prompt(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 6001,
+                    "message": {
+                        "message_id": 31,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/search",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "search_prompt")
+        self.assertIn("What would you like to find", communication_service.sent[0]["body"])
+
+    def test_telegram_mybookings_slash_returns_lookup_prompt(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 6002,
+                    "message": {
+                        "message_id": 32,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/mybookings",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "needs_booking_reference")
+        self.assertIn("booking reference", communication_service.sent[0]["body"])
+
+    def test_telegram_cancel_slash_marks_cancel_intent_pending(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 6003,
+                    "message": {
+                        "message_id": 33,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/cancel",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "needs_booking_reference")
+        self.assertTrue(captured_calls[0]["metadata"].get("cancel_intent_pending"))
+        self.assertIn("cancellation", communication_service.sent[0]["body"])
+
+    def test_telegram_keyboard_button_find_a_service_routes_to_search_prompt(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 6004,
+                    "message": {
+                        "message_id": 34,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "Find a service",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "search_prompt")
+
+    def test_telegram_support_slash_notifies_configured_support_chat(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.settings = SimpleNamespace(
+                bookedai_customer_telegram_webhook_secret_token="telegram-secret",
+                bookedai_customer_telegram_bot_token="customer-bot-token",
+                booking_business_email="info@bookedai.au",
+                bookedai_support_telegram_chat_ids="999111,888222",
+            )
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 6005,
+                    "message": {
+                        "message_id": 35,
+                        "from": {
+                            "id": 999,
+                            "first_name": "Long",
+                            "username": "longbookedai",
+                        },
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/support I need a refund",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "support_handoff")
+        self.assertTrue(captured_calls[0]["metadata"].get("human_handoff_requested"))
+        # 1 customer-facing reply + 2 support notifications (one per chat id)
+        sent_chat_ids = [item["chat_id"] for item in communication_service.sent]
+        self.assertIn("123456", sent_chat_ids)
+        self.assertIn("999111", sent_chat_ids)
+        self.assertIn("888222", sent_chat_ids)
+        notify_body = next(
+            item["body"] for item in communication_service.sent if item["chat_id"] == "999111"
+        )
+        self.assertIn("BookedAI support handoff requested", notify_body)
+        self.assertIn("@longbookedai", notify_body)
+        handoff_meta = captured_calls[0]["metadata"]["lifecycle_updates"]["support_handoff"]
+        self.assertEqual(handoff_meta["targets"], 2)
+
+    def test_telegram_support_slash_without_configured_chat_still_replies(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 6006,
+                    "message": {
+                        "message_id": 36,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "Talk to support",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "support_handoff")
+        self.assertEqual(len(communication_service.sent), 1)
+        self.assertIn("flagged this conversation", communication_service.sent[0]["body"])
