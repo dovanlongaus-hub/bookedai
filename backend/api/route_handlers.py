@@ -60,6 +60,8 @@ from schemas import (
     AdminClaimHandoffResponse,
     AdminPendingHandoffsResponse,
     AdminPortalSupportActionRequest,
+    AdminReleaseHandoffRequest,
+    AdminReleaseHandoffResponse,
     AdminPortalSupportActionResponse,
     AdminBookingDetailResponse,
     AdminBookingConfirmationRequest,
@@ -122,11 +124,13 @@ from service_layer.admin_dashboard_service import (
     send_admin_booking_confirmation_email,
 )
 from service_layer.admin_messaging_service import (
+    HandoffAlreadyClaimedError,
     apply_admin_message_action,
     build_admin_message_detail_payload,
     build_admin_messaging_payload,
     build_admin_pending_handoffs_payload,
     claim_pending_handoff,
+    release_pending_handoff,
 )
 from service_layer.communication_service import CommunicationService
 from service_layer.discord_bot_service import DiscordBotService
@@ -3554,11 +3558,17 @@ async def admin_messaging_pending_handoffs(
     x_admin_token: str | None = Header(default=None),
     limit: int = 60,
     hours: int = 72,
+    include_claimed: bool = False,
 ) -> AdminPendingHandoffsResponse:
     require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
 
     async with get_session(request.app.state.session_factory) as session:
-        payload = await build_admin_pending_handoffs_payload(session, limit=limit, hours=hours)
+        payload = await build_admin_pending_handoffs_payload(
+            session,
+            limit=limit,
+            hours=hours,
+            include_claimed=include_claimed,
+        )
 
     return AdminPendingHandoffsResponse(**payload)
 
@@ -3583,11 +3593,64 @@ async def admin_messaging_claim_handoff(
     )
 
     async with get_session(request.app.state.session_factory) as session:
-        result = await claim_pending_handoff(
+        try:
+            result = await claim_pending_handoff(
+                session,
+                conversation_id=conversation_id,
+                channel=channel,
+                claimed_by=admin_username,
+            )
+        except HandoffAlreadyClaimedError as conflict:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "handoff_already_claimed",
+                    "claimed_by": conflict.claimed_by,
+                    "claimed_at": conflict.claimed_at,
+                    "message": (
+                        f"Already claimed by {conflict.claimed_by} at {conflict.claimed_at}. "
+                        "Wait for the TTL to expire or use the release endpoint."
+                    ),
+                },
+            )
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No messaging session found for {channel}:{conversation_id}.",
+        )
+
+    # Best-effort notify staff Telegram so the team knows who's on the thread.
+    await _notify_staff_handoff_claim(request, claim=result)
+
+    return AdminClaimHandoffResponse(status="ok", **result)
+
+
+@api.post(
+    "/admin/messaging/handoffs/{conversation_id}/release",
+    response_model=AdminReleaseHandoffResponse,
+)
+async def admin_messaging_release_handoff(
+    conversation_id: str,
+    request: Request,
+    payload: AdminReleaseHandoffRequest | None = None,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+    channel: str = "telegram",
+) -> AdminReleaseHandoffResponse:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    admin_username = (
+        str(getattr(request.app.state.settings, "admin_username", "") or "").strip()
+        or "admin"
+    )
+
+    async with get_session(request.app.state.session_factory) as session:
+        result = await release_pending_handoff(
             session,
             conversation_id=conversation_id,
             channel=channel,
-            claimed_by=admin_username,
+            released_by=admin_username,
         )
 
     if result is None:
@@ -3596,7 +3659,46 @@ async def admin_messaging_claim_handoff(
             detail=f"No messaging session found for {channel}:{conversation_id}.",
         )
 
-    return AdminClaimHandoffResponse(status="ok", **result)
+    return AdminReleaseHandoffResponse(status="ok", **result)
+
+
+async def _notify_staff_handoff_claim(
+    request: Request,
+    *,
+    claim: dict[str, object],
+) -> None:
+    chat_ids = _bookedai_support_telegram_chat_ids(request.app.state.settings)
+    if not chat_ids or not hasattr(request.app.state, "communication_service"):
+        return
+    communication_service: CommunicationService = request.app.state.communication_service
+    body = (
+        "BookedAI handoff claimed\n"
+        f"Claimed by: {claim.get('claimed_by')}\n"
+        f"Conversation: {claim.get('channel')}:{claim.get('conversation_id')}\n"
+        f"At: {claim.get('claimed_at')}\n\n"
+        "Auto-suppression for 4 hours."
+    )
+    async def _deliver(chat_id: str) -> None:
+        try:
+            await communication_service.send_telegram(chat_id=chat_id, body=body)
+        except Exception as exc:
+            logger.warning(
+                "staff_handoff_claim_notify_failed",
+                extra={
+                    "event_type": "staff_handoff_claim_notify_failed",
+                    "tenant_id": None,
+                    "status": 0,
+                    "route": "/api/admin/messaging/handoffs/.../claim",
+                    "request_id": "",
+                    "integration_name": "telegram",
+                    "conversation_id": str(claim.get("conversation_id") or ""),
+                    "booking_reference": "",
+                    "job_name": "",
+                    "job_id": "",
+                },
+                exc_info=exc,
+            )
+    await asyncio.gather(*(_deliver(chat_id) for chat_id in chat_ids))
 
 
 @api.get("/admin/messaging/{source_kind}/{item_id}", response_model=AdminMessagingDetailResponse)

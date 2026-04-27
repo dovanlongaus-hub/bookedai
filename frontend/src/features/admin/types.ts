@@ -202,6 +202,7 @@ export type AdminPendingHandoffsResponse = {
   total: number;
   pending_count: number;
   failed_count: number;
+  claimed_count: number;
 };
 
 export type AdminClaimHandoffResponse = {
@@ -211,6 +212,14 @@ export type AdminClaimHandoffResponse = {
   claimed_at: string;
   claimed_by: string;
   ttl_seconds: number;
+};
+
+export type AdminReleaseHandoffResponse = {
+  status: string;
+  conversation_id: string;
+  channel: string;
+  released_at: string;
+  released_by: string;
 };
 
 export type CustomerAgentHealthChannelStatus = {

@@ -117,6 +117,27 @@ class MessagingAutomationService:
 
         locale = self._resolve_locale(metadata.get("telegram_language_code"))
 
+        # Phase B.3 — if a human admin has actively claimed this conversation
+        # (via POST /api/admin/messaging/handoffs/<conversation_id>/claim), the
+        # bot must NOT run its slash / keyboard / care branches so it doesn't
+        # cross-talk with the teammate. The claim auto-expires after
+        # HANDOFF_CLAIMED_TTL_SECONDS so a forgotten claim eventually re-arms
+        # the bot.
+        claim_state = await self._load_channel_session_state(
+            session,
+            channel=normalized_channel,
+            conversation_id=conversation_key,
+        )
+        if self._is_handoff_claimed(
+            claim_state.get("session_metadata") if isinstance(claim_state, dict) else None
+        ):
+            return self._build_handoff_claimed_active_result(
+                channel=normalized_channel,
+                identity_metadata=identity_metadata,
+                locale=locale,
+                claim_metadata=claim_state.get("session_metadata") if isinstance(claim_state, dict) else None,
+            )
+
         if (
             normalized_channel == "telegram"
             and str(metadata.get("start_command_kind") or "") == "welcome"
@@ -785,6 +806,10 @@ class MessagingAutomationService:
             "customer_identity": (
                 row.customer_identity_json if isinstance(row.customer_identity_json, dict) else {}
             ),
+            "session_metadata": (
+                row.metadata_json if isinstance(row.metadata_json, dict) else {}
+            ),
+            "tenant_id": str(row.tenant_id or "").strip() or None,
         }
 
     async def _upsert_channel_session_state(
@@ -2104,6 +2129,59 @@ class MessagingAutomationService:
             },
         )
 
+    HANDOFF_CLAIMED_TTL_SECONDS = 60 * 60 * 4  # 4 hours
+
+    def _build_handoff_claimed_active_result(
+        self,
+        *,
+        channel: str,
+        identity_metadata: dict[str, object],
+        locale: str = "en",
+        claim_metadata: dict[str, object] | None = None,
+    ) -> MessagingAutomationResult:
+        body = self._localized("handoff_claimed_active", locale)
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="handoff_claimed_active",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "handoff_claimed_active",
+                "human_handoff_active": True,
+                "human_handoff_claimed_by": str(
+                    (claim_metadata or {}).get("handoff_claimed_by") or ""
+                ).strip() or None,
+                "human_handoff_claimed_at": str(
+                    (claim_metadata or {}).get("handoff_claimed_at") or ""
+                ).strip() or None,
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    @classmethod
+    def _is_handoff_claimed(cls, session_metadata: dict[str, object] | None) -> bool:
+        # Reads the same handoff_claimed_at / handoff_claimed_by keys written
+        # by service_layer.admin_messaging_service.claim_pending_handoff so the
+        # bot-side suppression and the admin claim endpoint stay in sync.
+        if not isinstance(session_metadata, dict):
+            return False
+        recorded = str(session_metadata.get("handoff_claimed_at") or "").strip()
+        if not recorded:
+            return False
+        try:
+            recorded_at = datetime.fromisoformat(recorded)
+        except ValueError:
+            return False
+        if recorded_at.tzinfo is None:
+            recorded_at = recorded_at.replace(tzinfo=UTC)
+        if datetime.now(UTC) - recorded_at > timedelta(seconds=cls.HANDOFF_CLAIMED_TTL_SECONDS):
+            return False
+        return True
+
     SUPPORTED_LOCALES = ("en", "vi")
     DEFAULT_LOCALE = "en"
 
@@ -2198,6 +2276,16 @@ class MessagingAutomationService:
         "keyboard_placeholder": {
             "en": "Tell me what you want to book…",
             "vi": "Bạn muốn đặt gì? Gõ vào đây…",
+        },
+        "handoff_claimed_active": {
+            "en": (
+                "👤 A BookedAI teammate is reading this thread now and will reply directly. "
+                "I'm stepping back so we don't double-up — go ahead and chat with them here."
+            ),
+            "vi": (
+                "👤 Đội BookedAI đang theo dõi cuộc trò chuyện này và sẽ trả lời trực tiếp. "
+                "Mình tạm dừng để tránh trả lời chồng chéo — bạn cứ trao đổi với đội ở đây nhé."
+            ),
         },
     }
 

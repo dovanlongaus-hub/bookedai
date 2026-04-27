@@ -12,6 +12,7 @@ type PendingHandoffsSectionProps = {
   errorMessage?: string | null;
   onRefresh?: () => void;
   onClaim?: (conversationId: string) => void;
+  onRelease?: (conversationId: string) => void;
   claimingConversationId?: string | null;
 };
 
@@ -47,6 +48,7 @@ export function PendingHandoffsSection({
   errorMessage,
   onRefresh,
   onClaim,
+  onRelease,
   claimingConversationId,
 }: PendingHandoffsSectionProps) {
   const items = useMemo(() => data?.items ?? [], [data?.items]);
@@ -144,26 +146,38 @@ export function PendingHandoffsSection({
                       Open in Telegram
                     </a>
                   ) : null}
-                  {onClaim && item.conversation_id ? (
-                    <button
-                      type="button"
-                      onClick={() => onClaim(item.conversation_id as string)}
-                      disabled={
-                        claimingConversationId === item.conversation_id || item.claim_active
-                      }
-                      title={
-                        item.claim_active
-                          ? `Already claimed${item.claimed_by ? ` by ${item.claimed_by}` : ''}`
-                          : 'Claim this conversation. The bot will pause auto-replies for 4h.'
-                      }
-                      className="rounded-full border border-emerald-600 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {claimingConversationId === item.conversation_id
-                        ? 'Claiming…'
-                        : item.claim_active
-                          ? `Claimed${item.claimed_by ? ` · ${item.claimed_by}` : ''}`
-                          : 'Claim'}
-                    </button>
+                  {item.conversation_id ? (
+                    item.claim_active ? (
+                      <>
+                        <span
+                          className="rounded-full bg-sky-100 px-3 py-1 text-xs font-semibold text-sky-900 ring-1 ring-inset ring-sky-200"
+                          title={item.claimed_at ? `Claimed at ${formatDateTime(item.claimed_at)}` : undefined}
+                        >
+                          Claimed{item.claimed_by ? ` · ${item.claimed_by}` : ''}
+                        </span>
+                        {onRelease ? (
+                          <button
+                            type="button"
+                            onClick={() => onRelease(item.conversation_id as string)}
+                            disabled={claimingConversationId === item.conversation_id}
+                            title="Release the claim. The bot will resume auto-replies on the next customer message."
+                            className="rounded-full border border-amber-600 bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                          >
+                            {claimingConversationId === item.conversation_id ? 'Releasing…' : 'Release'}
+                          </button>
+                        ) : null}
+                      </>
+                    ) : onClaim ? (
+                      <button
+                        type="button"
+                        onClick={() => onClaim(item.conversation_id as string)}
+                        disabled={claimingConversationId === item.conversation_id}
+                        title="Claim this conversation. The bot will pause auto-replies for 4h."
+                        className="rounded-full border border-emerald-600 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {claimingConversationId === item.conversation_id ? 'Claiming…' : 'Claim'}
+                      </button>
+                    ) : null
                   ) : null}
                 </div>
               </div>

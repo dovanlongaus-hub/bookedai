@@ -11,6 +11,7 @@ import {
   fetchAdminMessageDetail,
   fetchAdminMessaging,
   fetchAdminPendingHandoffs,
+  releaseAdminPendingHandoff,
   downloadAdminServiceQualityExport,
   fetchAdminBookingDetail,
   fetchAdminDashboardData,
@@ -388,6 +389,27 @@ export function useAdminPageState(apiBaseUrl: string) {
       setPendingHandoffsError(message);
     } finally {
       setPendingHandoffsLoading(false);
+    }
+  }
+
+  async function releasePendingHandoff(conversationId: string) {
+    if (!sessionToken || !conversationId) {
+      return;
+    }
+    setClaimingHandoffConversationId(conversationId);
+    setPendingHandoffsError(null);
+    try {
+      await releaseAdminPendingHandoff(apiBaseUrl, sessionToken, conversationId);
+      void refreshPendingHandoffs();
+    } catch (requestError) {
+      const message = resolveErrorMessage(requestError, 'Could not release this handoff.');
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setPendingHandoffsError(message);
+    } finally {
+      setClaimingHandoffConversationId(null);
     }
   }
 
@@ -1149,6 +1171,7 @@ export function useAdminPageState(apiBaseUrl: string) {
     pendingHandoffsError,
     refreshPendingHandoffs,
     claimPendingHandoff,
+    releasePendingHandoff,
     claimingHandoffConversationId,
     partners,
     importedServices,
