@@ -300,6 +300,30 @@ class AdminMessagingActionResponse(BaseModel):
     message: str
 
 
+class AdminPendingHandoffItem(BaseModel):
+    event_id: str
+    conversation_id: str | None = None
+    channel: str
+    customer_care_status: str
+    sender_name: str | None = None
+    last_message: str | None = None
+    created_at: str
+    telegram_chat_id: str | None = None
+    telegram_username: str | None = None
+    booking_reference: str | None = None
+    support_handoff_failed: bool = False
+    support_handoff_targets: int = 0
+    support_handoff_delivered: int = 0
+
+
+class AdminPendingHandoffsResponse(BaseModel):
+    status: str
+    items: list[AdminPendingHandoffItem]
+    total: int
+    pending_count: int
+    failed_count: int
+
+
 class PartnerProfileItem(BaseModel):
     id: int
     name: str

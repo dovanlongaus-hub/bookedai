@@ -10,6 +10,7 @@ import { BillingSupportSummarySection } from '../features/admin/billing-support-
 import { IntegrationHealthSection } from '../features/admin/integration-health-section';
 import { LiveConfigurationSection } from '../features/admin/live-configuration-section';
 import { MessagingWorkspace } from '../features/admin/messaging-workspace';
+import { PendingHandoffsSection } from '../features/admin/pending-handoffs-section';
 import { WorkspaceSettingsSummarySection } from '../features/admin/workspace-settings-summary-section';
 import { TenantManagementSection } from '../features/admin/tenant-management-section';
 import { RecentEventsSection } from '../features/admin/recent-events-section';
@@ -120,6 +121,10 @@ export function AdminPage() {
     customerAgentHealth,
     messagingActionMessage,
     messagingActionSubmittingKey,
+    pendingHandoffs,
+    pendingHandoffsLoading,
+    pendingHandoffsError,
+    refreshPendingHandoffs,
     partners,
     importedServices,
     tenants,
@@ -227,7 +232,17 @@ export function AdminPage() {
     if (typeof window !== 'undefined') {
       window.location.hash = nextWorkspace;
     }
+    if (nextWorkspace === 'messaging') {
+      void refreshPendingHandoffs();
+    }
   }
+
+  useEffect(() => {
+    if (activeWorkspace === 'messaging' && pendingHandoffs === null && !pendingHandoffsLoading) {
+      void refreshPendingHandoffs();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeWorkspace]);
 
   function changePanel(nextPanel: AdminWorkspacePanelId) {
     if (!workspacePanels[activeWorkspace].includes(nextPanel)) {
@@ -743,23 +758,33 @@ export function AdminPage() {
         ) : null}
 
         {activeWorkspace === 'messaging' ? (
-          <MessagingWorkspace
-            items={messagingItems}
-            selectedDetail={selectedMessageDetail}
-            selectedTenantRef={selectedTenantRef || null}
-            selectedTenantName={selectedTenantDetail?.tenant.name ?? null}
-            actionMessage={messagingActionMessage}
-            actionSubmittingKey={messagingActionSubmittingKey}
-            onSelectMessage={(sourceKind, itemId) => {
-              void loadMessageDetail(sourceKind, itemId);
-            }}
-            onRetryMessage={(sourceKind, itemId, note) => {
-              void retryMessage(sourceKind, itemId, note);
-            }}
-            onMarkManualFollowUp={(sourceKind, itemId, note) => {
-              void markMessageManualFollowUp(sourceKind, itemId, note);
-            }}
-          />
+          <>
+            <PendingHandoffsSection
+              data={pendingHandoffs}
+              loading={pendingHandoffsLoading}
+              errorMessage={pendingHandoffsError}
+              onRefresh={() => {
+                void refreshPendingHandoffs();
+              }}
+            />
+            <MessagingWorkspace
+              items={messagingItems}
+              selectedDetail={selectedMessageDetail}
+              selectedTenantRef={selectedTenantRef || null}
+              selectedTenantName={selectedTenantDetail?.tenant.name ?? null}
+              actionMessage={messagingActionMessage}
+              actionSubmittingKey={messagingActionSubmittingKey}
+              onSelectMessage={(sourceKind, itemId) => {
+                void loadMessageDetail(sourceKind, itemId);
+              }}
+              onRetryMessage={(sourceKind, itemId, note) => {
+                void retryMessage(sourceKind, itemId, note);
+              }}
+              onMarkManualFollowUp={(sourceKind, itemId, note) => {
+                void markMessageManualFollowUp(sourceKind, itemId, note);
+              }}
+            />
+          </>
         ) : null}
 
         {activeWorkspace === 'reliability' ? (

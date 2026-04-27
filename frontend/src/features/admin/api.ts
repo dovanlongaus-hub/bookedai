@@ -12,6 +12,7 @@ import {
   AdminMessagingDetailResponse,
   AdminMessagingListResponse,
   AdminOverviewResponse,
+  AdminPendingHandoffsResponse,
   AdminPortalSupportActionResponse,
   AdminServiceCatalogQualityResponse,
   AdminServiceMerchantListResponse,
@@ -203,6 +204,31 @@ export async function fetchAdminMessaging(
     throw new Error(parseErrorMessage(payload, 'Could not load messaging workspace.'));
   }
   return payload as AdminMessagingListResponse;
+}
+
+export async function fetchAdminPendingHandoffs(
+  apiBaseUrl: string,
+  sessionToken: string,
+  limit = 60,
+  hours = 72,
+) {
+  const response = await fetch(
+    `${apiBaseUrl}/admin/messaging/handoffs?limit=${limit}&hours=${hours}`,
+    {
+      headers: createAdminAuthHeaders(sessionToken),
+    },
+  );
+  const payload = (await parseJsonOrNull(response)) as
+    | AdminPendingHandoffsResponse
+    | { detail?: string }
+    | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not load pending handoffs.'));
+  }
+  return payload as AdminPendingHandoffsResponse;
 }
 
 export async function fetchAdminCustomerAgentHealth(

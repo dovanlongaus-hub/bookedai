@@ -1,13 +1,15 @@
 from __future__ import annotations
 
 import json
+from datetime import UTC, datetime, timedelta
 
+from db import ConversationEvent
 from repositories.audit_repository import AuditLogRepository
 from repositories.base import RepositoryContext
 from repositories.email_repository import EmailRepository
 from repositories.outbox_repository import OutboxRepository
 from service_layer.lifecycle_ops_service import execute_crm_sync_retry
-from sqlalchemy import text
+from sqlalchemy import desc, select, text
 
 
 def _coerce_json_object(value) -> dict[str, object]:
@@ -579,3 +581,113 @@ async def apply_admin_message_action(
         }
 
     raise ValueError("Unsupported messaging action")
+
+
+HANDOFF_LOOKBACK_HOURS_DEFAULT = 72
+HANDOFF_LOOKBACK_HOURS_MAX = 24 * 14  # 2 weeks
+
+
+def _handoff_metadata_payload(metadata: object | None) -> dict[str, object]:
+    payload = _coerce_json_object(metadata)
+    return payload
+
+
+def _is_handoff_event(metadata: dict[str, object], ai_intent: str | None) -> bool:
+    intent = str(ai_intent or "").strip()
+    if intent in {"support_handoff", "support_handoff_failed"}:
+        return True
+    care_status = str(metadata.get("customer_care_status") or "").strip()
+    if care_status in {"support_handoff", "support_handoff_failed"}:
+        return True
+    if bool(metadata.get("human_handoff_requested")):
+        return True
+    return False
+
+
+def _build_pending_handoff_item(row: ConversationEvent) -> dict[str, object]:
+    metadata = _handoff_metadata_payload(row.metadata_json)
+    care_status = str(metadata.get("customer_care_status") or "").strip()
+    if not care_status:
+        care_status = (
+            "support_handoff_failed"
+            if bool(metadata.get("support_handoff_failed"))
+            else "support_handoff"
+        )
+    handoff = metadata.get("lifecycle_updates", {})
+    if isinstance(handoff, dict):
+        handoff_block = handoff.get("support_handoff") or {}
+    else:
+        handoff_block = {}
+    if not isinstance(handoff_block, dict):
+        handoff_block = {}
+    last_message = str(row.message_text or "").strip() or None
+    if last_message and len(last_message) > 280:
+        last_message = last_message[:280].rstrip() + "…"
+    return {
+        "event_id": str(row.id),
+        "conversation_id": str(row.conversation_id or "").strip() or None,
+        "channel": str(row.source or "").strip().lower() or "telegram",
+        "customer_care_status": care_status,
+        "sender_name": str(row.sender_name or "").strip() or None,
+        "last_message": last_message,
+        "created_at": (
+            row.created_at.isoformat() if row.created_at is not None else ""
+        ),
+        "telegram_chat_id": str(metadata.get("telegram_chat_id") or "").strip() or None,
+        "telegram_username": str(metadata.get("telegram_username") or "").strip() or None,
+        "booking_reference": str(metadata.get("booking_reference") or "").strip() or None,
+        "support_handoff_failed": bool(
+            metadata.get("support_handoff_failed") or care_status == "support_handoff_failed"
+        ),
+        "support_handoff_targets": int(handoff_block.get("targets") or 0),
+        "support_handoff_delivered": int(handoff_block.get("delivered_count") or 0),
+    }
+
+
+async def build_admin_pending_handoffs_payload(
+    session,
+    *,
+    limit: int = 60,
+    hours: int = HANDOFF_LOOKBACK_HOURS_DEFAULT,
+) -> dict[str, object]:
+    limit = max(1, min(int(limit), 200))
+    hours = max(1, min(int(hours), HANDOFF_LOOKBACK_HOURS_MAX))
+    cutoff = datetime.now(UTC) - timedelta(hours=hours)
+
+    statement = (
+        select(ConversationEvent)
+        .where(ConversationEvent.created_at >= cutoff)
+        .where(
+            ConversationEvent.ai_intent.in_(
+                ["support_handoff", "support_handoff_failed"]
+            )
+        )
+        .order_by(desc(ConversationEvent.created_at))
+        .limit(limit * 4)  # over-fetch to filter out non-handoff rows in Python
+    )
+    result = await session.execute(statement)
+    rows = result.scalars().all()
+
+    items: list[dict[str, object]] = []
+    seen_keys: set[str] = set()
+    for row in rows:
+        metadata = _handoff_metadata_payload(row.metadata_json)
+        if not _is_handoff_event(metadata, row.ai_intent):
+            continue
+        # De-dupe by conversation_id — show the newest handoff per conversation only.
+        key = str(row.conversation_id or row.id)
+        if key in seen_keys:
+            continue
+        seen_keys.add(key)
+        items.append(_build_pending_handoff_item(row))
+        if len(items) >= limit:
+            break
+
+    failed_count = sum(1 for item in items if item.get("support_handoff_failed"))
+    return {
+        "status": "ok",
+        "items": items,
+        "total": len(items),
+        "pending_count": len(items) - failed_count,
+        "failed_count": failed_count,
+    }
