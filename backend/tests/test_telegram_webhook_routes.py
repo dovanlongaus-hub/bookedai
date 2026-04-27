@@ -685,7 +685,7 @@ class TelegramWebhookRoutesTestCase(TestCase):
             "service_layer.messaging_automation_service.MessagingAutomationService._load_conversation_history",
             _load_conversation_history,
         ), patch(
-            "service_layer.messaging_automation_service.MessagingAutomationService._try_create_chat_booking_intent",
+            "api.route_handlers.MessagingAutomationService.handle_customer_message",
             _try_create_chat_booking_intent,
         ), patch(
             "api.route_handlers.orchestrate_booking_followup_sync",
@@ -783,7 +783,7 @@ class TelegramWebhookRoutesTestCase(TestCase):
             "api.route_handlers.store_event",
             _store_event,
         ), patch(
-            "service_layer.messaging_automation_service.MessagingAutomationService.handle_customer_message",
+            "api.route_handlers.MessagingAutomationService.handle_customer_message",
             _handle_customer_message,
         ), patch(
             "api.route_handlers._finalize_messaging_booking_intent_side_effects",
@@ -1761,6 +1761,152 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertTrue(result.metadata.get("support_handoff_debounced"))
         self.assertIn("already pinged", result.ai_reply)
 
+    def test_recent_booking_reference_helper_respects_ttl(self):
+        from service_layer.messaging_automation_service import MessagingAutomationService
+        from datetime import datetime, timedelta, UTC
+
+        recent_iso = datetime.now(UTC).isoformat()
+        stale_iso = (
+            datetime.now(UTC)
+            - timedelta(seconds=MessagingAutomationService.RECENT_BOOKING_REFERENCE_TTL_SECONDS + 60)
+        ).isoformat()
+
+        self.assertEqual(
+            MessagingAutomationService._recent_booking_reference(
+                {
+                    "recent_booking_reference": "v1-abc123",
+                    "recent_booking_recorded_at": recent_iso,
+                }
+            ),
+            "v1-abc123",
+        )
+        self.assertIsNone(
+            MessagingAutomationService._recent_booking_reference(
+                {
+                    "recent_booking_reference": "v1-abc123",
+                    "recent_booking_recorded_at": stale_iso,
+                }
+            )
+        )
+        # missing timestamp → assume recent (graceful)
+        self.assertEqual(
+            MessagingAutomationService._recent_booking_reference(
+                {"recent_booking_reference": "v1-abc123"}
+            ),
+            "v1-abc123",
+        )
+        self.assertIsNone(MessagingAutomationService._recent_booking_reference({}))
+        self.assertIsNone(MessagingAutomationService._recent_booking_reference(None))
+
+    def test_telegram_mybookings_slash_auto_pulls_recent_booking_when_known(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _fake_load_channel_session_state(*_args, **_kwargs):
+            from datetime import datetime, UTC
+
+            return {
+                "service_search_query": None,
+                "service_options": [],
+                "reply_controls": {},
+                "customer_identity": {},
+                "session_metadata": {
+                    "recent_booking_reference": "v1-abc123",
+                    "recent_booking_recorded_at": datetime.now(UTC).isoformat(),
+                },
+                "tenant_id": None,
+            }
+
+        async def _resolve_customer_care_booking_reference(*_args, **_kwargs):
+            return {
+                "booking_reference": "v1-abc123",
+                "resolved_by": "explicit_reference",
+                "candidate_count": 1,
+            }
+
+        async def _build_portal_customer_care_turn(*_args, **_kwargs):
+            return {
+                "reply": "Booking v1-abc123 — Sydney chess class on Sat 14:00.",
+                "next_actions": [
+                    {"id": "request_cancel", "enabled": True},
+                    {"id": "request_reschedule", "enabled": True},
+                ],
+            }
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.MessagingAutomationService._load_channel_session_state",
+            _fake_load_channel_session_state,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ), patch(
+            "service_layer.messaging_automation_service.build_portal_customer_care_turn",
+            _build_portal_customer_care_turn,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 8000,
+                    "message": {
+                        "message_id": 80,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/mybookings",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        # Auto-pull → care turn fires → ai_intent="answered" with booking-care reply.
+        self.assertEqual(captured_calls[0]["ai_intent"], "answered")
+        self.assertEqual(
+            captured_calls[0]["metadata"]["booking_reference"], "v1-abc123"
+        )
+        self.assertIn("v1-abc123", communication_service.sent[0]["body"])
+
+    def test_telegram_mybookings_slash_falls_back_to_prompt_when_no_recent_booking(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        # Default _fake_load returns empty session_metadata, so should fall back to prompt.
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 8001,
+                    "message": {
+                        "message_id": 81,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/mybookings",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "needs_booking_reference")
+
     def test_telegram_change_time_callback_shows_reschedule_date_picker(self):
         captured_calls: list[dict[str, object]] = []
         communication_service = _FakeTelegramCommunicationService()
@@ -1960,3 +2106,415 @@ class TelegramWebhookRoutesTestCase(TestCase):
             "reschedule:confirm:v1-abc:2026-04-29:18:00"
         )
         self.assertEqual(parsed, ("confirm", "v1-abc", "2026-04-29", "18:00"))
+
+    def test_telegram_booking_with_stripe_configured_adds_pay_now_button(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+        email_service = _FakeEmailService(configured=False)
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **_kwargs):
+            return {"booking_reference": None, "resolved_by": "no_safe_match", "candidate_count": 0}
+
+        async def _try_create_chat_booking_intent(*_args, **_kwargs):
+            return MessagingAutomationResult(
+                ai_reply=(
+                    "<b>BookedAI.au: booking request started</b>\n"
+                    "<b>Reference</b>: <code>v1-pay001</code>"
+                ),
+                ai_intent="booking_intent_captured",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": {"channel": "telegram"},
+                    "customer_care_status": "booking_intent_captured",
+                    "booking_reference": "v1-pay001",
+                    "locale": "en",
+                    "booking_intent": {
+                        "booking_reference": "v1-pay001",
+                        "tenant_id": "tenant-chess",
+                        "booking_intent_id": "bi-pay-001",
+                        "service_name": "Chess pilot class",
+                        "customer_email": "long@example.com",
+                        "amount_aud": 30.0,
+                        "currency_code": "AUD",
+                    },
+                    "reply_controls": {
+                        "telegram_reply_markup": {
+                            "inline_keyboard": [
+                                [{"text": "View booking", "url": "https://portal.bookedai.au/?booking_reference=v1-pay001"}]
+                            ]
+                        },
+                        "telegram_parse_mode": "HTML",
+                    },
+                },
+            )
+
+        async def _orchestrate_booking_followup_sync(*_args, **_kwargs):
+            return SimpleNamespace(
+                deal_record_id=71, deal_sync_status="pending", deal_external_entity_id=None,
+                task_record_id=72, task_sync_status="pending", task_external_entity_id=None,
+                warning_codes=[],
+            )
+
+        stripe_call_log: list[dict[str, object]] = []
+
+        class _FakeStripeResponse:
+            status_code = 200
+            content = b"x"
+            def raise_for_status(self): return None
+            def json(self):
+                return {"id": "cs_test_abc", "url": "https://checkout.stripe.com/c/pay/cs_test_abc"}
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *args): return False
+            async def post(self, url, headers=None, content=None, **kwargs):
+                stripe_call_log.append({"url": url, "headers": headers, "content": content})
+                return _FakeStripeResponse()
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event", _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ), patch(
+            "api.route_handlers.MessagingAutomationService.handle_customer_message",
+            _try_create_chat_booking_intent,
+        ), patch(
+            "api.route_handlers.orchestrate_booking_followup_sync",
+            _orchestrate_booking_followup_sync,
+        ), patch(
+            "api.route_handlers.httpx.AsyncClient",
+            _FakeAsyncClient,
+        ):
+            app = create_test_app()
+            app.state.settings = SimpleNamespace(
+                bookedai_customer_telegram_webhook_secret_token="telegram-secret",
+                bookedai_customer_telegram_bot_token="customer-bot-token",
+                booking_business_email="info@bookedai.au",
+                stripe_secret_key="sk_test_abc",
+                stripe_currency="AUD",
+            )
+            app.state.communication_service = communication_service
+            app.state.email_service = email_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 9001,
+                    "message": {
+                        "message_id": 91,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "Book 1 for Long long@example.com tomorrow 4pm",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        keyboard = communication_service.sent[0]["reply_markup"]["inline_keyboard"]
+        pay_button = keyboard[0][0]
+        self.assertIn("Pay AUD", pay_button["text"])
+        self.assertEqual(pay_button["url"], "https://checkout.stripe.com/c/pay/cs_test_abc")
+        self.assertEqual(len(stripe_call_log), 1)
+        body_bytes = stripe_call_log[0]["content"]
+        body = body_bytes.decode() if isinstance(body_bytes, (bytes, bytearray)) else str(body_bytes)
+        from urllib.parse import parse_qs
+        parsed_form = parse_qs(body)
+        self.assertEqual(parsed_form.get("mode"), ["payment"])
+        self.assertEqual(parsed_form.get("line_items[0][price_data][unit_amount]"), ["3000"])
+        self.assertEqual(parsed_form.get("client_reference_id"), ["v1-pay001"])
+        self.assertEqual(parsed_form.get("metadata[source]"), ["telegram_manager_bot"])
+        self.assertIn("https://checkout.stripe.com/c/pay/cs_test_abc", communication_service.sent[0]["body"])
+        lifecycle = captured_calls[0]["metadata"]["lifecycle_updates"]
+        self.assertEqual(
+            lifecycle["stripe_checkout"]["checkout_url"],
+            "https://checkout.stripe.com/c/pay/cs_test_abc",
+        )
+        self.assertEqual(lifecycle["stripe_checkout"]["external_session_id"], "cs_test_abc")
+
+    def test_telegram_booking_without_stripe_secret_falls_back_to_no_pay_button(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+        email_service = _FakeEmailService(configured=False)
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **_kwargs):
+            return {"booking_reference": None, "resolved_by": "no_safe_match", "candidate_count": 0}
+
+        async def _try_create_chat_booking_intent(*_args, **_kwargs):
+            return MessagingAutomationResult(
+                ai_reply="Booking captured",
+                ai_intent="booking_intent_captured",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": {"channel": "telegram"},
+                    "customer_care_status": "booking_intent_captured",
+                    "booking_reference": "v1-pay002",
+                    "locale": "en",
+                    "booking_intent": {
+                        "booking_reference": "v1-pay002",
+                        "tenant_id": "tenant-chess",
+                        "service_name": "Chess pilot class",
+                        "customer_email": "long@example.com",
+                        "amount_aud": 30.0,
+                    },
+                    "reply_controls": {
+                        "telegram_reply_markup": {
+                            "inline_keyboard": [
+                                [{"text": "View booking", "url": "https://portal.bookedai.au/?booking_reference=v1-pay002"}]
+                            ]
+                        },
+                        "telegram_parse_mode": "HTML",
+                    },
+                },
+            )
+
+        async def _orchestrate_booking_followup_sync(*_args, **_kwargs):
+            return SimpleNamespace(
+                deal_record_id=71, deal_sync_status="pending", deal_external_entity_id=None,
+                task_record_id=72, task_sync_status="pending", task_external_entity_id=None,
+                warning_codes=[],
+            )
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event", _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ), patch(
+            "api.route_handlers.MessagingAutomationService.handle_customer_message",
+            _try_create_chat_booking_intent,
+        ), patch(
+            "api.route_handlers.orchestrate_booking_followup_sync",
+            _orchestrate_booking_followup_sync,
+        ):
+            app = create_test_app()
+            # No stripe_secret_key configured
+            app.state.communication_service = communication_service
+            app.state.email_service = email_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 9002,
+                    "message": {
+                        "message_id": 92,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "Book 1 for Long long@example.com tomorrow 4pm",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        keyboard = communication_service.sent[0]["reply_markup"]["inline_keyboard"]
+        self.assertEqual(keyboard[0][0]["text"], "View booking")
+        self.assertNotIn("checkout.stripe.com", communication_service.sent[0]["body"])
+        lifecycle = captured_calls[0]["metadata"]["lifecycle_updates"]
+        self.assertNotIn("stripe_checkout", lifecycle)
+
+    def test_telegram_booking_pay_button_localized_for_vietnamese(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+        email_service = _FakeEmailService(configured=False)
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **_kwargs):
+            return {"booking_reference": None, "resolved_by": "no_safe_match", "candidate_count": 0}
+
+        async def _try_create_chat_booking_intent(*_args, **_kwargs):
+            return MessagingAutomationResult(
+                ai_reply="Booking captured",
+                ai_intent="booking_intent_captured",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": {"channel": "telegram"},
+                    "customer_care_status": "booking_intent_captured",
+                    "booking_reference": "v1-pay003",
+                    "locale": "vi",
+                    "booking_intent": {
+                        "booking_reference": "v1-pay003",
+                        "tenant_id": "tenant-chess",
+                        "service_name": "Lớp cờ vua",
+                        "customer_email": "long@example.com",
+                        "amount_aud": 30.0,
+                    },
+                    "reply_controls": {
+                        "telegram_reply_markup": {"inline_keyboard": []},
+                        "telegram_parse_mode": "HTML",
+                    },
+                },
+            )
+
+        async def _orchestrate_booking_followup_sync(*_args, **_kwargs):
+            return SimpleNamespace(
+                deal_record_id=71, deal_sync_status="pending", deal_external_entity_id=None,
+                task_record_id=72, task_sync_status="pending", task_external_entity_id=None,
+                warning_codes=[],
+            )
+
+        class _FakeStripeResponse:
+            status_code = 200
+            content = b"x"
+            def raise_for_status(self): return None
+            def json(self):
+                return {"id": "cs_test_vi", "url": "https://checkout.stripe.com/c/pay/cs_test_vi"}
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *args): return False
+            async def post(self, *args, **kwargs): return _FakeStripeResponse()
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event", _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ), patch(
+            "api.route_handlers.MessagingAutomationService.handle_customer_message",
+            _try_create_chat_booking_intent,
+        ), patch(
+            "api.route_handlers.orchestrate_booking_followup_sync",
+            _orchestrate_booking_followup_sync,
+        ), patch(
+            "api.route_handlers.httpx.AsyncClient",
+            _FakeAsyncClient,
+        ):
+            app = create_test_app()
+            app.state.settings = SimpleNamespace(
+                bookedai_customer_telegram_webhook_secret_token="telegram-secret",
+                bookedai_customer_telegram_bot_token="customer-bot-token",
+                booking_business_email="info@bookedai.au",
+                stripe_secret_key="sk_test_abc",
+                stripe_currency="AUD",
+            )
+            app.state.communication_service = communication_service
+            app.state.email_service = email_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 9003,
+                    "message": {
+                        "message_id": 93,
+                        "from": {"id": 999, "first_name": "Long", "language_code": "vi"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "Book 1 for Long long@example.com",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        keyboard = communication_service.sent[0]["reply_markup"]["inline_keyboard"]
+        pay_button = keyboard[0][0]
+        self.assertIn("Thanh toán", pay_button["text"])
+        self.assertIn("Thanh toán ngay", communication_service.sent[0]["body"])
+
+    def test_telegram_booking_stripe_api_failure_falls_back_gracefully(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+        email_service = _FakeEmailService(configured=False)
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **_kwargs):
+            return {"booking_reference": None, "resolved_by": "no_safe_match", "candidate_count": 0}
+
+        async def _try_create_chat_booking_intent(*_args, **_kwargs):
+            return MessagingAutomationResult(
+                ai_reply="Booking captured",
+                ai_intent="booking_intent_captured",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": {"channel": "telegram"},
+                    "customer_care_status": "booking_intent_captured",
+                    "booking_reference": "v1-pay004",
+                    "locale": "en",
+                    "booking_intent": {
+                        "booking_reference": "v1-pay004",
+                        "tenant_id": "tenant-chess",
+                        "service_name": "Chess",
+                        "customer_email": "long@example.com",
+                        "amount_aud": 30.0,
+                    },
+                    "reply_controls": {
+                        "telegram_reply_markup": {
+                            "inline_keyboard": [[{"text": "View booking", "url": "https://portal.bookedai.au/?booking_reference=v1-pay004"}]]
+                        },
+                        "telegram_parse_mode": "HTML",
+                    },
+                },
+            )
+
+        async def _orchestrate_booking_followup_sync(*_args, **_kwargs):
+            return SimpleNamespace(
+                deal_record_id=71, deal_sync_status="pending", deal_external_entity_id=None,
+                task_record_id=72, task_sync_status="pending", task_external_entity_id=None,
+                warning_codes=[],
+            )
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs): pass
+            async def __aenter__(self): return self
+            async def __aexit__(self, *args): return False
+            async def post(self, *args, **kwargs):
+                raise RuntimeError("Stripe is down")
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event", _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ), patch(
+            "api.route_handlers.MessagingAutomationService.handle_customer_message",
+            _try_create_chat_booking_intent,
+        ), patch(
+            "api.route_handlers.orchestrate_booking_followup_sync",
+            _orchestrate_booking_followup_sync,
+        ), patch(
+            "api.route_handlers.httpx.AsyncClient",
+            _FakeAsyncClient,
+        ):
+            app = create_test_app()
+            app.state.settings = SimpleNamespace(
+                bookedai_customer_telegram_webhook_secret_token="telegram-secret",
+                bookedai_customer_telegram_bot_token="customer-bot-token",
+                booking_business_email="info@bookedai.au",
+                stripe_secret_key="sk_test_abc",
+                stripe_currency="AUD",
+            )
+            app.state.communication_service = communication_service
+            app.state.email_service = email_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 9004,
+                    "message": {
+                        "message_id": 94,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "Book 1 for Long long@example.com",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        keyboard = communication_service.sent[0]["reply_markup"]["inline_keyboard"]
+        self.assertEqual(keyboard[0][0]["text"], "View booking")
+        lifecycle = captured_calls[0]["metadata"]["lifecycle_updates"]
+        self.assertNotIn("stripe_checkout", lifecycle)
