@@ -137,9 +137,11 @@ from service_layer.demo_workflow_service import (
     sync_demo_booking_from_brief as sync_demo_booking_from_brief_service,
 )
 from service_layer.lifecycle_ops_service import (
+    orchestrate_booking_followup_sync,
     orchestrate_email_sent_sync,
     orchestrate_lifecycle_email,
 )
+from service_layer.communication_service import render_bookedai_confirmation_email
 from service_layer.messaging_automation_service import MessagingAutomationService
 from service_layer.prompt9_semantic_search_service import Prompt9SemanticSearchService
 from service_layer.tenant_app_service import (
@@ -718,6 +720,22 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
     if not chat_id:
         return None
     text_value = str(raw_message.get("text") or raw_message.get("caption") or "").strip()
+    if text_value.startswith("/start"):
+        start_payload = text_value.split(maxsplit=1)[1].strip() if " " in text_value else ""
+        if start_payload.startswith("bk."):
+            booking_reference = start_payload[3:].strip()
+            if booking_reference:
+                text_value = (
+                    f"My booking reference is {booking_reference}. "
+                    "I need help with this booking."
+                )
+        elif start_payload.startswith("svc."):
+            service_context = start_payload[4:].strip().replace("-", " ")
+            text_value = (
+                f"I want help booking {service_context}." if service_context else "I want help with a booking."
+            )
+        elif start_payload:
+            text_value = "I need help with my booking."
     if callback_data:
         text_value = callback_data
     user_location: dict[str, object] | None = None
@@ -1554,6 +1572,143 @@ async def _finalize_whatsapp_booking_request_side_effects(
             }
         },
     }
+
+
+async def _finalize_messaging_booking_intent_side_effects(
+    request: Request,
+    session,
+    *,
+    channel: str,
+    booking_intent: dict[str, object] | None,
+) -> dict[str, object]:
+    booking = booking_intent if isinstance(booking_intent, dict) else {}
+    tenant_id = str(booking.get("tenant_id") or "").strip()
+    booking_reference = str(booking.get("booking_reference") or "").strip()
+    booking_intent_id = str(booking.get("booking_intent_id") or "").strip() or None
+    contact_id = str(booking.get("contact_id") or "").strip() or None
+    service_name = str(booking.get("service_name") or "BookedAI service").strip() or "BookedAI service"
+    customer_name = str(booking.get("customer_name") or "").strip() or None
+    customer_email = str(booking.get("customer_email") or "").strip().lower() or None
+    customer_phone = str(booking.get("customer_phone") or "").strip() or None
+    requested_date = str(booking.get("requested_date") or "").strip() or None
+    requested_time = str(booking.get("requested_time") or "").strip() or None
+    timezone = str(booking.get("timezone") or "Australia/Sydney").strip() or "Australia/Sydney"
+    booking_path = str(booking.get("booking_path") or "request_callback").strip() or "request_callback"
+
+    if not tenant_id or not booking_reference:
+        return {}
+
+    crm_sync = await orchestrate_booking_followup_sync(
+        session,
+        tenant_id=tenant_id,
+        booking_intent_id=booking_intent_id,
+        booking_reference=booking_reference,
+        full_name=customer_name,
+        email=customer_email,
+        phone=customer_phone,
+        source=channel,
+        service_name=service_name,
+        requested_date=requested_date,
+        requested_time=requested_time,
+        timezone=timezone,
+        booking_path=booking_path,
+        notes=f"Captured via {channel} messaging agent",
+    )
+
+    result: dict[str, object] = {
+        "crm_sync": {
+            "deal": {
+                "record_id": crm_sync.deal_record_id,
+                "sync_status": crm_sync.deal_sync_status,
+                "external_entity_id": crm_sync.deal_external_entity_id,
+            },
+            "task": {
+                "record_id": crm_sync.task_record_id,
+                "sync_status": crm_sync.task_sync_status,
+                "external_entity_id": crm_sync.task_external_entity_id,
+            },
+            "warning_codes": crm_sync.warning_codes,
+        }
+    }
+
+    if not customer_email or not hasattr(request.app.state, "email_service"):
+        return result
+
+    email_service: EmailService = request.app.state.email_service
+    rendered_email = render_bookedai_confirmation_email(
+        variables={
+            "customer_name": customer_name or "there",
+            "service_name": service_name,
+            "slot_label": " ".join(bit for bit in [requested_date, requested_time] if bit).strip() or "To be confirmed",
+            "booking_reference": booking_reference,
+            "business_name": "BookedAI.au",
+            "venue_name": "BookedAI.au",
+            "support_email": getattr(request.app.state.settings, "booking_business_email", None) or "info@bookedai.au",
+            "support_phone": "+61455301335",
+            "manage_link": f"https://portal.bookedai.au/?booking_reference={booking_reference}",
+            "timezone": timezone,
+            "additional_note": "We captured your request from chat. We will confirm the booking and next step shortly.",
+        },
+        public_app_url=getattr(request.app.state.settings, "public_app_url", None),
+    )
+
+    delivery_status = "queued"
+    email_warnings: list[str] = []
+    if email_service.smtp_configured():
+        try:
+            await email_service.send_email(
+                to=[customer_email],
+                cc=[],
+                subject=rendered_email.subject,
+                text=rendered_email.text,
+                html=rendered_email.html,
+            )
+            delivery_status = "sent"
+        except Exception as exc:
+            email_warnings.append(f"email_send_failed:{exc}")
+    else:
+        email_warnings.append("smtp_unconfigured")
+
+    email_result = await orchestrate_lifecycle_email(
+        session,
+        tenant_id=tenant_id,
+        template_key="bookedai_booking_confirmation",
+        subject=rendered_email.subject,
+        provider="smtp" if delivery_status == "sent" else "unconfigured",
+        delivery_status=delivery_status,
+        contact_id=contact_id,
+        event_payload={
+            "channel": channel,
+            "booking_reference": booking_reference,
+            "customer_email": customer_email,
+            "service_name": service_name,
+        },
+    )
+    email_crm_sync = await orchestrate_email_sent_sync(
+        session,
+        tenant_id=tenant_id,
+        message_id=email_result.message_id,
+        template_key="bookedai_booking_confirmation",
+        subject=rendered_email.subject,
+        recipient_email=customer_email,
+        provider="smtp" if delivery_status == "sent" else "unconfigured",
+        delivery_status=delivery_status,
+    )
+    result["email_confirmation"] = {
+        "message_id": email_result.message_id,
+        "delivery_status": email_result.delivery_status,
+        "provider": email_result.provider,
+        "warnings": email_warnings + email_result.warning_codes,
+        "crm_sync": {
+            "task": {
+                "record_id": email_crm_sync.task_record_id,
+                "sync_status": email_crm_sync.task_sync_status,
+                "external_entity_id": email_crm_sync.task_external_entity_id,
+                "warnings": email_crm_sync.warning_codes,
+            }
+        },
+    }
+    return result
 
 
 def require_admin_access(
@@ -2681,6 +2836,24 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                 )
                 ai_reply = automation_result.ai_reply
                 care_metadata = automation_result.metadata
+                booking_intent_updates = await _finalize_messaging_booking_intent_side_effects(
+                    request,
+                    session,
+                    channel="telegram",
+                    booking_intent=care_metadata.get("booking_intent")
+                    if isinstance(care_metadata.get("booking_intent"), dict)
+                    else None,
+                )
+                if booking_intent_updates:
+                    existing_updates = (
+                        care_metadata.get("lifecycle_updates")
+                        if isinstance(care_metadata.get("lifecycle_updates"), dict)
+                        else {}
+                    )
+                    care_metadata["lifecycle_updates"] = {
+                        **existing_updates,
+                        **booking_intent_updates,
+                    }
                 lifecycle_metadata = await _finalize_whatsapp_booking_request_side_effects(
                     request,
                     session,
@@ -2690,7 +2863,15 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                     customer_message=message.text,
                 )
                 if lifecycle_metadata:
-                    care_metadata["lifecycle_updates"] = lifecycle_metadata
+                    existing_updates = (
+                        care_metadata.get("lifecycle_updates")
+                        if isinstance(care_metadata.get("lifecycle_updates"), dict)
+                        else {}
+                    )
+                    care_metadata["lifecycle_updates"] = {
+                        **existing_updates,
+                        **lifecycle_metadata,
+                    }
                 delivery_metadata = await _send_messaging_customer_care_reply(
                     request,
                     channel="telegram",
@@ -2750,6 +2931,16 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                 route="/api/webhooks/bookedai-telegram",
             )
         except Exception as exc:
+            fallback_delivery: dict[str, object] | None = None
+            try:
+                fallback_delivery = await _send_messaging_customer_care_reply(
+                    request,
+                    channel="telegram",
+                    to=str(metadata.get("telegram_chat_id") or "").strip() or None,
+                    body="Sorry, I hit a temporary issue just now. Please try again in a moment.",
+                )
+            except Exception:
+                fallback_delivery = None
             logger.warning(
                 "telegram_webhook_processing_failed",
                 extra={
@@ -2763,6 +2954,7 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                     "booking_reference": "",
                     "job_name": "",
                     "job_id": "",
+                    "fallback_delivery": fallback_delivery,
                 },
                 exc_info=exc,
             )

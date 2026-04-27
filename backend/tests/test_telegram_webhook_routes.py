@@ -77,6 +77,18 @@ class _FakeTelegramCommunicationService:
         )
 
 
+class _FakeEmailService:
+    def __init__(self, *, configured: bool = True):
+        self.configured = configured
+        self.sent: list[dict[str, object]] = []
+
+    def smtp_configured(self):
+        return self.configured
+
+    async def send_email(self, **kwargs):
+        self.sent.append(kwargs)
+
+
 def create_test_app() -> FastAPI:
     app = FastAPI()
     app.include_router(api)
@@ -102,6 +114,16 @@ class TelegramWebhookRoutesTestCase(TestCase):
 
         response = client.post(
             "/api/webhooks/telegram",
+            json={"message": {"message_id": 1, "chat": {"id": 123}, "text": "Hello"}},
+        )
+
+        self.assertEqual(response.status_code, 403)
+
+    def test_customer_telegram_webhook_requires_secret_when_configured(self):
+        client = TestClient(create_test_app())
+
+        response = client.post(
+            "/api/webhooks/bookedai-telegram",
             json={"message": {"message_id": 1, "chat": {"id": 123}, "text": "Hello"}},
         )
 
@@ -442,6 +464,7 @@ class TelegramWebhookRoutesTestCase(TestCase):
     def test_telegram_book_option_can_capture_booking_intent_result(self):
         captured_calls: list[dict[str, object]] = []
         communication_service = _FakeTelegramCommunicationService()
+        email_service = _FakeEmailService(configured=True)
 
         async def _store_event(_session, **kwargs):
             captured_calls.append(kwargs)
@@ -480,8 +503,48 @@ class TelegramWebhookRoutesTestCase(TestCase):
                     "messaging_layer": {"channel": "telegram"},
                     "customer_care_status": "booking_intent_captured",
                     "booking_reference": "v1-telegram123",
-                    "booking_intent": {"booking_reference": "v1-telegram123"},
+                    "booking_intent": {
+                        "booking_reference": "v1-telegram123",
+                        "tenant_id": "tenant-chess",
+                        "booking_intent_id": "bi-telegram-123",
+                        "contact_id": "contact-123",
+                        "service_name": "Chess pilot class",
+                        "customer_name": "Long",
+                        "customer_email": "long@example.com",
+                        "customer_phone": "+61455301335",
+                        "requested_date": "2026-04-28",
+                        "requested_time": "16:00",
+                        "timezone": "Australia/Sydney",
+                        "booking_path": "book_now_capture",
+                    },
                 },
+            )
+
+        async def _orchestrate_booking_followup_sync(*_args, **_kwargs):
+            return SimpleNamespace(
+                deal_record_id=71,
+                deal_sync_status="pending",
+                deal_external_entity_id=None,
+                task_record_id=72,
+                task_sync_status="pending",
+                task_external_entity_id=None,
+                warning_codes=[],
+            )
+
+        async def _orchestrate_lifecycle_email(*_args, **_kwargs):
+            return SimpleNamespace(
+                message_id="email-telegram-1",
+                delivery_status="sent",
+                provider="smtp",
+                warning_codes=[],
+            )
+
+        async def _orchestrate_email_sent_sync(*_args, **_kwargs):
+            return SimpleNamespace(
+                task_record_id=73,
+                task_sync_status="pending",
+                task_external_entity_id=None,
+                warning_codes=[],
             )
 
         with patch("api.route_handlers.get_session", _fake_get_session), patch(
@@ -496,9 +559,19 @@ class TelegramWebhookRoutesTestCase(TestCase):
         ), patch(
             "service_layer.messaging_automation_service.MessagingAutomationService._try_create_chat_booking_intent",
             _try_create_chat_booking_intent,
+        ), patch(
+            "api.route_handlers.orchestrate_booking_followup_sync",
+            _orchestrate_booking_followup_sync,
+        ), patch(
+            "api.route_handlers.orchestrate_lifecycle_email",
+            _orchestrate_lifecycle_email,
+        ), patch(
+            "api.route_handlers.orchestrate_email_sent_sync",
+            _orchestrate_email_sent_sync,
         ):
             app = create_test_app()
             app.state.communication_service = communication_service
+            app.state.email_service = email_service
             client = TestClient(app)
             response = client.post(
                 "/api/webhooks/telegram",
@@ -515,9 +588,112 @@ class TelegramWebhookRoutesTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(communication_service.sent), 1)
+        self.assertEqual(email_service.sent[0]["to"], ["long@example.com"])
         self.assertIn("v1-telegram123", communication_service.sent[0]["body"])
         self.assertEqual(captured_calls[0]["ai_intent"], "booking_intent_captured")
         self.assertEqual(captured_calls[0]["metadata"]["booking_reference"], "v1-telegram123")
+        lifecycle = captured_calls[0]["metadata"]["lifecycle_updates"]
+        self.assertEqual(lifecycle["crm_sync"]["deal"]["record_id"], 71)
+        self.assertEqual(lifecycle["crm_sync"]["task"]["record_id"], 72)
+        self.assertEqual(lifecycle["email_confirmation"]["message_id"], "email-telegram-1")
+        self.assertEqual(
+            lifecycle["email_confirmation"]["crm_sync"]["task"]["record_id"],
+            73,
+        )
+
+    def test_telegram_preserves_booking_intent_lifecycle_updates_when_queued_request_also_exists(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _handle_customer_message(*_args, **_kwargs):
+            return MessagingAutomationResult(
+                ai_reply="Done. Reference: v1-telegram123",
+                ai_intent="booking_intent_captured",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": {"channel": "telegram"},
+                    "booking_reference": "v1-telegram123",
+                    "booking_intent": {
+                        "booking_reference": "v1-telegram123",
+                        "tenant_id": "tenant-chess",
+                        "booking_intent_id": "bi-telegram-123",
+                        "customer_email": "long@example.com",
+                    },
+                    "queued_request": {
+                        "request_type": "reschedule_request",
+                        "booking_reference": "v1-telegram123",
+                        "tenant_id": "tenant-chess",
+                        "customer_email": "long@example.com",
+                    },
+                },
+            )
+
+        async def _finalize_booking_intent(*_args, **_kwargs):
+            return {
+                "crm_sync": {
+                    "deal": {"record_id": 71, "sync_status": "pending"},
+                    "task": {"record_id": 72, "sync_status": "pending"},
+                },
+                "email_confirmation": {
+                    "message_id": "email-telegram-1",
+                    "delivery_status": "sent",
+                },
+            }
+
+        async def _finalize_queued_request(*_args, **_kwargs):
+            return {
+                "queued_request": {
+                    "request_type": "reschedule_request",
+                    "booking_reference": "v1-telegram123",
+                }
+            }
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.MessagingAutomationService.handle_customer_message",
+            _handle_customer_message,
+        ), patch(
+            "api.route_handlers._finalize_messaging_booking_intent_side_effects",
+            _finalize_booking_intent,
+        ), patch(
+            "api.route_handlers._finalize_whatsapp_booking_request_side_effects",
+            _finalize_queued_request,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "message": {
+                        "message_id": 10,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "Book 1 and also reschedule my current class",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(communication_service.sent), 1)
+        lifecycle = captured_calls[0]["metadata"]["lifecycle_updates"]
+        self.assertEqual(lifecycle["crm_sync"]["deal"]["record_id"], 71)
+        self.assertEqual(lifecycle["crm_sync"]["task"]["record_id"], 72)
+        self.assertEqual(lifecycle["email_confirmation"]["message_id"], "email-telegram-1")
+        self.assertEqual(
+            lifecycle["queued_request"]["request_type"],
+            "reschedule_request",
+        )
+        self.assertEqual(
+            lifecycle["queued_request"]["booking_reference"],
+            "v1-telegram123",
+        )
 
     def test_telegram_existing_order_search_asks_what_to_do_with_current_booking(self):
         captured_calls: list[dict[str, object]] = []
