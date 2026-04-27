@@ -1040,7 +1040,7 @@ class TelegramWebhookRoutesTestCase(TestCase):
                     "update_id": 5001,
                     "message": {
                         "message_id": 21,
-                        "from": {"id": 999, "first_name": "Long", "language_code": "vi"},
+                        "from": {"id": 999, "first_name": "Long", "language_code": "en-AU"},
                         "chat": {"id": 123456, "type": "private"},
                         "text": "/start",
                     },
@@ -1060,11 +1060,116 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(communication_service.sent[0]["parse_mode"], "HTML")
         self.assertEqual(captured_calls[0]["ai_intent"], "welcome")
         self.assertEqual(
-            captured_calls[0]["metadata"]["telegram_language_code"], "vi"
+            captured_calls[0]["metadata"]["telegram_language_code"], "en-au"
         )
+        self.assertEqual(captured_calls[0]["metadata"]["locale"], "en")
         self.assertEqual(
             captured_calls[0]["metadata"]["start_command_kind"], "welcome"
         )
+
+    def test_telegram_start_in_vietnamese_locale_renders_vietnamese_welcome(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 7001,
+                    "message": {
+                        "message_id": 41,
+                        "from": {"id": 999, "first_name": "Long", "language_code": "vi"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/start",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = communication_service.sent[0]["body"]
+        self.assertIn("Chào Long", body)
+        self.assertIn("Tìm dịch vụ", body)
+        keyboard = communication_service.sent[0]["reply_markup"]["keyboard"]
+        self.assertEqual(keyboard[0][0]["text"], "Tìm dịch vụ")
+        self.assertEqual(keyboard[0][1]["text"], "Booking của tôi")
+        self.assertEqual(keyboard[1][0]["text"], "Gặp hỗ trợ")
+        self.assertEqual(captured_calls[0]["metadata"]["locale"], "vi")
+
+    def test_telegram_unsupported_locale_falls_back_to_english_welcome(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 7002,
+                    "message": {
+                        "message_id": 42,
+                        "from": {"id": 999, "first_name": "Long", "language_code": "fr"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/start",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = communication_service.sent[0]["body"]
+        self.assertIn("Find a service", body)
+        self.assertEqual(captured_calls[0]["metadata"]["locale"], "en")
+
+    def test_telegram_vietnamese_keyboard_label_routes_to_search_prompt(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 7003,
+                    "message": {
+                        "message_id": 43,
+                        "from": {"id": 999, "first_name": "Long", "language_code": "vi"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "Tìm dịch vụ",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "search_prompt")
+        body = communication_service.sent[0]["body"]
+        self.assertIn("Bạn muốn tìm gì", body)
 
     def test_telegram_typing_indicator_is_sent_before_reply(self):
         captured_calls: list[dict[str, object]] = []
