@@ -49,6 +49,7 @@ const pitchNavItems = [
   { id: 'solution', label: 'Solution' },
   { id: 'pricing', label: 'Pricing' },
   { id: 'architecture', label: 'Architecture', href: architectureUrl },
+  { id: 'roadmap-execution', label: 'Roadmap' },
   { id: 'surfaces', label: 'Surfaces' },
   { id: 'trust', label: 'Trust' },
 ];
@@ -365,6 +366,92 @@ function PitchArchitectureFlowVisual() {
                   <div className="mt-1 text-sm leading-6 text-slate-700">{body}</div>
                 </div>
               ))}
+            </figcaption>
+          </figure>
+        </div>
+      </SectionCard>
+    </section>
+  );
+}
+
+function MasterRoadmapPitchSection() {
+  return (
+    <section
+      id="roadmap-execution"
+      aria-labelledby="pitch-master-roadmap-title"
+      className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8"
+    >
+      <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f7faff_46%,#f3f5fc_100%)] px-5 py-6 shadow-[0_28px_80px_rgba(15,23,42,0.10)] sm:px-7 lg:px-8 lg:py-8">
+        <div className="grid gap-7 xl:grid-cols-[0.42fr_1.58fr] xl:items-start">
+          <div>
+            <SignalPill className="w-fit border border-black/6 bg-white/80 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#b91c1c]">
+              Roadmap & execution plan
+            </SignalPill>
+            <h2
+              id="pitch-master-roadmap-title"
+              className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl lg:text-[2.6rem] lg:leading-[1.08]"
+            >
+              Master Roadmap — 8 Weeks to Production Scale
+            </h2>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
+              Phase 0 launched 2026-04-11 · Go-live 2026-04-30 · Total project completion 2026-06-07.
+              The plan synced from <code className="rounded bg-slate-100 px-1 py-0.5 text-[12px] text-slate-700">01-MASTER-ROADMAP-SYNCED.md</code> shows
+              every phase, milestone, and tenant runtime against the same calendar.
+            </p>
+
+            <div className="mt-5 flex flex-wrap gap-3">
+              <a
+                href={roadmapHref}
+                className="rounded-full bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+              >
+                Open full roadmap
+              </a>
+              <a
+                href="/roadmap/master-roadmap-2026-04-11-to-06-07.svg"
+                className="rounded-full border border-black/8 bg-white/80 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
+                target="_blank"
+                rel="noreferrer"
+              >
+                View roadmap image
+              </a>
+            </div>
+          </div>
+
+          <figure className="rounded-[1.85rem] border border-black/6 bg-white/85 p-3 shadow-[0_22px_58px_rgba(15,23,42,0.08)] sm:p-4">
+            <div className="overflow-hidden rounded-[1.45rem] border border-slate-200 bg-white">
+              <img
+                src="/roadmap/master-roadmap-2026-04-11-to-06-07.svg"
+                alt="BookedAI Master Roadmap from 2026-04-11 Phase 0 reset through 2026-06-07 Phase 23 closeout, organized in five workstream swim lanes (Pre Go-Live, Go-Live Sprint, Post Go-Live, Communication Layer, Tenant Runtimes) with milestones M-01 through M-11 and a hard GO-LIVE LOCK on 2026-04-30"
+                className="block h-auto w-full"
+                loading="lazy"
+              />
+            </div>
+            <figcaption className="mt-4 grid gap-3 md:grid-cols-3">
+              <div className="min-w-0 rounded-[1.1rem] border border-rose-200 bg-rose-50/60 px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-rose-700">
+                  Pre go-live · D-3 → D-0
+                </div>
+                <div className="mt-1 text-sm leading-6 text-slate-700">
+                  Telegram-primary; 3 tenants verified — Co Mai Hung Chess, Future Swim, AI Mentor 1-1.
+                </div>
+              </div>
+              <div className="min-w-0 rounded-[1.1rem] border border-blue-200 bg-blue-50/60 px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-700">
+                  Post go-live · weekly cadence
+                </div>
+                <div className="mt-1 text-sm leading-6 text-slate-700">
+                  Widget runtime → Wallet/Stripe → Billing truth → Multi-tenant template → Release
+                  governance.
+                </div>
+              </div>
+              <div className="min-w-0 rounded-[1.1rem] border border-violet-200 bg-violet-50/60 px-4 py-3">
+                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-700">
+                  Communication overlay
+                </div>
+                <div className="mt-1 text-sm leading-6 text-slate-700">
+                  M-09 WhatsApp outbound · M-10 iMessage feasibility research · M-11 SMS adapter.
+                </div>
+              </div>
             </figcaption>
           </figure>
         </div>
@@ -973,6 +1060,9 @@ export function PitchDeckApp() {
 
       {/* ── 6. ARCHITECTURE ─────────────────────────────────────────── */}
       <PitchArchitectureFlowVisual />
+
+      {/* ── 6.5 ROADMAP & EXECUTION PLAN ────────────────────────────── */}
+      <MasterRoadmapPitchSection />
 
       {/* ── 7. SURFACES ─────────────────────────────────────────────── */}
       <section id="surfaces" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">

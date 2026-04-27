@@ -4,6 +4,8 @@ Date: `2026-04-27`
 
 Status: `active SSOT — phase + roadmap synchronization, anchored 2026-04-27`
 
+> **Latest scope updates (2026-04-27)**: AI Mentor 1-1 added to go-live ([CR-009](05-CHANGE-REQUESTS.md)); Telegram-only channel pre go-live, post-go-live communication-layer research scheduled ([CR-010](05-CHANGE-REQUESTS.md)); Stripe subscription deferred to Phase 21 ([CR-011](05-CHANGE-REQUESTS.md)); Zoho CRM live activation awaits tenant credentials ([CR-012](05-CHANGE-REQUESTS.md)).
+
 Owner lane: `Product/PM` (xem [phase-execution-operating-system-2026-04-26.md](../../development/phase-execution-operating-system-2026-04-26.md))
 
 ## 1. Mục tiêu (Purpose)
@@ -55,15 +57,21 @@ Tài liệu gốc trong `docs/architecture/` và `docs/development/` được gi
 | File | Nội dung |
 |---|---|
 | [00-README.md](00-README.md) | (file này) Index, authority statement, update procedure |
-| [01-MASTER-ROADMAP-SYNCED.md](01-MASTER-ROADMAP-SYNCED.md) | Danh sách phase chuẩn `0 → 23`, ngày, status, sprint range, deliverable; Gantt 26 tuần |
-| [02-RECONCILIATION-LOG.md](02-RECONCILIATION-LOG.md) | Mọi mâu thuẫn được phát hiện và cách hoà giải, group theo phase |
+| [01-MASTER-ROADMAP-SYNCED.md](01-MASTER-ROADMAP-SYNCED.md) | Danh sách phase chuẩn `0 → 23`, ngày (re-anchored), status, sprint range, deliverable; Gantt 8 tuần `2026-04-11 → 2026-06-07` |
+| [02-RECONCILIATION-LOG.md](02-RECONCILIATION-LOG.md) | Mọi mâu thuẫn được phát hiện và cách hoà giải, group theo phase (incl. RC-100..RC-102 re-anchor) |
 | [03-DOC-AUTHORITY-MAP.md](03-DOC-AUTHORITY-MAP.md) | Nhãn authority cho từng tài liệu phase/sprint/roadmap cũ |
+| [04-VISION-TARGET-MILESTONES.md](04-VISION-TARGET-MILESTONES.md) | (NEW) Vision, North-Star, target outcomes 90/180/365 days, milestones M-01..M-08 |
+| [05-CHANGE-REQUESTS.md](05-CHANGE-REQUESTS.md) | (NEW) Change Request register: workflow, types, status legend, CR-001..CR-008 |
+| [06-BIG-PICTURE.md](06-BIG-PICTURE.md) | (NEW) One-page visual: timeline strip, Mermaid Gantt, swim-lanes, critical path, decision points |
+| [07-PAST-WORK-LOG.md](07-PAST-WORK-LOG.md) | (NEW `2026-04-27`) Snapshot Phase 0 → today: week-by-week timeline, phase-by-phase status, confidence assessment for go-live `2026-04-30` |
+| [08-IMPLEMENT-FIX-PLAN.md](08-IMPLEMENT-FIX-PLAN.md) | (NEW `2026-04-27`) Action plan to hit go-live `2026-04-30`: Gate A/B/C/D/E fix backlog with countdown D-3 → D-0 + fallback/rollback procedure |
 | [phases/phase-00-detail.md](phases/phase-00-detail.md) → [phase-23-detail.md](phases/phase-23-detail.md) | 1 file chi tiết / phase theo template chuẩn |
 | [zz-CHANGELOG.md](zz-CHANGELOG.md) | Changelog cho riêng pack này |
 
 ## 5. Quy ước (Conventions)
 
-- **Anchor today** = `2026-04-27`. Mọi cụm từ tương đối ("next sprint", "soon") đã được quy đổi sang ISO date hoặc đánh dấu `[date pending]`.
+- **Anchor today** = `2026-04-27`. **Re-anchored** `2026-04-27` per user input: Phase 0 start = `2026-04-11`; M-01 chess+swim demo = `2026-04-29`; M-02 go-live = `2026-04-30`; weekly Mon-Sun cadence post-go-live; Phase 23 end = `2026-06-07` = total project completion. Xem [02-RECONCILIATION-LOG.md §RC-100](02-RECONCILIATION-LOG.md), [05-CHANGE-REQUESTS.md §CR-001](05-CHANGE-REQUESTS.md), [04-VISION-TARGET-MILESTONES.md](04-VISION-TARGET-MILESTONES.md), [06-BIG-PICTURE.md](06-BIG-PICTURE.md).
+- Mọi cụm từ tương đối ("next sprint", "soon") đã được quy đổi sang ISO date hoặc đánh dấu `[date pending]`.
 - **Phase numbering**: pack này dùng `Phase 0` → `Phase 23` đúng theo [bookedai-master-roadmap-2026-04-26.md](../../architecture/bookedai-master-roadmap-2026-04-26.md). `Phase 10-16` không tồn tại trong product roadmap mới — `Sprint 11-16` map vào `Phase 7`, `Phase 8`, `Phase 9` (xem `01-MASTER-ROADMAP-SYNCED.md` §Sprint Map).
 - **Sprint numbering**: `Sprint 1` → `Sprint 22` đã commit; `Sprint 23` và `Sprint 24` là indicative post-22 horizon.
 - **Status vocabulary**:
@@ -87,10 +95,12 @@ Khi 1 phase đóng, hoặc khi roadmap thay đổi:
 
 ## 7. Reading order theo audience
 
-- **Leadership / Investor**: [01-MASTER-ROADMAP-SYNCED.md](01-MASTER-ROADMAP-SYNCED.md) (sections §1 Snapshot và §6 Gantt) → [phases/phase-19-detail.md](phases/phase-19-detail.md) → [phases/phase-21-detail.md](phases/phase-21-detail.md) → [09-OPEN-QUESTIONS.md](../09-OPEN-QUESTIONS.md).
+- **Leadership / Investor**: [04-VISION-TARGET-MILESTONES.md](04-VISION-TARGET-MILESTONES.md) → [06-BIG-PICTURE.md](06-BIG-PICTURE.md) → [01-MASTER-ROADMAP-SYNCED.md](01-MASTER-ROADMAP-SYNCED.md) (sections §0 Date Anchor, §1 Snapshot, §6 Gantt) → [phases/phase-19-detail.md](phases/phase-19-detail.md) → [phases/phase-21-detail.md](phases/phase-21-detail.md) → [09-OPEN-QUESTIONS.md](../09-OPEN-QUESTIONS.md).
 - **Engineering leads**: [01-MASTER-ROADMAP-SYNCED.md](01-MASTER-ROADMAP-SYNCED.md) (sections §3 Sprint Map và §5 P0/P1 anchors) → file detail của phase đang làm → [phase-execution-operating-system-2026-04-26.md](../../development/phase-execution-operating-system-2026-04-26.md) cho gates.
-- **PM/Operations**: [02-RECONCILIATION-LOG.md](02-RECONCILIATION-LOG.md) → [03-DOC-AUTHORITY-MAP.md](03-DOC-AUTHORITY-MAP.md) → [zz-CHANGELOG.md](zz-CHANGELOG.md).
+- **PM/Operations**: [05-CHANGE-REQUESTS.md](05-CHANGE-REQUESTS.md) → [02-RECONCILIATION-LOG.md](02-RECONCILIATION-LOG.md) → [03-DOC-AUTHORITY-MAP.md](03-DOC-AUTHORITY-MAP.md) → [zz-CHANGELOG.md](zz-CHANGELOG.md).
 
 ## Changelog
 
+- `2026-04-27` (scope update) — Added top-of-file callout for CR-009 (AI Mentor 1-1) + CR-010 (Telegram-only pre go-live; post-go-live comms-layer research) + CR-011 (Stripe defer) + CR-012 (Zoho CRM defer).
+- `2026-04-27` (re-anchor) — Added files 04, 05, 06; updated index, conventions section with re-anchor note; updated reading order to start with Vision/Big-Picture for leadership audience.
 - `2026-04-27` initial publication of `docs/pm/roadmap-synced/` pack synthesizing Phase 0-23 + post-Sprint-22 horizon from 50+ source documents in `docs/architecture/` and `docs/development/`.

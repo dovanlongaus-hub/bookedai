@@ -1,0 +1,301 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1000" width="1600" height="1000" font-family="Inter, system-ui, -apple-system, sans-serif" role="img" aria-label="BookedAI Sprint to Go-Live timeline 2026-04-11 to 2026-04-30 with 13 phases and milestones M-01 demo and M-02 go-live lock">
+  <title>BookedAI — Sprint to Go-Live (2026-04-11 → 2026-04-30)</title>
+  <desc>Daily Gantt grid showing 13 phases (P0–P9, P17, P18, P19) from 11 April 2026 to 30 April 2026. Status colours: shipped (emerald), shipped baseline (cyan), in-progress (amber), in-progress at-risk (rose). Today marker at 27 April; M-01 demo on 29 April; M-02 GO-LIVE LOCK on 30 April.</desc>
+
+  <defs>
+    <linearGradient id="bgFade" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f3f5f8"/>
+    </linearGradient>
+    <linearGradient id="m02Glow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dc2626" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#dc2626" stop-opacity="0.04"/>
+    </linearGradient>
+    <filter id="softShadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="2" result="off"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1600" height="1000" fill="url(#bgFade)"/>
+
+  <!-- Header -->
+  <g class="header">
+    <text x="60" y="56" font-size="28" font-weight="700" fill="#0f172a" letter-spacing="-0.5">BookedAI — Sprint to Go-Live</text>
+    <text x="60" y="84" font-size="15" font-weight="500" fill="#475569">2026-04-11 (Phase 0) → 2026-04-30 (M-02 GO-LIVE LOCK) · 20 days · 13 active phases</text>
+    <text x="60" y="106" font-size="12" font-weight="600" fill="#0891b2" letter-spacing="1.4">SOURCE OF TRUTH · docs/pm/roadmap-synced/01-MASTER-ROADMAP-SYNCED.md</text>
+  </g>
+
+  <!-- Legend (top right) -->
+  <g class="legend" transform="translate(1060,32)">
+    <rect x="0" y="0" width="500" height="92" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="16" y="22" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="1">STATUS LEGEND</text>
+    <g transform="translate(16,34)">
+      <rect width="14" height="14" rx="3" fill="#10b981"/><text x="22" y="11" font-size="11" fill="#334155">Shipped</text>
+      <g transform="translate(110,0)"><rect width="14" height="14" rx="3" fill="#0891b2"/><text x="22" y="11" font-size="11" fill="#334155">Shipped baseline</text></g>
+      <g transform="translate(260,0)"><rect width="14" height="14" rx="3" fill="#f59e0b"/><text x="22" y="11" font-size="11" fill="#334155">In-Progress</text></g>
+      <g transform="translate(370,0)"><rect width="14" height="14" rx="3" fill="#f43f5e"/><text x="22" y="11" font-size="11" fill="#334155">At-Risk</text></g>
+    </g>
+    <g transform="translate(16,60)">
+      <line x1="0" y1="7" x2="20" y2="7" stroke="#dc2626" stroke-width="2" stroke-dasharray="3 3"/>
+      <text x="26" y="11" font-size="11" fill="#334155">TODAY (Mon 27 Apr)</text>
+      <g transform="translate(180,0)">
+        <polygon points="6,0 12,7 6,14 0,7" fill="#dc2626"/>
+        <text x="20" y="11" font-size="11" fill="#334155">M-01 / M-02 milestone</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Timeline geometry constants (calc):
+       chart left = 260, chart top = 160, chart right = 1560, chart bottom = 900
+       day cols = 20  (Apr 11 .. Apr 30)
+       col width = (1560-260)/20 = 65
+       row count = 13, row height = (900-200)/13 ≈ 53.8 (we use 54)
+  -->
+
+  <!-- Day grid header -->
+  <g class="day-header" transform="translate(260,140)">
+    <rect x="0" y="0" width="1300" height="60" fill="#0f172a" rx="8"/>
+    <text x="650" y="22" text-anchor="middle" font-size="11" font-weight="700" fill="#e2e8f0" letter-spacing="2">APRIL 2026 — DAILY GRID</text>
+    <!-- 20 day cells -->
+    <g font-size="11" fill="#cbd5e1" font-weight="600" text-anchor="middle">
+      <!-- Apr 11 Sat -->
+      <g><text x="32.5" y="42">11</text><text x="32.5" y="55" font-size="9" fill="#94a3b8">Sat</text></g>
+      <g><text x="97.5" y="42">12</text><text x="97.5" y="55" font-size="9" fill="#94a3b8">Sun</text></g>
+      <g><text x="162.5" y="42" fill="#fbbf24">13</text><text x="162.5" y="55" font-size="9" fill="#94a3b8">Mon</text></g>
+      <g><text x="227.5" y="42">14</text><text x="227.5" y="55" font-size="9" fill="#94a3b8">Tue</text></g>
+      <g><text x="292.5" y="42">15</text><text x="292.5" y="55" font-size="9" fill="#94a3b8">Wed</text></g>
+      <g><text x="357.5" y="42">16</text><text x="357.5" y="55" font-size="9" fill="#94a3b8">Thu</text></g>
+      <g><text x="422.5" y="42">17</text><text x="422.5" y="55" font-size="9" fill="#94a3b8">Fri</text></g>
+      <g><text x="487.5" y="42">18</text><text x="487.5" y="55" font-size="9" fill="#94a3b8">Sat</text></g>
+      <g><text x="552.5" y="42">19</text><text x="552.5" y="55" font-size="9" fill="#94a3b8">Sun</text></g>
+      <g><text x="617.5" y="42" fill="#fbbf24">20</text><text x="617.5" y="55" font-size="9" fill="#94a3b8">Mon</text></g>
+      <g><text x="682.5" y="42">21</text><text x="682.5" y="55" font-size="9" fill="#94a3b8">Tue</text></g>
+      <g><text x="747.5" y="42">22</text><text x="747.5" y="55" font-size="9" fill="#94a3b8">Wed</text></g>
+      <g><text x="812.5" y="42">23</text><text x="812.5" y="55" font-size="9" fill="#94a3b8">Thu</text></g>
+      <g><text x="877.5" y="42">24</text><text x="877.5" y="55" font-size="9" fill="#94a3b8">Fri</text></g>
+      <g><text x="942.5" y="42">25</text><text x="942.5" y="55" font-size="9" fill="#94a3b8">Sat</text></g>
+      <g><text x="1007.5" y="42">26</text><text x="1007.5" y="55" font-size="9" fill="#94a3b8">Sun</text></g>
+      <g><text x="1072.5" y="42" fill="#fbbf24">27</text><text x="1072.5" y="55" font-size="9" fill="#94a3b8">Mon</text></g>
+      <g><text x="1137.5" y="42">28</text><text x="1137.5" y="55" font-size="9" fill="#94a3b8">Tue</text></g>
+      <g><text x="1202.5" y="42">29</text><text x="1202.5" y="55" font-size="9" fill="#94a3b8">Wed</text></g>
+      <g><text x="1267.5" y="42">30</text><text x="1267.5" y="55" font-size="9" fill="#94a3b8">Thu</text></g>
+    </g>
+  </g>
+
+  <!-- Phase row backgrounds + grid -->
+  <g class="grid">
+    <!-- Vertical day grid (light) -->
+    <g stroke="#e2e8f0" stroke-width="1">
+      <line x1="260" y1="200" x2="260" y2="900"/>
+      <line x1="325" y1="200" x2="325" y2="900"/>
+      <line x1="390" y1="200" x2="390" y2="900"/>
+      <line x1="455" y1="200" x2="455" y2="900"/>
+      <line x1="520" y1="200" x2="520" y2="900"/>
+      <line x1="585" y1="200" x2="585" y2="900"/>
+      <line x1="650" y1="200" x2="650" y2="900"/>
+      <line x1="715" y1="200" x2="715" y2="900"/>
+      <line x1="780" y1="200" x2="780" y2="900"/>
+      <line x1="845" y1="200" x2="845" y2="900"/>
+      <line x1="910" y1="200" x2="910" y2="900"/>
+      <line x1="975" y1="200" x2="975" y2="900"/>
+      <line x1="1040" y1="200" x2="1040" y2="900"/>
+      <line x1="1105" y1="200" x2="1105" y2="900"/>
+      <line x1="1170" y1="200" x2="1170" y2="900"/>
+      <line x1="1235" y1="200" x2="1235" y2="900"/>
+      <line x1="1300" y1="200" x2="1300" y2="900"/>
+      <line x1="1365" y1="200" x2="1365" y2="900"/>
+      <line x1="1430" y1="200" x2="1430" y2="900"/>
+      <line x1="1495" y1="200" x2="1495" y2="900"/>
+      <line x1="1560" y1="200" x2="1560" y2="900"/>
+    </g>
+    <!-- Week boundary highlights (Mondays Apr 13, 20, 27) -->
+    <g stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 4" opacity="0.55">
+      <line x1="390" y1="200" x2="390" y2="900"/>
+      <line x1="845" y1="200" x2="845" y2="900"/>
+      <line x1="1300" y1="200" x2="1300" y2="900"/>
+    </g>
+  </g>
+
+  <!-- Phase labels + bars -->
+  <!-- Helper: x = 260 + (dayIndex * 65); width = (endDay-startDay+1)*65
+       Day index: Apr 11 = 0, Apr 30 = 19  -->
+
+  <g class="phase-rows" font-size="12" font-family="Inter, system-ui, sans-serif">
+    <!-- Row 1: Phase 0 — Reset (Apr 11 → Apr 17) Shipped emerald -->
+    <g class="phase-row" transform="translate(0,210)">
+      <rect x="60" y="0" width="190" height="42" fill="#ffffff" stroke="#e2e8f0" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#0f172a">P0 · Reset</text>
+      <text x="74" y="32" font-size="10" fill="#64748b">Apr 11 → Apr 17</text>
+      <g class="phase-bar">
+        <rect x="260" y="6" width="455" height="30" rx="6" fill="#10b981" filter="url(#softShadow)"/>
+        <text x="270" y="25" font-size="11" font-weight="600" fill="#ffffff">Shipped · environment + repo reset</text>
+      </g>
+    </g>
+    <!-- Row 2: Phase 1 — Public landing (Apr 13 → Apr 18) Shipped + carry P1-7/P1-8 -->
+    <g class="phase-row" transform="translate(0,262)">
+      <rect x="60" y="0" width="190" height="42" fill="#ffffff" stroke="#e2e8f0" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#0f172a">P1 · Public landing</text>
+      <text x="74" y="32" font-size="10" fill="#64748b">Apr 13 → Apr 18 · carry P1-7/8</text>
+      <g class="phase-bar">
+        <rect x="390" y="6" width="390" height="30" rx="6" fill="#10b981" filter="url(#softShadow)"/>
+        <text x="400" y="25" font-size="11" font-weight="600" fill="#ffffff">Shipped · homepage / pitch / pricing</text>
+      </g>
+    </g>
+    <!-- Row 3: Phase 2 — Data foundation (Apr 14 → Apr 21) Shipped baseline cyan -->
+    <g class="phase-row" transform="translate(0,314)">
+      <rect x="60" y="0" width="190" height="42" fill="#ffffff" stroke="#e2e8f0" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#0f172a">P2 · Data foundation</text>
+      <text x="74" y="32" font-size="10" fill="#64748b">Apr 14 → Apr 21</text>
+      <g class="phase-bar">
+        <rect x="455" y="6" width="520" height="30" rx="6" fill="#0891b2" filter="url(#softShadow)"/>
+        <text x="465" y="25" font-size="11" font-weight="600" fill="#ffffff">Shipped baseline · contracts + API v1</text>
+      </g>
+    </g>
+    <!-- Row 4: Phase 3 — Multi-channel (Apr 16 → Apr 26) In-Progress amber -->
+    <g class="phase-row" transform="translate(0,366)">
+      <rect x="60" y="0" width="190" height="42" fill="#ffffff" stroke="#e2e8f0" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#0f172a">P3 · Multi-channel</text>
+      <text x="74" y="32" font-size="10" fill="#64748b">Apr 16 → Apr 26 · Telegram-primary</text>
+      <g class="phase-bar">
+        <rect x="585" y="6" width="715" height="30" rx="6" fill="#f59e0b" filter="url(#softShadow)"/>
+        <text x="595" y="25" font-size="11" font-weight="600" fill="#ffffff">In-Progress · CR-010 Telegram-only at go-live</text>
+      </g>
+    </g>
+    <!-- Row 5: Phase 4 — Reporting (Apr 18 → Apr 26) In-Progress -->
+    <g class="phase-row" transform="translate(0,418)">
+      <rect x="60" y="0" width="190" height="42" fill="#ffffff" stroke="#e2e8f0" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#0f172a">P4 · Reporting</text>
+      <text x="74" y="32" font-size="10" fill="#64748b">Apr 18 → Apr 26</text>
+      <g class="phase-bar">
+        <rect x="715" y="6" width="585" height="30" rx="6" fill="#f59e0b" filter="url(#softShadow)"/>
+        <text x="725" y="25" font-size="11" font-weight="600" fill="#ffffff">In-Progress · ledger filters + visibility</text>
+      </g>
+    </g>
+    <!-- Row 6: Phase 5 — Payments / recovery (Apr 18 → Apr 26) In-Progress -->
+    <g class="phase-row" transform="translate(0,470)">
+      <rect x="60" y="0" width="190" height="42" fill="#ffffff" stroke="#e2e8f0" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#0f172a">P5 · Payments / recovery</text>
+      <text x="74" y="32" font-size="10" fill="#64748b">Apr 18 → Apr 26</text>
+      <g class="phase-bar">
+        <rect x="715" y="6" width="585" height="30" rx="6" fill="#f59e0b" filter="url(#softShadow)"/>
+        <text x="725" y="25" font-size="11" font-weight="600" fill="#ffffff">In-Progress · Stripe intent + reminder</text>
+      </g>
+    </g>
+    <!-- Row 7: Phase 6 — Optimization (Apr 16 → Apr 26) In-Progress -->
+    <g class="phase-row" transform="translate(0,522)">
+      <rect x="60" y="0" width="190" height="42" fill="#ffffff" stroke="#e2e8f0" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#0f172a">P6 · Optimization</text>
+      <text x="74" y="32" font-size="10" fill="#64748b">Apr 16 → Apr 26</text>
+      <g class="phase-bar">
+        <rect x="585" y="6" width="715" height="30" rx="6" fill="#f59e0b" filter="url(#softShadow)"/>
+        <text x="595" y="25" font-size="11" font-weight="600" fill="#ffffff">In-Progress · search + UX polish</text>
+      </g>
+    </g>
+    <!-- Row 8: Phase 7 — Tenant workspace (Apr 21 → Apr 26) Shipped baseline -->
+    <g class="phase-row" transform="translate(0,574)">
+      <rect x="60" y="0" width="190" height="42" fill="#ffffff" stroke="#e2e8f0" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#0f172a">P7 · Tenant workspace</text>
+      <text x="74" y="32" font-size="10" fill="#64748b">Apr 21 → Apr 26</text>
+      <g class="phase-bar">
+        <rect x="910" y="6" width="390" height="30" rx="6" fill="#0891b2" filter="url(#softShadow)"/>
+        <text x="920" y="25" font-size="11" font-weight="600" fill="#ffffff">Shipped baseline · Ops visibility</text>
+      </g>
+    </g>
+    <!-- Row 9: Phase 8 — Admin platform (Apr 21 → Apr 26) Shipped baseline -->
+    <g class="phase-row" transform="translate(0,626)">
+      <rect x="60" y="0" width="190" height="42" fill="#ffffff" stroke="#e2e8f0" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#0f172a">P8 · Admin platform</text>
+      <text x="74" y="32" font-size="10" fill="#64748b">Apr 21 → Apr 26</text>
+      <g class="phase-bar">
+        <rect x="910" y="6" width="390" height="30" rx="6" fill="#0891b2" filter="url(#softShadow)"/>
+        <text x="920" y="25" font-size="11" font-weight="600" fill="#ffffff">Shipped baseline · workspace shell</text>
+      </g>
+    </g>
+    <!-- Row 10: Phase 9 — QA / release base (Apr 23 → Apr 26) In-Progress -->
+    <g class="phase-row" transform="translate(0,678)">
+      <rect x="60" y="0" width="190" height="42" fill="#ffffff" stroke="#e2e8f0" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#0f172a">P9 · QA / release base</text>
+      <text x="74" y="32" font-size="10" fill="#64748b">Apr 23 → Apr 26</text>
+      <g class="phase-bar">
+        <rect x="1040" y="6" width="260" height="30" rx="6" fill="#f59e0b" filter="url(#softShadow)"/>
+        <text x="1050" y="25" font-size="11" font-weight="600" fill="#ffffff">In-Progress · release-gate</text>
+      </g>
+    </g>
+    <!-- Row 11: Phase 17 — Full-flow stabilization (Apr 20 → Apr 29) At-Risk rose -->
+    <g class="phase-row" transform="translate(0,730)">
+      <rect x="60" y="0" width="190" height="42" fill="#fff1f2" stroke="#fecaca" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#9f1239">P17 · Full-flow stabilization</text>
+      <text x="74" y="32" font-size="10" fill="#9f1239">Apr 20 → Apr 29 · AT-RISK</text>
+      <g class="phase-bar">
+        <rect x="845" y="6" width="390" height="30" rx="6" fill="#f43f5e" filter="url(#softShadow)"/>
+        <text x="855" y="25" font-size="11" font-weight="600" fill="#ffffff">At-Risk · 3-tenant proof + mobile QA</text>
+      </g>
+    </g>
+    <!-- Row 12: Phase 18 — Revenue-ops ledger (Apr 20 → Apr 30) At-Risk -->
+    <g class="phase-row" transform="translate(0,782)">
+      <rect x="60" y="0" width="190" height="42" fill="#fff1f2" stroke="#fecaca" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#9f1239">P18 · Revenue-ops ledger</text>
+      <text x="74" y="32" font-size="10" fill="#9f1239">Apr 20 → Apr 30 · AT-RISK</text>
+      <g class="phase-bar">
+        <rect x="845" y="6" width="455" height="30" rx="6" fill="#f43f5e" filter="url(#softShadow)"/>
+        <text x="855" y="25" font-size="11" font-weight="600" fill="#ffffff">At-Risk · evidence drawers carry to S20</text>
+      </g>
+    </g>
+    <!-- Row 13: Phase 19 — Customer-care + status agent (Apr 25 → Apr 30) At-Risk -->
+    <g class="phase-row" transform="translate(0,834)">
+      <rect x="60" y="0" width="190" height="42" fill="#fff1f2" stroke="#fecaca" rx="6"/>
+      <text x="74" y="18" font-size="11" font-weight="700" fill="#9f1239">P19 · Customer-care + status</text>
+      <text x="74" y="32" font-size="10" fill="#9f1239">Apr 25 → Apr 30 · AT-RISK</text>
+      <g class="phase-bar">
+        <rect x="942" y="6" width="358" height="30" rx="6" fill="#f43f5e" filter="url(#softShadow)"/>
+        <text x="952" y="25" font-size="11" font-weight="600" fill="#ffffff">At-Risk · status agent first proof</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- TODAY marker (Mon Apr 27 = day index 16; x = 260 + 16*65 = 1300; centred at 1300+32.5 = 1332.5) -->
+  <g class="today-marker">
+    <line x1="1332.5" y1="200" x2="1332.5" y2="900" stroke="#dc2626" stroke-width="2" stroke-dasharray="5 4" opacity="0.85"/>
+    <rect x="1280" y="172" width="105" height="22" rx="11" fill="#dc2626"/>
+    <text x="1332.5" y="187" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="1">TODAY · APR 27</text>
+  </g>
+
+  <!-- M-01 milestone (Wed Apr 29 = day index 18; x = 260 + 18*65 = 1430; centred at 1462.5) -->
+  <g class="milestone milestone-m01">
+    <line x1="1462.5" y1="200" x2="1462.5" y2="900" stroke="#dc2626" stroke-width="1.5" opacity="0.65"/>
+    <polygon points="1462.5,140 1480,156.5 1462.5,173 1445,156.5" fill="#dc2626"/>
+    <rect x="1340" y="912" width="245" height="40" rx="8" fill="#dc2626"/>
+    <text x="1462.5" y="930" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff" letter-spacing="0.6">M-01 · DEMO REHEARSAL</text>
+    <text x="1462.5" y="945" text-anchor="middle" font-size="10" fill="#fee2e2">Chess + Swim + AI Mentor 1-1</text>
+  </g>
+
+  <!-- M-02 milestone (Thu Apr 30 = day index 19; x = 260 + 19*65 = 1495; centred at 1527.5) -->
+  <g class="milestone milestone-m02">
+    <!-- Glow column for M-02 -->
+    <rect x="1495" y="200" width="65" height="700" fill="url(#m02Glow)"/>
+    <line x1="1527.5" y1="200" x2="1527.5" y2="900" stroke="#b91c1c" stroke-width="3"/>
+    <polygon points="1527.5,134 1548,156.5 1527.5,179 1507,156.5" fill="#b91c1c" stroke="#ffffff" stroke-width="2"/>
+    <!-- Star inside diamond -->
+    <polygon points="1527.5,144 1530,153 1539.5,153 1532,159 1535,168 1527.5,162.5 1520,168 1523,159 1515.5,153 1525,153" fill="#fde68a"/>
+    <text x="1527.5" y="118" text-anchor="middle" font-size="11" font-weight="700" fill="#b91c1c" letter-spacing="1">HARD</text>
+  </g>
+
+  <!-- M-02 callout box -->
+  <g transform="translate(1230,955)">
+    <rect x="0" y="0" width="320" height="34" rx="8" fill="#b91c1c"/>
+    <text x="160" y="18" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff" letter-spacing="0.6">M-02 · GO-LIVE LOCK · 2026-04-30</text>
+    <text x="160" y="30" text-anchor="middle" font-size="10" fill="#fee2e2">Image promote 09:00 · Smoke 09:30 · Sign-off 14:00</text>
+  </g>
+
+  <!-- Footer -->
+  <g class="footer">
+    <line x1="60" y1="970" x2="1560" y2="970" stroke="#e2e8f0"/>
+    <text x="60" y="990" font-size="11" fill="#64748b">BookedAI · roadmap.bookedai.au — Generated 2026-04-27 from synced SSOT (01-MASTER-ROADMAP-SYNCED.md)</text>
+    <text x="1560" y="990" text-anchor="end" font-size="11" fill="#64748b">CR-010 Telegram-primary · 3 tenants: Chess · Future Swim · AI Mentor 1-1</text>
+  </g>
+</svg>

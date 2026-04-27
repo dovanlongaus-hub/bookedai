@@ -1,0 +1,391 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1800 1100" width="1800" height="1100" font-family="Inter, system-ui, -apple-system, sans-serif" role="img" aria-label="BookedAI Master Roadmap from 2026-04-11 Phase 0 reset through 2026-06-07 Phase 23 closeout, organized into five workstream swim lanes with milestones M-01 through M-11 and a hard GO-LIVE LOCK on 2026-04-30">
+  <title>BookedAI Master Roadmap — 8 Weeks to Production Scale</title>
+  <desc>Workstream swim-lane roadmap covering 9 weekly buckets from Apr 11 through Jun 7 2026. Lanes: Pre-Go-Live, Go-Live Sprint, Post-Go-Live, Communication Layer, Tenant Runtimes. Milestones M-01 demo (29 Apr), M-02 GO-LIVE LOCK (30 Apr), M-03 widget on first SME (10 May), M-04 wallet/Stripe continuity (17 May), M-05 tenant revenue proof (24 May), M-06 multi-tenant template + SMS (31 May), M-07 CI + observability (7 Jun), M-08 total project completion (7 Jun), and overlay milestones M-09 WhatsApp outbound (4-10 May), M-10 iMessage feasibility (11-17 May), M-11 SMS adapter (25-31 May).</desc>
+
+  <defs>
+    <linearGradient id="bgFade2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fafafa"/>
+      <stop offset="1" stop-color="#eef2f7"/>
+    </linearGradient>
+    <linearGradient id="goLiveGlow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#dc2626" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#dc2626" stop-opacity="0.02"/>
+    </linearGradient>
+    <linearGradient id="lanePreGoLive" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#ecfdf5"/><stop offset="1" stop-color="#f0fdf4"/>
+    </linearGradient>
+    <linearGradient id="laneGoLive" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fef2f2"/><stop offset="1" stop-color="#fff7ed"/>
+    </linearGradient>
+    <linearGradient id="lanePostGoLive" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#eff6ff"/><stop offset="1" stop-color="#f5f3ff"/>
+    </linearGradient>
+    <linearGradient id="laneComms" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fdf4ff"/><stop offset="1" stop-color="#fdf2f8"/>
+    </linearGradient>
+    <linearGradient id="laneTenants" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#fffbeb"/><stop offset="1" stop-color="#f0fdfa"/>
+    </linearGradient>
+    <filter id="softShadow2" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur in="SourceAlpha" stdDeviation="3"/>
+      <feOffset dx="0" dy="2" result="off"/>
+      <feComponentTransfer><feFuncA type="linear" slope="0.18"/></feComponentTransfer>
+      <feMerge><feMergeNode/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <marker id="arrowRed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 Z" fill="#b91c1c"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1800" height="1100" fill="url(#bgFade2)"/>
+
+  <!-- Header -->
+  <g class="header">
+    <text x="60" y="58" font-size="32" font-weight="700" fill="#0f172a" letter-spacing="-0.5">BookedAI Master Roadmap</text>
+    <text x="60" y="84" font-size="16" font-weight="500" fill="#475569">8 Weeks to Production Scale · 2026-04-11 (Phase 0) → 2026-06-07 (Phase 23 Closeout)</text>
+    <text x="60" y="106" font-size="12" font-weight="600" fill="#0891b2" letter-spacing="1.4">SOURCE OF TRUTH · 01-MASTER-ROADMAP-SYNCED.md · 04-VISION-TARGET-MILESTONES.md · 05-CHANGE-REQUESTS.md</text>
+  </g>
+
+  <!-- Legend (top right) -->
+  <g class="legend" transform="translate(1240,32)">
+    <rect x="0" y="0" width="520" height="92" rx="14" fill="#ffffff" stroke="#e2e8f0"/>
+    <text x="16" y="22" font-size="11" font-weight="700" fill="#0f172a" letter-spacing="1">LEGEND</text>
+    <g transform="translate(16,34)">
+      <rect width="14" height="14" rx="3" fill="#10b981"/><text x="22" y="11" font-size="11" fill="#334155">Shipped</text>
+      <g transform="translate(95,0)"><rect width="14" height="14" rx="3" fill="#0891b2"/><text x="22" y="11" font-size="11" fill="#334155">Shipped baseline</text></g>
+      <g transform="translate(230,0)"><rect width="14" height="14" rx="3" fill="#f59e0b"/><text x="22" y="11" font-size="11" fill="#334155">In-Progress</text></g>
+      <g transform="translate(335,0)"><rect width="14" height="14" rx="3" fill="#f43f5e"/><text x="22" y="11" font-size="11" fill="#334155">At-Risk</text></g>
+      <g transform="translate(420,0)"><rect width="14" height="14" rx="3" fill="#64748b"/><text x="22" y="11" font-size="11" fill="#334155">Planned</text></g>
+    </g>
+    <g transform="translate(16,60)">
+      <polygon points="6,0 12,7 6,14 0,7" fill="#dc2626"/>
+      <text x="20" y="11" font-size="11" fill="#334155">Milestone (M-01 → M-08)</text>
+      <g transform="translate(180,0)">
+        <polygon points="6,0 12,7 6,14 0,7" fill="#7c3aed"/>
+        <text x="20" y="11" font-size="11" fill="#334155">Communication overlay</text>
+      </g>
+      <g transform="translate(360,0)">
+        <polygon points="8,0 16,8 8,16 0,8" fill="#fde68a" stroke="#b91c1c" stroke-width="2"/>
+        <text x="22" y="13" font-size="11" fill="#334155">M-02 HARD</text>
+      </g>
+    </g>
+  </g>
+
+  <!-- Week column geometry:
+       chart left = 240, chart right = 1750 (width 1510)
+       9 weekly cells: Wk Apr 11 / Apr 13 / Apr 20 / Apr 27 / May 4 / May 11 / May 18 / May 25 / Jun 1
+       col width = 1510 / 9 ≈ 167.78  ⇒  use 168
+       Lane top = 200, lane height = 130, gap 8 between lanes (5 lanes total)
+  -->
+
+  <!-- Week header -->
+  <g class="week-header" transform="translate(240,140)">
+    <rect x="0" y="0" width="1510" height="50" fill="#0f172a" rx="8"/>
+    <text x="755" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#e2e8f0" letter-spacing="2">9-WEEK PROGRAM TIMELINE</text>
+    <g font-size="11" fill="#cbd5e1" font-weight="600" text-anchor="middle">
+      <text x="84" y="42">Wk · Apr 11</text>
+      <text x="252" y="42">Wk · Apr 13</text>
+      <text x="420" y="42">Wk · Apr 20</text>
+      <text x="588" y="42" fill="#fbbf24">Wk · Apr 27 ★</text>
+      <text x="756" y="42">Wk · May 4</text>
+      <text x="924" y="42">Wk · May 11</text>
+      <text x="1092" y="42">Wk · May 18</text>
+      <text x="1260" y="42">Wk · May 25</text>
+      <text x="1428" y="42">Wk · Jun 1</text>
+    </g>
+  </g>
+
+  <!-- Week column dividers -->
+  <g class="week-grid" stroke="#e2e8f0" stroke-width="1">
+    <line x1="240" y1="200" x2="240" y2="900"/>
+    <line x1="408" y1="200" x2="408" y2="900"/>
+    <line x1="576" y1="200" x2="576" y2="900"/>
+    <line x1="744" y1="200" x2="744" y2="900"/>
+    <line x1="912" y1="200" x2="912" y2="900"/>
+    <line x1="1080" y1="200" x2="1080" y2="900"/>
+    <line x1="1248" y1="200" x2="1248" y2="900"/>
+    <line x1="1416" y1="200" x2="1416" y2="900"/>
+    <line x1="1584" y1="200" x2="1584" y2="900"/>
+    <line x1="1750" y1="200" x2="1750" y2="900"/>
+  </g>
+
+  <!-- M-02 GO-LIVE LOCK column highlight (Wk Apr 27 column = x 576..744) -->
+  <rect x="576" y="200" width="168" height="700" fill="url(#goLiveGlow)"/>
+
+  <!-- Lane backgrounds + labels -->
+  <!-- Lane 1: Pre-Go-Live  y=200 h=130 -->
+  <rect x="240" y="200" width="1510" height="130" fill="url(#lanePreGoLive)" opacity="0.55"/>
+  <g transform="translate(60,200)">
+    <rect x="0" y="0" width="170" height="130" fill="#ecfdf5" stroke="#a7f3d0" rx="8"/>
+    <text x="14" y="26" font-size="13" font-weight="700" fill="#065f46">Pre-Go-Live</text>
+    <text x="14" y="46" font-size="10" fill="#047857">Phase 0 → Phase 9</text>
+    <text x="14" y="62" font-size="10" fill="#047857">baseline + tenant + admin</text>
+    <text x="14" y="86" font-size="10" font-weight="600" fill="#065f46">Apr 11 → Apr 26</text>
+    <text x="14" y="102" font-size="10" fill="#047857">Shipped / shipped baseline</text>
+  </g>
+  <!-- Lane 2: Go-Live Sprint  y=338 h=130 -->
+  <rect x="240" y="338" width="1510" height="130" fill="url(#laneGoLive)" opacity="0.55"/>
+  <g transform="translate(60,338)">
+    <rect x="0" y="0" width="170" height="130" fill="#fef2f2" stroke="#fecaca" rx="8"/>
+    <text x="14" y="26" font-size="13" font-weight="700" fill="#9f1239">Go-Live Sprint</text>
+    <text x="14" y="46" font-size="10" fill="#be123c">Phase 17 / 18 / 19</text>
+    <text x="14" y="62" font-size="10" fill="#be123c">3-tenant proof + ledger</text>
+    <text x="14" y="86" font-size="10" font-weight="600" fill="#9f1239">Apr 20 → Apr 30 · AT-RISK</text>
+    <text x="14" y="102" font-size="10" fill="#be123c">M-01 demo · M-02 LOCK</text>
+  </g>
+  <!-- Lane 3: Post-Go-Live  y=476 h=130 -->
+  <rect x="240" y="476" width="1510" height="130" fill="url(#lanePostGoLive)" opacity="0.55"/>
+  <g transform="translate(60,476)">
+    <rect x="0" y="0" width="170" height="130" fill="#eff6ff" stroke="#bfdbfe" rx="8"/>
+    <text x="14" y="26" font-size="13" font-weight="700" fill="#1e3a8a">Post-Go-Live</text>
+    <text x="14" y="46" font-size="10" fill="#1d4ed8">Phase 20 → 23</text>
+    <text x="14" y="62" font-size="10" fill="#1d4ed8">widget · wallet · billing</text>
+    <text x="14" y="86" font-size="10" font-weight="600" fill="#1e3a8a">May 4 → Jun 7</text>
+    <text x="14" y="102" font-size="10" fill="#1d4ed8">Weekly cadence</text>
+  </g>
+  <!-- Lane 4: Communication Layer (overlay) y=614 h=130 -->
+  <rect x="240" y="614" width="1510" height="130" fill="url(#laneComms)" opacity="0.55"/>
+  <g transform="translate(60,614)">
+    <rect x="0" y="0" width="170" height="130" fill="#fdf4ff" stroke="#f5d0fe" rx="8"/>
+    <text x="14" y="26" font-size="13" font-weight="700" fill="#6b21a8">Comms Layer</text>
+    <text x="14" y="46" font-size="10" fill="#7e22ce">Telegram (P0) · WA / iMsg / SMS</text>
+    <text x="14" y="62" font-size="10" fill="#7e22ce">CR-010 channel scope</text>
+    <text x="14" y="86" font-size="10" font-weight="600" fill="#6b21a8">M-09 · M-10 · M-11</text>
+    <text x="14" y="102" font-size="10" fill="#7e22ce">Overlay (post go-live)</text>
+  </g>
+  <!-- Lane 5: Tenant Runtimes  y=752 h=130 -->
+  <rect x="240" y="752" width="1510" height="130" fill="url(#laneTenants)" opacity="0.55"/>
+  <g transform="translate(60,752)">
+    <rect x="0" y="0" width="170" height="130" fill="#fffbeb" stroke="#fde68a" rx="8"/>
+    <text x="14" y="26" font-size="13" font-weight="700" fill="#92400e">Tenant Runtimes</text>
+    <text x="14" y="46" font-size="10" fill="#b45309">Chess · Future Swim</text>
+    <text x="14" y="62" font-size="10" fill="#b45309">AI Mentor 1-1 (embed)</text>
+    <text x="14" y="86" font-size="10" font-weight="600" fill="#92400e">3 tenants live Apr 30</text>
+    <text x="14" y="102" font-size="10" fill="#b45309">Telegram-primary</text>
+  </g>
+
+  <!-- ========= PHASE BLOCKS ========= -->
+  <!-- Helper week-x:
+       Wk Apr 11 = 240..408 (centre 324)
+       Wk Apr 13 = 408..576 (centre 492)
+       Wk Apr 20 = 576..744 (centre 660)
+       Wk Apr 27 = 744..912 (centre 828)  ← M-02 already drawn at 744
+       Wk May 4  = 912..1080 (centre 996)
+       Wk May 11 = 1080..1248 (centre 1164)
+       Wk May 18 = 1248..1416 (centre 1332)
+       Wk May 25 = 1416..1584 (centre 1500)
+       Wk Jun 1  = 1584..1750 (centre 1667)
+       Lane y centres: pre 265, go-live 403, post 541, comms 679, tenants 817
+  -->
+
+  <!-- Pre-Go-Live lane blocks -->
+  <g class="phase-block" transform="translate(248,212)">
+    <rect width="156" height="50" rx="8" fill="#10b981" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Phase 0 · Reset</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#ecfdf5">Apr 11 → 17 · Shipped</text>
+  </g>
+  <g class="phase-block" transform="translate(416,212)">
+    <rect width="156" height="50" rx="8" fill="#10b981" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Phase 1 · Public landing</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#ecfdf5">Apr 13 → 18 · Shipped</text>
+  </g>
+  <g class="phase-block" transform="translate(416,268)">
+    <rect width="156" height="50" rx="8" fill="#0891b2" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Phase 2 · Data foundation</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#cffafe">Apr 14 → 21 · Baseline</text>
+  </g>
+  <g class="phase-block" transform="translate(584,212)">
+    <rect width="156" height="50" rx="8" fill="#f59e0b" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">P3-6 · Channel + UX</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#fef3c7">Apr 16 → 26 · In-Progress</text>
+  </g>
+  <g class="phase-block" transform="translate(584,268)">
+    <rect width="156" height="50" rx="8" fill="#0891b2" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">P7-9 · Tenant + admin + QA</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#cffafe">Apr 21 → 26 · Baseline</text>
+  </g>
+
+  <!-- Go-Live Sprint lane blocks -->
+  <g class="phase-block" transform="translate(584,350)">
+    <rect width="156" height="50" rx="8" fill="#f43f5e" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Phase 17 · Stabilization</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#ffe4e6">Apr 20 → 29 · AT-RISK</text>
+  </g>
+  <g class="phase-block" transform="translate(584,406)">
+    <rect width="156" height="50" rx="8" fill="#f43f5e" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Phase 18 · Revenue-ops</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#ffe4e6">Apr 20 → 30 · AT-RISK</text>
+  </g>
+  <g class="phase-block" transform="translate(752,350)">
+    <rect width="156" height="50" rx="8" fill="#f43f5e" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Phase 19 · Status agent</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#ffe4e6">Apr 25 → 30 · AT-RISK</text>
+  </g>
+  <g class="phase-block" transform="translate(752,406)">
+    <rect width="156" height="50" rx="8" fill="#b91c1c" stroke="#fde68a" stroke-width="2" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">M-02 · GO-LIVE LOCK</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#fee2e2">Thu 2026-04-30 · HARD</text>
+  </g>
+
+  <!-- Post-Go-Live lane blocks -->
+  <g class="phase-block" transform="translate(920,488)">
+    <rect width="156" height="50" rx="8" fill="#64748b" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Phase 20 · Widget runtime</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#e2e8f0">May 4 → 10 · Planned</text>
+  </g>
+  <g class="phase-block" transform="translate(1088,488)">
+    <rect width="156" height="50" rx="8" fill="#64748b" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Phase 20.5 · Wallet/Stripe</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#e2e8f0">May 11 → 17 · Planned</text>
+  </g>
+  <g class="phase-block" transform="translate(1256,488)">
+    <rect width="156" height="50" rx="8" fill="#64748b" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Phase 21 · Billing truth</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#e2e8f0">May 18 → 24 · Planned</text>
+  </g>
+  <g class="phase-block" transform="translate(1424,488)">
+    <rect width="156" height="50" rx="8" fill="#64748b" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Phase 22 · Multi-tenant</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#e2e8f0">May 25 → 31 · Planned</text>
+  </g>
+  <g class="phase-block" transform="translate(1592,488)">
+    <rect width="150" height="50" rx="8" fill="#64748b" filter="url(#softShadow2)"/>
+    <text x="75" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Phase 23 · Release gov</text>
+    <text x="75" y="36" text-anchor="middle" font-size="10" fill="#e2e8f0">→ Jun 7 · Planned</text>
+  </g>
+
+  <!-- Communication Layer overlays -->
+  <g class="phase-block" transform="translate(584,626)">
+    <rect width="156" height="50" rx="8" fill="#7c3aed" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Telegram-only at go-live</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#ede9fe">CR-010 · P0 channel</text>
+  </g>
+  <g class="phase-block" transform="translate(920,626)">
+    <rect width="156" height="50" rx="8" fill="#a855f7" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">M-09 · WhatsApp outbound</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#f3e8ff">May 4 → 10 · production</text>
+  </g>
+  <g class="phase-block" transform="translate(1088,626)">
+    <rect width="156" height="50" rx="8" fill="#a855f7" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">M-10 · iMessage research</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#f3e8ff">May 11 → 17 · feasibility</text>
+  </g>
+  <g class="phase-block" transform="translate(1424,626)">
+    <rect width="156" height="50" rx="8" fill="#a855f7" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">M-11 · SMS adapter</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#f3e8ff">May 25 → 31 · cross-ref P22</text>
+  </g>
+
+  <!-- Tenant Runtimes lane -->
+  <g class="phase-block" transform="translate(584,764)">
+    <rect width="156" height="50" rx="8" fill="#f59e0b" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Co Mai Hung Chess</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#fef3c7">Telegram primary · Apr 30</text>
+  </g>
+  <g class="phase-block" transform="translate(584,820)">
+    <rect width="156" height="50" rx="8" fill="#0891b2" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Future Swim</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#cffafe">Telegram primary · Apr 30</text>
+  </g>
+  <g class="phase-block" transform="translate(752,764)">
+    <rect width="156" height="50" rx="8" fill="#7c3aed" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">AI Mentor 1-1</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#ede9fe">embed · ai-mentor-doer</text>
+  </g>
+  <g class="phase-block" transform="translate(920,764)">
+    <rect width="156" height="50" rx="8" fill="#10b981" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Widget on first SME</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#ecfdf5">M-03 · install diagnostics</text>
+  </g>
+  <g class="phase-block" transform="translate(1424,764)">
+    <rect width="156" height="50" rx="8" fill="#10b981" filter="url(#softShadow2)"/>
+    <text x="78" y="20" text-anchor="middle" font-size="11" font-weight="700" fill="#ffffff">Multi-tenant template</text>
+    <text x="78" y="36" text-anchor="middle" font-size="10" fill="#ecfdf5">M-06 · 3+ verticals</text>
+  </g>
+
+  <!-- Milestone diamond markers (above lanes, top of week column) -->
+  <g class="milestones">
+    <!-- M-01 in Wk Apr 27 (centre 660 inside Phase 17 cell? actually Wk Apr 27 column = 744..912; Apr 29 ≈ centre 828) -->
+    <g transform="translate(820,194)">
+      <polygon points="8,0 16,8 8,16 0,8" fill="#dc2626"/>
+      <text x="20" y="13" font-size="11" font-weight="700" fill="#dc2626">M-01 · 29 Apr</text>
+    </g>
+    <!-- M-02 GO-LIVE LOCK (HARD) -->
+    <g transform="translate(820,176)">
+      <polygon points="10,0 20,10 10,20 0,10" fill="#fde68a" stroke="#b91c1c" stroke-width="2"/>
+      <polygon points="10,4 12,9 18,9 13,12 15,18 10,14 5,18 7,12 2,9 8,9" fill="#b91c1c"/>
+      <text x="26" y="16" font-size="11" font-weight="700" fill="#b91c1c">M-02 LOCK · 30 Apr (HARD)</text>
+    </g>
+    <!-- M-03 -->
+    <g transform="translate(986,194)">
+      <polygon points="8,0 16,8 8,16 0,8" fill="#dc2626"/>
+      <text x="20" y="13" font-size="11" font-weight="700" fill="#dc2626">M-03 · 10 May</text>
+    </g>
+    <!-- M-04 -->
+    <g transform="translate(1154,194)">
+      <polygon points="8,0 16,8 8,16 0,8" fill="#dc2626"/>
+      <text x="20" y="13" font-size="11" font-weight="700" fill="#dc2626">M-04 · 17 May</text>
+    </g>
+    <!-- M-05 -->
+    <g transform="translate(1322,194)">
+      <polygon points="8,0 16,8 8,16 0,8" fill="#dc2626"/>
+      <text x="20" y="13" font-size="11" font-weight="700" fill="#dc2626">M-05 · 24 May</text>
+    </g>
+    <!-- M-06 -->
+    <g transform="translate(1490,194)">
+      <polygon points="8,0 16,8 8,16 0,8" fill="#dc2626"/>
+      <text x="20" y="13" font-size="11" font-weight="700" fill="#dc2626">M-06 · 31 May</text>
+    </g>
+    <!-- M-07 / M-08 (Jun 7) -->
+    <g transform="translate(1620,194)">
+      <polygon points="8,0 16,8 8,16 0,8" fill="#dc2626"/>
+      <text x="20" y="13" font-size="11" font-weight="700" fill="#dc2626">M-07/M-08 · 7 Jun</text>
+    </g>
+  </g>
+
+  <!-- GO-LIVE LOCK arrow callout -->
+  <g class="golive-arrow">
+    <path d="M 980 388 Q 880 360 830 408" stroke="#b91c1c" stroke-width="2.5" fill="none" marker-end="url(#arrowRed)"/>
+    <rect x="985" y="370" width="220" height="46" rx="8" fill="#b91c1c"/>
+    <text x="1095" y="389" text-anchor="middle" font-size="12" font-weight="700" fill="#ffffff">GO-LIVE LOCK 2026-04-30</text>
+    <text x="1095" y="405" text-anchor="middle" font-size="10" fill="#fee2e2">Key inflection point — all 3 tenants live</text>
+  </g>
+
+  <!-- ========= TENANT RUNTIME CALLOUT BOX (bottom-right) ========= -->
+  <g class="tenant-callout" transform="translate(1240,920)">
+    <rect x="0" y="0" width="510" height="160" rx="14" fill="#0f172a" filter="url(#softShadow2)"/>
+    <text x="20" y="28" font-size="13" font-weight="700" fill="#fde68a" letter-spacing="1.4">3-TENANT GO-LIVE ROSTER · 2026-04-30</text>
+    <text x="20" y="48" font-size="10" fill="#cbd5e1">Per CR-009 (3-tenant scope) · CR-010 (Telegram-primary)</text>
+
+    <g transform="translate(20,64)">
+      <rect width="14" height="14" rx="3" fill="#f59e0b"/>
+      <text x="22" y="11" font-size="12" font-weight="600" fill="#ffffff">Co Mai Hung Chess</text>
+      <text x="22" y="26" font-size="10" fill="#cbd5e1">Telegram primary · search → match → book → portal → care</text>
+    </g>
+    <g transform="translate(20,108)">
+      <rect width="14" height="14" rx="3" fill="#0891b2"/>
+      <text x="22" y="11" font-size="12" font-weight="600" fill="#ffffff">Future Swim</text>
+      <text x="22" y="26" font-size="10" fill="#cbd5e1">Telegram primary · WhatsApp QR-bridge bonus only</text>
+    </g>
+    <g transform="translate(280,64)">
+      <rect width="14" height="14" rx="3" fill="#7c3aed"/>
+      <text x="22" y="11" font-size="12" font-weight="600" fill="#ffffff">AI Mentor 1-1</text>
+      <text x="22" y="26" font-size="10" fill="#cbd5e1">tenant_ref ai-mentor-doer</text>
+      <text x="22" y="40" font-size="10" fill="#cbd5e1">embed · product.bookedai.au/partner/</text>
+      <text x="22" y="54" font-size="10" fill="#cbd5e1">ai-mentor-pro/embed</text>
+    </g>
+    <g transform="translate(280,128)">
+      <rect width="14" height="14" rx="3" fill="#10b981"/>
+      <text x="22" y="11" font-size="11" font-weight="600" fill="#ffffff">M-08 · TOTAL COMPLETION 2026-06-07</text>
+    </g>
+  </g>
+
+  <!-- Footer -->
+  <g class="footer">
+    <line x1="60" y1="1060" x2="1750" y2="1060" stroke="#e2e8f0"/>
+    <text x="60" y="1082" font-size="11" fill="#64748b">pitch.bookedai.au · roadmap.bookedai.au — BookedAI 2026 · master roadmap synced 2026-04-27</text>
+    <text x="1750" y="1082" text-anchor="end" font-size="11" fill="#64748b">Authority chain: 01-MASTER · 04-VISION · 05-CR · 08-IMPLEMENT-FIX-PLAN</text>
+  </g>
+</svg>

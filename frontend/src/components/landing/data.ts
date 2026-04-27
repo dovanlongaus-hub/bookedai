@@ -289,12 +289,32 @@ export type RoadmapSprint = {
   references?: RoadmapSprintReference[];
 };
 
+export type RoadmapTenantCase = {
+  name: string;
+  channel: string;
+  summary: string;
+  embedHref?: string;
+};
+
+export type RoadmapMilestone = {
+  id: string;
+  date: string;
+  title: string;
+  hard?: boolean;
+  status?: RoadmapStatus;
+  summary?: string;
+};
+
 export type RoadmapContent = SectionContent & {
   lead: string;
   architectures: RoadmapArchitecture[];
   roleGroups: RoadmapRoleGroup[];
   phases: RoadmapPhase[];
   sprints: RoadmapSprint[];
+  lastUpdated?: string;
+  tenantCases?: RoadmapTenantCase[];
+  milestones?: RoadmapMilestone[];
+  channelScopeNote?: string;
 };
 
 export type ImageUploadContent = SectionContent & {
@@ -1503,6 +1523,128 @@ export const roadmapContent: RoadmapContent = {
         { title: 'Revisit handoff tooling only if operators need shared or server-backed note state', status: 'Planned' },
       ],
     },
+    {
+      name: 'Phase 0 — Reset',
+      timing: '2026-04-11 → 2026-04-17',
+      windowLabel: 'Synced SSOT · 01-MASTER-ROADMAP',
+      focusLabel: 'Environment + repo reset before phased delivery',
+      milestoneLabel: 'Shipped baseline now feeds every downstream phase',
+      summary: 'Phase 0 hard-reset the environment, repo posture, and shared contracts so Phase 1 → Phase 9 could rebuild on a clean foundation.',
+      tasks: [
+        { title: 'Repo + environment hard reset', status: 'Completed' },
+        { title: 'Shared contract realignment for downstream phases', status: 'Completed' },
+      ],
+    },
+    {
+      name: 'Phase 5 — Payments / recovery',
+      timing: '2026-04-18 → 2026-04-26',
+      windowLabel: 'Synced SSOT · 01-MASTER-ROADMAP',
+      focusLabel: 'Stripe payment intent, mirror, reminder, and policy-gated recovery',
+      milestoneLabel: 'Foundations shipped; receivable truth lands in Phase 21',
+      summary: 'Phase 5 connects payment intent, payment mirror, and policy-gated reminder actions to the booking lifecycle.',
+      tasks: [
+        { title: 'Stripe payment intent + booking linkage', status: 'In Progress' },
+        { title: 'Policy-gated reminder/recovery action runs', status: 'In Progress' },
+        { title: 'Manual-review revenue surfacing for tenant Ops', status: 'Planned' },
+      ],
+    },
+    {
+      name: 'Phase 6 — Optimization',
+      timing: '2026-04-16 → 2026-04-26',
+      windowLabel: 'Synced SSOT · 01-MASTER-ROADMAP',
+      focusLabel: 'Search, ranking, mobile UX, and conversion polish',
+      milestoneLabel: 'Search and confirmation polish keep core flow dependable',
+      summary: 'Phase 6 deepens search ranking, conversion polish, and mobile UX without destabilizing the core booking path.',
+      tasks: [
+        { title: 'Search ranking + trust diagnostics', status: 'In Progress' },
+        { title: 'Mobile and confirmation UX polish across pitch/product/portal', status: 'In Progress' },
+      ],
+    },
+    {
+      name: 'Phase 7 — Tenant workspace',
+      timing: '2026-04-21 → 2026-04-26',
+      windowLabel: 'Synced SSOT · 01-MASTER-ROADMAP',
+      focusLabel: 'Tenant Ops visibility, catalog publishing, onboarding template',
+      milestoneLabel: 'Shipped baseline; deeper template extraction lands in Phase 22',
+      summary: 'Phase 7 stood up the tenant workspace shell, Ops visibility, and catalog publishing baseline.',
+      tasks: [
+        { title: 'Tenant Ops visibility for action runs', status: 'Completed' },
+        { title: 'Tenant catalog publishing baseline', status: 'Completed' },
+        { title: 'Onboarding template draft', status: 'In Progress' },
+      ],
+    },
+    {
+      name: 'Phase 8 — Admin platform',
+      timing: '2026-04-21 → 2026-04-26',
+      windowLabel: 'Synced SSOT · 01-MASTER-ROADMAP',
+      focusLabel: 'Operations, catalog, reliability workspace split + workspace shell',
+      milestoneLabel: 'Shipped baseline; panel deep-link QA closed',
+      summary: 'Phase 8 split admin into operations/catalog/reliability workspaces with deep-link entry and explicit admin host runtime linkage.',
+      tasks: [
+        { title: 'Workspace split + admin host runtime linkage', status: 'Completed' },
+        { title: 'Issue-first workspace insights + deep-link entry', status: 'Completed' },
+        { title: 'Panel-level admin information architecture', status: 'Completed' },
+      ],
+    },
+    {
+      name: 'Phase 9 — QA / release base',
+      timing: '2026-04-23 → 2026-04-26',
+      windowLabel: 'Synced SSOT · 01-MASTER-ROADMAP',
+      focusLabel: 'Release gate, smoke harness, healthcheck stack',
+      milestoneLabel: 'Release gate green locally; live promote pending',
+      summary: 'Phase 9 packaged the build, smoke, and backend lifecycle checks into a release-gate-ready CI lane.',
+      tasks: [
+        { title: 'Release gate suite + healthcheck stack', status: 'In Progress' },
+        { title: 'Cross-surface smoke coverage (pitch/product/portal/admin)', status: 'In Progress' },
+      ],
+    },
+    {
+      name: 'Phase 20.5 — Wallet / Stripe continuity',
+      timing: '2026-05-11 → 2026-05-17',
+      windowLabel: 'Post Go-Live · Synced SSOT',
+      focusLabel: 'Wallet linkage + Stripe continuity for tenant subscriptions',
+      milestoneLabel: 'M-04 · Wallet + Stripe continuity live',
+      summary: 'Phase 20.5 closes the wallet and Stripe continuity gap so subscription renewal and customer wallet posture stay in lockstep with booking truth.',
+      tasks: [
+        { title: 'Wallet provisioning + tenant linkage', status: 'Planned' },
+        { title: 'Stripe subscription continuity + invoice mirror', status: 'Planned' },
+        { title: 'Customer wallet visibility in portal', status: 'Planned' },
+      ],
+    },
+  ],
+  lastUpdated: '2026-04-27',
+  channelScopeNote:
+    'CR-010: Telegram-only at go-live. WhatsApp inbound retained, outbound research M-09 post go-live. iMessage research M-10. SMS adapter Phase 22 / M-11.',
+  tenantCases: [
+    {
+      name: 'Co Mai Hung Chess',
+      channel: 'Telegram primary',
+      summary: 'Chess academy parent flow: search → match → book → pay → portal → care reply. First M-01 demo proof case.',
+    },
+    {
+      name: 'Future Swim',
+      channel: 'Telegram primary',
+      summary: 'Swim school booking on Telegram primary; WhatsApp Evolution QR-bridge as bonus only at go-live.',
+    },
+    {
+      name: 'AI Mentor 1-1',
+      channel: 'Embed widget',
+      summary: 'Mentor catalog (5 private 1-1 + 5 group) via product.bookedai.au/partner/ai-mentor-pro/embed. Tenant ref ai-mentor-doer.',
+      embedHref: 'https://product.bookedai.au/partner/ai-mentor-pro/embed?embed=1&tenant_ref=ai-mentor-doer',
+    },
+  ],
+  milestones: [
+    { id: 'M-01', date: '2026-04-29', title: 'Chess + Swim + AI Mentor 1-1 demo dress rehearsal', status: 'In Progress' },
+    { id: 'M-02', date: '2026-04-30', title: 'GO-LIVE LOCK', hard: true, status: 'In Progress', summary: 'Hard milestone — image promote 09:00, smoke 09:30, sign-off 14:00' },
+    { id: 'M-03', date: '2026-05-10', title: 'Widget on first SME + Phase 19 carry', status: 'Planned' },
+    { id: 'M-04', date: '2026-05-17', title: 'Wallet + Stripe continuity live', status: 'Planned' },
+    { id: 'M-05', date: '2026-05-24', title: 'Tenant revenue proof + billing truth', status: 'Planned' },
+    { id: 'M-06', date: '2026-05-31', title: 'Multi-tenant template + SMS', status: 'Planned' },
+    { id: 'M-07', date: '2026-06-07', title: 'CI + observability', status: 'Planned' },
+    { id: 'M-08', date: '2026-06-07', title: 'TOTAL PROJECT COMPLETION', status: 'Planned' },
+    { id: 'M-09', date: '2026-05-04 → 2026-05-10', title: 'WhatsApp outbound production verify', status: 'Planned' },
+    { id: 'M-10', date: '2026-05-11 → 2026-05-17', title: 'iMessage feasibility research memo', status: 'Planned' },
+    { id: 'M-11', date: '2026-05-25 → 2026-05-31', title: 'SMS adapter (cross-ref Phase 22)', status: 'Planned' },
   ],
   sprints: [
     {
