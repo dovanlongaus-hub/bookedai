@@ -27,6 +27,7 @@ DEFAULT_BOT_COMMANDS: list[dict[str, str]] = [
     {"command": "search", "description": "Find a service to book"},
     {"command": "mybookings", "description": "View your active bookings"},
     {"command": "cancel", "description": "Cancel an active booking"},
+    {"command": "support", "description": "Talk to a BookedAI human"},
     {"command": "help", "description": "How this bot works"},
 ]
 

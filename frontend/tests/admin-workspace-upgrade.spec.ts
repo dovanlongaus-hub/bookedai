@@ -61,7 +61,7 @@ async function stubAdminWorkspaceUpgrade(page: Parameters<typeof test>[0]['page'
             created_at: '2026-04-23T07:00:00Z',
             ai_intent: null,
             workflow_status: 'pending_manual_followup',
-            message_text: 'Webhook delivery is waiting for operator review.',
+            message_text: 'Webhook delivery is waiting for team review.',
             ai_reply: null,
             sender_name: null,
             sender_email: null,
@@ -315,10 +315,31 @@ async function stubAdminWorkspaceUpgrade(page: Parameters<typeof test>[0]['page'
       body: JSON.stringify({ status: 'ok', items: [] }),
     });
   });
+
+  await page.route('**/api/admin/customer-agent/health', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        agent: 'BookedAI Manager Bot',
+        window_hours: 24,
+        webhook_pending_count: 0,
+        recent_events: {
+          total: 0,
+          by_channel: {},
+        },
+        last_reply_status: {},
+        last_callback_ack_status: {},
+        top_failed_identity_resolution_reasons: [],
+        recent_channel_sessions: [],
+      }),
+    });
+  });
 }
 
 test.describe('admin workspace upgrade lanes', () => {
-  test('platform settings exposes a trusted workspace-settings handoff CTA @admin', async ({
+  test('platform settings exposes a trusted workspace-settings CTA @admin', async ({
     page,
   }) => {
     await stubAdminWorkspaceUpgrade(page);
@@ -328,9 +349,9 @@ test.describe('admin workspace upgrade lanes', () => {
     await expect(settingsSummary.getByText('Workspace settings', { exact: true })).toBeVisible();
     await expect(settingsSummary.getByText('Harbour Glow Spa')).toBeVisible();
 
-    const handoffCta = settingsSummary.getByRole('link', { name: 'Open workspace settings' });
-    await expect(handoffCta).toBeVisible();
-    await expect(handoffCta).toHaveAttribute(
+    const settingsCta = settingsSummary.getByRole('link', { name: 'Open workspace settings' });
+    await expect(settingsCta).toBeVisible();
+    await expect(settingsCta).toHaveAttribute(
       'href',
       'https://admin.bookedai.au/admin/settings?admin_return=1&admin_scope=%2Fadmin%23platform-settings&admin_scope_label=Platform+Settings&tenantId=tenant-harbour-glow&tenantSlug=harbour-glow',
     );

@@ -33,7 +33,7 @@ export function ShadowDiagnosticsLegend({ className = '' }: ShadowDiagnosticsLeg
   return (
     <div className={`rounded-2xl border border-slate-200 bg-white/90 px-3 py-3 ${className}`.trim()}>
       <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-        Operator note
+        Team note
       </div>
       <p className="mt-1 text-xs leading-5 text-slate-600">
         Use these breakdowns to triage shadow drift before considering any read-path switch.

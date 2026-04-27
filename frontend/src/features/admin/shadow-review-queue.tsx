@@ -374,7 +374,7 @@ export function ShadowReviewQueue({
             </div>
             <div className="mt-3">
               <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Operator note
+                Team note
                 <textarea
                   value={caseNotes[getCaseKey(example)] ?? ''}
                   onChange={(event) => updateCaseNote(example, event.target.value)}

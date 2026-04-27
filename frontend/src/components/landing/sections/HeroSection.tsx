@@ -52,7 +52,7 @@ export function HeroSection({
   ];
   const executiveMetrics = [
     { label: 'Primary surface', value: 'Responsive web app on bookedai.au and product.bookedai.au' },
-    { label: 'Enterprise signal', value: 'Shared workflow state instead of disconnected tools and handoffs' },
+    { label: 'Enterprise signal', value: 'Shared booking state instead of disconnected tools and next steps' },
     { label: 'Phase posture', value: 'Desktop and mobile web first now, native app later' },
   ];
   const deliveryPriorityRows = [
@@ -66,7 +66,7 @@ export function HeroSection({
     },
     {
       label: 'Native later',
-      value: 'iOS and Android are deferred until the web flow, operator controls, and release gates are more mature.',
+      value: 'iOS and Android are deferred until the web flow, team controls, and release gates are more mature.',
     },
   ];
 
@@ -185,7 +185,7 @@ export function HeroSection({
                   See a buyer-ready product surface, not just a widget demo.
                 </div>
                 <div className="mt-2.5 max-w-[27rem] text-sm leading-6 text-black/58 sm:mt-3 sm:max-w-[30rem] sm:text-[0.98rem]">
-                  The homepage now shows the real shape of the operating model: demand enters, fit is qualified, the best option is visible, and conversion continuity remains intact from first contact to booking-ready action.
+                  The homepage now shows the real shape of the product: demand enters, fit is qualified, the best option is visible, and conversion continuity remains intact from first contact to booking-ready action.
                 </div>
               </div>
               <div className="flex items-center gap-2 self-start rounded-full bg-emerald-50/90 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-700 sm:text-[10px] sm:tracking-[0.16em]">
@@ -198,7 +198,7 @@ export function HeroSection({
               {[
                 'Strategic framing',
                 'Decision-ready ranking',
-                'Enterprise-style workflow continuity',
+                'Enterprise-style booking continuity',
               ].map((item) => (
                 <div
                   key={item}

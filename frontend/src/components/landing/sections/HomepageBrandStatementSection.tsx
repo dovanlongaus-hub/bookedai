@@ -58,14 +58,14 @@ export function HomepageBrandStatementSection() {
             {[
               {
                 label: 'What the homepage should signal',
-                value: 'A serious operating product with workflow depth and commercial clarity',
+                value: 'A serious booking product with follow-up depth and commercial clarity',
               },
               {
                 label: 'What the investor should see',
-                value: 'A scalable control layer, not only a conversational UI',
+                value: 'A scalable revenue workspace, not only a conversational UI',
               },
               {
-                label: 'What the operator should understand',
+                label: 'What the owner should understand',
                 value: 'This can sit inside real service operations, not only product demos',
               },
             ].map((item) => (

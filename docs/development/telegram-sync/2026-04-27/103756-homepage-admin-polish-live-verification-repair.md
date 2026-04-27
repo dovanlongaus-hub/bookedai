@@ -1,3 +1,16 @@
+# Homepage/Admin Polish Live Verification Repair
+
+- Timestamp: 2026-04-27T10:37:56.724674+00:00
+- Source: docs/development/homepage-admin-polish-closeout-2026-04-27.md
+- Category: release
+- Status: closed
+
+## Summary
+
+Homepage/admin polish is live and verified. Source compare now checks deployed Vite frontend source, live verify scans Vite lazy chunks, healthcheck matches the new Bookedai.au title, production containers were rebuilt/recreated, stack health passed, and homepage/admin polish verification passed.
+
+## Details
+
 # Homepage and Admin Copy Polish Closeout, 2026-04-27
 
 ## Scope completed in code

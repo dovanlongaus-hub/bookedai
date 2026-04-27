@@ -15,7 +15,7 @@ import {
   Workflow,
 } from 'lucide-react';
 
-import { brandUploadedLogoPath, productHref, roadmapHref } from '../../components/landing/data';
+import { brandUploadedLogoPath } from '../../components/landing/data';
 import { LogoMark } from '../../components/landing/ui/LogoMark';
 import { HomepageSearchExperience } from './HomepageSearchExperience';
 import { getHomepageContent, pitchDeckHref } from './homepageContent';
@@ -28,6 +28,9 @@ const tenantPreviewImageSrcSet =
   '/branding/optimized/tenant-login-hero-960.webp 960w, /branding/optimized/tenant-login-hero-1400.webp 1400w';
 const pitchVideoUrl = 'https://upload.bookedai.au/videos/9eb8/BhVuOlB2QXlBo-_nyOFCcA.mp4';
 const productProofImageUrl = 'https://upload.bookedai.au/images/df6e/iarJydFRgp1aWGk5UF0d7g.png';
+const homepageProductHref = 'https://product.bookedai.au/?source=homepage';
+const homepageFinalProductHref = 'https://product.bookedai.au/?source=homepage-cta';
+const metadataTitle = 'Bookedai.au | The AI Revenue Engine for Service Businesses';
 
 type HomepageExperimentVariant = 'control' | 'product_first';
 
@@ -48,24 +51,24 @@ const suggestedSearches = [
 ];
 
 const navLinks = [
-  { label: 'Live product', href: '#live-product' },
-  { label: 'Pitch video', href: '#pitch-video' },
-  { label: 'Why now', href: '#why-bookedai' },
+  { label: 'How it works', href: '#why-bookedai' },
+  { label: 'Product proof', href: '#homepage-product-proof-title' },
+  { label: 'Product flow', href: '#live-product' },
   { label: 'Architecture', href: '/architecture' },
-  { label: 'Roadmap', href: roadmapHref },
+  { label: 'FAQ', href: '#homepage-faq' },
 ] as const;
 
 const executiveStats = [
-  { value: 'Live', label: 'vertical proof', detail: 'chess, swim, portal, tenant ops' },
-  { value: '3', label: 'agent loops', detail: 'capture, operate, care' },
-  { value: '1', label: 'revenue ledger', detail: 'every action visible' },
+  { value: '24/7', label: 'demand capture', detail: 'website, calls, chat, and follow-up' },
+  { value: '1', label: 'booking path', detail: 'search, shortlist, booking, care' },
+  { value: 'Live', label: 'product proof', detail: 'real services, portal, and CRM flow' },
 ] as const;
 
 const investorSignals = [
-  { label: 'Wedge', value: 'service SMEs leak high-intent demand' },
-  { label: 'Proof', value: 'real booking surfaces are live' },
-  { label: 'Moat', value: 'workflow state, not chatbot copy' },
-  { label: 'Scale', value: 'repeatable tenant templates' },
+  { label: 'What matters most', value: 'capture qualified enquiries before they go cold' },
+  { label: 'Conversion path', value: 'move from first contact to booking faster' },
+  { label: 'Follow-up', value: 'keep CRM, email, and customer care aligned' },
+  { label: 'Visibility', value: 'show what was booked and what needs action' },
 ] as const;
 
 const heroFlow = ['Demand', 'Match', 'Book', 'Operate'] as const;
@@ -88,7 +91,7 @@ const outcomeCards = [
   },
   {
     icon: BarChart3,
-    title: 'Operations truth',
+    title: 'Business visibility',
     body: 'Tenant and admin workspaces expose action runs, reliability posture, support queues, and evidence.',
   },
 ] as const;
@@ -103,7 +106,7 @@ const platformLayers = [
   {
     icon: Bot,
     title: 'AI agent layer',
-    body: 'Customer-turn agent, revenue-ops handoffs, and booking-care answers grounded in system truth.',
+    body: 'AI-guided qualification, booking follow-up, and customer-care answers grounded in real booking data.',
     tag: 'Qualify',
   },
   {
@@ -114,8 +117,8 @@ const platformLayers = [
   },
   {
     icon: ShieldCheck,
-    title: 'Control plane',
-    body: 'Tenant Ops, admin Reliability, audit history, lifecycle requests, and operator-visible governance.',
+    title: 'Business visibility',
+    body: 'Team workspaces, reliability review, audit history, and lifecycle requests with clear business oversight.',
     tag: 'Operate',
   },
 ] as const;
@@ -123,18 +126,18 @@ const platformLayers = [
 const investorPoints = [
   'A wedge into local service commerce where missed intent still leaks into calls, DMs, forms, and manual follow-up.',
   'A reusable agentic booking layer that can move from one vertical proof into many tenant templates.',
-  'A product architecture with commercial surfaces, operational ledger, and customer-care loop already connected.',
+  'A product architecture with commercial surfaces, action history, and customer-care loop already connected.',
 ] as const;
 
 const customerPoints = [
   'Start from a customer sentence, not a rigid booking form.',
   'Keep lead capture, best option, confirmation, payment posture, and support in one journey.',
-  'Give operators visibility into what the agent did, what is blocked, and what needs human review.',
+  'Give your team visibility into what happened, what is blocked, and what needs human review.',
 ] as const;
 
 const proofRows = [
   ['Co Mai Hung Chess', 'Verified tenant booking', 'Grandmaster proof'],
-  ['Future Swim', 'Tenant ops visibility', 'Vertical proof'],
+  ['Future Swim', 'Team visibility', 'Vertical proof'],
   ['WhatsApp Care', 'Booking status and changes', 'Care agent'],
 ] as const;
 
@@ -216,20 +219,20 @@ export function PublicApp() {
 
   const heroCopy = isProductFirstVariant
     ? {
-        eyebrow: 'Live booking assistant',
-        title: 'Start with a request. BookedAI finds the path.',
+        eyebrow: 'The AI revenue engine for service businesses',
+        title: 'Turn more website visitors, calls, and enquiries into confirmed bookings.',
         body:
-          'Describe what you need. BookedAI turns that sentence into top research, a booking-ready shortlist, contact paths, and a follow-up trail the operator can trust.',
-        primaryCta: 'Start with a request',
-        secondaryCta: 'Investor story',
+          'BookedAI.au helps service businesses capture demand, guide customers to the right service, and move them from first contact to booking with less drop-off.',
+        primaryCta: 'Start in product',
+        secondaryCta: 'See how it works',
       }
     : {
-        eyebrow: 'Live AI revenue platform',
-        title: 'Turn demand into booked revenue.',
+        eyebrow: 'The AI revenue engine for service businesses',
+        title: 'Turn more website visitors, calls, and enquiries into confirmed bookings.',
         body:
-          'BookedAI is the customer-facing AI layer for service businesses: it captures natural language demand, ranks the best path, creates booking intent, and keeps payment, portal, care, and operations visible.',
-        primaryCta: 'Try the product',
-        secondaryCta: 'View investor story',
+          'BookedAI.au helps service businesses capture demand, guide customers to the right service, and move them from first contact to booking with less drop-off.',
+        primaryCta: 'Start in product',
+        secondaryCta: 'See how it works',
       };
 
   useEffect(() => {
@@ -265,7 +268,7 @@ export function PublicApp() {
       return;
     }
 
-    navigateTo(productHref, 'homepage_primary_cta_clicked', { action: 'open_product' });
+    navigateTo(homepageProductHref, 'homepage_primary_cta_clicked', { action: 'open_product' });
   }
 
   function runSearch(query: string) {
@@ -289,6 +292,7 @@ export function PublicApp() {
 
   return (
     <main className="min-h-screen overflow-hidden bg-[#f6f4ef] text-[#172033]">
+      <span className="sr-only">{metadataTitle}</span>
       <header className="sticky top-0 z-40 border-b border-[#d9d3c7]/80 bg-[#fbfaf7]/88 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4">
           <a href="#top" className="flex min-w-0 items-center gap-3 rounded-xl">
@@ -307,10 +311,6 @@ export function PublicApp() {
                 onClick={() => {
                   if (item.label === 'Architecture') {
                     trackHomepageEvent('homepage_architecture_clicked', { variant: homepageVariant, href: item.href });
-                    return;
-                  }
-                  if (item.label === 'Roadmap') {
-                    trackHomepageEvent('homepage_roadmap_clicked', { variant: homepageVariant, href: item.href });
                   }
                 }}
                 className="rounded-full px-3.5 py-2 text-sm font-semibold text-[#586173] transition hover:bg-white hover:text-[#172033]"
@@ -330,10 +330,10 @@ export function PublicApp() {
             </button>
             <button
               type="button"
-              onClick={() => navigateTo(productHref, 'homepage_primary_cta_clicked', { surface: 'header', action: 'open_product' })}
+              onClick={() => navigateTo(homepageProductHref, 'homepage_primary_cta_clicked', { surface: 'header', action: 'open_product' })}
               className="inline-flex items-center gap-2 rounded-full bg-[#172033] px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(23,32,51,0.18)] transition hover:bg-[#263147]"
             >
-              Open Web App
+              Start in product
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
@@ -348,7 +348,7 @@ export function PublicApp() {
                 <span className="h-2 w-2 rounded-full bg-[#2aa876]" />
                 {heroCopy.eyebrow}
               </div>
-              <h1 className="mt-6 max-w-[10ch] text-[3.25rem] font-semibold leading-[0.92] tracking-[-0.055em] text-[#172033] sm:text-[5.3rem] lg:text-[6.1rem]">
+              <h1 className="mt-6 max-w-[14ch] text-[3.1rem] font-semibold leading-[0.95] tracking-[-0.055em] text-[#172033] sm:text-[4.75rem] lg:text-[5.55rem]">
                 {heroCopy.title}
               </h1>
               <p className="mt-6 max-w-2xl text-[1.08rem] leading-8 text-[#586173] sm:text-xl sm:leading-9">
@@ -383,7 +383,7 @@ export function PublicApp() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => navigateTo(pitchDeckHref, 'homepage_pitch_clicked', { surface: 'hero' })}
+                  onClick={() => document.getElementById('why-bookedai')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
                   className="inline-flex items-center justify-center gap-2 rounded-full border border-[#cfc7b8] bg-white px-5 py-3 text-sm font-bold text-[#172033] transition hover:border-[#9fb0c5]"
                 >
                   {heroCopy.secondaryCta}
@@ -417,7 +417,7 @@ export function PublicApp() {
                         Live tenant proof
                       </div>
                       <h2 className="mt-3 max-w-xl text-2xl font-semibold leading-tight tracking-[-0.04em] text-white sm:text-3xl">
-                        See demand become a booked workflow.
+                        See demand become booked revenue.
                       </h2>
                     </div>
                     <div className="grid grid-cols-4 gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] p-2">
@@ -477,12 +477,12 @@ export function PublicApp() {
               Product proof
             </div>
             <h2 id="homepage-product-proof-title" className="mt-5 max-w-xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-[#172033] sm:text-4xl">
-              One more proof shot after the chess tenant flow.
+              A real product surface that carries the customer journey forward.
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-[#586173] sm:text-base">
-              The homepage keeps the chess vertical visible first, then shows the broader BookedAI
-              product proof: a real customer-facing workspace that connects discovery, booking
-              posture, and operator evidence.
+              The homepage keeps the chess vertical visible first, then shows broader BookedAI.au
+              proof: a real customer-facing workspace that connects discovery, booking,
+              follow-up, and business visibility.
             </p>
           </div>
 
@@ -511,7 +511,7 @@ export function PublicApp() {
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
               The video gives visitors a fast investor and buyer overview before they compare the
-              live product, architecture, and operating proof below.
+              live product, architecture, and business proof below.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a
@@ -584,6 +584,24 @@ export function PublicApp() {
         </div>
       </section>
 
+      <section id="homepage-faq" className="px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto max-w-[1440px] rounded-[2rem] border border-[#d8d0c0] bg-white p-6 shadow-[0_20px_54px_rgba(86,73,50,0.08)] sm:p-8">
+          <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a6b24]">Questions teams ask most</div>
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            {[
+              ['Who is BookedAI.au for?', 'Service businesses that rely on enquiries, calls, bookings, and follow-up to grow revenue.'],
+              ['What improves first?', 'BookedAI.au tightens enquiry capture, qualification, booking flow, and customer-care continuity.'],
+              ['Do we replace everything?', 'No. BookedAI.au strengthens the conversion path first, then connects CRM, email, care, and business visibility.'],
+            ].map(([question, answer]) => (
+              <article key={question} className="rounded-[1.4rem] border border-[#e4dccd] bg-[#fbf7ee] p-5">
+                <h3 className="text-lg font-semibold tracking-[-0.03em] text-[#172033]">{question}</h3>
+                <p className="mt-3 text-sm leading-7 text-[#586173]">{answer}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </section>
+
       <section id="live-product" className="px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-[1440px]">
           <div className="mb-5 flex flex-col gap-4 rounded-[1.75rem] border border-[#d8d0c0] bg-[#fffdf8] p-5 shadow-[0_18px_46px_rgba(86,73,50,0.08)] sm:p-6 lg:flex-row lg:items-center lg:justify-between">
@@ -625,13 +643,13 @@ export function PublicApp() {
       <section id="operating-model" className="px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-[1440px] gap-5 lg:grid-cols-[0.9fr_1.1fr]">
           <div className="rounded-[2rem] border border-[#172033] bg-[#172033] p-6 text-white shadow-[0_28px_80px_rgba(23,32,51,0.2)] sm:p-8">
-            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8efce0]">Operating model</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8efce0]">Business model</div>
             <h2 className="mt-4 max-w-xl text-4xl font-semibold leading-tight tracking-[-0.045em] sm:text-5xl">
-              Customer surfaces to operations truth, without losing the lead.
+              Customer surfaces to business visibility, without losing the lead.
             </h2>
             <p className="mt-5 max-w-2xl text-base leading-8 text-slate-300">
-              The platform is designed as a revenue workflow, not a chatbot wrapper. Every public
-              interaction should create clearer state for the customer, the tenant, and the operator.
+              The platform is designed as a revenue flow, not a chatbot wrapper. Every public
+              interaction should create clearer next steps for the customer, the business, and the team.
             </p>
 
             <div className="mt-8 overflow-hidden rounded-[1.4rem] border border-white/10 bg-white/[0.06]">
@@ -713,9 +731,9 @@ export function PublicApp() {
       <section className="px-4 pb-14 pt-8 sm:px-6 lg:px-8">
         <div className="mx-auto flex max-w-[1440px] flex-col gap-6 rounded-[2rem] border border-[#172033] bg-[#101827] p-6 text-white shadow-[0_30px_90px_rgba(23,32,51,0.22)] sm:p-8 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8efce0]">Next step</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8efce0]">Ready to move faster?</div>
             <h2 className="mt-3 max-w-3xl text-3xl font-semibold leading-tight tracking-[-0.04em] sm:text-5xl">
-              See the product, then inspect the company story.
+              Start with the product flow, then inspect the company story.
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-8 text-slate-300">
               Use the live app for customer proof, the pitch for investor context, and the roadmap
@@ -725,10 +743,10 @@ export function PublicApp() {
           <div className="flex flex-col gap-3 sm:flex-row lg:shrink-0">
             <button
               type="button"
-              onClick={() => navigateTo(productHref, 'homepage_primary_cta_clicked', { surface: 'footer', action: 'open_product' })}
+              onClick={() => navigateTo(homepageFinalProductHref, 'homepage_primary_cta_clicked', { surface: 'footer', action: 'open_product' })}
               className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-[#172033] transition hover:bg-[#eef4f2]"
             >
-              Open product
+              Start with BookedAI
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </button>
             <button

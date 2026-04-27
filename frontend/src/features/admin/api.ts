@@ -502,7 +502,7 @@ export async function sendAdminDiscordHandoff(
     if (isUnauthorizedResponse(response)) {
       throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
     }
-    throw new Error(parseErrorMessage(responsePayload, 'Could not send Discord handoff.'));
+    throw new Error(parseErrorMessage(responsePayload, 'Could not send Discord team update.'));
   }
   return responsePayload as AdminDiscordHandoffResponse;
 }

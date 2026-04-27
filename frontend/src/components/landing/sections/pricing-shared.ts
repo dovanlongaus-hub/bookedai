@@ -86,7 +86,7 @@ export const plans: Plan[] = [
     features: [
       'AI website chat',
       'core enquiry capture',
-      'simple booking handoff',
+      'simple booking follow-through',
       'starter activation path',
       '1 focused service workflow',
       'best for proving operating fit before expansion',
@@ -101,9 +101,9 @@ export const plans: Plan[] = [
     ctaLabel: 'Review Pro',
     introLabel: 'Growth layer',
     microcopy:
-      'The clearest paid path for teams that want BookedAI to move from helpful surface into a repeatable revenue workflow.',
+      'The clearest paid path for teams that want BookedAI to move from helpful surface into a repeatable revenue flow.',
     supportingText:
-      'Strong fit for growing operators that need more qualification discipline, follow-up control, and commercial visibility without moving into custom scope.',
+      'Strong fit for growing service teams that need more qualification discipline, follow-up visibility, and commercial clarity without moving into custom scope.',
     features: [
       'everything in Starter',
       'missed call SMS auto-reply',
@@ -118,21 +118,21 @@ export const plans: Plan[] = [
     id: 'pro',
     name: 'Pro Max',
     price: 'A$349',
-    subtitle: 'For higher-volume or more complex operators that need broader automation, deeper qualification, and multi-service or multi-location support.',
+    subtitle: 'For higher-volume or more complex service teams that need broader automation, deeper qualification, and multi-service or multi-location support.',
     badge: 'Scale layer',
     ctaLabel: 'Review Pro Max',
     introLabel: 'Scale posture',
     microcopy:
-      'Built for businesses where operating depth, coordination, and commercial complexity justify a more advanced control layer.',
+      'Built for businesses where operating depth, coordination, and commercial complexity justify a more advanced team workspace.',
     supportingText:
-      'Best for multi-location clinics, hospitality groups, education operators, and service teams that need deeper automation and more visible operating control.',
+      'Best for multi-location clinics, hospitality groups, education providers, and service teams that need deeper automation and more visible business flow.',
     features: [
       'everything in Pro',
       'AI answers inbound calls',
       'advanced booking and reminder automation',
       'multi-service and multi-location support',
       'CRM or workflow integration',
-      'operator visibility dashboard',
+      'team visibility dashboard',
     ],
   },
 ];

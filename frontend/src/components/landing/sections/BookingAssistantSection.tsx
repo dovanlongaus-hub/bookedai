@@ -612,8 +612,8 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
           : result.calendar_add_url
             ? 'Calendar link ready'
           : result.workflow_status
-            ? 'Sent into ops workflow'
-            : 'Queued for handoff',
+            ? 'Sent into team flow'
+            : 'Queued for follow-up',
       tone:
         result.meeting_status === 'scheduled' || result.workflow_status
           ? 'bg-emerald-50 text-emerald-700'
@@ -1755,7 +1755,7 @@ export function BookingAssistantSection({
                                   {[
                                     'Customer details',
                                     'Preferred time',
-                                    bookingResult ? 'Booking reference and payment ready' : 'Payment and confirmation handoff',
+                                    bookingResult ? 'Booking reference and payment ready' : 'Payment and confirmation follow-up',
                                   ].map((item, index) => (
                                     <div key={item} className="flex items-center gap-3 rounded-[1rem] bg-[#f8fafc] px-3 py-3">
                                       <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-950 text-[11px] font-semibold text-white">
@@ -2005,7 +2005,7 @@ export function BookingAssistantSection({
                         {bookingResult.confirmation_message}
                       </p>
                       <div className="mt-4 rounded-[1rem] border border-emerald-200 bg-white/80 px-4 py-3 text-sm text-slate-700">
-                        <span className="font-semibold text-slate-900">Customer handoff:</span>{' '}
+                        <span className="font-semibold text-slate-900">Customer follow-up:</span>{' '}
                         {bookingResult.email_status === 'sent'
                           ? `Confirmation email has been sent and the next payment step is ready for the customer now.`
                           : `Booking is queued for manual email follow-up via ${bookingResult.contact_email}.`}

@@ -57,12 +57,12 @@ export function PortalSupportQueueSection({
             Support and payment queue
           </div>
           <h2 className="mt-3 text-xl font-bold text-slate-950">
-            Review portal requests and payment attention items from one operator lane
+            Review portal requests and payment attention items from one team lane
           </h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
             This queue brings customer follow-up and payment exceptions into the admin workspace so
-            operators can open the booking context, confirm the request, and watch whether the
-            internal state is still pending, retrying, or already handled.
+            the team can open the booking context, confirm the request, and watch whether the
+            review state is still pending, retrying, or already handled.
           </p>
         </div>
         <span className="rounded-full bg-amber-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-800 ring-1 ring-amber-200">
@@ -155,7 +155,7 @@ export function PortalSupportQueueSection({
               {item.resolution_status ? (
                 <div className="mt-3 rounded-[1rem] border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm leading-6 text-emerald-900">
                   <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                    Latest internal action
+                    Latest team action
                   </div>
                   <p className="mt-2">
                     {item.resolution_status}
@@ -167,7 +167,7 @@ export function PortalSupportQueueSection({
               ) : item.action_request_id ? (
                 <div className="mt-3 rounded-[1rem] border border-slate-200 bg-white px-3 py-3">
                   <label className="block text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Internal note
+                    Team note
                   </label>
                   <textarea
                     value={draftNotes[item.id] ?? ''}
@@ -175,7 +175,7 @@ export function PortalSupportQueueSection({
                       setDraftNotes((current) => ({ ...current, [item.id]: event.target.value }))
                     }
                     rows={3}
-                    placeholder="Record what the operator checked or why the request was escalated."
+                    placeholder="Record what the team checked or why the request was escalated."
                     className="mt-2 w-full rounded-[1rem] border border-slate-200 bg-slate-50 px-3 py-3 text-sm text-slate-900 outline-none transition focus:border-sky-400 focus:bg-white"
                   />
                 </div>

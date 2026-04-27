@@ -46,10 +46,10 @@ const lanes = [
     label: 'Convert',
     tone: 'from-emerald-50 to-white',
     accent: 'bg-emerald-500',
-    items: ['Booking intent', 'Payment posture', 'QR portal', 'Email/calendar', 'CRM handoff'],
+    items: ['Booking intent', 'Payment posture', 'QR portal', 'Email/calendar', 'CRM follow-through'],
   },
   {
-    title: 'Control plane',
+    title: 'Operations layer',
     label: 'Operate',
     tone: 'from-amber-50 to-white',
     accent: 'bg-amber-500',
@@ -71,7 +71,7 @@ const capabilityCards = [
   {
     icon: DatabaseZap,
     title: 'Operational truth model',
-    body: 'Bookings, payment posture, support state, CRM handoff, and agent actions remain visible to operators.',
+    body: 'Bookings, payment posture, support state, CRM follow-through, and agent actions remain visible to the team.',
   },
   {
     icon: ShieldCheck,
@@ -93,7 +93,7 @@ const proofImages = [
     srcSet:
       '/branding/optimized/tenant-login-hero-960.webp 960w, /branding/optimized/tenant-login-hero-1400.webp 1400w',
     title: 'Tenant operations proof',
-    body: 'The tenant gateway and workspace demonstrate how operators inherit booking context instead of raw chat noise.',
+    body: 'The tenant gateway and workspace demonstrate how teams inherit booking context instead of raw chat noise.',
   },
 ] as const;
 
@@ -144,7 +144,7 @@ function TopNav() {
 function ArchitectureHeroDiagram() {
   return (
     <figure
-      aria-label="BookedAI architecture image showing demand surfaces, AI orchestration, revenue core, and control plane"
+      aria-label="BookedAI architecture image showing demand surfaces, AI orchestration, revenue core, and operations layer"
       className="relative overflow-hidden rounded-[2rem] border border-white/80 bg-white p-4 shadow-[0_32px_90px_rgba(15,23,42,0.12)] sm:p-5"
     >
       <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(239,246,255,0.92),rgba(255,255,255,0.55)_42%,rgba(236,253,245,0.76))]" />

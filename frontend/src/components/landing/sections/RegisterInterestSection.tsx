@@ -9,11 +9,11 @@ const deploymentModes = [
   },
   {
     title: 'Dedicated customer app',
-    body: 'Run a cleaner customer-facing booking app under the SME brand while keeping BookedAI orchestration and follow-up underneath.',
+    body: 'Run a cleaner customer-facing booking app under the SME brand while keeping BookedAI coordination and follow-up underneath.',
   },
   {
     title: 'Linked full portal',
-    body: 'Connect the launch flow into the wider BookedAI portal once the customer is ready for deeper operator, tenant, and lifecycle workflows.',
+    body: 'Connect the launch flow into the wider BookedAI portal once the customer is ready for deeper team, tenant, and lifecycle flows.',
   },
 ];
 

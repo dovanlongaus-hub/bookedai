@@ -296,6 +296,14 @@ Latest public homepage investor/customer redesign from `2026-04-25`:
 - the live-read Playwright booking smoke now verifies that full friendly flow from query through selected match, booking form, authoritative v1 booking intent, portal confirmation, follow-up copy, and no horizontal overflow before a homepage release can pass
 - the latest pitch video at `https://upload.bookedai.au/videos/9eb8/BhVuOlB2QXlBo-_nyOFCcA.mp4` is now embedded with native controls on both `bookedai.au` and `pitch.bookedai.au`, giving visitors an early watchable overview before they continue into live product proof or the deeper deck
 
+Latest homepage/admin polish verification repair from `2026-04-27`:
+
+- the polished homepage/admin copy baseline is live on the deployed Vite frontend, with hero, proof, FAQ, final CTA, metadata, and product-flow links verified from `frontend/src/apps/public/PublicApp.tsx`, `frontend/index.html`, and the live Vite chunks
+- `scripts/compare_homepage_source_state.sh` now checks deployed frontend source instead of only the parallel root Next.js shell, preventing false PASS results when production is built from `frontend/`
+- `scripts/verify_homepage_admin_polish.sh` now scans the Vite index bundle plus lazy chunks such as `PublicApp-*.js`, and the remaining public/admin frontend `control plane` wording was renamed to operations-layer/workspace language so the old-wording cleanup gate can pass across served chunks
+- `scripts/healthcheck_stack.sh` now matches the current live homepage shell title: `Bookedai.au | The AI Revenue Engine for Service Businesses`
+- live verification passed after rebuilding/recreating production backend/web/beta containers, restarting proxy, reactivating n8n, and rerunning stack health plus homepage/admin polish verification on `2026-04-27T10:39:54Z`
+
 Latest portal customer-care status-agent update from `2026-04-25`:
 
 - `2026-04-26` production portal continuation recovery closed the live UAT gap where valid `v1-*` booking references could create bookings successfully but fail to hydrate in `portal.bookedai.au` with CORS/`Failed to fetch`

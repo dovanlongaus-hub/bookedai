@@ -18,15 +18,15 @@ const overviewStages = [
   {
     id: 'architecture',
     eyebrow: '02',
-    title: 'Operating system',
-    body: 'Make the platform legible: surfaces, revenue engine, integrations, and control layers in one view.',
+    title: 'Business view',
+    body: 'Make the product legible: enquiry capture, booking flow, follow-up, integrations, and owner visibility in one view.',
     tone: 'from-[#ecfeff] to-white',
   },
   {
     id: 'implementation',
     eyebrow: '03',
     title: 'Rollout path',
-    body: 'Show how an SME can launch on the web now, prove ROI, and expand into native later without rebuilding the workflow.',
+    body: 'Show how an SME can launch on the web now, prove ROI, and expand into deeper channels later without rebuilding the flow.',
     tone: 'from-[#f0fdf4] to-white',
   },
   {
@@ -39,7 +39,7 @@ const overviewStages = [
 ];
 
 const insightPoints = [
-  'Cleaner story for SMEs, operators, and investors around the live web app',
+  'Cleaner story for SMEs, service teams, and investors around the live web app',
   'Architecture is visible instead of buried in technical detail or native-app speculation',
   'Each section answers one buying question, in order',
 ];
@@ -66,7 +66,7 @@ const whyThisHelpsCards = [
   },
   {
     title: 'Stronger sales conversations',
-    body: 'The structure gives founders and operators a cleaner narrative to present in demos, decks, and live calls around the web app that exists today.',
+    body: 'The structure gives founders and service teams a cleaner narrative to present in demos, decks, and live calls around the web app that exists today.',
   },
   {
     title: 'Lower decision friction',
@@ -89,10 +89,10 @@ export function HomepageOverviewSection({
               Homepage at a glance
             </SignalPill>
             <h2 className="mt-4 max-w-[12ch] text-[2rem] font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-[2.7rem] lg:text-[3.25rem]">
-              One scan should explain why BookedAI can win as a responsive web revenue layer first.
+              One scan should explain why BookedAI can win as a responsive web booking product first.
             </h2>
             <p className="mt-4 max-w-[34rem] text-[1rem] leading-7 text-black/66">
-              The sequence is now filtered around the highest-value signals first: responsive product proof, operating model, rollout logic, pricing posture, and trust to close the decision.
+              The sequence is now filtered around the highest-value signals first: responsive product proof, owner visibility, rollout logic, pricing posture, and trust to close the decision.
             </p>
 
             <div className="mt-6 rounded-[1.7rem] border border-black/6 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4 shadow-[0_14px_30px_rgba(15,23,42,0.04)]">
@@ -104,7 +104,7 @@ export function HomepageOverviewSection({
                   },
                   {
                     label: 'Operational question',
-                    value: 'How does it fit the business workflow across desktop and mobile web?',
+                    value: 'How does it fit the business flow across desktop and mobile web?',
                   },
                   {
                     label: 'Decision question',

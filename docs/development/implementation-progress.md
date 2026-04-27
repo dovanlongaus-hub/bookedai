@@ -12,6 +12,33 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-27`
 
+Implementation update from `2026-04-27` (homepage/admin business-owner wording live deploy):
+
+- completed the next promotion step after local QA by deploying the B2B business-owner-first homepage/admin copy cleanup through `bash scripts/deploy_live_host.sh`
+- production deploy rebuilt backend, beta-backend, web, and beta-web images; recreated the app containers, restarted the proxy, and reactivated the n8n booking intake workflow
+- live homepage now serves the rebuilt Vite shell with `last-modified: Mon, 27 Apr 2026 11:36:55 GMT`, app bundle `/assets/index-OFT1M25o.js`, public bundle `/assets/PublicApp-a2XvE_9O.js`, and data chunk `/assets/data-BHqxrLAf.js`
+- verification passed with `bash scripts/healthcheck_stack.sh` at `2026-04-27T11:38:37Z` and `bash scripts/verify_homepage_admin_polish.sh`, including metadata, hero/proof/CTA/product-link checks, and absence checks for the old internal admin/homepage phrasing
+- status: homepage/admin business-owner wording cleanup is live and verified
+
+Implementation update from `2026-04-27` (landing data-driven public copy final pass):
+
+- completed the final scoped copy cleanup in `frontend/src/components/landing/data.ts`, targeting the data-driven public sections that still carried internal-sounding `operator`, `runtime`, `handoff`, `control plane`, or `chat revenue platform` language
+- kept the change copy-only and structure-preserving: public wording now favors `team`, `staff`, `account`, `support`, `product surface`, `booking next step`, and `revenue workflow` while retaining IDs, URLs, statuses, and roadmap data shape
+- verification passed locally with `npm --prefix frontend run build`, `git diff --check -- frontend/src/components/landing/data.ts memory/2026-04-27.md`, and targeted grep against `frontend/src/components/landing/data.ts`
+- deployed live with `bash scripts/deploy_live_host.sh`; backend, beta-backend, web, and beta-web rebuilt/recreated, proxy restarted, and the n8n booking intake workflow stayed active
+- post-deploy verification passed with `bash scripts/healthcheck_stack.sh` at `2026-04-27T11:12:33Z`, `bash scripts/verify_homepage_admin_polish.sh`, live homepage bundle `/assets/index-B6w90ijm.js`, and a direct live `data-BCQN71vM.js` scan confirming the cleanup terms are absent
+- operator sync archived `docs/development/telegram-sync/2026-04-27/111332-landing-data-driven-public-copy-cleanup-live.md`; Notion page creation and Discord summary both succeeded
+- status: landing data-driven public copy cleanup is live and verified
+
+Implementation update from `2026-04-27` (homepage/admin polish live verification repair):
+
+- corrected the homepage source comparator so it checks the deployed Vite production source under `frontend/src/apps/public/PublicApp.tsx` and `frontend/index.html`, not only the parallel root Next.js shell
+- fixed a TypeScript nav-tracking issue in `PublicApp.tsx` exposed by the production Vite build after the homepage nav labels changed
+- hardened live homepage verification so it scans Vite lazy chunks such as `PublicApp-*.js`, then removed remaining public/admin frontend `control plane` wording so the old-wording cleanup gate passes across served chunks
+- updated `scripts/healthcheck_stack.sh` to match the new `Bookedai.au | The AI Revenue Engine for Service Businesses` homepage shell title
+- live recovery completed after two host deploy passes: production backend/web/beta containers are up on freshly built images, proxy restarted, n8n workflow reactivated, stack health passed at `2026-04-27T10:39:54Z`, and `bash scripts/verify_homepage_admin_polish.sh` passed all homepage/admin polish checks
+- status: homepage/admin polish source, build, deploy, stack health, and live bundle verification are closed
+
 Implementation update from `2026-04-27` (portal QR and channel handoff clarity):
 
 - upgraded `portal.bookedai.au` so loaded bookings show a booking portal QR, payment QR/posture panel, copy/save/download controls, and the canonical `booking_reference` portal URL in the main booking command center

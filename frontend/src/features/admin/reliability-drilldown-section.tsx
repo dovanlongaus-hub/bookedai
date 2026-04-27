@@ -43,7 +43,7 @@ function buildMode(
       checklist: [
         `Check the ${configItemsCount} visible configuration items for missing coverage or masked values that need refresh.`,
         'Confirm integration provider status and sync mode still match the intended rollout posture.',
-        'Hold user-facing rollout if config drift explains the operator issue more directly than automation attention.',
+        'Hold user-facing rollout if config drift explains the customer-facing issue more directly than automation attention.',
       ],
       primaryActionLabel: 'Open live configuration',
       primaryPanel: 'live-configuration',
@@ -54,12 +54,12 @@ function buildMode(
   if (activePanel === 'api-inventory') {
     return {
       badge: 'Contract review',
-      title: 'Review API contract exposure before blaming operator workflow',
+      title: 'Review API contract exposure before blaming the team flow',
       detail:
         'Use this drill-down when reliability concerns look like missing routes, incomplete admin visibility, or an additive contract gap.',
       checklist: [
         `Review the ${apiRoutesCount} visible routes exposed to admin reliability.`,
-        'Check whether the operator workflow is landing on an additive v1 path or only a legacy admin path.',
+        'Check whether the team flow is landing on an additive v1 path or only a legacy admin path.',
         'Use this lane before asking for deeper backend changes if the current surface already lacks the required route.',
       ],
       primaryActionLabel: 'Open API inventory',
@@ -69,14 +69,14 @@ function buildMode(
   }
 
   return {
-    badge: 'Operator action',
+    badge: 'Team action',
     title: 'Review automation triage and AI quality from the same reliability lane',
     detail:
-      'Use this drill-down when operators need to inspect retry posture, automation action lanes, and the selected service context before changing rollout posture.',
+      'Use this drill-down when the team needs to inspect retry posture, automation action lanes, and the selected service context before changing rollout posture.',
     checklist: [
       `Check automation triage and retry posture for the current service context: ${selectedServiceId ?? 'no selected service'}.`,
       'Use AI quality preview to inspect additive search, trust, booking path, and lifecycle signals without touching authoritative writes.',
-      'Escalate config or contract review only if the operator-action lane does not explain the issue clearly enough.',
+      'Escalate config or contract review only if the team-action lane does not explain the issue clearly enough.',
     ],
     primaryActionLabel: 'Open AI quality preview',
     primaryPanel: 'prompt5-preview',
@@ -137,7 +137,7 @@ export function ReliabilityDrilldownSection({
             Next action
           </div>
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            Keep the drill-down focused on one reliability lane at a time so operator review stays
+            Keep the drill-down focused on one reliability lane at a time so team review stays
             actionable instead of scanning every panel.
           </p>
           <button
@@ -170,13 +170,13 @@ export function ReliabilityDrilldownSection({
         fallback={
           <div className="mt-5 rounded-[1.5rem] border border-violet-200 bg-white p-5 shadow-[0_20px_50px_rgba(109,40,217,0.05)]">
             <div className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-700">
-              Operator notes and export cues
+              Team notes and export cues
             </div>
             <h3 className="mt-2 text-lg font-semibold text-slate-950">
-              Loading handoff module
+              Loading team update module
             </h3>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              Reliability handoff packaging now loads separately so the checklist and lane
+              Reliability update packaging now loads separately so the checklist and lane
               navigation can render before the local note and export tools are needed.
             </p>
           </div>

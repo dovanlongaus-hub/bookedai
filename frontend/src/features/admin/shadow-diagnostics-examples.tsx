@@ -42,7 +42,7 @@ export function ShadowDiagnosticsExamples({
           </div>
           <p className="mt-1 text-xs text-slate-500">
             Recent record-level shadow drift is shown here with the observed timestamp and the legacy versus
-            normalized values used during operator triage.
+            normalized values used during team triage.
           </p>
         </div>
         <div className="text-xs font-medium text-slate-500">

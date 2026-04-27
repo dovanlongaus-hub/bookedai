@@ -26,7 +26,9 @@ Current public runtime decision:
 - BookedAI is shipping the responsive web app as the primary current-phase product surface.
 - `bookedai.au` now has an executive acquisition homepage that explains the full BookedAI revenue-engine story in the first viewport, then keeps the real live search-to-booking workspace on-page for proof.
 - `pitch.bookedai.au` remains the deeper pitch and architecture-visualization surface for investors who want the longer company story.
-- `scripts/healthcheck_stack.sh` expects `bookedai.au` to serve the homepage shell directly and still probes `pitch.bookedai.au` as the deeper pitch surface.
+- `scripts/healthcheck_stack.sh` expects `bookedai.au` to serve the homepage shell directly with the current `Bookedai.au | The AI Revenue Engine for Service Businesses` title and still probes `pitch.bookedai.au` as the deeper pitch surface.
+- `scripts/compare_homepage_source_state.sh` checks the deployed Vite homepage source and metadata from the host worktree before deploy.
+- `scripts/verify_homepage_admin_polish.sh` verifies the live homepage shell and Vite JS chunks, including lazy homepage chunks, after deploy.
 - `product.bookedai.au` is the deeper live product web runtime; search uses a ChatGPT-like composer, results stay results-first after ranking, and compact cards use detail popups, chat-based refinements, and explicit `Book` actions before customer details open.
 - chess searches can surface the reviewed BookedAI chess tenant in the normal result list with verified-tenant capability chips for booking, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit/revisit.
 - `portal.bookedai.au` is the returning-customer command center: a valid `booking_reference` opens booking status, payment posture, booking QR, payment QR/link when ready, Telegram/WhatsApp continuation links with the ID attached, and request-safe actions for reschedule/change, cancel, help, save, or add another booking.

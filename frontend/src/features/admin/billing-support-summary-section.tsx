@@ -24,9 +24,9 @@ export function BillingSupportSummarySection({
             Keep portal follow-up and payment exceptions actionable from one lane
           </h2>
           <p className="template-body mt-2 max-w-3xl text-sm leading-7">
-            This summary turns the shared queue into a triage-ready support surface so operators can
+            This summary turns the shared queue into a triage-ready support view so teams can
             see whether the current issue is a portal request, a payment exception, or a still-open
-            handoff before opening the deeper booking context.
+            follow-through step before opening the deeper booking context.
           </p>
         </div>
         <div className="booked-note-surface px-4 py-3 text-sm text-black/70">
@@ -42,10 +42,10 @@ export function BillingSupportSummarySection({
 
       <div className="mt-6 grid gap-4 md:grid-cols-5">
         <SummaryCard label="Portal requests" value={`${summary.portalRequests}`} detail="Customer-driven reschedule or cancellation requests." />
-        <SummaryCard label="Payment attention" value={`${summary.paymentAttention}`} detail="Requires-action or failed payment states waiting for operator review." />
+        <SummaryCard label="Payment attention" value={`${summary.paymentAttention}`} detail="Requires-action or failed payment states waiting for team review." />
         <SummaryCard label="Unresolved" value={`${summary.unresolved}`} detail="Items that still need a review, reply, or escalation decision." />
-        <SummaryCard label="Escalated" value={`${summary.escalated}`} detail="Cases already marked for a higher-touch handoff." />
-        <SummaryCard label="Reviewed" value={`${summary.resolved}`} detail="Queue items already acknowledged by an operator." />
+        <SummaryCard label="Escalated" value={`${summary.escalated}`} detail="Cases already marked for higher-touch follow-through." />
+        <SummaryCard label="Reviewed" value={`${summary.resolved}`} detail="Queue items already acknowledged by the team." />
       </div>
 
       <div className="mt-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4">

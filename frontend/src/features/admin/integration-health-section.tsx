@@ -60,7 +60,7 @@ export function IntegrationHealthSection({
             Cross-system visibility for CRM, messaging, payments, and webhook posture
           </h2>
           <p className="template-body mt-2 max-w-3xl text-sm leading-7">
-            This lane now reads the shared event and support data as an operator review surface, so
+            This lane reads shared event and support data as a team review view, so
             the team can spot integration-specific pressure before jumping into tenant edits,
             preview tools, or platform configuration.
           </p>
@@ -93,7 +93,7 @@ export function IntegrationHealthSection({
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.14em] text-sky-700">
-                Telegram booking-care runtime
+                Telegram booking-care product
               </div>
               <div className="mt-2 text-lg font-semibold text-slate-950">
                 Booking, CRM, email, and callback posture in one view

@@ -63,7 +63,7 @@ const deploymentModes: Array<{
   {
     id: 'linked_full_portal',
     title: 'Linked full portal',
-    body: 'Best for teams that want the SME launch flow now and a wider BookedAI operator portal connected after rollout.',
+    body: 'Best for teams that want the SME launch flow now and a broader BookedAI business workspace connected after rollout.',
   },
 ];
 
@@ -178,7 +178,7 @@ const offerPackages: Array<{
     backendPlanId: 'pro',
     icon: Building2,
     headline: 'Best for broader automation, multi-location logic, and deeper portal or workflow customization.',
-    body: 'For SMEs and operators who need a more tailored BookedAI package after the early launch stage is working.',
+    body: 'For SMEs and business teams who need a more tailored BookedAI package after the early launch stage is working.',
     commissionNote:
       'Commission is tied only to confirmed bookings generated via the installed BookedAI experience, not generic external bookings.',
   },
@@ -218,7 +218,7 @@ function buildRegistrationNotes(
     'Homepage offer: first 10 SMEs receive free online setup',
     'Commercial model: subscription or upgrade path plus commission only on successful bookings completed through the BookedAI-installed plugin, website flow, app flow, or booking assistant popup',
     'Subscription intent: customer wants to start the BookedAI trial now',
-    formState.notes.trim() ? `Operator notes: ${formState.notes.trim()}` : null,
+    formState.notes.trim() ? `Business notes: ${formState.notes.trim()}` : null,
   ];
 
   return fragments.filter(Boolean).join('\n');

@@ -21,9 +21,9 @@ const handoffFormats: {
   {
     value: 'slack',
     label: 'Slack',
-    audience: 'Ops channel handoff',
+    audience: 'Team channel update',
     suggestedTitle: `${brandName} reliability triage update`,
-    intro: 'Use this short format for rapid operator or release-channel updates.',
+    intro: 'Use this short format for rapid team or release-channel updates.',
   },
   {
     value: 'ticket',
@@ -89,13 +89,13 @@ export function ReliabilityHandoffPanel({
   }, [operatorNote, storageKey]);
 
   const exportSummary = useMemo(() => {
-    const followUpNote = operatorNote.trim() || 'No local operator note recorded yet.';
+    const followUpNote = operatorNote.trim() || 'No local team note recorded yet.';
     if (handoffFormat === 'discord') {
       return [
         `Team update: ${laneLabel}`,
         `Summary: ${laneSummary}`,
         `Primary action: ${primaryActionLabel}`,
-        `Operator note: ${followUpNote}`,
+        `Team note: ${followUpNote}`,
         'Checklist:',
         ...checklist.map((item, index) => `${index + 1}. ${item}`),
         'Suggested use: Discord team update or async ops channel summary.',
@@ -108,10 +108,10 @@ export function ReliabilityHandoffPanel({
         `Focus lane: ${laneToken}`,
         `Summary: ${laneSummary}`,
         `Primary action: ${primaryActionLabel}`,
-        `Operator note: ${followUpNote}`,
+        `Team note: ${followUpNote}`,
         'Acceptance checklist:',
         ...checklist.map((item, index) => `${index + 1}. ${item}`),
-        'Suggested use: task tracker or team handoff ticket.',
+        'Suggested use: task tracker or team follow-through ticket.',
       ].join('\n');
     }
 
@@ -121,7 +121,7 @@ export function ReliabilityHandoffPanel({
         `Risk lane: ${laneToken}`,
         `Current posture: ${laneSummary}`,
         `Immediate action: ${primaryActionLabel}`,
-        `Operator note: ${followUpNote}`,
+        `Team note: ${followUpNote}`,
         'Triage checkpoints:',
         ...checklist.map((item, index) => `- ${index + 1}. ${item}`),
         'Suggested use: release hold, incident journal, or escalation note.',
@@ -134,17 +134,17 @@ export function ReliabilityHandoffPanel({
       `Lane focus: ${laneToken}`,
       `Summary: ${laneSummary}`,
       `Primary action: ${primaryActionLabel}`,
-      `Operator note: ${followUpNote}`,
+      `Team note: ${followUpNote}`,
       'Checklist:',
       ...checklist.map((item, index) => `${index + 1}. ${item}`),
-      'Suggested use: Slack or fast operator handoff.',
+      'Suggested use: Slack or fast team update.',
     ].join('\n');
   }, [checklist, handoffFormat, laneLabel, laneSummary, laneToken, operatorNote, primaryActionLabel]);
 
   const selectedFormat = handoffFormats.find((format) => format.value === handoffFormat) ?? handoffFormats[0];
 
   async function prepareExportPackage() {
-    setExportStatus('Export package refreshed for handoff.');
+    setExportStatus('Export package refreshed for team follow-through.');
 
     if (typeof navigator === 'undefined' || !navigator.clipboard?.writeText) {
       return;
@@ -152,9 +152,9 @@ export function ReliabilityHandoffPanel({
 
     try {
       await navigator.clipboard.writeText(exportSummary);
-      setExportStatus('Export package copied to clipboard and ready for handoff.');
+      setExportStatus('Export package copied to clipboard and ready for team follow-through.');
     } catch {
-      setExportStatus('Export package refreshed for handoff.');
+      setExportStatus('Export package refreshed for team follow-through.');
     }
   }
 
@@ -164,7 +164,7 @@ export function ReliabilityHandoffPanel({
     }
 
     setSendingDiscord(true);
-    setExportStatus('Sending handoff to Discord...');
+    setExportStatus('Sending team update to Discord...');
 
     try {
       const response = await sendAdminDiscordHandoff(apiBaseUrl, sessionToken, {
@@ -175,7 +175,7 @@ export function ReliabilityHandoffPanel({
       });
       setExportStatus(response.message);
     } catch (error) {
-      setExportStatus(error instanceof Error ? error.message : 'Could not send Discord handoff.');
+      setExportStatus(error instanceof Error ? error.message : 'Could not send Discord team update.');
     } finally {
       setSendingDiscord(false);
     }
@@ -183,14 +183,14 @@ export function ReliabilityHandoffPanel({
 
   function clearOperatorNote() {
     setOperatorNote('');
-    setExportStatus('Local operator note cleared.');
+    setExportStatus('Local team note cleared.');
   }
 
   return (
     <div className="mt-5 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
       <div className="rounded-[1.5rem] border border-violet-200 bg-white p-5">
         <div className="text-xs font-semibold uppercase tracking-[0.14em] text-violet-700">
-          Operator notes and export cues
+          Team notes and export cues
         </div>
         <div className="mt-3 grid gap-3 md:grid-cols-3">
           {handoffFormats.map((format) => (
@@ -220,18 +220,18 @@ export function ReliabilityHandoffPanel({
           <p className="mt-2 text-sm leading-6 text-slate-600">{selectedFormat.intro}</p>
         </div>
         <label className="mt-3 block text-sm font-semibold text-slate-950" htmlFor="reliability-operator-note">
-          Operator note
+          Team note
         </label>
         <textarea
           id="reliability-operator-note"
           value={operatorNote}
           onChange={(event) => setOperatorNote(event.target.value)}
-          placeholder="Capture the lane-specific follow-up you want to hand off after this review."
+          placeholder="Capture the lane-specific follow-up you want the team to take after this review."
           className="mt-3 min-h-[140px] w-full rounded-[1.25rem] border border-slate-200 bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700 outline-none transition focus:border-violet-300 focus:bg-white"
         />
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Keep this note local and additive. It is meant for operator handoff, not as an
-          authoritative backend workflow record.
+          Keep this note local and additive. It is meant for team follow-through, not as an
+          authoritative backend process record.
         </p>
         <div className="mt-4 flex flex-wrap gap-3">
           <button
@@ -272,7 +272,7 @@ export function ReliabilityHandoffPanel({
           Export-ready summary
         </div>
         <p className="mt-3 text-sm leading-6 text-slate-600">
-          Use this summary in Slack, ticket handoff, or incident notes.
+          Use this summary in Slack, team tickets, or incident notes.
         </p>
         <p className="mt-2 text-sm leading-6 text-slate-600">
           Discord webhook: {discordConfigured ? 'configured and ready to post.' : 'not configured yet.'}

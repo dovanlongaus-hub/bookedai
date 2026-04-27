@@ -431,6 +431,27 @@ async function stubAdminApis(page: Parameters<typeof test>[0]['page']) {
     });
   });
 
+  await page.route('**/api/admin/customer-agent/health', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        agent: 'BookedAI Manager Bot',
+        window_hours: 24,
+        webhook_pending_count: 0,
+        recent_events: {
+          total: 0,
+          by_channel: {},
+        },
+        last_reply_status: {},
+        last_callback_ack_status: {},
+        top_failed_identity_resolution_reasons: [],
+        recent_channel_sessions: [],
+      }),
+    });
+  });
+
   await page.route('**/api/admin/tenants', async (route) => {
     if (route.request().method() !== 'GET') {
       await route.continue();

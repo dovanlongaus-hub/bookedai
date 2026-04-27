@@ -200,7 +200,7 @@ export function ShadowDiagnosticsReferences({
       ) : (
         <div className="mt-3 rounded-2xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-500">
           No category-level drift references are available yet. Once the shadow compare detects drift, this
-          panel will show both the busiest categories and their latest operator-ready examples.
+          panel will show both the busiest categories and their latest team-ready examples.
         </div>
       )}
     </div>

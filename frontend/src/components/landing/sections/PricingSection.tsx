@@ -401,7 +401,7 @@ export function PricingSection() {
             The pricing story is designed to win quickly without sounding lightweight: clear entry path, clear rollout scope, predictable monthly layer, and performance upside tied to real booked revenue.
           </p>
           <p className="template-body mx-auto mt-4 max-w-3xl text-sm leading-6 sm:text-base">
-            Built for service operators who want a cleaner operating model, not only a cheaper chatbot. Launch standalone on your website, as a dedicated booking app, or as part of the broader BookedAI portal path.
+            Built for service teams who want a clearer booking business, not only a cheaper chatbot. Launch standalone on your website, as a dedicated booking app, or as part of the broader BookedAI portal path.
           </p>
 
           <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
@@ -428,7 +428,7 @@ export function PricingSection() {
               <div>
                 <div className="template-kicker text-[11px]">Pricing flow graphic</div>
                 <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                  The homepage should make the commercial model legible before the buyer ever opens the deeper product runtime.
+                  The homepage should make the commercial model legible before the buyer ever opens the deeper product experience.
                 </div>
               </div>
               <div className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
@@ -471,7 +471,7 @@ export function PricingSection() {
               </h3>
             </div>
               <p className="template-body mt-5 max-w-2xl text-base leading-7">
-              Pick the package that matches your current operating maturity. Every registration and booking action should continue into the same onboarding, timing, confirmation, and commercial handoff path without hiding implementation scope or performance logic.
+              Pick the package that matches your current operating maturity. Every registration and booking action should continue into the same onboarding, timing, confirmation, and commercial follow-through path without hiding implementation scope or performance logic.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {topOffers.map((offer) => (
@@ -583,7 +583,7 @@ export function PricingSection() {
                 Usually starts from {advancedPlan.price}/mo after your 1 month free period
               </p>
               <p className="mt-3 text-sm leading-6 text-slate-600">
-                We keep advanced rollout off the main buying path so smaller teams can decide quickly, while larger operators can still enter with the right scope, governance, and performance model.
+                We keep advanced rollout off the main buying path so smaller teams can decide quickly, while larger service teams can still enter with the right scope, oversight, and performance model.
               </p>
 
               <ul className="mt-8 space-y-3">

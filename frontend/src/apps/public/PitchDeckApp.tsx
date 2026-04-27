@@ -69,7 +69,7 @@ const agentSurfaceCards = [
   {
     eyebrow: 'Product agent',
     title: 'Live AI booking flow',
-    body: 'product.bookedai.au runs the live search, shortlist, booking capture, and operator handoff in one session.',
+    body: 'product.bookedai.au runs the live search, shortlist, booking capture, and team follow-through in one session.',
     href: productUrl,
     cta: 'Open Web App',
     tone: 'from-[#eef6ff] to-white',
@@ -138,7 +138,7 @@ const pricingPlans = [
 
 const architectureCapabilityCards = [
   ['Designed surface', 'A visual system buyers can inspect, not a hidden backend diagram.'],
-  ['Connected workflow', 'Every customer turn can become booking state, care state, and operator evidence.'],
+  ['Connected workflow', 'Every customer turn can become booking state, care state, and clear business evidence.'],
   ['Enterprise posture', 'Tenant boundaries, policy gates, audit trails, and fallback rails are visible by design.'],
 ];
 
@@ -153,7 +153,7 @@ const architectureSupportRails = [
   ['Customer surfaces', 'bookedai.au, product, demo, portal, widget'],
   ['Agent layer', 'customer turn, revenue ops, care/status'],
   ['Revenue core', 'lead, booking intent, payment, email/calendar'],
-  ['Control plane', 'tenant ops, admin reliability, audit ledger'],
+  ['Operations layer', 'tenant ops, admin reliability, audit ledger'],
 ];
 
 function VisualChip({
@@ -191,7 +191,7 @@ function PitchVideoSection() {
               </h2>
               <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
                 A short visual walkthrough for the commercial narrative: customer demand, AI booking,
-                operator visibility, and why the platform is built around revenue truth.
+                team visibility, and why the platform is built around real revenue outcomes.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -263,7 +263,7 @@ function ArchitectureSnapshotImage() {
           BOOKEDAI ARCHITECTURE
         </text>
         <text x="84" y="130" fill="white" fontSize="34" fontWeight="700">
-          Revenue engine from demand to operator truth
+          Revenue engine from demand to booking clarity
         </text>
 
         <rect x="308" y="166" width="364" height="216" rx="34" fill="url(#pitchArchitectureCore)" fillOpacity="0.95" />
@@ -721,7 +721,7 @@ export function PitchDeckApp() {
 
               <p className="max-w-xl text-base leading-8 text-black/60 sm:text-lg">
                 BookedAI responds instantly, qualifies customer intent, recommends the right service,
-                and hands every booking into a visible operator workflow. Built first for Australian
+                and carries every booking into a visible business workflow. Built first for Australian
                 service businesses.
               </p>
 
@@ -814,7 +814,7 @@ export function PitchDeckApp() {
               Warm leads leak when staff are busy.
             </h2>
             <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">
-              Customers are ready to book, but slow replies, unclear qualification, and messy handoffs
+              Customers are ready to book, but slow replies, unclear qualification, and disconnected next steps
               turn demand into missed revenue before the team can act.
             </p>
 
@@ -899,7 +899,7 @@ export function PitchDeckApp() {
               </h2>
               <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">
                 The product gives every enquiry a fast first response, enough context to qualify fit,
-                and a clear next step operators can trust.
+                and a clear next step your team can trust.
               </p>
 
               <div className="mt-6 space-y-3">
@@ -1137,13 +1137,13 @@ export function PitchDeckApp() {
       {/* ── 8. TRUST + PARTNERS ─────────────────────────────────────── */}
       <section id="trust" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
         <div className="grid gap-5 xl:grid-cols-2">
-          {/* Operator voices */}
+          {/* Team voices */}
           <SectionCard className="overflow-hidden bg-[linear-gradient(135deg,#ffffff_0%,#f6fbff_50%,#f0fdf4_100%)] px-6 py-6 sm:px-7 lg:px-8">
             <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-              Operator voices
+              Team voices
             </SignalPill>
             <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f] sm:text-3xl">
-              Built for service operators, not generic chatbot theatre.
+              Built for service teams, not generic chatbot theatre.
             </h2>
             <div className="mt-6 space-y-3">
               {trustItems.map((item) => (
@@ -1212,7 +1212,7 @@ export function PitchDeckApp() {
                 {teamSectionContent.kicker}
               </SignalPill>
               <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-                Built by operators, engineers, and execution-minded founders
+                Built by business operators, engineers, and execution-minded founders
               </h2>
               <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">
                 {teamSectionContent.body}

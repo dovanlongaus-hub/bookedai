@@ -40,7 +40,7 @@ for name in "${required_supabase_containers[@]}"; do
 done
 
 root_html="$(curl -fsS "https://${ROOT_DOMAIN}")"
-if ! grep -Fq "BookedAI | The AI Revenue Engine" <<<"${root_html}"; then
+if ! grep -Fq "Bookedai.au | The AI Revenue Engine" <<<"${root_html}"; then
   echo "ERROR: ${ROOT_DOMAIN} did not serve the BookedAI homepage shell"
   exit 1
 fi
