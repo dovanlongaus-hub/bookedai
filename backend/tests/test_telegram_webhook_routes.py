@@ -1040,7 +1040,7 @@ class TelegramWebhookRoutesTestCase(TestCase):
                     "update_id": 5001,
                     "message": {
                         "message_id": 21,
-                        "from": {"id": 999, "first_name": "Long", "language_code": "vi"},
+                        "from": {"id": 999, "first_name": "Long", "language_code": "en-AU"},
                         "chat": {"id": 123456, "type": "private"},
                         "text": "/start",
                     },
@@ -1060,7 +1060,7 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(communication_service.sent[0]["parse_mode"], "HTML")
         self.assertEqual(captured_calls[0]["ai_intent"], "welcome")
         self.assertEqual(
-            captured_calls[0]["metadata"]["telegram_language_code"], "vi"
+            captured_calls[0]["metadata"]["telegram_language_code"], "en-au"
         )
         self.assertEqual(
             captured_calls[0]["metadata"]["start_command_kind"], "welcome"
@@ -1489,3 +1489,367 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(captured_calls[0]["ai_intent"], "support_handoff")
         self.assertEqual(len(communication_service.sent), 1)
         self.assertIn("flagged this conversation", communication_service.sent[0]["body"])
+
+    def test_slash_parser_strips_at_botname_suffix(self):
+        intent, args = MessagingAutomationService._parse_slash_command(
+            "/cancel@BookedAI_Manager_Bot v1-abc123"
+        )
+        self.assertEqual(intent, "cancel")
+        self.assertEqual(args, "v1-abc123")
+
+    def test_slash_parser_returns_args_for_search_command(self):
+        intent, args = MessagingAutomationService._parse_slash_command(
+            "/search Sydney chess class"
+        )
+        self.assertEqual(intent, "search")
+        self.assertEqual(args, "Sydney chess class")
+
+    def test_slash_parser_returns_empty_args_for_bare_command(self):
+        intent, args = MessagingAutomationService._parse_slash_command("/cancel")
+        self.assertEqual(intent, "cancel")
+        self.assertEqual(args, "")
+
+    def test_welcome_html_escapes_sender_name(self):
+        from schemas import TawkMessage
+
+        result = MessagingAutomationService(
+            public_search_service=None
+        )._build_welcome_result(
+            channel="telegram",
+            message=TawkMessage(
+                conversation_id="telegram:1",
+                message_id="1",
+                text="/start",
+                sender_name="<script>alert(1)</script>",
+            ),
+            identity_metadata={},
+            locale="en",
+        )
+
+        self.assertIn("&lt;script&gt;", result.ai_reply)
+        self.assertNotIn("<script>", result.ai_reply)
+
+    def test_needs_booking_reference_reply_controls_include_support_button(self):
+        controls = MessagingAutomationService._needs_booking_reference_reply_controls(
+            locale="en"
+        )
+        markup = controls["telegram_reply_markup"]
+        inline = markup["inline_keyboard"]
+        self.assertEqual(inline[0][0]["callback_data"], "/support")
+        # Persistent reply keyboard with home options is also present.
+        labels = [btn["text"] for row in markup["keyboard"] for btn in row]
+        self.assertIn("Find a service", labels)
+        self.assertIn("Talk to support", labels)
+
+    def test_telegram_cancel_slash_with_inline_ref_returns_confirm_keyboard(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **kwargs):
+            return {
+                "booking_reference": "v1-abc123",
+                "resolved_by": "explicit_reference",
+                "candidate_count": 1,
+            }
+
+        async def _build_portal_customer_care_turn(*_args, **_kwargs):
+            return {
+                "reply": "Booking found.",
+                "next_actions": [
+                    {"id": "request_cancel", "enabled": True},
+                ],
+            }
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ), patch(
+            "service_layer.messaging_automation_service.build_portal_customer_care_turn",
+            _build_portal_customer_care_turn,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 6010,
+                    "message": {
+                        "message_id": 40,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/cancel v1-abc123",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "cancel_confirmation")
+        sent_markup = communication_service.sent[0].get("reply_markup") or {}
+        rows = sent_markup.get("inline_keyboard") or []
+        self.assertEqual(len(rows), 1)
+        labels = [btn["text"] for btn in rows[0]]
+        self.assertTrue(any("Confirm cancel" in label for label in labels))
+        self.assertTrue(any("Keep booking" in label for label in labels))
+        callback_values = [btn.get("callback_data") for btn in rows[0]]
+        self.assertIn("Cancel current booking v1-abc123", callback_values)
+        self.assertIn("Keep current booking v1-abc123", callback_values)
+
+    def test_support_handoff_fanout_runs_concurrently(self):
+        import asyncio
+        import time
+
+        captured_calls: list[dict[str, object]] = []
+        slow_delay = 0.15
+
+        class _SlowTelegramCommunicationService(_FakeTelegramCommunicationService):
+            async def send_telegram(self, **kwargs):
+                await asyncio.sleep(slow_delay)
+                return await super().send_telegram(**kwargs)
+
+        communication_service = _SlowTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.settings = SimpleNamespace(
+                bookedai_customer_telegram_webhook_secret_token="telegram-secret",
+                bookedai_customer_telegram_bot_token="customer-bot-token",
+                booking_business_email="info@bookedai.au",
+                bookedai_support_telegram_chat_ids="111,222,333",
+            )
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            started = time.perf_counter()
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 6011,
+                    "message": {
+                        "message_id": 41,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/support",
+                    },
+                },
+            )
+            elapsed = time.perf_counter() - started
+
+        self.assertEqual(response.status_code, 200)
+        # 1 customer-facing reply + 3 staff notifications.
+        self.assertEqual(len(communication_service.sent), 4)
+        # If sequential: ~4 × 0.15 = 0.6s. With gather: ~0.15s + overhead. Allow 0.45s ceiling.
+        self.assertLess(elapsed, 0.45, msg=f"fan-out took {elapsed:.3f}s — expected concurrent")
+
+    def test_telegram_change_time_callback_shows_reschedule_date_picker(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "callback_query": {
+                        "id": "cb-rsch-1",
+                        "from": {"id": 999, "first_name": "Long"},
+                        "data": "reschedule:date:v1-rsch001",
+                        "message": {
+                            "message_id": 81,
+                            "chat": {"id": 123456, "type": "private"},
+                            "text": "Pending booking menu",
+                        },
+                    }
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "reschedule_date_picker")
+        body = communication_service.sent[0]["body"]
+        self.assertIn("v1-rsch001", body)
+        self.assertIn("Pick a new date", body)
+        keyboard = communication_service.sent[0]["reply_markup"]["inline_keyboard"]
+        self.assertGreaterEqual(len(keyboard), 4)
+        first_button = keyboard[0][0]
+        self.assertTrue(
+            first_button["callback_data"].startswith("reschedule:time:v1-rsch001:")
+        )
+        back_button = keyboard[-1][0]
+        self.assertEqual(back_button["callback_data"], "Keep current booking v1-rsch001")
+
+    def test_telegram_reschedule_date_pick_shows_time_picker(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "callback_query": {
+                        "id": "cb-rsch-2",
+                        "from": {"id": 999, "first_name": "Long"},
+                        "data": "reschedule:time:v1-rsch001:2026-04-29",
+                        "message": {
+                            "message_id": 82,
+                            "chat": {"id": 123456, "type": "private"},
+                            "text": "Pick a date",
+                        },
+                    }
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "reschedule_time_picker")
+        body = communication_service.sent[0]["body"]
+        self.assertIn("2026-04-29", body)
+        self.assertIn("v1-rsch001", body)
+        keyboard = communication_service.sent[0]["reply_markup"]["inline_keyboard"]
+        time_buttons = [
+            button for row in keyboard for button in row
+            if button["callback_data"].startswith("reschedule:confirm:")
+        ]
+        self.assertEqual(len(time_buttons), 4)
+        for button in time_buttons:
+            self.assertIn("v1-rsch001:2026-04-29:", button["callback_data"])
+
+    def test_telegram_reschedule_confirm_queues_portal_request(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+        captured_queue_calls: list[dict[str, object]] = []
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _queue_portal_booking_request(*_args, **kwargs):
+            captured_queue_calls.append(kwargs)
+            return {
+                "request_type": "reschedule_request",
+                "booking_reference": kwargs.get("booking_reference"),
+                "preferred_date": kwargs.get("preferred_date"),
+                "preferred_time": kwargs.get("preferred_time"),
+                "message": "Reschedule request queued.",
+            }
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.queue_portal_booking_request",
+            _queue_portal_booking_request,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "callback_query": {
+                        "id": "cb-rsch-3",
+                        "from": {"id": 999, "first_name": "Long"},
+                        "data": "reschedule:confirm:v1-rsch001:2026-04-29:18:00",
+                        "message": {
+                            "message_id": 83,
+                            "chat": {"id": 123456, "type": "private"},
+                            "text": "Pick a time",
+                        },
+                    }
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "reschedule_confirmed")
+        self.assertEqual(len(captured_queue_calls), 1)
+        self.assertEqual(captured_queue_calls[0]["booking_reference"], "v1-rsch001")
+        self.assertEqual(captured_queue_calls[0]["preferred_date"], "2026-04-29")
+        self.assertEqual(captured_queue_calls[0]["preferred_time"], "18:00")
+        self.assertEqual(captured_queue_calls[0]["request_type"], "reschedule_request")
+        body = communication_service.sent[0]["body"]
+        self.assertIn("v1-rsch001", body)
+        self.assertIn("2026-04-29 18:00", body)
+
+    def test_telegram_reschedule_picker_localized_for_vietnamese(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "callback_query": {
+                        "id": "cb-rsch-vi",
+                        "from": {"id": 999, "first_name": "Long", "language_code": "vi"},
+                        "data": "reschedule:date:v1-rsch002",
+                        "message": {
+                            "message_id": 84,
+                            "chat": {"id": 123456, "type": "private"},
+                            "text": "Pending menu",
+                        },
+                    }
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["metadata"]["locale"], "vi")
+        body = communication_service.sent[0]["body"]
+        self.assertIn("Chọn ngày mới", body)
+
+    def test_telegram_pending_booking_change_time_uses_reschedule_callback(self):
+        controls = MessagingAutomationService._booking_care_reply_controls(
+            "v1-pending999",
+            new_booking_query="Chess class",
+        )
+        keyboard = controls["telegram_reply_markup"]["inline_keyboard"]
+        change_time_button = keyboard[3][0]
+        self.assertEqual(change_time_button["text"], "Change time")
+        self.assertEqual(
+            change_time_button["callback_data"], "reschedule:date:v1-pending999"
+        )
+
+    def test_telegram_reschedule_callback_parser_handles_time_with_colon(self):
+        parsed = MessagingAutomationService._parse_reschedule_picker_callback(
+            "reschedule:confirm:v1-abc:2026-04-29:18:00"
+        )
+        self.assertEqual(parsed, ("confirm", "v1-abc", "2026-04-29", "18:00"))
