@@ -56,6 +56,9 @@ from schemas import (
     AdminMessagingActionResponse,
     AdminMessagingDetailResponse,
     AdminMessagingListResponse,
+    AdminClaimHandoffRequest,
+    AdminClaimHandoffResponse,
+    AdminPendingHandoffsResponse,
     AdminPortalSupportActionRequest,
     AdminPortalSupportActionResponse,
     AdminBookingDetailResponse,
@@ -122,6 +125,8 @@ from service_layer.admin_messaging_service import (
     apply_admin_message_action,
     build_admin_message_detail_payload,
     build_admin_messaging_payload,
+    build_admin_pending_handoffs_payload,
+    claim_pending_handoff,
 )
 from service_layer.communication_service import CommunicationService
 from service_layer.discord_bot_service import DiscordBotService
@@ -3540,6 +3545,58 @@ async def admin_messaging(
         payload = await build_admin_messaging_payload(session, limit=limit)
 
     return AdminMessagingListResponse(**payload)
+
+
+@api.get("/admin/messaging/handoffs", response_model=AdminPendingHandoffsResponse)
+async def admin_messaging_pending_handoffs(
+    request: Request,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+    limit: int = 60,
+    hours: int = 72,
+) -> AdminPendingHandoffsResponse:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    async with get_session(request.app.state.session_factory) as session:
+        payload = await build_admin_pending_handoffs_payload(session, limit=limit, hours=hours)
+
+    return AdminPendingHandoffsResponse(**payload)
+
+
+@api.post(
+    "/admin/messaging/handoffs/{conversation_id}/claim",
+    response_model=AdminClaimHandoffResponse,
+)
+async def admin_messaging_claim_handoff(
+    conversation_id: str,
+    request: Request,
+    payload: AdminClaimHandoffRequest | None = None,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+    channel: str = "telegram",
+) -> AdminClaimHandoffResponse:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+
+    admin_username = (
+        str(getattr(request.app.state.settings, "admin_username", "") or "").strip()
+        or "admin"
+    )
+
+    async with get_session(request.app.state.session_factory) as session:
+        result = await claim_pending_handoff(
+            session,
+            conversation_id=conversation_id,
+            channel=channel,
+            claimed_by=admin_username,
+        )
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No messaging session found for {channel}:{conversation_id}.",
+        )
+
+    return AdminClaimHandoffResponse(status="ok", **result)
 
 
 @api.get("/admin/messaging/{source_kind}/{item_id}", response_model=AdminMessagingDetailResponse)

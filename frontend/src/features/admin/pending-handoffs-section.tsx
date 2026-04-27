@@ -11,6 +11,8 @@ type PendingHandoffsSectionProps = {
   loading?: boolean;
   errorMessage?: string | null;
   onRefresh?: () => void;
+  onClaim?: (conversationId: string) => void;
+  claimingConversationId?: string | null;
 };
 
 const STATUS_LABELS: Record<string, string> = {
@@ -44,6 +46,8 @@ export function PendingHandoffsSection({
   loading,
   errorMessage,
   onRefresh,
+  onClaim,
+  claimingConversationId,
 }: PendingHandoffsSectionProps) {
   const items = useMemo(() => data?.items ?? [], [data?.items]);
   const pendingCount = data?.pending_count ?? 0;
@@ -129,16 +133,39 @@ export function PendingHandoffsSection({
                     </p>
                   ) : null}
                 </div>
-                {telegramDeepLink ? (
-                  <a
-                    href={telegramDeepLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="rounded-full bg-slate-900 px-4 py-1.5 text-sm font-semibold text-white hover:bg-slate-700"
-                  >
-                    Open in Telegram
-                  </a>
-                ) : null}
+                <div className="flex flex-col items-stretch gap-2 md:flex-row md:items-center">
+                  {telegramDeepLink ? (
+                    <a
+                      href={telegramDeepLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="rounded-full bg-slate-900 px-4 py-1.5 text-sm font-semibold text-white hover:bg-slate-700"
+                    >
+                      Open in Telegram
+                    </a>
+                  ) : null}
+                  {onClaim && item.conversation_id ? (
+                    <button
+                      type="button"
+                      onClick={() => onClaim(item.conversation_id as string)}
+                      disabled={
+                        claimingConversationId === item.conversation_id || item.claim_active
+                      }
+                      title={
+                        item.claim_active
+                          ? `Already claimed${item.claimed_by ? ` by ${item.claimed_by}` : ''}`
+                          : 'Claim this conversation. The bot will pause auto-replies for 4h.'
+                      }
+                      className="rounded-full border border-emerald-600 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {claimingConversationId === item.conversation_id
+                        ? 'Claiming…'
+                        : item.claim_active
+                          ? `Claimed${item.claimed_by ? ` · ${item.claimed_by}` : ''}`
+                          : 'Claim'}
+                    </button>
+                  ) : null}
+                </div>
               </div>
             </li>
           );

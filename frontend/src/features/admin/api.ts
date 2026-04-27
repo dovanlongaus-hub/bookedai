@@ -12,6 +12,7 @@ import {
   AdminMessagingDetailResponse,
   AdminMessagingListResponse,
   AdminOverviewResponse,
+  AdminClaimHandoffResponse,
   AdminPendingHandoffsResponse,
   AdminPortalSupportActionResponse,
   AdminServiceCatalogQualityResponse,
@@ -229,6 +230,36 @@ export async function fetchAdminPendingHandoffs(
     throw new Error(parseErrorMessage(payload, 'Could not load pending handoffs.'));
   }
   return payload as AdminPendingHandoffsResponse;
+}
+
+export async function claimAdminPendingHandoff(
+  apiBaseUrl: string,
+  sessionToken: string,
+  conversationId: string,
+  note?: string | null,
+) {
+  const response = await fetch(
+    `${apiBaseUrl}/admin/messaging/handoffs/${encodeURIComponent(conversationId)}/claim`,
+    {
+      method: 'POST',
+      headers: {
+        ...createAdminAuthHeaders(sessionToken),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ note: note ?? null }),
+    },
+  );
+  const payload = (await parseJsonOrNull(response)) as
+    | AdminClaimHandoffResponse
+    | { detail?: string }
+    | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not claim this handoff.'));
+  }
+  return payload as AdminClaimHandoffResponse;
 }
 
 export async function fetchAdminCustomerAgentHealth(

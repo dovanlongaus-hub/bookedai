@@ -7,6 +7,7 @@ from schemas import (
     AdminMessagingActionResponse,
     AdminMessagingDetailResponse,
     AdminMessagingListResponse,
+    AdminClaimHandoffResponse,
     AdminPendingHandoffsResponse,
     AdminPortalSupportActionResponse,
     AdminBookingsResponse,
@@ -85,6 +86,12 @@ router.add_api_route(
     handlers.admin_messaging_pending_handoffs,
     methods=["GET"],
     response_model=AdminPendingHandoffsResponse,
+)
+router.add_api_route(
+    "/admin/messaging/handoffs/{conversation_id}/claim",
+    handlers.admin_messaging_claim_handoff,
+    methods=["POST"],
+    response_model=AdminClaimHandoffResponse,
 )
 router.add_api_route(
     "/admin/messaging/{source_kind}/{item_id}",

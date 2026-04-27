@@ -1040,7 +1040,7 @@ class TelegramWebhookRoutesTestCase(TestCase):
                     "update_id": 5001,
                     "message": {
                         "message_id": 21,
-                        "from": {"id": 999, "first_name": "Long", "language_code": "vi"},
+                        "from": {"id": 999, "first_name": "Long", "language_code": "en-AU"},
                         "chat": {"id": 123456, "type": "private"},
                         "text": "/start",
                     },
@@ -1060,7 +1060,7 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(communication_service.sent[0]["parse_mode"], "HTML")
         self.assertEqual(captured_calls[0]["ai_intent"], "welcome")
         self.assertEqual(
-            captured_calls[0]["metadata"]["telegram_language_code"], "vi"
+            captured_calls[0]["metadata"]["telegram_language_code"], "en-au"
         )
         self.assertEqual(
             captured_calls[0]["metadata"]["start_command_kind"], "welcome"
@@ -1489,3 +1489,80 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(captured_calls[0]["ai_intent"], "support_handoff")
         self.assertEqual(len(communication_service.sent), 1)
         self.assertIn("flagged this conversation", communication_service.sent[0]["body"])
+
+    def test_handoff_claimed_active_suppresses_normal_bot_branches(self):
+        from datetime import datetime, UTC
+
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _fake_load_channel_session_state(*_args, **_kwargs):
+            return {
+                "service_search_query": None,
+                "service_options": [],
+                "reply_controls": {},
+                "customer_identity": {},
+                "session_metadata": {
+                    "handoff_claimed_at": datetime.now(UTC).isoformat(),
+                    "handoff_claimed_by": "admin",
+                },
+                "tenant_id": None,
+            }
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.MessagingAutomationService._load_channel_session_state",
+            _fake_load_channel_session_state,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 9000,
+                    "message": {
+                        "message_id": 90,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/cancel v1-abc123",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "handoff_claimed_active")
+        self.assertTrue(captured_calls[0]["metadata"].get("human_handoff_active"))
+        self.assertEqual(
+            captured_calls[0]["metadata"].get("human_handoff_claimed_by"), "admin"
+        )
+        sent = communication_service.sent[0]
+        self.assertIsNone(sent.get("reply_markup"))
+        self.assertIn("BookedAI teammate", sent["body"])
+
+    def test_handoff_claimed_stale_does_not_suppress_after_ttl(self):
+        from datetime import datetime, timedelta, UTC
+
+        from service_layer.messaging_automation_service import MessagingAutomationService
+
+        stale = (
+            datetime.now(UTC)
+            - timedelta(seconds=MessagingAutomationService.HANDOFF_CLAIMED_TTL_SECONDS + 60)
+        ).isoformat()
+
+        self.assertFalse(
+            MessagingAutomationService._is_handoff_claimed({"handoff_claimed_at": stale})
+        )
+        self.assertTrue(
+            MessagingAutomationService._is_handoff_claimed(
+                {"handoff_claimed_at": datetime.now(UTC).isoformat()}
+            )
+        )
+        self.assertFalse(MessagingAutomationService._is_handoff_claimed({}))
+        self.assertFalse(MessagingAutomationService._is_handoff_claimed(None))
