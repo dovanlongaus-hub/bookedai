@@ -1,81 +1,117 @@
+import Image from "next/image";
+
 import { FooterSection } from "@/components/sections/footer-section";
 import { HeroSection } from "@/components/sections/hero-section";
 import { FadeIn } from "@/components/ui/motion";
 
 const quickSignals = [
-  "Search-first homepage",
-  "Booking-focused path",
+  "Capture more qualified enquiries",
+  "Convert faster to booking",
+  "Automate follow-up, CRM, and customer care",
 ] as const;
 
 const workflowSteps = [
   {
     step: "01",
-    title: "Start with a simple search",
-    body: "Customers often arrive with only a location or a broad need. The page should help them begin with minimal effort.",
+    title: "Capture demand wherever it starts",
+    body: "Bring website enquiries, calls, chat, and search demand into one guided revenue flow.",
   },
   {
     step: "02",
-    title: "Clarify the next step",
-    body: "Search, qualification, and clearer prompts make the path easier to understand.",
+    title: "Qualify and guide instantly",
+    body: "BookedAI.au guides customers to the right service and reduces back-and-forth before booking.",
   },
   {
     step: "03",
-    title: "Move toward booking",
-    body: "The experience supports call, booking, payment, or follow-up while the customer is still engaged.",
+    title: "Automate what happens after booking",
+    body: "Keep the journey moving with post-booking care, follow-up, CRM sync, and email continuity.",
   },
 ] as const;
 
 const featureGroups = [
   {
-    title: "What the homepage now emphasizes",
-    items: ["Location-aware search", "Industry suggestions", "Simple first action", "Calmer visual structure"],
+    title: "BookedAI.au gives your team one clearer conversion path",
+    items: [
+      "Capture demand from website, calls, chat, and search",
+      "Guide customers to the right service faster",
+      "Reduce drop-off before booking or payment",
+      "See clearer visibility into conversion blockers",
+    ],
+  },
+  {
+    title: "Automation continues after the booking",
+    items: [
+      "Trigger automated customer care after booking",
+      "Keep CRM records, lifecycle status, and customer context in sync",
+      "Send confirmation and continuity emails with the right booking context",
+      "Support recovery flows without extra admin overhead",
+    ],
   },
 ] as const;
 
-const industries = [
-  "Plumbers",
-  "Electricians",
-  "Restaurants",
-  "Hairdressers",
-  "Dentists",
-  "Mechanics",
-  "Builders",
-  "Cafes",
+const proofStats = [
+  { label: "Channels connected", value: "Search, web, calls, chat" },
+  { label: "What it covers", value: "Enquiry, booking, follow-up, care" },
+  { label: "What stays synced", value: "CRM, email, lifecycle context" },
+] as const;
+
+const trustBlocks = [
+  {
+    title: "Capture demand faster",
+    body: "Turn website visitors, calls, and chats into structured enquiries your team can act on fast.",
+  },
+  {
+    title: "Convert with less drop-off",
+    body: "Guide customers to the right service, booking step, or payment path while intent is still high.",
+  },
+  {
+    title: "Keep care moving automatically",
+    body: "Run post-booking care, follow-up, CRM sync, and lifecycle email without adding admin burden.",
+  },
+] as const;
+
+const proofHighlights = [
+  "A real product flow that starts on the homepage and continues in product",
+  "Automation built around booking, follow-up, customer care, CRM, and lifecycle email",
+  "Built for business owners who need commercial visibility, not just a prettier front end",
 ] as const;
 
 const pricingCards = [
   {
     name: "Starter",
-    price: "Freemium entry",
-    body: "For service businesses validating a cleaner search-to-booking flow.",
-    points: ["Homepage search surface", "Lead capture", "Basic booking routing", "Simple visibility layer"],
+    audience: "Best for single-location teams or early rollout",
+    price: "Get started free",
+    body: "For service businesses that need cleaner demand capture, booking guidance, and clear visibility.",
+    points: ["Lead capture basics", "Homepage conversion layer", "Simple booking routing", "Core visibility into enquiries"],
   },
   {
     name: "Growth",
-    price: "Setup + success model",
-    body: "For businesses ready to connect search, website, and follow-up into a stronger conversion path.",
-    points: ["Everything in Starter", "Multi-channel conversion flow", "Booking and payment handoff", "Better operator insight"],
+    audience: "Best for teams ready to automate more of the booking journey",
+    price: "Built to convert",
+    body: "For teams ready to connect search, website, booking, and follow-up into a stronger booking engine.",
+    points: ["Everything in Starter", "Multi-channel conversion flow", "Booking and payment handoff", "Automated follow-up and recovery support"],
   },
   {
     name: "Scale",
-    price: "Custom expansion",
-    body: "For teams that want broader automation, stronger recovery, and deeper commercial visibility.",
-    points: ["Advanced follow-up", "Deeper integration support", "Revenue workflow tailoring", "Priority optimization"],
+    audience: "Best for teams that need deeper workflow and lifecycle orchestration",
+    price: "Custom rollout",
+    body: "For teams that want deeper automation across customer care, CRM, lifecycle email, and a tailored revenue workflow.",
+    points: ["Advanced follow-up automation", "CRM and lifecycle workflow depth", "Workflow tailoring", "Priority optimization and rollout support"],
   },
 ] as const;
 
 const faqs = [
   {
-    question: "Is this homepage now meant to feel more like search than a pitch deck?",
-    answer: "Yes. The structure is lighter, clearer, and more action-led so users can understand the product quickly and start interacting faster.",
+    question: "Who is BookedAI.au for?",
+    answer: "BookedAI.au is built for service businesses that rely on enquiries, calls, bookings, and follow-up to grow revenue, especially local teams with fragmented demand.",
   },
   {
-    question: "Does BookedAI only handle chat?",
-    answer: "No. The product direction covers search demand, website enquiries, calls, booking flow, follow-up, and commercial visibility.",
+    question: "What does BookedAI.au improve first?",
+    answer: "Most teams start by improving the front of the funnel: clearer enquiry capture, faster qualification, and less drop-off before booking or payment. Then BookedAI.au extends that flow into post-booking care, follow-up, CRM sync, and lifecycle email.",
   },
   {
-    question: "Can this still support local service SMEs?",
-    answer: "Yes. The homepage now presents that value in a cleaner marketplace-style format that works well for local service discovery.",
+    question: "Do I need to replace my whole stack?",
+    answer: "No. BookedAI.au strengthens the path from demand to booking first, then expands into deeper workflow, customer care, follow-up, CRM sync, and operational visibility over time.",
   },
 ] as const;
 
@@ -84,18 +120,18 @@ export default function Page() {
     <main className="min-h-screen overflow-x-hidden bg-[#f8fafc] text-slate-900">
       <HeroSection />
 
-      <section className="relative z-10 -mt-8 pb-12">
+      <section className="relative z-10 -mt-10 pb-12">
         <div className="container-brand">
           <FadeIn>
-            <div className="rounded-[2rem] border border-slate-200 bg-white px-6 py-5 shadow-[0_10px_26px_rgba(15,23,42,0.04)] sm:px-8">
+            <div className="rounded-[2.25rem] border border-slate-200/90 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,250,252,0.96))] px-6 py-5 shadow-[0_20px_50px_rgba(15,23,42,0.08)] backdrop-blur sm:px-8">
               <div className="flex flex-wrap items-center gap-3">
                 <span className="text-xs font-semibold uppercase tracking-[0.2em] text-slate-500">
-                  Quick signals
+                  What matters most
                 </span>
                 {quickSignals.map((item) => (
                   <span
                     key={item}
-                    className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600"
+                    className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-[0_6px_14px_rgba(15,23,42,0.04)]"
                   >
                     {item}
                   </span>
@@ -103,6 +139,22 @@ export default function Page() {
               </div>
             </div>
           </FadeIn>
+        </div>
+      </section>
+
+      <section className="pb-8">
+        <div className="container-brand">
+          <div className="grid gap-6 lg:grid-cols-3">
+            {trustBlocks.map((item, index) => (
+              <FadeIn key={item.title} delay={0.04 * index}>
+                <article className="h-full rounded-[2rem] border border-slate-200/90 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-8 shadow-[0_14px_34px_rgba(15,23,42,0.05)] transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1">
+                  <div className="text-sm font-semibold uppercase tracking-[0.18em] text-[#3563f6]">Why it matters</div>
+                  <h3 className="mt-5 text-[1.45rem] font-medium tracking-tight text-slate-900">{item.title}</h3>
+                  <p className="mt-4 text-[15px] leading-8 text-slate-600">{item.body}</p>
+                </article>
+              </FadeIn>
+            ))}
+          </div>
         </div>
       </section>
 
@@ -114,10 +166,10 @@ export default function Page() {
                 How It Works
               </div>
               <h2 className="mt-4 text-4xl font-medium tracking-tight text-slate-900 sm:text-[3.25rem]">
-                A quieter structure for discovery and action
+                A clearer path from first enquiry to confirmed booking.
               </h2>
               <p className="mt-6 text-[17px] leading-8 text-slate-600">
-                One central search action and lighter supporting sections make the page easier to scan.
+                BookedAI.au reduces friction at the front of the funnel, qualifies demand faster, and keeps the journey moving before and after booking.
               </p>
             </div>
           </FadeIn>
@@ -125,7 +177,7 @@ export default function Page() {
           <div className="mt-20 grid gap-6 lg:grid-cols-3">
             {workflowSteps.map((item, index) => (
               <FadeIn key={item.step} delay={0.05 * index}>
-                <article className="h-full rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_8px_22px_rgba(15,23,42,0.035)]">
+                <article className="h-full rounded-[2rem] border border-slate-200/90 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-8 shadow-[0_14px_34px_rgba(15,23,42,0.05)] transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1">
                   <div className="text-sm font-semibold text-[#3563f6]">{item.step}</div>
                   <h3 className="mt-6 text-[1.55rem] font-medium tracking-tight text-slate-900">{item.title}</h3>
                   <p className="mt-4 text-[15px] leading-8 text-slate-600">{item.body}</p>
@@ -137,29 +189,61 @@ export default function Page() {
       </section>
 
       <section id="dashboard" className="bg-white py-32 sm:py-36">
+        <div className="container-brand pb-14">
+          <FadeIn>
+            <div className="overflow-hidden rounded-[2.5rem] border border-slate-200/60 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_28%),linear-gradient(180deg,#081121_0%,#0f172a_100%)] text-white shadow-[0_24px_60px_rgba(15,23,42,0.18)]">
+              <div className="grid gap-0 lg:grid-cols-[1.05fr_0.95fr] lg:items-stretch">
+                <div className="flex flex-col justify-center px-8 py-10 sm:px-10 lg:px-12 lg:py-12">
+                  <div className="text-xs font-semibold uppercase tracking-[0.24em] text-sky-200">Product proof</div>
+                  <h2 className="mt-4 max-w-2xl text-3xl font-medium tracking-tight text-white sm:text-[2.4rem]">
+                    One automation layer from enquiry to booking, follow-up, CRM, and customer care.
+                  </h2>
+                  <p className="mt-5 max-w-2xl text-[15px] leading-8 text-slate-300 sm:text-[16px]">
+                    BookedAI.au is built to keep the customer journey moving after the first click, with continuity across care, lifecycle communication, and revenue follow-through.
+                  </p>
+                  <ul className="mt-7 space-y-3">
+                    {proofHighlights.map((item) => (
+                      <li key={item} className="flex items-start gap-3 text-[15px] leading-7 text-slate-200">
+                        <span className="mt-2 h-2 w-2 rounded-full bg-sky-300" />
+                        <span>{item}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+                <div className="relative min-h-[320px] border-t border-white/10 lg:min-h-[100%] lg:border-l lg:border-t-0">
+                  <Image
+                    src="/branding/bookedai-homepage-image.webp"
+                    alt="BookedAI.au product proof preview"
+                    fill
+                    className="object-cover object-center"
+                    sizes="(max-width: 1024px) 100vw, 48vw"
+                  />
+                  <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(15,23,42,0.02),rgba(15,23,42,0.36))]" />
+                </div>
+              </div>
+            </div>
+          </FadeIn>
+        </div>
         <div className="container-brand">
           <div className="grid gap-12 xl:grid-cols-[0.98fr_1.02fr] xl:items-start">
             <FadeIn>
               <div className="max-w-xl">
                 <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                  Product Direction
+                  Why BookedAI.au converts better
                 </div>
                 <h2 className="mt-4 text-4xl font-medium tracking-tight text-slate-900 sm:text-[3.25rem]">
-                  Homepage first
+                  Better demand capture, less revenue leakage, stronger post-booking continuity.
                 </h2>
                 <p className="mt-6 text-[17px] leading-8 text-slate-600">
-                  Instead of overwhelming visitors with too much story up front, the page now prioritizes
-                  discovery, intent capture, and clearer next steps.
+                  Instead of treating every enquiry or booking as a disconnected event, BookedAI.au guides the next step and keeps CRM, email, and customer-care continuity aligned.
                 </p>
-                <div className="mt-12 rounded-[1.75rem] bg-[#eef3ff] p-7">
-                  <div className="text-sm font-semibold text-[#3563f6]">Popular industries</div>
-                  <div className="mt-4 flex flex-wrap gap-3">
-                    {industries.map((item) => (
-                      <span key={item} className="rounded-full bg-white px-4 py-2 text-sm text-slate-600 shadow-sm">
-                        {item}
-                      </span>
-                    ))}
-                  </div>
+                <div className="mt-12 grid gap-4 rounded-[1.75rem] bg-[#eef3ff] p-7 sm:grid-cols-3">
+                  {proofStats.map((item) => (
+                    <div key={item.label} className="rounded-[1.25rem] border border-slate-200/80 bg-white px-5 py-5 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-400">{item.label}</div>
+                      <div className="mt-3 text-lg font-medium tracking-tight text-slate-900">{item.value}</div>
+                    </div>
+                  ))}
                 </div>
               </div>
             </FadeIn>
@@ -193,13 +277,13 @@ export default function Page() {
           <FadeIn>
             <div className="mx-auto max-w-2xl text-center">
               <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-                Pricing Path
+                Pricing
               </div>
               <h2 className="mt-4 text-4xl font-medium tracking-tight text-slate-900 sm:text-[3.25rem]">
-                Simple packages with room to grow
+                Plans for each stage of growth.
               </h2>
               <p className="mt-6 text-[17px] leading-8 text-slate-600">
-                Pricing stays visible and easy to compare, without a heavier landing-page treatment.
+                Start with a lighter conversion layer, then expand into booking, payment, post-booking care, follow-up, CRM sync, and lifecycle email as demand grows.
               </p>
             </div>
           </FadeIn>
@@ -207,8 +291,9 @@ export default function Page() {
           <div className="mt-20 grid gap-6 xl:grid-cols-3">
             {pricingCards.map((card, index) => (
               <FadeIn key={card.name} delay={0.04 * index}>
-                <article className="h-full rounded-[2rem] border border-slate-200 bg-white p-8 shadow-[0_8px_22px_rgba(15,23,42,0.035)]">
+                <article className="h-full rounded-[2rem] border border-slate-200/90 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] p-8 shadow-[0_14px_34px_rgba(15,23,42,0.05)] transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1">
                   <div className="text-sm font-semibold uppercase tracking-[0.18em] text-slate-500">{card.name}</div>
+                  <div className="mt-3 text-sm font-medium text-[#3563f6]">{card.audience}</div>
                   <div className="mt-4 text-3xl font-medium tracking-tight text-slate-900">{card.price}</div>
                   <p className="mt-4 text-[15px] leading-8 text-slate-600">{card.body}</p>
                   <ul className="mt-6 space-y-3">
@@ -234,7 +319,7 @@ export default function Page() {
                 FAQ
               </div>
               <h2 className="mt-4 text-4xl font-medium tracking-tight text-slate-900 sm:text-[3.25rem]">
-                Common questions
+                Questions teams ask most
               </h2>
             </div>
           </FadeIn>
@@ -242,7 +327,7 @@ export default function Page() {
           <div className="mt-20 grid gap-6 lg:grid-cols-2">
             {faqs.map((item, index) => (
               <FadeIn key={item.question} delay={0.04 * index}>
-                <article className="rounded-[2rem] border border-slate-200 bg-[#fcfdff] p-8 shadow-[0_8px_20px_rgba(15,23,42,0.03)]">
+                <article className="rounded-[2rem] border border-slate-200/90 bg-[linear-gradient(180deg,#ffffff_0%,#fbfdff_100%)] p-8 shadow-[0_12px_26px_rgba(15,23,42,0.04)] transition-transform duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] hover:-translate-y-1">
                   <h3 className="text-xl font-medium tracking-tight text-slate-900">{item.question}</h3>
                   <p className="mt-4 text-[15px] leading-8 text-slate-600">{item.answer}</p>
                 </article>
@@ -255,23 +340,28 @@ export default function Page() {
       <section className="py-16 sm:py-20">
         <div className="container-brand">
           <FadeIn>
-            <div className="rounded-[2.4rem] border border-slate-200 bg-white px-6 py-12 text-center shadow-[0_10px_28px_rgba(15,23,42,0.035)] sm:px-10">
+            <div className="rounded-[2.6rem] border border-slate-200/90 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-6 py-12 text-center shadow-[0_18px_46px_rgba(15,23,42,0.06)] sm:px-10">
               <div className="text-xs font-semibold uppercase tracking-[0.24em] text-[#3563f6]">
-                Next Step
+                Ready to move faster?
               </div>
               <h2 className="mx-auto mt-4 max-w-3xl text-4xl font-medium tracking-tight text-slate-900 sm:text-[3.1rem]">
-                Keep the homepage simple
+                Turn more demand into booked revenue.
               </h2>
               <p className="mx-auto mt-6 max-w-2xl text-[17px] leading-8 text-slate-600">
-                This version keeps the logo and navigation, while moving the rest of the homepage toward
-                a cleaner, search-oriented style.
+                If your team is losing momentum between enquiry, booking, follow-up, and customer care, BookedAI.au gives you a cleaner automated path forward.
               </p>
               <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
                 <a
-                  href="#hero"
+                  href="https://product.bookedai.au/?source=homepage-cta"
                   className="inline-flex items-center justify-center rounded-full bg-[#3563f6] px-6 py-3 text-sm font-semibold text-white transition hover:brightness-95"
                 >
-                  Back To Search
+                  Start with BookedAI.au
+                </a>
+                <a
+                  href="#pricing"
+                  className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  View pricing
                 </a>
               </div>
             </div>

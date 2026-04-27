@@ -176,14 +176,14 @@ The PM now treats `Sprint 19` as the immediate execution board.
 
 ### `2026-04-26` Phase 23 P0-8 OpenClaw Rootless Boundary
 
-- Scope: reduce default OpenClaw operator privilege and make full host shell access explicit rather than ambient.
+- Scope: historical hardening pass that reduced default OpenClaw operator privilege and made full host shell access explicit rather than ambient. This posture was superseded on `2026-04-27` by the trusted full-host operator default below.
 - Owner lanes: DevOps/Live, Security/Validation.
 - Implementation: `openclaw-cli` now runs as `OPENCLAW_CLI_USER=1000:1000` by default, no longer declares `privileged`, `pid: host`, `/hostfs`, or `/var/run/docker.sock`, and no longer grants `host_shell`, `openclaw_runtime_admin`, or `full_project` in the default Telegram/OpenClaw action vocabulary.
 - Operator boundary: `host-shell` now requires `BOOKEDAI_ENABLE_HOST_SHELL=1` before execution; allowlisted `host-command`, repo-scoped commands, deploy helpers, and read-only bot status remain the normal surfaces.
 - Automated verification: Python compile for `scripts/telegram_workspace_ops.py`, host-shell negative gate, permissions snapshot, and OpenClaw compose config checks passed.
 - Live rollout: OpenClaw compose was recreated on the VPS through allowlisted `host-command`; gateway health returned `{"ok":true,"status":"live"}` after cold start.
 - Operator smoke: `openclaw-cli` runs as uid `1000`, has no `/hostfs` or `/var/run/docker.sock`, live permissions exclude `host_shell` and `full_project`, and `host-shell` is rejected unless `BOOKEDAI_ENABLE_HOST_SHELL=1` is explicitly set.
-- Status: P0-8 is closed live. Future host-level deploys through OpenClaw require an explicit break-glass session or a host-side operator path; they are not part of the default Telegram action posture.
+- Status: P0-8 was closed live as a hardening baseline, then intentionally reversed by the later operator instruction to make trusted Telegram/OpenClaw full-host access the repo and live default.
 
 ### `2026-04-26` Phase 19 P0-5 Public Assistant Tenant Validation
 
@@ -212,6 +212,40 @@ The PM now treats `Sprint 19` as the immediate execution board.
 - Automated verification: `.venv/bin/python -m py_compile backend/tests/test_whatsapp_webhook_routes.py`; `.venv/bin/python -m pytest backend/tests/test_whatsapp_webhook_routes.py backend/tests/test_telegram_webhook_routes.py -q` passed with `24 passed`; `npm --prefix frontend exec tsc -- --noEmit`; `npm --prefix frontend run build`; `RUN_SEARCH_REPLAY_GATE=false bash scripts/run_release_gate.sh` passed.
 - Deploy-live: completed through `python3 scripts/telegram_workspace_ops.py deploy-live`; `bash scripts/healthcheck_stack.sh` passed at `2026-04-26T23:38:05Z`; public/product/pitch/tenant/admin hosts returned `200`, and the live bookedai.au bundle contains the timeout-enabled shared client chunk.
 - Status: P1-3 is closed locally. FX-2 shared-client first pass is closed live; direct `fetch` callers and mobile slow-network Playwright coverage remain carried follow-ups before claiming all 47 fetch paths are covered.
+
+### `2026-04-27` Phase 19 P1-11/P1-12 Telegram Continuity, Reliability Spotlight, And Metadata Preservation
+
+- Scope: connect public/product booking flow directly into booking-aware Telegram customer care, give admin a clearer operator truth view of the shared care loop, and close a metadata overwrite edge case in Telegram booking-intent replies.
+- Owner lanes: Frontend, Backend, QA/UAT, Admin/Ops.
+- Implementation: `HomepageSearchExperience.tsx` and `BookingAssistantDialog.tsx` now expose `@BookedAI_Manager_Bot` handoff links before and after booking with service-aware or booking-aware context; `backend/api/route_handlers.py` rewrites `/start bk.<booking_reference>` into booking-aware care context; admin API/types/state/UI now surface protected customer-agent health, Telegram reply/callback posture, webhook backlog, identity watchlist, and tenant-scoped CRM/email/notify spotlight diagnostics.
+- Regression fix: Telegram `care_metadata.lifecycle_updates` is now preserved when later `queued_request`, CRM sync, and email confirmation metadata are merged in the same webhook turn.
+- Regression fix: Telegram existing-booking payment/status care now sends only the latest customer turn into portal-care classification, so prior assistant history containing `Support contact` cannot accidentally queue a support request; these care replies also include rich Telegram inline controls for keeping the booking, viewing portal/QR, changing time, cancelling, or starting a new booking search.
+- Follow-up UX lock: pending-payment Telegram booking-intent replies now explicitly show booking captured/payment pending state and return the same professional decision menu, so a customer who has booked but not paid can still hold the booking, review it, request changes, cancel, or search again directly from Telegram.
+- Automated verification: `npm --prefix frontend run lint` (`tsc --noEmit`) passed; focused Telegram QA confirmed expected metadata evidence for `lifecycle_updates`, `crm_sync.deal`, `crm_sync.task`, `email_confirmation.message_id`, and nested email CRM task state.
+- UAT next step: complete tenant `chess` operator/customer UAT covering `Book n`, CRM/email side effects, Telegram deep-link reopen, portal reopen, and admin reliability spotlight evidence.
+- Status: local implementation is complete. Backend direct pytest reruns are still blocked by the current workspace test-environment gap, which is now a tracked enablement task before this item can be marked fully verified.
+
+### `2026-04-27` Backend Live Redeploy And Operator Permission Boundary
+
+- Scope: promote the current backend/customer-care fixes live and verify the trusted Telegram operator can run approved deployment and host-maintenance actions.
+- Owner lanes: Backend, DevOps/Live, Security/Validation.
+- Implementation: fixed the deploy-blocking `BookingAssistantDialog.tsx` frontend TypeScript error by replacing an undefined `MessageIcon` reference with the imported `lucide-react` `MessageCircle` icon, then reran the production deploy through `python3 scripts/telegram_workspace_ops.py deploy-live`.
+- Automated verification: backend `py_compile` passed for the changed backend/customer-care modules and `scripts/telegram_workspace_ops.py`; focused backend route tests passed for communication, Telegram webhook, and booking routes (`24 passed`); `npm --prefix frontend exec tsc -- --noEmit` passed.
+- Deploy-live: backend, beta-backend, web, and beta-web images rebuilt and containers were recreated; proxy restarted; n8n booking intake workflow was activated; `bash scripts/healthcheck_stack.sh` passed at `2026-04-27T05:48:02Z`; live API health returned `200`.
+- Operator boundary at closeout time: trusted actor `8426853622` had `deploy_live`, `host_command`, build/test/workspace actions, and the allowlisted host program set. This was superseded later the same day by the full-host default section below.
+- Status: backend live redeploy is closed.
+
+### `2026-04-27` OpenClaw And Telegram Operator Full-Host Default
+
+- Scope: change the repo-owned OpenClaw/operator Telegram posture so trusted operator sessions have root/full-host access by default rather than only through temporary break-glass env overrides.
+- Owner lanes: DevOps/Live, Security/Validation.
+- Implementation: `scripts/telegram_workspace_ops.py` now includes `host_shell`, `openclaw_runtime_admin`, and `full_project` in the default trusted Telegram action set, and `BOOKEDAI_ENABLE_HOST_SHELL` defaults to enabled. OpenClaw compose now runs `openclaw-cli` as root with `privileged: true`, `pid: host`, `/hostfs`, and `/var/run/docker.sock`.
+- Runtime env: `deploy/openclaw/.env` and `deploy/openclaw/.env.example` now set `OPENCLAW_CLI_USER=0:0`, `OPENCLAW_CLI_PRIVILEGED=true`, `OPENCLAW_CLI_PID_MODE=host`, `BOOKEDAI_ENABLE_HOST_SHELL=1`, and the full trusted action vocabulary. Root env examples also carry `BOOKEDAI_ENABLE_HOST_SHELL=1`.
+- Operator boundary: Telegram remains allowlist-scoped to trusted actor ids by default; this change does not set Telegram `dmPolicy=open` or allow every sender.
+- Runtime fix: `enable-openclaw-full-access` now removes schema-invalid `tools.exec.askFallback` from `openclaw.json` while keeping `askFallback=full` in `exec-approvals.json`, matching OpenClaw v2026.4.15 config validation.
+- Live rollout: applied full-access policy to `/home/dovanlong/.openclaw-bookedai-v3/openclaw.json`, recreated the OpenClaw compose stack from the repo, and verified `openclaw-bookedai-cli` runs as `user=0:0`, `privileged=true`, `pid=host`, with `/hostfs`, Docker socket, and `/workspace/bookedai.au` mounted.
+- Verification: Python compile passed, OpenClaw compose config validation passed, env production checksum refreshed, trusted actor `8426853622` permission snapshot shows `host_shell`, `openclaw_runtime_admin`, `full_project`, and `host_shell_enabled=true`; direct host-shell smoke returned `/`; gateway health returned `{"ok":true,"status":"live"}`; CLI health became `healthy`.
+- Status: repo and live runtime are now full-host/full-access for trusted operator sessions.
 
 ## UAT Standard
 

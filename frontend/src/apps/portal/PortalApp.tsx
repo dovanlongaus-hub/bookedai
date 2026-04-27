@@ -3,16 +3,22 @@ import {
   ArrowRight,
   CalendarClock,
   CheckCircle2,
+  Copy,
   Clock3,
   CreditCard,
+  Download,
   HelpCircle,
   Home,
   Mail,
   MapPin,
+  MessageCircle,
   NotebookTabs,
+  QrCode,
   RefreshCw,
+  Save,
   ShieldCheck,
   Sparkles,
+  Smartphone,
   UserRound,
   XCircle,
 } from 'lucide-react';
@@ -25,6 +31,7 @@ import type {
   PortalBookingDetailResponse,
   PortalCustomerCareTurnResponse,
 } from '../../shared/contracts';
+import { copyTextToClipboard, downloadQrCodePng, generateQrCodeDataUrl } from '../../shared/utils/qrCode';
 
 type PortalLoadState =
   | { status: 'idle' }
@@ -144,6 +151,7 @@ const PORTAL_VARIANT_STORAGE_KEY = 'bookedai.portal.variant';
 const BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL = 'info@bookedai.au';
 const BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_PHONE = '+61455301335';
 const BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_CHANNELS = 'Telegram, WhatsApp, or iMessage';
+const BOOKEDAI_CUSTOMER_TELEGRAM_BOT = 'BookedAI_Manager_Bot';
 
 function isPortalExperimentVariant(value: string | null | undefined): value is PortalExperimentVariant {
   return value === 'control' || value === 'status_first';
@@ -415,6 +423,59 @@ function viewTitle(viewMode: PortalViewMode) {
   return portalViewTitleItems.find((item) => item.id === viewMode)?.label || 'Booking overview';
 }
 
+function buildPortalUrl(bookingReference: string, action?: PortalViewMode) {
+  const query = new URLSearchParams({ booking_reference: bookingReference });
+  if (action && action !== 'status' && action !== 'overview') {
+    query.set('action', action);
+  }
+  return `https://portal.bookedai.au/?${query.toString()}`;
+}
+
+function buildTelegramCareUrl(bookingReference: string) {
+  return `https://t.me/${BOOKEDAI_CUSTOMER_TELEGRAM_BOT}?start=${encodeURIComponent(`bk.${bookingReference}`)}`;
+}
+
+function buildWhatsAppCareUrl(bookingReference: string, serviceName?: string | null) {
+  const text = [
+    `Hi BookedAI, I am continuing booking ${bookingReference}.`,
+    serviceName ? `Service: ${serviceName}.` : '',
+    'Please keep this ID attached so I can check payment, change time, cancel, or save the booking.',
+  ]
+    .filter(Boolean)
+    .join(' ');
+  return `https://wa.me/${BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_PHONE.replace(/[^\d]/g, '')}?text=${encodeURIComponent(text)}`;
+}
+
+function actionEffectLabel(action: PortalViewMode) {
+  if (action === 'pay') return 'opens payment status or checkout, then returns here with the same booking ID';
+  if (action === 'reschedule') return 'queues a time-change request for provider review';
+  if (action === 'cancel') return 'queues a cancellation request without deleting history';
+  if (action === 'change_plan') return 'opens pause or lighter-plan options for manual review';
+  if (action === 'help') return 'keeps the booking ID attached while support answers';
+  if (action === 'edit') return 'shows managed change choices instead of starting over';
+  return 'reloads booking status, payment posture, timeline, and support context';
+}
+
+function readSavedPortalBookings() {
+  if (typeof window === 'undefined') {
+    return [] as Array<{ booking_reference: string; portal_url: string; saved_at: string }>;
+  }
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem('bookedai.savedPortalBookings') || '[]');
+    if (!Array.isArray(parsed)) {
+      return [];
+    }
+    return parsed.filter(
+      (item): item is { booking_reference: string; portal_url: string; saved_at: string } =>
+        typeof item?.booking_reference === 'string' &&
+        typeof item?.portal_url === 'string' &&
+        typeof item?.saved_at === 'string',
+    );
+  } catch {
+    return [];
+  }
+}
+
 export function PortalApp() {
   const initialReference = useMemo(() => readPortalReferenceFromUrl(), []);
   const initialViewMode = useMemo(() => readPortalViewFromUrl(), []);
@@ -434,6 +495,9 @@ export function PortalApp() {
   const [careTurn, setCareTurn] = useState<PortalCustomerCareTurnResponse | null>(null);
   const [careError, setCareError] = useState<string | null>(null);
   const [careLoading, setCareLoading] = useState(false);
+  const [portalQrDataUrl, setPortalQrDataUrl] = useState('');
+  const [paymentQrDataUrl, setPaymentQrDataUrl] = useState('');
+  const [linkActionMessage, setLinkActionMessage] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<PortalLoadState>(
     initialReference ? { status: 'loading', bookingReference: initialReference } : { status: 'idle' },
   );
@@ -543,6 +607,85 @@ export function PortalApp() {
   }
 
   const detail = loadState.status === 'ready' ? loadState.detail : null;
+  const currentBookingReference = detail?.booking.booking_reference ?? '';
+  const currentPortalUrl = currentBookingReference ? buildPortalUrl(currentBookingReference) : '';
+  const currentPaymentUrl = detail?.payment.payment_url ?? '';
+  const currentTelegramUrl = currentBookingReference ? buildTelegramCareUrl(currentBookingReference) : '';
+  const currentWhatsAppUrl = currentBookingReference
+    ? buildWhatsAppCareUrl(currentBookingReference, detail?.service.service_name)
+    : '';
+
+  useEffect(() => {
+    let cancelled = false;
+    setPortalQrDataUrl('');
+    setPaymentQrDataUrl('');
+
+    async function generateQrs() {
+      const [portalQr, paymentQr] = await Promise.all([
+        currentPortalUrl ? generateQrCodeDataUrl(currentPortalUrl) : Promise.resolve(''),
+        currentPaymentUrl ? generateQrCodeDataUrl(currentPaymentUrl) : Promise.resolve(''),
+      ]);
+      if (cancelled) {
+        return;
+      }
+      setPortalQrDataUrl(portalQr);
+      setPaymentQrDataUrl(paymentQr);
+    }
+
+    void generateQrs().catch(() => {
+      if (cancelled) {
+        return;
+      }
+      setPortalQrDataUrl('');
+      setPaymentQrDataUrl('');
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [currentPortalUrl, currentPaymentUrl]);
+
+  async function handleCopyPortalContext() {
+    if (!detail || !currentPortalUrl) {
+      return;
+    }
+    const copied = await copyTextToClipboard(
+      [
+        `Booking reference: ${detail.booking.booking_reference}`,
+        `Portal: ${currentPortalUrl}`,
+        currentPaymentUrl ? `Payment: ${currentPaymentUrl}` : 'Payment: waiting for provider confirmation',
+        `Telegram: ${currentTelegramUrl}`,
+        `WhatsApp: ${currentWhatsAppUrl}`,
+      ].join('\n'),
+    );
+    setLinkActionMessage(copied ? 'Booking ID, portal link, QR payment context, and chat links copied.' : 'Copy was not available in this browser.');
+    trackPortalEvent('portal_context_copied', {
+      variant: portalVariant,
+      booking_reference: detail.booking.booking_reference,
+      copied,
+    });
+  }
+
+  function handleSavePortalContext() {
+    if (!detail || !currentPortalUrl || typeof window === 'undefined') {
+      return;
+    }
+    const savedBookings = readSavedPortalBookings();
+    const nextSavedBookings = [
+      {
+        booking_reference: detail.booking.booking_reference,
+        portal_url: currentPortalUrl,
+        saved_at: new Date().toISOString(),
+      },
+      ...savedBookings.filter((item) => item.booking_reference !== detail.booking.booking_reference),
+    ].slice(0, 8);
+    window.localStorage.setItem('bookedai.savedPortalBookings', JSON.stringify(nextSavedBookings));
+    setLinkActionMessage('Saved in this browser. Reopen the portal with the same booking ID anytime.');
+    trackPortalEvent('portal_context_saved', {
+      variant: portalVariant,
+      booking_reference: detail.booking.booking_reference,
+    });
+  }
 
   function openRequestComposer(mode: Exclude<PortalRequestMode, null>) {
     setRequestMode(mode);
@@ -996,6 +1139,153 @@ export function PortalApp() {
                   <div className={`mx-5 mb-5 rounded-[1rem] border px-4 py-4 sm:mx-6 sm:mb-6 ${statusSummaryClasses(detail.status_summary.tone)}`}>
                     <div className="text-sm font-semibold">{detail.status_summary.title}</div>
                     <div className="mt-1 text-sm leading-6 opacity-90">{detail.status_summary.body}</div>
+                  </div>
+
+                  <div className="mx-5 mb-5 grid gap-4 sm:mx-6 sm:mb-6 xl:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+                    <div className="rounded-[1.25rem] border border-slate-200 bg-slate-950 p-4 text-white">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">
+                        <QrCode className="h-4 w-4" />
+                        Booking and payment QR
+                      </div>
+                      <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
+                        <div className="rounded-[1rem] border border-white/10 bg-white p-3 text-slate-950">
+                          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Booking portal
+                          </div>
+                          <div className="mt-2 flex items-center gap-3">
+                            <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-[0.9rem] border border-slate-200 bg-white">
+                              {portalQrDataUrl ? (
+                                <img
+                                  src={portalQrDataUrl}
+                                  alt={`Booking portal QR for ${detail.booking.booking_reference}`}
+                                  className="h-24 w-24"
+                                />
+                              ) : (
+                                <QrCode className="h-8 w-8 text-slate-300" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="break-all text-sm font-semibold text-slate-950">
+                                {detail.booking.booking_reference}
+                              </div>
+                              <p className="mt-1 text-xs leading-5 text-slate-600">
+                                Scan to reopen this booking with the ID already attached.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="rounded-[1rem] border border-white/10 bg-white p-3 text-slate-950">
+                          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            Payment
+                          </div>
+                          <div className="mt-2 flex items-center gap-3">
+                            <div className="flex h-28 w-28 shrink-0 items-center justify-center rounded-[0.9rem] border border-slate-200 bg-white">
+                              {paymentQrDataUrl ? (
+                                <img
+                                  src={paymentQrDataUrl}
+                                  alt={`Payment QR for ${detail.booking.booking_reference}`}
+                                  className="h-24 w-24"
+                                />
+                              ) : (
+                                <CreditCard className="h-8 w-8 text-slate-300" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-sm font-semibold text-slate-950">
+                                {currentPaymentUrl ? 'Checkout link ready' : 'Payment pending'}
+                              </div>
+                              <p className="mt-1 text-xs leading-5 text-slate-600">
+                                {currentPaymentUrl
+                                  ? 'Scan to open the secure payment step for this booking.'
+                                  : 'QR appears here when Stripe, partner checkout, or transfer instructions are ready.'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCopyPortalContext}
+                          className="inline-flex min-h-10 items-center gap-2 rounded-[0.85rem] border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white transition hover:bg-white/15"
+                        >
+                          <Copy className="h-4 w-4" />
+                          Copy ID and links
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSavePortalContext}
+                          className="inline-flex min-h-10 items-center gap-2 rounded-[0.85rem] border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white transition hover:bg-white/15"
+                        >
+                          <Save className="h-4 w-4" />
+                          Save here
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            void downloadQrCodePng(currentPortalUrl, `bookedai-${detail.booking.booking_reference}.png`);
+                          }}
+                          className="inline-flex min-h-10 items-center gap-2 rounded-[0.85rem] border border-white/15 bg-white/10 px-3 text-xs font-semibold text-white transition hover:bg-white/15"
+                        >
+                          <Download className="h-4 w-4" />
+                          QR PNG
+                        </button>
+                      </div>
+                      {linkActionMessage ? (
+                        <div className="mt-3 rounded-[0.9rem] border border-white/10 bg-white/10 px-3 py-2 text-xs leading-5 text-white/75">
+                          {linkActionMessage}
+                        </div>
+                      ) : null}
+                    </div>
+
+                    <div className="rounded-[1.25rem] border border-sky-200 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                        <Smartphone className="h-4 w-4" />
+                        Continue from chat
+                      </div>
+                      <p className="mt-3 text-sm leading-6 text-slate-700">
+                        Links from chat, Telegram, or WhatsApp should open this portal with the booking ID in the URL:
+                        <span className="mt-2 block break-all rounded-[0.85rem] border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-900">
+                          {currentPortalUrl}
+                        </span>
+                      </p>
+                      <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                        <a
+                          href={currentTelegramUrl}
+                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.9rem] border border-sky-200 bg-white px-3 text-sm font-semibold text-[#0f62fe] transition hover:border-sky-300"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          Telegram with ID
+                        </a>
+                        <a
+                          href={currentWhatsAppUrl}
+                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.9rem] border border-emerald-200 bg-white px-3 text-sm font-semibold text-emerald-700 transition hover:border-emerald-300"
+                        >
+                          <MessageCircle className="h-4 w-4" />
+                          WhatsApp with ID
+                        </a>
+                      </div>
+                      <div className="mt-4 grid gap-2">
+                        {(['status', 'pay', 'reschedule', 'cancel', 'help'] as PortalViewMode[]).map((action) => (
+                          <a
+                            key={`portal-effect-${action}`}
+                            href={buildPortalUrl(detail.booking.booking_reference, action)}
+                            className="rounded-[0.9rem] border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600 transition hover:border-slate-300"
+                          >
+                            <span className="font-semibold text-slate-950">{viewTitle(action)}:</span>{' '}
+                            {actionEffectLabel(action)}
+                          </a>
+                        ))}
+                        <a
+                          href="/"
+                          className="rounded-[0.9rem] border border-slate-200 bg-white px-3 py-2 text-xs leading-5 text-slate-600 transition hover:border-slate-300"
+                        >
+                          <span className="font-semibold text-slate-950">Add booking:</span> starts a fresh BookedAI search while this booking remains reopenable by ID.
+                        </a>
+                      </div>
+                    </div>
                   </div>
 
                   <div className="mx-5 mb-5 rounded-[1.25rem] border border-sky-200 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4 sm:mx-6 sm:mb-6">
@@ -1461,6 +1751,16 @@ export function PortalApp() {
                           className="w-full rounded-[1rem] border border-slate-200 bg-white px-3 py-3 text-sm text-slate-900"
                         />
                       </label>
+                      <div className="rounded-[1rem] border border-sky-200 bg-white px-3 py-3 text-xs leading-5 text-slate-600">
+                        <span className="font-semibold text-slate-950">Next effect:</span>{' '}
+                        {requestMode === 'reschedule'
+                          ? 'BookedAI keeps the original booking active, records the preferred time, and queues provider review.'
+                          : requestMode === 'pause'
+                            ? 'BookedAI saves the pause request for support review without cancelling the current booking.'
+                            : requestMode === 'downgrade'
+                              ? 'BookedAI saves the lighter-plan request and keeps payment/support context attached.'
+                              : 'BookedAI queues a cancellation review, keeps the booking history visible, and waits for provider confirmation.'}
+                      </div>
                       <div className="flex gap-3">
                         <button
                           type="submit"

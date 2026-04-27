@@ -15,9 +15,9 @@ export default async function AdminLoginPage() {
     <main className="min-h-screen bg-[radial-gradient(circle_at_top,_rgba(56,189,248,0.18),_transparent_28%),linear-gradient(180deg,_#020617_0%,_#0f172a_100%)] px-6 py-16">
       <div className="mx-auto flex min-h-[calc(100vh-8rem)] max-w-6xl items-center gap-12 lg:grid lg:grid-cols-[1.1fr_0.9fr]">
         <section className="max-w-2xl">
-          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-300">BookedAI</p>
+          <p className="text-xs font-semibold uppercase tracking-[0.35em] text-sky-300">BookedAI.au</p>
           <h1 className="mt-4 text-4xl font-semibold leading-tight text-white md:text-5xl">
-            Revenue operations access for the operators who keep tenant growth moving.
+            Revenue operations access for the teams who keep tenant growth moving.
           </h1>
           <p className="mt-6 max-w-xl text-base leading-8 text-slate-300">
             The root admin workspace now uses email verification codes by default so shared bootstrap passwords are no

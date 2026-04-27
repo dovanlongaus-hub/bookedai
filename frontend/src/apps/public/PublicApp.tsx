@@ -26,7 +26,8 @@ const chessScreenImageSrcSet =
 const tenantPreviewImageUrl = '/branding/optimized/tenant-login-hero-1400.webp';
 const tenantPreviewImageSrcSet =
   '/branding/optimized/tenant-login-hero-960.webp 960w, /branding/optimized/tenant-login-hero-1400.webp 1400w';
-const pitchVideoUrl = 'https://upload.bookedai.au/videos/0cfb/LCpooAUVSsL24QXMvIBR0A.mp4';
+const pitchVideoUrl = 'https://upload.bookedai.au/videos/9eb8/BhVuOlB2QXlBo-_nyOFCcA.mp4';
+const productProofImageUrl = 'https://upload.bookedai.au/images/df6e/iarJydFRgp1aWGk5UF0d7g.png';
 
 type HomepageExperimentVariant = 'control' | 'product_first';
 
@@ -464,6 +465,36 @@ export function PublicApp() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section aria-labelledby="homepage-product-proof-title" className="px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-[1440px] gap-5 rounded-[2rem] border border-[#d8d0c0] bg-[#fffdf8] p-4 shadow-[0_24px_70px_rgba(86,73,50,0.1)] sm:p-6 lg:grid-cols-[0.7fr_1.3fr] lg:items-center lg:p-8">
+          <div className="p-1 sm:p-2">
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#c9ddd7] bg-[#eaf4f1] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#19684b]">
+              <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
+              Product proof
+            </div>
+            <h2 id="homepage-product-proof-title" className="mt-5 max-w-xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-[#172033] sm:text-4xl">
+              One more proof shot after the chess tenant flow.
+            </h2>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-[#586173] sm:text-base">
+              The homepage keeps the chess vertical visible first, then shows the broader BookedAI
+              product proof: a real customer-facing workspace that connects discovery, booking
+              posture, and operator evidence.
+            </p>
+          </div>
+
+          <div className="overflow-hidden rounded-[1.6rem] border border-[#172033]/10 bg-[#101827] p-3 shadow-[0_24px_70px_rgba(23,32,51,0.16)]">
+            <img
+              src={productProofImageUrl}
+              alt="BookedAI product proof workspace screenshot"
+              className="aspect-[1693/929] w-full rounded-[1.15rem] bg-white object-contain object-center"
+              loading="lazy"
+              width={1693}
+              height={929}
+            />
           </div>
         </div>
       </section>

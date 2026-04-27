@@ -105,7 +105,7 @@ export function AdminLoginForm() {
         <p className="text-xs font-semibold uppercase tracking-[0.3em] text-sky-300">Admin Workspace</p>
         <h1 className="mt-2 text-2xl font-semibold text-white">Sign in with a one-time code</h1>
         <p className="mt-2 text-sm leading-6 text-slate-300">
-          Enter your work email to receive a 6-digit verification code for the BookedAI admin workspace.
+          Enter your work email to receive a 6-digit verification code for the BookedAI.au admin workspace.
         </p>
       </div>
 
@@ -117,7 +117,7 @@ export function AdminLoginForm() {
               type="email"
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="operator@bookedai.au"
+              placeholder="info@bookedai.au"
               className="border-white/15 bg-slate-900 text-white placeholder:text-slate-500"
               required
             />

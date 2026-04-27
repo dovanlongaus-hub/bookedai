@@ -16,7 +16,7 @@ export function TrustBar() {
         <FadeIn className="glass rounded-brand p-4 sm:p-5">
           <div className="flex flex-wrap items-center gap-3">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-brand-muted">
-              Built for commercial visibility
+              Built for modern service businesses
             </div>
             <div className="hidden h-4 w-px bg-white/10 sm:block" />
             {trustItems.map((item) => (

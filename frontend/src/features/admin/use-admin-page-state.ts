@@ -28,6 +28,7 @@ import {
   AdminBookingDetailResponse,
   AdminBookingRecord,
   AdminConfigEntry,
+  AdminCustomerAgentHealthResponse,
   AdminMessagingDetailResponse,
   AdminMessagingItem,
   AdminOverviewResponse,
@@ -68,6 +69,7 @@ export function useAdminPageState(apiBaseUrl: string) {
   const [apiRoutes, setApiRoutes] = useState<AdminApiRoute[]>([]);
   const [messagingItems, setMessagingItems] = useState<AdminMessagingItem[]>([]);
   const [selectedMessageDetail, setSelectedMessageDetail] = useState<AdminMessagingDetailResponse | null>(null);
+  const [customerAgentHealth, setCustomerAgentHealth] = useState<AdminCustomerAgentHealthResponse | null>(null);
   const [messagingActionMessage, setMessagingActionMessage] = useState('');
   const [messagingActionSubmittingKey, setMessagingActionSubmittingKey] = useState<string | null>(null);
   const [partners, setPartners] = useState<PartnerProfileItem[]>([]);
@@ -144,6 +146,7 @@ export function useAdminPageState(apiBaseUrl: string) {
     setApiRoutes([]);
     setMessagingItems([]);
     setSelectedMessageDetail(null);
+    setCustomerAgentHealth(null);
     setMessagingActionMessage('');
     setMessagingActionSubmittingKey(null);
     setPartners([]);
@@ -397,6 +400,7 @@ export function useAdminPageState(apiBaseUrl: string) {
         config: configPayload,
         apiInventory: apiInventoryPayload,
         messaging: messagingPayload,
+        customerAgentHealth: customerAgentHealthPayload,
         partners: partnersPayload,
         services: servicesPayload,
         serviceQuality: serviceQualityPayload,
@@ -421,6 +425,7 @@ export function useAdminPageState(apiBaseUrl: string) {
       setConfigItems(configPayload.items);
       setApiRoutes(apiInventoryPayload.items);
       setMessagingItems(messagingPayload.items);
+      setCustomerAgentHealth(customerAgentHealthPayload);
       setPartners(partnersPayload.items);
       setImportedServices(servicesPayload.items);
       setServiceQualityCounts(serviceQualityPayload.counts);
@@ -1066,6 +1071,7 @@ export function useAdminPageState(apiBaseUrl: string) {
     apiRoutes,
     messagingItems,
     selectedMessageDetail,
+    customerAgentHealth,
     messagingActionMessage,
     messagingActionSubmittingKey,
     partners,

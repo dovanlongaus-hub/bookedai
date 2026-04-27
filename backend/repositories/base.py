@@ -25,7 +25,10 @@ class BaseRepository:
 
     @staticmethod
     def tenant_lookup_sql(param_name: str = "tenant_ref") -> str:
-        return f"(select id from tenants where id::text = :{param_name} or slug = :{param_name} limit 1)"
+        return (
+            f"(select id from tenants where id::text = cast(:{param_name} as text) "
+            f"or slug = cast(:{param_name} as text) limit 1)"
+        )
 
     def effective_tenant_ref(self, tenant_id: str | None = None) -> str | None:
         return tenant_id or self.tenant_id

@@ -51,7 +51,7 @@ export default async function TeamPage() {
       <PageHeader
         eyebrow="Phase 3"
         title="Team and roles"
-        description="This control plane gives tenant admins a practical operator surface for team access: invite users, move them between active and invited states, and keep role visibility close to daily execution."
+        description="This workspace gives tenant admins a practical surface for team access: invite users, move them between active and invited states, and keep role visibility close to daily execution."
       />
       <SupportModePageBanner
         scopeLabel="Team and roles"
@@ -61,7 +61,7 @@ export default async function TeamPage() {
 
       <div className="grid gap-4 md:grid-cols-4">
         <MetricCard label="Team members" value={String(users.length)} hint="Current active tenant roster." />
-        <MetricCard label="Active" value={String(activeUsers)} hint="Operators with immediate workspace access." />
+        <MetricCard label="Active" value={String(activeUsers)} hint="Team members with immediate workspace access." />
         <MetricCard label="Invited" value={String(invitedUsers)} hint="Pending activation and onboarding." />
         <MetricCard label="Roles" value={String(roles.length)} hint="Role catalog available for assignment." />
       </div>
@@ -152,7 +152,7 @@ export default async function TeamPage() {
         <AdminCard className="p-6">
           <h2 className="text-lg font-semibold text-slate-950">Add team member</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            Create an operator record now and assign the primary role up front so the workspace opens with the right access lane.
+            Create a team record now and assign the primary role up front so the workspace opens with the right access level.
           </p>
           <div className="mt-6">
             <TeamMemberForm

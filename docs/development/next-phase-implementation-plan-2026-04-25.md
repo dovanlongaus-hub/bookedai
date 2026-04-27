@@ -22,6 +22,10 @@ It should be read with:
 
 The latest verified baseline is:
 
+- Telegram customer-care continuity now includes booking-aware deep links through `@BookedAI_Manager_Bot`: pre-booking service context can be handed off from public/product surfaces, and post-booking support can reopen the correct booking thread through `/start bk.<booking_reference>`
+- admin Reliability/Integrations now has a customer-agent spotlight lane for protected health, Telegram reply/callback posture, webhook backlog, identity watchlist, and tenant-scoped CRM/email/notify signals, so operators can verify customer-care completion truth instead of relying on generic queue counts
+- Telegram booking-intent webhook metadata now preserves `lifecycle_updates` when CRM/email/queued-request side effects occur together, closing a regression risk in the shared Phase 19 care path
+
 - product requirement message: `BookedAI connects every customer message - WhatsApp, SMS, Telegram, email and web chat - into one AI Revenue Engine that captures intent, creates booking paths, supports payment and receivable follow-up, and records customer-care actions with operator-visible revenue evidence.`
 - upgraded market-facing message: `BookedAI turns missed service enquiries into booked revenue. It captures intent across chat, calls, email, web, and messaging apps, then helps book, follow up, track payment posture, and show operators what revenue was won or still needs action.`
 - investor/judge message: `BookedAI is an AI Revenue Engine for service businesses: an omnichannel agent layer that captures intent, creates booking references, tracks payment and follow-up posture, and records every revenue action in an auditable operating system.`
@@ -34,7 +38,7 @@ The latest verified baseline is:
 - public/product search cards now require top-left thumbnail/preview treatment, Google Maps actions for physical places, faster staged progress copy, and early-match visibility while deeper checks continue
 - homepage shortcut search now has a fast-preview contract for proof verticals: exact Future Swim, Co Mai Hung Chess, and WSTI AI Event prompts should show relevant catalog/shortcut results immediately while deeper live ranking continues, without bypassing the near-me location guardrail
 - the homepage customer-facing agent now keeps a visible chat thread and can spawn revenue-ops handoff actions after booking
-- the default BookedAI email sender and support fallback for bookedai.au flows is `info@bookedai.au`, including SMTP username/From defaults when explicit env overrides are omitted
+- the default BookedAI email sender and support fallback for bookedai.au flows is `info@bookedai.au`, including SMTP username/From defaults when explicit env overrides are omitted or blank; the repo runtime `.env` and Docker dev/prod compose fallbacks are aligned to that mailbox
 - the legacy homepage/product service booking session path now follows that same mailbox rule: public service bookings use `BOOKING_BUSINESS_EMAIL` / `info@bookedai.au` for customer confirmation copy, internal lead notification, follow-up links, response contact email, and workflow metadata; tenant-owned catalog emails are used only as internal CC recipients and tenant notification context
 - confirmation email HTML rendering is now part of the security baseline: customer/provider-controlled confirmation values are escaped before entering HTML, and confirmation CTA URLs must be `http` or `https` before rendering into the action link
 - provider URLs returned through Messaging Automation service-search are now part of the same security baseline: Telegram controls and chat-compatible responses only carry `http` or `https` provider URLs, with unsafe provider links omitted or falling back to BookedAI-owned handoff URLs
@@ -207,6 +211,8 @@ The seven-lane review captured in `docs/development/full-stack-review-2026-04-26
 - `P1-2` ship inline action controls on WhatsApp outbound replies and align the sender identity to `BookedAI Manager Bot`
 - `P1-3` closed locally: WhatsApp webhook tests now mirror Telegram coverage for identity-gate, queued cancel, queued reschedule, and Internet expansion
 - `P1-10` make customer-facing email templates channel-aware so support copy names `info@bookedai.au` and the available chat channel
+- `P1-11` customer Telegram deep-link continuity is now active locally: public/product booking surfaces can hand off to `@BookedAI_Manager_Bot`, `/start bk.<booking_reference>` resumes booking-aware care, and the next closeout step is live tenant UAT for `chess` plus direct backend pytest enablement in this workspace
+- `P1-12` admin/customer-care observability is now active locally: Reliability/Integrations surfaces customer-agent health, Telegram reply and callback posture, identity watchlist, webhook backlog, and tenant-scoped CRM/email/notify spotlight data; the next closeout step is promoting this with live UAT evidence
 - A/B activation: `CH-1`, `CH-2`, `CH-3`, `CH-4`, `CH-5`
 - schema delta: add `location_posture` to the chat response shape and propagate through web, Telegram, WhatsApp; this unlocks `BC-1`
 

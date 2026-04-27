@@ -30,11 +30,11 @@ export function ProductApp() {
       ? 'Live booking flow'
       : 'Booking flow active';
   const productFlowDescription = !bookingAssistantV1Enabled
-    ? 'Search, shortlist, booking, and follow-up are all live in this product.'
+    ? 'Chat, search, preview, booking, payment posture, calendar, CRM/email, and customer-care follow-up are connected in this product.'
     : bookingAssistantV1LiveReadEnabled
-      ? 'Search, shortlist, booking, and follow-up are all live in this product.'
-      : 'Search, shortlist, and booking are all active on this product.';
-  const productFlowSteps = ['Search', 'Match', 'Book', 'Follow-up'];
+      ? 'Chat, search, preview, booking, payment posture, calendar, CRM/email, and customer-care follow-up are connected in this product.'
+      : 'Chat, search, preview, booking, and follow-up are active on this product.';
+  const productFlowSteps = ['Chat', 'Search', 'Preview', 'Book', 'Pay', 'Care'];
   const productRuntimeConfig = createPublicAssistantRuntimeConfig({
     channel: 'public_web',
     tenantRef: BOOKEDAI_PUBLIC_TENANT_REF,
@@ -72,7 +72,7 @@ export function ProductApp() {
     <main className="booked-shell min-h-screen min-h-[100svh] overflow-x-hidden md:min-h-[100dvh]">
       <h1 className="sr-only">BookedAI live revenue flow</h1>
       <section className="relative flex min-h-[100svh] flex-col md:min-h-[100dvh]">
-        <h2 className="sr-only">Search, shortlist, book, and follow up</h2>
+        <h2 className="sr-only">Chat, search, preview, book, pay, and follow up</h2>
         <div className="pointer-events-none absolute inset-x-0 top-0 z-0 h-28 bg-[radial-gradient(circle_at_top,rgba(139,92,246,0.12),transparent_62%)] sm:h-40" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-0 h-36 bg-[linear-gradient(180deg,rgba(255,255,255,0),rgba(237,242,249,0.9))]" />
 
@@ -159,7 +159,7 @@ export function ProductApp() {
                 Ready to use BookedAI for your business?
               </div>
               <div className="mt-1 text-sm font-semibold text-[var(--apple-near-black)]">
-                Start a free trial and get the full search-to-booking flow live on your website.
+                Start a free trial and get the full chat-to-booking-care flow live on your website.
               </div>
             </div>
             <button

@@ -17,7 +17,7 @@ export function FinalCTASection() {
             <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-end">
               <div>
                 <div className="inline-flex items-center rounded-full border border-brand-green/20 bg-brand-green/10 px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] text-brand-green">
-                  Final conversion prompt
+                  Ready to grow bookings?
                 </div>
                 <h2 className="mt-5 max-w-4xl text-4xl font-bold tracking-tight text-white sm:text-5xl">
                   Stop losing revenue to missed calls, slow follow-up, and disconnected customer journeys.
@@ -40,10 +40,10 @@ export function FinalCTASection() {
 
               <div className="flex flex-col gap-3">
                 <Button href="#pricing" size="lg" className="w-full">
-                  Schedule My Demo
+                  Book a demo
                 </Button>
                 <Button href="#how-it-works" variant="secondary" size="lg" className="w-full">
-                  Talk Through Revenue Fit
+                  See how it works
                 </Button>
               </div>
             </div>

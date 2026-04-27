@@ -40,7 +40,7 @@ export function AdminShell({
         <aside className="hidden w-72 shrink-0 lg:block">
           <AdminCard className="sticky top-4 p-5">
             <div className="text-xs font-semibold uppercase tracking-[0.24em] text-slate-500">
-              BookedAI Admin
+              BookedAI.au Admin
             </div>
             <h1 className="mt-3 text-2xl font-semibold text-slate-950">
               Revenue Engine OS

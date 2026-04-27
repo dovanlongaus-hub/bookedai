@@ -33,7 +33,7 @@ Without a stable end-to-end flow, no later phase (revenue ops, customer care, bi
 | Admin responsive ≤720px (P1-7) | Frontend | Closed `2026-04-26` | [implementation-progress.md](../../../development/implementation-progress.md) |
 | PitchDeckApp Playwright coverage (P1-8) | QA | Closed locally `2026-04-26`; live promote pending | tests/pitch-deck-rendering.spec.ts |
 | Phone `aria-describedby` (P1-7) | Frontend | Closed `2026-04-26` | implementation-progress.md |
-| Product full-flow UI/UX merge + mobile/web app UAT | Frontend + Product/PM + QA | Closed locally `2026-04-27`; live promote pending | [product-full-flow-ui-ux-review-2026-04-27.md](../../../development/product-full-flow-ui-ux-review-2026-04-27.md) |
+| Product full-flow UI/UX merge + mobile/web app UAT | Frontend + Product/PM + QA | Closed live `2026-04-27`; duplicate QR removed; slow-search status/performance improved; linked Telegram care added; release gate, deploy-live, and live mobile smoke passed | [product-full-flow-ui-ux-review-2026-04-27.md](../../../development/product-full-flow-ui-ux-review-2026-04-27.md) |
 | Future Swim Miranda URL hotfix (P1-9) | Backend + Data | Closed live `2026-04-26` | migration `020` |
 | QW-1..QW-8 inline copy upgrade | Content + Frontend | Closed `2026-04-26` | [bookedai-master-roadmap-2026-04-26.md §Tier 1](../../../architecture/bookedai-master-roadmap-2026-04-26.md) |
 | FX-1 payment-state badge (Stripe ready / QR transfer / Manual review / Pending) | Frontend | Open → Sprint 20 | next-phase plan |
@@ -41,6 +41,7 @@ Without a stable end-to-end flow, no later phase (revenue ops, customer care, bi
 | FX-4 destructive action confirmation modal | Frontend | Open → Phase 17 | bookedai-master-roadmap-2026-04-26.md |
 | FX-5 focus restoration on dialog close | Frontend | Closed `2026-04-26` | implementation-progress.md |
 | FX-7 portal `booking_reference` URL canonicalization | Frontend | Closed live `2026-04-27` | implementation-progress.md |
+| Portal QR/payment/channel handoff clarity | Frontend | Closed locally `2026-04-27`; live promote pending | implementation-progress.md |
 | Wallet/Stripe return URL canonicalization | Backend | Carry → Phase 20.5 | next-phase plan |
 | A/B activation: AC-1, AC-2, AC-3, BC-1, BC-3, BC-4, RT-1, RT-2, RT-3 | QA + Content | Sprint 20 wave 1 + Sprint 22 wave 2 | full-stack-review |
 
@@ -94,4 +95,4 @@ Without a stable end-to-end flow, no later phase (revenue ops, customer care, bi
 
 ## Closeout summary
 
-Phase 17 actively closing through Sprint 19 (`2026-04-27 → 2026-05-03`). As of `2026-04-27`: P0-1, P0-3, P0-4 (code/indexes), P0-5, P0-7, P0-8 closed; P0-2 decision-recorded; P0-6 carried (workflow scope). P1-7, P1-8, P1-9 closed locally or live. FX-2 shared API timeout closed live; FX-5 focus restoration closed; FX-7 portal URL canonicalization closed live. Product full-flow UI/UX merge is closed locally with Product regression plus mobile/web app UAT passing and awaits live promotion. Phase 17 will mark `Shipped` upon Sprint 19 closeout.
+Phase 17 actively closing through Sprint 19 (`2026-04-27 → 2026-05-03`). As of `2026-04-27`: P0-1, P0-3, P0-4 (code/indexes), P0-5, P0-7, P0-8 closed; P0-2 decision-recorded; P0-6 carried (workflow scope). P1-7, P1-8, P1-9 closed locally or live. FX-2 shared API timeout closed live; FX-5 focus restoration closed; FX-7 portal URL canonicalization closed live. Portal QR/payment/channel handoff clarity is closed locally: loaded bookings now show booking and payment QR posture, copy/save/download controls, Telegram/WhatsApp continuation links with booking ID, and action-effect guidance for pay/change/cancel/add/help paths. Product full-flow UI/UX merge is closed live with duplicate QR removal, slow-search status/perceived-performance improvements, linked Telegram care, Product regression plus mobile/web app UAT passing, live-read Product popup UAT passing, backend communication+booking route tests passing, release gate passing, deploy-live passing, and live mobile smoke on `product.bookedai.au`. Phase 17 will mark `Shipped` upon Sprint 19 closeout.

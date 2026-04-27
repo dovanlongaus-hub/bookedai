@@ -67,7 +67,7 @@ export function DemoLandingApp() {
 
   function bookDemoFromCta() {
     setFloatingCtaOpen(false);
-    window.open('mailto:hello@bookedai.au?subject=BookedAI%20Demo', '_blank', 'noopener,noreferrer');
+    window.open('mailto:info@bookedai.au?subject=BookedAI%20Demo', '_blank', 'noopener,noreferrer');
   }
 
   const flowStage: DemoFlowStage = experience.booking?.reportPreview

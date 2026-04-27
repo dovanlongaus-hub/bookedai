@@ -437,11 +437,10 @@ class MessagingAutomationService:
                     },
                 )
 
-        enriched_message = self._with_history_context(history, message.text)
         care_turn = await build_portal_customer_care_turn(
             session,
             booking_reference=booking_reference,
-            message=enriched_message,
+            message=message.text,
             customer_email=customer_email,
             customer_phone=customer_phone,
         )
@@ -500,6 +499,7 @@ class MessagingAutomationService:
                 "booking_resolution": resolution,
                 "care_turn": care_turn,
                 "queued_request": queued_request,
+                "reply_controls": self._booking_care_reply_controls(booking_reference),
             },
         )
 
@@ -1629,6 +1629,84 @@ class MessagingAutomationService:
         next_controls["telegram_parse_mode"] = "HTML"
         return next_controls
 
+    @staticmethod
+    def _booking_care_reply_controls(
+        booking_reference: str,
+        *,
+        new_booking_query: str | None = None,
+    ) -> dict[str, object]:
+        portal_url = MessagingAutomationService._portal_booking_url(booking_reference)
+        qr_url = MessagingAutomationService._portal_qr_url(booking_reference)
+        search_query = str(new_booking_query or "Find another booking option").strip()
+        bookedai_search_url = MessagingAutomationService._bookedai_web_assistant_url(search_query)
+        return {
+            "telegram_reply_markup": {
+                "inline_keyboard": [
+                    [{"text": "Keep this booking", "callback_data": f"Keep current booking {booking_reference}"}],
+                    [{"text": "View booking", "url": portal_url}],
+                    [{"text": "Open order QR", "url": qr_url}],
+                    [
+                        {
+                            "text": "Change time",
+                            "callback_data": f"Change current booking {booking_reference}",
+                        },
+                        {
+                            "text": "Cancel booking",
+                            "callback_data": f"Cancel current booking {booking_reference}",
+                        },
+                    ],
+                    [
+                        {
+                            "text": "New booking search",
+                            "callback_data": "Find another booking option and keep current booking",
+                        },
+                        {
+                            "text": "Open BookedAI",
+                            "url": bookedai_search_url,
+                        },
+                    ],
+                ]
+            },
+            "telegram_parse_mode": "HTML",
+            "actions": [
+                {
+                    "id": "keep_booking",
+                    "label": "Keep this booking",
+                    "booking_reference": booking_reference,
+                },
+                {
+                    "id": "open_booking_portal",
+                    "label": "View booking",
+                    "url": portal_url,
+                },
+                {
+                    "id": "open_order_qr",
+                    "label": "Open order QR",
+                    "url": qr_url,
+                },
+                {
+                    "id": "request_reschedule",
+                    "label": "Change time",
+                    "booking_reference": booking_reference,
+                },
+                {
+                    "id": "request_cancel",
+                    "label": "Cancel booking",
+                    "booking_reference": booking_reference,
+                },
+                {
+                    "id": "new_booking_search",
+                    "label": "New booking search",
+                    "query": search_query,
+                },
+                {
+                    "id": "open_bookedai",
+                    "label": "Open BookedAI",
+                    "url": bookedai_search_url,
+                },
+            ],
+        }
+
     async def _try_create_chat_booking_intent(
         self,
         session,
@@ -1697,16 +1775,20 @@ class MessagingAutomationService:
 
         portal_url = self._portal_booking_url(booking_reference)
         qr_code_url = self._portal_qr_url(booking_reference)
-        payment_line = "If payment is required, BookedAI will send the payment link after provider confirmation."
+        payment_line = (
+            "Payment status: pending. Your booking request is kept in BookedAI while provider "
+            "confirmation and payment instructions are prepared."
+        )
         reply = (
             f"<b>{BOOKEDAI_CUSTOMER_PROJECT_NAME}: booking request started</b>\n"
             f"<b>Service</b>: {self._html(service_name)}\n"
             f"<b>Reference</b>: {self._html(booking_reference)}\n"
+            "<b>Status</b>: booking captured, payment pending\n"
             f"<b>Portal</b>: <a href=\"{self._html(portal_url)}\">open order</a>\n"
             f"<b>QR</b>: <a href=\"{self._html(qr_code_url)}\">open QR code</a>\n"
             f"<b>Website</b>: <a href=\"{BOOKEDAI_PUBLIC_URL}\">bookedai.au</a>\n\n"
             f"{self._html(payment_line)}\n"
-            "Reply here anytime to confirm, change time, ask about payment, or request cancellation."
+            "Use the menu below to keep this booking, review it, ask for a change, cancel, or start a new search."
         )
         return MessagingAutomationResult(
             ai_reply=reply,
@@ -1726,22 +1808,19 @@ class MessagingAutomationService:
                     "service_name": service_name,
                     "contact_id": contact_id,
                     "lead_id": lead_id,
+                    "customer_name": str(contact.get("name") or "").strip() or None,
+                    "customer_email": str(contact.get("email") or "").strip().lower() or None,
+                    "customer_phone": str(contact.get("phone") or "").strip() or None,
+                    "requested_date": str(contact.get("requested_date") or "").strip() or None,
+                    "requested_time": str(contact.get("requested_time") or "").strip() or None,
+                    "timezone": "Australia/Sydney",
+                    "booking_path": "request_callback",
                     "payment_status": "pending",
                 },
-                "reply_controls": {
-                    "telegram_reply_markup": {
-                        "inline_keyboard": [
-                            [{"text": "Open booking portal", "url": portal_url}],
-                            [
-                                {
-                                    "text": "Open BookedAI",
-                                    "url": MessagingAutomationService._bookedai_web_assistant_url(service_name),
-                                }
-                            ],
-                        ]
-                    },
-                    "telegram_parse_mode": "HTML",
-                },
+                "reply_controls": self._booking_care_reply_controls(
+                    booking_reference,
+                    new_booking_query=service_name,
+                ),
                 "selected_option": selected_option,
             },
         )

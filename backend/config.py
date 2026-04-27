@@ -335,27 +335,32 @@ def get_settings() -> Settings:
         ),
         google_maps_static_api_key=os.getenv("GOOGLE_MAPS_STATIC_API_KEY", ""),
         google_oauth_client_id=os.getenv("GOOGLE_OAUTH_CLIENT_ID", ""),
-        booking_business_email=os.getenv("BOOKING_BUSINESS_EMAIL", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL),
-        customer_booking_support_email=os.getenv(
+        booking_business_email=env_str("BOOKING_BUSINESS_EMAIL", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL)
+        or DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
+        customer_booking_support_email=env_str(
             "BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL",
-            os.getenv("BOOKING_BUSINESS_EMAIL", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL),
-        ),
+            env_str("BOOKING_BUSINESS_EMAIL", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL),
+        )
+        or DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
         customer_booking_support_phone=os.getenv(
             "BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_PHONE",
             os.getenv("WHATSAPP_FROM_NUMBER", DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE),
         ),
-        email_smtp_host=os.getenv("EMAIL_SMTP_HOST", ""),
+        email_smtp_host=env_str("EMAIL_SMTP_HOST", ""),
         email_smtp_port=env_int("EMAIL_SMTP_PORT", 587),
-        email_smtp_username=os.getenv("EMAIL_SMTP_USERNAME", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL),
-        email_smtp_password=os.getenv("EMAIL_SMTP_PASSWORD", ""),
-        email_smtp_from=os.getenv("EMAIL_SMTP_FROM", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL),
+        email_smtp_username=env_str("EMAIL_SMTP_USERNAME", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL)
+        or DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
+        email_smtp_password=env_str("EMAIL_SMTP_PASSWORD", ""),
+        email_smtp_from=env_str("EMAIL_SMTP_FROM", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL)
+        or DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
         email_smtp_use_tls=env_bool("EMAIL_SMTP_USE_TLS", False),
         email_smtp_use_starttls=env_bool("EMAIL_SMTP_USE_STARTTLS", True),
-        email_imap_host=os.getenv("EMAIL_IMAP_HOST", ""),
+        email_imap_host=env_str("EMAIL_IMAP_HOST", ""),
         email_imap_port=env_int("EMAIL_IMAP_PORT", 993),
-        email_imap_username=os.getenv("EMAIL_IMAP_USERNAME", ""),
-        email_imap_password=os.getenv("EMAIL_IMAP_PASSWORD", ""),
-        email_imap_mailbox=os.getenv("EMAIL_IMAP_MAILBOX", "INBOX"),
+        email_imap_username=env_str("EMAIL_IMAP_USERNAME", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL)
+        or DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
+        email_imap_password=env_str("EMAIL_IMAP_PASSWORD", ""),
+        email_imap_mailbox=env_str("EMAIL_IMAP_MAILBOX", "INBOX") or "INBOX",
         email_imap_use_ssl=env_bool("EMAIL_IMAP_USE_SSL", True),
         sms_provider=os.getenv("SMS_PROVIDER", "twilio"),
         sms_twilio_account_sid=os.getenv("SMS_TWILIO_ACCOUNT_SID", ""),

@@ -19,6 +19,7 @@ from api.route_handlers import api
 from service_layer.messaging_automation_service import (
     CUSTOMER_AGENT_CANONICAL_NAME,
     CUSTOMER_AGENT_PLATFORM_NAMES,
+    MessagingAutomationService,
     MessagingAutomationResult,
 )
 
@@ -107,6 +108,33 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(
             CUSTOMER_AGENT_PLATFORM_NAMES["telegram"]["preferred_username"],
             "BookedAI_Manager_Bot",
+        )
+
+    def test_telegram_pending_booking_menu_exposes_professional_next_actions(self):
+        controls = MessagingAutomationService._booking_care_reply_controls(
+            "v1-pending123",
+            new_booking_query="Chess pilot class",
+        )
+
+        self.assertEqual(controls["telegram_parse_mode"], "HTML")
+        keyboard = controls["telegram_reply_markup"]["inline_keyboard"]
+        self.assertEqual(keyboard[0][0]["text"], "Keep this booking")
+        self.assertEqual(keyboard[1][0]["text"], "View booking")
+        self.assertIn("v1-pending123", keyboard[1][0]["url"])
+        self.assertEqual(keyboard[3][0]["text"], "Change time")
+        self.assertEqual(keyboard[3][1]["text"], "Cancel booking")
+        self.assertEqual(keyboard[4][0]["text"], "New booking search")
+        self.assertEqual(keyboard[4][1]["text"], "Open BookedAI")
+        action_ids = {action["id"] for action in controls["actions"]}
+        self.assertTrue(
+            {
+                "keep_booking",
+                "open_booking_portal",
+                "request_reschedule",
+                "request_cancel",
+                "new_booking_search",
+                "open_bookedai",
+            }.issubset(action_ids)
         )
 
     def test_telegram_webhook_requires_secret_when_configured(self):
@@ -460,6 +488,91 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertIn("booking reference", communication_service.sent[0]["body"])
         self.assertIn("email/phone", communication_service.sent[0]["body"])
         self.assertEqual(captured_calls[0]["metadata"]["customer_identity"]["identity_type"], "missing")
+
+    def test_telegram_existing_booking_payment_turn_uses_latest_message_for_support_queue(self):
+        captured_calls: list[dict[str, object]] = []
+        captured_care_messages: list[str] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **_kwargs):
+            return {
+                "booking_reference": "v1-6dfc0946e4",
+                "resolved_by": "booking_reference",
+                "candidate_count": 1,
+            }
+
+        async def _load_conversation_history(*_args, **_kwargs):
+            return [
+                {
+                    "role": "assistant",
+                    "text": "Support contact: info@bookedai.au or +61455301335 on Telegram.",
+                    "booking_reference": "v1-6dfc0946e4",
+                }
+            ]
+
+        async def _build_portal_customer_care_turn(*_args, **kwargs):
+            captured_care_messages.append(kwargs["message"])
+            return {
+                "phase": "payment_help",
+                "reply": "Booking v1-6dfc0946e4 payment is currently `pending`.",
+                "identity": {"verified": True},
+                "next_actions": [
+                    {
+                        "id": "contact_support",
+                        "label": "Contact support",
+                        "enabled": True,
+                        "href": "mailto:info@bookedai.au",
+                    }
+                ],
+                "operations": {"summary": {"total": 0}},
+                "created_request": None,
+            }
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ), patch(
+            "service_layer.messaging_automation_service.MessagingAutomationService._load_conversation_history",
+            _load_conversation_history,
+        ), patch(
+            "service_layer.messaging_automation_service.build_portal_customer_care_turn",
+            _build_portal_customer_care_turn,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "message": {
+                        "message_id": 12,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "Payment status for v1-6dfc0946e4?",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_care_messages, ["Payment status for v1-6dfc0946e4?"])
+        self.assertNotIn("[Prior conversation:", captured_care_messages[0])
+        self.assertNotIn("queued this as a support request", communication_service.sent[0]["body"])
+        keyboard = communication_service.sent[0]["reply_markup"]["inline_keyboard"]
+        self.assertEqual(keyboard[0][0]["text"], "Keep this booking")
+        self.assertEqual(keyboard[1][0]["text"], "View booking")
+        self.assertIn("v1-6dfc0946e4", keyboard[1][0]["url"])
+        self.assertEqual(keyboard[3][0]["text"], "Change time")
+        self.assertEqual(keyboard[3][1]["text"], "Cancel booking")
+        self.assertEqual(keyboard[4][0]["text"], "New booking search")
+        self.assertEqual(communication_service.sent[0]["parse_mode"], "HTML")
+        self.assertEqual(captured_calls[0]["metadata"]["care_turn"]["created_request"], None)
 
     def test_telegram_book_option_can_capture_booking_intent_result(self):
         captured_calls: list[dict[str, object]] = []

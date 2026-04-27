@@ -59,7 +59,7 @@ export default async function ReportsPage({
       <PageHeader
         eyebrow="Phase 6"
         title="Reports workspace"
-        description="This reporting lane separates finance and collections analysis from the day-to-day operator dashboard: paid versus unpaid trend, aging, recovered revenue, and collection priority all live in one read model."
+        description="This reporting workspace separates finance and collections analysis from day-to-day activity: paid versus unpaid trend, aging, recovered revenue, and collection priority all live in one view."
       />
       <SupportModePageBanner
         scopeLabel="Reports workspace"
@@ -142,7 +142,7 @@ export default async function ReportsPage({
         <MetricCard
           label="Zoho deals lost"
           value={String(dealFeedback.summary.lost_count)}
-          hint="Closed lost outcomes now visible in BookedAI reporting."
+          hint="Closed lost outcomes now visible in BookedAI.au reporting."
         />
         <MetricCard
           label="Zoho won revenue"
@@ -357,7 +357,7 @@ export default async function ReportsPage({
       <AdminCard className="p-6">
         <h2 className="text-lg font-semibold text-slate-950">Zoho deal outcome feedback</h2>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          This is the first inbound CRM intelligence loop: won/lost commercial outcomes from Zoho are now visible in BookedAI reporting without replacing local booking or payment truth.
+          This is the first inbound CRM intelligence loop: won/lost commercial outcomes from Zoho are now visible in BookedAI.au reporting without replacing local booking or payment truth.
         </p>
         <div className="mt-4 overflow-hidden rounded-2xl border border-slate-200">
           <table className="min-w-full divide-y divide-slate-200 text-sm">

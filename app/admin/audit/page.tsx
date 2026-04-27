@@ -46,7 +46,7 @@ export default async function AuditPage({
       <PageHeader
         eyebrow="Phase 3"
         title="Audit workspace"
-        description="This audit workspace turns event history into an operator-facing investigation surface: filter by entity type, search summaries, and review the latest control-plane and revenue operations changes in one place."
+        description="This audit workspace turns event history into a clear review surface: filter by entity type, search summaries, and review the latest workspace and revenue changes in one place."
       />
       <SupportModePageBanner
         scopeLabel="Audit workspace"

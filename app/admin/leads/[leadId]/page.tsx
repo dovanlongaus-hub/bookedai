@@ -167,7 +167,7 @@ export default async function LeadDetailPage({
         <div className="space-y-6">
           <CrmSyncStatusCard
             title="Zoho CRM lead sync"
-            description="Lead sync status is visible here so operators can see whether a lifecycle-captured lead already exists in Zoho and replay the last write-back when the provider fails."
+            description="Lead sync status is visible here so teams can see whether a lifecycle-captured lead already exists in Zoho and replay the last write-back when the provider fails."
             enabled={crmSync.enabled}
             record={crmSync.record}
             emptyMessage="No Zoho CRM sync record exists for this lead yet. In the current admin lane, lead sync is usually created by lifecycle capture or after conversion into a customer contact."
@@ -187,7 +187,7 @@ export default async function LeadDetailPage({
           <AdminCard className="p-6">
             <h2 className="text-lg font-semibold text-slate-950">Conversion aftermath</h2>
             <p className="mt-2 text-sm leading-6 text-slate-600">
-              This card makes the downstream result explicit after qualification or conversion, so operators can see what record was created and where to continue the workflow next.
+              This card makes the downstream result explicit after qualification or conversion, so teams can see what record was created and where to continue next.
             </p>
             <div className="mt-4 space-y-4 text-sm text-slate-700">
               <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -246,7 +246,7 @@ export default async function LeadDetailPage({
                 </div>
               </div>
               <div>
-                <div className="font-semibold text-slate-950">Operator next move</div>
+                <div className="font-semibold text-slate-950">Recommended next move</div>
                 <div className="mt-1">
                   {latestRelatedBooking
                     ? "Continue in the booking record to confirm schedule, payment posture, and follow-up."

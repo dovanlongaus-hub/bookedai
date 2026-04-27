@@ -59,7 +59,7 @@ function buildTenantWorkspaceLink(tenantSlug: string, panel: "overview" | "billi
   const params = new URLSearchParams({
     admin_return: "1",
     admin_scope: `/admin/tenants?tenant=${encodeURIComponent(tenantSlug)}`,
-    admin_scope_label: "Tenant investigation",
+    admin_scope_label: "Tenant review",
   });
   return `${baseUrl}/${encodeURIComponent(tenantSlug)}?${params.toString()}${hash}`;
 }
@@ -118,8 +118,8 @@ export default async function TenantsPage({
     <div className="space-y-6">
       <PageHeader
         eyebrow="Phase 3 to 4"
-        title="Tenant investigation"
-        description="This lane keeps tenant support safer than direct session takeover: investigate tenant auth posture, billing readiness, and CRM retry state first, then open read-only support mode with an audit trail when deeper investigation is needed."
+        title="Tenant review"
+        description="This workspace keeps tenant support safer than direct session takeover: review tenant access, billing readiness, and CRM retry state first, then open read-only support mode with an audit trail when deeper review is needed."
       />
 
       {session.impersonation ? (
@@ -211,7 +211,7 @@ export default async function TenantsPage({
               <AdminCard className="p-6">
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div>
-                    <h2 className="text-lg font-semibold text-slate-950">Tenant auth investigation</h2>
+                    <h2 className="text-lg font-semibold text-slate-950">Tenant access review</h2>
                     <p className="mt-2 text-sm leading-6 text-slate-600">
                       Review tenant team posture, invite backlog, and whether the support case looks like an access problem or a workspace-governance issue.
                     </p>
@@ -245,7 +245,7 @@ export default async function TenantsPage({
                   </div>
                   <div className="mt-2 text-xs text-slate-500">
                     Updated {formatDateLabel(investigation.team?.activity?.last_updated_at)} by{" "}
-                    {investigation.team?.activity?.last_updated_by ?? "BookedAI"}
+                    {investigation.team?.activity?.last_updated_by ?? "BookedAI.au"}
                   </div>
                 </div>
                 <div className="mt-5 space-y-3">
@@ -267,7 +267,7 @@ export default async function TenantsPage({
               <AdminCard className="p-6">
                 <h2 className="text-lg font-semibold text-slate-950">Read-only support mode</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Open tenant support mode only when investigation needs a tenant-scoped context. This mode stays read-only and writes an audit trail.
+                  Open tenant support mode only when the review needs a tenant-scoped context. This mode stays read-only and writes an audit trail.
                 </p>
                 <form action={startTenantSupportModeAction} className="mt-5 space-y-4">
                   <input type="hidden" name="tenantId" value={selectedTenant.id} />
@@ -298,7 +298,7 @@ export default async function TenantsPage({
                     Tenant runtime deep links
                   </div>
                   <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Use these links when support investigation needs the tenant-facing runtime view. They open the exact tenant section directly; support mode remains an admin-side read-only audit state.
+                    Use these links when support review needs the tenant-facing runtime view. They open the exact tenant section directly while support mode stays read-only.
                   </p>
                   <div className="mt-4 flex flex-wrap gap-2">
                     <a href={buildTenantWorkspaceLink(selectedTenant.slug, "overview")} target="_blank" rel="noreferrer">
@@ -322,7 +322,7 @@ export default async function TenantsPage({
               <InvestigationTimelineCard items={investigationFeed} formatDateLabel={formatDateLabel} />
 
               <AdminCard className="p-6">
-                <h2 className="text-lg font-semibold text-slate-950">Billing investigation</h2>
+                <h2 className="text-lg font-semibold text-slate-950">Billing review</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
                   This snapshot stays focused on commercial truth: billing account, subscription readiness, invoice posture, and gateway state.
                 </p>
@@ -373,9 +373,9 @@ export default async function TenantsPage({
               </AdminCard>
 
               <AdminCard className="p-6">
-                <h2 className="text-lg font-semibold text-slate-950">CRM and integrations investigation</h2>
+                <h2 className="text-lg font-semibold text-slate-950">CRM and integrations review</h2>
                 <p className="mt-2 text-sm leading-6 text-slate-600">
-                  Use this to separate tenant complaints caused by provider posture from cases caused by CRM retry backlog or credential review.
+                  Use this to separate provider-side issues from cases caused by CRM retry backlog or credential review.
                 </p>
                 <div className="mt-5 grid gap-3 md:grid-cols-3">
                   <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
@@ -427,7 +427,7 @@ export default async function TenantsPage({
           <AdminCard className="p-6">
             <h2 className="text-lg font-semibold text-slate-950">No tenant available</h2>
             <p className="mt-2 text-sm text-slate-600">
-              This admin session does not currently have any tenant context available for investigation.
+              This admin session does not currently have any tenant context available for review.
             </p>
           </AdminCard>
         )}

@@ -10,7 +10,134 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 ## Status Snapshot
 
-Date: `2026-04-26`
+Date: `2026-04-27`
+
+Implementation update from `2026-04-27` (portal QR and channel handoff clarity):
+
+- upgraded `portal.bookedai.au` so loaded bookings show a booking portal QR, payment QR/posture panel, copy/save/download controls, and the canonical `booking_reference` portal URL in the main booking command center
+- added explicit Telegram and WhatsApp continuation links that carry the booking ID (`bk.<booking_reference>` for Telegram and a prefilled WhatsApp message), so customers moving from chat/Telegram/WhatsApp into the portal keep the same order context
+- added visible action-effect guidance for status, pay, reschedule, cancel, help, and add-new-booking paths, plus request-form next-effect copy explaining that change/cancel/pause/downgrade actions queue provider/support review rather than silently mutating the booking
+- verification passed with frontend TypeScript (`npm --prefix frontend exec tsc -- --noEmit`) and focused portal Playwright from the frontend workspace (`npm exec playwright test tests/portal-enterprise-workspace.spec.ts`, `6 passed`)
+- status: local frontend implementation and regression coverage are complete; live deploy/UAT remains the next promotion step
+
+Implementation update from `2026-04-27` (Telegram pending-booking action menu):
+
+- upgraded the customer-facing Telegram booking-care menu so pending-payment and existing-booking replies expose clear app-style choices: keep booking, view booking, open QR, change time, cancel booking, start a new booking search, or open BookedAI
+- updated Telegram booking-intent capture copy to explicitly show `booking captured, payment pending` and explain that BookedAI keeps the booking request while provider confirmation/payment instructions are prepared
+- kept the Telegram reply format on HTML parse mode for normal booking/search/care replies so headings, labels, portal links, QR links, and controls render as compact professional customer-service messages
+- verification passed with focused Telegram webhook regression: `.venv-test/bin/python -m pytest backend/tests/test_telegram_webhook_routes.py -q` (`15 passed`)
+- status: local backend implementation and regression coverage are complete; live deploy and real customer Telegram UAT remain the next promotion step
+
+Implementation update from `2026-04-27` (email sender configuration alignment):
+
+- aligned the live repo runtime email identity on `info@bookedai.au`: root `.env` now sets `BOOKING_BUSINESS_EMAIL`, `EMAIL_SMTP_USERNAME`, `EMAIL_SMTP_FROM`, and `EMAIL_IMAP_USERNAME` to the BookedAI mailbox instead of a tenant-specific mailbox, and `supabase/.env` now uses the same mailbox for Supabase email admin/certbot settings
+- hardened backend config parsing so blank email env values fall back to `info@bookedai.au` for booking business email, customer support email, SMTP username, SMTP From, and IMAP username
+- updated Docker dev/prod compose defaults so backend and beta-backend receive `info@bookedai.au` for SMTP username, SMTP From, and IMAP username when explicit env overrides are omitted
+- updated remaining public/admin webapp contact placeholders that still pointed at `hello@bookedai.au` or `operator@bookedai.au`
+- verification passed with `python3 -m py_compile backend/config.py`, focused backend pytest for config and booking-assistant email behavior (`18 passed`), direct settings probes for both root `.env` and omitted-env fallback, a source scan for old bookedai.au sender identities, live deploy via `bash scripts/deploy_live_host.sh`, stack health at `2026-04-27T09:28:05Z`, live API/public HTTP smoke, and backend/beta-backend container env probes confirming the four email identity vars all resolve to `info@bookedai.au`
+- delivery credential check: SMTP auth against Zoho with the deployed `info@bookedai.au` username currently returns `SMTPAuthenticationError`, so the remaining live-delivery requirement is replacing `EMAIL_SMTP_PASSWORD` and `EMAIL_IMAP_PASSWORD` with valid app passwords for `info@bookedai.au`
+- status: sender identity configuration and production deployment are complete; real outbound delivery is blocked until the `info@bookedai.au` mailbox app-password secret is updated
+
+Implementation update from `2026-04-27` (homepage live redeploy):
+
+- redeployed the homepage/web bundle through `python3 scripts/telegram_workspace_ops.py --telegram-user-id 8426853622 deploy-live`, using the fixed Docker host-context path
+- preflight frontend TypeScript passed with `npm --prefix frontend exec tsc -- --noEmit`
+- production deploy rebuilt/recreated web and beta-web, recreated backend/beta-backend as part of the current deploy wrapper, restarted proxy, and activated the n8n booking intake workflow
+- post-deploy verification passed with `bash scripts/healthcheck_stack.sh` at `2026-04-27T08:51:01Z`; `https://bookedai.au/` returned `200` with title `BookedAI | The AI Revenue Engine for Service Businesses`; backend health also returned `200`
+- status: homepage live deploy is complete
+
+Implementation update from `2026-04-27` (backend and homepage live promotion):
+
+- redeployed the current backend and homepage/web bundle through `python3 scripts/telegram_workspace_ops.py --telegram-user-id 8426853622 deploy-live`, using the fixed Docker host-context path
+- preflight verification passed with backend `py_compile` for route/config/operator modules and frontend TypeScript (`npm --prefix frontend exec tsc -- --noEmit`)
+- production deploy rebuilt backend and beta-backend, rebuilt web and beta-web, recreated backend/web/beta containers, restarted proxy, and activated the n8n booking intake workflow
+- post-deploy verification passed with `bash scripts/healthcheck_stack.sh` at `2026-04-27T08:20:21Z`; `https://api.bookedai.au/api/health` returned `200` / `{"status":"ok","service":"backend"}`; `https://bookedai.au/` returned `200` with title `BookedAI | The AI Revenue Engine for Service Businesses`
+- status: backend and homepage live deploy is complete
+
+Implementation update from `2026-04-27` (customer Telegram live token restore):
+
+- restored the customer-facing `@BookedAI_Manager_Bot` live token settings into both `/home/dovanlong/BookedAI/supabase/.env` and `/home/dovanlong/BookedAI/.env`; this matters because deploy syncs root `.env` from `supabase/.env`
+- redeployed on the VPS host with `cd /home/dovanlong/BookedAI && bash scripts/deploy_live_host.sh`; backend, beta-backend, web, and beta-web were recreated, proxy restarted, and the n8n booking intake workflow activated
+- reactivated the customer Telegram webhook with `scripts/customer_telegram_bot_manager.py --activate-webhook --webhook-info`; Telegram reports the webhook URL as `https://api.bookedai.au/api/webhooks/bookedai-telegram` with `pending_update_count=0`
+- verified `docker compose -f docker-compose.prod.yml --env-file .env config` resolves the customer Telegram token and webhook secret for backend and beta-backend without printing values, and `bookedai-backend-1` has both env vars present
+- post-deploy health passed with `bash scripts/healthcheck_stack.sh` at `2026-04-27T06:40:32Z`; live API health returned `200` / `{"status":"ok","service":"backend"}`
+- status: env, deploy, and webhook activation are complete; operator can now run the final inbound Telegram test
+
+Implementation update from `2026-04-27` (Docker host-context deploy-live fix):
+
+- fixed the Telegram/OpenClaw deploy-live host-context failure where `deploy_live_host.sh` could still run inside a container without Docker CLI and stop with `Live deploy requires the Docker host environment`
+- `scripts/telegram_workspace_ops.py` now resolves `nsenter` explicitly when `/hostfs` is present, including a host-mounted fallback path, and `deploy-live` falls back to the full-host `host-shell` lane when Docker is not available in the current runtime
+- verified the OpenClaw CLI runtime has `/hostfs`, Docker socket access, `nsenter`, full trusted Telegram actions, and `host_shell_enabled=true`; inside the CLI, `docker` is absent but `should_use_nsenter_host_exec()` now resolves `/usr/bin/nsenter`, so deploy-live can target the VPS host context
+- ran the requested host deploy directly with `cd /home/dovanlong/BookedAI && bash scripts/deploy_live_host.sh`; backend, beta-backend, web, and beta-web were rebuilt/recreated, proxy restarted, and the n8n booking intake workflow activated
+- post-deploy verification passed with `bash scripts/healthcheck_stack.sh` at `2026-04-27T06:05:59Z`; live API health returned `200` / `{"status":"ok","service":"backend"}`; OpenClaw CLI remained healthy and full-host
+- status: Docker host-context deploy blocker is fixed and live deploy is complete
+
+Implementation update from `2026-04-27` (OpenClaw and Telegram operator full-host default):
+
+- changed the repo default for `@Bookedairevenuebot` / OpenClaw operator work from rootless break-glass to trusted full-host access by default, per latest operator instruction
+- `scripts/telegram_workspace_ops.py` now includes `host_shell`, `openclaw_runtime_admin`, and `full_project` in the default trusted Telegram action set, and treats `BOOKEDAI_ENABLE_HOST_SHELL` as enabled by default unless explicitly disabled
+- `deploy/openclaw/docker-compose.yml` now runs `openclaw-cli` as root (`0:0`) with `privileged: true`, `pid: host`, `/hostfs`, and `/var/run/docker.sock`, while keeping the public Telegram control surface on trusted actor allowlist rather than opening it to every Telegram sender
+- `deploy/openclaw/.env`, `.env.example`, `.env.production.example`, and `deploy/openclaw/.env.example` now carry the full-access defaults: `BOOKEDAI_ENABLE_HOST_SHELL=1` and the full trusted action vocabulary
+- `enable-openclaw-full-access` was corrected for OpenClaw v2026.4.15 schema: `askFallback` is now removed from `openclaw.json` and kept only in `exec-approvals.json`, avoiding the gateway/CLI config validation error
+- live OpenClaw runtime config at `/home/dovanlong/.openclaw-bookedai-v3/openclaw.json` was updated to `tools.exec.security=full`, `tools.exec.ask=off`, trusted Telegram allowlist `8426853622`, webchat elevated access, and `agents.defaults.elevatedDefault=full`
+- live OpenClaw compose was recreated with the full-host defaults; verification confirmed `openclaw-bookedai-cli` runs as `user=0:0`, `privileged=true`, `pid=host`, with `/hostfs`, `/var/run/docker.sock`, and `/workspace/bookedai.au` mounted
+- verification passed with Python compile, OpenClaw compose config validation, env checksum refresh, permission snapshot showing `host_shell_enabled=true`, direct `host-shell` smoke returning `/`, runtime gateway health `{"ok":true,"status":"live"}`, and CLI health `healthy`
+- documentation was updated across README, project memory, OpenClaw README, PM operating notes, and daily memory to record the new full-access default and its security posture
+- status: repo-side and live OpenClaw full-access default is implemented for trusted operator sessions
+
+Implementation update from `2026-04-27` (backend live redeploy and Telegram operator permission boundary):
+
+- redeployed the live stack through the approved operator entrypoint `python3 scripts/telegram_workspace_ops.py deploy-live`; backend, beta-backend, web, and beta-web images rebuilt, containers were recreated, the proxy restarted, and the n8n booking intake workflow was activated
+- fixed a frontend build blocker encountered during deploy by importing and using the existing `lucide-react` `MessageCircle` icon in `BookingAssistantDialog.tsx` for the Telegram care CTA, replacing the undefined `MessageIcon` reference
+- verified the backend/customer-care slice before promotion with backend `py_compile` and focused pytest for communication, Telegram webhook, and booking routes (`24 passed`), then verified frontend TypeScript with `npm --prefix frontend exec tsc -- --noEmit`
+- post-deploy verification passed with `bash scripts/healthcheck_stack.sh` at `2026-04-27T05:48:02Z`, and `https://api.bookedai.au/api/health` returned `200` / `{"status":"ok","service":"backend"}`
+- Telegram operator permissions were checked for trusted actor `8426853622`: `deploy_live`, `host_command`, build/test/workspace actions, and allowlisted host programs are available; unrestricted `host_shell` remains disabled unless an explicit break-glass session sets `BOOKEDAI_ENABLE_HOST_SHELL=1`
+- status: backend fix is live; the operator bot has the approved deploy/host-maintenance authority without broad default root shell access
+
+Implementation update from `2026-04-27` (Phase 19 Telegram care handoff, admin reliability spotlight, and webhook metadata preservation):
+
+- extended the public/product booking surfaces so `BookingAssistantDialog.tsx` and `HomepageSearchExperience.tsx` expose `@BookedAI_Manager_Bot` handoff links before booking and after booking, using service-aware context before confirmation and booking-reference-aware deep links after confirmation
+- added backend Telegram deep-link support in `backend/api/route_handlers.py` so `/start bk.<booking_reference>` resumes booking-aware customer-care context rather than falling back to a generic start flow
+- expanded admin reliability/integrations data and UI to surface protected customer-agent health, Telegram reply delivery/callback acknowledgement, webhook backlog, identity-resolution watchlist, and tenant-scoped CRM/email/notify spotlight data
+- fixed a Phase 19 Telegram edge case in `telegram_webhook(...)`: `care_metadata.lifecycle_updates` now survives later `queued_request` / delivery metadata merges instead of being overwritten when multiple booking side effects occur in the same turn
+- added/updated focused QA around Telegram booking-intent lifecycle metadata so the response can carry lifecycle updates, CRM sync deal/task, email confirmation state, and nested email CRM task evidence together
+- verification passed with `npm --prefix frontend run lint` (`tsc --noEmit`) and focused backend/frontend code review of the changed Telegram/admin paths; the parallel QA follow-up also confirmed the expected metadata shape in `backend/tests/test_telegram_webhook_routes.py`
+- status: local implementation is complete; next follow-ups are enabling the backend test environment in this workspace for direct pytest reruns and executing tenant `chess` UAT for Telegram booking/deep-link/customer-care continuity
+
+Implementation update from `2026-04-27` (public pitch video replacement refresh 3):
+
+- replaced the homepage and pitch embedded MP4 with `https://upload.bookedai.au/videos/9eb8/BhVuOlB2QXlBo-_nyOFCcA.mp4`
+- updated both `bookedai.au` (`PublicApp.tsx`) and `pitch.bookedai.au` (`PitchDeckApp.tsx`) to use the same refreshed uploaded video URL for native playback and direct fallback links
+- direct media verification confirmed the replacement MP4 returns `206`, `content-type: video/mp4`, and byte-range support
+- verification passed with frontend TypeScript, production build, live deploy through `python3 scripts/telegram_workspace_ops.py deploy-live`, stack healthcheck, and live bundle checks confirming both production chunks now contain the refreshed MP4 URL and not the prior `0cfb` MP4 URL
+
+Implementation update from `2026-04-27` (homepage and pitch product-proof image placement):
+
+- added the uploaded product-proof screenshot `https://upload.bookedai.au/images/df6e/iarJydFRgp1aWGk5UF0d7g.png` to `bookedai.au` immediately after the chess tenant proof block, framed as the bridge from vertical proof into the broader BookedAI product workspace
+- added the same uploaded evidence image inside the `pitch.bookedai.au` `Product proof` section, below the existing UI proof cards and before the product/demo CTAs
+- updated the landing-page requirement baseline and master roadmap Phase 17 notes so the proof placement is tracked as a public/pitch evidence-surface change
+- added the closeout note `docs/development/public-pitch-proof-image-placement-2026-04-27.md`
+- verification passed with `npm --prefix frontend exec tsc -- --noEmit`, `npm --prefix frontend run build`, and `git diff --check`
+- published the closeout to Notion and Discord via `python3 scripts/telegram_workspace_ops.py sync-doc`; archive entry is `docs/development/telegram-sync/2026-04-27/030128-public-and-pitch-product-proof-image-placement.md`
+- status: local implementation and verification are complete; live deployment was not run in this turn
+
+Implementation update from `2026-04-27` (Product full-flow UI/UX review and regression):
+
+- merged duplicate Product page flow wording into one customer journey: `Chat request -> Search -> Preview -> Select -> Book -> Payment posture -> Thank You / Portal -> Add calendar -> CRM/email/messaging -> Telegram/customer-care handoff`
+- updated `product.bookedai.au` shell copy and flow rail from `Search / Match / Book / Follow-up` to `Chat / Search / Preview / Book / Pay / Care`
+- replaced generic Product assistant welcome shortcuts with the four current proof verticals: `Chess`, `Future Swim`, `AI Event WSTI`, and `AI Mentor 1-1`, with all four visible on compact mobile
+- updated `BookingAssistantDialog.tsx` so welcome copy, in-form journey, confirmation journey, operation timeline, and confirmation message previews all reflect the full flow while preserving truthful pending/queued/ready status language
+- added a customer-care preview card for `BookedAI Manager Bot / portal` handoff using the booking reference and portal URL, without claiming a Telegram outbound send happened when no session status says so
+- refreshed Product regression coverage for the new flow rail, shortcut set, confirmation-care handoff, mobile responsive full-flow UAT at `390x844`, and desktop web app UAT through the preview modal
+- removed the duplicate post-booking QR block so the Thank You state has one booking-portal QR, with the lower panel simplified to booking summary and portal actions
+- hardened live-read Product popup behavior: chat-copy streaming failure now falls back softly so V1 search results still render, and service cards again show tenant/public-web provenance, `Book online`, and next-step/callback guidance
+- improved slow-search UX/performance: Product now shows instant local/catalog matches while live-read ranking verifies availability, maps, partner links, and Internet sources; the rich customer-agent turn is time-boxed and duplicate shadow search is skipped when live-read has already grounded the results
+- extended booking automation with linked Telegram follow-up: after booking, the frontend calls the backend Telegram-by-phone handoff; the backend sends through `@BookedAI_Manager_Bot` only when a matching Telegram chat session is linked, otherwise records a queued/manual-link state because Telegram cannot initiate a chat from phone alone
+- tightened the Thank You decision layout into compact portal review/edit/reschedule/cancel/Telegram care cards, and updated confirmation previews to show email sent from `info@bookedai.au`
+- refreshed Product regression coverage to assert exactly one confirmation QR after service and event booking submit
+- verification passed with `python3 -m py_compile backend/api/v1_communication_handlers.py backend/api/v1_communication_routes.py`, `npm --prefix frontend exec tsc -- --noEmit`, `cd backend && ../.venv/bin/python -m pytest tests/test_api_v1_communication_routes.py tests/test_api_v1_booking_routes.py -q` (`12 passed`), `cd frontend && npx playwright test tests/product-app-regression.spec.ts --workers=1 --reporter=line` (`6 passed`), `cd frontend && PLAYWRIGHT_PUBLIC_ASSISTANT_MODE=live-read npx playwright test tests/public-booking-assistant-live-read.spec.ts --grep "product popup" --workers=1 --reporter=line` (`4 passed`), `npm --prefix frontend run build`, and `RUN_SEARCH_REPLAY_GATE=false bash scripts/run_release_gate.sh` (all checks passed)
+- live rollout completed with `python3 scripts/telegram_workspace_ops.py deploy-live`; `bash scripts/healthcheck_stack.sh` passed at `2026-04-27T02:45:45Z`, `https://product.bookedai.au/` returned `HTTP/2 200`, the live product bundle contains the slow-search status, `@BookedAI_Manager_Bot`, `From: info@bookedai.au`, and all four proof-vertical shortcuts, and mobile live smoke at `390x844` confirmed the assistant input, shortcuts, and horizontal overflow `0`
+- status: Product full-flow UI/UX merge, slow-search performance UX, linked Telegram care, regression/UAT, release gate, live deploy, and live smoke are closed
 
 Implementation update from `2026-04-26` (public pitch video replacement refresh 2):
 
@@ -1137,7 +1264,7 @@ Planning and execution synchronization update from `2026-04-22`:
   - the repair preserves allowlist-based approval gating while making durable `allow-always` approvals valid again for commands that should become trusted
   - the checked-in Telegram/OpenClaw action vocabulary now includes `openclaw_runtime_admin` across the root env examples and OpenClaw compose/env templates, and README/project/OpenClaw docs describe the repair path
 - OpenClaw full-access runtime repair was added on `2026-04-26` for the operator-requested webchat/Telegram full-control posture:
-  - `scripts/telegram_workspace_ops.py` now exposes `enable-openclaw-full-access`, which sets `tools.exec.host=gateway`, `tools.exec.security=full`, `tools.exec.ask=off`, `tools.exec.askFallback=full`, and mirrors those full/off defaults into host `exec-approvals.json`
+  - `scripts/telegram_workspace_ops.py` now exposes `enable-openclaw-full-access`, which sets `tools.exec.host=gateway`, `tools.exec.security=full`, `tools.exec.ask=off`, and mirrors `security=full`, `ask=off`, and `askFallback=full` into host `exec-approvals.json`
   - the command enables `tools.elevated.enabled`, sets `agents.defaults.elevatedDefault=full`, allows `bot.bookedai.au` webchat elevated access, and grants Telegram elevated access to the trusted Telegram ids by default
   - `--telegram-open` exists as an explicit opt-in for `channels.telegram.dmPolicy=open` plus `allowFrom=["*"]`; the default keeps Telegram scoped to `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS`
 - production DNS origin pinning was tightened on `2026-04-23` for the new public IP `34.40.192.68`:
@@ -2713,6 +2840,35 @@ Current execution has also been running through a specialist multi-agent pattern
   - lane: `Tenant 2017 BTC login CTA recovery`
   - update: fixed tenant preview sign-in CTAs so `Open tenant sign-in` and activation `Open sign-in` open the auth card instead of returning to the overview panel; logout now resets the tenant auth role back to `sign-in` and clears the password field so re-login is immediately available.
   - verification: `npm --prefix frontend exec tsc -- --noEmit`; `npm --prefix frontend run build`; `python3 scripts/telegram_workspace_ops.py deploy-live`; `bash scripts/healthcheck_stack.sh`; live Playwright smoke on `https://tenant.bookedai.au/2017-btc?smoke=auth-fix-20260426` confirmed `#catalog`, visible auth workspace, enabled password CTA after input, and no horizontal overflow.
+- `2026-04-27`
+  - lane: `OpenClaw and Telegram full deploy host execution context`
+  - update: changed `scripts/telegram_workspace_ops.py deploy-live` so trusted host users `openclaw` and `telegram` run live deployment through the full VPS host-shell context from `/home/dovanlong/BookedAI`, matching the already-approved root/Docker posture. `permissions` now reports the current OS user and trusted host deploy-user status for easier operator diagnostics.
+  - update: hardened `scripts/deploy_live_host.sh` so direct wrapper calls from a privileged OpenClaw runtime with `/hostfs` but no container-local Docker CLI self-reexec through `nsenter --target 1 ...` into the real Docker host before continuing.
+  - verification: `python3 -m py_compile scripts/telegram_workspace_ops.py`; `bash -n scripts/deploy_live_host.sh scripts/deploy_production.sh`; `permissions` as both `openclaw` and `telegram` showed `trusted_host_deploy_user=true`; `deploy-live` as `telegram` completed production rebuild/recreate and n8n activation; `bash scripts/healthcheck_stack.sh` passed at `2026-04-27T08:56:59Z`; API/public/OpenClaw live probes returned `200`.
+- `2026-04-27`
+  - lane: `OpenClaw sudo-less host-shell deploy repair`
+  - update: fixed the remaining runtime blocker where `host-shell` prepended `sudo` even when `nsenter` host context was available, causing `FileNotFoundError: No such file or directory: 'sudo'` in slim OpenClaw runtimes. `scripts/telegram_workspace_ops.py` now runs `nsenter` host-context commands directly and only falls back to `sudo -n` when there is no host namespace prefix and the process is not already root.
+  - update: `permissions` now reports `sudo_available` and `nsenter_path`, so operator diagnostics can distinguish host namespace availability from sudo availability.
+  - verification: `python3 -m py_compile scripts/telegram_workspace_ops.py`; simulated no-sudo/nsenter execution path completed without trying to exec `sudo`; host deploy completed with `bash scripts/deploy_live_host.sh`; `bash scripts/healthcheck_stack.sh` passed at `2026-04-27T08:59:56Z`; API/public/product/OpenClaw live probes returned `200`.
+- `2026-04-27`
+  - lane: `Telegram customer booking payment/status care`
+  - update: fixed a customer Telegram false-escalation path where prior assistant history containing `Support contact` could be included in the portal-care message and accidentally queue a support request when the latest customer turn only asked for payment/status on an existing booking such as `v1-6dfc0946e4`.
+  - update: existing-booking Telegram care replies now include booking portal and QR inline controls so a pending-payment/status response has a direct reopen path instead of only plain support copy.
+  - verification: `.venv/bin/python -m py_compile backend/service_layer/messaging_automation_service.py backend/tests/test_telegram_webhook_routes.py`; `.venv/bin/python -m pytest backend/tests/test_telegram_webhook_routes.py -q` (`14 passed`).
+- `2026-04-27`
+  - lane: `Operator and customer Telegram bot activation`
+  - update: reactivated the OpenClaw operator bot `@Bookedairevenuebot` webhook at `https://api.bookedai.au/telegram-webhook` with trusted allowlist/elevated config intact, and confirmed operator outbound send to trusted actor `8426853622`.
+  - update: reactivated the customer booking bot `@BookedAI_Manager_Bot` webhook at `https://api.bookedai.au/api/webhooks/bookedai-telegram`, confirmed customer token/secret are present in live backend env, and configured tenant `co-mai-hung-chess-class` tenant notifications to Telegram chat id `8426853622`.
+  - update: fixed a live customer Telegram processing defect in the shared repository tenant lookup SQL: `tenant_ref` is now cast to text in common tenant lookup and nullable filters so asyncpg no longer raises `AmbiguousParameterError` during idempotency reservation.
+  - verification: backend repository `py_compile` passed; live deploy completed with `bash scripts/deploy_live_host.sh`; stack health passed at `2026-04-27T09:08:58Z`; operator webhook info showed pending `0` and no last error; customer webhook pending is `0`; synthetic customer Telegram webhook returned `200` / `messages_processed=1`, created a conversation event, and backend logs showed no idempotency SQL errors; customer bot test send returned message id `79`, operator bot test send returned message id `550`.
+- `2026-04-27`
+  - lane: `OpenClaw/Telegram host-shell sudo support and live deploy`
+  - update: hardened `scripts/telegram_workspace_ops.py` host execution so non-root runtimes with `nsenter` first try direct host namespace execution, then fall back to `sudo -n nsenter ...` if direct `nsenter` is denied. Commands executed after entering host context can use host `sudo`, so trusted OpenClaw/Telegram sessions can run commands such as `sudo -n docker ps` through `host-shell`.
+  - verification: `python3 -m py_compile scripts/telegram_workspace_ops.py`; `host-shell --command "sudo -n id && sudo -n docker ps"` passed as Linux users `openclaw` and `telegram`; `deploy-live` completed backend/web/beta rebuild and container recreate; `bash scripts/healthcheck_stack.sh` passed at `2026-04-27T09:46:28Z`; API/public/product/OpenClaw probes returned `200`.
+- `2026-04-27`
+  - lane: `OpenClaw host-exec alias and host live deploy`
+  - update: added `host-exec` to `scripts/telegram_workspace_ops.py` as the explicit OpenClaw-friendly alias for full `host-shell` execution, gated by the existing `host_shell` permission scope and capable of running host commands that use `sudo -n`.
+  - verification: `python3 -m py_compile scripts/telegram_workspace_ops.py`; `host-exec --command "sudo -n id && sudo -n docker ps"` passed as both `openclaw` and `telegram`; live deploy was run through `host-exec --cwd /home/dovanlong/BookedAI --command "bash scripts/deploy_live_host.sh"`; stack health passed at `2026-04-27T09:54:52Z`; API/public/product/OpenClaw probes returned `200`.
 - `2026-04-26`
   - lane: `BookedAI Manager Bot full retest and live redeploy`
   - update: reran the full release gate after activating the customer-facing `@BookedAI_Manager_Bot`, then redeployed the production stack through the approved host-level live deploy entrypoint. Backend, beta-backend, web, and beta-web images rebuilt successfully, containers were recreated, proxy restarted, and the n8n booking intake workflow remained active.

@@ -49,6 +49,7 @@ def create_test_app() -> FastAPI:
         render_template=lambda **kwargs: kwargs.get("fallback_body") or "Rendered BookedAI template",
         send_sms=_async_noop,
         send_whatsapp=_async_noop,
+        send_telegram=_async_noop,
     )
     return app
 
@@ -251,3 +252,113 @@ class Apiv1CommunicationRoutes(TestCase):
         self.assertEqual(payload["data"]["message_id"], "msg-wa-1")
         self.assertEqual(payload["data"]["delivery_status"], "queued")
         self.assertEqual(payload["data"]["provider"], "whatsapp_twilio")
+
+    def test_send_telegram_by_phone_queues_when_customer_chat_not_linked(self):
+        app = create_test_app()
+        app.state.communication_service = SimpleNamespace(
+            render_template=lambda **kwargs: kwargs.get("fallback_body") or "Rendered BookedAI template",
+            send_telegram=lambda **_: _async_value(
+                SimpleNamespace(
+                    provider="telegram_bot",
+                    delivery_status="sent",
+                    provider_message_id="tg-1",
+                    warnings=[],
+                )
+            ),
+        )
+
+        with patch("api.v1_communication_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_communication_handlers.get_session",
+            _fake_get_session,
+        ), patch(
+            "api.v1_communication_handlers.orchestrate_communication_touch",
+            _async_value_factory(
+                SimpleNamespace(
+                    message_id="msg-tg-queued",
+                    delivery_status="queued",
+                    provider="telegram_bot",
+                    warning_codes=["customer_telegram_chat_not_linked"],
+                )
+            ),
+        ):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/telegram/messages/send-by-phone",
+                json={
+                    "to": "+61400000000",
+                    "body": "Hello from BookedAI Manager Bot",
+                    "actor_context": {
+                        "channel": "public_web",
+                        "tenant_id": "tenant-test",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["message_id"], "msg-tg-queued")
+        self.assertEqual(payload["data"]["delivery_status"], "queued")
+        self.assertIn("customer_telegram_chat_not_linked", payload["data"]["warnings"][0])
+
+    def test_send_telegram_by_phone_sends_to_linked_chat(self):
+        app = create_test_app()
+        sent: list[dict[str, object]] = []
+
+        async def _send_telegram(**kwargs):
+            sent.append(kwargs)
+            return SimpleNamespace(
+                provider="telegram_bot",
+                delivery_status="sent",
+                provider_message_id="tg-provider-1",
+                warnings=[],
+            )
+
+        app.state.communication_service = SimpleNamespace(
+            render_template=lambda **kwargs: kwargs.get("fallback_body") or "Rendered BookedAI template",
+            send_telegram=_send_telegram,
+        )
+        linked_session = SimpleNamespace(
+            channel="telegram",
+            conversation_id="123456",
+            customer_identity_json={"phone": "+61400000000"},
+            metadata_json={},
+        )
+
+        @asynccontextmanager
+        async def _fake_linked_session(_session_factory):
+            yield _WritableFakeSession(execute_result=linked_session)
+
+        with patch("api.v1_communication_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_communication_handlers.get_session",
+            _fake_linked_session,
+        ), patch(
+            "api.v1_communication_handlers.orchestrate_communication_touch",
+            _async_value_factory(
+                SimpleNamespace(
+                    message_id="msg-tg-sent",
+                    delivery_status="sent",
+                    provider="telegram_bot",
+                    warning_codes=[],
+                )
+            ),
+        ):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/telegram/messages/send-by-phone",
+                json={
+                    "to": "+61 400 000 000",
+                    "body": "Hello from BookedAI Manager Bot",
+                    "actor_context": {
+                        "channel": "public_web",
+                        "tenant_id": "tenant-test",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["message_id"], "msg-tg-sent")
+        self.assertEqual(payload["data"]["delivery_status"], "sent")
+        self.assertEqual(sent[0]["chat_id"], "123456")

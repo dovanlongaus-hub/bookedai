@@ -109,7 +109,7 @@ function getSettingsReadOnlyReason(options: {
   missingTenantHint: boolean;
 }) {
   if (options.supportModeActive) {
-    return "Support mode keeps this workspace investigation-first, so tenant configuration writes stay blocked until support mode ends.";
+    return "Support mode keeps this workspace review-first, so tenant configuration changes stay blocked until support mode ends.";
   }
 
   if (options.handoffRequiresReentry) {
@@ -175,7 +175,7 @@ export default async function SettingsPage({
       <PageHeader
         eyebrow="Phase 3"
         title="Workspace settings"
-        description="Settings now covers the tenant profile that operators actually use: workspace identity, locale defaults, and branding content including editable HTML introduction blocks."
+        description="Settings covers the tenant profile teams actually use: workspace identity, locale defaults, and branding content including editable HTML introduction blocks."
       />
       <SupportModePageBanner
         scopeLabel="Workspace settings"
@@ -205,7 +205,7 @@ export default async function SettingsPage({
               </h2>
               <p className="text-sm leading-6 text-slate-600">
                 {supportModeActive
-                  ? "Support mode keeps this page read-only so operators can inspect branding, billing, branches, and plugin posture without accidentally mutating the tenant while an investigation is active."
+                  ? "Support mode keeps this page read-only so teams can inspect branding, billing, branches, and plugin posture without accidentally changing the tenant while a review is active."
                   : handoffRequiresReentry
                   ? handoff.invalidAdminScope
                     ? "The return path in this handoff was not trusted, so the page is locked to read-only. Go back to the shipped Platform Settings shell and open workspace settings again from the canonical CTA."
@@ -236,7 +236,7 @@ export default async function SettingsPage({
               </a>
             ) : supportModeActive ? (
               <div className="rounded-2xl border border-dashed border-violet-300 bg-white/80 px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
-                End support mode or return to tenant investigation before attempting configuration changes.
+                End support mode or return to the tenant review workspace before attempting configuration changes.
               </div>
             ) : handoff.adminReturn ? (
               <div className="rounded-2xl border border-dashed border-violet-300 bg-white/80 px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
@@ -276,7 +276,7 @@ export default async function SettingsPage({
               Use the HTML introduction field for controlled rich content that can later feed tenant landing sections, CRM sync notes, or onboarding previews.
             </p>
             <p>
-              Phase 2 parity now also surfaces branch and billing baseline data here so workspace configuration can be reviewed against the same control-plane truth that powers support investigation.
+              Branch and billing baseline data also appear here so workspace configuration can be reviewed against the same source of truth used during support reviews.
             </p>
           </div>
 
@@ -545,7 +545,7 @@ export default async function SettingsPage({
 
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Integration operator posture
+                Integration access status
               </div>
               <div className="mt-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
                 <div className="flex flex-wrap items-center gap-3">

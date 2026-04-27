@@ -57,7 +57,7 @@ function getLeadsReadOnlyReason(options: {
   missingTenantHint: boolean;
 }) {
   if (options.supportModeActive) {
-    return "Support mode keeps this workspace investigation-first, so lead writes and conversions stay blocked until support mode ends.";
+    return "Support mode keeps this workspace review-first, so lead changes and conversions stay blocked until support mode ends.";
   }
 
   if (options.handoffRequiresReentry) {
@@ -222,7 +222,7 @@ export default async function LeadsPage({
               </h2>
               <p className="text-sm leading-6 text-slate-600">
                 {supportModeActive
-                  ? "Support mode keeps this page read-only so operators can inspect pipeline, follow-up posture, and CRM state without mutating the tenant while an investigation is active."
+                  ? "Support mode keeps this page read-only so teams can inspect pipeline, follow-up status, and CRM state without changing the tenant while a review is active."
                   : handoffRequiresReentry
                   ? handoff.invalidAdminScope
                     ? "The return path in this handoff was not trusted, so the page is locked to read-only. Go back to the shipped admin shell and open Leads again from the canonical CTA."
@@ -253,7 +253,7 @@ export default async function LeadsPage({
               </a>
             ) : supportModeActive ? (
               <div className="rounded-2xl border border-dashed border-violet-300 bg-white/80 px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
-                End support mode or return to tenant investigation before attempting lead changes.
+                End support mode or return to the tenant review workspace before attempting lead changes.
               </div>
             ) : handoff.adminReturn ? (
               <div className="rounded-2xl border border-dashed border-violet-300 bg-white/80 px-4 py-3 text-sm text-slate-600 lg:max-w-xs">
@@ -332,9 +332,9 @@ export default async function LeadsPage({
               className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-sm text-slate-900"
             >
               <option value="all">All owners</option>
-              <option value="BookedAI SDR">BookedAI SDR</option>
+              <option value="BookedAI.au SDR">BookedAI.au SDR</option>
               <option value="Amy Tran">Amy Tran</option>
-              <option value="BookedAI Operator">BookedAI Operator</option>
+              <option value="BookedAI.au Team">BookedAI.au Team</option>
             </select>
             <select
               name="sort_by"
@@ -480,7 +480,7 @@ export default async function LeadsPage({
         <AdminCard className="p-6">
           <h2 className="text-lg font-semibold text-slate-950">Create lead</h2>
           <p className="mt-2 text-sm leading-6 text-slate-600">
-            New leads enter the pipeline with owner, stage, score, and follow-up timing so operators can push demand quickly into customer or booking conversion.
+            New leads enter the pipeline with owner, stage, score, and follow-up timing so teams can move demand quickly into customer or booking conversion.
           </p>
           <div className="mt-6">
             <LeadForm

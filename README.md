@@ -29,6 +29,7 @@ Current public runtime decision:
 - `scripts/healthcheck_stack.sh` expects `bookedai.au` to serve the homepage shell directly and still probes `pitch.bookedai.au` as the deeper pitch surface.
 - `product.bookedai.au` is the deeper live product web runtime; search uses a ChatGPT-like composer, results stay results-first after ranking, and compact cards use detail popups, chat-based refinements, and explicit `Book` actions before customer details open.
 - chess searches can surface the reviewed BookedAI chess tenant in the normal result list with verified-tenant capability chips for booking, Stripe, QR payment/confirmation, calendar, email, WhatsApp Agent, and portal edit/revisit.
+- `portal.bookedai.au` is the returning-customer command center: a valid `booking_reference` opens booking status, payment posture, booking QR, payment QR/link when ready, Telegram/WhatsApp continuation links with the ID attached, and request-safe actions for reschedule/change, cancel, help, save, or add another booking.
 - configured messaging channels now feed a shared Messaging Automation Layer: customer message -> channel webhook -> BookedAI Inbox (`conversation_events`) -> AI booking-care policy -> booking/payment/follow-up/retention workflow side effects -> provider reply. The separate customer-facing BookedAI Telegram bot is the first generalized channel at `/api/webhooks/bookedai-telegram`, while WhatsApp continues through `/api/webhooks/whatsapp` and `/api/webhooks/evolution`; SMS, email, and web chat should reuse this same engine as their adapters mature.
 - `/roadmap` exposes the active Phase/Sprint `17-23` plan for full-flow stabilization, revenue-ops control, customer care, widget runtime, billing truth, templates, and release governance.
 - native mobile is intentionally deferred to a later phase.
@@ -160,6 +161,7 @@ Core production services defined in [`docker-compose.prod.yml`](/home/dovanlong/
 - default support/contact for BookedAI-managed customer booking channels is `BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL=info@bookedai.au` and `BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_PHONE=+61455301335`; expose that phone as Telegram, WhatsApp, or iMessage-capable customer contact
 - intended customer webhook target: `https://api.bookedai.au/api/webhooks/bookedai-telegram`
 - live status: `@BookedAI_Manager_Bot` is active with Telegram webhook configured to the customer webhook target, and the production backend reads `BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN` from the live secret environment
+- current tenant activation proof: `co-mai-hung-chess-class` has Telegram tenant notifications configured to chat id `8426853622`; `@BookedAI_Manager_Bot` can send to that chat after the customer/tenant user has started the bot
 - do not use the OpenClaw/operator Telegram bot token here; this bot is only for BookedAI customer service search, booking, follow-up, billing reminders, reschedule/cancel requests, confirmation, and retention journeys
 - Telegram messages are stored as `telegram_inbound` conversation events, answered by the same booking-care/status agent as WhatsApp, and can queue audited cancellation or reschedule requests when the booking is safely resolved
 - Telegram service-search shortlist state is also mirrored into `messaging_channel_sessions`, so callback actions can recover the latest query/options/reply controls without depending only on event-history shape
@@ -168,6 +170,9 @@ Core production services defined in [`docker-compose.prod.yml`](/home/dovanlong/
 - customers can tap or send `Find more on Internet near me` to widen discovery through the configured BookedAI public search service; external results are labeled `public_web_search` and remain inside the BookedAI reply/booking flow
 - after a shortlist reply, customers can tap `Book 1` or answer `Book 1` with name plus email or phone and preferred time; BookedAI creates the contact, lead, booking intent, booking reference, portal link, and pending payment/follow-up state directly from Telegram
 - existing-booking questions remain scoped to that private channel and are loaded only by explicit booking reference or a safe single customer identity match from phone/email parsed from the customer message or provider metadata
+- existing-booking payment/status care replies use only the latest customer turn for support-escalation detection, so prior assistant copy such as `Support contact` cannot accidentally queue a support request; Telegram also returns a rich inline action menu for these care replies
+- pending-payment booking replies in Telegram must keep the customer in a professional app-style decision flow: `Keep this booking`, `View booking`, `Open order QR`, `Change time`, `Cancel booking`, `New booking search`, and `Open BookedAI`
+- normal `BookedAI Manager Bot` messages should use Telegram HTML parse mode for headings, labels, and links whenever the message is part of search, booking capture, pending-payment care, or existing-booking support
 - operator activation helper: after `BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN` is present in the secret environment, run `python3 scripts/customer_telegram_bot_manager.py --get-me --activate-webhook --webhook-info`; after a user has pressed Start in Telegram, get a chat id with `python3 scripts/customer_telegram_bot_manager.py --recent-chats` and send a controlled test with `python3 scripts/customer_telegram_bot_manager.py --send-test-chat-id <chat_id>`
 - operator UAT helper: run `python3 scripts/customer_agent_uat.py --api-base https://api.bookedai.au` for the web-chat probe; set `BOOKEDAI_CUSTOMER_TELEGRAM_WEBHOOK_SECRET_TOKEN` and `BOOKEDAI_CUSTOMER_TELEGRAM_UAT_CHAT_ID` to include Telegram message/callback webhook probes without printing secrets
 - protected operator health is available at `/api/customer-agent/health` and `/api/admin/customer-agent/health` with admin authentication; it reports recent channel events, pending posture, last reply/callback status, identity-resolution failures, and recent channel-session snapshots
@@ -521,6 +526,7 @@ python3 scripts/telegram_workspace_ops.py test --command "./scripts/run_release_
 python3 scripts/telegram_workspace_ops.py workspace-command --command "git mv old/path new/path"
 python3 scripts/telegram_workspace_ops.py host-command --command "apt-get update"
 python3 scripts/telegram_workspace_ops.py host-shell --cwd / --command "docker ps && systemctl status nginx"
+python3 scripts/telegram_workspace_ops.py host-exec --cwd / --command "sudo -n docker ps && sudo -n systemctl status nginx"
 python3 scripts/telegram_workspace_ops.py sync-openclaw-bookedai-agent
 python3 scripts/telegram_workspace_ops.py fix-openclaw-approvals
 python3 scripts/telegram_workspace_ops.py enable-openclaw-full-access
@@ -530,19 +536,25 @@ python3 scripts/telegram_workspace_ops.py whatsapp-bot-status
 The wrapper keeps the operator path explicit:
 
 - `build-frontend` runs the BookedAI production frontend build in `frontend/`
-- `deploy-live` runs the approved VPS-host deployment wrapper `bash scripts/deploy_live_host.sh`; when invoked from the privileged OpenClaw CLI container at `/workspace/bookedai.au`, it automatically enters the VPS host namespace before running the deploy
+- `deploy-live` runs the approved VPS-host deployment wrapper `bash scripts/deploy_live_host.sh`; when invoked from the privileged OpenClaw CLI container at `/workspace/bookedai.au`, or by the trusted host users `openclaw` and `telegram`, it automatically uses the full host execution context before running the deploy
 - `test` runs a repo-scoped validation command such as release-gate, backend, or frontend verification
 - `workspace-command` runs a repo-scoped shell command so Telegram/OpenClaw can handle broader BookedAI changes, including file moves, refactors, and multi-surface rollout steps
 - `host-command` runs a host-level command through `sudo -n` only when the requested program is in the checked-in allowlist such as `apt-get`, `docker`, `systemctl`, `journalctl`, `service`, `timedatectl`, or `ufw`
-- `host-shell` is now blocked by default and only works when `BOOKEDAI_ENABLE_HOST_SHELL=1` is set for an explicit break-glass operator session; normal Telegram/OpenClaw operation should prefer repo-scoped commands, `deploy-live`, `whatsapp-bot-status`, or allowlisted `host-command`
+- `host-shell` is enabled by default for trusted Telegram/OpenClaw operators through `BOOKEDAI_ENABLE_HOST_SHELL=1`, giving the operator bot an ambient full-host break-glass lane for VPS repair, deploy, Docker, and system service work
+- `host-exec` is the explicit OpenClaw-friendly alias for `host-shell`; use it when the operator request says host-exec or when the command should run as a full host execution with host `sudo`
 - `sync-openclaw-bookedai-agent` installs or updates the always-on `BookedAI Booking Customer Agent` manifest in the OpenClaw runtime config directory without adding schema-invalid entries to `openclaw.json`; use `--legacy-whatsapp-agent` only when syncing the older WhatsApp-specific care manifest
 - `fix-openclaw-approvals` aligns `tools.exec.ask` and the host `exec-approvals.json` defaults to `on-miss`, repairing the OpenClaw error `allow-always is unavailable because the effective policy requires approval every time` while keeping untrusted commands approval-gated
-- `enable-openclaw-full-access` is the trusted-operator break-glass posture for `bot.bookedai.au`: it sets OpenClaw exec to `security=full`, `ask=off`, `askFallback=full`, enables elevated access for webchat, enables elevated access for Telegram trusted ids, and sets `agents.defaults.elevatedDefault=full`; pass `--telegram-open` only if every Telegram sender should be allowed
+- `enable-openclaw-full-access` is the trusted-operator runtime policy apply/repair posture for `bot.bookedai.au`: it sets OpenClaw exec to `security=full` and `ask=off`, keeps `askFallback=full` in `exec-approvals.json`, enables elevated access for webchat, enables elevated access for Telegram trusted ids, and sets `agents.defaults.elevatedDefault=full`; pass `--telegram-open` only if every Telegram sender should be allowed
 - `whatsapp-bot-status` runs the read-only WhatsApp bot readiness probe for OpenClaw, API health, provider status, and the active webhook route; for `whatsapp_evolution` it checks `/api/webhooks/evolution`, and for Meta/Twilio it checks `/api/webhooks/whatsapp`
 - when the wrapper is running inside the privileged OpenClaw CLI container, `deploy-live`, `host-command`, and `host-shell` now jump into the real host namespaces through `nsenter --target 1 ...`, so Docker, package managers, and system binaries resolve against the VPS itself instead of the container filesystem
+- when `nsenter` host context is available, the operator wrapper executes that host-context command directly instead of prepending `sudo`; this covers slim OpenClaw runtimes where `/hostfs` is mounted but the container image does not include a `sudo` binary
+- if a non-root runtime can see `nsenter` but cannot execute it directly, `host-shell` now falls back to `sudo -n nsenter ...`; once inside the host namespace, the requested command can itself use host `sudo`, so trusted OpenClaw/Telegram commands such as `host-shell --command "sudo -n docker ps"` work under the current operator permissions
+- if the current runtime has no Docker CLI but host-shell is enabled, `deploy-live` now falls back to the full-host `host-shell` path instead of running `deploy_live_host.sh` inside the container and failing with `Live deploy requires the Docker host environment`
+- `scripts/deploy_live_host.sh` now also self-reexecs through `nsenter` when called directly from an OpenClaw runtime that has `/hostfs` but no container-local Docker CLI, so direct wrapper calls and `deploy-live` share the same VPS host context
 - `sync-doc` is the documentation or Notion or Discord path for Telegram change tracking
-- `host-command` intentionally does not expose `bash`, `sh`, or arbitrary executable paths, so it can support machine operations without turning the Telegram path into a general-purpose root shell
-- `host-shell` remains intentionally broader, but `host_shell`, `openclaw_runtime_admin`, and `full_project` are no longer in the default OpenClaw action set; grant them only for temporary, audited break-glass work
+- `host-command` still does not expose `bash`, `sh`, or arbitrary executable paths; use `host-shell` for the requested full-root/full-host operator lane
+- `host_shell`, `openclaw_runtime_admin`, and `full_project` are now part of the default trusted OpenClaw/Telegram action set, and the OpenClaw CLI compose service runs as root with privileged host access, `/hostfs`, and Docker socket access by default
+- on the current VPS host, Linux users `openclaw` and `telegram` are trusted root operators: both are in `sudo` and `docker`, and `/etc/sudoers.d/99-bookedai-full-root-users` grants passwordless `ALL` commands for host repair, deploy, Docker, and container administration
 - on the current VPS host, Linux user `openclaw` is provisioned with ACL-based write access to the host repo path `/home/dovanlong/BookedAI`; because that path is bind-mounted into the container at `/workspace/bookedai.au`, trusted OpenClaw execution can now create, edit, rename, and delete project files there without changing the repo owner
 - that ACL posture was then re-applied recursively across the whole repo tree on `2026-04-22` so previously restricted subdirectories inherit the same write model; direct verification as `openclaw` now also covers the homepage landing files `frontend/src/components/landing/sections/HomepageExecutiveBoardSection.tsx` and `frontend/src/components/landing/sections/HomepageOverviewSection.tsx`
 - the standard OpenClaw gateway runtime writes the bind mount as container user `node` (`uid 1000`, mapped to host ACL entry `ubuntu` on this machine), so the same ACL write model is now granted to host `uid 1000` as well; this restores memory flushes and other repo writes initiated from the gateway runtime
@@ -559,7 +571,7 @@ Telegram authorization for elevated actions:
 - inspect the current permission snapshot with:
 
 ```sh
-python3 scripts/telegram_workspace_ops.py permissions --telegram-user-id 8426853622
+python3 scripts/telegram_workspace_ops.py --telegram-user-id 8426853622 permissions
 ```
 
 ## CI/CD collaboration summary

@@ -39,7 +39,7 @@ export function FooterSection() {
                   info@bookedai.au
                 </a>
                 <a href="#pricing" className="transition hover:text-slate-900">
-                  Book a Demo
+                  View Pricing
                 </a>
                 <span>BookedAI.au</span>
               </div>

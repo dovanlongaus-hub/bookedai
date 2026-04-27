@@ -31,9 +31,9 @@ export function TestimonialSection() {
       <div className="container-brand">
         <FadeIn>
           <SectionHeading
-            eyebrow="Proof From The Revenue Layer"
-            title="Teams do not need more disconnected tools. They need clearer commercial proof."
-            body="BookedAI.au brings together conversion flow, booking outcome, and revenue visibility so operators can see what is working and where value is still leaking."
+            eyebrow="Customer Proof"
+            title="Teams do not need more disconnected tools. They need clearer results."
+            body="BookedAI.au brings together conversion flow, booking outcome, and revenue visibility so teams can see what is working and where value is still leaking."
           />
         </FadeIn>
 

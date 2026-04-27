@@ -7,6 +7,7 @@ import {
   AdminBookingDetailResponse,
   AdminBookingsResponse,
   AdminConfigResponse,
+  AdminCustomerAgentHealthResponse,
   AdminMessagingActionResponse,
   AdminMessagingDetailResponse,
   AdminMessagingListResponse,
@@ -204,6 +205,26 @@ export async function fetchAdminMessaging(
   return payload as AdminMessagingListResponse;
 }
 
+export async function fetchAdminCustomerAgentHealth(
+  apiBaseUrl: string,
+  sessionToken: string,
+) {
+  const response = await fetch(`${apiBaseUrl}/admin/customer-agent/health`, {
+    headers: createAdminAuthHeaders(sessionToken),
+  });
+  const payload = (await parseJsonOrNull(response)) as
+    | AdminCustomerAgentHealthResponse
+    | { detail?: string }
+    | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not load customer agent health.'));
+  }
+  return payload as AdminCustomerAgentHealthResponse;
+}
+
 export async function fetchAdminMessageDetail(
   apiBaseUrl: string,
   sessionToken: string,
@@ -278,6 +299,7 @@ export async function fetchAdminDashboardData(
     fetch(`${apiBaseUrl}/admin/services`, { headers }),
     fetch(`${apiBaseUrl}/admin/services/quality`, { headers }),
     fetch(`${apiBaseUrl}/admin/messaging?limit=60`, { headers }),
+    fetch(`${apiBaseUrl}/admin/customer-agent/health`, { headers }),
   ]);
 
   const payloads = await Promise.all(responses.map((response) => parseJsonOrNull(response)));
@@ -300,6 +322,7 @@ export async function fetchAdminDashboardData(
     services: payloads[5] as AdminServiceMerchantListResponse,
     serviceQuality: payloads[6] as AdminServiceCatalogQualityResponse,
     messaging: payloads[7] as AdminMessagingListResponse,
+    customerAgentHealth: payloads[8] as AdminCustomerAgentHealthResponse,
     bookingsViewEnabled:
       responses[1].headers.get('X-BookedAI-Admin-Bookings-View') === 'enhanced',
     bookingsShadowStatus: responses[1].headers.get('X-BookedAI-Admin-Bookings-Shadow') ?? 'disabled',

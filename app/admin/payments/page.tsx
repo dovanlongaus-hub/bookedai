@@ -67,11 +67,11 @@ export default async function PaymentsPage({
     <div className="space-y-6">
       <PageHeader
         eyebrow="Phase 3"
-        title="Payments control plane"
-        description="This is the first revenue-truth payment lane for the admin workspace: list, filter, record payments, and move status without leaving the tenant operating view."
+        title="Payments workspace"
+        description="This payments workspace lets teams list, filter, record payments, and move status without leaving the tenant view."
       />
       <SupportModePageBanner
-        scopeLabel="Payments control plane"
+        scopeLabel="Payments workspace"
         tenantPanel="billing"
         adminPath="/admin/payments"
       />

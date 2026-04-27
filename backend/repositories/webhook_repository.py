@@ -96,7 +96,7 @@ class WebhookEventRepository(BaseRepository):
                 where status <> 'processed'
                   and (:provider is null or provider = :provider)
                   and (
-                    :tenant_ref is null
+                    cast(:tenant_ref as text) is null
                     or tenant_id = {self.tenant_lookup_sql()}
                   )
                 order by received_at asc, id asc
