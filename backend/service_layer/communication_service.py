@@ -556,6 +556,49 @@ class CommunicationService:
             warnings=[],
         )
 
+    async def send_telegram_chat_action(
+        self,
+        *,
+        chat_id: str,
+        action: str = "typing",
+    ) -> CommunicationSendResult:
+        recipient = str(chat_id or "").strip()
+        if not recipient:
+            raise ValueError("Telegram chat_id is required.")
+        bot_token = self._customer_telegram_bot_token()
+        if not bot_token:
+            return CommunicationSendResult(
+                provider="telegram_bot",
+                delivery_status="queued",
+                warnings=["Telegram bot token is not configured; chat action was skipped."],
+            )
+        async with httpx.AsyncClient(timeout=10) as client:
+            previous_httpx_level = HTTPX_LOGGER.level
+            HTTPX_LOGGER.setLevel(logging.WARNING)
+            try:
+                response = await client.post(
+                    f"https://api.telegram.org/bot{bot_token}/sendChatAction",
+                    json={"chat_id": recipient, "action": action},
+                )
+                response.raise_for_status()
+            except httpx.HTTPStatusError as error:
+                status_code = error.response.status_code if error.response is not None else None
+                warning = "Telegram chat action is unavailable right now."
+                if status_code is not None:
+                    warning = f"Telegram chat action returned HTTP {status_code}."
+                return CommunicationSendResult(
+                    provider="telegram_bot",
+                    delivery_status="queued",
+                    warnings=[warning],
+                )
+            finally:
+                HTTPX_LOGGER.setLevel(previous_httpx_level)
+        return CommunicationSendResult(
+            provider="telegram_bot",
+            delivery_status="sent",
+            warnings=[],
+        )
+
     @staticmethod
     def _normalize_provider_name(value: str | None) -> str:
         return str(value or "").strip().lower()

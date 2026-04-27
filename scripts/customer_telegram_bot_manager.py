@@ -22,6 +22,14 @@ SECRET_ENV_KEYS = {
     "BOOKEDAI_CUSTOMER_TELEGRAM_WEBHOOK_SECRET_TOKEN",
 }
 
+DEFAULT_BOT_COMMANDS: list[dict[str, str]] = [
+    {"command": "start", "description": "Open BookedAI Manager Bot"},
+    {"command": "search", "description": "Find a service to book"},
+    {"command": "mybookings", "description": "View your active bookings"},
+    {"command": "cancel", "description": "Cancel an active booking"},
+    {"command": "help", "description": "How this bot works"},
+]
+
 
 def load_dotenv_file() -> None:
     env_path = REPO_ROOT / ".env"
@@ -187,6 +195,12 @@ def main() -> int:
     parser.add_argument("--send-test-chat-id")
     parser.add_argument("--message", default=DEFAULT_TEST_MESSAGE)
     parser.add_argument(
+        "--set-commands",
+        action="store_true",
+        help="Publish the BookedAI Manager Bot command menu via setMyCommands.",
+    )
+    parser.add_argument("--get-commands", action="store_true")
+    parser.add_argument(
         "--set-env-token-stdin",
         action="store_true",
         help="Read BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN from stdin and write it to an env file without printing it.",
@@ -246,6 +260,17 @@ def main() -> int:
         )
         result = response.get("result") if isinstance(response.get("result"), dict) else {}
         print(json.dumps({"test_message": "sent", "message_id": result.get("message_id")}, indent=2))
+
+    if args.set_commands:
+        did_work = True
+        api_call(token, "setMyCommands", {"commands": DEFAULT_BOT_COMMANDS})
+        print(json.dumps({"commands": "published", "count": len(DEFAULT_BOT_COMMANDS)}, indent=2))
+
+    if args.get_commands:
+        did_work = True
+        response = api_call(token, "getMyCommands")
+        commands = response.get("result") if isinstance(response.get("result"), list) else []
+        print(json.dumps({"commands": commands}, indent=2))
 
     if not did_work:
         parser.print_help()

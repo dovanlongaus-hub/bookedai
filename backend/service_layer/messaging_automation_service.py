@@ -115,6 +115,24 @@ class MessagingAutomationService:
             customer_phone=customer_phone,
         )
 
+        if (
+            normalized_channel == "telegram"
+            and str(metadata.get("start_command_kind") or "") == "welcome"
+        ):
+            return self._build_welcome_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+            )
+
+        slash_intent = self._slash_command_intent(message.text)
+        if slash_intent == "help":
+            return self._build_welcome_result(
+                channel=normalized_channel,
+                message=message,
+                identity_metadata=identity_metadata,
+            )
+
         history = await self._load_conversation_history(
             session,
             channel=normalized_channel,
@@ -937,6 +955,24 @@ class MessagingAutomationService:
         return options[offset]
 
     @staticmethod
+    def _slash_command_intent(message: str) -> str | None:
+        text = str(message or "").strip().lower()
+        if not text.startswith("/"):
+            return None
+        head = text.split(maxsplit=1)[0]
+        mapping = {
+            "/help": "help",
+            "/start": "help",
+            "/search": "search",
+            "/find": "search",
+            "/mybookings": "mybookings",
+            "/booking": "mybookings",
+            "/cancel": "cancel",
+            "/support": "support",
+        }
+        return mapping.get(head)
+
+    @staticmethod
     def _is_booking_intake_intent(message: str) -> bool:
         normalized = unicodedata.normalize("NFKD", str(message or "").strip().lower())
         ascii_text = "".join(ch for ch in normalized if not unicodedata.combining(ch))
@@ -1516,7 +1552,7 @@ class MessagingAutomationService:
         return "\n".join(
             [
                 f"<b>{BOOKEDAI_CUSTOMER_PROJECT_NAME}: current order found</b>",
-                f"<b>Current order</b>: {MessagingAutomationService._html(booking_reference)}",
+                f"<b>Current order</b>: <code>{MessagingAutomationService._html(booking_reference)}</code>",
                 f"<b>Portal</b>: <a href=\"{MessagingAutomationService._html(portal_url)}\">open order</a>",
                 f"<b>QR</b>: <a href=\"{MessagingAutomationService._html(qr_url)}\">open QR code</a>",
                 "",
@@ -1782,7 +1818,7 @@ class MessagingAutomationService:
         reply = (
             f"<b>{BOOKEDAI_CUSTOMER_PROJECT_NAME}: booking request started</b>\n"
             f"<b>Service</b>: {self._html(service_name)}\n"
-            f"<b>Reference</b>: {self._html(booking_reference)}\n"
+            f"<b>Reference</b>: <code>{self._html(booking_reference)}</code> (tap to copy)\n"
             "<b>Status</b>: booking captured, payment pending\n"
             f"<b>Portal</b>: <a href=\"{self._html(portal_url)}\">open order</a>\n"
             f"<b>QR</b>: <a href=\"{self._html(qr_code_url)}\">open QR code</a>\n"
@@ -1864,4 +1900,46 @@ class MessagingAutomationService:
             "and your name/email if you want a confirmation sent. "
             "If you already booked, send the booking reference and I can check status, payment, "
             f"reschedule, or cancellation options. {channel_hint} You can also continue at https://bookedai.au."
+        )
+
+    def _build_welcome_result(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        identity_metadata: dict[str, object],
+    ) -> MessagingAutomationResult:
+        sender_name = str(message.sender_name or "").strip()
+        greeting = f"Hi {sender_name}," if sender_name else "Hi there,"
+        body = (
+            f"{greeting} I'm <b>BookedAI Manager Bot</b>. "
+            "I can find and book services for you across Australia and online.\n\n"
+            "Try one of these:\n"
+            "• Tap <b>Find a service</b> below\n"
+            "• Or type what you want, e.g. <i>Find a chess class in Sydney this weekend</i>\n"
+            "• Send /mybookings to see your active bookings\n"
+            "• Send /help anytime to see what I can do"
+        )
+        reply_keyboard = {
+            "keyboard": [
+                [{"text": "Find a service"}, {"text": "My bookings"}],
+                [{"text": "Talk to support"}],
+            ],
+            "resize_keyboard": True,
+            "is_persistent": True,
+            "input_field_placeholder": "Tell me what you want to book…",
+        }
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="welcome",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "welcome",
+                "reply_controls": {
+                    "telegram_reply_markup": reply_keyboard,
+                    "telegram_parse_mode": "HTML",
+                },
+            },
         )
