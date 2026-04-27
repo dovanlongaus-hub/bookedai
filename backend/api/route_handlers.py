@@ -16,6 +16,7 @@ from html.parser import HTMLParser
 from io import StringIO
 from json import JSONDecodeError
 from pathlib import Path
+from urllib.parse import urlencode
 from uuid import uuid4
 
 import httpx
@@ -1393,11 +1394,22 @@ async def _notify_bookedai_support_handoff(
             }
 
     deliveries = list(await asyncio.gather(*(_deliver(chat_id) for chat_id in chat_ids)))
+    delivered_count = sum(
+        1 for item in deliveries if str(item.get("delivery_status") or "") == "sent"
+    )
     return {
         "channel": "telegram",
         "targets": len(chat_ids),
         "deliveries": deliveries,
+        "delivered_count": delivered_count,
+        "all_failed": len(chat_ids) > 0 and delivered_count == 0,
     }
+
+
+def _handoff_completely_failed(handoff_metadata: dict[str, object] | None) -> bool:
+    if not isinstance(handoff_metadata, dict):
+        return False
+    return bool(handoff_metadata.get("all_failed"))
 
 
 async def _send_telegram_chat_action(
@@ -1687,6 +1699,142 @@ async def _finalize_messaging_queued_request_side_effects(
     }
 
 
+_PAY_NOW_BUTTON_LABELS: dict[str, str] = {
+    "en": "💳 Pay {currency} {amount:g} now",
+    "vi": "💳 Thanh toán {currency} {amount:g} ngay",
+}
+_PAY_NOW_LINE_LABELS: dict[str, str] = {
+    "en": "\n\n💳 Pay now: {checkout_url}",
+    "vi": "\n\n💳 Thanh toán ngay: {checkout_url}",
+}
+
+
+def _pay_now_button_text(locale: str, *, amount_aud: float, currency: str) -> str:
+    template = _PAY_NOW_BUTTON_LABELS.get(locale) or _PAY_NOW_BUTTON_LABELS["en"]
+    return template.format(currency=currency.upper(), amount=amount_aud)
+
+
+def _inject_pay_now_button(
+    care_metadata: dict[str, object],
+    stripe_checkout: dict[str, object],
+) -> None:
+    reply_controls = care_metadata.get("reply_controls")
+    if not isinstance(reply_controls, dict):
+        reply_controls = {}
+        care_metadata["reply_controls"] = reply_controls
+    markup = reply_controls.get("telegram_reply_markup")
+    if not isinstance(markup, dict):
+        markup = {}
+        reply_controls["telegram_reply_markup"] = markup
+    keyboard = markup.get("inline_keyboard")
+    if not isinstance(keyboard, list):
+        keyboard = []
+        markup["inline_keyboard"] = keyboard
+    locale = str(care_metadata.get("locale") or "en")
+    amount = float(stripe_checkout.get("amount_aud") or 0)
+    currency = str(stripe_checkout.get("currency") or "AUD")
+    checkout_url = str(stripe_checkout.get("checkout_url") or "").strip()
+    if not checkout_url:
+        return
+    pay_button = {
+        "text": _pay_now_button_text(locale, amount_aud=amount, currency=currency),
+        "url": checkout_url,
+    }
+    keyboard.insert(0, [pay_button])
+
+
+def _append_pay_now_line(
+    ai_reply: str | None,
+    stripe_checkout: dict[str, object],
+    *,
+    locale: str,
+) -> str | None:
+    if not ai_reply:
+        return ai_reply
+    checkout_url = str(stripe_checkout.get("checkout_url") or "").strip()
+    if not checkout_url:
+        return ai_reply
+    template = _PAY_NOW_LINE_LABELS.get(locale) or _PAY_NOW_LINE_LABELS["en"]
+    return ai_reply + template.format(checkout_url=checkout_url)
+
+
+async def _create_chat_stripe_checkout_session(
+    request: Request,
+    *,
+    booking_reference: str,
+    service_name: str,
+    amount_aud: float | None,
+    customer_email: str | None,
+) -> dict[str, object] | None:
+    if not amount_aud or amount_aud <= 0:
+        return None
+    settings_obj = request.app.state.settings
+    secret_key = str(getattr(settings_obj, "stripe_secret_key", "") or "").strip()
+    if not secret_key:
+        return None
+    currency = (str(getattr(settings_obj, "stripe_currency", "") or "AUD")).strip() or "AUD"
+    amount_cents = int(round(float(amount_aud) * 100))
+    portal_url = f"https://portal.bookedai.au/?booking_reference={booking_reference}"
+    success_url = f"{portal_url}&payment=success"
+    cancel_url = f"{portal_url}&payment=cancelled"
+    form_data: list[tuple[str, str]] = [
+        ("mode", "payment"),
+        ("success_url", success_url),
+        ("cancel_url", cancel_url),
+        ("payment_method_types[]", "card"),
+        ("line_items[0][quantity]", "1"),
+        ("line_items[0][price_data][currency]", currency.lower()),
+        ("line_items[0][price_data][unit_amount]", str(amount_cents)),
+        ("line_items[0][price_data][product_data][name]", service_name),
+        ("client_reference_id", booking_reference),
+        ("metadata[booking_reference]", booking_reference),
+        ("metadata[service_name]", service_name),
+        ("metadata[source]", "telegram_manager_bot"),
+    ]
+    normalized_email = str(customer_email or "").strip().lower()
+    if normalized_email:
+        form_data.append(("customer_email", normalized_email))
+    try:
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                "https://api.stripe.com/v1/checkout/sessions",
+                headers={
+                    "Authorization": f"Bearer {secret_key}",
+                    "Content-Type": "application/x-www-form-urlencoded",
+                },
+                content=urlencode(form_data).encode(),
+            )
+            response.raise_for_status()
+            payload = response.json()
+    except Exception as exc:
+        logger.warning(
+            "chat_stripe_checkout_failed",
+            extra={
+                "event_type": "chat_stripe_checkout_failed",
+                "tenant_id": None,
+                "status": 0,
+                "route": "/api/webhooks/bookedai-telegram",
+                "request_id": "",
+                "integration_name": "stripe",
+                "conversation_id": "",
+                "booking_reference": booking_reference,
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+        return None
+    checkout_url = str(payload.get("url") or "").strip()
+    if not checkout_url:
+        return None
+    return {
+        "checkout_url": checkout_url,
+        "external_session_id": str(payload.get("id") or "").strip() or None,
+        "amount_aud": float(amount_aud),
+        "currency": currency.upper(),
+    }
+
+
 async def _finalize_messaging_booking_intent_side_effects(
     request: Request,
     session,
@@ -1728,6 +1876,16 @@ async def _finalize_messaging_booking_intent_side_effects(
         notes=f"Captured via {channel} messaging agent",
     )
 
+    raw_amount = booking.get("amount_aud")
+    amount_aud = float(raw_amount) if isinstance(raw_amount, (int, float)) and raw_amount > 0 else None
+    stripe_checkout = await _create_chat_stripe_checkout_session(
+        request,
+        booking_reference=booking_reference,
+        service_name=service_name,
+        amount_aud=amount_aud,
+        customer_email=customer_email,
+    )
+
     result: dict[str, object] = {
         "crm_sync": {
             "deal": {
@@ -1743,6 +1901,8 @@ async def _finalize_messaging_booking_intent_side_effects(
             "warning_codes": crm_sync.warning_codes,
         }
     }
+    if stripe_checkout:
+        result["stripe_checkout"] = stripe_checkout
 
     if not customer_email or not hasattr(request.app.state, "email_service"):
         return result
@@ -2976,6 +3136,14 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                         **existing_updates,
                         **booking_intent_updates,
                     }
+                    stripe_checkout = booking_intent_updates.get("stripe_checkout")
+                    if isinstance(stripe_checkout, dict) and stripe_checkout.get("checkout_url"):
+                        _inject_pay_now_button(care_metadata, stripe_checkout)
+                        ai_reply = _append_pay_now_line(
+                            ai_reply,
+                            stripe_checkout,
+                            locale=str(care_metadata.get("locale") or "en"),
+                        )
                 lifecycle_metadata = await _finalize_messaging_queued_request_side_effects(
                     request,
                     session,
@@ -3010,6 +3178,13 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                             **existing_updates,
                             "support_handoff": handoff_metadata,
                         }
+                        if _handoff_completely_failed(handoff_metadata):
+                            ai_reply = MessagingAutomationService.render_support_handoff_failed(
+                                locale=str(care_metadata.get("locale") or "en"),
+                                support_email=DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
+                            )
+                            care_metadata["customer_care_status"] = "support_handoff_failed"
+                            care_metadata["support_handoff_failed"] = True
                 delivery_metadata = await _send_messaging_customer_care_reply(
                     request,
                     channel="telegram",
