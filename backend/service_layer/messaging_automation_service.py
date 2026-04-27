@@ -159,12 +159,18 @@ class MessagingAutomationService:
             if slash_args:
                 message.text = slash_args
             else:
-                return self._build_my_bookings_prompt_result(
-                    channel=normalized_channel,
-                    message=message,
-                    identity_metadata=identity_metadata,
-                    locale=locale,
+                recent_ref = self._recent_booking_reference(
+                    channel_state.get("session_metadata") if isinstance(channel_state, dict) else None
                 )
+                if recent_ref:
+                    message.text = recent_ref
+                else:
+                    return self._build_my_bookings_prompt_result(
+                        channel=normalized_channel,
+                        message=message,
+                        identity_metadata=identity_metadata,
+                        locale=locale,
+                    )
         elif slash_intent == "cancel":
             if slash_args:
                 message.text = slash_args
@@ -206,12 +212,18 @@ class MessagingAutomationService:
                     locale=locale,
                 )
             if keyboard_intent == "mybookings":
-                return self._build_my_bookings_prompt_result(
-                    channel=normalized_channel,
-                    message=message,
-                    identity_metadata=identity_metadata,
-                    locale=locale,
+                recent_ref = self._recent_booking_reference(
+                    channel_state.get("session_metadata") if isinstance(channel_state, dict) else None
                 )
+                if recent_ref:
+                    message.text = recent_ref
+                else:
+                    return self._build_my_bookings_prompt_result(
+                        channel=normalized_channel,
+                        message=message,
+                        identity_metadata=identity_metadata,
+                        locale=locale,
+                    )
             if keyboard_intent == "support":
                 return await self._dispatch_support_handoff(
                     session,
@@ -654,6 +666,16 @@ class MessagingAutomationService:
                 )
                 if queued_request:
                     reply = f"{reply} {queued_request.get('message')}".strip()
+
+        await self._remember_recent_booking_reference(
+            session,
+            channel=normalized_channel,
+            conversation_id=conversation_key,
+            tenant_id=tenant_ref,
+            customer_identity=identity_metadata,
+            booking_reference=booking_reference,
+            existing_state=channel_state,
+        )
 
         return MessagingAutomationResult(
             ai_reply=reply,
@@ -2714,6 +2736,67 @@ class MessagingAutomationService:
             support_email=support_email,
         )
 
+    async def _remember_recent_booking_reference(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        customer_identity: dict[str, object],
+        booking_reference: str,
+        existing_state: dict[str, object] | None = None,
+    ) -> None:
+        if not conversation_id or not booking_reference:
+            return
+        existing_metadata = (existing_state or {}).get("session_metadata") if existing_state else {}
+        if not isinstance(existing_metadata, dict):
+            existing_metadata = {}
+        merged_metadata = {
+            **existing_metadata,
+            "recent_booking_reference": booking_reference,
+            "recent_booking_recorded_at": datetime.now(UTC).isoformat(),
+        }
+        await self._upsert_channel_session_state(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=customer_identity,
+            service_search_query=(existing_state or {}).get("service_search_query"),
+            service_options=[
+                item
+                for item in ((existing_state or {}).get("service_options") or [])
+                if isinstance(item, dict)
+            ],
+            reply_controls=(existing_state or {}).get("reply_controls") or {},
+            last_ai_intent="recent_booking_recorded",
+            last_workflow_status="answered",
+            metadata=merged_metadata,
+        )
+
+    @classmethod
+    def _recent_booking_reference(
+        cls, session_metadata: dict[str, object] | None
+    ) -> str | None:
+        if not isinstance(session_metadata, dict):
+            return None
+        ref = str(session_metadata.get("recent_booking_reference") or "").strip()
+        if not ref:
+            return None
+        recorded = str(session_metadata.get("recent_booking_recorded_at") or "").strip()
+        if not recorded:
+            return ref
+        try:
+            recorded_at = datetime.fromisoformat(recorded)
+        except ValueError:
+            return ref
+        if recorded_at.tzinfo is None:
+            recorded_at = recorded_at.replace(tzinfo=UTC)
+        if datetime.now(UTC) - recorded_at > timedelta(seconds=cls.RECENT_BOOKING_REFERENCE_TTL_SECONDS):
+            return None
+        return ref
+
     SUPPORTED_LOCALES = ("en", "vi")
     DEFAULT_LOCALE = "en"
 
@@ -2907,6 +2990,7 @@ class MessagingAutomationService:
 
     CANCEL_INTENT_TTL_SECONDS = 600
     SUPPORT_HANDOFF_DEBOUNCE_SECONDS = 300
+    RECENT_BOOKING_REFERENCE_TTL_SECONDS = 60 * 60 * 24 * 30  # 30 days
 
     @classmethod
     def _resolve_locale(cls, language_code: str | None) -> str:
