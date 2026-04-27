@@ -27,7 +27,7 @@ export default async function RolesPage() {
       <PageHeader
         eyebrow="Phase 3"
         title="Roles and permissions"
-        description="This workspace completes the first permission-management slice for the admin control plane: review role posture, edit permission sets, and keep access semantics close to the actual operating modules."
+        description="This workspace covers permission management for the admin area: review role posture, edit permission sets, and keep access semantics close to the modules people use every day."
       />
       <SupportModePageBanner
         scopeLabel="Roles and permissions"

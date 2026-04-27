@@ -177,6 +177,47 @@ export type AdminMessagingDetailResponse = {
   events: AdminMessagingEvent[];
 };
 
+export type CustomerAgentHealthChannelStatus = {
+  delivery_status?: string | null;
+  provider?: string | null;
+  warnings?: string[];
+  conversation_id?: string | null;
+  created_at?: string | null;
+};
+
+export type CustomerAgentHealthFailureReason = {
+  reason: string;
+  count: number;
+};
+
+export type CustomerAgentHealthSessionSnapshot = {
+  channel: string;
+  conversation_id: string;
+  tenant_id?: string | null;
+  service_search_query?: string | null;
+  service_options_count: number;
+  last_ai_intent?: string | null;
+  last_workflow_status?: string | null;
+  last_reply_delivery?: Record<string, unknown>;
+  last_callback_ack?: Record<string, unknown>;
+  updated_at?: string | null;
+};
+
+export type AdminCustomerAgentHealthResponse = {
+  status: string;
+  agent: string;
+  window_hours: number;
+  webhook_pending_count: number;
+  recent_events: {
+    total: number;
+    by_channel: Record<string, number>;
+  };
+  last_reply_status: Record<string, CustomerAgentHealthChannelStatus>;
+  last_callback_ack_status: Record<string, CustomerAgentHealthChannelStatus>;
+  top_failed_identity_resolution_reasons: CustomerAgentHealthFailureReason[];
+  recent_channel_sessions: CustomerAgentHealthSessionSnapshot[];
+};
+
 export type AdminMessagingActionResponse = {
   status: string;
   action: string;

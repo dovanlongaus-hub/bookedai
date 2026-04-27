@@ -37,7 +37,7 @@ export function DashboardPreviewSection() {
                 align="left"
                 eyebrow="Revenue Visibility Built In"
                 title="See what BookedAI.au actually generates."
-                body="BookedAI.au does not stop at handling enquiries. It helps you measure bookings won, revenue created, opportunities missed, and which channels drive the best performance."
+                body="BookedAI.au does not stop at handling enquiries. It helps you measure bookings won, revenue created, opportunities missed, and the channels driving the best performance."
               />
 
               <div className="mt-8 space-y-3 text-sm text-brand-muted">
@@ -75,7 +75,7 @@ export function DashboardPreviewSection() {
                   ))}
                 </MetricList>
 
-                <MetricList title="Revenue recovery queue">
+                <MetricList title="Revenue opportunities to recover">
                   {recoveryRows.map((row) => (
                     <div key={row.name} className="flex justify-between">
                       <span className="text-brand-muted">{row.name}</span>

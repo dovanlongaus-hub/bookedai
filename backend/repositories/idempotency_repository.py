@@ -33,7 +33,7 @@ class IdempotencyRepository(BaseRepository):
                 where scope = :scope
                   and idempotency_key = :idempotency_key
                   and (
-                    :tenant_ref is null
+                    cast(:tenant_ref as text) is null
                     or tenant_id is null
                     or tenant_id = {self.tenant_lookup_sql()}
                   )

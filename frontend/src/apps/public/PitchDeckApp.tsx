@@ -36,10 +36,11 @@ import {
 const productUrl = 'https://product.bookedai.au/';
 const demoLandingUrl = 'https://demo.bookedai.au/';
 const architectureUrl = '/architecture';
-const pitchVideoUrl = 'https://upload.bookedai.au/videos/0cfb/LCpooAUVSsL24QXMvIBR0A.mp4';
+const pitchVideoUrl = 'https://upload.bookedai.au/videos/9eb8/BhVuOlB2QXlBo-_nyOFCcA.mp4';
 const chessScreenImageUrl = '/branding/optimized/chess-screen-proof-1400.webp';
 const chessScreenImageSrcSet =
   '/branding/optimized/chess-screen-proof-960.webp 960w, /branding/optimized/chess-screen-proof-1400.webp 1400w';
+const productProofImageUrl = 'https://upload.bookedai.au/images/df6e/iarJydFRgp1aWGk5UF0d7g.png';
 
 const pitchNavItems = [
   { id: 'hero', label: 'Overview' },
@@ -996,6 +997,20 @@ export function PitchDeckApp() {
                   </div>
                 </div>
               ))}
+            </div>
+
+            <div className="mt-6 overflow-hidden rounded-[1.6rem] border border-black/6 bg-[#0f172a] p-3 shadow-[0_20px_56px_rgba(15,23,42,0.12)]">
+              <img
+                src={productProofImageUrl}
+                alt="BookedAI product proof workspace screenshot"
+                className="aspect-[1693/929] w-full rounded-[1.1rem] bg-white object-contain object-center"
+                loading="lazy"
+                width={1693}
+                height={929}
+              />
+              <div className="px-2 pb-1 pt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/62">
+                Product proof · uploaded evidence
+              </div>
             </div>
 
             <div className="mt-6 flex gap-3">

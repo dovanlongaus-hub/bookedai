@@ -112,7 +112,7 @@ class JobRunRepository(BaseRepository):
                   created_at
                 from job_runs
                 where (
-                  :tenant_ref is null
+                  cast(:tenant_ref as text) is null
                   or tenant_id = {self.tenant_lookup_sql()}
                 )
                 order by coalesce(finished_at, started_at, created_at) desc, id desc

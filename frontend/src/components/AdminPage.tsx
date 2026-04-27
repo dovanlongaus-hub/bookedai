@@ -117,6 +117,7 @@ export function AdminPage() {
     apiRoutes,
     messagingItems,
     selectedMessageDetail,
+    customerAgentHealth,
     messagingActionMessage,
     messagingActionSubmittingKey,
     partners,
@@ -717,7 +718,10 @@ export function AdminPage() {
               <IntegrationHealthSection
                 recentEvents={overview?.recent_events ?? []}
                 queueItems={overview?.portal_support_queue ?? []}
+                messagingItems={messagingItems}
+                customerAgentHealth={customerAgentHealth}
                 selectedTenantName={selectedTenantDetail?.tenant.name ?? null}
+                selectedTenantRef={selectedTenantRef || null}
               />
 
               <div id="recent-events">

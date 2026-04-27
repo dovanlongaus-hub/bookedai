@@ -298,6 +298,7 @@ Active deliverables:
 - explicit `Book` gate before contact details open
 - progressive search loading with skeleton and staged status
 - mobile no-overflow at `390px`
+- public and pitch proof surfaces can include the uploaded BookedAI product-evidence screenshot after the chess proof / inside Product proof to keep the vertical story connected to the broader product workspace
 
 Review-driven additions:
 
@@ -358,6 +359,9 @@ Review-driven additions:
 - `P1-2` WhatsApp inline action controls and `BookedAI Manager Bot` sender identity alignment
 - `P1-3` WhatsApp webhook test parity with Telegram suite (`closed locally 2026-04-26`)
 - `P1-10` channel-aware email templates with `info@bookedai.au` and chat-channel mention
+- `P1-11` Telegram deep-link continuity from public/product booking surfaces into booking-aware `@BookedAI_Manager_Bot` customer-care threads (`local implementation active 2026-04-27`, live `chess` UAT pending)
+- `P1-12` admin/customer-care reliability spotlight for protected customer-agent health, Telegram reply/callback posture, webhook backlog, identity watchlist, and tenant-scoped CRM/email/notify visibility (`local implementation active 2026-04-27`, live UAT pending)
+- `P1-13` Telegram pending-payment action menu: after `Book n` capture or an existing-booking payment/status reply, the customer must see rich Telegram controls to keep the booking, view portal/QR, change time, cancel, start a new booking search, or open BookedAI (`local implementation active 2026-04-27`, live UAT pending)
 
 A/B activation in this phase:
 
@@ -374,6 +378,7 @@ Source documents:
 - `docs/development/whatsapp-direct-provider-override-2026-04-26.md`
 - `docs/development/telegram-manager-bot-result-ux-2026-04-26.md`
 - `docs/development/customer-booking-support-contact-defaults-2026-04-26.md`
+- `docs/development/implementation-progress.md`
 
 ### Phase 20 — Widget and plugin runtime
 

@@ -289,6 +289,8 @@ Visual proof presentation requirements:
 - proof blocks should be arranged as compact, scan-friendly visual systems rather than long explanatory text cards
 - charts, funnel bars, activity states, and grouped proof cards should carry the main explanatory load where possible
 - supporting text should only clarify the commercial meaning of the visuals instead of duplicating them
+- `bookedai.au` may place uploaded product-evidence screenshots immediately after the chess tenant proof when the image strengthens the transition from vertical proof into the broader BookedAI product workspace, provided the block stays compact and does not push the live search runtime out of the main page flow
+- `pitch.bookedai.au` should carry the same evidence screenshot inside the `Product proof` section when it helps investors connect the chess tenant story to the wider product surface
 
 Booking assistant live-read waiting-state requirements:
 

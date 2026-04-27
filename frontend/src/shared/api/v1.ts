@@ -1150,6 +1150,13 @@ export async function sendWhatsAppMessage(request: SendCommunicationMessageReque
   );
 }
 
+export async function sendTelegramMessageByPhone(request: SendCommunicationMessageRequest) {
+  return requestV1Envelope<SendCommunicationMessageResponse>(
+    '/v1/telegram/messages/send-by-phone',
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
 export async function getIntegrationProviderStatuses() {
   return requestV1Envelope<IntegrationProviderStatusesResponse>('/v1/integrations/providers/status');
 }
@@ -1722,6 +1729,7 @@ export const apiV1 = {
   createPaymentIntent,
   sendSmsMessage,
   sendWhatsAppMessage,
+  sendTelegramMessageByPhone,
   sendLifecycleEmail,
   getIntegrationAttention,
   getIntegrationAttentionTriage,

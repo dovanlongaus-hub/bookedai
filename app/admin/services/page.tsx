@@ -87,7 +87,7 @@ export default async function ServicesPage({
             <div>
               <h2 className="text-lg font-semibold text-slate-950">Service list</h2>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Keep the catalog lightweight here. This admin slice focuses on the offer essentials operators need most often.
+                Keep the catalog lightweight here. This workspace focuses on the offer essentials teams need most often.
               </p>
             </div>
           </div>

@@ -29,11 +29,11 @@ test('LeadForm shows a read-only explanation when mutation is blocked', () => {
       tenantId="tenant-harbour-glow"
       tenantSlug="harbour-glow"
       disabled
-      readOnlyReason="Support mode keeps this workspace investigation-first."
+      readOnlyReason="Support mode keeps this workspace review-first."
     />,
   );
 
   assert.match(html, /Leads is read-only right now/);
-  assert.match(html, /Support mode keeps this workspace investigation-first/);
+  assert.match(html, /Support mode keeps this workspace review-first/);
   assert.match(html, /<fieldset disabled="" class="space-y-4">/);
 });

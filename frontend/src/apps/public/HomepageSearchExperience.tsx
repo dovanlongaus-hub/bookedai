@@ -1184,6 +1184,25 @@ function getBookingQrCodeUrl(result: BookingAssistantSessionResponse) {
   return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(targetUrl)}`;
 }
 
+function buildTelegramCareUrl(params: {
+  bookingReference?: string | null;
+  serviceName?: string | null;
+}) {
+  const bookingReference = params.bookingReference?.trim();
+  if (bookingReference) {
+    return `https://t.me/BookedAI_Manager_Bot?start=${encodeURIComponent(`bk.${bookingReference}`)}`;
+  }
+
+  const serviceSlug = (params.serviceName || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 36);
+
+  return `https://t.me/BookedAI_Manager_Bot?start=${encodeURIComponent(serviceSlug ? `svc.${serviceSlug}` : 'care')}`;
+}
+
 function buildBookingFlowSteps(params: {
   currentQuery: string;
   selectedService: ServiceCatalogItem | null;
@@ -4550,6 +4569,15 @@ export function HomepageSearchExperience({
                   <SparkIcon className="h-4 w-4" />
                   {submitLoading ? content.ui.bookingSubmitting : content.ui.bookingButton}
                 </button>
+                <a
+                  href={buildTelegramCareUrl({ serviceName: selectedService?.name ?? null })}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="public-apple-secondary-button inline-flex h-10 w-full items-center justify-center gap-2 rounded-[0.95rem] px-5 text-sm font-semibold transition"
+                >
+                  <MessageIcon className="h-4 w-4" />
+                  Need help in Telegram? Open BookedAI Manager Bot
+                </a>
               </form>
             </div>
           ) : null}
@@ -4663,6 +4691,15 @@ export function HomepageSearchExperience({
                       body: 'If plans changed, submit a cancellation request from the same managed flow.',
                       label: 'Request cancellation',
                       href: getBookingPortalUrl(result, 'cancel'),
+                    },
+                    {
+                      title: 'Telegram care',
+                      body: `Open BookedAI Manager Bot with booking ${result.booking_reference} ready in the new chat session for ${result.service.name}.`,
+                      label: 'Open Telegram',
+                      href: buildTelegramCareUrl({
+                        bookingReference: result.booking_reference,
+                        serviceName: result.service.name,
+                      }),
                     },
                   ].map((item) => (
                   <a
@@ -4853,6 +4890,19 @@ export function HomepageSearchExperience({
                   <MessageIcon className="h-4 w-4" />
                   <span>Chat</span>
                 </button>
+                <a
+                  href={buildTelegramCareUrl({
+                    bookingReference: result.booking_reference,
+                    serviceName: result.service.name,
+                  })}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Open Telegram booking care"
+                  className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
+                >
+                  <MessageIcon className="h-4 w-4" />
+                  <span>Telegram</span>
+                </a>
                 <button
                   type="button"
                   aria-label="Return home"

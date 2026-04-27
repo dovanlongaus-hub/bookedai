@@ -60,16 +60,16 @@ export async function SupportModePageBanner({
             <AdminBadge tone="info">{scopeLabel}</AdminBadge>
           </div>
           <div className="mt-3 text-sm font-semibold text-amber-950">
-            Investigating tenant <span className="font-bold">{impersonation.tenantSlug}</span> from this workspace.
+            Reviewing tenant <span className="font-bold">{impersonation.tenantSlug}</span> from this workspace.
           </div>
           <div className="mt-1 text-sm leading-6 text-amber-900">
-            Keep this page investigation-first while support mode is active. Create, update, delete, and sync write actions are blocked until support mode ends.
+            Keep this page review-first while support mode is active. Create, update, delete, and sync actions stay blocked until support mode ends.
             {impersonation.reason ? ` Reason: ${impersonation.reason}.` : ""}
           </div>
         </div>
         <div className="flex flex-wrap gap-2">
           <Link href={`/admin/tenants?tenant=${encodeURIComponent(impersonation.tenantSlug)}`}>
-            <AdminButton variant="secondary">Return to tenant investigation</AdminButton>
+            <AdminButton variant="secondary">Return to tenant review</AdminButton>
           </Link>
           <a
             href={buildTenantWorkspaceLink({

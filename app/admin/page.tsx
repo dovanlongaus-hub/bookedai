@@ -165,7 +165,7 @@ export default async function AdminDashboardPage() {
           />
           <ChartCard
             title="Booking status"
-            subtitle="Operational booking posture by current status."
+            subtitle="Current booking status across the workspace."
             items={snapshot.bookingStatusSeries.map((item) => ({
               label: item.label,
               value: item.count,
@@ -329,7 +329,7 @@ export default async function AdminDashboardPage() {
             ))
           ) : (
             <p className="text-sm text-slate-600">
-              Audit logs will appear here as operators create, update, archive, and recover records.
+              Audit logs will appear here as teams create, update, archive, and recover records.
             </p>
           )}
         </div>

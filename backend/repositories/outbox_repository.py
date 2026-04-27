@@ -92,7 +92,7 @@ class OutboxRepository(BaseRepository):
                 where status in ('pending', 'retrying')
                   and available_at <= now()
                   and (
-                    :tenant_ref is null
+                    cast(:tenant_ref as text) is null
                     or tenant_id = {self.tenant_lookup_sql()}
                   )
                 order by available_at asc, id asc
@@ -165,7 +165,7 @@ class OutboxRepository(BaseRepository):
                   available_at = now()
                 where id = :event_id
                   and (
-                    :tenant_ref is null
+                    cast(:tenant_ref as text) is null
                     or tenant_id = {self.tenant_lookup_sql()}
                   )
                   and status in ('failed', 'retrying', 'pending')

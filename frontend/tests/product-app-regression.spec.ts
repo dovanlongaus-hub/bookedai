@@ -184,7 +184,7 @@ async function openProductApp(
 ) {
   await stubProductApis(page, options);
   await page.goto('/product');
-  await expect(page.getByText(/Search, shortlist, book/i).first()).toBeVisible();
+  await expect(page.getByText(/Chat, search, preview/i).first()).toBeVisible();
   await expect(page.getByRole('textbox', { name: /Ask the booking assistant/i })).toBeVisible();
 }
 
@@ -192,6 +192,16 @@ async function runAssistantSearch(page: Parameters<typeof test>[0]['page'], quer
   const input = page.locator('#assistant-chat-input').first();
   await input.fill(query);
   await page.getByRole('button', { name: /^Send(?: search)?$/i }).click();
+}
+
+async function expectNoHorizontalOverflow(page: Parameters<typeof test>[0]['page']) {
+  const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
+  expect(overflow).toBeLessThanOrEqual(1);
+}
+
+async function expectSingleConfirmationQr(page: Parameters<typeof test>[0]['page']) {
+  await expect(page.getByRole('img', { name: /QR code for/i })).toHaveCount(1);
+  await expect(page.getByText(/Scan the QR or open the portal/i)).toHaveCount(0);
 }
 
 test.describe('product app regression', () => {
@@ -202,9 +212,85 @@ test.describe('product app regression', () => {
     await expect(page.getByRole('button', { name: 'Free Trial', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /Start Free Trial/i })).toBeVisible();
     await expect(page.getByText(/Ready to use BookedAI for your business/i)).toBeVisible();
-    await expect(page.getByText(/Search, shortlist, booking, and follow-up are all live/i)).toBeVisible();
+    await expect(page.getByText(/Chat, search, preview, booking, payment posture/i)).toBeVisible();
+    await expect(page.getByText('Care', { exact: true }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Chess/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Future Swim/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /AI Event WSTI/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /AI Mentor 1-1/i })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
 
     await page.screenshot({ path: testInfo.outputPath('product-app-mobile.png') });
+  });
+
+  test('mobile UAT keeps full booking flow responsive from search to thank-you', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await openProductApp(page, {
+      services: [demoService],
+      bookingSessionBody: demoBookingSession,
+    });
+
+    await expectNoHorizontalOverflow(page);
+    await runAssistantSearch(page, 'Need a precision fade in Sydney');
+    await expect(page.getByText(/Precision Fade/i).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Select & book|Select to book/i }).first()).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await page.getByRole('button', { name: /Select & book|Select to book/i }).first().click();
+    await expect(page.getByText(/Ready to book/i).first()).toBeVisible();
+    await expect(page.getByText(/Your booking journey/i).first()).toBeVisible();
+    await expect(page.getByLabel(/Name/i)).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await page.getByLabel(/Name/i).fill('Mobile Customer');
+    await page.getByRole('textbox', { name: 'Email', exact: true }).fill('mobile@example.com');
+    await page.getByLabel(/Preferred time/i).fill('2026-05-02T11:00');
+    await page.getByRole('button', { name: /^Confirm Booking Request$/i }).click();
+
+    await expect(page.getByText(/Booking secured/i)).toBeVisible();
+    await expect(page.getByText('Your booking portal', { exact: true })).toBeVisible();
+    await expect(page.getByText('Customer care handoff', { exact: true })).toBeVisible();
+    await expect(page.getByText('Telegram and customer care handoff', { exact: true })).toBeVisible();
+    await expectSingleConfirmationQr(page);
+    await expectNoHorizontalOverflow(page);
+
+    await page.screenshot({ path: testInfo.outputPath('product-app-mobile-full-flow.png'), fullPage: true });
+  });
+
+  test('desktop web app UAT supports preview, select, book, and care handoff', async ({ page }, testInfo) => {
+    await page.setViewportSize({ width: 1440, height: 1100 });
+    await openProductApp(page, {
+      services: [demoService],
+      bookingSessionBody: demoBookingSession,
+    });
+
+    await runAssistantSearch(page, 'Need a precision fade in Sydney');
+    await expect(page.getByRole('button', { name: /View details/i }).first()).toBeVisible();
+    await page.getByRole('button', { name: /View details/i }).first().click();
+
+    await expect(page.getByText(/Quick preview/i)).toBeVisible();
+    await expect(page.getByText(/Why it matches/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Book this service/i })).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+
+    await page.getByRole('button', { name: /Book this service/i }).click();
+    await expect(page.getByText(/Ready to book/i).first()).toBeVisible();
+    await expect(page.getByText(/Details/i).first()).toBeVisible();
+    await expect(page.getByText(/Confirm/i).first()).toBeVisible();
+    await expect(page.getByText(/Care/i).first()).toBeVisible();
+
+    await page.getByLabel(/Name/i).fill('Desktop Customer');
+    await page.getByRole('textbox', { name: 'Email', exact: true }).fill('desktop@example.com');
+    await page.getByLabel(/Preferred time/i).fill('2026-05-02T11:00');
+    await page.getByRole('button', { name: /^Confirm Booking Request$/i }).click();
+
+    await expect(page.getByText(/Booking secured/i)).toBeVisible();
+    await expect(page.getByText(/Email, messaging, and customer-care handoffs/i)).toBeVisible();
+    await expect(page.getByText('Telegram and customer care handoff', { exact: true })).toBeVisible();
+    await expectSingleConfirmationQr(page);
+    await expectNoHorizontalOverflow(page);
+
+    await page.screenshot({ path: testInfo.outputPath('product-app-desktop-webapp-full-flow.png'), fullPage: true });
   });
 
   test('trial CTA routes to register-interest with attribution', async ({ page }) => {
@@ -265,6 +351,9 @@ test.describe('product app regression', () => {
 
     await expect(page.getByText(/Request, follow-up, and confirmation status/i)).toBeVisible();
     await expect(page.getByText(/What happened after your request was confirmed/i)).toBeVisible();
+    await expect(page.getByText(/Email, messaging, and customer-care handoffs/i)).toBeVisible();
+    await expect(page.getByText(/Telegram and customer care handoff/i)).toBeVisible();
+    await expectSingleConfirmationQr(page);
     await expect(page.getByText(/BookedAI Demo Night/i).first()).toBeVisible();
     await expect(page.getByText(/Please select a service from the search results/i)).toHaveCount(0);
   });
@@ -286,6 +375,9 @@ test.describe('product app regression', () => {
 
     await expect(page.getByText(/Request, follow-up, and confirmation status/i)).toBeVisible();
     await expect(page.getByText(/What happened after your request was confirmed/i)).toBeVisible();
+    await expect(page.getByText('Customer care handoff', { exact: true })).toBeVisible();
+    await expect(page.getByText('Telegram and customer care handoff', { exact: true })).toBeVisible();
+    await expectSingleConfirmationQr(page);
     await expect(page.getByText(/^Edit details$/i)).toBeVisible();
     await expect(page.getByText(/^Cancel request$/i)).toBeVisible();
   });

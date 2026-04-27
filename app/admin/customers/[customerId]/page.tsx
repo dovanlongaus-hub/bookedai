@@ -236,7 +236,7 @@ export default async function CustomerDetailPage({
 
         <div className="space-y-6">
           <CrmSyncStatusCard
-            description="Customer detail now exposes the Zoho CRM write-back posture directly in the admin workspace so operators can retry contact sync without leaving the revenue workspace."
+            description="Customer detail now exposes Zoho CRM write-back status directly in the admin workspace so teams can retry contact sync without leaving the revenue workspace."
             enabled={crmSync.enabled}
             record={crmSync.record}
             emptyMessage="No Zoho CRM sync record exists for this customer yet. Run a contact sync once the customer profile is ready."

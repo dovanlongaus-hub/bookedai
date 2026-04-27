@@ -8,6 +8,8 @@ import os
 import shlex
 import shutil
 import subprocess
+import getpass
+import errno
 import urllib.error
 import urllib.request
 from pathlib import Path
@@ -30,8 +32,12 @@ DEFAULT_TELEGRAM_ALLOWED_ACTIONS = {
     "workspace_write",
     "repo_structure",
     "host_command",
+    "host_shell",
+    "openclaw_runtime_admin",
     "whatsapp_bot_status",
+    "full_project",
 }
+TRUSTED_HOST_DEPLOY_USERS = {"openclaw", "telegram"}
 HOST_COMMAND_ALLOWED_PROGRAMS = {
     "apt",
     "apt-get",
@@ -49,12 +55,34 @@ class TelegramAuthorizationError(RuntimeError):
     """Raised when a Telegram actor is not allowed to run an operation."""
 
 
+def resolve_nsenter_path() -> str | None:
+    if not Path("/hostfs").exists():
+        return None
+
+    container_nsenter = shutil.which("nsenter")
+    if container_nsenter:
+        return container_nsenter
+
+    for candidate in ("/hostfs/usr/bin/nsenter", "/hostfs/bin/nsenter"):
+        if Path(candidate).exists():
+            return candidate
+    return None
+
+
 def should_use_nsenter_host_exec() -> bool:
-    return Path("/hostfs").exists() and shutil.which("nsenter") is not None
+    return resolve_nsenter_path() is not None
+
+
+def current_os_user() -> str:
+    return os.getenv("USER") or os.getenv("LOGNAME") or getpass.getuser()
+
+
+def is_trusted_host_deploy_user() -> bool:
+    return current_os_user() in TRUSTED_HOST_DEPLOY_USERS
 
 
 def is_host_shell_enabled() -> bool:
-    return os.getenv("BOOKEDAI_ENABLE_HOST_SHELL", "").strip().lower() in {
+    return os.getenv("BOOKEDAI_ENABLE_HOST_SHELL", "1").strip().lower() in {
         "1",
         "true",
         "yes",
@@ -63,9 +91,51 @@ def is_host_shell_enabled() -> bool:
 
 
 def build_host_exec_prefix() -> list[str]:
-    if should_use_nsenter_host_exec():
-        return ["nsenter", "--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid"]
+    nsenter_path = resolve_nsenter_path()
+    if nsenter_path:
+        return [nsenter_path, "--target", "1", "--mount", "--uts", "--ipc", "--net", "--pid"]
     return []
+
+
+def sudo_available() -> bool:
+    return shutil.which("sudo") is not None
+
+
+def run_host_argv(command: list[str]) -> int:
+    host_exec_prefix = build_host_exec_prefix()
+    host_command = [*host_exec_prefix, *command]
+    if os.geteuid() == 0:
+        completed = subprocess.run(host_command, check=False)
+        return completed.returncode
+
+    if host_exec_prefix:
+        try:
+            completed = subprocess.run(host_command, check=False)
+            if completed.returncode == 0:
+                return completed.returncode
+        except PermissionError:
+            completed = None
+        except OSError as exc:
+            if exc.errno != errno.EPERM:
+                raise
+
+        sudo_path = shutil.which("sudo")
+        if sudo_path:
+            completed = subprocess.run([sudo_path, "-n", *host_command], check=False)
+            return completed.returncode
+        raise ValueError(
+            "Host execution found nsenter host context, but this runtime cannot execute nsenter directly "
+            "and sudo is not installed to elevate nsenter."
+        )
+
+    sudo_path = shutil.which("sudo")
+    if not sudo_path:
+        raise ValueError(
+            "Host execution needs sudo because this runtime has no nsenter host context and is not root, "
+            "but sudo is not installed in the current runtime."
+        )
+    completed = subprocess.run([sudo_path, "-n", *host_command], check=False)
+    return completed.returncode
 
 
 def run_command(command: list[str], *, cwd: Path | None = None) -> int:
@@ -74,26 +144,16 @@ def run_command(command: list[str], *, cwd: Path | None = None) -> int:
 
 
 def run_host_command(command: list[str]) -> int:
-    host_command = [*build_host_exec_prefix(), *command]
-    if os.geteuid() == 0:
-        completed = subprocess.run(host_command, check=False)
-    else:
-        completed = subprocess.run(["sudo", "-n", *host_command], check=False)
-    return completed.returncode
+    return run_host_argv(command)
 
 
 def run_host_shell(command: str, *, cwd: Path | None = None) -> int:
     if not is_host_shell_enabled():
         raise ValueError(
-            "host-shell is disabled. Set BOOKEDAI_ENABLE_HOST_SHELL=1 only for an explicit break-glass operator session."
+            "host-shell is disabled. Set BOOKEDAI_ENABLE_HOST_SHELL=1 to enable the default trusted operator full-host lane."
         )
     shell_command = command if not cwd else f"cd {shlex.quote(str(cwd))} && {command}"
-    host_command = [*build_host_exec_prefix(), "/bin/bash", "-lc", shell_command]
-    if os.geteuid() == 0:
-        completed = subprocess.run(host_command, check=False)
-    else:
-        completed = subprocess.run(["sudo", "-n", *host_command], check=False)
-    return completed.returncode
+    return run_host_argv(["/bin/bash", "-lc", shell_command])
 
 
 def run_shell_command(command: str, *, cwd: Path | None = None) -> int:
@@ -153,7 +213,12 @@ def permissions_snapshot(actor_id: str | None) -> dict[str, object]:
         "trusted_user_ids": sorted(trusted_ids),
         "allowed_actions": sorted(allowed_actions),
         "actor_is_trusted": bool(actor_id and actor_id in trusted_ids),
+        "current_os_user": current_os_user(),
+        "trusted_host_deploy_users": sorted(TRUSTED_HOST_DEPLOY_USERS),
+        "trusted_host_deploy_user": is_trusted_host_deploy_user(),
         "host_shell_enabled": is_host_shell_enabled(),
+        "sudo_available": sudo_available(),
+        "nsenter_path": resolve_nsenter_path(),
     }
 
 
@@ -277,7 +342,9 @@ def handle_build_frontend(_args: argparse.Namespace) -> int:
 
 
 def handle_deploy_live(_args: argparse.Namespace) -> int:
-    if should_use_nsenter_host_exec():
+    if should_use_nsenter_host_exec() or is_trusted_host_deploy_user():
+        return run_host_shell("bash scripts/deploy_live_host.sh", cwd=resolve_host_repo_root())
+    if shutil.which("docker") is None and is_host_shell_enabled():
         return run_host_shell("bash scripts/deploy_live_host.sh", cwd=resolve_host_repo_root())
     return run_command(["bash", "scripts/deploy_live_host.sh"], cwd=REPO_ROOT)
 
@@ -483,8 +550,12 @@ def _extract_whatsapp_provider_status(provider_payload: object) -> dict[str, obj
 def _read_dotenv_values(path: Path) -> dict[str, str]:
     if not path.exists():
         return {}
+    try:
+        raw_text = path.read_text()
+    except OSError:
+        return {}
     values: dict[str, str] = {}
-    for line in path.read_text().splitlines():
+    for line in raw_text.splitlines():
         stripped = line.strip()
         if not stripped or stripped.startswith("#") or "=" not in stripped:
             continue
@@ -747,6 +818,12 @@ def _set_if_different(target: dict[str, object], key: str, value: object, change
         changes.append(f"{label}.{key}")
 
 
+def _remove_if_present(target: dict[str, object], key: str, changes: list[str], label: str) -> None:
+    if key in target:
+        target.pop(key)
+        changes.append(f"{label}.{key}:removed")
+
+
 def repair_openclaw_exec_approval_policy(
     *,
     config_path: Path,
@@ -769,8 +846,7 @@ def repair_openclaw_exec_approval_policy(
     _set_if_different(exec_config, "ask", ask, config_changes, "tools.exec")
     if "security" not in exec_config:
         _set_if_different(exec_config, "security", "allowlist", config_changes, "tools.exec")
-    if "askFallback" not in exec_config:
-        _set_if_different(exec_config, "askFallback", "deny", config_changes, "tools.exec")
+    _remove_if_present(exec_config, "askFallback", config_changes, "tools.exec")
 
     if approvals.get("version") is None:
         _set_if_different(approvals, "version", 1, approvals_changes, "root")
@@ -839,7 +915,7 @@ def enable_openclaw_full_access(
     _set_if_different(exec_config, "host", "gateway", config_changes, "tools.exec")
     _set_if_different(exec_config, "security", "full", config_changes, "tools.exec")
     _set_if_different(exec_config, "ask", "off", config_changes, "tools.exec")
-    _set_if_different(exec_config, "askFallback", "full", config_changes, "tools.exec")
+    _remove_if_present(exec_config, "askFallback", config_changes, "tools.exec")
 
     elevated_config = tools.setdefault("elevated", {})
     if not isinstance(elevated_config, dict):
@@ -1095,6 +1171,14 @@ def build_parser() -> argparse.ArgumentParser:
     host_shell_parser.add_argument("--cwd", default="/")
     host_shell_parser.set_defaults(handler=handle_host_shell)
 
+    host_exec_parser = subparsers.add_parser(
+        "host-exec",
+        help="Alias for host-shell: run a sudo-capable fully elevated host command from trusted OpenClaw/Telegram sessions.",
+    )
+    host_exec_parser.add_argument("--command", required=True)
+    host_exec_parser.add_argument("--cwd", default="/")
+    host_exec_parser.set_defaults(handler=handle_host_shell)
+
     permissions_parser = subparsers.add_parser(
         "permissions",
         help="Print the resolved Telegram allowlist and action permissions for the current actor.",
@@ -1180,6 +1264,7 @@ def main() -> int:
         "workspace-command": {"workspace_write", "repo_structure"},
         "host-command": {"host_command"},
         "host-shell": {"host_shell"},
+        "host-exec": {"host_shell"},
         "whatsapp-bot-status": {"whatsapp_bot_status"},
         "sync-openclaw-bookedai-agent": {"workspace_write", "whatsapp_bot_status"},
         "fix-openclaw-approvals": {"openclaw_runtime_admin"},

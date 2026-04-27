@@ -38,7 +38,7 @@ export function PricingSection() {
       <div className="container-brand">
         <div className="mx-auto max-w-3xl text-center">
           <div className="text-xs uppercase tracking-[0.24em] text-brand-muted">
-            Freemium Entry, Clear SME Growth Path
+            Simple pricing for growing service businesses
           </div>
           <h2 className="mt-4 text-4xl font-bold tracking-tight sm:text-5xl">
             Start freemium. Upgrade as your bookings grow.
@@ -82,7 +82,7 @@ export function PricingSection() {
               "Multi-channel follow-up across web, email, and SMS",
               "Calendar, CRM, and payment integrations",
               "Smarter lead qualification and reminder flows",
-              "Clearer ROI dashboards for owner-operators",
+              "Clearer ROI dashboards for business owners",
               "Best for SMEs scaling bookings without extra headcount",
             ]}
           />
@@ -108,7 +108,7 @@ export function PricingSection() {
             booking value, and sales cycle, so SMEs can start lean and upgrade
             as capability increases. The goal is simple: <span className="font-semibold text-white">we win when you win.</span>
           </p>
-          <Button href="#hero">Book a Strategy Demo</Button>
+          <Button href="#hero">Book a demo</Button>
         </div>
       </div>
     </section>
