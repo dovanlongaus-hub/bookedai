@@ -1620,21 +1620,30 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(args, "")
 
     def test_welcome_html_escapes_sender_name(self):
+        import asyncio
+
         from schemas import TawkMessage
 
-        result = MessagingAutomationService(
-            public_search_service=None
-        )._build_welcome_result(
-            channel="telegram",
-            message=TawkMessage(
-                conversation_id="telegram:1",
-                message_id="1",
-                text="/start",
-                sender_name="<script>alert(1)</script>",
-            ),
-            identity_metadata={},
-            locale="en",
-        )
+        async def _noop_upsert(*_args, **_kwargs):
+            return None
+
+        with patch.object(MessagingAutomationService, "_upsert_channel_session_state", _noop_upsert):
+            result = asyncio.run(
+                MessagingAutomationService(public_search_service=None)._build_welcome_result(
+                    SimpleNamespace(),
+                    channel="telegram",
+                    conversation_id="telegram:1",
+                    tenant_id=None,
+                    message=TawkMessage(
+                        conversation_id="telegram:1",
+                        message_id="1",
+                        text="/start",
+                        sender_name="<script>alert(1)</script>",
+                    ),
+                    identity_metadata={},
+                    locale="en",
+                )
+            )
 
         self.assertIn("&lt;script&gt;", result.ai_reply)
         self.assertNotIn("<script>", result.ai_reply)
@@ -2813,3 +2822,164 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(response.json()["messages_processed"], 0)
         self.assertEqual(response.json()["reason"], "channel_broadcast_no_reply")
         self.assertEqual(communication_service.sent, [])
+
+    def test_telegram_start_hsess_picks_up_handoff_context(self):
+        from datetime import UTC, datetime, timedelta
+
+        from db import CustomerHandoffSession
+
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _fake_mark_consumed(_self, session_id, *, chat_id=None):
+            return CustomerHandoffSession(
+                id=session_id,
+                source="product_homepage",
+                payload_json={"booking_reference": "v1-handoff-789"},
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+                consumed_at=datetime.now(UTC),
+                consumed_by_chat_id=chat_id,
+            )
+
+        async def _resolve_customer_care_booking_reference(*_args, message=None, **_kwargs):
+            if message and "v1-handoff-789" in str(message):
+                return {
+                    "booking_reference": "v1-handoff-789",
+                    "resolved_by": "explicit_reference",
+                    "candidate_count": 1,
+                }
+            return {"booking_reference": None, "resolved_by": "no_safe_match", "candidate_count": 0}
+
+        async def _build_portal_customer_care_turn(*_args, **_kwargs):
+            return {
+                "reply": "Booking v1-handoff-789 — Sydney chess class on Sat 14:00.",
+                "next_actions": [{"id": "request_cancel", "enabled": True}],
+            }
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "repositories.customer_handoff_session_repository."
+            "CustomerHandoffSessionRepository.mark_consumed",
+            _fake_mark_consumed,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ), patch(
+            "service_layer.messaging_automation_service.build_portal_customer_care_turn",
+            _build_portal_customer_care_turn,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 9100,
+                    "message": {
+                        "message_id": 91,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/start hsess_abcdef",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "answered")
+        self.assertEqual(captured_calls[0]["metadata"]["booking_reference"], "v1-handoff-789")
+        self.assertEqual(captured_calls[0]["metadata"]["handoff_session_id"], "abcdef")
+
+    def test_telegram_start_hsess_falls_back_to_welcome_when_session_missing(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _fake_mark_consumed(_self, _session_id, *, chat_id=None):
+            return None
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "repositories.customer_handoff_session_repository."
+            "CustomerHandoffSessionRepository.mark_consumed",
+            _fake_mark_consumed,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 9101,
+                    "message": {
+                        "message_id": 92,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/start hsess_doesnotexist",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "welcome")
+
+    def test_telegram_start_hsess_propagates_locale_to_bot_reply(self):
+        from datetime import UTC, datetime, timedelta
+
+        from db import CustomerHandoffSession
+
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _fake_mark_consumed(_self, session_id, *, chat_id=None):
+            return CustomerHandoffSession(
+                id=session_id,
+                source="product_homepage",
+                payload_json={"locale": "vi"},
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+                consumed_at=datetime.now(UTC),
+                consumed_by_chat_id=chat_id,
+            )
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "repositories.customer_handoff_session_repository."
+            "CustomerHandoffSessionRepository.mark_consumed",
+            _fake_mark_consumed,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 9102,
+                    "message": {
+                        "message_id": 93,
+                        "from": {"id": 999, "first_name": "Long", "language_code": "en"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/start hsess_vihandoff",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "welcome")
+        self.assertIn("Mình", captured_calls[0]["ai_reply"])
+        self.assertEqual(captured_calls[0]["metadata"]["telegram_language_code"], "vi")

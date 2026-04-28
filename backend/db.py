@@ -185,6 +185,26 @@ class TenantEmailLoginCode(Base):
     )
 
 
+class CustomerHandoffSession(Base):
+    """Carries product.bookedai.au context (search query, shortlisted services,
+    booking ref, etc.) into the Telegram bot via a `?start=hsess_<id>` deeplink.
+    Created server-side when the customer taps "Need help in Telegram", consumed
+    once on bot pickup. Auto-expires after a short TTL.
+    """
+
+    __tablename__ = "customer_handoff_sessions"
+
+    id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    source: Mapped[str] = mapped_column(String(50), nullable=False, default="product_homepage", index=True)
+    payload_json: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
+    consumed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    consumed_by_chat_id: Mapped[str | None] = mapped_column(String(64))
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+
+
 def create_engine(database_url: str) -> AsyncEngine:
     return create_async_engine(database_url, future=True)
 

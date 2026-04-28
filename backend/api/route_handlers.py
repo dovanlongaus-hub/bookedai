@@ -733,6 +733,7 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
     text_value = str(raw_message.get("text") or raw_message.get("caption") or "").strip()
     start_command_kind: str | None = None
     start_command_payload: str | None = None
+    handoff_session_id: str | None = None
     if text_value.startswith("/start"):
         start_payload = text_value.split(maxsplit=1)[1].strip() if " " in text_value else ""
         start_command_payload = start_payload or None
@@ -752,6 +753,16 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
             else:
                 start_command_kind = "welcome"
                 text_value = ""
+        elif start_payload.startswith("hsess_"):
+            # Phase C handoff deep-link from product.bookedai.au. The /start
+            # payload carries an opaque session id that the bot looks up to
+            # pre-fill context (service query, booking ref, etc.) — see
+            # CustomerHandoffSessionRepository.mark_consumed.
+            session_id_candidate = start_payload[len("hsess_") :].strip()
+            if session_id_candidate:
+                start_command_kind = "handoff_session"
+                handoff_session_id = session_id_candidate
+                text_value = ""  # actual context is loaded from the session row
         elif start_payload:
             start_command_kind = "generic"
             text_value = "I need help with my booking."
@@ -826,6 +837,7 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
         "callback_data": callback_data or None,
         "start_command_kind": start_command_kind,
         "start_command_payload": start_command_payload,
+        "handoff_session_id": handoff_session_id,
         "user_location": user_location,
         "raw_payload": raw_message,
     }
@@ -1479,6 +1491,90 @@ def _handoff_completely_failed(handoff_metadata: dict[str, object] | None) -> bo
     if not isinstance(handoff_metadata, dict):
         return False
     return bool(handoff_metadata.get("all_failed"))
+
+
+async def _apply_handoff_session_context(
+    session,
+    *,
+    message: TawkMessage,
+    metadata: dict[str, object],
+    session_id: str,
+) -> None:
+    """Consume a customer_handoff_session row and pre-fill the inbound message
+    with the context the public app stashed there. Mutates `message.text` and
+    `metadata` in place; logs and no-ops on miss/expired so the bot falls back
+    to a normal welcome turn.
+    """
+    try:
+        from repositories.base import RepositoryContext as _RepoCtx
+        from repositories.customer_handoff_session_repository import (
+            CustomerHandoffSessionRepository as _Repo,
+        )
+    except Exception:  # pragma: no cover - defensive: missing module → silent fallback
+        return
+    try:
+        repository = _Repo(_RepoCtx(session=session))
+        chat_id = str(metadata.get("telegram_chat_id") or "").strip() or None
+        row = await repository.mark_consumed(session_id, chat_id=chat_id)
+    except Exception as exc:
+        logger.warning(
+            "handoff_session_consume_failed",
+            extra={
+                "event_type": "handoff_session_consume_failed",
+                "tenant_id": None,
+                "status": 0,
+                "route": "/api/webhooks/bookedai-telegram",
+                "request_id": "",
+                "integration_name": "handoff_session",
+                "conversation_id": str(message.conversation_id or ""),
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+        return
+    if row is None:
+        metadata["handoff_session_status"] = "expired_or_unknown"
+        return
+    payload = row.payload_json if isinstance(row.payload_json, dict) else {}
+    metadata["handoff_session_status"] = "consumed"
+    metadata["handoff_session_payload"] = payload
+    metadata["handoff_session_source"] = str(row.source or "").strip() or None
+
+    # Surface the persisted locale to telegram_language_code so
+    # MessagingAutomationService._resolve_locale picks it up on this turn.
+    # The customer's homepage locale is a stronger signal than Telegram's
+    # client-reported language_code (often the OS default in markets where
+    # users browse in one locale but use Telegram in another), so it wins.
+    payload_locale = str(payload.get("locale") or "").strip().lower()
+    if payload_locale:
+        metadata["telegram_language_code"] = payload_locale
+
+    # Translate the payload fields into a synthetic customer message so the
+    # standard intake / search path picks up where the public app left off.
+    booking_reference = str(payload.get("booking_reference") or "").strip()
+    service_query = str(payload.get("service_query") or "").strip()
+    service_slug = str(payload.get("service_slug") or "").strip().replace("-", " ")
+    location_hint = str(payload.get("location_hint") or "").strip()
+    notes = str(payload.get("notes") or "").strip()
+
+    if booking_reference:
+        message.text = (
+            f"My booking reference is {booking_reference}. I need help with this booking."
+        )
+        return
+    parts: list[str] = []
+    if service_query:
+        parts.append(f"Find {service_query}")
+    elif service_slug:
+        parts.append(f"Find {service_slug}")
+    if location_hint and not (service_query and location_hint.lower() in service_query.lower()):
+        parts.append(f"in {location_hint}")
+    if notes:
+        parts.append(f"({notes[:200]})")
+    if parts:
+        message.text = " ".join(parts).strip()
 
 
 async def _send_telegram_chat_action(
@@ -3185,6 +3281,18 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                 chat_id=str(metadata.get("telegram_chat_id") or "").strip() or None,
                 action="typing",
             )
+            # Phase C: if /start hsess_<id> deep-link, consume the handoff
+            # session and prefill message.text + metadata so the rest of the
+            # automation pipeline behaves as if the customer typed the
+            # context themselves.
+            handoff_session_id = str(metadata.get("handoff_session_id") or "").strip()
+            if handoff_session_id:
+                await _apply_handoff_session_context(
+                    session,
+                    message=message,
+                    metadata=metadata,
+                    session_id=handoff_session_id,
+                )
             if hasattr(request.app.state, "communication_service"):
                 automation_result = await MessagingAutomationService(
                     public_search_service=getattr(request.app.state, "openai_service", None)
