@@ -270,6 +270,107 @@ class TenantRepository(BaseRepository):
             "updated_at": row.get("updated_at"),
         }
 
+    async def get_partner_config(self, slug: str) -> dict[str, object] | None:
+        """Return the stored partner-config JSONB for a tenant slug, or None.
+
+        The result is the raw stored payload — callers are responsible for
+        layering the safe fallback when this returns None. Returns None both
+        for unknown slugs and for tenants whose `partner_config_jsonb` column
+        has not been set.
+        """
+        normalized_slug = (slug or "").strip().lower()
+        if not normalized_slug:
+            return None
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  partner_config_jsonb,
+                  partner_config_updated_at
+                from tenants
+                where slug = :slug
+                limit 1
+                """
+            ),
+            {"slug": normalized_slug},
+        )
+        row = result.mappings().first()
+        if not row:
+            return None
+        config = row.get("partner_config_jsonb")
+        if not isinstance(config, dict):
+            return None
+        return dict(config)
+
+    async def upsert_partner_config(
+        self,
+        *,
+        slug: str,
+        config: dict[str, object],
+    ) -> dict[str, object] | None:
+        """Persist the partner-config JSONB for an existing tenant.
+
+        Does NOT auto-create tenants — admins must create the tenant row
+        first via the existing tenant management surface. Returns the
+        stored config payload + updated_at timestamp, or None when the
+        slug does not match an existing tenant.
+        """
+        normalized_slug = (slug or "").strip().lower()
+        if not normalized_slug:
+            return None
+        result = await self.session.execute(
+            text(
+                """
+                update tenants
+                set
+                  partner_config_jsonb = cast(:partner_config_jsonb as jsonb),
+                  partner_config_updated_at = now(),
+                  updated_at = now()
+                where slug = :slug
+                returning
+                  slug,
+                  partner_config_jsonb,
+                  partner_config_updated_at
+                """
+            ),
+            {
+                "slug": normalized_slug,
+                "partner_config_jsonb": json.dumps(config),
+            },
+        )
+        row = result.mappings().first()
+        if not row:
+            return None
+        stored = row.get("partner_config_jsonb")
+        return {
+            "slug": row.get("slug"),
+            "partner_config_jsonb": dict(stored) if isinstance(stored, dict) else {},
+            "partner_config_updated_at": row.get("partner_config_updated_at"),
+        }
+
+    async def list_tenants_with_config_status(self) -> list[dict[str, object | None]]:
+        """List every tenant with a `has_partner_config` flag for admin UIs."""
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  id::text as id,
+                  slug,
+                  name,
+                  status,
+                  industry,
+                  timezone,
+                  locale,
+                  (partner_config_jsonb is not null) as has_partner_config,
+                  partner_config_updated_at
+                from tenants
+                order by name asc, slug asc
+                """
+            )
+        )
+        rows = result.mappings().all()
+        return [dict(row) for row in rows]
+
     async def list_tenant_members(self, tenant_id: str) -> list[dict[str, str | None]]:
         result = await self.session.execute(
             text(
@@ -650,6 +751,67 @@ class TenantRepository(BaseRepository):
         period_start = datetime.now(timezone.utc)
         period_end = period_start + timedelta(days=period_days)
 
+        await self.session.execute(
+            text(
+                """
+                delete from subscription_periods
+                where subscription_id = cast(:subscription_id as uuid)
+                """
+            ),
+            {"subscription_id": subscription_id},
+        )
+        result = await self.session.execute(
+            text(
+                """
+                insert into subscription_periods (
+                  id,
+                  subscription_id,
+                  period_start,
+                  period_end,
+                  status
+                )
+                values (
+                  cast(:period_id as uuid),
+                  cast(:subscription_id as uuid),
+                  :period_start,
+                  :period_end,
+                  :status
+                )
+                returning
+                  id::text as id,
+                  subscription_id::text as subscription_id,
+                  period_start,
+                  period_end,
+                  status,
+                  created_at
+                """
+            ),
+            {
+                "period_id": str(uuid4()),
+                "subscription_id": subscription_id,
+                "period_start": period_start,
+                "period_end": period_end,
+                "status": status,
+            },
+        )
+        row = result.mappings().first()
+        return {
+            "id": row["id"],
+            "subscription_id": row["subscription_id"],
+            "period_start": row["period_start"],
+            "period_end": row["period_end"],
+            "status": row["status"],
+            "created_at": row["created_at"],
+        }
+
+    async def replace_subscription_period_from_stripe(
+        self,
+        *,
+        subscription_id: str,
+        period_start: datetime,
+        period_end: datetime,
+        status: str = "open",
+    ) -> dict[str, str | None]:
         await self.session.execute(
             text(
                 """
