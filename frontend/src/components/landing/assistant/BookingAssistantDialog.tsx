@@ -1,4 +1,13 @@
-import { FormEvent, PointerEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  FormEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { MessageCircle } from 'lucide-react';
 
 import {
@@ -8,6 +17,7 @@ import {
   type BookingAssistantContent,
 } from '../data';
 import { apiV1 } from '../../../shared/api';
+import { createCustomerHandoffSession } from '../../../shared/api/handoff';
 import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../../shared/config/api';
 import { resolveApiErrorMessage } from '../../../shared/api/client';
 import {
@@ -642,6 +652,7 @@ function buildAuthoritativeBookingIntentResult(params: {
   const { authoritativeResult, selectedService, requestedDate, requestedTime, customerEmail, trustWarnings, nextStep } = params;
   const bookingReference =
     authoritativeResult.bookingReference?.trim() || authoritativeResult.bookingIntentId;
+  const supportEmail = authoritativeResult.contactEmail?.trim() || authoritativeResult.supportEmail?.trim() || 'info@bookedai.au';
   const amountLabel = formatServicePrice(selectedService);
   const rawDetailLine = nextStep?.trim() || trustWarnings[0] || 'We will confirm the final slot with the provider.';
   const detailLine = rawDetailLine.toLowerCase().includes('candidate not found')
@@ -661,13 +672,13 @@ function buildAuthoritativeBookingIntentResult(params: {
     payment_status: 'payment_follow_up_required',
     payment_url: '',
     qr_code_url: '',
-    email_status: customerEmail.trim() ? 'sent' : 'pending_manual_followup',
+    email_status: authoritativeResult.emailStatus === 'sent' && customerEmail.trim() ? 'sent' : 'pending_manual_followup',
     meeting_status: 'configuration_required',
     meeting_join_url: null,
     meeting_event_url: null,
     calendar_add_url: null,
     confirmation_message: `Booking request captured in v1. ${detailLine}`,
-    contact_email: customerEmail.trim() || 'follow-up required',
+    contact_email: supportEmail,
     workflow_status: authoritativeResult.trust.recommended_booking_path ?? 'request_callback',
     crm_sync: authoritativeResult.crmSync ?? null,
   };
@@ -3077,6 +3088,33 @@ export function BookingAssistantDialog({
       body: summary.body,
     });
     window.location.href = mailto;
+  }
+
+  /**
+   * Phase C handoff click handler. Mints a customer_handoff_session row server-side
+   * with the booking ref / search query / selected service so the bot opens the
+   * conversation already aware of context. Falls back to the legacy `?start=bk.` /
+   * `?start=svc.` deeplink (the synchronous href) on API failure so the link is
+   * never broken.
+   */
+  async function handleTelegramCareClick(
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    params: { bookingReference?: string | null; serviceName?: string | null },
+  ) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    event.preventDefault();
+    const trimmedQuery = pendingSearchQuery.trim();
+    const browserLocale = (window.navigator?.language || '').split('-')[0].toLowerCase() || null;
+    const handoff = await createCustomerHandoffSession({
+      source: 'product_homepage',
+      bookingReference: params.bookingReference ?? null,
+      serviceQuery: trimmedQuery || params.serviceName || null,
+      serviceSlug: params.serviceName ?? null,
+      locale: browserLocale,
+    });
+    window.open(handoff.deeplink, '_blank', 'noopener,noreferrer');
   }
 
   function handleAddToCalendar() {
@@ -6233,6 +6271,11 @@ export function BookingAssistantDialog({
 
                 <a
                   href={buildTelegramCareUrl({ serviceName: selectedService?.name ?? selectedEvent?.title ?? null })}
+                  onClick={(event) => {
+                    void handleTelegramCareClick(event, {
+                      serviceName: selectedService?.name ?? selectedEvent?.title ?? null,
+                    });
+                  }}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
@@ -6585,11 +6628,18 @@ export function BookingAssistantDialog({
                           bookingReference: result.booking_reference,
                           serviceName: result.service.name,
                         }),
+                        onTelegramClick: (event: ReactMouseEvent<HTMLAnchorElement>) => {
+                          void handleTelegramCareClick(event, {
+                            bookingReference: result.booking_reference,
+                            serviceName: result.service.name,
+                          });
+                        },
                       },
                     ].map((item) => (
                       <a
                         key={item.title}
                         href={item.href}
+                        onClick={(item as { onTelegramClick?: (event: ReactMouseEvent<HTMLAnchorElement>) => void }).onTelegramClick}
                         target="_blank"
                         rel="noreferrer"
                         className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
