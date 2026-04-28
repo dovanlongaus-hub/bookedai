@@ -28,6 +28,18 @@
   --color-apple-danger:      #ff3b30;
   --color-apple-filter-bg:   #fafafc;
   --color-apple-overlay:     rgba(210, 210, 215, 0.64);
+  /* Paper-blue family — soft tints used as section backdrops */
+  --color-apple-paper-blue-50:       var(--apple-paper-blue-50);
+  --color-apple-paper-blue-100:      var(--apple-paper-blue-100);
+  --color-apple-paper-blue-200:      var(--apple-paper-blue-200);
+  --color-apple-paper-blue-300:      var(--apple-paper-blue-300);
+  --color-apple-paper-blue-navy-700: var(--apple-paper-blue-navy-700);
+  --color-apple-paper-blue-navy-800: var(--apple-paper-blue-navy-800);
+  --color-apple-paper-blue-navy-900: var(--apple-paper-blue-navy-900);
+  /* Neutral ring (border) tokens */
+  --color-apple-ring-neutral-100: var(--apple-ring-neutral-100);
+  --color-apple-ring-neutral-200: var(--apple-ring-neutral-200);
+  --color-apple-ring-neutral-300: var(--apple-ring-neutral-300);
   --color-bookedai-bg: #0B1020;
   --color-bookedai-bg-soft: #121A2B;
   --color-bookedai-surface: #182235;
@@ -89,6 +101,14 @@
   /* Shadows */
   --shadow-apple:    rgba(0, 0, 0, 0.22) 3px 5px 30px 0px;
   --shadow-apple-sm: rgba(0, 0, 0, 0.12) 0px 2px 12px 0px;
+  --shadow-apple-card:   0 8px 24px rgba(15, 23, 42, 0.06);
+  --shadow-apple-pop:    0 18px 36px rgba(15, 23, 42, 0.18);
+  --shadow-apple-button: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-apple-panel:  0 12px 32px rgba(15, 23, 42, 0.08);
+  --shadow-apple-hero:   0 24px 64px rgba(15, 23, 42, 0.14);
+  --shadow-apple-paper-warm-sm:  0 1px 2px rgba(86, 73, 50, 0.06);
+  --shadow-apple-paper-warm:     0 8px 24px rgba(86, 73, 50, 0.08);
+  --shadow-apple-paper-warm-pop: 0 18px 40px rgba(86, 73, 50, 0.16);
   --shadow-bookedai-card: 0 10px 40px rgba(2,6,23,0.38);
   --shadow-bookedai-glow: 0 0 0 1px rgba(255,255,255,0.06), 0 18px 60px rgba(139,92,246,0.16);
   --shadow-bookedai-float: 0 20px 70px rgba(2,6,23,0.46);
@@ -586,6 +606,11 @@
   @keyframes appleFade {
     from { opacity: 0; }
     to   { opacity: 1; }
+  }
+
+  @keyframes slideInFromRight {
+    from { transform: translateX(100%); }
+    to   { transform: translateX(0); }
   }
 
   .animate-booking-pulse {

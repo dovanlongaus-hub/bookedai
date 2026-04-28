@@ -32,6 +32,15 @@
  *   var(--apple-btn-filter-bg)  #fafafc   Filter/search button bg
  *   var(--apple-btn-active-bg)  #ededf2   Active button state bg
  *
+ *   PAPER-BLUE FAMILY — soft tints used as section backdrops
+ *   var(--apple-paper-blue-50)       #f8fbff   Lightest paper tint
+ *   var(--apple-paper-blue-100)      #eef4ff   Card / section tint
+ *   var(--apple-paper-blue-200)      #dbe7fb   Border / hover
+ *   var(--apple-paper-blue-300)      #cfe1ff   Selected / accent border
+ *   var(--apple-paper-blue-navy-700) #31507b   Paper text accent
+ *   var(--apple-paper-blue-navy-800) #2f3d4f   Paper body
+ *   var(--apple-paper-blue-navy-900) #0f3d7a   Navy paper deep
+ *
  * TEXT
  *   var(--apple-text-primary)   #1d1d1f              Headings, primary text on light
  *   var(--apple-text-secondary) rgba(0,0,0,0.8)      Body text on light
@@ -55,6 +64,19 @@
  * SHADOWS
  *   var(--apple-shadow)    rgba(0,0,0,0.22) 3px 5px 30px 0px   Card elevation
  *   var(--apple-shadow-sm) rgba(0,0,0,0.12) 0px 2px 12px 0px   Subtle lift
+ *   var(--shadow-apple-card)   0 8px 24px rgba(15,23,42,0.06)   Resting card lift
+ *   var(--shadow-apple-pop)    0 18px 36px rgba(15,23,42,0.18)  Hover / pop lift
+ *   var(--shadow-apple-button) 0 1px 2px  rgba(0,0,0,0.05)      Button rest shadow
+ *   var(--shadow-apple-panel)  0 12px 32px rgba(15,23,42,0.08)  Panel elevation (topbar / pinned panel)
+ *   var(--shadow-apple-hero)   0 24px 64px rgba(15,23,42,0.14)  Hero / modal elevation
+ *   var(--shadow-apple-paper-warm-sm)  0 1px 2px  rgba(86,73,50,0.06)   Manila warm shadow (rest)
+ *   var(--shadow-apple-paper-warm)     0 8px 24px rgba(86,73,50,0.08)   Manila warm shadow (card)
+ *   var(--shadow-apple-paper-warm-pop) 0 18px 40px rgba(86,73,50,0.16)  Manila warm shadow (pop)
+ *
+ * NEUTRAL RINGS / BORDERS
+ *   var(--apple-ring-neutral-100) #e5e7eb   Lightest neutral ring (chip pills, soft outlines)
+ *   var(--apple-ring-neutral-200) #e3e3e7   Mid neutral ring (toolbar pills)
+ *   var(--apple-ring-neutral-300) #d1d5db   Heavier neutral ring (form/control outline)
  *
  * NAV
  *   var(--apple-nav-bg)     rgba(0,0,0,0.8)   Glass nav background
@@ -72,7 +94,12 @@
  *   text-apple-success, text-apple-warning, text-apple-danger
  *   rounded-apple-micro, rounded-apple-standard, rounded-apple-comfortable
  *   rounded-apple-large, rounded-apple-pill
- *   shadow-apple, shadow-apple-sm
+ *   shadow-apple, shadow-apple-sm, shadow-apple-card, shadow-apple-pop, shadow-apple-button
+ *   shadow-apple-panel, shadow-apple-hero
+ *   shadow-apple-paper-warm-sm, shadow-apple-paper-warm, shadow-apple-paper-warm-pop
+ *   ring-apple-ring-neutral-{100,200,300}, border-apple-ring-neutral-{100,200,300}
+ *   bg-apple-paper-blue-{50,100,200,300}, text-apple-paper-blue-{50,100,200,300}, border-apple-paper-blue-{50,100,200,300}
+ *   text-apple-paper-blue-navy-{700,800,900}, bg-apple-paper-blue-navy-{700,800,900}
  *   font-display, font-body, font-mono
  *
  * ── Component Classes (use in JSX className) ────────────────────────────────

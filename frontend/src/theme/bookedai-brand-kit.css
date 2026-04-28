@@ -1,3 +1,11 @@
+/*
+ * DEPRECATED 2026-04-28: parallel brand-kit retained for back-compat.
+ * Use Apple system tokens (apple-tokens.css + minimal-bento-template.css).
+ * Do not author new components against these `--bookedai-*` variables.
+ * The aurora gradient / purple accent / DM Sans surface that originated here
+ * is OFF-BRAND under the post-2026-04-28 Apple design pass. Migrate any
+ * remaining consumers to `var(--apple-*)` tokens before deleting this file.
+ */
 :root {
   --bookedai-bg: #0B1020;
   --bookedai-bg-soft: #121A2B;
