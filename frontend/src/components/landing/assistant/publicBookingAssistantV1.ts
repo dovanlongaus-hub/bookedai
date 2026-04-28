@@ -1,5 +1,6 @@
 import { apiV1 } from '../../../shared/api';
 import { ApiClientError } from '../../../shared/api/client';
+import { setPortalAccessToken } from '../../../apps/portal/portal-token-store';
 import type { ApiChannel, DeploymentMode } from '../../../shared/contracts/common';
 import type {
   ApiActorContext,
@@ -898,12 +899,26 @@ export async function createPublicBookingAssistantLeadAndBookingIntent(params: P
   }
 
   const leadData = 'data' in leadResponse ? leadResponse.data : null;
+  const bookingReference = bookingIntentResponse.data.booking_reference ?? null;
+  const portalIssue = bookingIntentResponse.data.portal ?? null;
+
+  // P0-3 portal access token capture: persist into sessionStorage so the
+  // portal SPA can forward `X-Portal-Token` once the user navigates over.
+  // Never log the plaintext.
+  if (bookingReference && portalIssue?.access_token) {
+    setPortalAccessToken(
+      bookingReference,
+      portalIssue.access_token,
+      portalIssue.expires_at ?? null,
+    );
+  }
+
   return {
     leadId: leadData?.lead_id ?? null,
     contactId: leadData?.contact_id ?? null,
     conversationId: leadData?.conversation_id ?? null,
     bookingIntentId: bookingIntentResponse.data.booking_intent_id,
-    bookingReference: bookingIntentResponse.data.booking_reference ?? null,
+    bookingReference,
     trust: bookingIntentResponse.data.trust,
     warnings: bookingIntentResponse.data.warnings,
     crmSync: bookingIntentResponse.data.crm_sync ?? null,

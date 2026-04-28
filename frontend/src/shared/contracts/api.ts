@@ -776,9 +776,16 @@ export interface CreateBookingIntentRequest {
   notes?: string | null;
 }
 
+export interface CreateBookingIntentPortalIssue {
+  url: string | null;
+  access_token: string | null;
+  expires_at: string | null;
+}
+
 export interface CreateBookingIntentResponse {
   booking_intent_id: string;
   booking_reference?: string | null;
+  portal?: CreateBookingIntentPortalIssue | null;
   trust: V1BookingTrustSummary;
   warnings: string[];
   crm_sync?: {

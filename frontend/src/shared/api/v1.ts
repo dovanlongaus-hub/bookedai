@@ -148,6 +148,28 @@ function withJsonBody(body: unknown, init?: RequestInit): RequestInit {
   };
 }
 
+/**
+ * Attach the per-booking portal access token (P0-3) as a header. The header
+ * form is preferred over the `?token=` query string so the plaintext does not
+ * leak into proxy logs / referrers / browser history. The backend
+ * `_extract_portal_token` helper reads either form.
+ */
+function withPortalAccessToken(
+  portalAccessToken: string | null | undefined,
+  init?: RequestInit,
+): RequestInit | undefined {
+  const trimmed = typeof portalAccessToken === 'string' ? portalAccessToken.trim() : '';
+  if (!trimmed) {
+    return init;
+  }
+  const headers = new Headers(init?.headers);
+  headers.set('X-Portal-Token', trimmed);
+  return {
+    ...(init ?? {}),
+    headers,
+  };
+}
+
 function appendQueryParam(params: URLSearchParams, key: string, value: unknown) {
   if (value === null || value === undefined || value === '') {
     return;
@@ -564,6 +586,80 @@ function normalizeSearchCandidatesEnvelope(
 
 export async function createLead(request: CreateLeadRequest) {
   return requestV1Envelope<CreateLeadResponse>('/v1/leads', withJsonBody(request, { method: 'POST' }));
+}
+
+export type PublicBookingStatsWindow = {
+  bookings: number;
+  capturedAudRounded: number;
+  tenantsActive: number;
+};
+
+export type PublicBookingStatsRecent = {
+  tenantAlias: string;
+  amountAudRounded: number;
+  agoMinutes: number;
+};
+
+export type PublicBookingStats = {
+  windows: {
+    last24h: PublicBookingStatsWindow;
+    last7d: PublicBookingStatsWindow;
+    last30d: PublicBookingStatsWindow;
+  };
+  recent: PublicBookingStatsRecent[];
+  generatedAt: string | null;
+  ttlSeconds: number;
+};
+
+function normalizePublicStatsWindow(value: unknown): PublicBookingStatsWindow {
+  const record = isRecord(value) ? value : {};
+  return {
+    bookings: readNumber(record, 'bookings') ?? 0,
+    capturedAudRounded: readNumber(record, 'captured_aud_rounded', 'capturedAudRounded') ?? 0,
+    tenantsActive: readNumber(record, 'tenants_active', 'tenantsActive') ?? 0,
+  };
+}
+
+function normalizePublicStatsRecent(value: unknown): PublicBookingStatsRecent | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const tenantAlias = readString(value, 'tenant_alias', 'tenantAlias');
+  const amount = readNumber(value, 'amount_aud_rounded', 'amountAudRounded');
+  const ago = readNumber(value, 'ago_minutes', 'agoMinutes');
+  if (!tenantAlias || amount === null || ago === null) {
+    return null;
+  }
+  return {
+    tenantAlias,
+    amountAudRounded: amount,
+    agoMinutes: ago,
+  };
+}
+
+export async function getPublicBookingStats(): Promise<PublicBookingStats> {
+  const envelope = await requestV1Envelope<unknown>('/v1/public/stats/bookings');
+  if (!isApiSuccessEnvelope<unknown>(envelope)) {
+    throw new ApiClientError('Public booking stats response was not a success envelope.', 200, envelope);
+  }
+
+  const data: Record<string, unknown> = isRecord(envelope.data) ? envelope.data : {};
+  const windows: Record<string, unknown> = isRecord(data['windows']) ? data['windows'] : {};
+  const meta: Record<string, unknown> = isRecord(data['meta']) ? data['meta'] : {};
+  const recentRaw = Array.isArray(data['recent']) ? data['recent'] : [];
+
+  return {
+    windows: {
+      last24h: normalizePublicStatsWindow(windows['last_24h'] ?? windows['last24h']),
+      last7d: normalizePublicStatsWindow(windows['last_7d'] ?? windows['last7d']),
+      last30d: normalizePublicStatsWindow(windows['last_30d'] ?? windows['last30d']),
+    },
+    recent: recentRaw
+      .map(normalizePublicStatsRecent)
+      .filter((entry): entry is PublicBookingStatsRecent => entry !== null),
+    generatedAt: readString(meta, 'generated_at', 'generatedAt'),
+    ttlSeconds: readNumber(meta, 'ttl_seconds', 'ttlSeconds') ?? 30,
+  };
 }
 
 export async function startChatSession(request: StartChatSessionRequest) {
@@ -1224,9 +1320,13 @@ export async function retryCrmSync(request: RetryCrmSyncRequest) {
   );
 }
 
-export async function getTenantOverview(tenantRef?: string | null) {
+export async function getTenantOverview(tenantRef?: string | null, sessionToken?: string | null) {
   const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
-  return requestV1Envelope<TenantOverviewResponse>(`/v1/tenant/overview${query}`);
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantOverviewResponse>(`/v1/tenant/overview${query}`, { headers });
 }
 
 export async function getTenantPluginInterface(tenantRef?: string | null, sessionToken?: string | null) {
@@ -1254,9 +1354,13 @@ export async function getTenantRevenueMetrics(
   });
 }
 
-export async function getTenantBookings(tenantRef?: string | null) {
+export async function getTenantBookings(tenantRef?: string | null, sessionToken?: string | null) {
   const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
-  return requestV1Envelope<TenantBookingsResponse>(`/v1/tenant/bookings${query}`);
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantBookingsResponse>(`/v1/tenant/bookings${query}`, { headers });
 }
 
 export async function getTenantLeads(
@@ -1347,59 +1451,78 @@ export async function getTenantTeam(tenantRef?: string | null, sessionToken?: st
   return requestV1Envelope<TenantTeamResponse>(`/v1/tenant/team${query}`, { headers });
 }
 
-export async function getPortalBookingDetail(bookingReference: string) {
+export async function getPortalBookingDetail(
+  bookingReference: string,
+  portalAccessToken?: string | null,
+) {
   return requestV1Envelope<PortalBookingDetailResponse>(
     `/v1/portal/bookings/${encodeURIComponent(bookingReference)}`,
+    withPortalAccessToken(portalAccessToken),
   );
 }
 
 export async function createPortalCustomerCareTurn(
   bookingReference: string,
   request: PortalCustomerCareTurnRequest,
+  portalAccessToken?: string | null,
 ) {
   return requestV1Envelope<PortalCustomerCareTurnResponse>(
     `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/care-turn`,
-    withJsonBody(request, { method: 'POST' }),
+    withPortalAccessToken(portalAccessToken, withJsonBody(request, { method: 'POST' })),
   );
 }
 
 export async function requestPortalBookingReschedule(
   bookingReference: string,
   request: PortalBookingActionRequest,
+  portalAccessToken?: string | null,
 ) {
   return requestV1Envelope<PortalBookingActionResponse>(
     `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/reschedule-request`,
-    withJsonBody(request, { method: 'POST' }),
+    withPortalAccessToken(portalAccessToken, withJsonBody(request, { method: 'POST' })),
   );
 }
 
 export async function requestPortalBookingCancellation(
   bookingReference: string,
   request: PortalBookingActionRequest,
+  portalAccessToken?: string | null,
 ) {
   return requestV1Envelope<PortalBookingActionResponse>(
     `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/cancel-request`,
-    withJsonBody(request, { method: 'POST' }),
+    withPortalAccessToken(portalAccessToken, withJsonBody(request, { method: 'POST' })),
   );
 }
 
 export async function requestPortalBookingPause(
   bookingReference: string,
   request: PortalBookingActionRequest,
+  portalAccessToken?: string | null,
 ) {
   return requestV1Envelope<PortalBookingActionResponse>(
     `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/pause-request`,
-    withJsonBody(request, { method: 'POST' }),
+    withPortalAccessToken(portalAccessToken, withJsonBody(request, { method: 'POST' })),
   );
 }
 
 export async function requestPortalBookingDowngrade(
   bookingReference: string,
   request: PortalBookingActionRequest,
+  portalAccessToken?: string | null,
 ) {
   return requestV1Envelope<PortalBookingActionResponse>(
     `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/downgrade-request`,
-    withJsonBody(request, { method: 'POST' }),
+    withPortalAccessToken(portalAccessToken, withJsonBody(request, { method: 'POST' })),
+  );
+}
+
+export async function disablePortalBookingReminders(
+  bookingReference: string,
+  portalAccessToken?: string | null,
+) {
+  return requestV1Envelope<{ status: string; message?: string }>(
+    `/v1/portal/bookings/${encodeURIComponent(bookingReference)}/reminders/disable`,
+    withPortalAccessToken(portalAccessToken, withJsonBody({}, { method: 'POST' })),
   );
 }
 
@@ -1709,8 +1832,430 @@ export async function archiveTenantCatalogService(
   );
 }
 
+export type AgentActivityWorkflowStatus = 'queued' | 'in_flight' | 'done' | 'attention' | string;
+
+export type AgentActivityStep = {
+  id: number;
+  source: string;
+  event_type: string;
+  ai_intent: string | null;
+  ai_reply: string | null;
+  workflow_status: AgentActivityWorkflowStatus | null;
+  duration_ms: number | null;
+  evidence: Record<string, unknown>;
+  created_at: string | null;
+};
+
+export type AgentActivityResponse = {
+  conversation_id: string;
+  steps: AgentActivityStep[];
+  limit: number;
+  count: number;
+};
+
+function normalizeAgentActivityStep(raw: unknown): AgentActivityStep {
+  const record = isRecord(raw) ? raw : {};
+  const evidenceCandidate = record.evidence;
+  const evidence: Record<string, unknown> = isRecord(evidenceCandidate)
+    ? (evidenceCandidate as Record<string, unknown>)
+    : {};
+  return {
+    id: toNumberOrNull(record.id) ?? 0,
+    source: readString(record, 'source') ?? 'public_chat',
+    event_type: readString(record, 'event_type', 'eventType') ?? '',
+    ai_intent: readString(record, 'ai_intent', 'aiIntent'),
+    ai_reply: readString(record, 'ai_reply', 'aiReply'),
+    workflow_status: readString(record, 'workflow_status', 'workflowStatus'),
+    duration_ms: readNumber(record, 'duration_ms', 'durationMs'),
+    evidence,
+    created_at: readString(record, 'created_at', 'createdAt'),
+  };
+}
+
+export async function getAgentActivity(
+  conversationId: string,
+  options: {
+    limit?: number;
+    tenantId?: string | null;
+    tenantRef?: string | null;
+    sessionToken?: string | null;
+    signal?: AbortSignal;
+  } = {},
+): Promise<AgentActivityResponse> {
+  const trimmed = conversationId.trim();
+  if (!trimmed) {
+    return {
+      conversation_id: '',
+      steps: [],
+      limit: 0,
+      count: 0,
+    };
+  }
+
+  const params = new URLSearchParams();
+  appendQueryParam(params, 'conversation_id', trimmed);
+  appendQueryParam(params, 'limit', options.limit ?? null);
+  appendQueryParam(params, 'tenant_id', options.tenantId ?? null);
+  appendQueryParam(params, 'tenant_ref', options.tenantRef ?? null);
+
+  const headers = new Headers();
+  if (options.sessionToken) {
+    headers.set('Authorization', `Bearer ${options.sessionToken}`);
+  }
+
+  const envelope = await requestV1Envelope<AgentActivityResponse>(
+    `/v1/agent/activity?${params.toString()}`,
+    { headers, signal: options.signal },
+  );
+
+  if (!isApiSuccessEnvelope<AgentActivityResponse>(envelope)) {
+    return {
+      conversation_id: trimmed,
+      steps: [],
+      limit: options.limit ?? 0,
+      count: 0,
+    };
+  }
+
+  const data: Record<string, unknown> = isRecord(envelope.data) ? envelope.data : {};
+  const rawStepsValue = data['steps'];
+  const rawSteps = Array.isArray(rawStepsValue) ? (rawStepsValue as unknown[]) : [];
+  const steps = rawSteps.map(normalizeAgentActivityStep);
+  return {
+    conversation_id: readString(data, 'conversation_id', 'conversationId') ?? trimmed,
+    steps,
+    limit: readNumber(data, 'limit') ?? options.limit ?? steps.length,
+    count: readNumber(data, 'count') ?? steps.length,
+  };
+}
+
+/**
+ * Tenant partner config (Wave 5-E-1) — drives the generic <TenantPartnerApp> component.
+ *
+ * The shape mirrors the backend response from
+ *   GET /api/v1/public/tenants/{slug}/partner-config
+ * The endpoint is unauthenticated, returns 404 when the slug is unknown or
+ * `active=false`, and is safe to call from public partner subdomains.
+ */
+export type TenantPartnerCtaIntent =
+  | 'open_search'
+  | 'external'
+  | 'run_demo'
+  | 'book_demo'
+  | 'open_portal';
+
+export type TenantPartnerCta = {
+  label: string;
+  intent: TenantPartnerCtaIntent;
+  href?: string;
+};
+
+export type TenantPartnerBrand = {
+  name: string;
+  tagline?: string;
+  logo_url?: string;
+  favicon_url?: string | null;
+  accent_color: string;
+};
+
+export type TenantPartnerHero = {
+  kicker: string;
+  h1: string;
+  sub: string;
+  primary_cta: TenantPartnerCta;
+  secondary_cta?: TenantPartnerCta;
+};
+
+export type TenantPartnerChannelTelegram = {
+  bot_username: string;
+  enabled: boolean;
+};
+
+export type TenantPartnerChannelWhatsApp = {
+  phone_number: string;
+  enabled: boolean;
+};
+
+export type TenantPartnerChannels = {
+  telegram?: TenantPartnerChannelTelegram;
+  whatsapp?: TenantPartnerChannelWhatsApp;
+  email_support?: string;
+};
+
+export type TenantPartnerFeatures = {
+  monthly_reminder_default: boolean;
+  post_booking_feedback: boolean;
+  show_audit_ledger: boolean;
+  layout_override: string | null;
+};
+
+export type TenantPartnerTrustSignal = {
+  label: string;
+  icon: string;
+};
+
+export type TenantPartnerConfig = {
+  slug: string;
+  active: boolean;
+  brand: TenantPartnerBrand;
+  hero: TenantPartnerHero;
+  capabilities: string[];
+  channels: TenantPartnerChannels;
+  features: TenantPartnerFeatures;
+  services_endpoint: string;
+  booking_endpoint: string;
+  portal_endpoint_prefix: string;
+  trust_signals: TenantPartnerTrustSignal[];
+  footer_html: string | null;
+};
+
+const TENANT_PARTNER_CTA_INTENTS: ReadonlyArray<TenantPartnerCtaIntent> = [
+  'open_search',
+  'external',
+  'run_demo',
+  'book_demo',
+  'open_portal',
+];
+
+function normalizeTenantPartnerCta(value: unknown): TenantPartnerCta | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const label = readString(value, 'label');
+  const intentRaw = readString(value, 'intent');
+  const intent = TENANT_PARTNER_CTA_INTENTS.find((item) => item === intentRaw) ?? null;
+  if (!label || !intent) {
+    return null;
+  }
+  const href = readString(value, 'href') ?? undefined;
+  const cta: TenantPartnerCta = { label, intent };
+  if (href) {
+    cta.href = href;
+  }
+  return cta;
+}
+
+function normalizeTenantPartnerBrand(value: unknown): TenantPartnerBrand {
+  const record = isRecord(value) ? value : {};
+  return {
+    name: readString(record, 'name') ?? 'BookedAI partner',
+    tagline: readString(record, 'tagline') ?? undefined,
+    logo_url: readString(record, 'logo_url', 'logoUrl') ?? undefined,
+    favicon_url: readString(record, 'favicon_url', 'faviconUrl') ?? null,
+    accent_color: readString(record, 'accent_color', 'accentColor') ?? '',
+  };
+}
+
+function normalizeTenantPartnerHero(value: unknown): TenantPartnerHero | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const primary = normalizeTenantPartnerCta(value['primary_cta'] ?? value['primaryCta']);
+  if (!primary) {
+    return null;
+  }
+  const secondary = normalizeTenantPartnerCta(value['secondary_cta'] ?? value['secondaryCta']);
+  const hero: TenantPartnerHero = {
+    kicker: readString(value, 'kicker') ?? '',
+    h1: readString(value, 'h1') ?? '',
+    sub: readString(value, 'sub') ?? '',
+    primary_cta: primary,
+  };
+  if (secondary) {
+    hero.secondary_cta = secondary;
+  }
+  return hero;
+}
+
+function normalizeTenantPartnerChannels(value: unknown): TenantPartnerChannels {
+  if (!isRecord(value)) {
+    return {};
+  }
+  const channels: TenantPartnerChannels = {};
+  const telegram = isRecord(value['telegram']) ? value['telegram'] : null;
+  if (telegram) {
+    const botUsername = readString(telegram, 'bot_username', 'botUsername');
+    if (botUsername) {
+      channels.telegram = {
+        bot_username: botUsername,
+        enabled: readBoolean(telegram, 'enabled'),
+      };
+    }
+  }
+  const whatsapp = isRecord(value['whatsapp']) ? value['whatsapp'] : null;
+  if (whatsapp) {
+    const phoneNumber = readString(whatsapp, 'phone_number', 'phoneNumber');
+    if (phoneNumber) {
+      channels.whatsapp = {
+        phone_number: phoneNumber,
+        enabled: readBoolean(whatsapp, 'enabled'),
+      };
+    }
+  }
+  const emailSupport = readString(value, 'email_support', 'emailSupport');
+  if (emailSupport) {
+    channels.email_support = emailSupport;
+  }
+  return channels;
+}
+
+function normalizeTenantPartnerFeatures(value: unknown): TenantPartnerFeatures {
+  const record = isRecord(value) ? value : {};
+  return {
+    monthly_reminder_default: readBoolean(record, 'monthly_reminder_default', 'monthlyReminderDefault'),
+    post_booking_feedback: readBoolean(record, 'post_booking_feedback', 'postBookingFeedback'),
+    show_audit_ledger: readBoolean(record, 'show_audit_ledger', 'showAuditLedger'),
+    layout_override: readString(record, 'layout_override', 'layoutOverride'),
+  };
+}
+
+function normalizeTenantPartnerTrustSignal(value: unknown): TenantPartnerTrustSignal | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const label = readString(value, 'label');
+  if (!label) {
+    return null;
+  }
+  return {
+    label,
+    icon: readString(value, 'icon') ?? 'check-circle',
+  };
+}
+
+function normalizeTenantPartnerConfig(value: unknown): TenantPartnerConfig | null {
+  if (!isRecord(value)) {
+    return null;
+  }
+  const slug = readString(value, 'slug');
+  if (!slug) {
+    return null;
+  }
+  const hero = normalizeTenantPartnerHero(value['hero']);
+  if (!hero) {
+    return null;
+  }
+  const trustRaw = Array.isArray(value['trust_signals'])
+    ? (value['trust_signals'] as unknown[])
+    : Array.isArray(value['trustSignals'])
+      ? (value['trustSignals'] as unknown[])
+      : [];
+  return {
+    slug,
+    active: readBoolean(value, 'active'),
+    brand: normalizeTenantPartnerBrand(value['brand']),
+    hero,
+    capabilities: toStringArray(value['capabilities']),
+    channels: normalizeTenantPartnerChannels(value['channels']),
+    features: normalizeTenantPartnerFeatures(value['features']),
+    services_endpoint:
+      readString(value, 'services_endpoint', 'servicesEndpoint') ?? '',
+    booking_endpoint:
+      readString(value, 'booking_endpoint', 'bookingEndpoint') ?? '',
+    portal_endpoint_prefix:
+      readString(value, 'portal_endpoint_prefix', 'portalEndpointPrefix') ?? '',
+    trust_signals: trustRaw
+      .map(normalizeTenantPartnerTrustSignal)
+      .filter((entry): entry is TenantPartnerTrustSignal => entry !== null),
+    footer_html: readString(value, 'footer_html', 'footerHtml'),
+  };
+}
+
+type TenantPartnerCacheEntry = {
+  expiresAt: number;
+  config: TenantPartnerConfig | null;
+};
+
+const TENANT_PARTNER_CONFIG_DEFAULT_TTL_SECONDS = 60;
+const tenantPartnerConfigCache = new Map<string, TenantPartnerCacheEntry>();
+
+function getTenantPartnerCacheEntry(slug: string): TenantPartnerCacheEntry | null {
+  const entry = tenantPartnerConfigCache.get(slug);
+  if (!entry) {
+    return null;
+  }
+  if (entry.expiresAt <= Date.now()) {
+    tenantPartnerConfigCache.delete(slug);
+    return null;
+  }
+  return entry;
+}
+
+function setTenantPartnerCacheEntry(
+  slug: string,
+  config: TenantPartnerConfig | null,
+  ttlSeconds: number,
+) {
+  const ttl = Number.isFinite(ttlSeconds) && ttlSeconds > 0
+    ? ttlSeconds
+    : TENANT_PARTNER_CONFIG_DEFAULT_TTL_SECONDS;
+  tenantPartnerConfigCache.set(slug, {
+    expiresAt: Date.now() + ttl * 1000,
+    config,
+  });
+}
+
+/** Test helper — clears the in-memory tenant partner config cache. */
+export function clearTenantPartnerConfigCache() {
+  tenantPartnerConfigCache.clear();
+}
+
+/**
+ * Fetch the public tenant partner config for the given slug.
+ *
+ * Returns `null` when the backend reports the partner is unknown or inactive
+ * (HTTP 404). Throws `ApiClientError` for any other failure so the caller can
+ * surface a recoverable retry / error state. Successful responses (and 404s)
+ * are cached in-memory for `meta.cache_seconds` (default 60s) to keep
+ * partner-page navigation snappy.
+ */
+export async function getTenantPartnerConfig(
+  slug: string,
+): Promise<TenantPartnerConfig | null> {
+  const trimmed = typeof slug === 'string' ? slug.trim().toLowerCase() : '';
+  if (!trimmed) {
+    return null;
+  }
+  const cached = getTenantPartnerCacheEntry(trimmed);
+  if (cached) {
+    return cached.config;
+  }
+  try {
+    const envelope = await requestV1Envelope<unknown>(
+      `/v1/public/tenants/${encodeURIComponent(trimmed)}/partner-config`,
+    );
+    if (!isApiSuccessEnvelope<unknown>(envelope)) {
+      throw new ApiClientError(
+        'Tenant partner config response was not a success envelope.',
+        200,
+        envelope,
+      );
+    }
+    const data: Record<string, unknown> = isRecord(envelope.data) ? envelope.data : {};
+    const meta: Record<string, unknown> = isRecord(data['meta']) ? data['meta'] : {};
+    const cacheSeconds = readNumber(meta, 'cache_seconds', 'cacheSeconds')
+      ?? TENANT_PARTNER_CONFIG_DEFAULT_TTL_SECONDS;
+    const configPayload = isRecord(data['partner_config'])
+      ? data['partner_config']
+      : isRecord(data['partnerConfig'])
+        ? data['partnerConfig']
+        : data;
+    const config = normalizeTenantPartnerConfig(configPayload);
+    setTenantPartnerCacheEntry(trimmed, config, cacheSeconds);
+    return config;
+  } catch (error) {
+    if (error instanceof ApiClientError && error.status === 404) {
+      setTenantPartnerCacheEntry(trimmed, null, TENANT_PARTNER_CONFIG_DEFAULT_TTL_SECONDS);
+      return null;
+    }
+    throw error;
+  }
+}
+
 export const apiV1 = {
   createLead,
+  getPublicBookingStats,
+  getTenantPartnerConfig,
   startChatSession,
   createAssessmentSession,
   answerAssessmentSession,
@@ -1759,6 +2304,7 @@ export const apiV1 = {
   requestPortalBookingCancellation,
   requestPortalBookingPause,
   requestPortalBookingDowngrade,
+  disablePortalBookingReminders,
   archiveTenantCatalogService,
   createTenantCatalogService,
   importTenantCatalogFromWebsite,
@@ -1783,4 +2329,5 @@ export const apiV1 = {
   retryCrmSync,
   getTenantRevenueMetrics,
   getTenantLeads,
+  getAgentActivity,
 };

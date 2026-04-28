@@ -25,6 +25,7 @@ import {
 
 import { brandPreferredLogoPath } from '../../components/landing/data';
 import { BrandLockup } from '../../components/landing/ui/BrandLockup';
+import { AgentActivityDrawer } from '../../shared/components/AgentActivityDrawer';
 import { apiV1 } from '../../shared/api/v1';
 import type {
   PortalBookingAction,
@@ -32,6 +33,10 @@ import type {
   PortalCustomerCareTurnResponse,
 } from '../../shared/contracts';
 import { copyTextToClipboard, downloadQrCodePng, generateQrCodeDataUrl } from '../../shared/utils/qrCode';
+// Importing the portal-token-store module triggers a one-time URL bootstrap
+// that captures `?token=` into sessionStorage and scrubs it from the URL so it
+// never leaks into history, referrers, or analytics.
+import { clearPortalAccessToken, getPortalAccessToken } from './portal-token-store';
 
 type PortalLoadState =
   | { status: 'idle' }
@@ -317,6 +322,27 @@ function normalizePortalLoadError(error: unknown) {
   };
 }
 
+function isPortalTokenAuthError(error: unknown): boolean {
+  if (!error || typeof error !== 'object') {
+    return false;
+  }
+  const status = (error as { status?: unknown }).status;
+  if (typeof status === 'number' && (status === 401 || status === 403)) {
+    return true;
+  }
+  const body = (error as { body?: unknown }).body;
+  if (body && typeof body === 'object') {
+    const code = (body as { error?: { code?: unknown } }).error?.code;
+    if (
+      typeof code === 'string' &&
+      (code === 'portal_access_token_required' || code === 'portal_access_token_invalid')
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function formatDateTime(dateValue?: string | null, timeValue?: string | null, timezone?: string | null) {
   if (!dateValue && !timeValue) {
     return 'Awaiting schedule confirmation';
@@ -353,7 +379,7 @@ function toneClasses(action: PortalBookingAction) {
     return 'border-slate-200 bg-slate-100 text-slate-400';
   }
   if (action.style === 'primary') {
-    return 'border-[#0f62fe] bg-[#0f62fe] text-white hover:bg-[#0b57e3]';
+    return 'border-[#0071e3] bg-[#0071e3] text-white hover:bg-[#0077ed]';
   }
   if (action.style === 'danger') {
     return 'border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-100';
@@ -366,7 +392,7 @@ function timelineToneClasses(tone: 'complete' | 'current' | 'upcoming') {
     return 'bg-emerald-500';
   }
   if (tone === 'current') {
-    return 'bg-[#0f62fe]';
+    return 'bg-[#0071e3]';
   }
   return 'bg-slate-300';
 }
@@ -498,6 +524,10 @@ export function PortalApp() {
   const [portalQrDataUrl, setPortalQrDataUrl] = useState('');
   const [paymentQrDataUrl, setPaymentQrDataUrl] = useState('');
   const [linkActionMessage, setLinkActionMessage] = useState<string | null>(null);
+  const [remindersEnabled, setRemindersEnabled] = useState(true);
+  const [remindersToggleBusy, setRemindersToggleBusy] = useState(false);
+  const [remindersToggleMessage, setRemindersToggleMessage] = useState<string | null>(null);
+  const [remindersToggleError, setRemindersToggleError] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<PortalLoadState>(
     initialReference ? { status: 'loading', bookingReference: initialReference } : { status: 'idle' },
   );
@@ -511,7 +541,10 @@ export function PortalApp() {
 
     async function load() {
       try {
-        const envelope = await apiV1.getPortalBookingDetail(initialReference);
+        const envelope = await apiV1.getPortalBookingDetail(
+          initialReference,
+          getPortalAccessToken(initialReference),
+        );
         if (cancelled || envelope.status !== 'ok') {
           return;
         }
@@ -531,6 +564,9 @@ export function PortalApp() {
       } catch (error) {
         if (cancelled) {
           return;
+        }
+        if (isPortalTokenAuthError(error)) {
+          clearPortalAccessToken(initialReference);
         }
         const errorState = normalizePortalLoadError(error);
         setLoadState({
@@ -570,7 +606,10 @@ export function PortalApp() {
     setLoadState({ status: 'loading', bookingReference: normalizedReference });
 
     try {
-      const envelope = await apiV1.getPortalBookingDetail(normalizedReference);
+      const envelope = await apiV1.getPortalBookingDetail(
+        normalizedReference,
+        getPortalAccessToken(normalizedReference),
+      );
       if (envelope.status !== 'ok') {
         return;
       }
@@ -592,6 +631,9 @@ export function PortalApp() {
         source: 'manual_lookup',
       });
     } catch (error) {
+      if (isPortalTokenAuthError(error)) {
+        clearPortalAccessToken(normalizedReference);
+      }
       const errorState = normalizePortalLoadError(error);
       setLoadState({
         status: 'error',
@@ -721,14 +763,31 @@ export function PortalApp() {
           timezone: requestTimezone || null,
         };
 
+      const portalAccessToken = getPortalAccessToken(detail.booking.booking_reference);
       const envelope =
         requestMode === 'reschedule'
-          ? await apiV1.requestPortalBookingReschedule(detail.booking.booking_reference, requestPayload)
+          ? await apiV1.requestPortalBookingReschedule(
+              detail.booking.booking_reference,
+              requestPayload,
+              portalAccessToken,
+            )
           : requestMode === 'pause'
-            ? await apiV1.requestPortalBookingPause(detail.booking.booking_reference, requestPayload)
+            ? await apiV1.requestPortalBookingPause(
+                detail.booking.booking_reference,
+                requestPayload,
+                portalAccessToken,
+              )
             : requestMode === 'downgrade'
-              ? await apiV1.requestPortalBookingDowngrade(detail.booking.booking_reference, requestPayload)
-              : await apiV1.requestPortalBookingCancellation(detail.booking.booking_reference, requestPayload);
+              ? await apiV1.requestPortalBookingDowngrade(
+                  detail.booking.booking_reference,
+                  requestPayload,
+                  portalAccessToken,
+                )
+              : await apiV1.requestPortalBookingCancellation(
+                  detail.booking.booking_reference,
+                  requestPayload,
+                  portalAccessToken,
+                );
 
       if (envelope.status !== 'ok') {
         return;
@@ -753,6 +812,50 @@ export function PortalApp() {
     }
   }
 
+  async function handleRemindersToggle(nextEnabled: boolean) {
+    if (!detail || remindersToggleBusy) {
+      return;
+    }
+    setRemindersToggleMessage(null);
+    setRemindersToggleError(null);
+
+    if (nextEnabled) {
+      // Re-enable is not exposed via the disable endpoint; show guidance instead of disabling toggle silently.
+      setRemindersEnabled(true);
+      setRemindersToggleMessage('Monthly check-ins remain on by default.');
+      return;
+    }
+
+    setRemindersToggleBusy(true);
+    setRemindersEnabled(false);
+    try {
+      const portalAccessToken = getPortalAccessToken(detail.booking.booking_reference);
+      const envelope = await apiV1.disablePortalBookingReminders(
+        detail.booking.booking_reference,
+        portalAccessToken,
+      );
+      if (envelope.status !== 'ok') {
+        setRemindersEnabled(true);
+        setRemindersToggleError('We could not disable monthly check-ins right now. Please try again.');
+        return;
+      }
+      setRemindersToggleMessage(
+        "We won't send monthly check-ins for this booking. You can re-enable anytime by contacting support.",
+      );
+      trackPortalEvent('portal_reminders_disabled', {
+        variant: portalVariant,
+        booking_reference: detail.booking.booking_reference,
+      });
+    } catch (error) {
+      setRemindersEnabled(true);
+      setRemindersToggleError(
+        error instanceof Error ? error.message : 'We could not disable monthly check-ins right now.',
+      );
+    } finally {
+      setRemindersToggleBusy(false);
+    }
+  }
+
   async function handleCustomerCareSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!detail || !careQuestion.trim()) {
@@ -769,6 +872,7 @@ export function PortalApp() {
           customer_email: detail.customer.email ?? null,
           customer_phone: detail.customer.phone ?? null,
         },
+        getPortalAccessToken(detail.booking.booking_reference),
       );
       if (envelope.status !== 'ok') {
         return;
@@ -851,9 +955,10 @@ export function PortalApp() {
 
   return (
     <main className="min-h-screen bg-[#f4f7fb] text-[#172033]">
+      <AgentActivityDrawer conversationId={currentBookingReference || null} />
       <section className="px-4 pt-4 sm:px-6 lg:px-8">
-        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-3 rounded-[1.05rem] border border-slate-200 bg-white px-3 py-2 shadow-[0_16px_36px_rgba(15,23,42,0.08)]">
-          <a href="/" className="min-w-0 rounded-[1.1rem] border border-black/6 bg-white px-2.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+        <div className="mx-auto flex max-w-[1280px] items-center justify-between gap-3 rounded-[1.05rem] border border-slate-200 bg-white px-3 py-2 shadow-apple-panel">
+          <a href="/" className="min-w-0 rounded-[1.1rem] border border-black/6 bg-white px-2.5 py-2 shadow-apple-card">
             <BrandLockup
               logoSrc={brandPreferredLogoPath}
               compact={false}
@@ -885,7 +990,7 @@ export function PortalApp() {
 
       <section id="portal-top" className="px-4 py-4 sm:px-6 lg:px-8 lg:py-5">
         <div className="mx-auto grid max-w-[1280px] gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(24rem,0.55fr)]">
-          <div className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.08)] sm:p-6">
+          <div className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-apple-panel sm:p-6">
             <div className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-emerald-800">
               <ShieldCheck className="h-3.5 w-3.5" />
               Customer portal
@@ -912,7 +1017,7 @@ export function PortalApp() {
             </div>
           </div>
 
-          <form onSubmit={handleLookup} className="rounded-[1.4rem] border border-slate-200 bg-slate-950 p-4 text-white shadow-[0_18px_44px_rgba(15,23,42,0.16)] sm:p-5">
+          <form onSubmit={handleLookup} className="rounded-[1.4rem] border border-slate-200 bg-slate-950 p-4 text-white shadow-apple-pop sm:p-5">
             <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/55">
               <NotebookTabs className="h-4 w-4" />
               Booking lookup
@@ -930,7 +1035,7 @@ export function PortalApp() {
               />
               <button
                 type="submit"
-                className="inline-flex min-h-[3rem] items-center justify-center gap-2 rounded-[0.9rem] bg-[#0f62fe] px-4 text-sm font-semibold text-white transition hover:bg-[#0b57e3]"
+                className="inline-flex min-h-[3rem] items-center justify-center gap-2 rounded-[0.9rem] bg-[#0071e3] px-4 text-sm font-semibold text-white transition hover:bg-[#0077ed]"
               >
                 Review booking
                 <ArrowRight className="h-4 w-4" />
@@ -948,7 +1053,7 @@ export function PortalApp() {
         <div className="mx-auto grid max-w-[1280px] gap-6 lg:grid-cols-[minmax(0,1.52fr)_minmax(21rem,0.88fr)]">
           <div className="space-y-6">
             {loadState.status === 'idle' ? (
-              <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+              <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-apple-panel">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                   Start here
                 </div>
@@ -961,7 +1066,7 @@ export function PortalApp() {
             ) : null}
 
             {loadState.status === 'loading' ? (
-              <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+              <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-apple-panel">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                   Loading
                 </div>
@@ -975,7 +1080,7 @@ export function PortalApp() {
             ) : null}
 
             {loadState.status === 'error' ? (
-              <section className="rounded-[2rem] border border-rose-200 bg-rose-50 p-6 shadow-[0_20px_60px_rgba(15,23,42,0.04)]">
+              <section className="rounded-[2rem] border border-rose-200 bg-rose-50 p-6 shadow-apple-panel">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-rose-700">
                   {loadState.recoverable ? 'Reference saved' : 'Booking not available'}
                 </div>
@@ -1031,7 +1136,7 @@ export function PortalApp() {
 
             {detail ? (
               <>
-                <section className="rounded-[1.2rem] border border-slate-200 bg-white p-4 shadow-[0_16px_44px_rgba(15,23,42,0.05)]">
+                <section className="rounded-[1.2rem] border border-slate-200 bg-white p-4 shadow-apple-panel">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
@@ -1052,7 +1157,7 @@ export function PortalApp() {
                             onClick={() => handlePortalViewSelect(item.id)}
                             className={`rounded-[0.8rem] px-3 py-2 text-[11px] font-semibold transition ${
                               active
-                                ? 'bg-[#0f62fe] text-white'
+                                ? 'bg-[#0071e3] text-white'
                                 : 'border border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
                             }`}
                           >
@@ -1064,8 +1169,8 @@ export function PortalApp() {
                   </div>
                 </section>
 
-                <section className="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
-                  <div className="border-b border-slate-200 bg-[linear-gradient(120deg,#ffffff_0%,#eef6ff_50%,#f8fbff_100%)] px-5 py-5 sm:px-6">
+                <section className="overflow-hidden rounded-[1.4rem] border border-slate-200 bg-white shadow-apple-panel">
+                  <div className="border-b border-slate-200 bg-[linear-gradient(120deg,#ffffff_0%,var(--apple-paper-blue-100)_50%,var(--apple-paper-blue-50)_100%)] px-5 py-5 sm:px-6">
                   <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
                     <div>
                       <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
@@ -1240,8 +1345,8 @@ export function PortalApp() {
                       ) : null}
                     </div>
 
-                    <div className="rounded-[1.25rem] border border-sky-200 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4">
-                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                    <div className="rounded-[1.25rem] border border-sky-200 bg-[linear-gradient(180deg,var(--apple-paper-blue-50)_0%,#ffffff_100%)] p-4">
+                      <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0071e3]">
                         <Smartphone className="h-4 w-4" />
                         Continue from chat
                       </div>
@@ -1254,7 +1359,7 @@ export function PortalApp() {
                       <div className="mt-4 grid gap-2 sm:grid-cols-2">
                         <a
                           href={currentTelegramUrl}
-                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.9rem] border border-sky-200 bg-white px-3 text-sm font-semibold text-[#0f62fe] transition hover:border-sky-300"
+                          className="inline-flex min-h-11 items-center justify-center gap-2 rounded-[0.9rem] border border-sky-200 bg-white px-3 text-sm font-semibold text-[#0071e3] transition hover:border-sky-300"
                         >
                           <MessageCircle className="h-4 w-4" />
                           Telegram with ID
@@ -1288,8 +1393,8 @@ export function PortalApp() {
                     </div>
                   </div>
 
-                  <div className="mx-5 mb-5 rounded-[1.25rem] border border-sky-200 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] p-4 sm:mx-6 sm:mb-6">
-                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                  <div className="mx-5 mb-5 rounded-[1.25rem] border border-sky-200 bg-[linear-gradient(180deg,var(--apple-paper-blue-50)_0%,#ffffff_100%)] p-4 sm:mx-6 sm:mb-6">
+                    <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0071e3]">
                       <Sparkles className="h-4 w-4" />
                       Customer-care status agent
                     </div>
@@ -1298,12 +1403,12 @@ export function PortalApp() {
                         value={careQuestion}
                         onChange={(event) => setCareQuestion(event.target.value)}
                         placeholder="Ask about payment, reschedule, class progress, pause, or support..."
-                        className="min-h-11 flex-1 rounded-full border border-slate-200 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-[#0f62fe]"
+                        className="min-h-11 flex-1 rounded-full border border-slate-200 bg-white px-4 text-sm text-slate-800 outline-none transition focus:border-[#0071e3]"
                       />
                       <button
                         type="submit"
                         disabled={careLoading || !careQuestion.trim()}
-                        className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#0f62fe] bg-[#0f62fe] px-5 text-sm font-semibold text-white transition hover:bg-[#0b57e3] disabled:cursor-not-allowed disabled:opacity-55"
+                        className="inline-flex min-h-11 items-center justify-center rounded-full border border-[#0071e3] bg-[#0071e3] px-5 text-sm font-semibold text-white transition hover:bg-[#0077ed] disabled:cursor-not-allowed disabled:opacity-55"
                       >
                         {careLoading ? 'Checking...' : 'Ask'}
                       </button>
@@ -1346,8 +1451,8 @@ export function PortalApp() {
                   </div>
 
                   {viewMode === 'pay' ? (
-                    <div className="mt-6 rounded-[1.4rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                    <div className="mt-6 rounded-[1.4rem] border border-apple-paper-blue-200 bg-[linear-gradient(180deg,var(--apple-paper-blue-50)_0%,#ffffff_100%)] px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0071e3]">
                         Payment status
                       </div>
                       <div className="mt-2 text-sm font-semibold text-slate-900">
@@ -1362,8 +1467,8 @@ export function PortalApp() {
                   ) : null}
 
                   {viewMode === 'help' ? (
-                    <div className="mt-6 rounded-[1.4rem] border border-sky-200 bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                    <div className="mt-6 rounded-[1.4rem] border border-sky-200 bg-[linear-gradient(180deg,var(--apple-paper-blue-50)_0%,#ffffff_100%)] px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0071e3]">
                         Ask for help
                       </div>
                       <div className="mt-2 text-sm font-semibold text-slate-900">
@@ -1376,8 +1481,8 @@ export function PortalApp() {
                   ) : null}
 
                   {viewMode === 'change_plan' ? (
-                    <div className="mt-6 rounded-[1.4rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                    <div className="mt-6 rounded-[1.4rem] border border-apple-paper-blue-200 bg-[linear-gradient(180deg,var(--apple-paper-blue-50)_0%,#ffffff_100%)] px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0071e3]">
                         Change plan
                       </div>
                       <div className="mt-2 text-sm font-semibold text-slate-900">
@@ -1406,8 +1511,8 @@ export function PortalApp() {
                   ) : null}
 
                   {viewMode === 'edit' ? (
-                    <div className="mt-6 rounded-[1.4rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-4">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0f62fe]">
+                    <div className="mt-6 rounded-[1.4rem] border border-apple-paper-blue-200 bg-[linear-gradient(180deg,var(--apple-paper-blue-50)_0%,#ffffff_100%)] px-4 py-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#0071e3]">
                         Edit booking
                       </div>
                       <div className="mt-2 text-sm font-semibold text-slate-900">
@@ -1453,7 +1558,7 @@ export function PortalApp() {
                 </section>
 
                 <section className="grid gap-6 xl:grid-cols-[minmax(0,1.1fr)_minmax(18rem,0.9fr)]">
-                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-apple-panel">
                     <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                       <Home className="h-4 w-4" />
                       Provider and service
@@ -1483,7 +1588,7 @@ export function PortalApp() {
                         {detail.service.map_url ? (
                           <a
                             href={detail.service.map_url}
-                            className="mt-2 inline-flex text-sm font-medium text-[#0f62fe]"
+                            className="mt-2 inline-flex text-sm font-medium text-[#0071e3]"
                           >
                             Open map
                           </a>
@@ -1509,7 +1614,7 @@ export function PortalApp() {
                     </dl>
                   </div>
 
-                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <div className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-apple-panel">
                     <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                       <UserRound className="h-4 w-4" />
                       Customer details
@@ -1543,7 +1648,7 @@ export function PortalApp() {
                   </div>
                 </section>
 
-                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-apple-panel">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                     <RefreshCw className="h-4 w-4" />
                     Booking timeline
@@ -1567,7 +1672,7 @@ export function PortalApp() {
           <aside className="space-y-6 lg:sticky lg:top-4 lg:self-start">
             {detail ? (
               <>
-                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-apple-panel">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                     <HelpCircle className="h-4 w-4" />
                     What would you like to do?
@@ -1582,7 +1687,7 @@ export function PortalApp() {
                           onClick={() => handlePortalViewSelect(item.id)}
                           className={`rounded-[1rem] border px-4 py-3 text-left transition ${
                             active
-                              ? 'border-[#0f62fe] bg-[#eef4ff]'
+                              ? 'border-[#0071e3] bg-apple-paper-blue-100'
                               : 'border-slate-200 bg-slate-50 hover:border-slate-300 hover:bg-white'
                           }`}
                         >
@@ -1594,7 +1699,7 @@ export function PortalApp() {
                   </div>
                 </section>
 
-                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-apple-panel">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                     <ArrowRight className="h-4 w-4" />
                     Quick actions
@@ -1785,8 +1890,62 @@ export function PortalApp() {
                   ) : null}
                 </section>
 
+                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-apple-panel">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
+                    <Mail className="h-4 w-4" />
+                    Notifications
+                  </div>
+                  <div className="mt-4 flex items-start justify-between gap-4 rounded-[1.2rem] border border-slate-200 bg-slate-50 p-4">
+                    <div className="min-w-0">
+                      <div className="text-sm font-semibold text-slate-900">
+                        Auto monthly check-in emails
+                      </div>
+                      <p className="mt-1 text-xs leading-5 text-slate-600">
+                        We send a friendly reminder once a month so you can pause, resume, or re-book without losing context.
+                      </p>
+                    </div>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={remindersEnabled}
+                      aria-label="Auto monthly check-in emails"
+                      disabled={remindersToggleBusy}
+                      onClick={() => handleRemindersToggle(!remindersEnabled)}
+                      className={`relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                        remindersEnabled
+                          ? 'border-[#0071e3] bg-[#0071e3]'
+                          : 'border-slate-300 bg-slate-200'
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition ${
+                          remindersEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
+                      />
+                      <span className="sr-only">{remindersEnabled ? 'On' : 'Off'}</span>
+                    </button>
+                  </div>
+                  {remindersToggleMessage ? (
+                    <div
+                      role="status"
+                      className="mt-3 rounded-[1.2rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs leading-5 text-emerald-800"
+                    >
+                      {remindersToggleMessage}
+                    </div>
+                  ) : null}
+                  {remindersToggleError ? (
+                    <div
+                      role="alert"
+                      className="mt-3 rounded-[1.2rem] border border-rose-200 bg-rose-50 px-4 py-3 text-xs leading-5 text-rose-700"
+                    >
+                      {remindersToggleError}
+                    </div>
+                  ) : null}
+                </section>
+
                 {detail.academy_report_preview ? (
-                  <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-apple-panel">
                     <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                       Student progress and retention
                     </div>
@@ -1816,7 +1975,7 @@ export function PortalApp() {
                   </section>
                 ) : null}
 
-                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-apple-panel">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                     <Mail className="h-4 w-4" />
                     Support
@@ -1829,12 +1988,12 @@ export function PortalApp() {
                     contact the support team using the details below.
                   </p>
                   <div className="mt-4 grid gap-2 text-sm text-slate-900">
-                    <a href={`mailto:${detail.support.contact_email || BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL}`} className="font-medium text-[#0f62fe]">
+                    <a href={`mailto:${detail.support.contact_email || BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL}`} className="font-medium text-[#0071e3]">
                       {detail.support.contact_email || BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_EMAIL}
                     </a>
                     <a
                       href={`sms:${(detail.support.contact_phone || BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_PHONE).replace(/[^\d+]/g, '')}`}
-                      className="font-medium text-[#0f62fe]"
+                      className="font-medium text-[#0071e3]"
                     >
                       {detail.support.contact_phone || BOOKEDAI_CUSTOMER_BOOKING_SUPPORT_PHONE}
                     </a>
@@ -1844,7 +2003,7 @@ export function PortalApp() {
                   </div>
                 </section>
 
-                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-apple-panel">
                   <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                     <Home className="h-4 w-4" />
                     Need another booking?
@@ -1861,7 +2020,7 @@ export function PortalApp() {
                 </section>
 
                 {detail.booking.notes ? (
-                  <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+                  <section className="rounded-[1.4rem] border border-slate-200 bg-white p-5 shadow-apple-panel">
                     <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                       <NotebookTabs className="h-4 w-4" />
                       Notes
@@ -1871,7 +2030,7 @@ export function PortalApp() {
                 ) : null}
               </>
             ) : (
-              <section className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(15,23,42,0.06)]">
+              <section className="rounded-[1.4rem] border border-slate-200 bg-white p-6 shadow-apple-panel">
                 <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#172033]/45">
                   <XCircle className="h-4 w-4" />
                   Portal actions

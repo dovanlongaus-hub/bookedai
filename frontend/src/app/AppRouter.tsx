@@ -32,6 +32,10 @@ const AIMentorProApp = lazy(async () => {
   const module = await import('../apps/public/AIMentorProApp');
   return { default: module.AIMentorProApp };
 });
+const AIMentorBookedAIApp = lazy(async () => {
+  const module = await import('../apps/public/AIMentorBookedAIApp');
+  return { default: module.AIMentorBookedAIApp };
+});
 const PitchDeckApp = lazy(async () => {
   const module = await import('../apps/public/PitchDeckApp');
   return { default: module.PitchDeckApp };
@@ -47,6 +51,14 @@ const RoadmapApp = lazy(async () => {
 const TenantApp = lazy(async () => {
   const module = await import('../apps/tenant/TenantApp');
   return { default: module.TenantApp };
+});
+const TenantPartnerApp = lazy(async () => {
+  const module = await import('../apps/public/TenantPartnerApp');
+  return { default: module.TenantPartnerApp };
+});
+const SandboxApp = lazy(async () => {
+  const module = await import('../apps/public/SandboxApp');
+  return { default: module.SandboxApp };
 });
 const PortalApp = lazy(async () => {
   const module = await import('../apps/portal/PortalApp');
@@ -160,6 +172,20 @@ function isAIMentorProRuntime() {
   );
 }
 
+function isAIMentorBookedAIRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { hostname, pathname } = window.location;
+  return (
+    hostname === 'aimentor.bookedai.au' ||
+    pathname === '/aimentor' ||
+    pathname === '/aimentor/' ||
+    pathname.startsWith('/aimentor/')
+  );
+}
+
 function isChessGrandmasterRuntime() {
   if (typeof window === 'undefined') {
     return false;
@@ -191,6 +217,84 @@ function isPortalRuntime() {
 
   const { hostname, pathname } = window.location;
   return hostname === 'portal.bookedai.au' || pathname === '/portal' || pathname.startsWith('/portal/');
+}
+
+function isSandboxRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { pathname } = window.location;
+  return pathname === '/sandbox' || pathname.startsWith('/sandbox/');
+}
+
+/**
+ * Hosts that already have bespoke React surfaces or non-tenant runtimes. Any
+ * `*.bookedai.au` subdomain NOT in this list is treated as a generic tenant
+ * partner subdomain and routed to <TenantPartnerApp /> with the subdomain
+ * label as the tenant slug. This is the "design via API" path: a new tenant
+ * onboards with a backend partner-config row + DNS, no new component file.
+ */
+const KNOWN_BOOKEDAI_HOSTS: ReadonlySet<string> = new Set<string>([
+  'bookedai.au',
+  'www.bookedai.au',
+  'pitch.bookedai.au',
+  'pitchdeck.bookedai.au',
+  'product.bookedai.au',
+  'portal.bookedai.au',
+  'tenant.bookedai.au',
+  'admin.bookedai.au',
+  'aimentor.bookedai.au',
+  'aimentor-pro.bookedai.au',
+  'chess.bookedai.au',
+  'futureswim.bookedai.au',
+  'roadmap.bookedai.au',
+  'architecture.bookedai.au',
+  'register.bookedai.au',
+  'demo.bookedai.au',
+]);
+
+function resolveTenantPartnerSlug(): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+  const { hostname, pathname } = window.location;
+
+  // Apex `/partner/{slug}` route — used for local dev and link sharing.
+  if (pathname === '/partner' || pathname === '/partner/') {
+    return null;
+  }
+  if (pathname.startsWith('/partner/')) {
+    const remainder = pathname.slice('/partner/'.length);
+    const segment = remainder.split('/')[0]?.trim();
+    if (segment) {
+      // Avoid stealing the bespoke `/partner/ai-mentor-pro` path that
+      // `isAIMentorProRuntime` already handles above.
+      if (segment === 'ai-mentor-pro') {
+        return null;
+      }
+      return segment.toLowerCase();
+    }
+  }
+
+  if (!hostname.endsWith('.bookedai.au')) {
+    return null;
+  }
+  if (KNOWN_BOOKEDAI_HOSTS.has(hostname)) {
+    return null;
+  }
+
+  // Extract the leftmost subdomain label as the tenant slug.
+  const subdomain = hostname.slice(0, -'.bookedai.au'.length);
+  const firstLabel = subdomain.split('.')[0]?.trim();
+  if (!firstLabel) {
+    return null;
+  }
+  return firstLabel.toLowerCase();
+}
+
+function isTenantPartnerRuntime() {
+  return resolveTenantPartnerSlug() !== null;
 }
 
 export function AppRouter() {
@@ -283,6 +387,14 @@ export function AppRouter() {
     );
   }
 
+  if (isAIMentorBookedAIRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <AIMentorBookedAIApp />
+      </Suspense>
+    );
+  }
+
   if (isAIMentorProRuntime()) {
     return (
       <Suspense fallback={fallback}>
@@ -311,6 +423,23 @@ export function AppRouter() {
     return (
       <Suspense fallback={fallback}>
         <PortalApp />
+      </Suspense>
+    );
+  }
+
+  if (isSandboxRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <SandboxApp />
+      </Suspense>
+    );
+  }
+
+  if (isTenantPartnerRuntime()) {
+    const tenantSlug = resolveTenantPartnerSlug() ?? '';
+    return (
+      <Suspense fallback={fallback}>
+        <TenantPartnerApp tenantSlug={tenantSlug} />
       </Suspense>
     );
   }
