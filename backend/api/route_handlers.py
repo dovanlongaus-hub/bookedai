@@ -1463,6 +1463,15 @@ async def _apply_handoff_session_context(
     metadata["handoff_session_payload"] = payload
     metadata["handoff_session_source"] = str(row.source or "").strip() or None
 
+    # Surface the persisted locale to telegram_language_code so
+    # MessagingAutomationService._resolve_locale picks it up on this turn.
+    # The customer's homepage locale is a stronger signal than Telegram's
+    # client-reported language_code (often the OS default in markets where
+    # users browse in one locale but use Telegram in another), so it wins.
+    payload_locale = str(payload.get("locale") or "").strip().lower()
+    if payload_locale:
+        metadata["telegram_language_code"] = payload_locale
+
     # Translate the payload fields into a synthetic customer message so the
     # standard intake / search path picks up where the public app left off.
     booking_reference = str(payload.get("booking_reference") or "").strip()

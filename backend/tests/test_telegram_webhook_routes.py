@@ -1607,3 +1607,67 @@ class TelegramWebhookRoutesTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(captured_calls[0]["ai_intent"], "welcome")
+
+    def test_telegram_start_hsess_propagates_locale_to_bot_reply(self):
+        from datetime import datetime, timedelta, UTC
+        from db import CustomerHandoffSession
+
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        consumed_marker = {"consumed": False}
+
+        async def _fake_mark_consumed(_self, session_id, *, chat_id=None):
+            if consumed_marker["consumed"]:
+                return None
+            consumed_marker["consumed"] = True
+            return CustomerHandoffSession(
+                id="vihandoff",
+                source="product_homepage",
+                payload_json={"locale": "vi"},
+                expires_at=datetime.now(UTC) + timedelta(hours=1),
+                consumed_at=datetime.now(UTC),
+                consumed_by_chat_id=chat_id,
+            )
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "repositories.customer_handoff_session_repository."
+            "CustomerHandoffSessionRepository.mark_consumed",
+            _fake_mark_consumed,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 9102,
+                    "message": {
+                        "message_id": 93,
+                        "from": {
+                            "id": 999,
+                            "first_name": "Long",
+                            "language_code": "en",
+                        },
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/start hsess_vihandoff",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "welcome")
+        # Customer's homepage locale ("vi") wins over Telegram's
+        # client-reported language_code ("en"): the welcome reply should be
+        # rendered in Vietnamese.
+        self.assertIn("Mình", captured_calls[0]["ai_reply"])
+        self.assertEqual(
+            captured_calls[0]["metadata"]["telegram_language_code"], "vi"
+        )
