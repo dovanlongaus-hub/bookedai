@@ -8,6 +8,7 @@ import {
   type PublicCtaAttribution,
   type PublicCtaName,
 } from '../attribution';
+import { PricingCalculator } from './PricingCalculator';
 import { PricingConsultationModal } from './PricingConsultationModal';
 import { PricingPlanCard } from './PricingPlanCard';
 import { PricingRecommendationPanel } from './PricingRecommendationPanel';
@@ -505,6 +506,17 @@ export function PricingSection() {
               ))}
             </div>
           </SectionCard>
+        </div>
+
+        <PricingCalculator />
+
+        <div className="mt-12 text-center">
+          <SignalPill className="inline-flex items-center justify-center px-4 py-2 text-[11px] uppercase tracking-[0.18em]">
+            Pick the engine that fits
+          </SignalPill>
+          <h3 className="mt-4 text-2xl font-semibold tracking-tight text-[var(--apple-near-black)] sm:text-3xl">
+            Three tiers, same revenue engine — pick the entry point that matches today.
+          </h3>
         </div>
 
         <div className="mt-8 grid gap-6 lg:grid-cols-3">

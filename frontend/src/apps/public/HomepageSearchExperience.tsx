@@ -30,6 +30,7 @@ import {
 } from '../../shared/presenters/partnerMatch';
 import { AgentActivityDrawer } from '../../shared/components/AgentActivityDrawer';
 import { PartnerMatchShortlist } from '../../shared/components/PartnerMatchShortlist';
+import { SlashCommandMenu } from '../../shared/components/SlashCommandMenu';
 import type { MatchCandidate } from '../../shared/contracts';
 import { normalizePhoneForMessaging } from '../../shared/utils/phone';
 import {
@@ -189,7 +190,7 @@ type LiveReadBookingSummary = {
 
 type BookingReturnNotice = {
   tone: 'success' | 'warning';
-  status: 'paid' | 'cancelled' | 'expired';
+  status: 'paid' | 'verifying' | 'cancelled' | 'expired';
   title: string;
   body: string;
   bookingReference: string | null;
@@ -1907,15 +1908,18 @@ type StripeReturnNoticeProps = {
 
 function StripeReturnNotice({ notice, portalUrl, onDismiss, onTryAgain }: StripeReturnNoticeProps) {
   const isPaid = notice.status === 'paid';
+  const isVerifying = notice.status === 'verifying';
   const wrapperToneClass = isPaid
     ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
     : 'border-amber-200 bg-amber-50 text-amber-900';
   const kickerToneClass = isPaid ? 'text-emerald-700' : 'text-amber-700';
   const kickerLabel = isPaid
     ? 'Payment confirmed'
-    : notice.status === 'expired'
-      ? 'Checkout expired'
-      : 'Payment cancelled';
+    : isVerifying
+      ? 'Payment verifying'
+      : notice.status === 'expired'
+        ? 'Checkout expired'
+        : 'Payment cancelled';
 
   const receiptHref = notice.sessionId ? `/receipt/${encodeURIComponent(notice.sessionId)}` : null;
 
@@ -1946,7 +1950,7 @@ function StripeReturnNotice({ notice, portalUrl, onDismiss, onTryAgain }: Stripe
           </p>
 
           <div className="mt-4 flex flex-wrap items-center gap-3">
-            {isPaid ? (
+            {isPaid || isVerifying ? (
               portalUrl ? (
                 <a
                   href={portalUrl}
@@ -1958,14 +1962,14 @@ function StripeReturnNotice({ notice, portalUrl, onDismiss, onTryAgain }: Stripe
                     }
                   }}
                 >
-                  Open my booking portal →
+                  {isPaid ? 'Open my booking portal →' : 'Check booking status →'}
                 </a>
               ) : (
                 <span
-                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/70 px-3 py-1.5 text-[12px] font-semibold text-emerald-800"
+                  className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-white/70 px-3 py-1.5 text-[12px] font-semibold text-amber-800"
                   data-testid="stripe-return-email-fallback"
                 >
-                  We'll email your booking link.
+                  We'll email your booking link after payment is verified.
                 </span>
               )
             ) : (
@@ -2066,6 +2070,11 @@ export function HomepageSearchExperience({
   const recognitionBaseQueryRef = useRef('');
   const bookingAssistantV1SessionIdRef = useRef<string | null>(null);
   const announcedBookingReferenceRef = useRef<string | null>(null);
+  // Lane 7 P2 — last picked slash-command intent verb. Stored in a ref so
+  // `runSearch` can pick it up without re-render churn between menu pick and
+  // submit. Cleared whenever the textarea is mutated by the user (so the
+  // hint never bleeds across unrelated searches).
+  const slashIntentHintRef = useRef<string | null>(null);
 
   function trackHomepageSearchEvent(eventName: string, payload: Record<string, unknown> = {}) {
     onHomepageEvent?.(eventName, {
@@ -2173,16 +2182,69 @@ export function HomepageSearchExperience({
 
     if (resolvedStatus === 'paid') {
       setBookingReturnNotice({
-        tone: 'success',
-        status: 'paid',
-        title: 'Payment received — your booking is confirmed.',
+        tone: 'warning',
+        status: 'verifying',
+        title: 'Payment is being verified.',
         body: bookingReference
-          ? `Booking reference ${bookingReference} · We've emailed your portal access link.`
-          : `We've emailed your booking link to your inbox.`,
+          ? `Booking reference ${bookingReference} · Stripe returned you to BookedAI, and we are checking backend payment truth before marking it paid.`
+          : `Stripe returned you to BookedAI, and we are checking backend payment truth before marking it paid.`,
         bookingReference,
         sessionId,
         token,
       });
+
+      if (bookingReference) {
+        const controller = new AbortController();
+        const search = new URLSearchParams({ booking_reference: bookingReference });
+        if (sessionId) {
+          search.set('session_id', sessionId);
+        }
+        void fetch(`${getApiBaseUrl()}/v1/payments/status?${search.toString()}`, {
+          signal: controller.signal,
+        })
+          .then(async (response) => {
+            if (!response.ok) {
+              throw new Error('Unable to verify payment status.');
+            }
+            return response.json() as Promise<{
+              data?: {
+                payment_status?: string | null;
+                booking_reference?: string | null;
+                session_match?: boolean | null;
+              };
+            }>;
+          })
+          .then((payload) => {
+            const paymentStatus = (payload.data?.payment_status || '').trim().toLowerCase();
+            if (paymentStatus === 'paid') {
+              setBookingReturnNotice({
+                tone: 'success',
+                status: 'paid',
+                title: 'Payment received — your booking is confirmed.',
+                body: `Booking reference ${bookingReference} · We've emailed your portal access link.`,
+                bookingReference,
+                sessionId,
+                token,
+              });
+            } else if (paymentStatus === 'cancelled' || paymentStatus === 'expired') {
+              setBookingReturnNotice({
+                tone: 'warning',
+                status: paymentStatus,
+                title: paymentStatus === 'expired'
+                  ? 'Payment was not completed — checkout expired.'
+                  : 'Payment was not completed.',
+                body: `Booking ${bookingReference} is still saved. Try again or message support and we'll keep your spot.`,
+                bookingReference,
+                sessionId,
+                token,
+              });
+            }
+          })
+          .catch(() => {
+            // Keep the verifying notice visible; webhook/session truth may still arrive shortly.
+          });
+        return () => controller.abort();
+      }
       return;
     }
 
@@ -2675,17 +2737,27 @@ export function HomepageSearchExperience({
     return automation;
   }
 
-  async function runSearch(nextQuery: string) {
+  async function runSearch(
+    nextQuery: string,
+    options?: { intentHint?: string | null },
+  ) {
     const trimmedQuery = nextQuery.trim();
     if (!trimmedQuery) {
       return;
     }
+
+    // Lane 7 P2 — slash commands forward a typed verb to the backend via
+    // `context.intent_hint`. Caller can also pass an explicit hint; otherwise
+    // we use whatever was stored from the most recent slash-menu pick.
+    const effectiveIntentHint =
+      options?.intentHint !== undefined ? options.intentHint : slashIntentHintRef.current;
 
     trackHomepageSearchEvent('homepage_search_started', {
       query: trimmedQuery,
       query_length: trimmedQuery.length,
       attachment_count: attachedReferences.length,
       live_read_mode: isLiveReadMode,
+      intent_hint: effectiveIntentHint ?? null,
     });
     const clarificationDecision = shouldHoldResultsForClarification(trimmedQuery);
 
@@ -2804,6 +2876,10 @@ export function HomepageSearchExperience({
           context: {
             surface: homepageRuntimeConfig.surface ?? 'bookedai_homepage_search_shell',
             attached_reference_count: attachedReferences.length,
+            // Lane 7 P2 — typed verb from slash command (e.g. "find_service",
+            // "book_service", "request_quote", "open_portal", "help"). Backend
+            // already has an `ai_intent` slot per Lane 7 §4.
+            ...(effectiveIntentHint ? { intent_hint: effectiveIntentHint } : {}),
           },
         });
 
@@ -4445,15 +4521,39 @@ export function HomepageSearchExperience({
                     <textarea
                       ref={searchComposerRef}
                       value={searchQuery}
-                      onChange={(event) => setSearchQuery(event.target.value)}
+                      onChange={(event) => {
+                        const next = event.target.value;
+                        // Lane 7 P2 — once the user mutates the textarea away
+                        // from a slash-command template, drop the buffered
+                        // intent hint so it doesn't bleed into a free-text
+                        // submit.
+                        if (!next.startsWith('/')) {
+                          slashIntentHintRef.current = null;
+                        }
+                        setSearchQuery(next);
+                      }}
                       onKeyDown={handleSearchComposerKeyDown}
-                      placeholder="Ask for a service, area, timing, or budget"
+                      placeholder="Ask for a service, area, timing, or budget — type / for shortcuts"
                       rows={1}
                       enterKeyHint="send"
                       autoCorrect="on"
                       spellCheck
                       className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-[16px] leading-6 text-apple-near-black outline-none placeholder:text-slate-400 sm:text-[1rem]"
                       aria-label="Ask BookedAI"
+                      data-testid="homepage-search-composer"
+                    />
+                    <SlashCommandMenu
+                      anchorEl={searchComposerRef.current}
+                      inputValue={searchQuery}
+                      onValueChange={setSearchQuery}
+                      onSubmit={(template, intentHint) => {
+                        // Buffer the intent verb; the user still has to press
+                        // Enter / send to actually run the search. This keeps
+                        // the slash menu a "rewrite the prompt" affordance,
+                        // not a hidden auto-submit.
+                        slashIntentHintRef.current = intentHint;
+                      }}
+                      position="above"
                     />
                     <div className="mb-1 flex shrink-0 items-center gap-1.5">
                       {voiceSupported ? (
@@ -5211,7 +5311,7 @@ export function HomepageSearchExperience({
 
               <p className="text-xs leading-5 text-slate-500">
                 {result.meeting_status === 'scheduled'
-                  ? 'A calendar event has been created and included in the booking flow. After payment, Stripe returns the customer to the homepage while the booking stays logged for follow-up.'
+                  ? 'A calendar event has been created and included in the booking flow. After payment, BookedAI verifies Stripe backend status before showing the paid state.'
                   : result.calendar_add_url
                     ? 'A calendar action is ready immediately and is also included in the booking email. After payment, the booking stays logged for follow-up.'
                     : 'The booking is confirmed, the email is ready, and follow-up has already been prepared.'}

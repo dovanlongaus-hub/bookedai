@@ -27,6 +27,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { LogoMark } from '../../components/landing/ui/LogoMark';
 import { AppleCTA } from '../../components/landing/ui/AppleCTA';
 import { apiRequest, ApiClientError } from '../../shared/api/client';
+import { SlashCommandMenu } from '../../shared/components/SlashCommandMenu';
 
 const TENANT_HOST = 'https://tenant.bookedai.au/';
 const BOOKEDAI_HOME = 'https://bookedai.au/';
@@ -158,12 +159,17 @@ async function postJson<T>(path: string, body: unknown): Promise<T> {
 type Stage = 'vertical' | 'dashboard';
 
 function VerticalChooserStage(props: {
-  onPick: (args: { vertical: Vertical | null; hint: string | null }) => void;
+  onPick: (args: { vertical: Vertical | null; hint: string | null; intentHint?: string | null }) => void;
   isLoading: boolean;
   errorMessage: string | null;
 }) {
   const { onPick, isLoading, errorMessage } = props;
   const [hint, setHint] = useState('');
+  // Lane 7 P2 — slash-command intent verb buffered between menu pick and
+  // submit. Forwarded into the sandbox spin-up payload so backend can
+  // record `ai_intent` on the seed conversation event.
+  const slashIntentHintRef = useRef<string | null>(null);
+  const hintInputRef = useRef<HTMLInputElement | null>(null);
 
   return (
     <main className="min-h-screen bg-apple-light text-apple-near-black">
@@ -236,7 +242,11 @@ function VerticalChooserStage(props: {
               event.preventDefault();
               const trimmed = hint.trim();
               if (!trimmed) return;
-              onPick({ vertical: null, hint: trimmed });
+              onPick({
+                vertical: null,
+                hint: trimmed,
+                intentHint: slashIntentHintRef.current,
+              });
             }}
           >
             <label className="sr-only" htmlFor="sandbox-hint">
@@ -244,14 +254,31 @@ function VerticalChooserStage(props: {
             </label>
             <input
               id="sandbox-hint"
+              ref={hintInputRef}
               type="text"
               value={hint}
-              onChange={(event) => setHint(event.target.value)}
-              placeholder="Or describe your business in one line — e.g. yoga studio in Melbourne"
+              onChange={(event) => {
+                const next = event.target.value;
+                if (!next.startsWith('/')) {
+                  slashIntentHintRef.current = null;
+                }
+                setHint(next);
+              }}
+              placeholder="Or describe your business in one line — type / for shortcuts"
               maxLength={240}
               disabled={isLoading}
               className="w-full rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-base text-apple-near-black"
               style={{ minHeight: '48px' }}
+              data-testid="sandbox-vertical-hint"
+            />
+            <SlashCommandMenu
+              anchorEl={hintInputRef.current}
+              inputValue={hint}
+              onValueChange={setHint}
+              onSubmit={(_template, intentHint) => {
+                slashIntentHintRef.current = intentHint;
+              }}
+              position="below"
             />
             <AppleCTA
               type="submit"
@@ -859,12 +886,19 @@ export function SandboxApp() {
   }, [celebrationVisible, bookings.length]);
 
   const handlePickVertical = useCallback(
-    async (args: { vertical: Vertical | null; hint: string | null }) => {
+    async (args: {
+      vertical: Vertical | null;
+      hint: string | null;
+      intentHint?: string | null;
+    }) => {
       setIsLoading(true);
       setErrorMessage(null);
       try {
         const data = await postJson<SandboxSessionData>('/v1/sandbox/sessions', {
           vertical_hint: args.hint ?? args.vertical ?? null,
+          // Lane 7 P2 — typed verb from slash command picked in the chooser.
+          // Backend can store this on the seed conversation event for analytics.
+          ...(args.intentHint ? { intent_hint: args.intentHint } : {}),
         });
         setSession(data);
         setBookings(data.bookings ?? []);

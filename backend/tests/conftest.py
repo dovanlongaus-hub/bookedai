@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import sys
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -15,6 +16,24 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 import app as app_module  # noqa: E402
+
+
+def _current_app_module():
+    """Return the LIVE ``app`` module from ``sys.modules``.
+
+    ``test_cors_security`` uses ``importlib.reload`` to swap the ``app``,
+    ``config``, and ``api.route_handlers`` modules in-place. After that
+    test, the ``app_module`` Python local captured at conftest import time
+    becomes a STALE reference — its ``.app`` attribute is the old FastAPI
+    instance, while ``sys.modules["app"]`` is the freshly reloaded one.
+    Tests using the ``client`` fixture (``test_api_v1_contract``) end up
+    talking to the stale app while monkeypatches target the live module.
+
+    Re-fetching here means every fixture / test sees whichever module is
+    currently registered in ``sys.modules``.
+    """
+
+    return sys.modules.get("app", app_module)
 
 
 class FakeEmailService:
@@ -133,19 +152,125 @@ def _reset_app_state_rate_limiter():
     try:
         from rate_limit import InMemoryRateLimiter
 
-        existing = getattr(app_module.app.state, "rate_limiter", None)
+        live_app = _current_app_module().app
+        existing = getattr(live_app.state, "rate_limiter", None)
         if existing is not None and hasattr(existing, "reset"):
             existing.reset()
         else:
-            app_module.app.state.rate_limiter = InMemoryRateLimiter()
+            live_app.state.rate_limiter = InMemoryRateLimiter()
     except Exception:
         pass
     yield
 
 
+# Environment variables that test cases mutate via raw ``os.environ`` writes
+# (or via ``importlib.reload`` paths that bake env into module-level config
+# snapshots). These leak between test files because no monkeypatch frame
+# restores them — the assignment lives directly on ``os.environ``.
+#
+# The list intentionally enumerates the keys we have OBSERVED tests touching;
+# adding to it is cheap and only restores values that existed at session
+# start, so it cannot mask a test that legitimately wants the env var set.
+_ENV_VARS_TO_RESTORE = (
+    "BOOKEDAI_ENVIRONMENT",
+    "ENVIRONMENT",
+    "CORS_ALLOW_ORIGINS",
+    "WHATSAPP_META_APP_SECRET",
+    "WHATSAPP_META_SIGNATURE_STRICT",
+    "WHATSAPP_EVOLUTION_WEBHOOK_SECRET",
+    "ADMIN_PASSWORD_HASH",
+    "ADMIN_PASSWORD",
+    "BOOKEDAI_PORTAL_TOKEN_STRICT",
+    "BOOKEDAI_AI_DAILY_CALL_BUDGET",
+    "BOOKEDAI_AI_DAILY_TOKEN_BUDGET",
+    "BOOKEDAI_AI_RATE_PER_MINUTE",
+    "BOOKEDAI_ENABLE_HOST_SHELL",
+    "BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN",
+    "BOOKEDAI_CUSTOMER_TELEGRAM_WEBHOOK_SECRET_TOKEN",
+    "BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS",
+    "BOOKEDAI_MESSAGING_PER_CHAT_LIMIT",
+    "BOOKEDAI_MESSAGING_PER_CHAT_WINDOW_SECONDS",
+)
+
+
+@pytest.fixture(autouse=True)
+def _restore_known_env_vars():
+    """Snapshot/restore env vars that some tests mutate without monkeypatch.
+
+    A few test files (notably the security wave around P1-S1/S2/S3) call
+    ``importlib.reload`` after writing env directly. When the reload path
+    raises before tearing the env back down, subsequent tests inherit a
+    polluted ``os.environ``. This fixture pins the baseline values seen
+    BEFORE the test, then restores them on teardown.
+    """
+
+    saved = {key: os.environ.get(key) for key in _ENV_VARS_TO_RESTORE}
+    try:
+        yield
+    finally:
+        for key, original in saved.items():
+            if original is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = original
+
+
+# Snapshot of keys present on the canonical ``app_module.app.state`` at
+# conftest import time. ``starlette.datastructures.State`` stores its
+# attributes inside a private ``_state`` dict (NOT on ``__dict__``), so we
+# read directly from it. Tests that bolt new keys onto the SHARED app
+# (notably the ``test_app`` / ``client`` fixtures, which set
+# ``session_factory`` and ``email_service``) would otherwise leak those
+# attributes into later test files. We restore the snapshot on teardown so
+# every test starts from the same baseline.
+def _state_dict(state) -> dict | None:
+    inner = getattr(state, "_state", None)
+    if isinstance(inner, dict):
+        return inner
+    return None
+
+
+_baseline_inner = _state_dict(app_module.app.state)
+_BASELINE_APP_STATE_KEYS: frozenset[str] = frozenset(
+    _baseline_inner.keys() if _baseline_inner is not None else ()
+)
+
+
+@pytest.fixture(autouse=True)
+def _reset_shared_app_state():
+    """Strip ad-hoc ``app.state`` attributes injected by previous tests.
+
+    The ``client`` / ``test_app`` fixtures bind ``session_factory``,
+    ``email_service``, and (via ``_reset_app_state_rate_limiter``) a
+    ``rate_limiter`` onto ``app_module.app.state``. Without this guard,
+    those attributes survive across test files — so a later test that
+    expects ``app.state.session_factory`` to be unset (e.g. relying on
+    its absence to short-circuit a code path) sees a stale ``object()``
+    instead.
+
+    We don't try to "deep-restore" — we just remove keys that weren't on
+    the original baseline. Re-binds inside the same test happen via the
+    standard ``app.state.X = ...`` assignment and are unaffected.
+    """
+
+    yield
+    try:
+        live_app = _current_app_module().app
+        inner = _state_dict(live_app.state)
+        if inner is None:
+            return
+        # Drop everything injected by this test that wasn't part of the
+        # original baseline. Iterate over a copy so we can mutate safely.
+        for key in list(inner.keys()):
+            if key not in _BASELINE_APP_STATE_KEYS:
+                inner.pop(key, None)
+    except Exception:
+        pass
+
+
 @pytest.fixture()
 def test_app():
-    app = app_module.app
+    app = _current_app_module().app
     app.router.lifespan_context = _noop_lifespan
     app.state.session_factory = object()
     app.state.email_service = FakeEmailService()
