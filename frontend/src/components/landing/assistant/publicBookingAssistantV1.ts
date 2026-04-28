@@ -36,6 +36,9 @@ export type PublicBookingAssistantAuthoritativeBookingIntentResult = {
   conversationId: string | null;
   bookingIntentId: string;
   bookingReference: string | null;
+  contactEmail?: string | null;
+  supportEmail?: string | null;
+  emailStatus?: 'sent' | 'pending_manual_followup' | null;
   trust: CreateBookingIntentResponse['trust'];
   warnings: string[];
   crmSync: CreateBookingIntentResponse['crm_sync'] | null;
