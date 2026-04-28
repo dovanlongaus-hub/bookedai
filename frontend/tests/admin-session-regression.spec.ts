@@ -771,12 +771,12 @@ test.describe('admin session and refresh regressions', () => {
 
     await page.goto('/admin');
 
-    const catalogButton = page.getByRole('button', { name: /^Catalog\b/i });
+    const catalogButton = page.getByRole('button', { name: /Open Catalog workspace/i });
     await expect(catalogButton).toBeVisible();
     await catalogButton.click();
     await expect(page.getByText('Partners and customers')).toBeVisible();
     await page.getByLabel('Business name').fill('Retry Ready Studio');
-    await page.getByRole('button', { name: 'Create profile' }).click();
+    await page.getByRole('button', { name: 'Create partner profile' }).click();
 
     await expect(page.getByText('Your admin session expired. Sign in again to continue.')).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
@@ -805,7 +805,7 @@ test.describe('admin session and refresh regressions', () => {
     await expect(page.getByText(/Signed in as info@bookedai\.au until/i)).toBeVisible();
 
     await page.getByLabel('Business name').fill('Retry Ready Studio');
-    await page.getByRole('button', { name: 'Create profile' }).click();
+    await page.getByRole('button', { name: 'Create partner profile' }).click();
 
     await expect(page.getByText('Partner profile created.')).toBeVisible();
     await expect(page.getByText('Retry Ready Studio')).toBeVisible();

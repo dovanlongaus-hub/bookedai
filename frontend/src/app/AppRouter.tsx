@@ -28,6 +28,10 @@ const ChessGrandmasterApp = lazy(async () => {
   const module = await import('../apps/public/ChessGrandmasterApp');
   return { default: module.ChessGrandmasterApp };
 });
+const ChessAccountApp = lazy(async () => {
+  const module = await import('../apps/public/ChessAccountApp');
+  return { default: module.ChessAccountApp };
+});
 const AIMentorProApp = lazy(async () => {
   const module = await import('../apps/public/AIMentorProApp');
   return { default: module.AIMentorProApp };
@@ -197,8 +201,21 @@ function isChessGrandmasterRuntime() {
     pathname === '/chess-grandmaster' ||
     pathname === '/chess-grandmaster/' ||
     pathname === '/tenant1-chess' ||
-    pathname === '/tenant1-chess/'
+    pathname === '/tenant1-chess/' ||
+    pathname === '/account' ||
+    pathname.startsWith('/account/')
   );
+}
+
+function isChessAccountRoute() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const { hostname, pathname } = window.location;
+  if (hostname !== 'chess.bookedai.au') {
+    return false;
+  }
+  return pathname === '/account' || pathname.startsWith('/account/');
 }
 
 function isTenantRuntime() {
@@ -380,6 +397,13 @@ export function AppRouter() {
   }
 
   if (isChessGrandmasterRuntime()) {
+    if (isChessAccountRoute()) {
+      return (
+        <Suspense fallback={fallback}>
+          <ChessAccountApp />
+        </Suspense>
+      );
+    }
     return (
       <Suspense fallback={fallback}>
         <ChessGrandmasterApp />

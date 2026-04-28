@@ -1,0 +1,32 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#111C34"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" rx="48" fill="url(#bg)"/>
+  <rect x="80" y="80" width="1040" height="540" rx="32" fill="#0B1220" stroke="#FBBF24" stroke-opacity="0.55" stroke-width="4"/>
+  <rect x="120" y="120" width="960" height="56" rx="16" fill="#0E223C"/>
+  <circle cx="158" cy="148" r="9" fill="#F87171"/>
+  <circle cx="190" cy="148" r="9" fill="#FACC15"/>
+  <circle cx="222" cy="148" r="9" fill="#4ADE80"/>
+  <text x="270" y="158" font-family="Inter, Arial, sans-serif" font-size="22" fill="#FACC15">private 1-1 coaching room - encrypted</text>
+  <g transform="translate(140 220)">
+    <rect width="440" height="380" rx="20" fill="#0F1E33"/>
+    <circle cx="220" cy="160" r="76" fill="#FBBF24"/>
+    <rect x="120" y="240" width="200" height="56" rx="20" fill="#FCD34D"/>
+    <text x="220" y="320" font-family="Inter, Arial, sans-serif" font-size="22" fill="#FCD34D" text-anchor="middle">Woman Grandmaster</text>
+    <text x="220" y="350" font-family="Inter, Arial, sans-serif" font-size="20" fill="#93C5FD" text-anchor="middle">Mai Hung</text>
+  </g>
+  <g transform="translate(620 220)">
+    <rect width="440" height="380" rx="20" fill="#0F1E33"/>
+    <circle cx="220" cy="160" r="64" fill="#5EEAD4"/>
+    <rect x="140" y="232" width="160" height="48" rx="16" fill="#2DD4BF"/>
+    <text x="220" y="316" font-family="Inter, Arial, sans-serif" font-size="22" fill="#5EEAD4" text-anchor="middle">Student spotlight</text>
+    <text x="220" y="346" font-family="Inter, Arial, sans-serif" font-size="18" fill="#93C5FD" text-anchor="middle">Personal calculation drill</text>
+  </g>
+  <text x="80" y="700" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="700" fill="#F8FAFC">Online Private 1-1 Coaching - 60 Minutes</text>
+  <text x="80" y="752" font-family="Inter, Arial, sans-serif" font-size="28" fill="#FBBF24">A$35 / hour - direct grandmaster coaching</text>
+  <text x="80" y="800" font-family="Inter, Arial, sans-serif" font-size="22" fill="#93C5FD">Accelerated progress - tactical sharpness - tournament prep</text>
+</svg>

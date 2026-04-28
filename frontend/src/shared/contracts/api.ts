@@ -1243,6 +1243,39 @@ export interface TenantLeadsResponse {
   items: TenantLeadItem[];
 }
 
+export interface TenantStudentProgressEntry {
+  session_date: string;
+  level: string;
+  attendance: number;
+  notes: string;
+  next_focus: string;
+}
+
+export interface TenantStudentItem {
+  contact_id: string;
+  full_name: string;
+  email: string | null;
+  current_program: string | null;
+  latest_progress: TenantStudentProgressEntry | null;
+}
+
+export interface TenantStudentsResponse {
+  students: TenantStudentItem[];
+}
+
+export interface TenantStudentProgressUpdateRequest {
+  session_date: string;
+  level: string;
+  attendance: number;
+  notes: string;
+  next_focus: string;
+}
+
+export interface TenantStudentProgressUpdateResponse {
+  ok: boolean;
+  progress: TenantStudentProgressEntry;
+}
+
 export interface TenantIntegrationsResponse {
   tenant: TenantOverviewTenantProfile;
   providers: IntegrationProviderStatusItem[];

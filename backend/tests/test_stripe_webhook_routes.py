@@ -5,6 +5,7 @@ import hmac
 import json
 import time
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -98,6 +99,38 @@ def _checkout_completed_event(
     }
 
 
+def _subscription_updated_event(
+    *,
+    event_id: str = "evt_sub_001",
+    tenant_id: str = "tenant-from-billing",
+    tenant_slug: str = "future-swim",
+    customer_id: str = "cus_test_123",
+    subscription_id: str = "sub_test_123",
+    status: str = "active",
+    plan_code: str = "growth",
+) -> dict[str, object]:
+    return {
+        "id": event_id,
+        "object": "event",
+        "type": "customer.subscription.updated",
+        "data": {
+            "object": {
+                "id": subscription_id,
+                "object": "subscription",
+                "customer": customer_id,
+                "status": status,
+                "current_period_start": 1770000000,
+                "current_period_end": 1772592000,
+                "metadata": {
+                    "tenant_id": tenant_id,
+                    "tenant_slug": tenant_slug,
+                    "plan_code": plan_code,
+                },
+            }
+        },
+    }
+
+
 def create_test_app() -> FastAPI:
     app = FastAPI()
     app.include_router(api)
@@ -119,6 +152,11 @@ class _ScriptedSession:
         self.payment_intent_lookup_id = "pi_row_001"
         self.payment_intent_metadata: dict[str, object] = {}
         self.idempotency_already_seen = False
+        self.billing_accounts: list[dict[str, object]] = []
+        self.subscriptions: list[dict[str, object]] = []
+        self.subscription_periods: list[dict[str, object]] = []
+        self.tenant_settings_updates: list[dict[str, object]] = []
+        self.audit_entries: list[dict[str, object]] = []
 
     async def execute(self, statement, params=None):
         sql = str(statement).strip().lower()
@@ -166,13 +204,85 @@ class _ScriptedSession:
             self.webhook_events.append(dict(params))
             return _FakeExecuteResult(101)
 
-        # 5. TenantRepository.get_default_tenant_id (any select against tenants).
+        # 5. Tenant settings lookup/update for Stripe billing gateway mirrors.
+        if "from tenant_settings" in sql and "stripe_customer_id" in sql:
+            return _FakeExecuteResult(None)
+        if "select settings_json" in sql and "from tenant_settings" in sql:
+            return _FakeExecuteResult(
+                {
+                    "settings_json": {
+                        "billing_gateway": {
+                            "stripe_customer_id": "cus_test_123",
+                            "stripe_checkout_plan_code": "growth",
+                        }
+                    }
+                }
+            )
+        if sql.startswith("insert into tenant_settings"):
+            self.tenant_settings_updates.append(dict(params))
+            return _FakeExecuteResult(
+                {
+                    "settings_json": json.loads(params.get("settings_json") or "{}"),
+                    "version": 2,
+                    "updated_at": datetime.now(UTC),
+                }
+            )
+
+        # 6. Tenant billing account/subscription mirrors.
+        if sql.startswith("insert into billing_accounts"):
+            self.billing_accounts.append(dict(params))
+            return _FakeExecuteResult(
+                {
+                    "id": "billing-account-1",
+                    "tenant_id": params.get("tenant_id"),
+                    "billing_email": params.get("billing_email"),
+                    "merchant_mode": params.get("merchant_mode") or "test",
+                    "created_at": datetime.now(UTC),
+                    "updated_at": datetime.now(UTC),
+                }
+            )
+        if "from subscriptions" in sql and "order by updated_at" in sql:
+            return _FakeExecuteResult(None)
+        if sql.startswith("insert into subscriptions"):
+            self.subscriptions.append(dict(params))
+            return _FakeExecuteResult(
+                {
+                    "id": params.get("subscription_id"),
+                    "tenant_id": params.get("tenant_id"),
+                    "billing_account_id": params.get("billing_account_id"),
+                    "status": params.get("status"),
+                    "plan_code": params.get("plan_code"),
+                    "started_at": params.get("started_at"),
+                    "ended_at": params.get("ended_at"),
+                    "created_at": datetime.now(UTC),
+                    "updated_at": datetime.now(UTC),
+                }
+            )
+        if sql.startswith("delete from subscription_periods"):
+            return _FakeExecuteResult(None)
+        if sql.startswith("insert into subscription_periods"):
+            self.subscription_periods.append(dict(params))
+            return _FakeExecuteResult(
+                {
+                    "id": params.get("period_id"),
+                    "subscription_id": params.get("subscription_id"),
+                    "period_start": params.get("period_start"),
+                    "period_end": params.get("period_end"),
+                    "status": params.get("status"),
+                    "created_at": datetime.now(UTC),
+                }
+            )
+        if sql.startswith("insert into audit_logs"):
+            self.audit_entries.append(dict(params))
+            return _FakeExecuteResult(501)
+
+        # 7. TenantRepository.get_default_tenant_id / resolve_tenant_id.
         if "from tenants" in sql and "where" in sql and "select id" in sql:
             return _FakeExecuteResult(self.default_tenant_id)
         if "from tenants" in sql:
             return _FakeExecuteResult(self.default_tenant_id)
 
-        # 6. PaymentIntentRepository.sync_callback_status lookup.
+        # 8. PaymentIntentRepository.sync_callback_status lookup.
         if "from payment_intents pi" in sql and "join booking_intents bi" in sql:
             return _FakeExecuteResult(
                 {
@@ -181,7 +291,7 @@ class _ScriptedSession:
                 }
             )
 
-        # 7. PaymentIntentRepository.sync_callback_status update.
+        # 9. PaymentIntentRepository.sync_callback_status update.
         if sql.startswith("update payment_intents"):
             self.payment_updates.append(dict(params))
             return _FakeExecuteResult(None)
@@ -282,7 +392,36 @@ class StripeReconcileServiceTestCase(IsolatedAsyncioTestCase):
         self.assertEqual(session.payment_updates, [])
         self.assertEqual(session.webhook_events, [])
 
-    async def test_unknown_event_type_is_ignored_gracefully(self):
+    async def test_subscription_updated_applies_tenant_billing_mirror(self):
+        session = _ScriptedSession(
+            tenant_lookup_value=None,
+            default_tenant_id="tenant-from-billing",
+        )
+        event = _subscription_updated_event()
+
+        result = await reconcile_stripe_event(session, event=event)
+
+        self.assertEqual(result["status"], "applied")
+        self.assertEqual(result["event_type"], "customer.subscription.updated")
+        self.assertEqual(result["tenant_id"], "tenant-from-billing")
+        self.assertEqual(result["subscription_status"], "active")
+        self.assertEqual(result["subscription_id"], "sub_test_123")
+        self.assertEqual(result["plan_code"], "growth")
+        self.assertEqual(len(session.billing_accounts), 1)
+        self.assertEqual(session.subscriptions[0]["status"], "active")
+        self.assertEqual(session.subscriptions[0]["plan_code"], "growth")
+        self.assertEqual(session.subscription_periods[0]["status"], "open")
+        settings_update = json.loads(session.tenant_settings_updates[0]["settings_json"])
+        self.assertEqual(
+            settings_update["billing_gateway"]["stripe_subscription_id"],
+            "sub_test_123",
+        )
+        self.assertEqual(
+            session.audit_entries[0]["event_type"],
+            "tenant.billing.stripe_subscription_reconciled",
+        )
+
+    async def test_subscription_without_tenant_context_is_ignored_gracefully(self):
         session = _ScriptedSession(
             tenant_lookup_value="tenant-from-booking",
             default_tenant_id="tenant-default",
@@ -296,8 +435,9 @@ class StripeReconcileServiceTestCase(IsolatedAsyncioTestCase):
         result = await reconcile_stripe_event(session, event=event)
 
         self.assertEqual(result["status"], "ignored")
-        self.assertEqual(result["reason"], "unsupported_event_type")
+        self.assertEqual(result["reason"], "tenant_subscription_context_missing")
         self.assertEqual(session.payment_updates, [])
+        self.assertEqual(session.subscriptions, [])
 
     async def test_checkout_expired_marks_expired(self):
         session = _ScriptedSession(
@@ -432,23 +572,17 @@ class StripeWebhookRouteTestCase(TestCase):
         self.assertEqual(body_json["event_type"], "checkout.session.completed")
         self.assertEqual(len(scripted.payment_updates), 1)
 
-    def test_unknown_event_type_returns_200_with_ignored_status(self):
+    def test_subscription_updated_route_returns_200_and_applies_update(self):
         scripted = _ScriptedSession(
-            tenant_lookup_value="tenant-from-booking",
-            default_tenant_id="tenant-default",
+            tenant_lookup_value=None,
+            default_tenant_id="tenant-from-billing",
         )
 
         @asynccontextmanager
         async def _fake_get_session(_factory):
             yield scripted
 
-        body = json.dumps(
-            {
-                "id": "evt_unknown_002",
-                "type": "customer.subscription.updated",
-                "data": {"object": {"id": "sub_123"}},
-            }
-        ).encode("utf-8")
+        body = json.dumps(_subscription_updated_event(event_id="evt_sub_route_001")).encode("utf-8")
         with patch("api.route_handlers.get_session", _fake_get_session):
             client = TestClient(create_test_app())
             response = client.post(
@@ -458,8 +592,11 @@ class StripeWebhookRouteTestCase(TestCase):
             )
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()["status"], "ignored")
+        self.assertEqual(response.json()["status"], "applied")
+        self.assertEqual(response.json()["subscription_status"], "active")
+        self.assertEqual(response.json()["subscription_id"], "sub_test_123")
         self.assertEqual(scripted.payment_updates, [])
+        self.assertEqual(scripted.subscriptions[0]["plan_code"], "growth")
 
     def test_duplicate_event_returns_200_without_double_update(self):
         scripted = _ScriptedSession(

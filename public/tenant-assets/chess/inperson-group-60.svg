@@ -1,0 +1,37 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E293B"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="board" x1="120" y1="200" x2="1080" y2="600" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#92400E"/>
+      <stop offset="1" stop-color="#451A03"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" rx="48" fill="url(#bg)"/>
+  <rect x="120" y="200" width="960" height="400" rx="24" fill="url(#board)"/>
+  <g opacity="0.9">
+    <rect x="160" y="240" width="100" height="100" fill="#FCD34D"/>
+    <rect x="360" y="240" width="100" height="100" fill="#FCD34D"/>
+    <rect x="560" y="240" width="100" height="100" fill="#FCD34D"/>
+    <rect x="760" y="240" width="100" height="100" fill="#FCD34D"/>
+    <rect x="960" y="240" width="100" height="100" fill="#FCD34D"/>
+    <rect x="260" y="340" width="100" height="100" fill="#FCD34D"/>
+    <rect x="460" y="340" width="100" height="100" fill="#FCD34D"/>
+    <rect x="660" y="340" width="100" height="100" fill="#FCD34D"/>
+    <rect x="860" y="340" width="100" height="100" fill="#FCD34D"/>
+    <rect x="160" y="440" width="100" height="100" fill="#FCD34D"/>
+    <rect x="360" y="440" width="100" height="100" fill="#FCD34D"/>
+    <rect x="560" y="440" width="100" height="100" fill="#FCD34D"/>
+    <rect x="760" y="440" width="100" height="100" fill="#FCD34D"/>
+    <rect x="960" y="440" width="100" height="100" fill="#FCD34D"/>
+  </g>
+  <circle cx="320" cy="160" r="48" fill="#FB7185"/>
+  <circle cx="500" cy="160" r="48" fill="#5EEAD4"/>
+  <circle cx="680" cy="160" r="48" fill="#A5B4FC"/>
+  <circle cx="860" cy="160" r="48" fill="#FBBF24"/>
+  <text x="80" y="700" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="700" fill="#F8FAFC">In-Person Group Class - 60 Minutes</text>
+  <text x="80" y="752" font-family="Inter, Arial, sans-serif" font-size="28" fill="#FBBF24">A$35 / hour / student - Sydney venues + home visits</text>
+  <text x="80" y="800" font-family="Inter, Arial, sans-serif" font-size="22" fill="#93C5FD">Over-the-board play - real piece tactile feedback - kids ages 6-14</text>
+</svg>

@@ -1,0 +1,30 @@
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="0.5" stop-color="#1E293B"/>
+      <stop offset="1" stop-color="#0B1220"/>
+    </linearGradient>
+    <linearGradient id="king" x1="200" y1="120" x2="320" y2="392" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBBF24"/>
+      <stop offset="1" stop-color="#B45309"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
+  <g opacity="0.18">
+    <rect x="64" y="64" width="48" height="48" fill="#F8FAFC"/>
+    <rect x="160" y="64" width="48" height="48" fill="#F8FAFC"/>
+    <rect x="256" y="64" width="48" height="48" fill="#F8FAFC"/>
+    <rect x="352" y="64" width="48" height="48" fill="#F8FAFC"/>
+    <rect x="112" y="112" width="48" height="48" fill="#F8FAFC"/>
+    <rect x="208" y="112" width="48" height="48" fill="#F8FAFC"/>
+    <rect x="304" y="112" width="48" height="48" fill="#F8FAFC"/>
+    <rect x="400" y="112" width="48" height="48" fill="#F8FAFC"/>
+  </g>
+  <path d="M256 96 L256 144 M232 120 L280 120" stroke="#FBBF24" stroke-width="14" stroke-linecap="round"/>
+  <path d="M196 200 Q256 158 316 200 L324 268 Q256 248 188 268 Z" fill="url(#king)"/>
+  <rect x="180" y="266" width="152" height="34" rx="10" fill="#FCD34D"/>
+  <path d="M196 300 Q220 360 196 412 L316 412 Q292 360 316 300 Z" fill="url(#king)"/>
+  <rect x="160" y="408" width="192" height="36" rx="14" fill="#FBBF24"/>
+  <text x="256" y="478" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="700" fill="#FCD34D" text-anchor="middle">CHESS</text>
+</svg>

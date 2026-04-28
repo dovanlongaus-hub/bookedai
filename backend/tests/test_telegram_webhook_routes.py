@@ -21,6 +21,7 @@ from service_layer.messaging_automation_service import (
     CUSTOMER_AGENT_PLATFORM_NAMES,
     MessagingAutomationService,
     MessagingAutomationResult,
+    _messaging_per_chat_limiter,
 )
 
 
@@ -118,6 +119,9 @@ def create_test_app() -> FastAPI:
 
 
 class TelegramWebhookRoutesTestCase(TestCase):
+    def setUp(self):
+        _messaging_per_chat_limiter.reset()
+
     def test_customer_telegram_agent_name_is_bookedai_manager_bot(self):
         self.assertEqual(CUSTOMER_AGENT_CANONICAL_NAME, "BookedAI Manager Bot")
         self.assertEqual(
@@ -588,6 +592,71 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(keyboard[4][0]["text"], "New booking search")
         self.assertEqual(communication_service.sent[0]["parse_mode"], "HTML")
         self.assertEqual(captured_calls[0]["metadata"]["care_turn"]["created_request"], None)
+
+    def test_telegram_explicit_booking_reference_without_identity_requires_verification(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+        care_called = False
+        queue_called = False
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **_kwargs):
+            return {
+                "booking_reference": "v1-weakidentity",
+                "resolved_by": "message_booking_reference",
+                "candidate_count": 1,
+            }
+
+        async def _build_portal_customer_care_turn(*_args, **_kwargs):
+            nonlocal care_called
+            care_called = True
+            return {}
+
+        async def _queue_portal_booking_request(*_args, **_kwargs):
+            nonlocal queue_called
+            queue_called = True
+            return {}
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ), patch(
+            "service_layer.messaging_automation_service.build_portal_customer_care_turn",
+            _build_portal_customer_care_turn,
+        ), patch(
+            "service_layer.messaging_automation_service.queue_portal_booking_request",
+            _queue_portal_booking_request,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "message": {
+                        "message_id": 13,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "Please cancel booking v1-weakidentity",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(care_called)
+        self.assertFalse(queue_called)
+        self.assertIn("verify it belongs to you", communication_service.sent[0]["body"])
+        self.assertEqual(captured_calls[0]["ai_intent"], "identity_verification_required")
+        self.assertEqual(
+            captured_calls[0]["metadata"]["customer_care_status"],
+            "identity_verification_required",
+        )
 
     def test_telegram_book_option_can_capture_booking_intent_result(self):
         captured_calls: list[dict[str, object]] = []

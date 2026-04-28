@@ -1,0 +1,55 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#1E293B"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" rx="48" fill="url(#bg)"/>
+  <rect x="80" y="80" width="1040" height="540" rx="32" fill="#0B1220" stroke="#38BDF8" stroke-opacity="0.5" stroke-width="4"/>
+  <rect x="120" y="120" width="960" height="56" rx="16" fill="#0E223C"/>
+  <circle cx="158" cy="148" r="9" fill="#F87171"/>
+  <circle cx="190" cy="148" r="9" fill="#FACC15"/>
+  <circle cx="222" cy="148" r="9" fill="#4ADE80"/>
+  <text x="270" y="158" font-family="Inter, Arial, sans-serif" font-size="22" fill="#93C5FD">co-mai-hung-chess.bookedai.au / online classroom</text>
+  <g transform="translate(140 220)">
+    <rect width="280" height="180" rx="16" fill="#0F1E33"/>
+    <circle cx="140" cy="80" r="40" fill="#FBBF24"/>
+    <rect x="80" y="120" width="120" height="40" rx="14" fill="#FCD34D"/>
+    <text x="140" y="172" font-family="Inter, Arial, sans-serif" font-size="18" fill="#93C5FD" text-anchor="middle">Coach Mai Hung</text>
+  </g>
+  <g transform="translate(440 220)">
+    <rect width="200" height="180" rx="16" fill="#0F1E33"/>
+    <circle cx="100" cy="80" r="32" fill="#5EEAD4"/>
+    <text x="100" y="160" font-family="Inter, Arial, sans-serif" font-size="16" fill="#93C5FD" text-anchor="middle">Student 1</text>
+  </g>
+  <g transform="translate(660 220)">
+    <rect width="200" height="180" rx="16" fill="#0F1E33"/>
+    <circle cx="100" cy="80" r="32" fill="#A5B4FC"/>
+    <text x="100" y="160" font-family="Inter, Arial, sans-serif" font-size="16" fill="#93C5FD" text-anchor="middle">Student 2</text>
+  </g>
+  <g transform="translate(880 220)">
+    <rect width="200" height="180" rx="16" fill="#0F1E33"/>
+    <circle cx="100" cy="80" r="32" fill="#FB7185"/>
+    <text x="100" y="160" font-family="Inter, Arial, sans-serif" font-size="16" fill="#93C5FD" text-anchor="middle">Student 3</text>
+  </g>
+  <g transform="translate(140 420)">
+    <rect width="940" height="180" rx="16" fill="#0E223C"/>
+    <g opacity="0.85">
+      <rect x="20" y="20" width="40" height="40" fill="#F8FAFC"/>
+      <rect x="100" y="20" width="40" height="40" fill="#F8FAFC"/>
+      <rect x="180" y="20" width="40" height="40" fill="#F8FAFC"/>
+      <rect x="260" y="20" width="40" height="40" fill="#F8FAFC"/>
+      <rect x="60" y="60" width="40" height="40" fill="#F8FAFC"/>
+      <rect x="140" y="60" width="40" height="40" fill="#F8FAFC"/>
+      <rect x="220" y="60" width="40" height="40" fill="#F8FAFC"/>
+      <rect x="300" y="60" width="40" height="40" fill="#F8FAFC"/>
+    </g>
+    <text x="380" y="56" font-family="Inter, Arial, sans-serif" font-size="22" fill="#FCD34D">Live board - White to move</text>
+    <text x="380" y="92" font-family="Inter, Arial, sans-serif" font-size="18" fill="#93C5FD">Tactical pattern: pin the knight, win the exchange</text>
+    <text x="380" y="132" font-family="Inter, Arial, sans-serif" font-size="18" fill="#5EEAD4">Group: 60 minutes - kids ages 6-14</text>
+  </g>
+  <text x="80" y="700" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="700" fill="#F8FAFC">Online Group Class - 60 Minutes</text>
+  <text x="80" y="752" font-family="Inter, Arial, sans-serif" font-size="28" fill="#FBBF24">A$35 / hour / student - led by Woman Grandmaster Mai Hung</text>
+  <text x="80" y="800" font-family="Inter, Arial, sans-serif" font-size="22" fill="#93C5FD">Beginner pathway - tournament-aware coaching - Sydney AEST/AEDT</text>
+</svg>

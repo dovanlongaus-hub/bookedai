@@ -88,6 +88,9 @@ import type {
   TenantIntegrationsResponse,
   TenantIntegrationProviderUpdateRequest,
   TenantLeadsResponse,
+  TenantStudentProgressUpdateRequest,
+  TenantStudentProgressUpdateResponse,
+  TenantStudentsResponse,
   TenantOnboardingResponse,
   TenantOperationsDispatchRequest,
   TenantOperationsDispatchResponse,
@@ -1377,6 +1380,29 @@ export async function getTenantLeads(
   return requestV1Envelope<TenantLeadsResponse>(`/v1/tenant/leads${query}`, { headers });
 }
 
+export async function tenantListStudents(sessionToken?: string | null) {
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantStudentsResponse>('/v1/tenants/me/students', { headers });
+}
+
+export async function tenantUpdateStudentProgress(
+  contactId: string,
+  request: TenantStudentProgressUpdateRequest,
+  sessionToken?: string | null,
+) {
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantStudentProgressUpdateResponse>(
+    `/v1/tenants/me/students/${encodeURIComponent(contactId)}/progress`,
+    withJsonBody(request, { method: 'PATCH', headers }),
+  );
+}
+
 export async function getTenantIntegrations(tenantRef?: string | null, sessionToken?: string | null) {
   const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
   const headers = new Headers();
@@ -1530,6 +1556,142 @@ export async function tenantGoogleAuth(request: TenantGoogleAuthRequest) {
   return requestV1Envelope<TenantAuthSessionResponse>(
     '/v1/tenant/auth/google',
     withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+// ---- Chess academy: payment options + student auth -------------------------------------------
+//
+// Phase 2A/2B endpoints for the chess.bookedai.au tenant landing surface. These shapes are
+// produced by the backend chess router (`/v1/chess/...` and `/v1/students/...`). The frontend
+// only needs minimal contracts here — there is no shared OpenAPI contract for these yet, so we
+// keep the types local rather than polluting `shared/contracts`.
+
+export type ChessPaymentLocale = 'en' | 'vi';
+
+export interface ChessPaymentOptionsRequest {
+  lead_id: string | null;
+  booking_intent_id?: string | null;
+  program_key: string;
+  amount_vnd: number;
+  amount_aud: number;
+  parent_name: string;
+  parent_email: string | null;
+  locale: ChessPaymentLocale;
+}
+
+export interface ChessStripeAudOption {
+  type: 'stripe_aud';
+  currency: 'AUD';
+  amount: number;
+  stripe_checkout_url: string;
+}
+
+export interface ChessVndBankQrOption {
+  type: 'vnd_bank_qr';
+  currency: 'VND';
+  amount: number;
+  qr_image_url: string;
+  bank_name: string;
+  account_holder: string;
+  account_number: string;
+  transfer_reference: string;
+}
+
+export interface ChessAudBankTransferOption {
+  type: 'aud_bank_transfer';
+  currency: 'AUD';
+  amount: number;
+  bank_name: string;
+  account_holder: string;
+  bsb: string;
+  account_number: string;
+  transfer_reference: string;
+}
+
+export type ChessPaymentOption =
+  | ChessStripeAudOption
+  | ChessVndBankQrOption
+  | ChessAudBankTransferOption;
+
+export interface ChessPaymentOptionsResponse {
+  payment_options: ChessPaymentOption[];
+}
+
+export async function chessPaymentOptions(request: ChessPaymentOptionsRequest) {
+  return requestV1Envelope<ChessPaymentOptionsResponse>(
+    '/v1/chess/payments/options',
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+export type StudentAuthIntent = 'sign_in' | 'create';
+
+export interface StudentGoogleAuthRequest {
+  id_token: string;
+  intent: StudentAuthIntent;
+}
+
+export interface StudentProfile {
+  id: string;
+  email: string;
+  full_name: string;
+  avatar_url: string | null;
+}
+
+export interface StudentAuthSessionResponse {
+  session_token: string;
+  student: StudentProfile;
+}
+
+export interface StudentBookingSummary {
+  booking_intent_id: string;
+  service_name: string;
+  requested_date: string;
+  requested_time: string;
+  status: string;
+  payment_status: string;
+}
+
+export interface StudentProgressEntry {
+  session_date: string;
+  level: string;
+  attendance: string;
+  notes: string;
+}
+
+export interface StudentMeResponse {
+  student: StudentProfile;
+  bookings: StudentBookingSummary[];
+  progress: StudentProgressEntry[];
+}
+
+function withBearerToken(token: string, init?: RequestInit): RequestInit {
+  const headers = new Headers(init?.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  return {
+    ...(init ?? {}),
+    headers,
+  };
+}
+
+export async function studentGoogleAuth(request: StudentGoogleAuthRequest) {
+  return requestV1Envelope<StudentAuthSessionResponse>(
+    '/v1/students/google_auth',
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+export async function studentMe(token: string) {
+  return requestV1Envelope<StudentMeResponse>(
+    '/v1/students/me',
+    withBearerToken(token, { method: 'GET' }),
+  );
+}
+
+export async function studentLogout(token: string) {
+  return requestV1Envelope<{ ok: boolean }>(
+    '/v1/students/me/logout',
+    withBearerToken(token, withJsonBody({}, { method: 'POST' })),
   );
 }
 
@@ -2315,6 +2477,10 @@ export const apiV1 = {
   tenantEmailCodeVerify,
   tenantGoogleAuth,
   tenantPasswordAuth,
+  chessPaymentOptions,
+  studentGoogleAuth,
+  studentMe,
+  studentLogout,
   updateTenantProfile,
   updateTenantPluginInterface,
   updateTenantBillingAccount,
@@ -2329,5 +2495,7 @@ export const apiV1 = {
   retryCrmSync,
   getTenantRevenueMetrics,
   getTenantLeads,
+  tenantListStudents,
+  tenantUpdateStudentProgress,
   getAgentActivity,
 };

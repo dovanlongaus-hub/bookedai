@@ -250,6 +250,39 @@ test.describe('customer portal workspace', () => {
     expect(await page.evaluate(() => window.location.hash)).toBe('');
   });
 
+  test('forwards portal access token via X-Portal-Token header and scrubs the URL', async ({ page }) => {
+    const portalRequestHeaders: Array<Record<string, string>> = [];
+    page.on('request', (request) => {
+      if (request.url().includes('/api/v1/portal/bookings/')) {
+        portalRequestHeaders.push(request.headers());
+      }
+    });
+
+    await page.goto('/portal?ref=BAI-DEMO-001&token=test-token-abc');
+
+    await expect(page.getByText('BAI-DEMO-001').first()).toBeVisible();
+
+    // The token query param must have been stripped from the URL so it does
+    // not leak into history, referrers, or analytics.
+    const search = await page.evaluate(() => window.location.search);
+    expect(search).not.toContain('token=');
+    expect(search).toContain('booking_reference=BAI-DEMO-001');
+
+    // The token must have been persisted under the per-booking sessionStorage
+    // key so subsequent portal calls in this tab can forward it.
+    const stored = await page.evaluate(() =>
+      window.sessionStorage.getItem('bookedai.portal.token.BAI-DEMO-001'),
+    );
+    expect(stored).toBe('test-token-abc');
+
+    // Every portal call captured in this test should have carried the
+    // X-Portal-Token header.
+    expect(portalRequestHeaders.length).toBeGreaterThan(0);
+    for (const headers of portalRequestHeaders) {
+      expect(headers['x-portal-token']).toBe('test-token-abc');
+    }
+  });
+
   test('prefers canonical booking_reference when URL sources conflict', async ({ page }) => {
     const warnings: string[] = [];
     page.on('console', (message) => {

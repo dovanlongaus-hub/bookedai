@@ -71,7 +71,7 @@ export function BrandLockup({
               <SignalPill
                 variant={eyebrowVariant}
                 className={[
-                  'px-2.5 py-1 text-[10px] uppercase tracking-[0.14em]',
+                  'px-2.5 py-1 text-xs uppercase tracking-[0.14em]',
                   eyebrowClassName,
                 ]
                   .filter(Boolean)

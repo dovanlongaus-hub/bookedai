@@ -1,0 +1,42 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#08111F"/>
+      <stop offset="0.5" stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#111C34"/>
+    </linearGradient>
+    <linearGradient id="hero" x1="640" y1="200" x2="1320" y2="780" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#5EEAD4"/>
+      <stop offset="1" stop-color="#1D4ED8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="240" cy="200" r="180" fill="#1D4ED8" fill-opacity="0.22"/>
+  <circle cx="1380" cy="200" r="220" fill="#14B8A6" fill-opacity="0.18"/>
+  <circle cx="1280" cy="780" r="260" fill="#F59E0B" fill-opacity="0.15"/>
+  <text x="100" y="180" font-family="Inter, Arial, sans-serif" font-size="68" font-weight="800" fill="#F8FAFC">AI Mentor 1-1 Pro</text>
+  <text x="100" y="244" font-family="Inter, Arial, sans-serif" font-size="36" fill="#5EEAD4">Convert AI to your DOER</text>
+  <text x="100" y="300" font-family="Inter, Arial, sans-serif" font-size="26" fill="#93C5FD">Private 1-1 + group mentoring - online globally - USD $50-$1,200 packages</text>
+  <g transform="translate(820 220)">
+    <rect width="700" height="540" rx="36" fill="#071426" stroke="#60A5FA" stroke-opacity="0.45" stroke-width="4"/>
+    <rect x="40" y="40" width="620" height="48" rx="18" fill="#0E223C"/>
+    <circle cx="74" cy="64" r="9" fill="#F87171"/>
+    <circle cx="106" cy="64" r="9" fill="#FACC15"/>
+    <circle cx="138" cy="64" r="9" fill="#4ADE80"/>
+    <text x="180" y="74" font-family="Inter, Arial, sans-serif" font-size="20" fill="#93C5FD">ai.longcare.au / partner runtime</text>
+    <rect x="40" y="120" width="620" height="80" rx="18" fill="#0F1E33"/>
+    <text x="60" y="158" font-family="Inter, Arial, sans-serif" font-size="22" fill="#FCD34D">Step 1 - First AI App in 60 minutes</text>
+    <text x="60" y="186" font-family="Inter, Arial, sans-serif" font-size="18" fill="#93C5FD">USD $120 private / USD $50 group per hour</text>
+    <rect x="40" y="220" width="620" height="80" rx="18" fill="#0F1E33"/>
+    <text x="60" y="258" font-family="Inter, Arial, sans-serif" font-size="22" fill="#5EEAD4">Step 2 - AI That Executes for You</text>
+    <text x="60" y="286" font-family="Inter, Arial, sans-serif" font-size="18" fill="#93C5FD">USD $600 private / USD $250 group / 5 hours</text>
+    <rect x="40" y="320" width="620" height="80" rx="18" fill="#0F1E33"/>
+    <text x="60" y="358" font-family="Inter, Arial, sans-serif" font-size="22" fill="#A5B4FC">Step 3 - Turn AI Into a Real Product</text>
+    <text x="60" y="386" font-family="Inter, Arial, sans-serif" font-size="18" fill="#93C5FD">USD $1,200 private / USD $500 group / 10 hours</text>
+    <rect x="40" y="420" width="620" height="80" rx="18" fill="#0E223C"/>
+    <text x="60" y="458" font-family="Inter, Arial, sans-serif" font-size="22" fill="#FBBF24">Project-based + ongoing ops support</text>
+    <text x="60" y="486" font-family="Inter, Arial, sans-serif" font-size="18" fill="#93C5FD">Custom pricing - tailored scope - mentor follow-through</text>
+  </g>
+  <text x="100" y="430" font-family="Inter, Arial, sans-serif" font-size="22" fill="#FACC15">Stripe checkout - WhatsApp - Telegram - calendar - portal edits</text>
+  <text x="100" y="476" font-family="Inter, Arial, sans-serif" font-size="22" fill="#5EEAD4">Powered by BookedAI tenant runtime</text>
+</svg>

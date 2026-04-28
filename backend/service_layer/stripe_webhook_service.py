@@ -53,6 +53,14 @@ STRIPE_SUBSCRIPTION_EVENT_TYPES: frozenset[str] = frozenset(
 )
 
 
+# Stripe checkout sessions opened by the chess.bookedai.au student-payment flow
+# tag themselves with this metadata key. We branch on it inside
+# ``reconcile_stripe_event`` so the webhook can mark the linked booking_intent
+# as paid even when ``client_reference_id`` is the chess transfer reference
+# (CHESS-XXXX) rather than a booking_reference.
+CHESS_STUDENT_PAYMENT_METADATA_KIND = "chess_student_payment"
+
+
 class StripeSignatureError(Exception):
     """Raised when the Stripe-Signature header cannot be verified."""
 
@@ -272,6 +280,145 @@ def _extract_subscription_handles(event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _extract_chess_student_handles(event: dict[str, Any]) -> dict[str, Any]:
+    """Pull chess student-payment markers off a Stripe event payload.
+
+    The chess.bookedai.au flow tags every checkout session it opens with
+    ``metadata.bookedai_kind == "chess_student_payment"`` plus the linked
+    ``booking_intent_id`` and ``lead_id`` so the webhook can flip the booking
+    intent to ``paid`` without depending on ``client_reference_id`` being a
+    booking reference.
+    """
+    event_type = _normalized_text(event.get("type")) or ""
+    data_object = (
+        event.get("data", {}).get("object") if isinstance(event.get("data"), dict) else None
+    )
+    if not isinstance(data_object, dict):
+        data_object = {}
+
+    metadata = _metadata_dict(data_object.get("metadata"))
+    bookedai_kind = _normalized_text(metadata.get("bookedai_kind"))
+    is_chess_student_payment = (
+        bookedai_kind == CHESS_STUDENT_PAYMENT_METADATA_KIND
+        and event_type
+        in {
+            "checkout.session.completed",
+            "checkout.session.async_payment_succeeded",
+            "checkout.session.async_payment_failed",
+            "checkout.session.expired",
+        }
+    )
+
+    if event_type in {
+        "checkout.session.completed",
+        "checkout.session.async_payment_succeeded",
+    }:
+        payment_status = "paid"
+    elif event_type == "checkout.session.expired":
+        payment_status = "expired"
+    elif event_type == "checkout.session.async_payment_failed":
+        payment_status = "failed"
+    else:
+        payment_status = None
+
+    return {
+        "is_chess_student_payment": is_chess_student_payment,
+        "event_type": event_type,
+        "booking_intent_id": _normalized_text(metadata.get("booking_intent_id")),
+        "lead_id": _normalized_text(metadata.get("lead_id")),
+        "transfer_reference": _normalized_text(metadata.get("transfer_reference")),
+        "external_session_id": _normalized_text(data_object.get("id")),
+        "payment_status": payment_status,
+    }
+
+
+async def _mark_chess_booking_intent_paid(
+    session,
+    *,
+    booking_intent_id: str,
+    payment_status: str,
+    metadata_updates: dict[str, Any] | None = None,
+) -> str | None:
+    """Update the booking intent the chess student-payment is linked to.
+
+    Returns the booking_intent_id that was updated (so callers can log it),
+    or ``None`` if the booking_intent could not be located.
+    """
+    normalized_id = (booking_intent_id or "").strip()
+    if not normalized_id:
+        return None
+
+    lookup = await session.execute(
+        text(
+            """
+            select id::text as booking_intent_id, metadata_json
+            from booking_intents
+            where id::text = cast(:booking_intent_id as text)
+               or booking_reference = cast(:booking_intent_id as text)
+            limit 1
+            """
+        ),
+        {"booking_intent_id": normalized_id},
+    )
+    row = lookup.mappings().first()
+    if not row:
+        return None
+
+    existing_metadata = dict(row.get("metadata_json") or {})
+    if metadata_updates:
+        for key, value in metadata_updates.items():
+            if value is None:
+                continue
+            text_value = str(value).strip()
+            if not text_value:
+                continue
+            existing_metadata[key] = value
+    existing_metadata["payment_status"] = payment_status
+
+    await session.execute(
+        text(
+            """
+            update booking_intents
+            set
+              payment_dependency_state = :payment_status,
+              metadata_json = cast(:metadata_json as jsonb),
+              updated_at = now()
+            where id = cast(:booking_intent_id as uuid)
+            """
+        ),
+        {
+            "booking_intent_id": row["booking_intent_id"],
+            "payment_status": payment_status,
+            "metadata_json": json.dumps(existing_metadata),
+        },
+    )
+    return row["booking_intent_id"]
+
+
+async def _resolve_chess_tenant_id(
+    session,
+    *,
+    booking_intent_id: str | None,
+) -> str | None:
+    normalized_id = (booking_intent_id or "").strip()
+    if not normalized_id:
+        return None
+    result = await session.execute(
+        text(
+            """
+            select tenant_id::text
+            from booking_intents
+            where id::text = cast(:booking_intent_id as text)
+               or booking_reference = cast(:booking_intent_id as text)
+            limit 1
+            """
+        ),
+        {"booking_intent_id": normalized_id},
+    )
+    value = result.scalar_one_or_none()
+    return str(value).strip() if value else None
+
+
 async def _resolve_booking_reference_tenant_id(
     session,
     *,
@@ -321,7 +468,10 @@ async def _resolve_subscription_tenant_id(
     handles: dict[str, Any],
 ) -> str | None:
     for candidate in (handles.get("tenant_id"), handles.get("tenant_slug")):
-        resolved = await tenant_repository.resolve_tenant_id(_normalized_text(candidate))
+        normalized_candidate = _normalized_text(candidate)
+        if not normalized_candidate:
+            continue
+        resolved = await tenant_repository.resolve_tenant_id(normalized_candidate)
         if resolved:
             return str(resolved).strip()
     return await _resolve_tenant_id_by_stripe_customer_id(
@@ -344,8 +494,9 @@ async def _reconcile_tenant_subscription_event(
     event_id: str | None,
     tenant_repository: TenantRepository,
     handles: dict[str, Any],
+    resolved_tenant_id: str | None = None,
 ) -> dict[str, Any]:
-    tenant_id = await _resolve_subscription_tenant_id(
+    tenant_id = resolved_tenant_id or await _resolve_subscription_tenant_id(
         session,
         tenant_repository=tenant_repository,
         handles=handles,
@@ -469,6 +620,7 @@ async def reconcile_stripe_event(
     """
     handles = _extract_event_handles(event)
     subscription_handles = _extract_subscription_handles(event)
+    chess_handles = _extract_chess_student_handles(event)
     event_id = _normalized_text(event.get("id"))
     event_type = handles["event_type"]
 
@@ -478,7 +630,29 @@ async def reconcile_stripe_event(
         session,
         booking_reference=handles["booking_reference"],
     )
-    tenant_id = booking_tenant_id or fallback_tenant_id
+    subscription_tenant_id = (
+        await _resolve_subscription_tenant_id(
+            session,
+            tenant_repository=tenant_repository,
+            handles=subscription_handles,
+        )
+        if subscription_handles["is_tenant_billing"]
+        else None
+    )
+    chess_tenant_id = (
+        await _resolve_chess_tenant_id(
+            session,
+            booking_intent_id=chess_handles.get("booking_intent_id"),
+        )
+        if chess_handles["is_chess_student_payment"]
+        else None
+    )
+    tenant_id = (
+        chess_tenant_id
+        or booking_tenant_id
+        or subscription_tenant_id
+        or fallback_tenant_id
+    )
 
     idempotency_repository = IdempotencyRepository(
         RepositoryContext(session=session, tenant_id=tenant_id)
@@ -510,12 +684,64 @@ async def reconcile_stripe_event(
         status="received",
     )
 
+    if chess_handles["is_chess_student_payment"]:
+        chess_payment_status = chess_handles.get("payment_status")
+        booking_intent_id = chess_handles.get("booking_intent_id") or ""
+        if not booking_intent_id:
+            return {
+                "status": "ignored",
+                "event_id": event_id,
+                "event_type": event_type,
+                "tenant_id": tenant_id,
+                "reason": "chess_student_booking_intent_missing",
+            }
+        if not chess_payment_status:
+            return {
+                "status": "ignored",
+                "event_id": event_id,
+                "event_type": event_type,
+                "tenant_id": tenant_id,
+                "reason": "chess_student_payment_status_unmapped",
+            }
+        updated_id = await _mark_chess_booking_intent_paid(
+            session,
+            booking_intent_id=booking_intent_id,
+            payment_status=chess_payment_status,
+            metadata_updates={
+                "stripe_event_id": event_id,
+                "stripe_event_type": event_type,
+                "stripe_session_id": chess_handles.get("external_session_id"),
+                "chess_transfer_reference": chess_handles.get("transfer_reference"),
+                "chess_lead_id": chess_handles.get("lead_id"),
+                "bookedai_kind": CHESS_STUDENT_PAYMENT_METADATA_KIND,
+            },
+        )
+        if not updated_id:
+            return {
+                "status": "ignored",
+                "event_id": event_id,
+                "event_type": event_type,
+                "tenant_id": tenant_id,
+                "reason": "chess_student_booking_intent_not_found",
+                "booking_intent_id": booking_intent_id,
+            }
+        return {
+            "status": "applied",
+            "event_id": event_id,
+            "event_type": event_type,
+            "tenant_id": chess_tenant_id or tenant_id,
+            "booking_intent_id": updated_id,
+            "payment_status": chess_payment_status,
+            "reason": "chess_student_payment",
+        }
+
     if subscription_handles["is_tenant_billing"]:
         return await _reconcile_tenant_subscription_event(
             session,
             event_id=event_id,
             tenant_repository=tenant_repository,
             handles=subscription_handles,
+            resolved_tenant_id=subscription_tenant_id,
         )
 
     if event_type not in SUPPORTED_EVENT_TYPES or not handles["payment_status"]:

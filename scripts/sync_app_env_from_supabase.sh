@@ -44,6 +44,31 @@ updates = {
 }
 updates["PUBLIC_API_URL"] = "https://api.bookedai.au"
 updates["VITE_API_BASE_URL"] = "https://api.bookedai.au/api"
+canonical_cors_origins = [
+    "https://bookedai.au",
+    "https://www.bookedai.au",
+    "https://admin.bookedai.au",
+    "https://beta.bookedai.au",
+    "https://product.bookedai.au",
+    "https://demo.bookedai.au",
+    "https://pitch.bookedai.au",
+    "https://portal.bookedai.au",
+    "https://tenant.bookedai.au",
+    "https://futureswim.bookedai.au",
+    "https://chess.bookedai.au",
+    "https://api.bookedai.au",
+    "https://upload.bookedai.au",
+]
+cors_origins = [
+    origin.strip()
+    for origin in app_env.get("CORS_ALLOW_ORIGINS", "").split(",")
+    if origin.strip()
+]
+for origin in canonical_cors_origins:
+    if origin not in cors_origins:
+        cors_origins.append(origin)
+if cors_origins:
+    updates["CORS_ALLOW_ORIGINS"] = ",".join(cors_origins)
 updates["DATABASE_URL"] = (
     f"postgresql+asyncpg://{updates['APP_DB_USER']}:{updates['APP_DB_PASSWORD']}"
     f"@supabase-db:5432/{updates['APP_DB_NAME']}"

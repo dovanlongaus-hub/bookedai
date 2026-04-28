@@ -1305,6 +1305,88 @@ export function TenantApp() {
   }, [panel, state.status, 'leads' in state ? state.leads : null]);
 
   useEffect(() => {
+    if (panel !== 'students' || state.status !== 'ready' || students !== null) return;
+    setStudentsLoading(true);
+    setStudentsError(null);
+    apiV1
+      .tenantListStudents(session?.session_token ?? null)
+      .then((env) => {
+        if (env.status === 'ok') {
+          setStudents(env.data.students ?? []);
+        }
+      })
+      .catch((error) => {
+        setStudentsError(
+          error instanceof Error
+            ? error.message
+            : 'Could not load students. Please retry shortly.',
+        );
+        setStudents([]);
+      })
+      .finally(() => setStudentsLoading(false));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [panel, state.status, students]);
+
+  async function handleRefreshStudents() {
+    setStudentsLoading(true);
+    setStudentsError(null);
+    setStudentSaveMessage(null);
+    setStudentSaveError(null);
+    try {
+      const env = await apiV1.tenantListStudents(session?.session_token ?? null);
+      if (env.status === 'ok') {
+        setStudents(env.data.students ?? []);
+      }
+    } catch (error) {
+      setStudentsError(
+        error instanceof Error
+          ? error.message
+          : 'Could not refresh students. Please retry shortly.',
+      );
+    } finally {
+      setStudentsLoading(false);
+    }
+  }
+
+  async function handleSaveStudentProgress(
+    contactId: string,
+    payload: TenantStudentProgressUpdateRequest,
+  ) {
+    setStudentSubmittingId(contactId);
+    setStudentSaveMessage(null);
+    setStudentSaveError(null);
+    try {
+      const env = await apiV1.tenantUpdateStudentProgress(
+        contactId,
+        payload,
+        session?.session_token ?? null,
+      );
+      if (env.status === 'ok' && env.data.ok) {
+        setStudentSaveMessage('Progress saved.');
+        setStudents((current) =>
+          (current ?? []).map((student) =>
+            student.contact_id === contactId
+              ? { ...student, latest_progress: env.data.progress }
+              : student,
+          ),
+        );
+        // Refresh in the background so any backend-derived fields stay current.
+        void handleRefreshStudents();
+      } else if (env.status === 'ok') {
+        setStudentSaveError('Progress was not saved by the server. Please retry.');
+      }
+    } catch (error) {
+      setStudentSaveError(
+        error instanceof Error
+          ? error.message
+          : 'Could not save progress. Please retry shortly.',
+      );
+    } finally {
+      setStudentSubmittingId(null);
+    }
+  }
+
+  useEffect(() => {
     if (panel !== 'operations' || state.status !== 'ready') return;
     const tenantSlug =
       session?.membership?.tenant_slug ?? session?.tenant?.slug ?? tenantRef ?? null;

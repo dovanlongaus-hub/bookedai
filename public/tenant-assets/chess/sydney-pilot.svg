@@ -1,0 +1,23 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0F172A"/>
+      <stop offset="1" stop-color="#111C34"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" rx="48" fill="url(#bg)"/>
+  <circle cx="240" cy="220" r="180" fill="#1D4ED8" fill-opacity="0.22"/>
+  <circle cx="980" cy="240" r="200" fill="#14B8A6" fill-opacity="0.18"/>
+  <rect x="120" y="180" width="960" height="420" rx="36" fill="#0B1220" stroke="#FBBF24" stroke-opacity="0.55" stroke-width="4"/>
+  <text x="160" y="280" font-family="Inter, Arial, sans-serif" font-size="36" fill="#FBBF24">Sydney pilot - kids chess</text>
+  <text x="160" y="340" font-family="Inter, Arial, sans-serif" font-size="56" font-weight="800" fill="#F8FAFC">Co Mai Hung Chess Class</text>
+  <text x="160" y="396" font-family="Inter, Arial, sans-serif" font-size="28" fill="#5EEAD4">Beginner foundations - tournament-aware coaching</text>
+  <text x="160" y="446" font-family="Inter, Arial, sans-serif" font-size="28" fill="#93C5FD">Online or in-person across Sydney NSW</text>
+  <rect x="160" y="500" width="280" height="60" rx="20" fill="#FBBF24"/>
+  <text x="300" y="540" font-family="Inter, Arial, sans-serif" font-size="26" font-weight="700" fill="#0B1220" text-anchor="middle">A$35 / hour</text>
+  <rect x="460" y="500" width="280" height="60" rx="20" fill="#0E223C" stroke="#5EEAD4" stroke-width="2"/>
+  <text x="600" y="540" font-family="Inter, Arial, sans-serif" font-size="22" fill="#5EEAD4" text-anchor="middle">Stripe + WhatsApp + Calendar</text>
+  <text x="80" y="700" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="700" fill="#F8FAFC">Sydney Pilot - Kids Chess Class</text>
+  <text x="80" y="752" font-family="Inter, Arial, sans-serif" font-size="28" fill="#FBBF24">Verified BookedAI tenant - book now from public search</text>
+  <text x="80" y="800" font-family="Inter, Arial, sans-serif" font-size="22" fill="#93C5FD">Woman Grandmaster Mai Hung - chess.bookedai.au</text>
+</svg>

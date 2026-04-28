@@ -1,0 +1,49 @@
+<svg width="1600" height="900" viewBox="0 0 1600 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1220"/>
+      <stop offset="0.6" stop-color="#111C34"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+    <linearGradient id="king" x1="600" y1="200" x2="900" y2="780" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FBBF24"/>
+      <stop offset="1" stop-color="#92400E"/>
+    </linearGradient>
+    <linearGradient id="board" x1="80" y1="540" x2="1520" y2="780" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E293B"/>
+      <stop offset="1" stop-color="#0F172A"/>
+    </linearGradient>
+  </defs>
+  <rect width="1600" height="900" fill="url(#bg)"/>
+  <circle cx="240" cy="180" r="180" fill="#1D4ED8" fill-opacity="0.22"/>
+  <circle cx="1380" cy="200" r="220" fill="#14B8A6" fill-opacity="0.18"/>
+  <circle cx="1280" cy="780" r="260" fill="#F59E0B" fill-opacity="0.16"/>
+  <rect x="80" y="540" width="1440" height="240" rx="32" fill="url(#board)"/>
+  <g opacity="0.45">
+    <rect x="120" y="560" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="280" y="560" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="440" y="560" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="600" y="560" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="760" y="560" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="920" y="560" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="1080" y="560" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="1240" y="560" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="200" y="640" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="360" y="640" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="520" y="640" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="680" y="640" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="840" y="640" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="1000" y="640" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="1160" y="640" width="80" height="80" fill="#F8FAFC"/>
+    <rect x="1320" y="640" width="80" height="80" fill="#F8FAFC"/>
+  </g>
+  <path d="M740 260 L740 320 M700 290 L780 290" stroke="#FBBF24" stroke-width="14" stroke-linecap="round"/>
+  <path d="M660 360 Q760 300 860 360 L880 460 Q760 430 640 460 Z" fill="url(#king)"/>
+  <rect x="630" y="456" width="260" height="48" rx="14" fill="#FCD34D"/>
+  <path d="M660 504 Q700 600 660 700 L860 700 Q820 600 860 504 Z" fill="url(#king)"/>
+  <rect x="610" y="694" width="300" height="56" rx="20" fill="#FBBF24"/>
+  <text x="100" y="180" font-family="Inter, Arial, sans-serif" font-size="68" font-weight="800" fill="#F8FAFC">Co Mai Hung Chess Class</text>
+  <text x="100" y="244" font-family="Inter, Arial, sans-serif" font-size="34" fill="#93C5FD">Woman Grandmaster coaching - online and in-person across Sydney</text>
+  <text x="100" y="320" font-family="Inter, Arial, sans-serif" font-size="28" fill="#5EEAD4">Beginner foundations - 1-1 premium - tournament preparation - A$35 / hour</text>
+  <text x="100" y="430" font-family="Inter, Arial, sans-serif" font-size="22" fill="#FACC15">Stripe checkout - WhatsApp follow-up - calendar - portal edits</text>
+</svg>

@@ -1,0 +1,49 @@
+<svg width="1200" height="900" viewBox="0 0 1200 900" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0B1220"/>
+      <stop offset="1" stop-color="#1E293B"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="900" rx="48" fill="url(#bg)"/>
+  <rect x="80" y="80" width="1040" height="540" rx="32" fill="#0B1220" stroke="#5EEAD4" stroke-opacity="0.55" stroke-width="4"/>
+  <rect x="120" y="120" width="960" height="56" rx="16" fill="#0E223C"/>
+  <circle cx="158" cy="148" r="9" fill="#F87171"/>
+  <circle cx="190" cy="148" r="9" fill="#FACC15"/>
+  <circle cx="222" cy="148" r="9" fill="#4ADE80"/>
+  <text x="270" y="158" font-family="Inter, Arial, sans-serif" font-size="22" fill="#5EEAD4">advanced strategy session - 90 minutes</text>
+  <g transform="translate(140 220)">
+    <rect width="600" height="380" rx="20" fill="#0F1E33"/>
+    <g opacity="0.85">
+      <rect x="40" y="40" width="60" height="60" fill="#F8FAFC"/>
+      <rect x="160" y="40" width="60" height="60" fill="#F8FAFC"/>
+      <rect x="280" y="40" width="60" height="60" fill="#F8FAFC"/>
+      <rect x="400" y="40" width="60" height="60" fill="#F8FAFC"/>
+      <rect x="100" y="100" width="60" height="60" fill="#F8FAFC"/>
+      <rect x="220" y="100" width="60" height="60" fill="#F8FAFC"/>
+      <rect x="340" y="100" width="60" height="60" fill="#F8FAFC"/>
+      <rect x="460" y="100" width="60" height="60" fill="#F8FAFC"/>
+      <rect x="40" y="160" width="60" height="60" fill="#F8FAFC"/>
+      <rect x="160" y="160" width="60" height="60" fill="#F8FAFC"/>
+      <rect x="280" y="160" width="60" height="60" fill="#F8FAFC"/>
+      <rect x="400" y="160" width="60" height="60" fill="#F8FAFC"/>
+    </g>
+    <text x="40" y="280" font-family="Inter, Arial, sans-serif" font-size="22" fill="#FBBF24">Opening: Sicilian Najdorf</text>
+    <text x="40" y="316" font-family="Inter, Arial, sans-serif" font-size="20" fill="#93C5FD">Strategic plan: pawn break on c5, queen-side pressure</text>
+    <text x="40" y="352" font-family="Inter, Arial, sans-serif" font-size="20" fill="#5EEAD4">Calculation depth: 4-5 moves with branching</text>
+  </g>
+  <g transform="translate(780 220)">
+    <rect width="280" height="380" rx="20" fill="#0E223C"/>
+    <text x="140" y="60" font-family="Inter, Arial, sans-serif" font-size="22" fill="#FCD34D" text-anchor="middle">Cohort</text>
+    <circle cx="80" cy="120" r="22" fill="#FB7185"/>
+    <circle cx="200" cy="120" r="22" fill="#5EEAD4"/>
+    <circle cx="80" cy="180" r="22" fill="#A5B4FC"/>
+    <circle cx="200" cy="180" r="22" fill="#FCD34D"/>
+    <circle cx="140" cy="240" r="22" fill="#34D399"/>
+    <text x="140" y="320" font-family="Inter, Arial, sans-serif" font-size="20" fill="#93C5FD" text-anchor="middle">3-5 students</text>
+    <text x="140" y="350" font-family="Inter, Arial, sans-serif" font-size="20" fill="#5EEAD4" text-anchor="middle">Tournament focus</text>
+  </g>
+  <text x="80" y="700" font-family="Inter, Arial, sans-serif" font-size="48" font-weight="700" fill="#F8FAFC">Online Group Class - 90 Minutes</text>
+  <text x="80" y="752" font-family="Inter, Arial, sans-serif" font-size="28" fill="#5EEAD4">A$52.50 / 90 minutes (A$35 / hour) - deeper tactical study</text>
+  <text x="80" y="800" font-family="Inter, Arial, sans-serif" font-size="22" fill="#93C5FD">Advanced openings - calculation - tournament psychology</text>
+</svg>
