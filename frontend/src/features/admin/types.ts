@@ -177,6 +177,30 @@ export type AdminMessagingDetailResponse = {
   events: AdminMessagingEvent[];
 };
 
+export type AdminPendingHandoffItem = {
+  event_id: string;
+  conversation_id?: string | null;
+  channel: string;
+  customer_care_status: string;
+  sender_name?: string | null;
+  last_message?: string | null;
+  created_at: string;
+  telegram_chat_id?: string | null;
+  telegram_username?: string | null;
+  booking_reference?: string | null;
+  support_handoff_failed: boolean;
+  support_handoff_targets: number;
+  support_handoff_delivered: number;
+};
+
+export type AdminPendingHandoffsResponse = {
+  status: string;
+  items: AdminPendingHandoffItem[];
+  total: number;
+  pending_count: number;
+  failed_count: number;
+};
+
 export type CustomerAgentHealthChannelStatus = {
   delivery_status?: string | null;
   provider?: string | null;

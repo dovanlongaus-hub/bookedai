@@ -9,6 +9,7 @@ import {
   deleteAdminService,
   fetchAdminMessageDetail,
   fetchAdminMessaging,
+  fetchAdminPendingHandoffs,
   downloadAdminServiceQualityExport,
   fetchAdminBookingDetail,
   fetchAdminDashboardData,
@@ -32,6 +33,7 @@ import {
   AdminMessagingDetailResponse,
   AdminMessagingItem,
   AdminOverviewResponse,
+  AdminPendingHandoffsResponse,
   AdminServiceCatalogQualityCounts,
   AdminServiceMerchantItem,
   AdminTenantDetailResponse,
@@ -72,6 +74,9 @@ export function useAdminPageState(apiBaseUrl: string) {
   const [customerAgentHealth, setCustomerAgentHealth] = useState<AdminCustomerAgentHealthResponse | null>(null);
   const [messagingActionMessage, setMessagingActionMessage] = useState('');
   const [messagingActionSubmittingKey, setMessagingActionSubmittingKey] = useState<string | null>(null);
+  const [pendingHandoffs, setPendingHandoffs] = useState<AdminPendingHandoffsResponse | null>(null);
+  const [pendingHandoffsLoading, setPendingHandoffsLoading] = useState(false);
+  const [pendingHandoffsError, setPendingHandoffsError] = useState<string | null>(null);
   const [partners, setPartners] = useState<PartnerProfileItem[]>([]);
   const [importedServices, setImportedServices] = useState<AdminServiceMerchantItem[]>([]);
   const [tenants, setTenants] = useState<AdminTenantListItem[]>([]);
@@ -359,6 +364,27 @@ export function useAdminPageState(apiBaseUrl: string) {
   async function loadMessageDetail(sourceKind: string, itemId: string) {
     const payload = await fetchAdminMessageDetail(apiBaseUrl, sessionToken, sourceKind, itemId);
     setSelectedMessageDetail(payload);
+  }
+
+  async function refreshPendingHandoffs() {
+    if (!sessionToken) {
+      return;
+    }
+    setPendingHandoffsLoading(true);
+    setPendingHandoffsError(null);
+    try {
+      const payload = await fetchAdminPendingHandoffs(apiBaseUrl, sessionToken, 60, 72);
+      setPendingHandoffs(payload);
+    } catch (requestError) {
+      const message = resolveErrorMessage(requestError, 'Could not load pending handoffs.');
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setPendingHandoffsError(message);
+    } finally {
+      setPendingHandoffsLoading(false);
+    }
   }
 
   async function loadDashboard(query?: string) {
@@ -1074,6 +1100,10 @@ export function useAdminPageState(apiBaseUrl: string) {
     customerAgentHealth,
     messagingActionMessage,
     messagingActionSubmittingKey,
+    pendingHandoffs,
+    pendingHandoffsLoading,
+    pendingHandoffsError,
+    refreshPendingHandoffs,
     partners,
     importedServices,
     tenants,
