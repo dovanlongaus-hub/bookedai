@@ -170,6 +170,19 @@ def _project_event_to_step(event: ConversationEvent) -> dict[str, Any]:
         except (TypeError, ValueError):
             duration_ms = None
 
+    # Wave 13-B — slash-command verbs are stored on
+    # ``metadata_json.user_intent_hint`` (see
+    # ``api/v1_search_handlers.py:_normalize_intent_hint``). They are NOT
+    # PII (the verb space is a short closed enum like
+    # ``find_service``/``book_service``), so we lift the value out of the
+    # masker and surface it as a typed step field.
+    user_intent_hint_raw = raw_metadata.pop("user_intent_hint", None)
+    user_intent_hint: str | None = None
+    if isinstance(user_intent_hint_raw, str):
+        candidate = user_intent_hint_raw.strip()
+        if candidate:
+            user_intent_hint = candidate
+
     masked_evidence = _mask_pii(raw_metadata) if raw_metadata else {}
 
     created_at_iso = (
@@ -186,6 +199,7 @@ def _project_event_to_step(event: ConversationEvent) -> dict[str, Any]:
         "ai_reply": _truncate_ai_reply(event.ai_reply),
         "workflow_status": event.workflow_status,
         "duration_ms": duration_ms,
+        "user_intent_hint": user_intent_hint,
         "evidence": masked_evidence,
         "created_at": created_at_iso,
     }

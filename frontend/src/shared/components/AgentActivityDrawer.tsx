@@ -86,6 +86,42 @@ function formatEventType(eventType: string): string {
   return eventType.replace(/_/g, ' ');
 }
 
+/**
+ * Wave 13-B — slash-command verb chip mapping.
+ * Maps raw `context.intent_hint` values (forwarded from
+ * `<SlashCommandMenu>`) to short, friendly labels surfaced next to the
+ * event_type in the Agent Activity Drawer. Unknown verbs fall back to a
+ * normalized title-case form so we never silently swallow a new intent.
+ */
+const INTENT_HINT_LABELS: Record<string, string> = {
+  find_service: 'Find service',
+  compare_services: 'Compare',
+  book_service: 'Book',
+  request_quote: 'Quote',
+  open_portal: 'Open portal',
+  help: 'Help',
+};
+
+function formatIntentHint(rawHint: string | null | undefined): string | null {
+  if (!rawHint) {
+    return null;
+  }
+  const trimmed = rawHint.trim();
+  if (!trimmed) {
+    return null;
+  }
+  const known = INTENT_HINT_LABELS[trimmed];
+  if (known) {
+    return known;
+  }
+  // Fallback: title-case the raw verb so e.g. `custom_intent` →
+  // `Custom intent`. Keeps the chip useful when a tenant introduces a
+  // new slash command before the frontend ships the mapping.
+  return trimmed
+    .replace(/_/g, ' ')
+    .replace(/^(.)(.*)$/, (_, head: string, tail: string) => head.toUpperCase() + tail);
+}
+
 export function AgentActivityDrawer({
   conversationId,
   tenantId = null,
@@ -257,6 +293,7 @@ export function AgentActivityDrawer({
         durationLabel: formatDuration(step.duration_ms),
         humanEventType: formatEventType(step.event_type),
         statusStyles: statusDotStyle(step.workflow_status),
+        intentHintLabel: formatIntentHint(step.user_intent_hint),
       })),
     [steps],
   );
@@ -407,6 +444,19 @@ export function AgentActivityDrawer({
                         <span className="flex-1 truncate font-medium tracking-[-0.01em]">
                           {step.humanEventType}
                         </span>
+                        {step.intentHintLabel ? (
+                          <span
+                            data-testid="agent-step-intent-hint"
+                            data-intent-hint={step.user_intent_hint ?? ''}
+                            className="template-chip rounded-apple-micro px-1.5 py-0.5 text-[11px] font-semibold"
+                            style={{
+                              background: 'rgba(0, 122, 255, 0.18)',
+                              color: 'var(--apple-text-dark)',
+                            }}
+                          >
+                            {step.intentHintLabel}
+                          </span>
+                        ) : null}
                         {step.durationLabel ? (
                           <span
                             className="rounded-apple-micro px-1.5 py-0.5 text-[11px] font-semibold"

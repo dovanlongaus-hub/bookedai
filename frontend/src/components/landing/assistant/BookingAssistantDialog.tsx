@@ -44,6 +44,11 @@ import {
   isBookedAiChessTenantService,
   toBookingReadyServiceItem,
 } from '../../../shared/presenters/partnerMatch';
+import { CitationChip } from '../../../shared/components/CitationChip';
+import {
+  parseCitations,
+  type CitationCandidate,
+} from '../../../shared/components/citationParser';
 import { PartnerMatchShortlist } from '../../../shared/components/PartnerMatchShortlist';
 import { normalizePhoneForMessaging } from '../../../shared/utils/phone';
 import {
@@ -976,9 +981,11 @@ function humanizeAutomationWarning(warning: string) {
     lower.includes('evolution api returned') ||
     lower.includes('connection closed') ||
     lower.includes('whatsapp_meta') ||
-    lower.includes('internal server error')
+    lower.includes('internal server error') ||
+    lower.includes('tenant session required') ||
+    lower.includes('actor_context.tenant_id')
   ) {
-    return 'Your booking is confirmed. We are sending the messaging follow-up — your booking and portal stay available.';
+    return 'Your booking is confirmed. BookedAI kept this on the public booking path; private workspace follow-up can happen behind the scenes.';
   }
   if (lower.includes('provider confirmation is required')) {
     return 'Provider confirmation is required before payment is collected.';
@@ -996,6 +1003,15 @@ function humanizeAutomationWarnings(warnings: string[]) {
   return Array.from(
     new Set(warnings.map(humanizeAutomationWarning).filter((warning): warning is string => Boolean(warning))),
   );
+}
+
+function humanizePublicBookingSubmitError(error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  const lower = message.toLowerCase();
+  if (lower.includes('tenant session required') || lower.includes('actor_context.tenant_id')) {
+    return 'This public chat can still take the booking request. Choose the result again and continue; BookedAI keeps tenant routing behind the scenes.';
+  }
+  return message || "We couldn't reach the operator right now. Let's try again or message support.";
 }
 
 function getServiceInitials(service: ServiceCatalogItem) {
@@ -2809,6 +2825,68 @@ export function BookingAssistantDialog({
     [selectedEvent, selectedService],
   );
 
+  /**
+   * Lane 7 P5 — Citation chips on AI replies (BookingAssistantDialog surface).
+   *
+   * Mirrors the homepage implementation: parses `[ID:cand-XYZ]` markers from
+   * the assistant reply, renders inline `[1]` chips, and scrolls + pulses
+   * the matching service card on click. Reuses the same `parseCitations`
+   * + `<CitationChip>` primitives from `frontend/src/shared/components/`.
+   */
+  const toCitationCandidate = (service: ServiceCatalogItem): CitationCandidate => ({
+    candidateId: service.id,
+    serviceName: service.name,
+    providerName: service.venue_name,
+    sourceLabel: service.source_label ?? null,
+  });
+
+  const scrollToCitedCandidate = (candidate: CitationCandidate) => {
+    if (typeof document === 'undefined') return;
+    const card = document.querySelector<HTMLElement>(
+      `[data-candidate-id="${CSS.escape(candidate.candidateId)}"]`,
+    );
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('citation-pulsing');
+    window.setTimeout(() => {
+      card.classList.remove('citation-pulsing');
+    }, 1500);
+  };
+
+  const renderAssistantReplyContent = (
+    content: string,
+    matchedServices: ServiceCatalogItem[] | undefined,
+  ) => {
+    const seen = new Set<string>();
+    const merged: ServiceCatalogItem[] = [];
+    for (const list of [matchedServices ?? [], catalog?.services ?? []]) {
+      for (const service of list) {
+        if (service && !seen.has(service.id)) {
+          seen.add(service.id);
+          merged.push(service);
+        }
+      }
+    }
+    const candidates = merged.map(toCitationCandidate);
+    const nodes = parseCitations(content, candidates);
+    if (!nodes.length) {
+      return content;
+    }
+    return nodes.map((node, idx) => {
+      if (node.kind === 'text') {
+        return <span key={`citation-text-${idx}`}>{node.text}</span>;
+      }
+      return (
+        <CitationChip
+          key={`citation-chip-${idx}-${node.candidate.candidateId}`}
+          index={node.index}
+          candidate={node.candidate}
+          onClick={scrollToCitedCandidate}
+        />
+      );
+    });
+  };
+
   const latestSuggestedServices = useMemo(() => {
     for (let index = messages.length - 1; index >= 0; index -= 1) {
       const message = messages[index];
@@ -4055,11 +4133,7 @@ export function BookingAssistantDialog({
       setResult(payload as BookingAssistantSessionResponse);
       setProductModuleTab('confirmed');
     } catch (error) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : "We couldn't reach the operator right now. Let's try again or message support.";
-      setSubmitError(message);
+      setSubmitError(humanizePublicBookingSubmitError(error));
     } finally {
       setLoading(false);
     }
@@ -4808,7 +4882,9 @@ export function BookingAssistantDialog({
                             : 'rounded-bl-[0.35rem] border border-slate-200 bg-white text-slate-700 shadow-[0_4px_12px_rgba(15,23,42,0.04)]'
                         } ${isProductAppLayout ? 'px-3.5 py-2.5 text-[13px] leading-5' : ''}`}
                       >
-                        {message.content}
+                        {message.role === 'assistant'
+                          ? renderAssistantReplyContent(message.content, message.matchedServices)
+                          : message.content}
                         {message.role === 'assistant' && message.suggestions?.length ? (
                           <div className="mt-3 flex flex-wrap gap-2">
                             {message.suggestions.map((item) => (
@@ -4860,6 +4936,7 @@ export function BookingAssistantDialog({
                           return (
                             <article
                               key={service.id}
+                              data-candidate-id={service.id}
                               className={`overflow-hidden rounded-[1.25rem] border text-left transition-all duration-200 ${
                                 isSelected
                                   ? 'booking-card-picked border-slate-950 bg-slate-950 text-white shadow-[0_18px_45px_rgba(15,23,42,0.18)]'
@@ -7052,10 +7129,10 @@ export function BookingAssistantDialog({
                   </div>
                   <p className="mt-3 text-[11px] leading-5 text-slate-500">
                     {result.meeting_status === 'scheduled'
-                      ? 'A calendar event has been created and included in the confirmation flow. After payment, Stripe returns the customer to the homepage while the request stays logged for portal, CRM, email, messaging, and Telegram care follow-up.'
+                      ? 'A calendar event has been created and included in the confirmation flow. After payment, BookedAI verifies Stripe backend status before showing the paid state while portal, CRM, email, messaging, and Telegram care stay linked.'
                       : result.calendar_add_url
-                        ? 'A Google Calendar action is ready immediately and is also included in the confirmation email. After payment, Stripe returns the customer to the homepage while the request stays logged for portal, CRM, messaging, and Telegram care follow-up.'
-                      : 'Stripe returns the customer to the homepage after payment. Email confirmation is handled here, and the request is already passed into the workflow for calendar, CRM, messaging, or team care follow-up.'}
+                        ? 'A Google Calendar action is ready immediately and is also included in the confirmation email. After payment, BookedAI verifies Stripe backend status while portal, CRM, messaging, and Telegram care stay linked.'
+                      : 'After payment, BookedAI verifies Stripe backend status before showing the paid state. Email confirmation is handled here, and the request is already passed into the workflow for calendar, CRM, messaging, or team care follow-up.'}
                   </p>
                 </div>
               ) : null}

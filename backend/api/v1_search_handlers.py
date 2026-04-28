@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from fastapi import Request
 from pydantic import BaseModel, Field
+
+from db import ConversationEvent
 
 from api.v1_routes import (
     ActorContextPayload,
@@ -64,6 +67,92 @@ class CustomerAgentTurnRequestPayload(BaseModel):
     attribution: AttributionContextPayload | None = None
     user_location: dict[str, Any] | None = None
     context: dict[str, Any] = Field(default_factory=dict)
+
+
+_INTENT_HINT_PATTERN = re.compile(r"^[a-z][a-z0-9_]{0,63}$")
+
+
+def _normalize_intent_hint(raw: object) -> str | None:
+    """Validate and normalize the slash-command ``context.intent_hint`` slot.
+
+    Wave 13-B contract: the frontend ``SlashCommandMenu`` forwards a typed
+    verb (e.g. ``"find_service"``) on the ``context.intent_hint`` slot of
+    ``createCustomerAgentTurn``. Persisting it on the
+    ``conversation_events`` ledger makes the Agent Activity Drawer (Wave
+    7-T1) and admin observability surface what intents users actually
+    invoke.
+
+    Validation policy:
+      * ``str`` only — non-strings are dropped silently.
+      * lowercase, alphanumeric/underscore, must start with a lowercase
+        letter, length 1..64 (regex ``^[a-z][a-z0-9_]{0,63}$``).
+      * Anything that fails returns ``None`` — we never raise to keep the
+        agent turn resilient even if the client sends a malformed hint.
+    """
+
+    if not isinstance(raw, str):
+        return None
+    candidate = raw.strip()
+    if not candidate:
+        return None
+    if not _INTENT_HINT_PATTERN.match(candidate):
+        return None
+    return candidate
+
+
+async def _record_intent_hint_event(
+    request: Request,
+    *,
+    conversation_id: str,
+    tenant_id: str | None,
+    intent_hint: str,
+    message: str,
+    channel: str,
+) -> None:
+    """Persist a single ``conversation_events`` row for a slash-command verb.
+
+    Storage decision: stored under ``metadata_json.user_intent_hint`` so it
+    never clobbers the LLM-derived ``ai_intent`` column. The Agent Activity
+    Drawer projector lifts it back out at read time
+    (``api/v1_agent_handlers.py:_project_event_to_step``).
+    """
+
+    session_factory = getattr(request.app.state, "session_factory", None)
+    if session_factory is None:
+        return
+    metadata: dict[str, Any] = {
+        "user_intent_hint": intent_hint,
+        "tenant_id": tenant_id,
+        "channel": channel,
+    }
+    try:
+        async with get_session(session_factory) as session:
+            session.add(
+                ConversationEvent(
+                    source=channel or "public_web",
+                    event_type="slash_command_intent",
+                    conversation_id=conversation_id,
+                    sender_name=None,
+                    sender_email=None,
+                    message_text=message[:500] if message else None,
+                    ai_intent=None,
+                    ai_reply=None,
+                    workflow_status="done",
+                    metadata_json=metadata,
+                )
+            )
+            await session.commit()
+    except Exception:  # noqa: BLE001
+        # Capturing the intent is best-effort — never fail the agent turn
+        # if the ledger write blips.
+        logger.warning(
+            "slash_command_intent_persist_failed",
+            extra={
+                "conversation_id": conversation_id,
+                "tenant_id": tenant_id or "",
+                "intent_hint": intent_hint,
+            },
+        )
 
 
 def _agent_clean_text(value: object) -> str:
@@ -182,11 +271,29 @@ async def customer_agent_turn(request: Request, payload: CustomerAgentTurnReques
         deployment_mode=payload.channel_context.deployment_mode,
     )
     tenant_id = await _resolve_tenant_id(request, actor_context)
+
+    # Wave 13-B — capture the slash-command intent_hint into the
+    # conversation_events ledger so the Agent Activity Drawer (Wave 7-T1)
+    # and admin observability surface what intents users actually invoke.
+    intent_hint = _normalize_intent_hint(
+        (payload.context or {}).get("intent_hint")
+    )
+    resolved_conversation_id = payload.conversation_id or f"conv_{uuid4().hex[:12]}"
+    if intent_hint:
+        await _record_intent_hint_event(
+            request,
+            conversation_id=resolved_conversation_id,
+            tenant_id=tenant_id,
+            intent_hint=intent_hint,
+            message=trimmed_message,
+            channel=payload.channel_context.channel,
+        )
+
     if not trimmed_message:
         return _success_response(
             {
                 "agent_turn_id": f"agent_turn_{uuid4().hex[:12]}",
-                "conversation_id": payload.conversation_id or f"conv_{uuid4().hex[:12]}",
+                "conversation_id": resolved_conversation_id,
                 "reply": "Send me what you want to book and I will search, clarify, then hand the right context into booking.",
                 "phase": "clarify",
                 "missing_context": ["brief"],
@@ -227,7 +334,7 @@ async def customer_agent_turn(request: Request, payload: CustomerAgentTurnReques
     return _success_response(
         {
             "agent_turn_id": f"agent_turn_{uuid4().hex[:12]}",
-            "conversation_id": payload.conversation_id or f"conv_{uuid4().hex[:12]}",
+            "conversation_id": resolved_conversation_id,
             "reply": reply,
             "phase": phase,
             "missing_context": missing_context,

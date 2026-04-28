@@ -29,6 +29,11 @@ import {
   type BookingReadyServiceItem,
 } from '../../shared/presenters/partnerMatch';
 import { AgentActivityDrawer } from '../../shared/components/AgentActivityDrawer';
+import { CitationChip } from '../../shared/components/CitationChip';
+import {
+  parseCitations,
+  type CitationCandidate,
+} from '../../shared/components/citationParser';
 import { PartnerMatchShortlist } from '../../shared/components/PartnerMatchShortlist';
 import { SlashCommandMenu } from '../../shared/components/SlashCommandMenu';
 import type { MatchCandidate } from '../../shared/contracts';
@@ -255,6 +260,56 @@ type AgentChatMessage = {
 };
 
 type ClarificationNeed = 'location' | 'timing' | 'brief';
+
+/**
+ * Lane 7 P5 — Render an assistant reply with inline citation chips.
+ *
+ * Walks through `parseCitations` output and renders text segments alongside
+ * `<CitationChip>` instances. Candidates are the union of message-scoped
+ * inline results (rendered in the chat bubble) and the broader result pool
+ * (so a chip referring to a card still in the side panel still resolves).
+ *
+ * If the reply has no markers, this collapses to a single text node and
+ * looks identical to `{message.content}` — graceful fallback.
+ */
+function renderAssistantReplyWithCitations(
+  content: string,
+  inlineResults: ServiceCatalogItem[],
+  pageResults: ServiceCatalogItem[],
+  toCandidate: (service: ServiceCatalogItem) => CitationCandidate,
+  onChipClick: (candidate: CitationCandidate) => void,
+) {
+  const seen = new Set<string>();
+  const merged: ServiceCatalogItem[] = [];
+  for (const list of [inlineResults, pageResults]) {
+    for (const service of list) {
+      if (service && !seen.has(service.id)) {
+        seen.add(service.id);
+        merged.push(service);
+      }
+    }
+  }
+  const candidates = merged.map(toCandidate);
+  const nodes = parseCitations(content, candidates);
+  if (!nodes.length) {
+    return content;
+  }
+  return nodes.map((node, idx) => {
+    if (node.kind === 'text') {
+      // Use a stable enough key — index is fine here because the node order
+      // is deterministic from the parser output.
+      return <span key={`citation-text-${idx}`}>{node.text}</span>;
+    }
+    return (
+      <CitationChip
+        key={`citation-chip-${idx}-${node.candidate.candidateId}`}
+        index={node.index}
+        candidate={node.candidate}
+        onClick={onChipClick}
+      />
+    );
+  });
+}
 
 function deriveClarificationNeeds(query: string): ClarificationNeed[] {
   const normalized = query.toLowerCase();
@@ -731,6 +786,15 @@ function normalizeSyncStatus(value: string | null | undefined) {
 
 function normalizeAutomationStatus(value: string | null | undefined) {
   return (value || '').trim().toLowerCase();
+}
+
+function humanizePublicBookingSubmitError(error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  const lower = message.toLowerCase();
+  if (lower.includes('tenant session required') || lower.includes('actor_context.tenant_id')) {
+    return 'This public chat can still take the booking request. Choose the result again and continue; BookedAI keeps tenant routing behind the scenes.';
+  }
+  return message || 'Unable to create booking request.';
 }
 
 function deriveCommunicationLaneStatus(
@@ -2403,6 +2467,42 @@ export function HomepageSearchExperience({
     [results],
   );
 
+  /**
+   * Lane 7 P5 — Citation chips on AI replies.
+   *
+   * Adapt the public catalog items into the lightweight `CitationCandidate`
+   * shape consumed by the parser/chip. The adapter is local to this file
+   * because `ServiceCatalogItem` lives here; the parser/chip stay reusable
+   * across surfaces.
+   */
+  function toCitationCandidate(service: ServiceCatalogItem): CitationCandidate {
+    return {
+      candidateId: service.id,
+      serviceName: service.name,
+      providerName: service.venue_name,
+      sourceLabel: service.source_label ?? null,
+    };
+  }
+
+  /**
+   * Click handler for inline citation chips: scroll the matched result card
+   * into view and pulse it briefly so the citation visibly anchors to its
+   * source ("show your work"). `prefers-reduced-motion` is honoured by the
+   * `.citation-pulsing` keyframe (see `frontend/src/styles.css`).
+   */
+  function scrollToCandidate(candidate: CitationCandidate) {
+    if (typeof document === 'undefined') return;
+    const card = document.querySelector<HTMLElement>(
+      `[data-candidate-id="${CSS.escape(candidate.candidateId)}"]`,
+    );
+    if (!card) return;
+    card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    card.classList.add('citation-pulsing');
+    window.setTimeout(() => {
+      card.classList.remove('citation-pulsing');
+    }, 1500);
+  }
+
   function focusSearchComposer() {
     window.setTimeout(() => {
       bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -3426,7 +3526,7 @@ export function HomepageSearchExperience({
       setResult(payload);
       setComposerCollapsed(true);
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : 'Unable to create booking request.');
+      setSubmitError(humanizePublicBookingSubmitError(error));
     } finally {
       setSubmitLoading(false);
     }
@@ -3853,7 +3953,11 @@ export function HomepageSearchExperience({
                             ) : null}
                           </div>
                         ) : null}
-                        <div>{message.content}</div>
+                        <div data-citation-bubble={message.role === 'assistant' ? 'true' : undefined}>
+                          {message.role === 'assistant'
+                            ? renderAssistantReplyWithCitations(message.content, inlineResults, results, toCitationCandidate, scrollToCandidate)
+                            : message.content}
+                        </div>
                         {inlineResults.length > 0 ? (
                           <div className="mt-3 grid gap-2.5">
                             <div className="flex flex-wrap items-center justify-between gap-2 rounded-[0.95rem] border border-apple-paper-blue-200 bg-white/78 px-3 py-2">
@@ -3891,6 +3995,7 @@ export function HomepageSearchExperience({
                               return (
                               <article
                                 key={`${message.id}-${service.id}`}
+                                data-candidate-id={service.id}
                                 className="rounded-[1rem] border border-apple-paper-blue-200 bg-white px-3 py-3 text-left shadow-apple-card"
                               >
                                 <div className="flex flex-wrap items-center gap-1.5">
@@ -4287,6 +4392,7 @@ export function HomepageSearchExperience({
                       <div
                         key={service.id}
                         data-homepage-result-entry="true"
+                        data-candidate-id={service.id}
                         style={getResultEntryStyle(resultIndex)}
                         className={`rounded-[1.35rem] border p-3 shadow-apple-card transition duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                           isSelected
@@ -4918,8 +5024,23 @@ export function HomepageSearchExperience({
                 </label>
 
                 {submitError ? (
-                  <div role="alert" className="rounded-[0.95rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                    {submitError}
+                  <div
+                    role="alert"
+                    aria-live="polite"
+                    className="rounded-[1rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+                  >
+                    <div className="font-semibold text-amber-950">Booking needs one more try</div>
+                    <p className="mt-1 leading-6">{submitError}</p>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSubmitError('');
+                        bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                      }}
+                      className="mt-2 inline-flex min-h-[44px] items-center justify-center rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-950 transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
+                    >
+                      Review selected result
+                    </button>
                   </div>
                 ) : null}
 

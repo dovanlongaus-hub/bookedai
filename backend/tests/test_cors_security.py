@@ -31,6 +31,38 @@ async def _noop_lifespan(_: object):
     yield
 
 
+_PRISTINE_MODULES = {
+    name: sys.modules.get(name)
+    for name in ("app", "config", "api.route_handlers")
+}
+
+
+@pytest.fixture(autouse=True)
+def _restore_modules_after_cors_reload():
+    """Restore the ORIGINAL module objects after each cors test.
+
+    `_reload_app` rips ``app`` / ``config`` / ``api.route_handlers`` out of
+    ``sys.modules`` and re-imports them with cors-test env. Other test files
+    captured the ORIGINAL ``api`` router (the FastAPI APIRouter object) at
+    their own import time; after the reload, those captured references are
+    "orphaned" — they reference the module-level ``get_session`` from the
+    PRE-reload module graph, while ``patch("api.route_handlers.get_session",
+    ...)`` would patch the POST-reload module. The patch goes to the new
+    module, but the routes still execute via the old module's ``get_session``
+    that was never patched, hence ``session_factory = object()`` runs as-is
+    and errors with ``'object' object is not callable``.
+
+    Restore the PRISTINE module objects (captured at conftest collection
+    time) so subsequent test files see the same module instances they
+    imported from at suite startup.
+    """
+
+    yield
+    for name, original_module in _PRISTINE_MODULES.items():
+        if original_module is not None:
+            sys.modules[name] = original_module
+
+
 def _reload_app(monkeypatch: pytest.MonkeyPatch, **env: str):
     """Reload the FastAPI app with a fresh environment.
 
@@ -82,6 +114,7 @@ def test_production_default_origins_exclude_localhost(monkeypatch):
     assert "127.0.0.1" not in default
     assert "https://bookedai.au" in default
     assert "https://api.bookedai.au" in default
+    assert "https://aimentor.bookedai.au" in default
 
 
 def test_staging_default_includes_staging_subdomains(monkeypatch):
