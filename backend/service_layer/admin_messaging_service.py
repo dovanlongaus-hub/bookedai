@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 
-from db import ConversationEvent
+from db import ConversationEvent, MessagingChannelSession
 from repositories.audit_repository import AuditLogRepository
 from repositories.base import RepositoryContext
 from repositories.email_repository import EmailRepository
@@ -604,7 +604,14 @@ def _is_handoff_event(metadata: dict[str, object], ai_intent: str | None) -> boo
     return False
 
 
-def _build_pending_handoff_item(row: ConversationEvent) -> dict[str, object]:
+HANDOFF_CLAIM_TTL_SECONDS = 4 * 60 * 60  # 4-hour suppression window
+
+
+def _build_pending_handoff_item(
+    row: ConversationEvent,
+    *,
+    session_metadata: dict[str, object] | None = None,
+) -> dict[str, object]:
     metadata = _handoff_metadata_payload(row.metadata_json)
     care_status = str(metadata.get("customer_care_status") or "").strip()
     if not care_status:
@@ -623,6 +630,9 @@ def _build_pending_handoff_item(row: ConversationEvent) -> dict[str, object]:
     last_message = str(row.message_text or "").strip() or None
     if last_message and len(last_message) > 280:
         last_message = last_message[:280].rstrip() + "…"
+    claim_meta = session_metadata if isinstance(session_metadata, dict) else {}
+    claimed_at = str(claim_meta.get("handoff_claimed_at") or "").strip() or None
+    claimed_by = str(claim_meta.get("handoff_claimed_by") or "").strip() or None
     return {
         "event_id": str(row.id),
         "conversation_id": str(row.conversation_id or "").strip() or None,
@@ -641,6 +651,153 @@ def _build_pending_handoff_item(row: ConversationEvent) -> dict[str, object]:
         ),
         "support_handoff_targets": int(handoff_block.get("targets") or 0),
         "support_handoff_delivered": int(handoff_block.get("delivered_count") or 0),
+        "claimed_at": claimed_at,
+        "claimed_by": claimed_by,
+        "claim_active": _is_handoff_claim_active(claim_meta),
+    }
+
+
+def _is_handoff_claim_active(
+    session_metadata: dict[str, object] | None,
+    *,
+    ttl_seconds: int = HANDOFF_CLAIM_TTL_SECONDS,
+) -> bool:
+    if not isinstance(session_metadata, dict):
+        return False
+    raw = str(session_metadata.get("handoff_claimed_at") or "").strip()
+    if not raw:
+        return False
+    try:
+        recorded_at = datetime.fromisoformat(raw)
+    except ValueError:
+        return False
+    if recorded_at.tzinfo is None:
+        recorded_at = recorded_at.replace(tzinfo=UTC)
+    return datetime.now(UTC) - recorded_at <= timedelta(seconds=ttl_seconds)
+
+
+class HandoffAlreadyClaimedError(Exception):
+    """Raised when an admin tries to claim a conversation already actively claimed
+    by a different admin within the TTL window. Carries the existing claim metadata
+    so the route layer can return 409 with a useful body."""
+
+    def __init__(
+        self,
+        *,
+        claimed_by: str,
+        claimed_at: str,
+    ) -> None:
+        super().__init__(f"Conversation already claimed by {claimed_by} at {claimed_at}")
+        self.claimed_by = claimed_by
+        self.claimed_at = claimed_at
+
+
+async def claim_pending_handoff(
+    session,
+    *,
+    conversation_id: str,
+    channel: str = "telegram",
+    claimed_by: str,
+) -> dict[str, object] | None:
+    """Persist `handoff_claimed_at` + `handoff_claimed_by` on the
+    MessagingChannelSession metadata so the bot's `_is_handoff_claimed`
+    suppression branch fires for follow-up customer messages.
+
+    Returns None when no MessagingChannelSession row exists for the
+    (channel, conversation_id) pair — the route turns this into 404.
+
+    Raises HandoffAlreadyClaimedError when the conversation is already
+    actively claimed by a different admin within the TTL window. Re-claiming
+    the same conversation under the SAME username is a no-op refresh.
+    """
+    normalized_conversation_id = str(conversation_id or "").strip()
+    if not normalized_conversation_id:
+        return None
+    result = await session.execute(
+        select(MessagingChannelSession)
+        .where(MessagingChannelSession.channel == channel)
+        .where(MessagingChannelSession.conversation_id == normalized_conversation_id)
+    )
+    rows = result.scalars().all()
+    row = rows[0] if rows else None
+    if row is None:
+        return None
+    existing = row.metadata_json if isinstance(row.metadata_json, dict) else {}
+    normalized_claimed_by = str(claimed_by or "").strip() or "admin"
+    if _is_handoff_claim_active(existing):
+        existing_claimed_by = str(existing.get("handoff_claimed_by") or "").strip()
+        existing_claimed_at = str(existing.get("handoff_claimed_at") or "").strip()
+        if existing_claimed_by and existing_claimed_by != normalized_claimed_by:
+            raise HandoffAlreadyClaimedError(
+                claimed_by=existing_claimed_by,
+                claimed_at=existing_claimed_at,
+            )
+    claimed_at = datetime.now(UTC).isoformat()
+    merged = {
+        **existing,
+        "handoff_claimed_at": claimed_at,
+        "handoff_claimed_by": normalized_claimed_by,
+    }
+    row.metadata_json = merged
+    row.last_ai_intent = "handoff_claimed"
+    row.last_workflow_status = "answered"
+    await session.flush()
+    await session.commit()
+    return {
+        "conversation_id": normalized_conversation_id,
+        "channel": channel,
+        "claimed_at": claimed_at,
+        "claimed_by": normalized_claimed_by,
+        "ttl_seconds": HANDOFF_CLAIM_TTL_SECONDS,
+    }
+
+
+async def release_pending_handoff(
+    session,
+    *,
+    conversation_id: str,
+    channel: str = "telegram",
+    released_by: str,
+) -> dict[str, object] | None:
+    """Clear `handoff_claimed_at` + `handoff_claimed_by` from the
+    MessagingChannelSession metadata so the bot resumes auto-reply on the
+    next customer message. Records `handoff_released_at` + `_by` for audit.
+
+    Returns None when no MessagingChannelSession row exists for the
+    (channel, conversation_id) pair — the route turns this into 404.
+    """
+    normalized_conversation_id = str(conversation_id or "").strip()
+    if not normalized_conversation_id:
+        return None
+    result = await session.execute(
+        select(MessagingChannelSession)
+        .where(MessagingChannelSession.channel == channel)
+        .where(MessagingChannelSession.conversation_id == normalized_conversation_id)
+    )
+    rows = result.scalars().all()
+    row = rows[0] if rows else None
+    if row is None:
+        return None
+    existing = row.metadata_json if isinstance(row.metadata_json, dict) else {}
+    released_at = datetime.now(UTC).isoformat()
+    normalized_released_by = str(released_by or "").strip() or "admin"
+    merged = {
+        key: value
+        for key, value in existing.items()
+        if key not in {"handoff_claimed_at", "handoff_claimed_by"}
+    }
+    merged["handoff_released_at"] = released_at
+    merged["handoff_released_by"] = normalized_released_by
+    row.metadata_json = merged
+    row.last_ai_intent = "handoff_released"
+    row.last_workflow_status = "answered"
+    await session.flush()
+    await session.commit()
+    return {
+        "conversation_id": normalized_conversation_id,
+        "channel": channel,
+        "released_at": released_at,
+        "released_by": normalized_released_by,
     }
 
 
@@ -649,6 +806,7 @@ async def build_admin_pending_handoffs_payload(
     *,
     limit: int = 60,
     hours: int = HANDOFF_LOOKBACK_HOURS_DEFAULT,
+    include_claimed: bool = False,
 ) -> dict[str, object]:
     limit = max(1, min(int(limit), 200))
     hours = max(1, min(int(hours), HANDOFF_LOOKBACK_HOURS_MAX))
@@ -668,7 +826,7 @@ async def build_admin_pending_handoffs_payload(
     result = await session.execute(statement)
     rows = result.scalars().all()
 
-    items: list[dict[str, object]] = []
+    candidate_rows: list[ConversationEvent] = []
     seen_keys: set[str] = set()
     for row in rows:
         metadata = _handoff_metadata_payload(row.metadata_json)
@@ -679,15 +837,62 @@ async def build_admin_pending_handoffs_payload(
         if key in seen_keys:
             continue
         seen_keys.add(key)
-        items.append(_build_pending_handoff_item(row))
-        if len(items) >= limit:
+        candidate_rows.append(row)
+        if len(candidate_rows) >= limit:
             break
 
-    failed_count = sum(1 for item in items if item.get("support_handoff_failed"))
+    # Bulk-load MessagingChannelSession rows so we can surface claim metadata + suppress
+    # claimed conversations from the queue without an N+1.
+    conversation_keys = {
+        str(row.conversation_id or "").strip()
+        for row in candidate_rows
+        if str(row.conversation_id or "").strip()
+    }
+    session_metadata_by_key: dict[tuple[str, str], dict[str, object]] = {}
+    if conversation_keys:
+        sessions_result = await session.execute(
+            select(MessagingChannelSession)
+            .where(MessagingChannelSession.conversation_id.in_(conversation_keys))
+        )
+        for session_row in sessions_result.scalars().all():
+            channel_key = str(session_row.channel or "").strip().lower()
+            conv_key = str(session_row.conversation_id or "").strip()
+            if not conv_key:
+                continue
+            session_metadata_by_key[(channel_key, conv_key)] = (
+                session_row.metadata_json
+                if isinstance(session_row.metadata_json, dict)
+                else {}
+            )
+
+    items: list[dict[str, object]] = []
+    claimed_count = 0
+    for row in candidate_rows:
+        channel_key = str(row.source or "").strip().lower() or "telegram"
+        conv_key = str(row.conversation_id or "").strip()
+        session_metadata = session_metadata_by_key.get((channel_key, conv_key)) or {}
+        if _is_handoff_claim_active(session_metadata):
+            claimed_count += 1
+            if not include_claimed:
+                # Default behavior — only surface unclaimed work so two admins
+                # don't double-claim. Frontend can opt in to see claimed rows
+                # by passing include_claimed=1.
+                continue
+        items.append(_build_pending_handoff_item(row, session_metadata=session_metadata))
+
+    failed_count = sum(
+        1
+        for item in items
+        if item.get("support_handoff_failed") and not item.get("claim_active")
+    )
+    pending_count = sum(
+        1 for item in items if not item.get("claim_active") and not item.get("support_handoff_failed")
+    )
     return {
         "status": "ok",
         "items": items,
         "total": len(items),
-        "pending_count": len(items) - failed_count,
+        "pending_count": pending_count,
         "failed_count": failed_count,
+        "claimed_count": claimed_count,
     }

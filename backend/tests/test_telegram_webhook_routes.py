@@ -2623,3 +2623,193 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(keyboard[0][0]["text"], "View booking")
         lifecycle = captured_calls[0]["metadata"]["lifecycle_updates"]
         self.assertNotIn("stripe_checkout", lifecycle)
+
+    def test_handoff_claimed_active_suppresses_normal_bot_branches(self):
+        from datetime import UTC, datetime
+
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _fake_load_channel_session_state(*_args, **_kwargs):
+            return {
+                "service_search_query": None,
+                "service_options": [],
+                "reply_controls": {},
+                "customer_identity": {},
+                "session_metadata": {
+                    "handoff_claimed_at": datetime.now(UTC).isoformat(),
+                    "handoff_claimed_by": "admin",
+                },
+                "tenant_id": None,
+            }
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.MessagingAutomationService._load_channel_session_state",
+            _fake_load_channel_session_state,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 12001,
+                    "message": {
+                        "message_id": 101,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/cancel v1-abc123",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(captured_calls[0]["ai_intent"], "handoff_claimed_active")
+        self.assertTrue(captured_calls[0]["metadata"].get("human_handoff_active"))
+        self.assertEqual(captured_calls[0]["metadata"].get("human_handoff_claimed_by"), "admin")
+        self.assertIsNone(communication_service.sent[0].get("reply_markup"))
+
+    def test_handoff_claimed_stale_does_not_suppress_after_ttl(self):
+        from datetime import UTC, datetime, timedelta
+
+        from service_layer.messaging_automation_service import MessagingAutomationService
+
+        stale = (
+            datetime.now(UTC)
+            - timedelta(seconds=MessagingAutomationService.HANDOFF_CLAIMED_TTL_SECONDS + 60)
+        ).isoformat()
+
+        self.assertFalse(MessagingAutomationService._is_handoff_claimed({"handoff_claimed_at": stale}))
+        self.assertTrue(
+            MessagingAutomationService._is_handoff_claimed(
+                {"handoff_claimed_at": datetime.now(UTC).isoformat()}
+            )
+        )
+        self.assertFalse(MessagingAutomationService._is_handoff_claimed({}))
+        self.assertFalse(MessagingAutomationService._is_handoff_claimed(None))
+
+    def test_telegram_group_chat_without_mention_is_ignored(self):
+        communication_service = _FakeTelegramCommunicationService()
+
+        app = create_test_app()
+        app.state.communication_service = communication_service
+        client = TestClient(app)
+        response = client.post(
+            "/api/webhooks/bookedai-telegram",
+            headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+            json={
+                "update_id": 12002,
+                "message": {
+                    "message_id": 102,
+                    "from": {"id": 999, "first_name": "Long"},
+                    "chat": {"id": -1001234567890, "type": "supergroup"},
+                    "text": "Hey everyone, what's for lunch?",
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ignored")
+        self.assertEqual(response.json()["messages_processed"], 0)
+        self.assertEqual(response.json()["reason"], "group_no_mention")
+        self.assertEqual(communication_service.sent, [])
+
+    def test_telegram_group_chat_with_mention_entity_is_handled(self):
+        captured_calls: list[dict[str, object]] = []
+        communication_service = _FakeTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        async def _resolve_customer_care_booking_reference(*_args, **_kwargs):
+            return {"booking_reference": None, "resolved_by": "no_safe_match", "candidate_count": 0}
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ), patch(
+            "service_layer.messaging_automation_service.resolve_customer_care_booking_reference",
+            _resolve_customer_care_booking_reference,
+        ):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 12003,
+                    "message": {
+                        "message_id": 103,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": -1001234567890, "type": "supergroup"},
+                        "text": "@BookedAI_Manager_Bot find a chess class in Sydney",
+                        "entities": [{"type": "mention", "offset": 0, "length": 21}],
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["messages_processed"], 1)
+        self.assertTrue(captured_calls[0]["metadata"]["is_group_chat"])
+        self.assertEqual(captured_calls[0]["metadata"]["addressed_via"], "mention_entity")
+
+    def test_telegram_group_chat_strips_persistent_keyboard_from_reply(self):
+        communication_service = _FakeTelegramCommunicationService()
+
+        with patch("api.route_handlers.get_session", _fake_get_session):
+            app = create_test_app()
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 12004,
+                    "message": {
+                        "message_id": 104,
+                        "from": {"id": 999, "first_name": "Long", "language_code": "en-AU"},
+                        "chat": {"id": -1001234567890, "type": "supergroup"},
+                        "text": "/start@BookedAI_Manager_Bot",
+                        "entities": [{"type": "bot_command", "offset": 0, "length": 28}],
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        markup = communication_service.sent[0].get("reply_markup")
+        if markup is not None:
+            self.assertNotIn("keyboard", markup)
+            self.assertNotIn("is_persistent", markup)
+
+    def test_telegram_channel_chat_is_ignored(self):
+        communication_service = _FakeTelegramCommunicationService()
+
+        app = create_test_app()
+        app.state.communication_service = communication_service
+        client = TestClient(app)
+        response = client.post(
+            "/api/webhooks/bookedai-telegram",
+            headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+            json={
+                "update_id": 12005,
+                "message": {
+                    "message_id": 105,
+                    "chat": {"id": -1009999999999, "type": "channel"},
+                    "text": "Channel broadcast message",
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["status"], "ignored")
+        self.assertEqual(response.json()["messages_processed"], 0)
+        self.assertEqual(response.json()["reason"], "channel_broadcast_no_reply")
+        self.assertEqual(communication_service.sent, [])

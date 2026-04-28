@@ -314,6 +314,9 @@ class AdminPendingHandoffItem(BaseModel):
     support_handoff_failed: bool = False
     support_handoff_targets: int = 0
     support_handoff_delivered: int = 0
+    claimed_at: str | None = None
+    claimed_by: str | None = None
+    claim_active: bool = False
 
 
 class AdminPendingHandoffsResponse(BaseModel):
@@ -322,6 +325,32 @@ class AdminPendingHandoffsResponse(BaseModel):
     total: int
     pending_count: int
     failed_count: int
+    claimed_count: int = 0
+
+
+class AdminClaimHandoffRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=500)
+
+
+class AdminClaimHandoffResponse(BaseModel):
+    status: str
+    conversation_id: str
+    channel: str
+    claimed_at: str
+    claimed_by: str
+    ttl_seconds: int
+
+
+class AdminReleaseHandoffRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=500)
+
+
+class AdminReleaseHandoffResponse(BaseModel):
+    status: str
+    conversation_id: str
+    channel: str
+    released_at: str
+    released_by: str
 
 
 class PartnerProfileItem(BaseModel):

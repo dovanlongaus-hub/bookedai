@@ -116,6 +116,20 @@ class MessagingAutomationService:
         )
 
         locale = self._resolve_locale(metadata.get("telegram_language_code"))
+        channel_state = await self._load_channel_session_state(
+            session,
+            channel=normalized_channel,
+            conversation_id=conversation_key,
+        )
+        if self._is_handoff_claimed(
+            channel_state.get("session_metadata") if isinstance(channel_state, dict) else None
+        ):
+            return self._build_handoff_claimed_active_result(
+                channel=normalized_channel,
+                identity_metadata=identity_metadata,
+                locale=locale,
+                claim_metadata=channel_state.get("session_metadata") if isinstance(channel_state, dict) else None,
+            )
 
         if (
             normalized_channel == "telegram"
@@ -128,11 +142,6 @@ class MessagingAutomationService:
                 locale=locale,
             )
 
-        channel_state = await self._load_channel_session_state(
-            session,
-            channel=normalized_channel,
-            conversation_id=conversation_key,
-        )
         tenant_ref = str(metadata.get("tenant_ref") or "").strip() or None
 
         slash_intent, slash_args = self._parse_slash_command(message.text)
@@ -159,12 +168,18 @@ class MessagingAutomationService:
             if slash_args:
                 message.text = slash_args
             else:
-                return self._build_my_bookings_prompt_result(
-                    channel=normalized_channel,
-                    message=message,
-                    identity_metadata=identity_metadata,
-                    locale=locale,
+                recent_reference = self._recent_booking_reference(
+                    channel_state.get("session_metadata") if isinstance(channel_state, dict) else None
                 )
+                if recent_reference:
+                    message.text = recent_reference
+                else:
+                    return self._build_my_bookings_prompt_result(
+                        channel=normalized_channel,
+                        message=message,
+                        identity_metadata=identity_metadata,
+                        locale=locale,
+                    )
         elif slash_intent == "cancel":
             if slash_args:
                 message.text = slash_args
@@ -206,12 +221,18 @@ class MessagingAutomationService:
                     locale=locale,
                 )
             if keyboard_intent == "mybookings":
-                return self._build_my_bookings_prompt_result(
-                    channel=normalized_channel,
-                    message=message,
-                    identity_metadata=identity_metadata,
-                    locale=locale,
+                recent_reference = self._recent_booking_reference(
+                    channel_state.get("session_metadata") if isinstance(channel_state, dict) else None
                 )
+                if recent_reference:
+                    message.text = recent_reference
+                else:
+                    return self._build_my_bookings_prompt_result(
+                        channel=normalized_channel,
+                        message=message,
+                        identity_metadata=identity_metadata,
+                        locale=locale,
+                    )
             if keyboard_intent == "support":
                 return await self._dispatch_support_handoff(
                     session,
@@ -1043,6 +1064,28 @@ class MessagingAutomationService:
             if reference:
                 return reference
         return None
+
+    RECENT_BOOKING_REFERENCE_TTL_SECONDS = 60 * 60 * 6
+
+    @classmethod
+    def _recent_booking_reference(cls, session_metadata: dict[str, object] | None) -> str | None:
+        if not isinstance(session_metadata, dict):
+            return None
+        reference = str(session_metadata.get("recent_booking_reference") or "").strip()
+        if not reference:
+            return None
+        recorded = str(session_metadata.get("recent_booking_recorded_at") or "").strip()
+        if not recorded:
+            return reference
+        try:
+            recorded_at = datetime.fromisoformat(recorded)
+        except ValueError:
+            return reference
+        if recorded_at.tzinfo is None:
+            recorded_at = recorded_at.replace(tzinfo=UTC)
+        if datetime.now(UTC) - recorded_at > timedelta(seconds=cls.RECENT_BOOKING_REFERENCE_TTL_SECONDS):
+            return None
+        return reference
 
     @staticmethod
     def _latest_service_options(history: list[dict[str, object]]) -> list[dict[str, object]]:
@@ -2243,6 +2286,39 @@ class MessagingAutomationService:
             },
         )
 
+    HANDOFF_CLAIMED_TTL_SECONDS = 60 * 60 * 4
+
+    def _build_handoff_claimed_active_result(
+        self,
+        *,
+        channel: str,
+        identity_metadata: dict[str, object],
+        locale: str = "en",
+        claim_metadata: dict[str, object] | None = None,
+    ) -> MessagingAutomationResult:
+        body = self._localized("handoff_claimed_active", locale)
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="handoff_claimed_active",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "handoff_claimed_active",
+                "human_handoff_active": True,
+                "human_handoff_claimed_by": str(
+                    (claim_metadata or {}).get("handoff_claimed_by") or ""
+                ).strip() or None,
+                "human_handoff_claimed_at": str(
+                    (claim_metadata or {}).get("handoff_claimed_at") or ""
+                ).strip() or None,
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
     async def _dispatch_support_handoff(
         self,
         session,
@@ -2669,6 +2745,23 @@ class MessagingAutomationService:
             return False
         return True
 
+    @classmethod
+    def _is_handoff_claimed(cls, session_metadata: dict[str, object] | None) -> bool:
+        if not isinstance(session_metadata, dict):
+            return False
+        recorded = str(session_metadata.get("handoff_claimed_at") or "").strip()
+        if not recorded:
+            return False
+        try:
+            recorded_at = datetime.fromisoformat(recorded)
+        except ValueError:
+            return False
+        if recorded_at.tzinfo is None:
+            recorded_at = recorded_at.replace(tzinfo=UTC)
+        if datetime.now(UTC) - recorded_at > timedelta(seconds=cls.HANDOFF_CLAIMED_TTL_SECONDS):
+            return False
+        return True
+
     async def _mark_support_handoff_dispatched(
         self,
         session,
@@ -2825,6 +2918,16 @@ class MessagingAutomationService:
                 "Mình vừa gửi thông báo cho đội BookedAI về cuộc trò chuyện này. "
                 "Họ sẽ vào trả lời sớm.\n\n"
                 "Nếu gấp, bạn email <b>{support_email}</b> kèm mã booking."
+            ),
+        },
+        "handoff_claimed_active": {
+            "en": (
+                "A BookedAI teammate is reading this thread now and will reply directly. "
+                "I'm stepping back so we don't double-up. Go ahead and chat with them here."
+            ),
+            "vi": (
+                "Đội BookedAI đang theo dõi cuộc trò chuyện này và sẽ trả lời trực tiếp. "
+                "Mình tạm dừng để tránh trả lời chồng chéo. Bạn cứ trao đổi với đội ở đây nhé."
             ),
         },
         "keyboard_find_service": {"en": "Find a service", "vi": "Tìm dịch vụ"},

@@ -191,6 +191,9 @@ export type AdminPendingHandoffItem = {
   support_handoff_failed: boolean;
   support_handoff_targets: number;
   support_handoff_delivered: number;
+  claimed_at?: string | null;
+  claimed_by?: string | null;
+  claim_active: boolean;
 };
 
 export type AdminPendingHandoffsResponse = {
@@ -199,6 +202,24 @@ export type AdminPendingHandoffsResponse = {
   total: number;
   pending_count: number;
   failed_count: number;
+  claimed_count: number;
+};
+
+export type AdminClaimHandoffResponse = {
+  status: string;
+  conversation_id: string;
+  channel: string;
+  claimed_at: string;
+  claimed_by: string;
+  ttl_seconds: number;
+};
+
+export type AdminReleaseHandoffResponse = {
+  status: string;
+  conversation_id: string;
+  channel: string;
+  released_at: string;
+  released_by: string;
 };
 
 export type CustomerAgentHealthChannelStatus = {

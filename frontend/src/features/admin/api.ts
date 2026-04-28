@@ -12,7 +12,9 @@ import {
   AdminMessagingDetailResponse,
   AdminMessagingListResponse,
   AdminOverviewResponse,
+  AdminClaimHandoffResponse,
   AdminPendingHandoffsResponse,
+  AdminReleaseHandoffResponse,
   AdminPortalSupportActionResponse,
   AdminServiceCatalogQualityResponse,
   AdminServiceMerchantListResponse,
@@ -211,9 +213,17 @@ export async function fetchAdminPendingHandoffs(
   sessionToken: string,
   limit = 60,
   hours = 72,
+  includeClaimed = true,
 ) {
+  const params = new URLSearchParams({
+    limit: String(limit),
+    hours: String(hours),
+  });
+  if (includeClaimed) {
+    params.set('include_claimed', '1');
+  }
   const response = await fetch(
-    `${apiBaseUrl}/admin/messaging/handoffs?limit=${limit}&hours=${hours}`,
+    `${apiBaseUrl}/admin/messaging/handoffs?${params.toString()}`,
     {
       headers: createAdminAuthHeaders(sessionToken),
     },
@@ -229,6 +239,74 @@ export async function fetchAdminPendingHandoffs(
     throw new Error(parseErrorMessage(payload, 'Could not load pending handoffs.'));
   }
   return payload as AdminPendingHandoffsResponse;
+}
+
+export async function claimAdminPendingHandoff(
+  apiBaseUrl: string,
+  sessionToken: string,
+  conversationId: string,
+  note?: string | null,
+) {
+  const response = await fetch(
+    `${apiBaseUrl}/admin/messaging/handoffs/${encodeURIComponent(conversationId)}/claim`,
+    {
+      method: 'POST',
+      headers: {
+        ...createAdminAuthHeaders(sessionToken),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ note: note ?? null }),
+    },
+  );
+  const payload = (await parseJsonOrNull(response)) as
+    | AdminClaimHandoffResponse
+    | { detail?: { code?: string; claimed_by?: string; message?: string } | string }
+    | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    if (response.status === 409 && payload && typeof payload === 'object' && 'detail' in payload) {
+      const detail = (payload as { detail?: { message?: string } | string }).detail;
+      const message =
+        typeof detail === 'object' && detail && 'message' in detail
+          ? (detail.message as string)
+          : 'Already claimed by another teammate.';
+      throw new Error(message);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not claim this handoff.'));
+  }
+  return payload as AdminClaimHandoffResponse;
+}
+
+export async function releaseAdminPendingHandoff(
+  apiBaseUrl: string,
+  sessionToken: string,
+  conversationId: string,
+  note?: string | null,
+) {
+  const response = await fetch(
+    `${apiBaseUrl}/admin/messaging/handoffs/${encodeURIComponent(conversationId)}/release`,
+    {
+      method: 'POST',
+      headers: {
+        ...createAdminAuthHeaders(sessionToken),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ note: note ?? null }),
+    },
+  );
+  const payload = (await parseJsonOrNull(response)) as
+    | AdminReleaseHandoffResponse
+    | { detail?: string }
+    | null;
+  if (!response.ok) {
+    if (isUnauthorizedResponse(response)) {
+      throw new Error(ADMIN_SESSION_EXPIRED_MESSAGE);
+    }
+    throw new Error(parseErrorMessage(payload, 'Could not release this handoff.'));
+  }
+  return payload as AdminReleaseHandoffResponse;
 }
 
 export async function fetchAdminCustomerAgentHealth(

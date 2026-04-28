@@ -299,8 +299,13 @@ class AdminPendingHandoffsRoutesTestCase(TestCase):
             def scalars(self):
                 return SimpleNamespace(all=lambda: self._rows)
 
-        async def _execute(_stmt):
-            # Filter the way the SQL would: only support_handoff* ai_intent.
+        async def _execute(stmt):
+            # Dispatch by the model the statement targets:
+            # - ConversationEvent → return the seeded handoff events.
+            # - MessagingChannelSession → return [] (no claim metadata in this test).
+            statement_text = str(stmt)
+            if "messaging_channel_sessions" in statement_text or "MessagingChannelSession" in statement_text:
+                return _FakeResult([])
             return _FakeResult(
                 [r for r in events_sorted if r.ai_intent in {"support_handoff", "support_handoff_failed"}]
             )
@@ -329,3 +334,419 @@ class AdminPendingHandoffsRoutesTestCase(TestCase):
         self.assertEqual(second["support_handoff_delivered"], 0)
         self.assertEqual(payload["pending_count"], 1)
         self.assertEqual(payload["failed_count"], 1)
+
+
+class AdminClaimHandoffRouteTestCase(TestCase):
+    def test_claim_handoff_endpoint_writes_metadata_and_returns_payload(self):
+        captured_session_writes: list[dict[str, object]] = []
+
+        class _FakeSessionRow:
+            def __init__(self):
+                self.channel = "telegram"
+                self.conversation_id = "telegram:111"
+                self.metadata_json = {"customer_care_status": "support_handoff"}
+                self.last_ai_intent = "support_handoff"
+                self.last_workflow_status = "answered"
+
+        session_row = _FakeSessionRow()
+
+        class _FakeResult:
+            def __init__(self, rows):
+                self._rows = rows
+
+            def scalars(self):
+                return SimpleNamespace(all=lambda: self._rows)
+
+        async def _execute(_stmt):
+            return _FakeResult([session_row])
+
+        async def _flush():
+            captured_session_writes.append(
+                {"event": "flush", "metadata_json": dict(session_row.metadata_json)}
+            )
+
+        async def _commit():
+            captured_session_writes.append({"event": "commit"})
+
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def _fake_get_session(_session_factory):
+            yield SimpleNamespace(
+                execute=_execute,
+                flush=_flush,
+                commit=_commit,
+            )
+
+        with patch(
+            "api.route_handlers.get_session",
+            _fake_get_session,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/admin/messaging/handoffs/telegram%3A111/claim",
+                headers={"X-Admin-Token": "test-admin-token"},
+                json={"note": "I'll handle this one."},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["conversation_id"], "telegram:111")
+        self.assertEqual(payload["channel"], "telegram")
+        self.assertEqual(payload["claimed_by"], "admin")
+        self.assertGreater(len(payload["claimed_at"]), 0)
+        self.assertEqual(payload["ttl_seconds"], 4 * 60 * 60)
+        # Session row picked up the claim metadata before flush.
+        self.assertEqual(session_row.last_ai_intent, "handoff_claimed")
+        self.assertIn("handoff_claimed_at", session_row.metadata_json)
+        self.assertEqual(session_row.metadata_json["handoff_claimed_by"], "admin")
+        self.assertEqual(captured_session_writes[0]["event"], "flush")
+        self.assertIn("handoff_claimed_at", captured_session_writes[0]["metadata_json"])
+
+    def test_claim_handoff_returns_404_when_session_not_found(self):
+        class _FakeResult:
+            def scalars(self):
+                return SimpleNamespace(all=lambda: [])
+
+        async def _execute(_stmt):
+            return _FakeResult()
+
+        async def _flush(): return None
+        async def _commit(): return None
+
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def _fake_get_session(_session_factory):
+            yield SimpleNamespace(execute=_execute, flush=_flush, commit=_commit)
+
+        with patch(
+            "api.route_handlers.get_session",
+            _fake_get_session,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/admin/messaging/handoffs/telegram%3Aunknown/claim",
+                headers={"X-Admin-Token": "test-admin-token"},
+            )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_claim_handoff_endpoint_requires_admin_token(self):
+        client = TestClient(create_test_app())
+        response = client.post("/api/admin/messaging/handoffs/telegram%3A111/claim")
+        self.assertIn(response.status_code, {401, 403})
+
+    def test_pending_handoffs_helper_skips_claimed_conversations(self):
+        from datetime import datetime, UTC, timedelta
+
+        from db import ConversationEvent, MessagingChannelSession
+        from service_layer.admin_messaging_service import (
+            build_admin_pending_handoffs_payload,
+        )
+
+        events = [
+            ConversationEvent(
+                id=1,
+                source="telegram",
+                event_type="telegram_inbound",
+                conversation_id="telegram:claimed",
+                sender_name="Long",
+                message_text="Need help",
+                ai_intent="support_handoff",
+                workflow_status="answered",
+                metadata_json={"customer_care_status": "support_handoff"},
+                created_at=datetime(2026, 4, 27, 12, 0, tzinfo=UTC),
+            ),
+            ConversationEvent(
+                id=2,
+                source="telegram",
+                event_type="telegram_inbound",
+                conversation_id="telegram:open",
+                sender_name="Anh",
+                message_text="Need help too",
+                ai_intent="support_handoff",
+                workflow_status="answered",
+                metadata_json={"customer_care_status": "support_handoff"},
+                created_at=datetime(2026, 4, 27, 11, 0, tzinfo=UTC),
+            ),
+        ]
+
+        # The first conversation has an active claim → it should be filtered out.
+        # The second has no claim → still surfaces.
+        claimed_session_row = SimpleNamespace(
+            channel="telegram",
+            conversation_id="telegram:claimed",
+            metadata_json={
+                "handoff_claimed_at": (datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
+                "handoff_claimed_by": "admin",
+            },
+        )
+
+        class _FakeResult:
+            def __init__(self, rows):
+                self._rows = rows
+
+            def scalars(self):
+                return SimpleNamespace(all=lambda: self._rows)
+
+        async def _execute(stmt):
+            statement_text = str(stmt)
+            if "messaging_channel_sessions" in statement_text or "MessagingChannelSession" in statement_text:
+                return _FakeResult([claimed_session_row])
+            return _FakeResult(events)
+
+        fake_session = SimpleNamespace(execute=_execute)
+
+        import asyncio
+
+        payload = asyncio.run(
+            build_admin_pending_handoffs_payload(fake_session, limit=10, hours=72)
+        )
+
+        self.assertEqual(payload["status"], "ok")
+        # Only the unclaimed conversation surfaces.
+        self.assertEqual(len(payload["items"]), 1)
+        self.assertEqual(payload["items"][0]["conversation_id"], "telegram:open")
+        self.assertEqual(payload["total"], 1)
+        self.assertEqual(payload["claimed_count"], 1)
+
+
+class AdminHandoffReleaseAndConflictTestCase(TestCase):
+    def test_release_handoff_clears_claim_metadata(self):
+        captured_writes: list[dict[str, object]] = []
+
+        class _FakeSessionRow:
+            def __init__(self):
+                self.channel = "telegram"
+                self.conversation_id = "telegram:111"
+                self.metadata_json = {
+                    "handoff_claimed_at": "2026-04-27T12:00:00+00:00",
+                    "handoff_claimed_by": "admin",
+                    "customer_care_status": "support_handoff",
+                }
+                self.last_ai_intent = "handoff_claimed"
+                self.last_workflow_status = "answered"
+
+        session_row = _FakeSessionRow()
+
+        class _FakeResult:
+            def __init__(self, rows):
+                self._rows = rows
+            def scalars(self):
+                return SimpleNamespace(all=lambda: self._rows)
+
+        async def _execute(_stmt):
+            return _FakeResult([session_row])
+
+        async def _flush():
+            captured_writes.append({"event": "flush", "metadata_json": dict(session_row.metadata_json)})
+
+        async def _commit():
+            captured_writes.append({"event": "commit"})
+
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def _fake_get_session(_session_factory):
+            yield SimpleNamespace(execute=_execute, flush=_flush, commit=_commit)
+
+        with patch("api.route_handlers.get_session", _fake_get_session):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/admin/messaging/handoffs/telegram%3A111/release",
+                headers={"X-Admin-Token": "test-admin-token"},
+                json={"note": "Resolved offline."},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["conversation_id"], "telegram:111")
+        self.assertEqual(payload["channel"], "telegram")
+        self.assertEqual(payload["released_by"], "admin")
+        # Claim keys cleared, audit keys recorded.
+        self.assertNotIn("handoff_claimed_at", session_row.metadata_json)
+        self.assertNotIn("handoff_claimed_by", session_row.metadata_json)
+        self.assertIn("handoff_released_at", session_row.metadata_json)
+        self.assertEqual(session_row.metadata_json["handoff_released_by"], "admin")
+        self.assertEqual(session_row.last_ai_intent, "handoff_released")
+        self.assertEqual(captured_writes[0]["event"], "flush")
+
+    def test_release_handoff_returns_404_when_session_not_found(self):
+        class _FakeResult:
+            def scalars(self):
+                return SimpleNamespace(all=lambda: [])
+
+        async def _execute(_stmt): return _FakeResult()
+        async def _flush(): return None
+        async def _commit(): return None
+
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def _fake_get_session(_session_factory):
+            yield SimpleNamespace(execute=_execute, flush=_flush, commit=_commit)
+
+        with patch("api.route_handlers.get_session", _fake_get_session):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/admin/messaging/handoffs/telegram%3Aunknown/release",
+                headers={"X-Admin-Token": "test-admin-token"},
+            )
+        self.assertEqual(response.status_code, 404)
+
+    def test_release_handoff_requires_admin_token(self):
+        client = TestClient(create_test_app())
+        response = client.post("/api/admin/messaging/handoffs/telegram%3A111/release")
+        self.assertIn(response.status_code, {401, 403})
+
+    def test_claim_handoff_returns_409_when_already_claimed_by_other_admin(self):
+        from datetime import datetime, UTC, timedelta
+
+        class _FakeSessionRow:
+            def __init__(self):
+                self.channel = "telegram"
+                self.conversation_id = "telegram:claimed"
+                # Active claim by a different admin within the 4h TTL.
+                self.metadata_json = {
+                    "handoff_claimed_at": (datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
+                    "handoff_claimed_by": "alice",
+                }
+                self.last_ai_intent = "handoff_claimed"
+                self.last_workflow_status = "answered"
+
+        session_row = _FakeSessionRow()
+
+        class _FakeResult:
+            def __init__(self, rows):
+                self._rows = rows
+            def scalars(self):
+                return SimpleNamespace(all=lambda: self._rows)
+
+        async def _execute(_stmt): return _FakeResult([session_row])
+        async def _flush(): return None
+        async def _commit(): return None
+
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def _fake_get_session(_session_factory):
+            yield SimpleNamespace(execute=_execute, flush=_flush, commit=_commit)
+
+        with patch("api.route_handlers.get_session", _fake_get_session):
+            client = TestClient(create_test_app())
+            # Default admin_username in test_app is "admin" (≠ "alice"), so this should 409.
+            response = client.post(
+                "/api/admin/messaging/handoffs/telegram%3Aclaimed/claim",
+                headers={"X-Admin-Token": "test-admin-token"},
+            )
+
+        self.assertEqual(response.status_code, 409)
+        body = response.json()
+        self.assertEqual(body["detail"]["code"], "handoff_already_claimed")
+        self.assertEqual(body["detail"]["claimed_by"], "alice")
+        # Original metadata not overwritten.
+        self.assertEqual(session_row.metadata_json["handoff_claimed_by"], "alice")
+
+    def test_claim_handoff_same_admin_reclaim_is_idempotent(self):
+        from datetime import datetime, UTC, timedelta
+
+        class _FakeSessionRow:
+            def __init__(self):
+                self.channel = "telegram"
+                self.conversation_id = "telegram:reclaim"
+                self.metadata_json = {
+                    "handoff_claimed_at": (datetime.now(UTC) - timedelta(minutes=5)).isoformat(),
+                    "handoff_claimed_by": "admin",  # same as test app's admin_username
+                }
+                self.last_ai_intent = "handoff_claimed"
+                self.last_workflow_status = "answered"
+
+        session_row = _FakeSessionRow()
+
+        class _FakeResult:
+            def __init__(self, rows):
+                self._rows = rows
+            def scalars(self):
+                return SimpleNamespace(all=lambda: self._rows)
+
+        async def _execute(_stmt): return _FakeResult([session_row])
+        async def _flush(): return None
+        async def _commit(): return None
+
+        from contextlib import asynccontextmanager
+
+        @asynccontextmanager
+        async def _fake_get_session(_session_factory):
+            yield SimpleNamespace(execute=_execute, flush=_flush, commit=_commit)
+
+        with patch("api.route_handlers.get_session", _fake_get_session):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/admin/messaging/handoffs/telegram%3Areclaim/claim",
+                headers={"X-Admin-Token": "test-admin-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        # claimed_at refreshed with latest timestamp.
+        self.assertEqual(body["claimed_by"], "admin")
+        self.assertGreater(len(body["claimed_at"]), 0)
+
+    def test_pending_handoffs_endpoint_includes_claimed_when_query_param_set(self):
+        from datetime import datetime, UTC, timedelta
+
+        async def _stub_payload(session, *, limit, hours, include_claimed):
+            base_item = {
+                "event_id": "10",
+                "conversation_id": "telegram:claimed",
+                "channel": "telegram",
+                "customer_care_status": "support_handoff",
+                "sender_name": "Long",
+                "last_message": "help",
+                "created_at": "2026-04-27T11:00:00+00:00",
+                "telegram_chat_id": "111",
+                "telegram_username": None,
+                "booking_reference": None,
+                "support_handoff_failed": False,
+                "support_handoff_targets": 0,
+                "support_handoff_delivered": 0,
+                "claimed_at": (datetime.now(UTC) - timedelta(minutes=10)).isoformat(),
+                "claimed_by": "alice",
+                "claim_active": True,
+            }
+            return {
+                "status": "ok",
+                "items": [base_item] if include_claimed else [],
+                "total": 1 if include_claimed else 0,
+                "pending_count": 0,
+                "failed_count": 0,
+                "claimed_count": 1,
+            }
+
+        with patch(
+            "api.route_handlers.get_session",
+            _fake_get_session,
+        ), patch(
+            "api.route_handlers.build_admin_pending_handoffs_payload",
+            AsyncMock(side_effect=_stub_payload),
+        ):
+            client = TestClient(create_test_app())
+            without_claimed = client.get(
+                "/api/admin/messaging/handoffs?limit=20&hours=72",
+                headers={"X-Admin-Token": "test-admin-token"},
+            )
+            with_claimed = client.get(
+                "/api/admin/messaging/handoffs?limit=20&hours=72&include_claimed=1",
+                headers={"X-Admin-Token": "test-admin-token"},
+            )
+
+        self.assertEqual(without_claimed.status_code, 200)
+        self.assertEqual(without_claimed.json()["total"], 0)
+        self.assertEqual(without_claimed.json()["claimed_count"], 1)
+        self.assertEqual(with_claimed.status_code, 200)
+        self.assertEqual(with_claimed.json()["total"], 1)
+        self.assertEqual(with_claimed.json()["items"][0]["claim_active"], True)
+        self.assertEqual(with_claimed.json()["items"][0]["claimed_by"], "alice")

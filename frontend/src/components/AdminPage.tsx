@@ -125,6 +125,9 @@ export function AdminPage() {
     pendingHandoffsLoading,
     pendingHandoffsError,
     refreshPendingHandoffs,
+    claimPendingHandoff,
+    releasePendingHandoff,
+    claimingHandoffConversationId,
     partners,
     importedServices,
     tenants,
@@ -766,6 +769,13 @@ export function AdminPage() {
               onRefresh={() => {
                 void refreshPendingHandoffs();
               }}
+              onClaim={(conversationId) => {
+                void claimPendingHandoff(conversationId);
+              }}
+              onRelease={(conversationId) => {
+                void releasePendingHandoff(conversationId);
+              }}
+              claimingConversationId={claimingHandoffConversationId}
             />
             <MessagingWorkspace
               items={messagingItems}

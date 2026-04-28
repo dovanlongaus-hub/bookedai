@@ -54,6 +54,8 @@ from repositories.webhook_repository import WebhookEventRepository
 from schemas import BookingWorkflowPayload, TawkMessage, TawkWebhookResponse
 from schemas import (
     AdminConfigResponse,
+    AdminClaimHandoffRequest,
+    AdminClaimHandoffResponse,
     AdminMessagingActionRequest,
     AdminMessagingActionResponse,
     AdminMessagingDetailResponse,
@@ -61,6 +63,8 @@ from schemas import (
     AdminPendingHandoffsResponse,
     AdminPortalSupportActionRequest,
     AdminPortalSupportActionResponse,
+    AdminReleaseHandoffRequest,
+    AdminReleaseHandoffResponse,
     AdminBookingDetailResponse,
     AdminBookingConfirmationRequest,
     AdminDiscordHandoffRequest,
@@ -122,10 +126,13 @@ from service_layer.admin_dashboard_service import (
     send_admin_booking_confirmation_email,
 )
 from service_layer.admin_messaging_service import (
+    HandoffAlreadyClaimedError,
     apply_admin_message_action,
     build_admin_message_detail_payload,
     build_admin_messaging_payload,
     build_admin_pending_handoffs_payload,
+    claim_pending_handoff,
+    release_pending_handoff,
 )
 from service_layer.communication_service import CommunicationService
 from service_layer.discord_bot_service import DiscordBotService
@@ -771,6 +778,21 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
     language_code = str(sender.get("language_code") or "").strip().lower() or None
     provider_message_id = str(raw_message.get("message_id") or "").strip() or None
     conversation_id = f"telegram:{chat_id}"
+    chat_type = str(chat.get("type") or "").strip().lower() or None
+    is_group_chat = chat_type in {"group", "supergroup"}
+    is_channel_chat = chat_type == "channel"
+    addressed_to_bot = True
+    addressed_via: str | None = None
+    if is_group_chat:
+        original_text = str(raw_message.get("text") or raw_message.get("caption") or "").strip()
+        addressed_to_bot, addressed_via = _telegram_message_is_addressed_to_bot(
+            raw_message=raw_message,
+            text_value=original_text,
+            callback_data=callback_data,
+        )
+    elif is_channel_chat:
+        addressed_to_bot = False
+        addressed_via = "channel_broadcast_no_reply"
     message = TawkMessage(
         conversation_id=conversation_id,
         message_id=provider_message_id,
@@ -791,7 +813,11 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
         "telegram_user_id": str(sender.get("id") or "").strip() or None,
         "telegram_username": username or None,
         "telegram_language_code": language_code,
-        "chat_type": str(chat.get("type") or "").strip() or None,
+        "chat_type": chat_type,
+        "is_group_chat": is_group_chat,
+        "is_channel_chat": is_channel_chat,
+        "addressed_to_bot": addressed_to_bot,
+        "addressed_via": addressed_via,
         "telegram_callback_query_id": (
             str(callback_query.get("id") or "").strip()
             if isinstance(callback_query, dict) and str(callback_query.get("id") or "").strip()
@@ -804,6 +830,47 @@ def _extract_telegram_payload(payload: dict[str, object]) -> tuple[TawkMessage, 
         "raw_payload": raw_message,
     }
     return message, metadata
+
+
+def _telegram_message_is_addressed_to_bot(
+    *,
+    raw_message: dict[str, object],
+    text_value: str,
+    callback_data: str,
+) -> tuple[bool, str | None]:
+    if callback_data:
+        return True, "callback_query"
+
+    reply_to = raw_message.get("reply_to_message")
+    if isinstance(reply_to, dict):
+        reply_from = reply_to.get("from")
+        if isinstance(reply_from, dict) and bool(reply_from.get("is_bot")):
+            return True, "reply_to_bot"
+
+    bot_username = "BookedAI_Manager_Bot"
+    bot_username_lower = bot_username.lower()
+    entities = raw_message.get("entities")
+    if isinstance(entities, list):
+        for entity in entities:
+            if not isinstance(entity, dict):
+                continue
+            entity_type = str(entity.get("type") or "").strip().lower()
+            offset = int(entity.get("offset") or 0)
+            length = int(entity.get("length") or 0)
+            if length <= 0:
+                continue
+            slice_text = text_value[offset : offset + length]
+            if entity_type == "mention" and slice_text.lower() == f"@{bot_username_lower}":
+                return True, "mention_entity"
+            if entity_type == "bot_command" and slice_text.lower().endswith(
+                f"@{bot_username_lower}"
+            ):
+                return True, "command_with_bot_suffix"
+
+    if f"@{bot_username_lower}" in text_value.lower():
+        return True, "mention_text_match"
+
+    return False, None
 
 
 def _customer_telegram_webhook_secret(settings_obj: object) -> str:
@@ -3072,6 +3139,15 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
         return {"status": "ignored", "messages_processed": 0}
 
     message, metadata = normalized
+    if not bool(metadata.get("addressed_to_bot", True)):
+        return {
+            "status": "ignored",
+            "messages_processed": 0,
+            "reason": str(metadata.get("addressed_via") or "channel_broadcast_no_reply")
+            if metadata.get("is_channel_chat")
+            else "group_no_mention",
+        }
+
     external_event_id = str(
         payload.get("update_id")
         or metadata.get("telegram_callback_query_id")
@@ -3187,16 +3263,32 @@ async def telegram_webhook(request: Request) -> dict[str, object]:
                             )
                             care_metadata["customer_care_status"] = "support_handoff_failed"
                             care_metadata["support_handoff_failed"] = True
+                reply_markup = (
+                    care_metadata.get("reply_controls", {}).get("telegram_reply_markup")
+                    if isinstance(care_metadata.get("reply_controls"), dict)
+                    else None
+                )
+                if bool(metadata.get("is_group_chat")) and isinstance(reply_markup, dict):
+                    reply_markup = {
+                        key: value
+                        for key, value in reply_markup.items()
+                        if key
+                        not in {
+                            "keyboard",
+                            "resize_keyboard",
+                            "is_persistent",
+                            "input_field_placeholder",
+                        }
+                    }
+                    if not reply_markup:
+                        reply_markup = None
+
                 delivery_metadata = await _send_messaging_customer_care_reply(
                     request,
                     channel="telegram",
                     to=str(metadata.get("telegram_chat_id") or "").strip() or None,
                     body=ai_reply,
-                    reply_markup=(
-                        care_metadata.get("reply_controls", {}).get("telegram_reply_markup")
-                        if isinstance(care_metadata.get("reply_controls"), dict)
-                        else None
-                    ),
+                    reply_markup=reply_markup,
                     parse_mode=(
                         str(care_metadata.get("reply_controls", {}).get("telegram_parse_mode") or "").strip() or None
                         if isinstance(care_metadata.get("reply_controls"), dict)
@@ -4750,10 +4842,134 @@ async def admin_messaging_pending_handoffs(
     x_admin_token: str | None = Header(default=None),
     limit: int = 60,
     hours: int = 72,
+    include_claimed: bool = False,
 ) -> AdminPendingHandoffsResponse:
     require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
 
     async with get_session(request.app.state.session_factory) as session:
-        payload = await build_admin_pending_handoffs_payload(session, limit=limit, hours=hours)
+        payload = await build_admin_pending_handoffs_payload(
+            session,
+            limit=limit,
+            hours=hours,
+            include_claimed=include_claimed,
+        )
 
     return AdminPendingHandoffsResponse(**payload)
+
+
+async def admin_messaging_claim_handoff(
+    conversation_id: str,
+    request: Request,
+    payload: AdminClaimHandoffRequest | None = None,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+    channel: str = "telegram",
+) -> AdminClaimHandoffResponse:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+    admin_username = (
+        str(getattr(request.app.state.settings, "admin_username", "") or "").strip()
+        or "admin"
+    )
+
+    async with get_session(request.app.state.session_factory) as session:
+        try:
+            result = await claim_pending_handoff(
+                session,
+                conversation_id=conversation_id,
+                channel=channel,
+                claimed_by=admin_username,
+            )
+        except HandoffAlreadyClaimedError as conflict:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "handoff_already_claimed",
+                    "claimed_by": conflict.claimed_by,
+                    "claimed_at": conflict.claimed_at,
+                    "message": (
+                        f"Already claimed by {conflict.claimed_by} at {conflict.claimed_at}. "
+                        "Wait for the TTL to expire or use the release endpoint."
+                    ),
+                },
+            ) from conflict
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No messaging session found for {channel}:{conversation_id}.",
+        )
+
+    await _notify_staff_handoff_claim(request, claim=result)
+    return AdminClaimHandoffResponse(status="ok", **result)
+
+
+async def admin_messaging_release_handoff(
+    conversation_id: str,
+    request: Request,
+    payload: AdminReleaseHandoffRequest | None = None,
+    authorization: str | None = Header(default=None),
+    x_admin_token: str | None = Header(default=None),
+    channel: str = "telegram",
+) -> AdminReleaseHandoffResponse:
+    require_admin_access(request, authorization=authorization, x_admin_token=x_admin_token)
+    admin_username = (
+        str(getattr(request.app.state.settings, "admin_username", "") or "").strip()
+        or "admin"
+    )
+
+    async with get_session(request.app.state.session_factory) as session:
+        result = await release_pending_handoff(
+            session,
+            conversation_id=conversation_id,
+            channel=channel,
+            released_by=admin_username,
+        )
+
+    if result is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No messaging session found for {channel}:{conversation_id}.",
+        )
+
+    return AdminReleaseHandoffResponse(status="ok", **result)
+
+
+async def _notify_staff_handoff_claim(
+    request: Request,
+    *,
+    claim: dict[str, object],
+) -> None:
+    chat_ids = _bookedai_support_telegram_chat_ids(request.app.state.settings)
+    if not chat_ids or not hasattr(request.app.state, "communication_service"):
+        return
+    communication_service: CommunicationService = request.app.state.communication_service
+    body = (
+        "BookedAI handoff claimed\n"
+        f"Claimed by: {claim.get('claimed_by')}\n"
+        f"Conversation: {claim.get('channel')}:{claim.get('conversation_id')}\n"
+        f"At: {claim.get('claimed_at')}\n\n"
+        "Auto-suppression for 4 hours."
+    )
+
+    async def _deliver(chat_id: str) -> None:
+        try:
+            await communication_service.send_telegram(chat_id=chat_id, body=body)
+        except Exception as exc:
+            logger.warning(
+                "staff_handoff_claim_notify_failed",
+                extra={
+                    "event_type": "staff_handoff_claim_notify_failed",
+                    "tenant_id": None,
+                    "status": 0,
+                    "route": "/api/admin/messaging/handoffs/.../claim",
+                    "request_id": "",
+                    "integration_name": "telegram",
+                    "conversation_id": str(claim.get("conversation_id") or ""),
+                    "booking_reference": "",
+                    "job_name": "",
+                    "job_id": "",
+                },
+                exc_info=exc,
+            )
+
+    await asyncio.gather(*(_deliver(chat_id) for chat_id in chat_ids))

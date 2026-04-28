@@ -7,9 +7,11 @@ import {
   deleteAdminTenantService,
   deleteAdminPartner,
   deleteAdminService,
+  claimAdminPendingHandoff,
   fetchAdminMessageDetail,
   fetchAdminMessaging,
   fetchAdminPendingHandoffs,
+  releaseAdminPendingHandoff,
   downloadAdminServiceQualityExport,
   fetchAdminBookingDetail,
   fetchAdminDashboardData,
@@ -77,6 +79,9 @@ export function useAdminPageState(apiBaseUrl: string) {
   const [pendingHandoffs, setPendingHandoffs] = useState<AdminPendingHandoffsResponse | null>(null);
   const [pendingHandoffsLoading, setPendingHandoffsLoading] = useState(false);
   const [pendingHandoffsError, setPendingHandoffsError] = useState<string | null>(null);
+  const [claimingHandoffConversationId, setClaimingHandoffConversationId] = useState<string | null>(
+    null,
+  );
   const [partners, setPartners] = useState<PartnerProfileItem[]>([]);
   const [importedServices, setImportedServices] = useState<AdminServiceMerchantItem[]>([]);
   const [tenants, setTenants] = useState<AdminTenantListItem[]>([]);
@@ -384,6 +389,67 @@ export function useAdminPageState(apiBaseUrl: string) {
       setPendingHandoffsError(message);
     } finally {
       setPendingHandoffsLoading(false);
+    }
+  }
+
+  async function releasePendingHandoff(conversationId: string) {
+    if (!sessionToken || !conversationId) {
+      return;
+    }
+    setClaimingHandoffConversationId(conversationId);
+    setPendingHandoffsError(null);
+    try {
+      await releaseAdminPendingHandoff(apiBaseUrl, sessionToken, conversationId);
+      void refreshPendingHandoffs();
+    } catch (requestError) {
+      const message = resolveErrorMessage(requestError, 'Could not release this handoff.');
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setPendingHandoffsError(message);
+    } finally {
+      setClaimingHandoffConversationId(null);
+    }
+  }
+
+  async function claimPendingHandoff(conversationId: string) {
+    if (!sessionToken || !conversationId) {
+      return;
+    }
+    setClaimingHandoffConversationId(conversationId);
+    setPendingHandoffsError(null);
+    try {
+      const result = await claimAdminPendingHandoff(apiBaseUrl, sessionToken, conversationId);
+      // Optimistic update: mark this row claimed locally so the queue hides it
+      // on the next refresh and the button flips to "Claimed".
+      setPendingHandoffs((current) => {
+        if (!current) {
+          return current;
+        }
+        const items = current.items.map((item) =>
+          item.conversation_id === conversationId
+            ? {
+                ...item,
+                claim_active: true,
+                claimed_at: result.claimed_at,
+                claimed_by: result.claimed_by,
+              }
+            : item,
+        );
+        return { ...current, items };
+      });
+      // Refresh from the server to drop claimed rows from the queue.
+      void refreshPendingHandoffs();
+    } catch (requestError) {
+      const message = resolveErrorMessage(requestError, 'Could not claim this handoff.');
+      if (message === ADMIN_SESSION_EXPIRED_MESSAGE) {
+        expireAdminSession(message);
+        return;
+      }
+      setPendingHandoffsError(message);
+    } finally {
+      setClaimingHandoffConversationId(null);
     }
   }
 
@@ -1104,6 +1170,9 @@ export function useAdminPageState(apiBaseUrl: string) {
     pendingHandoffsLoading,
     pendingHandoffsError,
     refreshPendingHandoffs,
+    claimPendingHandoff,
+    releasePendingHandoff,
+    claimingHandoffConversationId,
     partners,
     importedServices,
     tenants,
