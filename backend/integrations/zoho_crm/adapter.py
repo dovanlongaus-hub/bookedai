@@ -358,6 +358,89 @@ class ZohoCrmAdapter(ProviderAdapter):
         )
         return result
 
+    async def find_contact_by_email(
+        self,
+        settings: Settings,
+        *,
+        email: str,
+    ) -> dict[str, Any] | None:
+        """Search the Contacts module by email. Returns the first match or
+        None if Zoho returns 204/empty data. Used by the booking-feedback
+        consumer to attach a Note to an existing CRM contact rather than
+        creating an orphan note.
+        """
+        normalized_email = (email or "").strip().lower()
+        if not normalized_email:
+            return None
+        access_token, api_domain, _ = await self.get_access_token(settings)
+        api_base_url = self._resolve_api_base_url(settings, api_domain=api_domain)
+        module_api_name = settings.zoho_crm_default_contact_module.strip() or "Contacts"
+        try:
+            response_data = await self._request(
+                access_token=access_token,
+                method="GET",
+                url=f"{api_base_url.rstrip('/')}/{module_api_name}/search",
+                params={"email": normalized_email},
+            )
+        except httpx.HTTPStatusError as error:
+            # Zoho returns 204 (no content) when nothing matches; httpx
+            # raises only on >=400, so any other error here is a real fault.
+            if error.response is not None and error.response.status_code in {
+                204,
+                404,
+            }:
+                return None
+            raise
+        items = response_data.get("data") or []
+        if not isinstance(items, list) or not items:
+            return None
+        first = items[0]
+        return first if isinstance(first, dict) else None
+
+    async def create_note(
+        self,
+        settings: Settings,
+        *,
+        parent_id: str,
+        parent_module: str,
+        title: str,
+        content: str,
+    ) -> dict[str, Any]:
+        """Attach a Note to a CRM record (typically a Contact). Notes are
+        the canonical way to push booking feedback into Zoho without
+        polluting the Tasks/Activities timeline.
+        """
+        normalized_parent_id = (parent_id or "").strip()
+        normalized_parent_module = (parent_module or "").strip() or "Contacts"
+        if not normalized_parent_id:
+            raise ValueError("Zoho CRM note creation requires a parent record id.")
+        access_token, api_domain, token_source = await self.get_access_token(settings)
+        api_base_url = self._resolve_api_base_url(settings, api_domain=api_domain)
+        payload: dict[str, Any] = {
+            "Note_Title": (title or "").strip() or "BookedAI feedback",
+            "Note_Content": (content or "").strip(),
+            "Parent_Id": normalized_parent_id,
+            "se_module": normalized_parent_module,
+        }
+        response_data = await self._request(
+            access_token=access_token,
+            method="POST",
+            url=f"{api_base_url.rstrip('/')}/Notes",
+            json_body={"data": [payload]},
+        )
+        result = self._extract_upsert_result(response_data)
+        result.update(
+            {
+                "provider": self.provider_name,
+                "module_api_name": "Notes",
+                "parent_module": normalized_parent_module,
+                "parent_id": normalized_parent_id,
+                "token_source": token_source,
+                "api_base_url": api_base_url,
+            }
+        )
+        return result
+
     async def fetch_deal_by_id(
         self,
         settings: Settings,

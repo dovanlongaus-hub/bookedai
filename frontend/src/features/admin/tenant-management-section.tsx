@@ -418,7 +418,7 @@ export function TenantManagementSection({
                             disabled={savingTenantMemberEmail === member.email}
                             className="booked-button-secondary w-full disabled:opacity-60"
                           >
-                            {savingTenantMemberEmail === member.email ? 'Saving...' : 'Save access'}
+                            {savingTenantMemberEmail === member.email ? 'Saving access…' : 'Save access'}
                           </button>
                         </div>
                       </div>

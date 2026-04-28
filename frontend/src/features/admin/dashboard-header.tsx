@@ -75,7 +75,7 @@ export function AdminDashboardHeader({
         </div>
         <a
           href="#platform-settings"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-950"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)]"
           title="Open platform settings"
           aria-label="Open platform settings"
         >
@@ -83,9 +83,9 @@ export function AdminDashboardHeader({
         </a>
         <button
           type="button"
-          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-950"
-          title="Notifications"
-          aria-label="Notifications"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)]"
+          title="Open notifications"
+          aria-label="Open notifications"
         >
           <Bell className="h-4 w-4" aria-hidden="true" />
         </button>
@@ -107,17 +107,17 @@ export function AdminDashboardHeader({
           type="button"
           onClick={onRefresh}
           disabled={loadingDashboard}
-          className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950 disabled:cursor-not-allowed disabled:opacity-60"
-          aria-label="Refresh"
+          className="inline-flex h-10 items-center gap-2 rounded-2xl border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:text-slate-950 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:cursor-not-allowed disabled:opacity-60"
+          aria-label="Refresh dashboard"
         >
           <RefreshCw className={`h-4 w-4 ${loadingDashboard ? 'animate-spin' : ''}`} aria-hidden="true" />
-          <span className="hidden sm:inline">{loadingDashboard ? 'Refreshing' : 'Refresh'}</span>
+          <span className="hidden sm:inline">{loadingDashboard ? 'Pulling fresh data…' : 'Refresh'}</span>
         </button>
         <button
           type="button"
           onClick={onLogout}
-          className="inline-flex h-10 items-center gap-2 rounded-2xl bg-slate-950 px-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.2)] transition hover:bg-slate-800"
-          aria-label="Log out"
+          className="inline-flex h-10 items-center gap-2 rounded-2xl bg-slate-950 px-3 text-sm font-semibold text-white shadow-[0_12px_30px_rgba(15,23,42,0.2)] transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)]"
+          aria-label="Log out of admin workspace"
         >
           <LogOut className="h-4 w-4" aria-hidden="true" />
           <span className="hidden sm:inline">Log out</span>
@@ -132,7 +132,7 @@ export function AdminDashboardHeader({
               className={`booked-admin-topbar-metric ${metricToneClass(metric.tone)}`}
               title={metricDetails[metric.label]}
             >
-              <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-black/45">
+              <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.1em] text-black/45">
                 <span className="min-w-0 truncate">{metric.label}</span>
                 {metricDetails[metric.label] ? (
                   <Info className="h-3 w-3 shrink-0 text-slate-400" aria-hidden="true" />

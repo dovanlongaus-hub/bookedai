@@ -76,7 +76,7 @@ export function BillingSupportSummarySection({
             ))
           ) : (
             <div className="rounded-[1.2rem] border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
-              No unresolved billing-support items are waiting right now.
+              All caught up. New billing or support follow-ups will land here as customers raise them.
             </div>
           )}
         </div>

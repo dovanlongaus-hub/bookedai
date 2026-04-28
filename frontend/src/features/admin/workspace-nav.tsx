@@ -222,6 +222,8 @@ export function AdminWorkspaceNav({
                     onClick={() => onWorkspaceChange(workspace.id)}
                     className={`booked-admin-nav-item ${isActive ? 'is-active' : ''}`}
                     title={workspace.label}
+                    aria-label={`Open ${workspace.label} workspace`}
+                    aria-current={isActive ? 'page' : undefined}
                   >
                     <span
                       className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition ${

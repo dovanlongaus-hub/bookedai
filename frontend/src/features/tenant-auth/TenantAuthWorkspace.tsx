@@ -310,7 +310,7 @@ export function TenantAuthWorkspace({
             <div className="mt-5 space-y-5">
               {showGoogleSignInPrimary ? (
                 <div className="relative overflow-hidden rounded-[1.4rem] border border-sky-200 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.22),transparent_26%),linear-gradient(135deg,rgba(255,255,255,1)_0%,rgba(239,246,255,1)_58%,rgba(224,242,254,0.9)_100%)] px-5 py-5 shadow-[0_18px_40px_rgba(14,116,144,0.12)]">
-                  <div className="absolute right-4 top-4 rounded-full border border-sky-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700 backdrop-blur">
+                  <div className="absolute right-4 top-4 rounded-full border border-sky-200/80 bg-white/80 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700 backdrop-blur">
                     Google-first
                   </div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">
@@ -400,7 +400,7 @@ export function TenantAuthWorkspace({
             <div className="mt-5 space-y-5">
               {showGoogleCreatePrimary ? (
                 <div className="relative overflow-hidden rounded-[1.4rem] border border-sky-200 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.22),transparent_26%),linear-gradient(135deg,rgba(255,255,255,1)_0%,rgba(239,246,255,1)_58%,rgba(224,242,254,0.9)_100%)] px-5 py-5 shadow-[0_18px_40px_rgba(14,116,144,0.12)]">
-                  <div className="absolute right-4 top-4 rounded-full border border-sky-200/80 bg-white/80 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700 backdrop-blur">
+                  <div className="absolute right-4 top-4 rounded-full border border-sky-200/80 bg-white/80 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700 backdrop-blur">
                     Google-first
                   </div>
                   <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-700">

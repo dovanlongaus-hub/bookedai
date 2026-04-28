@@ -47,7 +47,7 @@ export function PartnerMatchCard({
           </div>
         ) : (
           <div
-            className={`mt-1 flex shrink-0 items-center justify-center rounded-xl border text-[10px] font-bold uppercase tracking-widest ${
+            className={`mt-1 flex shrink-0 items-center justify-center rounded-xl border text-xs font-bold uppercase tracking-widest ${
               selected ? 'border-[#d7e7ff] bg-white text-[#7aa8eb]' : 'border-slate-200 bg-slate-50 text-slate-400'
             }`}
             style={{ width: 72, height: 72 }}
@@ -61,12 +61,12 @@ export function PartnerMatchCard({
             <span className="truncate font-medium text-[#202124]">{card.providerLabel}</span>
             {card.sourceLabel ? <span className="truncate text-slate-400">• {card.sourceLabel}</span> : null}
             {trailingLabel ? (
-              <span className="rounded-full border border-[#e5e9f0] bg-[#f8fafc] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+              <span className="rounded-full border border-[#e5e9f0] bg-[#f8fafc] px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
                 {trailingLabel}
               </span>
             ) : null}
             {badge ? (
-              <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.12em] ${selected ? 'bg-[#1a73e8] text-white' : 'bg-emerald-50 text-emerald-700'}`}>
+              <span className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.12em] ${selected ? 'bg-[#1a73e8] text-white' : 'bg-emerald-50 text-emerald-700'}`}>
                 {badge}
               </span>
             ) : null}
@@ -80,7 +80,7 @@ export function PartnerMatchCard({
             </div>
             {card.bookingStatusLabel ? (
               <span
-                className={`shrink-0 rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${
                   selected ? 'bg-emerald-100 text-emerald-800' : 'bg-emerald-50 text-emerald-700'
                 }`}
               >
@@ -118,7 +118,7 @@ export function PartnerMatchCard({
               {card.confidenceNotes.slice(0, 3).map((note) => (
                 <span
                   key={note}
-                  className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  className={`rounded-full px-2 py-0.5 text-xs font-medium ${
                     selected ? 'bg-white text-slate-600 ring-1 ring-[#dbe9ff]' : 'bg-slate-100 text-slate-600'
                   }`}
                 >

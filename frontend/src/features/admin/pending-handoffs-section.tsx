@@ -74,23 +74,33 @@ export function PendingHandoffsSection({
             type="button"
             onClick={onRefresh}
             disabled={loading}
-            className="rounded-full border border-slate-300 px-4 py-1.5 text-sm font-semibold text-slate-700 hover:border-slate-500 disabled:opacity-50"
+            aria-label="Refresh pending handoffs"
+            className="rounded-full border border-slate-300 px-4 py-1.5 text-sm font-semibold text-slate-700 hover:border-slate-500 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:opacity-50"
           >
-            {loading ? 'Refreshing…' : 'Refresh'}
+            {loading ? 'Pulling fresh handoffs…' : 'Refresh'}
           </button>
         ) : null}
       </header>
 
       {errorMessage ? (
-        <div className="mt-4 rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-inset ring-rose-200">
+        <div
+          role="alert"
+          aria-live="polite"
+          className="mt-4 rounded-md bg-rose-50 px-4 py-3 text-sm text-rose-800 ring-1 ring-inset ring-rose-200"
+        >
           {errorMessage}
         </div>
       ) : null}
 
       <ul className="mt-5 space-y-3">
-        {items.length === 0 && !errorMessage ? (
+        {items.length === 0 && !errorMessage && !loading ? (
           <li className="rounded-md border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
-            No pending handoffs in the last 72 hours. The bot is keeping up.
+            All caught up. Pending handoffs from the last 72 hours will land here as soon as a customer asks for support.
+          </li>
+        ) : null}
+        {items.length === 0 && loading ? (
+          <li className="rounded-md border border-dashed border-slate-300 px-4 py-6 text-sm text-slate-500">
+            Pulling fresh handoffs…
           </li>
         ) : null}
         {items.map((item) => {
@@ -161,7 +171,8 @@ export function PendingHandoffsSection({
                             onClick={() => onRelease(item.conversation_id as string)}
                             disabled={claimingConversationId === item.conversation_id}
                             title="Release the claim. The bot will resume auto-replies on the next customer message."
-                            className="rounded-full border border-amber-600 bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-50"
+                            aria-label="Release this conversation"
+                            className="rounded-full border border-amber-600 bg-amber-50 px-4 py-1.5 text-sm font-semibold text-amber-900 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:cursor-not-allowed disabled:opacity-50"
                           >
                             {claimingConversationId === item.conversation_id ? 'Releasing…' : 'Release'}
                           </button>
@@ -173,7 +184,8 @@ export function PendingHandoffsSection({
                         onClick={() => onClaim(item.conversation_id as string)}
                         disabled={claimingConversationId === item.conversation_id}
                         title="Claim this conversation. The bot will pause auto-replies for 4h."
-                        className="rounded-full border border-emerald-600 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-50"
+                        aria-label="Claim this conversation"
+                        className="rounded-full border border-emerald-600 bg-emerald-50 px-4 py-1.5 text-sm font-semibold text-emerald-900 hover:bg-emerald-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:cursor-not-allowed disabled:opacity-50"
                       >
                         {claimingConversationId === item.conversation_id ? 'Claiming…' : 'Claim'}
                       </button>

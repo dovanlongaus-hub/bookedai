@@ -162,7 +162,7 @@ export function ShadowDiagnosticsReferences({
                   {reference.example.legacyValue !== undefined || reference.example.shadowValue !== undefined ? (
                     <div className="mt-3 grid gap-2 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 sm:grid-cols-2">
                       <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                           Legacy value
                         </div>
                         <div className="mt-1 text-xs leading-5 text-slate-700">
@@ -170,7 +170,7 @@ export function ShadowDiagnosticsReferences({
                         </div>
                       </div>
                       <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                           Shadow value
                         </div>
                         <div className="mt-1 text-xs leading-5 text-slate-700">

@@ -221,16 +221,16 @@ export function PartnersSection({
             <button
               type="submit"
               disabled={savingPartner || !partnerForm.name.trim()}
-              className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+              className="rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {savingPartner ? 'Saving...' : editingPartnerId ? 'Update profile' : 'Create profile'}
+              {savingPartner ? 'Saving your changes…' : editingPartnerId ? 'Save partner profile' : 'Create partner profile'}
             </button>
           </div>
         </div>
       </form>
 
       {partnerMessage ? (
-        <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+        <div role="status" aria-live="polite" className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
           {partnerMessage}
         </div>
       ) : null}
@@ -247,11 +247,11 @@ export function PartnersSection({
                   {partner.logo_url || partner.image_url ? (
                     <img
                       src={partner.logo_url || partner.image_url || ''}
-                      alt={partner.name}
+                      alt={`${partner.name} logo`}
                       className="h-full w-full object-contain"
                     />
                   ) : (
-                    <div className="text-xs text-slate-400">No logo</div>
+                    <div className="text-xs text-slate-400" aria-hidden="true">No logo</div>
                   )}
                 </div>
                 <div>

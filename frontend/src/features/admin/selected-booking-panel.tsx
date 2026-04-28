@@ -146,9 +146,10 @@ export function SelectedBookingPanel({
                   type="button"
                   onClick={onSendConfirmation}
                   disabled={sendingConfirmation}
-                  className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 disabled:opacity-60"
+                  aria-label="Send confirmation email to the customer"
+                  className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:opacity-60"
                 >
-                  {sendingConfirmation ? 'Sending confirmation...' : 'Send confirmation email'}
+                  {sendingConfirmation ? 'Sending the confirmation…' : 'Send confirmation email'}
                 </button>
               </div>
             ) : null}
@@ -167,7 +168,11 @@ export function SelectedBookingPanel({
                 />
               </label>
               {confirmationMessage ? (
-                <div className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="mt-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700"
+                >
                   {confirmationMessage}
                 </div>
               ) : null}
@@ -206,7 +211,9 @@ export function SelectedBookingPanel({
           </div>
         </>
       ) : (
-        <p className="mt-4 text-sm text-slate-600">Select a booking to inspect its full event timeline.</p>
+        <p className="mt-4 text-sm text-slate-600">
+          Pick a booking from the list to open its customer details, payment posture, and full event timeline.
+        </p>
       )}
     </section>
   );

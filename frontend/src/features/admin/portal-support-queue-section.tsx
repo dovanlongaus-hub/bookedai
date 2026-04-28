@@ -71,7 +71,11 @@ export function PortalSupportQueueSection({
       </div>
 
       {actionMessage ? (
-        <div className="mt-4 rounded-[1rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+        <div
+          role="status"
+          aria-live="polite"
+          className="mt-4 rounded-[1rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+        >
           {actionMessage}
         </div>
       ) : null}
@@ -207,9 +211,10 @@ export function PortalSupportQueueSection({
                         onApplyAction(item.action_request_id ?? item.id, 'reviewed', draftNotes[item.id] ?? null)
                       }
                       disabled={actionSubmittingId === item.action_request_id}
-                      className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      aria-label="Mark this request reviewed"
+                      className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-900 transition hover:bg-emerald-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {actionSubmittingId === item.action_request_id ? 'Saving...' : 'Mark reviewed'}
+                      {actionSubmittingId === item.action_request_id ? 'Saving your note…' : 'Mark reviewed'}
                     </button>
                     <button
                       type="button"
@@ -217,9 +222,10 @@ export function PortalSupportQueueSection({
                         onApplyAction(item.action_request_id ?? item.id, 'escalated', draftNotes[item.id] ?? null)
                       }
                       disabled={actionSubmittingId === item.action_request_id}
-                      className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                      aria-label="Escalate this request"
+                      className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-900 transition hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:cursor-not-allowed disabled:opacity-60"
                     >
-                      {actionSubmittingId === item.action_request_id ? 'Saving...' : 'Escalate'}
+                      {actionSubmittingId === item.action_request_id ? 'Saving your note…' : 'Escalate'}
                     </button>
                   </>
                 ) : null}
@@ -228,7 +234,7 @@ export function PortalSupportQueueSection({
           ))
         ) : (
           <div className="rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-500">
-            No recent portal support requests are waiting in the admin queue.
+            All caught up. New customer follow-ups will land here as they arrive.
           </div>
         )}
       </div>

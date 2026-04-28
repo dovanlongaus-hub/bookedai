@@ -19,7 +19,14 @@ export function TenantOnboardingStatusCard({
       <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
         {title}
       </h2>
-      <div className="mt-4 rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
+      <div
+        role="progressbar"
+        aria-label="Workspace setup progress"
+        aria-valuemin={0}
+        aria-valuemax={100}
+        aria-valuenow={onboarding.progress.percent}
+        className="mt-4 rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4"
+      >
         <div className="flex items-center justify-between gap-3">
           <div className="text-sm font-semibold text-slate-950">
             {onboarding.progress.completed_steps}/{onboarding.progress.total_steps} checkpoints complete

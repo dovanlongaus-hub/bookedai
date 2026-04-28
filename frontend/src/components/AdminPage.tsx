@@ -489,6 +489,11 @@ export function AdminPage() {
               </p>
 
               <div className="mt-6 grid gap-3">
+                {tenants.length === 0 ? (
+                  <div className="rounded-[1.4rem] border border-dashed border-slate-300 bg-slate-50 px-4 py-6 text-sm leading-6 text-slate-500">
+                    No tenants are visible yet. Pulling your tenant directory… If this stays empty, refresh the dashboard.
+                  </div>
+                ) : null}
                 {tenants.map((tenant) => {
                   const isActive = tenant.slug === selectedTenantRef;
                   return (
@@ -800,16 +805,15 @@ export function AdminPage() {
         {activeWorkspace === 'reliability' ? (
           <Suspense
             fallback={
-              <section className="template-card mt-6 p-6">
+              <section className="template-card mt-6 p-6" role="status" aria-live="polite" aria-busy="true">
                 <div className="template-kicker text-sm tracking-[0.14em]">
                   Reliability workspace
                 </div>
                 <h2 className="template-title mt-3 text-xl font-semibold text-[#1d1d1f]">
-                  Loading reliability triage module
+                  Opening reliability triage…
                 </h2>
                 <p className="template-body mt-2 max-w-3xl text-sm leading-6">
-                  Prompt 8 now ships reliability as a dedicated admin workspace module so the rest
-                  of the admin shell can stay lighter during initial load.
+                  Pulling matching quality, retry posture, and prompt drift signals so the team can review them in one place.
                 </p>
               </section>
             }

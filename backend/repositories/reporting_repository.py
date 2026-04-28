@@ -214,6 +214,83 @@ class ReportingRepository(BaseRepository):
             for row in result.mappings().all()
         ]
 
+    async def get_public_booking_summary(self, *, window_hours: int) -> dict:
+        """Aggregate booking + revenue counts for the public ticker.
+
+        Privacy-safe surface — never returns identifying fields. The amount is
+        returned as a raw sum here; the handler is responsible for rounding.
+        """
+        result = await self.session.execute(
+            text(
+                """
+                with bookings_window as (
+                  select
+                    count(*) as bookings,
+                    count(distinct tenant_id) as tenants_active
+                  from booking_intents
+                  where created_at >= now() - make_interval(hours => cast(:hours as integer))
+                ),
+                revenue_window as (
+                  select
+                    coalesce(sum(amount_aud), 0) as captured_aud
+                  from payment_intents
+                  where created_at >= now() - make_interval(hours => cast(:hours as integer))
+                    and status in ('paid', 'succeeded', 'completed')
+                )
+                select
+                  bw.bookings,
+                  bw.tenants_active,
+                  rw.captured_aud
+                from bookings_window bw, revenue_window rw
+                """
+            ),
+            {"hours": max(window_hours, 1)},
+        )
+        row = result.mappings().one()
+        return {
+            "bookings": int(row["bookings"] or 0),
+            "tenants_active": int(row["tenants_active"] or 0),
+            "captured_aud": float(row["captured_aud"] or 0.0),
+        }
+
+    async def list_public_recent_bookings(self, *, limit: int = 5) -> list[dict]:
+        """Return the most recent paid bookings for the public ticker.
+
+        The handler must anonymize the tenant alias and round the amount before
+        returning to a public caller. This method intentionally does NOT pull
+        customer name, email, phone, or booking_reference.
+        """
+        capped_limit = max(min(limit, 5), 1)
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  pi.amount_aud as amount_aud,
+                  pi.created_at as created_at,
+                  t.id::text as tenant_id,
+                  t.slug as tenant_slug,
+                  t.name as tenant_name
+                from payment_intents pi
+                join tenants t on t.id = pi.tenant_id
+                where pi.status in ('paid', 'succeeded', 'completed')
+                  and pi.created_at >= now() - make_interval(days => 30)
+                order by pi.created_at desc
+                limit :limit
+                """
+            ),
+            {"limit": capped_limit},
+        )
+        return [
+            {
+                "amount_aud": float(row["amount_aud"] or 0.0),
+                "created_at": row["created_at"],
+                "tenant_id": row["tenant_id"],
+                "tenant_slug": row["tenant_slug"],
+                "tenant_name": row["tenant_name"],
+            }
+            for row in result.mappings().all()
+        ]
+
     async def list_recent_booking_intents(
         self,
         tenant_id: str,

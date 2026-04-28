@@ -429,15 +429,15 @@ export function RevenueOpsActionLedger({
       ) : null}
 
       {error ? (
-        <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
+        <div role="alert" aria-live="polite" className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">
           {error}
         </div>
       ) : null}
 
       <div className="mt-5 space-y-3">
         {loading ? (
-          <div className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-500">
-            Loading revenue operations actions...
+          <div role="status" aria-live="polite" className="rounded-[1.5rem] border border-slate-200 bg-slate-50 p-5 text-sm font-semibold text-slate-500">
+            Pulling your action ledger…
           </div>
         ) : actions.length > 0 ? (
           actions.map((action) => (

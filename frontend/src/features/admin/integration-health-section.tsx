@@ -186,7 +186,7 @@ export function IntegrationHealthSection({
               ))
             ) : (
               <div className="rounded-[1rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm text-slate-500">
-                No tenant-scoped Telegram, CRM, email, or notify records are visible yet.
+                Nothing to review here yet. New Telegram, CRM, email, or notify records will land here as soon as they fire.
               </div>
             )}
           </div>
@@ -229,7 +229,7 @@ export function IntegrationHealthSection({
             ))
           ) : (
             <div className="rounded-[1.2rem] border border-dashed border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
-              No integration-specific attention items are currently visible in the shared feed.
+              All clear right now. The team will see new attention items here as soon as a provider raises one.
             </div>
           )}
         </div>

@@ -15,24 +15,30 @@ export function ApiInventorySection({ apiRoutes }: ApiInventorySectionProps) {
           <div>Access</div>
         </div>
         <div className="max-h-[420px] overflow-auto">
-          {apiRoutes.map((route) => (
-            <div
-              key={`${route.methods.join(',')}-${route.path}`}
-              className="grid grid-cols-[120px_1fr_120px] gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-700"
-            >
-              <div className="font-semibold text-slate-950">{route.methods.join(', ')}</div>
-              <div className="break-all">{route.path}</div>
-              <div>
-                <span
-                  className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
-                    route.protected ? 'bg-slate-950 text-white' : 'bg-sky-100 text-sky-700'
-                  }`}
-                >
-                  {route.protected ? 'Protected' : 'Public'}
-                </span>
-              </div>
+          {apiRoutes.length === 0 ? (
+            <div className="border-t border-slate-200 px-4 py-6 text-sm leading-6 text-slate-500">
+              No API routes are visible right now. Refresh the dashboard to pull the latest inventory.
             </div>
-          ))}
+          ) : (
+            apiRoutes.map((route) => (
+              <div
+                key={`${route.methods.join(',')}-${route.path}`}
+                className="grid grid-cols-[120px_1fr_120px] gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-700"
+              >
+                <div className="font-semibold text-slate-950">{route.methods.join(', ')}</div>
+                <div className="break-all">{route.path}</div>
+                <div>
+                  <span
+                    className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${
+                      route.protected ? 'bg-slate-950 text-white' : 'bg-sky-100 text-sky-700'
+                    }`}
+                  >
+                    {route.protected ? 'Protected' : 'Public'}
+                  </span>
+                </div>
+              </div>
+            ))
+          )}
         </div>
       </div>
     </section>

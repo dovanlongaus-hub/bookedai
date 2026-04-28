@@ -1065,12 +1065,13 @@ export function Prompt5PreviewSection({
                       void sendCommunicationPreview();
                     }}
                     disabled={communicationSubmitting}
-                    className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    aria-label="Send a BookedAI test message"
+                    className="mt-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:cursor-not-allowed disabled:opacity-60"
                   >
-                    {communicationSubmitting ? 'Sending...' : 'Send BookedAI test message'}
+                    {communicationSubmitting ? 'Sending the test message…' : 'Send BookedAI test message'}
                   </button>
                   {communicationError ? (
-                    <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                    <div role="alert" aria-live="polite" className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                       {communicationError}
                     </div>
                   ) : null}

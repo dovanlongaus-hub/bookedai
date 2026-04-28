@@ -2,7 +2,7 @@ import type { TenantSectionActivity } from '../../shared/contracts';
 
 function formatActivityTime(value: string | null | undefined) {
   if (!value) {
-    return 'Not recorded yet';
+    return 'No activity yet';
   }
   try {
     return new Intl.DateTimeFormat('en-AU', {

@@ -178,7 +178,7 @@ export function MessagingWorkspace({
               })
             ) : (
               <div className="rounded-[1.4rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-6 text-slate-600">
-                No messaging items match the current filters. Reset the filters or wait for new delivery activity.
+                No messages match these filters. Try clearing a filter or waiting for the next delivery to land.
               </div>
             )}
           </div>
@@ -198,7 +198,11 @@ export function MessagingWorkspace({
           </p>
 
           {actionMessage ? (
-            <div className="mt-5 rounded-[1.2rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-5 rounded-[1.2rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900"
+            >
               {actionMessage}
             </div>
           ) : null}
@@ -243,8 +247,8 @@ export function MessagingWorkspace({
                   className="booked-button disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {actionSubmittingKey === `${selectedDetail.item.source_kind}:${selectedDetail.item.item_id}:retry`
-                    ? 'Queuing retry...'
-                    : 'Retry eligible item'}
+                    ? 'Queuing retry…'
+                    : 'Retry this delivery'}
                 </button>
                 <button
                   type="button"
@@ -259,13 +263,17 @@ export function MessagingWorkspace({
                   className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   {actionSubmittingKey === `${selectedDetail.item.source_kind}:${selectedDetail.item.item_id}:manual`
-                    ? 'Saving follow-up...'
-                    : 'Mark manual follow-up'}
+                    ? 'Saving your follow-up…'
+                    : 'Mark for manual follow-up'}
                 </button>
               </div>
 
               {selectedDetail.item.last_error ? (
-                <div className="mt-5 rounded-[1.2rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900">
+                <div
+                  role="alert"
+                  aria-live="polite"
+                  className="mt-5 rounded-[1.2rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-900"
+                >
                   {selectedDetail.item.last_error}
                 </div>
               ) : null}
@@ -296,7 +304,7 @@ export function MessagingWorkspace({
             </>
           ) : (
             <div className="mt-5 rounded-[1.4rem] border border-dashed border-slate-300 bg-slate-50 p-6 text-sm leading-6 text-slate-600">
-              Open one message from the list to inspect payload, event history, and retry posture.
+              Pick a message on the left to see the full delivery payload, event history, and retry options.
             </div>
           )}
         </section>

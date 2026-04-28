@@ -39,7 +39,7 @@ function AssetPreview({
       </div>
       <div className="mt-3 overflow-hidden rounded-[1rem] border border-slate-200 bg-white">
         {imageUrl.trim() ? (
-          <img src={imageUrl} alt={label} className="h-40 w-full object-cover" />
+          <img src={imageUrl} alt={`${label} preview`} className="h-40 w-full object-cover" />
         ) : (
           <div className="flex h-40 items-center justify-center px-6 text-center text-sm text-slate-500">
             {placeholder}
@@ -231,7 +231,7 @@ export function TenantBusinessProfileCard({
                     disabled={!canManageExperience || profilePending}
                     onChange={(event) => handleAssetChange('logo', event)}
                   />
-                  {uploadingAsset === 'logo' ? 'Uploading logo...' : 'Upload logo'}
+                  {uploadingAsset === 'logo' ? 'Uploading your logo…' : 'Upload logo'}
                 </label>
                 <AssetPreview
                   label="Logo preview"
@@ -267,7 +267,7 @@ export function TenantBusinessProfileCard({
                     disabled={!canManageExperience || profilePending}
                     onChange={(event) => handleAssetChange('hero', event)}
                   />
-                  {uploadingAsset === 'hero' ? 'Uploading hero image...' : 'Upload hero image'}
+                  {uploadingAsset === 'hero' ? 'Uploading your hero image…' : 'Upload hero image'}
                 </label>
                 <AssetPreview
                   label={futureSwim ? 'Swim hero preview' : 'Hero preview'}
@@ -308,7 +308,7 @@ export function TenantBusinessProfileCard({
               {profileForm.hero_image_url.trim() ? (
                 <img
                   src={profileForm.hero_image_url}
-                  alt="Tenant hero"
+                  alt={`${profileForm.business_name || (futureSwim ? 'Swim school' : 'Workspace')} hero image preview`}
                   className="h-40 w-full object-cover"
                 />
               ) : null}
@@ -317,7 +317,7 @@ export function TenantBusinessProfileCard({
                   {profileForm.logo_url.trim() ? (
                     <img
                       src={profileForm.logo_url}
-                      alt="Tenant logo"
+                      alt={`${profileForm.business_name || (futureSwim ? 'Swim school' : 'Workspace')} logo preview`}
                       className="h-12 w-12 rounded-2xl object-cover"
                     />
                   ) : null}
@@ -369,10 +369,10 @@ export function TenantBusinessProfileCard({
         </section>
 
         {profileError ? (
-          <div className="booked-alert-error">{profileError}</div>
+          <div className="booked-alert-error" role="alert" aria-live="polite">{profileError}</div>
         ) : null}
         {profileMessage ? (
-          <div className="booked-alert-success">{profileMessage}</div>
+          <div className="booked-alert-success" role="status" aria-live="polite">{profileMessage}</div>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-3">
@@ -385,7 +385,7 @@ export function TenantBusinessProfileCard({
                 : ''
             }`}
           >
-            {profilePending ? (futureSwim ? 'Saving swim workspace profile...' : 'Saving workspace profile...') : (futureSwim ? 'Save swim workspace profile' : 'Save workspace profile')}
+            {profilePending ? (futureSwim ? 'Saving your swim workspace profile…' : 'Saving your workspace profile…') : (futureSwim ? 'Save swim workspace profile' : 'Save workspace profile')}
           </button>
           <div className="text-sm text-slate-500">
             {futureSwim

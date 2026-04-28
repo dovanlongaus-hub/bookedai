@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from hashlib import sha256
 from html import escape
 import json
+import logging
+import os
 import re
 import unicodedata
 from datetime import UTC, datetime, timedelta
@@ -13,6 +16,8 @@ from uuid import uuid4
 from sqlalchemy import desc, func, or_, select
 
 from core.customer_booking_contact import DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
+from core.portal_tokens import PortalTokenError, generate_portal_access_token
+from rate_limit import InMemoryRateLimiter
 from db import ConversationEvent, MessagingChannelSession, ServiceMerchantProfile
 from repositories.base import RepositoryContext
 from repositories.booking_intent_repository import BookingIntentRepository
@@ -40,6 +45,46 @@ PHONE_RE = re.compile(r"(\+\d[\d\s().-]{7,}\d)")
 BOOK_OPTION_RE = re.compile(r"\b(?:book|booking|reserve|chon|chọn|dat|đặt)\s*(?:option\s*)?([1-9])\b", re.I)
 DATE_RE = re.compile(r"\b(\d{4}-\d{2}-\d{2}|\d{1,2}[/-]\d{1,2}(?:[/-]\d{2,4})?)\b")
 TIME_RE = re.compile(r"\b(\d{1,2}(?::\d{2})?\s*(?:am|pm)?)\b", re.I)
+
+_logger = logging.getLogger(__name__)
+
+
+# Per-chat-id inbound abuse guardrail. Default: 30 messages per hour per
+# (channel, chat_id) pair. On exceed we silently DROP the inbound message —
+# replying confirms receipt and helps an attacker calibrate timing, so we
+# would rather appear unresponsive than chatty under abuse. Tuneable via
+# BOOKEDAI_MESSAGING_PER_CHAT_LIMIT and BOOKEDAI_MESSAGING_PER_CHAT_WINDOW_SECONDS.
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        value = int(str(raw).strip())
+    except (TypeError, ValueError):
+        return default
+    return value if value > 0 else default
+
+
+MESSAGING_PER_CHAT_LIMIT = _env_int("BOOKEDAI_MESSAGING_PER_CHAT_LIMIT", 30)
+MESSAGING_PER_CHAT_WINDOW_SECONDS = _env_int(
+    "BOOKEDAI_MESSAGING_PER_CHAT_WINDOW_SECONDS", 3600
+)
+
+_messaging_per_chat_limiter = InMemoryRateLimiter()
+
+
+def _hash_chat_id(value: str) -> str:
+    """Stable, non-reversible hash of a chat_id for structured logs.
+
+    We never log the raw chat_id (privacy / GDPR). Using a truncated SHA-256
+    digest gives enough uniqueness to correlate repeat offenders without
+    leaking the source identifier.
+    """
+
+    if not value:
+        return "anon"
+    return sha256(value.encode("utf-8", errors="ignore")).hexdigest()[:16]
+
 
 CUSTOMER_AGENT_CANONICAL_NAME = "BookedAI Manager Bot"
 CUSTOMER_AGENT_INTERNAL_ID = "bookedai_manager_bot"
@@ -112,6 +157,49 @@ class MessagingAutomationService:
     ) -> MessagingAutomationResult:
         normalized_channel = self._normalize_channel(channel)
         conversation_key = self._conversation_key(message=message, metadata=metadata)
+
+        # Per-chat-id inbound rate limit (Lane 6 §5 P2 guardrail). Silently
+        # drop messages once a single (channel, chat_id) pair exceeds 30
+        # messages/hour — replying confirms receipt to an abusive sender and
+        # hands them a calibration signal. Failure inside the limiter must
+        # not break the dispatcher, so we fail open on any internal error.
+        if conversation_key:
+            try:
+                bucket_key = f"messaging_inbound:{normalized_channel}:{conversation_key}"
+                acquired = await _messaging_per_chat_limiter.try_acquire(
+                    bucket_key,
+                    limit=MESSAGING_PER_CHAT_LIMIT,
+                    window_seconds=MESSAGING_PER_CHAT_WINDOW_SECONDS,
+                )
+                if not acquired:
+                    _logger.warning(
+                        "messaging_rate_limit_exceeded channel=%s chat_id_hash=%s limit=%s window_seconds=%s",
+                        normalized_channel,
+                        _hash_chat_id(conversation_key),
+                        MESSAGING_PER_CHAT_LIMIT,
+                        MESSAGING_PER_CHAT_WINDOW_SECONDS,
+                        extra={
+                            "event_type": "messaging_rate_limit_exceeded",
+                            "channel": normalized_channel,
+                            "chat_id_hash": _hash_chat_id(conversation_key),
+                            "limit": MESSAGING_PER_CHAT_LIMIT,
+                            "window_seconds": MESSAGING_PER_CHAT_WINDOW_SECONDS,
+                        },
+                    )
+                    return MessagingAutomationResult(
+                        ai_reply=None,
+                        ai_intent="rate_limited",
+                        workflow_status="rate_limited",
+                        metadata={
+                            "rate_limited": True,
+                            "channel": normalized_channel,
+                            "chat_id_hash": _hash_chat_id(conversation_key),
+                        },
+                    )
+            except Exception as exc:  # noqa: BLE001
+                # Fail-open: never let a broken rate limiter block real traffic.
+                _logger.warning("messaging_rate_limit_check_failed: %s", exc)
+
         customer_phone = self._customer_phone(message=message, metadata=metadata)
         customer_email = self._customer_email(message=message, metadata=metadata)
         identity_metadata = self._customer_identity_metadata(
@@ -533,6 +621,34 @@ class MessagingAutomationService:
                     "reply_controls": self._needs_booking_reference_reply_controls(locale),
                     },
                 )
+
+        if (
+            booking_reference
+            and resolution.get("resolved_by") == "message_booking_reference"
+            and not customer_phone
+            and not customer_email
+            and prior_booking_reference != booking_reference
+        ):
+            return MessagingAutomationResult(
+                ai_reply=(
+                    "I found that booking reference, but I need to verify it belongs to you before "
+                    "I show booking details or queue a change. Please reply with the email or phone "
+                    "used for the booking, or open the secure portal link from your confirmation."
+                ),
+                ai_intent="identity_verification_required",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": self._layer_metadata(normalized_channel),
+                    "customer_identity": identity_metadata,
+                    "customer_care_status": "identity_verification_required",
+                    "booking_reference": booking_reference,
+                    "booking_resolution": {
+                        **resolution,
+                        "identity_gate": "booking_reference_requires_contact_or_same_conversation",
+                    },
+                    "reply_controls": self._needs_booking_reference_reply_controls(locale),
+                },
+            )
 
         if (
             booking_reference
@@ -1683,12 +1799,20 @@ class MessagingAutomationService:
         return BOOKEDAI_PUBLIC_URL + "/?" + urlencode(params)
 
     @staticmethod
-    def _portal_booking_url(booking_reference: str) -> str:
-        return BOOKEDAI_PORTAL_URL + "/?" + urlencode({"booking_reference": booking_reference})
+    def _portal_booking_url(booking_reference: str, *, access_token: str | None = None) -> str:
+        params = {"booking_reference": booking_reference}
+        if access_token:
+            params["token"] = access_token
+        return BOOKEDAI_PORTAL_URL + "/?" + urlencode(params)
 
     @staticmethod
-    def _portal_qr_url(booking_reference: str) -> str:
-        return build_qr_code_url(MessagingAutomationService._portal_booking_url(booking_reference))
+    def _portal_qr_url(booking_reference: str, *, access_token: str | None = None) -> str:
+        return build_qr_code_url(
+            MessagingAutomationService._portal_booking_url(
+                booking_reference,
+                access_token=access_token,
+            )
+        )
 
     @staticmethod
     def _safe_http_url(value: object) -> str:
@@ -2079,10 +2203,47 @@ class MessagingAutomationService:
                 }
             ),
         )
+        portal_access_token: str | None = None
+        try:
+            issued_portal_token = generate_portal_access_token(booking_reference)
+            stored_portal_token = await booking_repository.store_portal_access_token(
+                booking_reference=booking_reference,
+                token_hash=issued_portal_token.token_hash,
+                expires_at=issued_portal_token.expires_at,
+            )
+            if stored_portal_token:
+                portal_access_token = issued_portal_token.plaintext
+        except PortalTokenError:
+            _logger.warning(
+                "messaging_booking_portal_token_issue_failed",
+                extra={
+                    "event_type": "messaging_booking_portal_token_issue_failed",
+                    "tenant_id": tenant_id,
+                    "booking_reference": booking_reference,
+                    "channel": channel,
+                },
+            )
+        except Exception:
+            _logger.warning(
+                "messaging_booking_portal_token_persist_failed",
+                extra={
+                    "event_type": "messaging_booking_portal_token_persist_failed",
+                    "tenant_id": tenant_id,
+                    "booking_reference": booking_reference,
+                    "channel": channel,
+                },
+                exc_info=True,
+            )
         await session.commit()
 
-        portal_url = self._portal_booking_url(booking_reference)
-        qr_code_url = self._portal_qr_url(booking_reference)
+        portal_url = self._portal_booking_url(
+            booking_reference,
+            access_token=portal_access_token,
+        )
+        qr_code_url = self._portal_qr_url(
+            booking_reference,
+            access_token=portal_access_token,
+        )
         payment_line = (
             "Payment status: pending. Your booking request is kept in BookedAI while provider "
             "confirmation and payment instructions are prepared."
@@ -2110,6 +2271,7 @@ class MessagingAutomationService:
                     "booking_intent_id": booking_intent_id,
                     "booking_reference": booking_reference,
                     "portal_url": portal_url,
+                    "portal_access_token_issued": portal_access_token is not None,
                     "qr_code_url": qr_code_url,
                     "tenant_id": tenant_id,
                     "service_id": service_id,

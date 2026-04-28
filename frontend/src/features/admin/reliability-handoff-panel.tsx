@@ -164,7 +164,7 @@ export function ReliabilityHandoffPanel({
     }
 
     setSendingDiscord(true);
-    setExportStatus('Sending team update to Discord...');
+    setExportStatus('Sending the team update to Discord…');
 
     try {
       const response = await sendAdminDiscordHandoff(apiBaseUrl, sessionToken, {
@@ -175,7 +175,7 @@ export function ReliabilityHandoffPanel({
       });
       setExportStatus(response.message);
     } catch (error) {
-      setExportStatus(error instanceof Error ? error.message : 'Could not send Discord team update.');
+      setExportStatus(error instanceof Error ? error.message : "Couldn't reach Discord — let's try again in a moment.");
     } finally {
       setSendingDiscord(false);
     }
@@ -255,7 +255,7 @@ export function ReliabilityHandoffPanel({
                 : 'cursor-not-allowed border border-slate-200 bg-slate-100 text-slate-400'
             }`}
           >
-            {sendingDiscord ? 'Sending to Discord...' : 'Send to Discord'}
+            {sendingDiscord ? 'Sending to Discord…' : 'Send to Discord'}
           </button>
           <button
             type="button"

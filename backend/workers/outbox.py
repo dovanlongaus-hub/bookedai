@@ -95,6 +95,20 @@ async def dispatch_phase2_outbox_event(
         },
     )
 
+    # Wave 5-D operational plumbing: route booking_feedback.recorded events
+    # to the Zoho CRM Note consumer in addition to the audit-log write. The
+    # consumer raises on transient HTTP errors so the outbox dispatcher
+    # records a failure and re-runs the event on the next tick (exponential
+    # back-off lives in the outbox repository update path).
+    if event.event_type == "booking_feedback.recorded":
+        # Local import keeps the worker module dependency-light at import
+        # time and avoids a circular import via integrations/.
+        from workers.zoho_crm_feedback_consumer import (
+            handle_booking_feedback_recorded,
+        )
+
+        await handle_booking_feedback_recorded(session, event)
+
 
 async def run_tracked_outbox_dispatch(
     session,

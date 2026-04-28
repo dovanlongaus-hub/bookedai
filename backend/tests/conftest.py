@@ -30,6 +30,40 @@ async def _noop_lifespan(_: object):
     yield
 
 
+@pytest.fixture(autouse=True)
+def _reset_messaging_per_chat_limiter():
+    """Per-test reset of the in-memory messaging rate limiter.
+
+    The shared (channel, chat_id) bucket persists for the life of the
+    interpreter, so back-to-back tests that reuse the same chat_id (e.g.
+    Telegram chat 123456 across 61 webhook tests) would otherwise trip the
+    30/hr guardrail and silently drop the inbound message.
+    """
+
+    try:
+        from service_layer.messaging_automation_service import (
+            _messaging_per_chat_limiter,
+        )
+
+        _messaging_per_chat_limiter.reset()
+    except Exception:
+        pass
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_ai_cost_breaker():
+    """Per-test reset of the in-process AI cost circuit breaker."""
+
+    try:
+        from core.ai_cost_breaker import get_breaker
+
+        get_breaker().reset()
+    except Exception:
+        pass
+    yield
+
+
 @pytest.fixture()
 def test_app():
     app = app_module.app

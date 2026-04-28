@@ -124,7 +124,7 @@ export function AdminLoginScreen({
               </div>
             </div>
 
-            <form className="mt-7 space-y-5" onSubmit={onSubmit}>
+            <form className="mt-7 space-y-5" onSubmit={onSubmit} aria-describedby={error ? 'admin-login-error' : undefined}>
               <label className="block text-sm">
                 <span className="mb-2 block font-semibold text-slate-700">Username</span>
                 <input
@@ -134,6 +134,8 @@ export function AdminLoginScreen({
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
                   placeholder="info@bookedai.au"
                   autoComplete="username"
+                  aria-label="Admin username"
+                  required
                 />
               </label>
               <label className="block text-sm">
@@ -145,21 +147,30 @@ export function AdminLoginScreen({
                   className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-slate-950 outline-none transition focus:border-sky-400 focus:bg-white focus:ring-4 focus:ring-sky-100"
                   placeholder="Enter admin password"
                   autoComplete="current-password"
+                  aria-label="Admin password"
+                  required
                 />
               </label>
               <button
                 type="submit"
                 disabled={!username || !password || loggingIn}
-                className="group inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(15,23,42,0.22)] transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                className="group inline-flex w-full items-center justify-center gap-2 rounded-2xl bg-slate-950 px-5 py-3.5 text-sm font-semibold text-white shadow-[0_18px_40px_rgba(15,23,42,0.22)] transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {loggingIn ? 'Signing in...' : 'Sign in to admin'}
+                {loggingIn ? 'Opening your workspace…' : 'Sign in to admin'}
                 <ArrowRight className="h-4 w-4 transition group-hover:translate-x-0.5" aria-hidden="true" />
               </button>
             </form>
 
             {error ? (
-              <div className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700">
-                {error}
+              <div
+                id="admin-login-error"
+                role="alert"
+                aria-live="polite"
+                className="mt-5 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700"
+              >
+                {/Invalid credentials|invalid_credentials|incorrect/i.test(error)
+                  ? "That username and password don't match. Try again or check your credentials."
+                  : error}
               </div>
             ) : (
               <div className="mt-5 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs leading-5 text-slate-500">

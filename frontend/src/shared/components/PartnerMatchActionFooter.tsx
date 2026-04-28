@@ -49,7 +49,7 @@ export function PartnerMatchActionFooter({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="min-w-0">
             <div
-              className={`text-[10px] font-semibold uppercase tracking-[0.14em] ${
+              className={`text-xs font-semibold uppercase tracking-[0.14em] ${
                 selected ? 'text-[#4d7fca]' : 'text-slate-500'
               }`}
             >

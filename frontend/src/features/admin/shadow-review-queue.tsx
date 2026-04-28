@@ -184,7 +184,7 @@ export function ShadowReviewQueue({
       <div className="mt-4 rounded-2xl border border-slate-200 bg-white px-4 py-3">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
               Review summary
             </div>
             <div className="mt-1 text-sm text-slate-700">
@@ -268,7 +268,7 @@ export function ShadowReviewQueue({
 
       <div className="mt-4 grid gap-3 md:grid-cols-3">
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
             Pending in slice
           </div>
           <div className="mt-2 text-2xl font-bold text-slate-950">{pendingCount}</div>
@@ -277,7 +277,7 @@ export function ShadowReviewQueue({
           </p>
         </div>
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
-          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
             Reviewed in slice
           </div>
           <div className="mt-2 text-2xl font-bold text-slate-950">{reviewedCount}</div>
@@ -288,7 +288,7 @@ export function ShadowReviewQueue({
         <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                 Next review
               </div>
               <div className="mt-2 text-sm font-semibold text-slate-950">
@@ -356,7 +356,7 @@ export function ShadowReviewQueue({
             ) : null}
             <div className="mt-3 grid gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 sm:grid-cols-2">
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Legacy
                 </div>
                 <div className="mt-1 text-xs leading-5 text-slate-700">
@@ -364,7 +364,7 @@ export function ShadowReviewQueue({
                 </div>
               </div>
               <div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Shadow
                 </div>
                 <div className="mt-1 text-xs leading-5 text-slate-700">

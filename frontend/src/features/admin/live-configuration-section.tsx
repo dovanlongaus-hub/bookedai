@@ -10,6 +10,11 @@ export function LiveConfigurationSection({ configItems }: LiveConfigurationSecti
   return (
     <section className="rounded-[2rem] border border-slate-200 bg-white p-6 shadow-[0_24px_60px_rgba(15,23,42,0.06)]">
       <h2 className="text-xl font-bold">Live configuration</h2>
+      {configCategories.length === 0 ? (
+        <div className="mt-5 rounded-[1.5rem] border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-sm leading-6 text-slate-500">
+          No configuration entries are visible yet. Refresh the dashboard once the platform settings have loaded.
+        </div>
+      ) : null}
       <div className="mt-5 space-y-5">
         {configCategories.map((category) => (
           <div key={category} className="rounded-[1.5rem] border border-slate-200">
