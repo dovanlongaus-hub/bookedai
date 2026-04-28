@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import base64
 import csv
 import hashlib
@@ -1372,29 +1373,26 @@ async def _notify_bookedai_support_handoff(
         f"Last message:\n{message_text or '[no text]'}\n\n"
         f"Reply via the BookedAI Manager Bot conversation: tg://user?id={customer_chat_id}"
     )
-    deliveries: list[dict[str, object]] = []
-    for chat_id in chat_ids:
+    async def _deliver(chat_id: str) -> dict[str, object]:
         try:
             result = await communication_service.send_telegram(
                 chat_id=chat_id,
                 body=body,
             )
-            deliveries.append(
-                {
-                    "chat_id": chat_id,
-                    "delivery_status": result.delivery_status,
-                    "provider_message_id": result.provider_message_id,
-                    "warnings": result.warnings or [],
-                }
-            )
+            return {
+                "chat_id": chat_id,
+                "delivery_status": result.delivery_status,
+                "provider_message_id": result.provider_message_id,
+                "warnings": result.warnings or [],
+            }
         except Exception as exc:
-            deliveries.append(
-                {
-                    "chat_id": chat_id,
-                    "delivery_status": "failed",
-                    "warnings": [str(exc)],
-                }
-            )
+            return {
+                "chat_id": chat_id,
+                "delivery_status": "failed",
+                "warnings": [str(exc)],
+            }
+
+    deliveries = list(await asyncio.gather(*(_deliver(chat_id) for chat_id in chat_ids)))
     return {
         "channel": "telegram",
         "targets": len(chat_ids),

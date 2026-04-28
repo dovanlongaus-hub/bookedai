@@ -128,7 +128,16 @@ class MessagingAutomationService:
                 locale=locale,
             )
 
-        slash_intent = self._slash_command_intent(message.text)
+        channel_state = await self._load_channel_session_state(
+            session,
+            channel=normalized_channel,
+            conversation_id=conversation_key,
+        )
+        tenant_ref = str(metadata.get("tenant_ref") or "").strip() or None
+
+        slash_intent, slash_args = self._parse_slash_command(message.text)
+        cancel_intent_locked = False
+
         if slash_intent == "help":
             return self._build_welcome_result(
                 channel=normalized_channel,
@@ -137,27 +146,45 @@ class MessagingAutomationService:
                 locale=locale,
             )
         if slash_intent == "search":
-            return self._build_search_prompt_result(
-                channel=normalized_channel,
-                message=message,
-                identity_metadata=identity_metadata,
-                locale=locale,
-            )
-        if slash_intent == "mybookings":
-            return self._build_my_bookings_prompt_result(
-                channel=normalized_channel,
-                message=message,
-                identity_metadata=identity_metadata,
-                locale=locale,
-            )
-        if slash_intent == "cancel":
-            return self._build_cancel_prompt_result(
-                channel=normalized_channel,
-                message=message,
-                identity_metadata=identity_metadata,
-                locale=locale,
-            )
-        if slash_intent == "support":
+            if slash_args:
+                message.text = slash_args
+            else:
+                return self._build_search_prompt_result(
+                    channel=normalized_channel,
+                    message=message,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                )
+        elif slash_intent == "mybookings":
+            if slash_args:
+                message.text = slash_args
+            else:
+                return self._build_my_bookings_prompt_result(
+                    channel=normalized_channel,
+                    message=message,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                )
+        elif slash_intent == "cancel":
+            if slash_args:
+                message.text = slash_args
+                cancel_intent_locked = True
+            else:
+                await self._mark_cancel_intent_pending(
+                    session,
+                    channel=normalized_channel,
+                    conversation_id=conversation_key,
+                    tenant_id=tenant_ref,
+                    customer_identity=identity_metadata,
+                    existing_state=channel_state,
+                )
+                return self._build_cancel_prompt_result(
+                    channel=normalized_channel,
+                    message=message,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                )
+        elif slash_intent == "support":
             return self._build_support_handoff_result(
                 channel=normalized_channel,
                 message=message,
@@ -165,35 +192,67 @@ class MessagingAutomationService:
                 locale=locale,
             )
 
-        keyboard_intent = self._reply_keyboard_intent(message.text)
-        if keyboard_intent == "search":
-            return self._build_search_prompt_result(
-                channel=normalized_channel,
-                message=message,
-                identity_metadata=identity_metadata,
-                locale=locale,
-            )
-        if keyboard_intent == "mybookings":
-            return self._build_my_bookings_prompt_result(
-                channel=normalized_channel,
-                message=message,
-                identity_metadata=identity_metadata,
-                locale=locale,
-            )
-        if keyboard_intent == "support":
-            return self._build_support_handoff_result(
-                channel=normalized_channel,
-                message=message,
-                identity_metadata=identity_metadata,
-                locale=locale,
-            )
+        if slash_intent is None:
+            keyboard_intent = self._reply_keyboard_intent(message.text)
+            if keyboard_intent == "search":
+                return self._build_search_prompt_result(
+                    channel=normalized_channel,
+                    message=message,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                )
+            if keyboard_intent == "mybookings":
+                return self._build_my_bookings_prompt_result(
+                    channel=normalized_channel,
+                    message=message,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                )
+            if keyboard_intent == "support":
+                return self._build_support_handoff_result(
+                    channel=normalized_channel,
+                    message=message,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                )
+
+        picker = self._parse_reschedule_picker_callback(message.text)
+        if picker is not None:
+            step, picker_booking_ref, picker_date, picker_time = picker
+            if step == "date":
+                return self._build_reschedule_date_picker_result(
+                    channel=normalized_channel,
+                    booking_reference=picker_booking_ref,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                )
+            if step == "time":
+                return self._build_reschedule_time_picker_result(
+                    channel=normalized_channel,
+                    booking_reference=picker_booking_ref,
+                    selected_date=picker_date,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                )
+            if step == "confirm":
+                return await self._handle_reschedule_confirm(
+                    session,
+                    channel=normalized_channel,
+                    booking_reference=picker_booking_ref,
+                    selected_date=picker_date,
+                    selected_time=picker_time,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                    customer_phone=customer_phone,
+                    customer_email=customer_email,
+                )
+
+        if not cancel_intent_locked and self._is_cancel_intent_active(
+            channel_state.get("session_metadata") if isinstance(channel_state, dict) else None
+        ):
+            cancel_intent_locked = True
 
         history = await self._load_conversation_history(
-            session,
-            channel=normalized_channel,
-            conversation_id=conversation_key,
-        )
-        channel_state = await self._load_channel_session_state(
             session,
             channel=normalized_channel,
             conversation_id=conversation_key,
@@ -330,6 +389,7 @@ class MessagingAutomationService:
                         "customer_identity": identity_metadata,
                         "customer_care_status": "needs_booking_reference",
                         "booking_resolution": resolution,
+                        "reply_controls": self._needs_booking_reference_reply_controls(locale),
                     },
                 )
 
@@ -363,6 +423,7 @@ class MessagingAutomationService:
                         "customer_identity": identity_metadata,
                         "customer_care_status": "needs_booking_reference",
                         "booking_resolution": resolution,
+                        "reply_controls": self._needs_booking_reference_reply_controls(locale),
                     },
                 )
             return MessagingAutomationResult(
@@ -378,6 +439,7 @@ class MessagingAutomationService:
                     "customer_identity": identity_metadata,
                     "customer_care_status": "needs_booking_reference",
                     "booking_resolution": resolution,
+                    "reply_controls": self._needs_booking_reference_reply_controls(locale),
                     },
                 )
 
@@ -531,8 +593,33 @@ class MessagingAutomationService:
                     "customer_care_status": "booking_not_found",
                     "booking_reference": booking_reference,
                     "booking_resolution": resolution,
+                    "reply_controls": self._needs_booking_reference_reply_controls(locale),
                 },
             )
+
+        if cancel_intent_locked:
+            cancel_action_enabled = any(
+                isinstance(action, dict)
+                and str(action.get("id") or "") == "request_cancel"
+                and bool(action.get("enabled"))
+                for action in care_turn.get("next_actions", [])
+            )
+            if cancel_action_enabled:
+                await self._clear_cancel_intent_pending(
+                    session,
+                    channel=normalized_channel,
+                    conversation_id=conversation_key,
+                    tenant_id=tenant_ref,
+                    customer_identity=identity_metadata,
+                    existing_state=channel_state,
+                )
+                return self._build_cancel_confirm_result(
+                    channel=normalized_channel,
+                    booking_reference=booking_reference,
+                    identity_metadata=identity_metadata,
+                    booking_resolution=resolution,
+                    locale=locale,
+                )
 
         reply = str(care_turn.get("reply") or "").strip()
         queued_request: dict[str, object] | None = None
@@ -785,6 +872,10 @@ class MessagingAutomationService:
             "customer_identity": (
                 row.customer_identity_json if isinstance(row.customer_identity_json, dict) else {}
             ),
+            "session_metadata": (
+                row.metadata_json if isinstance(row.metadata_json, dict) else {}
+            ),
+            "tenant_id": str(row.tenant_id or "").strip() or None,
         }
 
     async def _upsert_channel_session_state(
@@ -1749,7 +1840,7 @@ class MessagingAutomationService:
                     [
                         {
                             "text": "Change time",
-                            "callback_data": f"Change current booking {booking_reference}",
+                            "callback_data": f"reschedule:date:{booking_reference}",
                         },
                         {
                             "text": "Cancel booking",
@@ -1975,7 +2066,7 @@ class MessagingAutomationService:
         identity_metadata: dict[str, object],
         locale: str = "en",
     ) -> MessagingAutomationResult:
-        sender_name = str(message.sender_name or "").strip()
+        sender_name = escape(str(message.sender_name or "").strip())
         greeting = (
             self._localized("welcome_greeting_named", locale, name=sender_name)
             if sender_name
@@ -2104,6 +2195,380 @@ class MessagingAutomationService:
             },
         )
 
+    def _build_cancel_confirm_result(
+        self,
+        *,
+        channel: str,
+        booking_reference: str,
+        identity_metadata: dict[str, object],
+        booking_resolution: dict[str, object] | None,
+        locale: str = "en",
+    ) -> MessagingAutomationResult:
+        body = self._localized(
+            "cancel_confirm_prompt", locale, booking_reference=booking_reference
+        )
+        reply_markup = {
+            "inline_keyboard": [
+                [
+                    {
+                        "text": self._localized("cancel_confirm_yes", locale),
+                        "callback_data": f"Cancel current booking {booking_reference}",
+                    },
+                    {
+                        "text": self._localized("cancel_confirm_no", locale),
+                        "callback_data": f"Keep current booking {booking_reference}",
+                    },
+                ]
+            ]
+        }
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="cancel_confirmation",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "cancel_confirmation",
+                "booking_reference": booking_reference,
+                "booking_resolution": booking_resolution,
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_reply_markup": reply_markup,
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    RESCHEDULE_TIME_SLOTS: tuple[str, ...] = ("09:00", "12:00", "15:00", "18:00")
+    RESCHEDULE_DATE_OFFSETS: tuple[int, ...] = (1, 2, 3, 4, 5, 6, 7)
+
+    @staticmethod
+    def _parse_reschedule_picker_callback(
+        text: str,
+    ) -> tuple[str, str, str | None, str | None] | None:
+        raw = str(text or "").strip()
+        if not raw.startswith("reschedule:"):
+            return None
+        parts = raw.split(":")
+        # ["reschedule", step, booking_ref, ...optional date/time]
+        if len(parts) < 3:
+            return None
+        step = parts[1].strip().lower()
+        booking_ref = parts[2].strip()
+        if step not in {"date", "time", "confirm"} or not booking_ref:
+            return None
+        if step == "date":
+            return ("date", booking_ref, None, None)
+        if step == "time":
+            if len(parts) < 4 or not parts[3].strip():
+                return None
+            return ("time", booking_ref, parts[3].strip(), None)
+        # step == "confirm"
+        if len(parts) < 5 or not parts[3].strip() or not parts[4].strip():
+            return None
+        # rejoin time which may contain ":" (e.g. "18:00")
+        time_value = ":".join(parts[4:]).strip()
+        return ("confirm", booking_ref, parts[3].strip(), time_value)
+
+    @classmethod
+    def _reschedule_date_options(cls) -> list[tuple[str, str]]:
+        today = datetime.now(UTC).date()
+        options: list[tuple[str, str]] = []
+        weekday_short = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+        for offset in cls.RESCHEDULE_DATE_OFFSETS:
+            target = today + timedelta(days=offset)
+            label = f"{weekday_short[target.weekday()]} {target.day}/{target.month}"
+            options.append((target.isoformat(), label))
+        return options
+
+    def _build_reschedule_date_picker_result(
+        self,
+        *,
+        channel: str,
+        booking_reference: str,
+        identity_metadata: dict[str, object],
+        locale: str = "en",
+    ) -> MessagingAutomationResult:
+        body = self._localized(
+            "reschedule_date_prompt",
+            locale,
+            booking_reference=booking_reference,
+        )
+        date_options = self._reschedule_date_options()
+        rows: list[list[dict[str, object]]] = []
+        for index in range(0, len(date_options), 2):
+            row = []
+            for iso_date, label in date_options[index : index + 2]:
+                row.append(
+                    {
+                        "text": label,
+                        "callback_data": f"reschedule:time:{booking_reference}:{iso_date}",
+                    }
+                )
+            rows.append(row)
+        rows.append(
+            [
+                {
+                    "text": self._localized("reschedule_back_to_booking", locale),
+                    "callback_data": f"Keep current booking {booking_reference}",
+                }
+            ]
+        )
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="reschedule_date_picker",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "reschedule_date_picker",
+                "booking_reference": booking_reference,
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_reply_markup": {"inline_keyboard": rows},
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    def _build_reschedule_time_picker_result(
+        self,
+        *,
+        channel: str,
+        booking_reference: str,
+        selected_date: str,
+        identity_metadata: dict[str, object],
+        locale: str = "en",
+    ) -> MessagingAutomationResult:
+        body = self._localized(
+            "reschedule_time_prompt",
+            locale,
+            booking_reference=booking_reference,
+            selected_date=selected_date,
+        )
+        slots = list(self.RESCHEDULE_TIME_SLOTS)
+        rows: list[list[dict[str, object]]] = []
+        for index in range(0, len(slots), 2):
+            row = []
+            for slot in slots[index : index + 2]:
+                row.append(
+                    {
+                        "text": slot,
+                        "callback_data": f"reschedule:confirm:{booking_reference}:{selected_date}:{slot}",
+                    }
+                )
+            rows.append(row)
+        rows.append(
+            [
+                {
+                    "text": self._localized("reschedule_back_to_dates", locale),
+                    "callback_data": f"reschedule:date:{booking_reference}",
+                }
+            ]
+        )
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="reschedule_time_picker",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "reschedule_time_picker",
+                "booking_reference": booking_reference,
+                "selected_date": selected_date,
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_reply_markup": {"inline_keyboard": rows},
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    async def _handle_reschedule_confirm(
+        self,
+        session,
+        *,
+        channel: str,
+        booking_reference: str,
+        selected_date: str,
+        selected_time: str,
+        identity_metadata: dict[str, object],
+        locale: str,
+        customer_phone: str | None,
+        customer_email: str | None,
+    ) -> MessagingAutomationResult:
+        queued_request = await queue_portal_booking_request(
+            session,
+            booking_reference=booking_reference,
+            request_type="reschedule_request",
+            customer_note=(
+                f"Customer requested reschedule via inline picker: {selected_date} {selected_time}"
+            ),
+            preferred_date=selected_date,
+            preferred_time=selected_time,
+            timezone="Australia/Sydney",
+        )
+        body = self._localized(
+            "reschedule_confirmed",
+            locale,
+            booking_reference=booking_reference,
+            selected_date=selected_date,
+            selected_time=selected_time,
+        )
+        if not queued_request:
+            body = self._localized(
+                "reschedule_could_not_queue",
+                locale,
+                booking_reference=booking_reference,
+            )
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="reschedule_confirmed" if queued_request else "reschedule_failed",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": (
+                    "reschedule_confirmed" if queued_request else "reschedule_failed"
+                ),
+                "booking_reference": booking_reference,
+                "selected_date": selected_date,
+                "selected_time": selected_time,
+                "queued_request": queued_request,
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_reply_markup": {
+                        "inline_keyboard": [
+                            [
+                                {
+                                    "text": self._localized(
+                                        "reschedule_back_to_booking", locale
+                                    ),
+                                    "callback_data": f"Keep current booking {booking_reference}",
+                                }
+                            ]
+                        ]
+                    },
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    @staticmethod
+    def _support_inline_button(locale: str) -> dict[str, object]:
+        return {
+            "text": MessagingAutomationService._localized("talk_to_support", locale),
+            "callback_data": "/support",
+        }
+
+    @classmethod
+    def _needs_booking_reference_reply_controls(cls, locale: str) -> dict[str, object]:
+        return {
+            "telegram_reply_markup": {
+                "inline_keyboard": [[cls._support_inline_button(locale)]],
+                "keyboard": cls._home_reply_keyboard(locale)["keyboard"],
+                "resize_keyboard": True,
+                "is_persistent": True,
+                "input_field_placeholder": cls._localized("keyboard_placeholder", locale),
+            },
+            "telegram_parse_mode": "HTML",
+        }
+
+    async def _mark_cancel_intent_pending(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        customer_identity: dict[str, object],
+        existing_state: dict[str, object] | None = None,
+    ) -> None:
+        if not conversation_id:
+            return
+        existing_metadata = (existing_state or {}).get("session_metadata") if existing_state else {}
+        if not isinstance(existing_metadata, dict):
+            existing_metadata = {}
+        merged_metadata = {
+            **existing_metadata,
+            "cancel_intent_pending": True,
+            "cancel_intent_recorded_at": datetime.now(UTC).isoformat(),
+        }
+        await self._upsert_channel_session_state(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=customer_identity,
+            service_search_query=(existing_state or {}).get("service_search_query"),
+            service_options=[
+                item
+                for item in ((existing_state or {}).get("service_options") or [])
+                if isinstance(item, dict)
+            ],
+            reply_controls=(existing_state or {}).get("reply_controls") or {},
+            last_ai_intent="cancel_intent_pending",
+            last_workflow_status="answered",
+            metadata=merged_metadata,
+        )
+
+    async def _clear_cancel_intent_pending(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        customer_identity: dict[str, object],
+        existing_state: dict[str, object] | None = None,
+    ) -> None:
+        if not conversation_id:
+            return
+        existing_metadata = (existing_state or {}).get("session_metadata") if existing_state else {}
+        if not isinstance(existing_metadata, dict) or not existing_metadata.get("cancel_intent_pending"):
+            return
+        cleared = {
+            key: value
+            for key, value in existing_metadata.items()
+            if key not in {"cancel_intent_pending", "cancel_intent_recorded_at"}
+        }
+        await self._upsert_channel_session_state(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=customer_identity,
+            service_search_query=(existing_state or {}).get("service_search_query"),
+            service_options=[
+                item
+                for item in ((existing_state or {}).get("service_options") or [])
+                if isinstance(item, dict)
+            ],
+            reply_controls=(existing_state or {}).get("reply_controls") or {},
+            last_ai_intent="cancel_intent_cleared",
+            last_workflow_status="answered",
+            metadata=cleared,
+        )
+
+    @classmethod
+    def _is_cancel_intent_active(cls, session_metadata: dict[str, object] | None) -> bool:
+        if not isinstance(session_metadata, dict):
+            return False
+        if not session_metadata.get("cancel_intent_pending"):
+            return False
+        recorded = str(session_metadata.get("cancel_intent_recorded_at") or "").strip()
+        if not recorded:
+            return True
+        try:
+            recorded_at = datetime.fromisoformat(recorded)
+        except ValueError:
+            return True
+        if recorded_at.tzinfo is None:
+            recorded_at = recorded_at.replace(tzinfo=UTC)
+        if datetime.now(UTC) - recorded_at > timedelta(seconds=cls.CANCEL_INTENT_TTL_SECONDS):
+            return False
+        return True
+
     SUPPORTED_LOCALES = ("en", "vi")
     DEFAULT_LOCALE = "en"
 
@@ -2199,7 +2664,78 @@ class MessagingAutomationService:
             "en": "Tell me what you want to book…",
             "vi": "Bạn muốn đặt gì? Gõ vào đây…",
         },
+        "cancel_confirm_prompt": {
+            "en": (
+                "Confirm cancellation of booking <code>{booking_reference}</code>?\n\n"
+                "Tap <b>Confirm cancel</b> to send the cancel request to the provider, or "
+                "<b>Keep booking</b> to leave it untouched."
+            ),
+            "vi": (
+                "Xác nhận hủy booking <code>{booking_reference}</code>?\n\n"
+                "Bấm <b>Xác nhận hủy</b> để gửi yêu cầu hủy cho nhà cung cấp, hoặc "
+                "<b>Giữ booking</b> để giữ nguyên."
+            ),
+        },
+        "cancel_confirm_yes": {"en": "✅ Confirm cancel", "vi": "✅ Xác nhận hủy"},
+        "cancel_confirm_no": {"en": "↩ Keep booking", "vi": "↩ Giữ booking"},
+        "talk_to_support": {"en": "👤 Talk to support", "vi": "👤 Gặp hỗ trợ"},
+        "reschedule_date_prompt": {
+            "en": (
+                "Pick a new date for booking <code>{booking_reference}</code>:\n\n"
+                "Tap a date below. After picking, you'll choose a time slot. "
+                "The provider will confirm the new slot."
+            ),
+            "vi": (
+                "Chọn ngày mới cho booking <code>{booking_reference}</code>:\n\n"
+                "Bấm vào một ngày bên dưới. Sau khi chọn ngày, bạn sẽ chọn giờ. "
+                "Nhà cung cấp sẽ xác nhận lại lịch mới."
+            ),
+        },
+        "reschedule_time_prompt": {
+            "en": (
+                "New date: <b>{selected_date}</b> for booking <code>{booking_reference}</code>.\n\n"
+                "Pick a time slot below."
+            ),
+            "vi": (
+                "Ngày mới: <b>{selected_date}</b> cho booking <code>{booking_reference}</code>.\n\n"
+                "Bấm chọn khung giờ bên dưới."
+            ),
+        },
+        "reschedule_confirmed": {
+            "en": (
+                "Reschedule request sent.\n"
+                "Booking: <code>{booking_reference}</code>\n"
+                "New slot: <b>{selected_date} {selected_time}</b>\n\n"
+                "The provider will confirm. We'll keep you posted here."
+            ),
+            "vi": (
+                "Đã gửi yêu cầu đổi lịch.\n"
+                "Booking: <code>{booking_reference}</code>\n"
+                "Lịch mới: <b>{selected_date} {selected_time}</b>\n\n"
+                "Nhà cung cấp sẽ xác nhận. Mình sẽ cập nhật lại ở đây."
+            ),
+        },
+        "reschedule_could_not_queue": {
+            "en": (
+                "I couldn't queue the reschedule request for <code>{booking_reference}</code> "
+                "right now. Please try again or tap Talk to support."
+            ),
+            "vi": (
+                "Mình không gửi được yêu cầu đổi lịch cho <code>{booking_reference}</code> "
+                "lúc này. Bạn thử lại hoặc bấm Gặp hỗ trợ."
+            ),
+        },
+        "reschedule_back_to_booking": {
+            "en": "↩ Back to booking",
+            "vi": "↩ Về booking",
+        },
+        "reschedule_back_to_dates": {
+            "en": "↩ Pick a different date",
+            "vi": "↩ Chọn ngày khác",
+        },
     }
+
+    CANCEL_INTENT_TTL_SECONDS = 600
 
     @classmethod
     def _resolve_locale(cls, language_code: str | None) -> str:
