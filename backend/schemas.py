@@ -83,6 +83,23 @@ class CreateCustomerHandoffSessionResponse(BaseModel):
     expires_at: str
 
 
+class HandoffSessionSourceMetric(BaseModel):
+    minted: int
+    consumed: int
+
+
+class HandoffSessionSummaryResponse(BaseModel):
+    """Admin-only conversion metrics for `customer_handoff_sessions`."""
+
+    status: str
+    since: str
+    minted: int
+    consumed: int
+    expired_unconsumed: int
+    conversion_rate: float
+    by_source: dict[str, HandoffSessionSourceMetric]
+
+
 class EmailStatusResponse(BaseModel):
     smtp_configured: bool
     imap_configured: bool

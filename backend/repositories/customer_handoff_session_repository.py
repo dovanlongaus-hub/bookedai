@@ -4,7 +4,7 @@ from datetime import UTC, datetime, timedelta
 from secrets import token_urlsafe
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from db import CustomerHandoffSession
 from repositories.base import BaseRepository
@@ -72,3 +72,51 @@ class CustomerHandoffSessionRepository(BaseRepository):
         row.consumed_by_chat_id = (chat_id or "").strip() or None
         await self.session.flush()
         return row
+
+    async def summarize_since(
+        self, *, since: datetime
+    ) -> dict[str, Any]:
+        """Aggregate counts since `since` for the admin metrics endpoint.
+
+        Returns minted/consumed/expired-and-unconsumed totals plus a per-source
+        breakdown so ops can see which surface drives handoff conversion. Single
+        query — `created_at >= since` is the table's index path so this stays
+        cheap even as the table grows.
+        """
+        now = datetime.now(UTC)
+        result = await self.session.execute(
+            select(
+                CustomerHandoffSession.source,
+                func.count(CustomerHandoffSession.id).label("minted"),
+                func.count(CustomerHandoffSession.consumed_at).label("consumed"),
+            )
+            .where(CustomerHandoffSession.created_at >= since)
+            .group_by(CustomerHandoffSession.source)
+        )
+        rows = result.all()
+        by_source: dict[str, dict[str, int]] = {}
+        minted_total = 0
+        consumed_total = 0
+        for source, minted, consumed in rows:
+            label = (source or "").strip() or "unknown"
+            minted_int = int(minted or 0)
+            consumed_int = int(consumed or 0)
+            by_source[label] = {"minted": minted_int, "consumed": consumed_int}
+            minted_total += minted_int
+            consumed_total += consumed_int
+        # Expired-unconsumed count: rows past expires_at that were never consumed.
+        # Customers who tapped the link but never opened Telegram, or whose
+        # session expired before the bot picked it up.
+        expired_result = await self.session.execute(
+            select(func.count(CustomerHandoffSession.id))
+            .where(CustomerHandoffSession.created_at >= since)
+            .where(CustomerHandoffSession.consumed_at.is_(None))
+            .where(CustomerHandoffSession.expires_at < now)
+        )
+        expired_unconsumed = int(expired_result.scalar() or 0)
+        return {
+            "minted": minted_total,
+            "consumed": consumed_total,
+            "expired_unconsumed": expired_unconsumed,
+            "by_source": by_source,
+        }

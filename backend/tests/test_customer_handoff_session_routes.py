@@ -65,6 +65,10 @@ def create_test_app() -> FastAPI:
     app = FastAPI()
     app.include_router(handoff_router)
     app.state.session_factory = object()
+    app.state.settings = SimpleNamespace(
+        admin_api_token="admin-test-token",
+        admin_username="admin@bookedai.au",
+    )
     return app
 
 
@@ -187,3 +191,102 @@ class CustomerHandoffSessionRoutesTestCase(TestCase):
             self.assertIsNone(await repo.mark_consumed(row.id, chat_id="123456"))
 
         asyncio.run(_run())
+
+    def test_admin_handoff_session_summary_returns_metrics_for_admin(self):
+        async def _fake_summarize_since(_self, *, since):
+            # Captured via closure for assertion below.
+            self._captured_since = since
+            return {
+                "minted": 200,
+                "consumed": 150,
+                "expired_unconsumed": 30,
+                "by_source": {
+                    "product_homepage": {"minted": 180, "consumed": 140},
+                    "booking_assistant": {"minted": 20, "consumed": 10},
+                },
+            }
+
+        with patch("api.v1_handoff_handlers.get_session", _fake_get_session), patch(
+            "repositories.customer_handoff_session_repository."
+            "CustomerHandoffSessionRepository.summarize_since",
+            _fake_summarize_since,
+        ):
+            client = TestClient(create_test_app())
+            response = client.get(
+                "/api/v1/admin/handoff-sessions/summary?since_hours=48",
+                headers={"X-Admin-Token": "admin-test-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        body = response.json()
+        self.assertEqual(body["status"], "ok")
+        self.assertEqual(body["minted"], 200)
+        self.assertEqual(body["consumed"], 150)
+        self.assertEqual(body["expired_unconsumed"], 30)
+        # 150 / 200 = 0.75
+        self.assertEqual(body["conversion_rate"], 0.75)
+        self.assertEqual(body["by_source"]["product_homepage"]["minted"], 180)
+        self.assertEqual(body["by_source"]["booking_assistant"]["consumed"], 10)
+        # `since` is approximately 48h before now.
+        since_dt = datetime.fromisoformat(body["since"])
+        if since_dt.tzinfo is None:
+            since_dt = since_dt.replace(tzinfo=UTC)
+        delta = abs((datetime.now(UTC) - since_dt).total_seconds() - 48 * 3600)
+        self.assertLess(delta, 60)
+
+    def test_admin_handoff_session_summary_rejects_missing_admin_token(self):
+        client = TestClient(create_test_app())
+        response = client.get("/api/v1/admin/handoff-sessions/summary")
+        self.assertEqual(response.status_code, 401)
+
+    def test_admin_handoff_session_summary_rejects_wrong_admin_token(self):
+        client = TestClient(create_test_app())
+        response = client.get(
+            "/api/v1/admin/handoff-sessions/summary",
+            headers={"X-Admin-Token": "not-the-real-token"},
+        )
+        self.assertEqual(response.status_code, 401)
+
+    def test_admin_handoff_session_summary_handles_zero_minted(self):
+        async def _fake_summarize_since(_self, *, since):
+            return {"minted": 0, "consumed": 0, "expired_unconsumed": 0, "by_source": {}}
+
+        with patch("api.v1_handoff_handlers.get_session", _fake_get_session), patch(
+            "repositories.customer_handoff_session_repository."
+            "CustomerHandoffSessionRepository.summarize_since",
+            _fake_summarize_since,
+        ):
+            client = TestClient(create_test_app())
+            response = client.get(
+                "/api/v1/admin/handoff-sessions/summary",
+                headers={"X-Admin-Token": "admin-test-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        # Conversion rate is 0.0 when no sessions minted, not a divide-by-zero
+        # crash.
+        self.assertEqual(response.json()["conversion_rate"], 0.0)
+
+    def test_admin_handoff_session_summary_clamps_since_hours_to_30_days(self):
+        captured = {}
+
+        async def _fake_summarize_since(_self, *, since):
+            captured["since"] = since
+            return {"minted": 0, "consumed": 0, "expired_unconsumed": 0, "by_source": {}}
+
+        with patch("api.v1_handoff_handlers.get_session", _fake_get_session), patch(
+            "repositories.customer_handoff_session_repository."
+            "CustomerHandoffSessionRepository.summarize_since",
+            _fake_summarize_since,
+        ):
+            client = TestClient(create_test_app())
+            response = client.get(
+                "/api/v1/admin/handoff-sessions/summary?since_hours=99999",
+                headers={"X-Admin-Token": "admin-test-token"},
+            )
+
+        self.assertEqual(response.status_code, 200)
+        # since_hours is clamped to 30 days (720 hours) — keeps the index scan
+        # bounded and pushes BI workloads to the warehouse.
+        delta_hours = (datetime.now(UTC) - captured["since"]).total_seconds() / 3600
+        self.assertLess(abs(delta_hours - 720), 1)
