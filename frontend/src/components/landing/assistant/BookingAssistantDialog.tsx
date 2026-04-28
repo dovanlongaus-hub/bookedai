@@ -652,6 +652,7 @@ function buildAuthoritativeBookingIntentResult(params: {
   const { authoritativeResult, selectedService, requestedDate, requestedTime, customerEmail, trustWarnings, nextStep } = params;
   const bookingReference =
     authoritativeResult.bookingReference?.trim() || authoritativeResult.bookingIntentId;
+  const supportEmail = authoritativeResult.contactEmail?.trim() || authoritativeResult.supportEmail?.trim() || 'info@bookedai.au';
   const amountLabel = formatServicePrice(selectedService);
   const rawDetailLine = nextStep?.trim() || trustWarnings[0] || 'We will confirm the final slot with the provider.';
   const detailLine = rawDetailLine.toLowerCase().includes('candidate not found')
@@ -671,13 +672,13 @@ function buildAuthoritativeBookingIntentResult(params: {
     payment_status: 'payment_follow_up_required',
     payment_url: '',
     qr_code_url: '',
-    email_status: customerEmail.trim() ? 'sent' : 'pending_manual_followup',
+    email_status: authoritativeResult.emailStatus === 'sent' && customerEmail.trim() ? 'sent' : 'pending_manual_followup',
     meeting_status: 'configuration_required',
     meeting_join_url: null,
     meeting_event_url: null,
     calendar_add_url: null,
     confirmation_message: `Booking request captured in v1. ${detailLine}`,
-    contact_email: customerEmail.trim() || 'follow-up required',
+    contact_email: supportEmail,
     workflow_status: authoritativeResult.trust.recommended_booking_path ?? 'request_callback',
     crm_sync: authoritativeResult.crmSync ?? null,
   };
@@ -3105,11 +3106,13 @@ export function BookingAssistantDialog({
     }
     event.preventDefault();
     const trimmedQuery = pendingSearchQuery.trim();
+    const browserLocale = (window.navigator?.language || '').split('-')[0].toLowerCase() || null;
     const handoff = await createCustomerHandoffSession({
       source: 'product_homepage',
       bookingReference: params.bookingReference ?? null,
       serviceQuery: trimmedQuery || params.serviceName || null,
       serviceSlug: params.serviceName ?? null,
+      locale: browserLocale,
     });
     window.open(handoff.deeplink, '_blank', 'noopener,noreferrer');
   }
