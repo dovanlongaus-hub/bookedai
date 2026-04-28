@@ -27,6 +27,7 @@ bookedai-video/node_modules/
 bookedai-video/out/
 frontend/node_modules/
 frontend/dist/
+frontend/dist-widget/
 frontend/tmp-*
 supabase/.env
 supabase/.env.old

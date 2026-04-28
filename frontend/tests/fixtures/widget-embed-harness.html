@@ -1,0 +1,20 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>BookedAI widget harness</title>
+  <style>body { font-family: -apple-system, system-ui, sans-serif; padding: 32px; max-width: 640px; }</style>
+</head>
+<body>
+  <h1>External tenant page (test harness)</h1>
+  <p>This page hosts the widget like a real partner site would.</p>
+  <bookedai-search id="embed-1" tenant="ai-mentor-doer" theme="light"></bookedai-search>
+  <script src="/v1.js" defer></script>
+  <script>
+    window.__bookedaiEvents = [];
+    document.addEventListener('bookedai:open', (e) => window.__bookedaiEvents.push({ type: 'open', detail: e.detail }));
+    document.addEventListener('bookedai:booking', (e) => window.__bookedaiEvents.push({ type: 'booking', detail: e.detail }));
+  </script>
+</body>
+</html>
