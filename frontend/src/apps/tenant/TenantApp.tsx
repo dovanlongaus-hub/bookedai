@@ -24,6 +24,7 @@ import type {
   TenantTeamResponse,
 } from '../../shared/contracts';
 import { releaseLabel, releaseVersion } from '../../shared/config/release';
+import { CommandPalette, type Command } from '../../shared/components/CommandPalette';
 import { PartnerMatchActionFooter } from '../../shared/components/PartnerMatchActionFooter';
 import { PartnerMatchCard } from '../../shared/components/PartnerMatchCard';
 import {
@@ -1701,6 +1702,39 @@ export function TenantApp() {
     setCatalogEditError(null);
     setCatalogEditMessage(null);
   }, [selectedCatalogItem]);
+
+  const tenantPaletteCommands = useMemo<Command[]>(() => {
+    return [
+      {
+        id: 'tenant.todays_bookings',
+        label: "View today's bookings",
+        hint: 'open bookings panel',
+        intent: 'navigate',
+        group: 'Bookings',
+        keywords: ['bookings', 'today', 'schedule'],
+        run: () => handlePanelChange('bookings', 'cmdk'),
+      },
+      {
+        id: 'tenant.run_revenue_ops',
+        label: 'Run revenue-ops queue',
+        hint: 'operations panel',
+        intent: 'action',
+        group: 'Actions',
+        keywords: ['revenue', 'ops', 'queue', 'operations'],
+        run: () => handlePanelChange('operations', 'cmdk'),
+      },
+      {
+        id: 'tenant.open_billing',
+        label: 'Open billing',
+        hint: 'billing panel',
+        intent: 'navigate',
+        group: 'Navigation',
+        keywords: ['billing', 'payment', 'subscription'],
+        run: () => handlePanelChange('billing', 'cmdk'),
+      },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   async function refreshTenantWorkspace(nextSession = session) {
     const nextTenantRef =
@@ -5715,6 +5749,7 @@ export function TenantApp() {
           </div>
         </section>
       </div>
+      <CommandPalette surface="tenant" extraCommands={tenantPaletteCommands} />
     </main>
   );
 }

@@ -64,6 +64,85 @@ def _reset_ai_cost_breaker():
     yield
 
 
+@pytest.fixture(autouse=True)
+def _reset_embed_origin_cache():
+    """Per-test reset of the Wave 9-A embed-origin allow-list cache.
+
+    The cache is a process-local dict with a 60s TTL. Across a long pytest
+    run, entries seeded by `test_v1_embed_*` tests bleed into later tests,
+    making subsequent slug lookups short-circuit on stale data instead of
+    hitting the per-test fake session_factory.
+    """
+
+    try:
+        from app import _embed_origin_cache_clear
+
+        _embed_origin_cache_clear()
+    except Exception:
+        pass
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_sandbox_session_store():
+    """Per-test reset of the Wave 9-B in-memory sandbox session store.
+
+    Sessions persist for 24h by default; without a per-test reset the
+    `test_v1_sandbox_routes` ids accumulate and the per-process MAX cap
+    can be approached during full-suite runs.
+    """
+
+    try:
+        from core.sandbox_store import sandbox_session_store
+
+        sandbox_session_store.reset_for_tests()
+    except Exception:
+        pass
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_public_stats_cache():
+    """Per-test reset of the public stats 30s TTL cache.
+
+    Without this, the first test that hits `/api/v1/public/stats/bookings`
+    populates `_cache_state["payload"]`, and subsequent tests that expect
+    a fresh DB query (or a different fake session_factory) see the stale
+    payload instead.
+    """
+
+    try:
+        from api.v1_public_stats_handlers import reset_public_stats_cache
+
+        reset_public_stats_cache()
+    except Exception:
+        pass
+    yield
+
+
+@pytest.fixture(autouse=True)
+def _reset_app_state_rate_limiter():
+    """Per-test reset of the shared `app.state.rate_limiter` buckets.
+
+    Each test file binds a fresh `InMemoryRateLimiter()` to `app_module.app`,
+    but tests that don't re-bind inherit a previous file's limiter with
+    consumed buckets — causing late-suite tests to silently 429. Reset to a
+    fresh limiter (or `.reset()` if already present) before every test.
+    """
+
+    try:
+        from rate_limit import InMemoryRateLimiter
+
+        existing = getattr(app_module.app.state, "rate_limiter", None)
+        if existing is not None and hasattr(existing, "reset"):
+            existing.reset()
+        else:
+            app_module.app.state.rate_limiter = InMemoryRateLimiter()
+    except Exception:
+        pass
+    yield
+
+
 @pytest.fixture()
 def test_app():
     app = app_module.app

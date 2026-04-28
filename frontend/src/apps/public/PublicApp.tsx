@@ -18,6 +18,7 @@ import {
 
 import { brandUploadedLogoPath } from '../../components/landing/data';
 import { LogoMark } from '../../components/landing/ui/LogoMark';
+import { CommandPalette } from '../../shared/components/CommandPalette';
 import { LiveBookingStrip, LiveBookingToast } from '../../shared/components/LiveBookingTicker';
 import { HomepageSearchExperience } from './HomepageSearchExperience';
 import { getHomepageContent, pitchDeckHref } from './homepageContent';
@@ -1053,6 +1054,7 @@ export function PublicApp() {
       </section>
 
       <LiveBookingToast />
+      <CommandPalette surface="public" />
     </main>
   );
 }

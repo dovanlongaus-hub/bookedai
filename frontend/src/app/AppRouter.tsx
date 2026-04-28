@@ -40,6 +40,10 @@ const AIMentorBookedAIApp = lazy(async () => {
   const module = await import('../apps/public/AIMentorBookedAIApp');
   return { default: module.AIMentorBookedAIApp };
 });
+const AIMentorAccountApp = lazy(async () => {
+  const module = await import('../apps/public/AIMentorAccountApp');
+  return { default: module.AIMentorAccountApp };
+});
 const PitchDeckApp = lazy(async () => {
   const module = await import('../apps/public/PitchDeckApp');
   return { default: module.PitchDeckApp };
@@ -64,9 +68,25 @@ const SandboxApp = lazy(async () => {
   const module = await import('../apps/public/SandboxApp');
   return { default: module.SandboxApp };
 });
+const DocsApp = lazy(async () => {
+  const module = await import('../apps/public/DocsApp');
+  return { default: module.DocsApp };
+});
+const ChangelogApp = lazy(async () => {
+  const module = await import('../apps/public/ChangelogApp');
+  return { default: module.ChangelogApp };
+});
+const StatusApp = lazy(async () => {
+  const module = await import('../apps/public/StatusApp');
+  return { default: module.StatusApp };
+});
 const PortalApp = lazy(async () => {
   const module = await import('../apps/portal/PortalApp');
   return { default: module.PortalApp };
+});
+const StudentPortalApp = lazy(async () => {
+  const module = await import('../apps/portal/StudentPortalApp');
+  return { default: module.StudentPortalApp };
 });
 
 function isAdminRuntime() {
@@ -190,6 +210,26 @@ function isAIMentorBookedAIRuntime() {
   );
 }
 
+function isAIMentorAccountRoute() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const { hostname, pathname } = window.location;
+  if (
+    hostname !== 'aimentor.bookedai.au' &&
+    !pathname.startsWith('/aimentor')
+  ) {
+    return false;
+  }
+  // Match `/account`, `/account/`, `/aimentor/account`, `/aimentor/account/...`
+  return (
+    pathname === '/account' ||
+    pathname.startsWith('/account/') ||
+    pathname === '/aimentor/account' ||
+    pathname.startsWith('/aimentor/account/')
+  );
+}
+
 function isChessGrandmasterRuntime() {
   if (typeof window === 'undefined') {
     return false;
@@ -236,6 +276,14 @@ function isPortalRuntime() {
   return hostname === 'portal.bookedai.au' || pathname === '/portal' || pathname.startsWith('/portal/');
 }
 
+function isStudentPortalRoute() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const { pathname } = window.location;
+  return pathname === '/student-account' || pathname.startsWith('/student-account/');
+}
+
 function isSandboxRuntime() {
   if (typeof window === 'undefined') {
     return false;
@@ -243,6 +291,37 @@ function isSandboxRuntime() {
 
   const { pathname } = window.location;
   return pathname === '/sandbox' || pathname.startsWith('/sandbox/');
+}
+
+function isDocsRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { pathname } = window.location;
+  return pathname === '/docs' || pathname === '/docs/' || pathname.startsWith('/docs/');
+}
+
+function isChangelogRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { pathname } = window.location;
+  return (
+    pathname === '/changelog' ||
+    pathname === '/changelog/' ||
+    pathname.startsWith('/changelog/')
+  );
+}
+
+function isStatusRuntime() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const { pathname } = window.location;
+  return pathname === '/status' || pathname === '/status/' || pathname.startsWith('/status/');
 }
 
 /**
@@ -412,6 +491,13 @@ export function AppRouter() {
   }
 
   if (isAIMentorBookedAIRuntime()) {
+    if (isAIMentorAccountRoute()) {
+      return (
+        <Suspense fallback={fallback}>
+          <AIMentorAccountApp />
+        </Suspense>
+      );
+    }
     return (
       <Suspense fallback={fallback}>
         <AIMentorBookedAIApp />
@@ -443,6 +529,14 @@ export function AppRouter() {
     );
   }
 
+  if (isStudentPortalRoute()) {
+    return (
+      <Suspense fallback={fallback}>
+        <StudentPortalApp />
+      </Suspense>
+    );
+  }
+
   if (isPortalRuntime()) {
     return (
       <Suspense fallback={fallback}>
@@ -455,6 +549,30 @@ export function AppRouter() {
     return (
       <Suspense fallback={fallback}>
         <SandboxApp />
+      </Suspense>
+    );
+  }
+
+  if (isDocsRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <DocsApp />
+      </Suspense>
+    );
+  }
+
+  if (isChangelogRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <ChangelogApp />
+      </Suspense>
+    );
+  }
+
+  if (isStatusRuntime()) {
+    return (
+      <Suspense fallback={fallback}>
+        <StatusApp />
       </Suspense>
     );
   }

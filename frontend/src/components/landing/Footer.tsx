@@ -63,6 +63,9 @@ const FOOTER_COLUMNS: Array<{
   {
     heading: 'Company',
     links: [
+      { label: 'Docs', href: '/docs' },
+      { label: 'Changelog', href: '/changelog' },
+      { label: 'Status', href: '/status' },
       { label: 'Privacy', href: privacyHref },
       { label: 'Terms', href: termsHref },
       { label: 'Accessibility', href: '/accessibility' },

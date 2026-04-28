@@ -26,6 +26,7 @@ import {
 import { brandPreferredLogoPath } from '../../components/landing/data';
 import { BrandLockup } from '../../components/landing/ui/BrandLockup';
 import { AgentActivityDrawer } from '../../shared/components/AgentActivityDrawer';
+import { CommandPalette, type Command } from '../../shared/components/CommandPalette';
 import { apiV1 } from '../../shared/api/v1';
 import type {
   PortalBookingAction,
@@ -656,6 +657,54 @@ export function PortalApp() {
   const currentWhatsAppUrl = currentBookingReference
     ? buildWhatsAppCareUrl(currentBookingReference, detail?.service.service_name)
     : '';
+
+  const portalPaletteCommands = useMemo<Command[]>(() => {
+    return [
+      {
+        id: 'portal.open_my_booking',
+        label: 'Open my booking',
+        hint: currentBookingReference || 'set view to status',
+        intent: 'navigate',
+        group: 'Bookings',
+        keywords: ['my', 'booking', 'open', 'status'],
+        run: () => {
+          setViewMode('status');
+          if (currentBookingReference) {
+            syncPortalRouteState(currentBookingReference, 'status');
+          }
+        },
+      },
+      {
+        id: 'portal.reschedule_current',
+        label: 'Reschedule current',
+        hint: currentBookingReference || 'no booking loaded',
+        intent: 'action',
+        group: 'Actions',
+        keywords: ['reschedule', 'change', 'time', 'date'],
+        run: () => {
+          if (!detail) {
+            return;
+          }
+          openRequestComposer('reschedule');
+        },
+      },
+      {
+        id: 'portal.cancel_current',
+        label: 'Cancel current',
+        hint: currentBookingReference || 'no booking loaded',
+        intent: 'action',
+        group: 'Actions',
+        keywords: ['cancel', 'cancellation'],
+        run: () => {
+          if (!detail) {
+            return;
+          }
+          openRequestComposer('cancel');
+        },
+      },
+    ];
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentBookingReference, detail]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2049,6 +2098,7 @@ export function PortalApp() {
           </aside>
         </div>
       </section>
+      <CommandPalette surface="portal" extraCommands={portalPaletteCommands} />
     </main>
   );
 }
