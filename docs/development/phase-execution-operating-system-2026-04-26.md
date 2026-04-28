@@ -281,3 +281,8 @@ The project does not restart from Phase `0`. Phase `0-16` remain historical deli
 - finish `Sprint 19` P0/P1 gates
 - close Phase `17`, Phase `19`, and Phase `23` blockers enough to open Phase `20`
 - only then move to widget/plugin runtime, wallet/Stripe return, billing truth, multi-tenant templates, and final release governance scale-up
+
+## 2026-04-28 Gate Note
+
+- Zoho CRM booking lifecycle hardening is live-UAT verified with phone-only booking `v1-53a53835ae`: lead, contact, deal, and task all synced to Zoho and the booking reopened in the portal.
+- Release-gate hardening is applied for the next clean pass: frontend Playwright smoke runners build once, reuse `dist` preview, and combine legacy/admin cases; backend Telegram human-handoff suppression coverage is restored.

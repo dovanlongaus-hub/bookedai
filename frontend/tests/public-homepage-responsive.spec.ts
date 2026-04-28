@@ -13,11 +13,11 @@ test.describe('public homepage responsive qa', () => {
     await page.setViewportSize({ width: 1440, height: 1100 });
     await openHomepage(page);
 
-    await expect(page.getByRole('button', { name: /See plans for your business/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Get started/i })).toBeVisible();
-    await expect(page.getByText(/Automate follow-up, CRM sync, and customer care/i)).toBeVisible();
-    await expect(page.getByText(/Keep care moving automatically/i)).toBeVisible();
-    await expect(page.getByText(/Get started free/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Start in product/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /See how it works/i })).toBeVisible();
+    await expect(page.getByText(/capture qualified enquiries before they go cold/i)).toBeVisible();
+    await expect(page.getByText(/keep CRM, email, and customer care aligned/i)).toBeVisible();
+    await expect(page.getByText(/Ask, compare, book, and continue/i)).toBeVisible();
 
     await page.screenshot({
       path: testInfo.outputPath('homepage-desktop-b2b.png'),
@@ -28,10 +28,9 @@ test.describe('public homepage responsive qa', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openHomepage(page);
 
-    await expect(page.getByRole('button', { name: /Menu/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /See plans for your business/i })).toBeVisible();
-    await expect(page.getByRole('link', { name: /Get started/i })).toBeVisible();
-    await expect(page.getByText(/Capture more qualified enquiries/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Start in product/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /See how it works/i })).toBeVisible();
+    await expect(page.getByText(/capture qualified enquiries before they go cold/i)).toBeVisible();
 
     await page.screenshot({
       path: testInfo.outputPath('homepage-mobile-b2b.png'),
@@ -42,10 +41,8 @@ test.describe('public homepage responsive qa', () => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await openHomepage(page);
 
-    await page.getByPlaceholder(/Sydney or your main suburb/i).fill('Sydney');
-    await page.getByPlaceholder(/Plumber, salon, swim school, clinic/i).fill('Plumber');
-    await page.getByRole('button', { name: /See plans for your business/i }).click();
+    await page.getByRole('button', { name: /Start in product/i }).first().click();
 
-    await page.waitForURL(/product\.bookedai\.au\/\?q=Plumber\+in\+Sydney&source=homepage/i);
+    await page.waitForURL(/product\.bookedai\.au/i);
   });
 });

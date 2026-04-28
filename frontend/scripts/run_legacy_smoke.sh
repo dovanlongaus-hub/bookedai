@@ -5,14 +5,12 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "${ROOT_DIR}"
 
-run_case() {
-  local file="$1"
-  local grep_pattern="$2"
+grep_pattern="desktop keeps the business-owner positioning and key CTA clear|mobile keeps the business-owner CTA stack clear and usable|renders an enterprise booking command center and submits reschedule|keeps the portal layout inside the mobile viewport"
 
-  echo "[legacy-smoke] ${grep_pattern}"
-  PLAYWRIGHT_SKIP_BUILD="${PLAYWRIGHT_SKIP_BUILD:-0}" \
-    bash scripts/run_playwright_suite.sh legacy "${file}" --grep "${grep_pattern}"
-}
-
-run_case "tests/public-homepage-responsive.spec.ts" "desktop keeps the opening screen clean and search-first"
-run_case "tests/public-homepage-responsive.spec.ts" "mobile keeps search and actions compact like a Google-style shell"
+echo "[legacy-smoke] ${grep_pattern}"
+PLAYWRIGHT_SKIP_BUILD="${PLAYWRIGHT_SKIP_BUILD:-0}" \
+  bash scripts/run_playwright_suite.sh legacy \
+    "tests/public-homepage-responsive.spec.ts" \
+    "tests/portal-enterprise-workspace.spec.ts" \
+    --grep "${grep_pattern}" \
+    --workers=1

@@ -20,7 +20,7 @@ function deriveCommercialTruthState(billing: TenantBillingResponse) {
     return {
       label: 'Manual setup required',
       tone: 'border-amber-300 bg-amber-50 text-amber-950',
-      body: 'This workspace still needs a billing identity before package changes, live charging, or renewal posture can become credible.',
+      body: 'This workspace still needs a billing identity before package changes, live charging, or renewal readiness can become credible.',
     };
   }
 
@@ -28,7 +28,7 @@ function deriveCommercialTruthState(billing: TenantBillingResponse) {
     return {
       label: 'Provider-backed billing live',
       tone: 'border-emerald-300 bg-emerald-50 text-emerald-950',
-      body: 'This tenant has real billing-provider posture available, so package and invoice states can move through connected payment infrastructure instead of manual-only handling.',
+      body: 'This business has real billing-provider readiness available, so package and invoice states can move through connected payment infrastructure instead of manual-only handling.',
     };
   }
 
@@ -36,7 +36,7 @@ function deriveCommercialTruthState(billing: TenantBillingResponse) {
     return {
       label: 'Connected but not fully live',
       tone: 'border-sky-300 bg-sky-50 text-sky-950',
-      body: 'A billing provider connection exists, but this tenant still depends on additional live-mode or checkout readiness before the full self-serve loop is closed.',
+      body: 'A billing provider connection exists, but this business still depends on additional live-mode or checkout readiness before the full self-serve loop is closed.',
     };
   }
 
@@ -67,7 +67,7 @@ function deriveInvoiceTruthLabel(billing: TenantBillingResponse) {
   if (billing.gateway?.checkout_enabled) {
     return 'Provider-backed billing is ready, but no invoice cycle exists yet';
   }
-  return 'Invoice seam exists, but live invoice generation is still immature for this tenant';
+  return 'Invoice history is available, but live invoice generation is not fully active yet';
 }
 
 function formatDateLabel(value: string | null | undefined) {
@@ -163,13 +163,13 @@ export function TenantBillingWorkspace({
           </div>
 
           <p className="mt-3 text-sm leading-6 text-slate-600">
-            The tenant portal now acts as the self-serve surface for package choice, trial activation,
+            The business workspace now acts as the self-serve surface for package choice, trial activation,
             billing setup, and paid workspace readiness.
           </p>
 
           <div className={`mt-5 rounded-[1.25rem] border px-4 py-4 ${commercialTruth.tone}`}>
             <div className="text-[11px] font-semibold uppercase tracking-[0.14em] opacity-80">
-              Commercial truth
+              Billing readiness
             </div>
             <div className="mt-2 text-sm font-semibold">{commercialTruth.label}</div>
             <p className="mt-2 text-sm leading-6 opacity-90">{commercialTruth.body}</p>
@@ -194,7 +194,7 @@ export function TenantBillingWorkspace({
             </div>
             <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Payment posture
+                Payment setup
               </div>
               <div className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
                 {formatStatusLabel(billing.self_serve.payment_method_status)}

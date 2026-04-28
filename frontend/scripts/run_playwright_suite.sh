@@ -23,15 +23,12 @@ else
   export VITE_PUBLIC_BOOKING_ASSISTANT_V1_LIVE_READ=0
 fi
 
-bash scripts/kill_playwright_preview.sh 3100 3101
-
-if [[ "${PLAYWRIGHT_SKIP_BUILD:-0}" != "1" ]]; then
-  npm run build
+PREVIEW_ARGS=("${PORT}")
+if [[ "${PLAYWRIGHT_SKIP_BUILD:-0}" == "1" ]]; then
+  PREVIEW_ARGS+=("--skip-build")
 fi
 
-bash scripts/kill_playwright_preview.sh 3100 3101
-
-npx vite preview --host 127.0.0.1 --port "${PORT}" --strictPort &
+node scripts/start-playwright-preview.mjs "${PREVIEW_ARGS[@]}" &
 PREVIEW_PID=$!
 
 cleanup() {

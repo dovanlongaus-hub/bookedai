@@ -10,7 +10,25 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 ## Status Snapshot
 
-Date: `2026-04-27`
+Date: `2026-04-28`
+
+Implementation update from `2026-04-28` (Zoho CRM booking lifecycle live UAT and release-gate hardening):
+
+- completed live Zoho CRM booking UAT with phone-only Future Swim booking `v1-53a53835ae`; the API returned `200`, the booking reopened in the portal, and Zoho lead/contact/deal/task all reported `synced` with external CRM ids
+- stack health passed after the live probe at `2026-04-28T01:56:16Z`; backend logs showed Zoho OAuth, Leads, Contacts, Deals, Tasks, and CRM feedback webhook calls completing successfully for the UAT record
+- restored the Telegram human-handoff claimed TTL/suppression contract in `MessagingAutomationService` and verified the focused regression pair plus the backend release unittest lane (`69 tests OK`)
+- hardened frontend release-gate smoke stability by updating stale homepage smoke assertions, combining legacy/admin smoke cases under one Playwright invocation, and switching preview to the static `dist` server for test runs
+- verification completed: full backend pytest earlier passed (`344 passed`), live booking/portal UAT passed, stack health passed, frontend smoke lanes passed individually (`legacy 4`, `live-read 2`, `admin 4`, `tenant 4`), and backend release unittest lane passed; the long single-command release gate still needs a clean rerun after the dirty workspace stops restoring stale smoke files mid-run
+- status: Zoho CRM booking lifecycle hardening is live-UAT verified; release-gate runner fixes are locally applied for the next clean full-gate pass
+
+Implementation update from `2026-04-28` (tenant owner microcopy follow-up, local):
+
+- tightened remaining tenant auth-card and gateway microcopy toward business-owner language: owner access, business workspace, owner Google login, business account creation, owner identity, and booking-backed workspace
+- refreshed tenant billing labels away from internal readiness language by replacing commercial truth/payment posture/invoice seam wording with billing readiness, payment setup, and invoice history phrasing
+- added a mobile tenant gateway stale-copy/overflow smoke so the old `one tenant workspace`, `Commercial truth`, and `Payment posture` copy cannot return unnoticed
+- stabilized tenant smoke execution on the static SPA preview path and added the tenant smoke call back into `test:release-gate`
+- verification passed locally with `npm --prefix frontend exec tsc -- --noEmit`, `npm --prefix frontend run build`, and `PLAYWRIGHT_SKIP_BUILD=1 npm --prefix frontend run test:playwright:tenant-smoke` (`4 passed`)
+- status: local follow-up is complete; live deploy remains pending a clean full frontend release gate because an earlier full-gate attempt ran while stale smoke scripts were still present in the dirty workspace
 
 Implementation update from `2026-04-27` (homepage/admin business-owner wording live deploy):
 

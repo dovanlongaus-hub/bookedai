@@ -79,25 +79,44 @@ async function main() {
 
   await killExistingPreviewServer(port);
 
-  const preview = spawn(
-    `npx vite preview --host 127.0.0.1 --port ${String(port)} --strictPort`,
-    {
+  let shuttingDown = false;
+  let preview = null;
+
+  function spawnPreview() {
+    preview = spawn('node', ['scripts/serve_dist_spa.mjs'], {
       stdio: 'inherit',
-      shell: true,
-      env: process.env,
-    },
-  );
+      env: {
+        ...process.env,
+        PLAYWRIGHT_PREVIEW_HOST: '127.0.0.1',
+        PLAYWRIGHT_PREVIEW_PORT: String(port),
+      },
+    });
 
-  preview.on('error', (error) => {
-    console.error(error);
-    process.exit(1);
+    preview.on('error', (error) => {
+      console.error(error);
+      process.exit(1);
+    });
+
+    preview.on('exit', (code) => {
+      if (shuttingDown) {
+        process.exit(code ?? 0);
+        return;
+      }
+
+      console.error(`[playwright-preview] preview exited with code ${code ?? 0}; restarting`);
+      setTimeout(spawnPreview, 250);
+    });
+  }
+
+  spawnPreview();
+
+  process.on('SIGINT', () => {
+    shuttingDown = true;
+    preview?.kill('SIGINT');
   });
-
-  process.on('SIGINT', () => preview.kill('SIGINT'));
-  process.on('SIGTERM', () => preview.kill('SIGTERM'));
-
-  preview.on('exit', (code) => {
-    process.exit(code ?? 0);
+  process.on('SIGTERM', () => {
+    shuttingDown = true;
+    preview?.kill('SIGTERM');
   });
 }
 

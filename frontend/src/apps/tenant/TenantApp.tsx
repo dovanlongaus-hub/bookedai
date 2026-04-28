@@ -2977,14 +2977,14 @@ export function TenantApp() {
     const gatewayCopy =
       tenantVariant === 'revenue_ops'
         ? {
-            title: 'Turn every enquiry into tracked revenue operations',
+            title: 'Turn missed enquiries into bookings your team can follow up',
             body:
-              'Sign in with Google, create a new workspace, or use a one-time email code. BookedAI shows what was captured, what needs follow-up, and which revenue actions are ready to run.',
+              'Sign in with Google, create a new workspace, or use a one-time email code. BookedAI shows what was captured, what needs follow-up, and what payment or customer-care step comes next.',
           }
         : {
-            title: 'Run bookings, enquiries, and follow-up from one tenant workspace',
+            title: 'Run bookings, enquiries, and follow-up from one owner workspace',
             body:
-              'Sign in with Google, create a new workspace, or use a one-time email code. BookedAI routes you to the right tenant and keeps booking, revenue, and automation work in one place.',
+              'Sign in with Google, create a new workspace, or use a one-time email code. BookedAI routes you to the right business and keeps service bookings, customer follow-up, and revenue visibility in one place.',
           };
 
     return (
@@ -3003,9 +3003,9 @@ export function TenantApp() {
               </p>
               <div className="mt-8 grid max-w-xl gap-3 sm:grid-cols-3">
                 {[
-                  ['Fast verified access', 'Google-linked tenant identity'],
+                  ['Fast verified access', 'Google-linked owner identity'],
                   ['Password-free fallback', 'Secure one-time email code'],
-                  ['Right workspace', 'Routes to the matching tenant'],
+                  ['Right business', 'Routes to the matching workspace'],
                 ].map(([label, detail]) => (
                   <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
                     <div className="text-sm font-semibold text-slate-950">{label}</div>
@@ -3040,7 +3040,7 @@ export function TenantApp() {
                 </span>
               </div>
               <div className="mt-6 text-xs font-medium text-slate-400" aria-label="Tenant gateway release">
-                Secure tenant access · API-backed workspace · Source {releaseVersion}
+                Secure owner access · Booking-backed workspace · Source {releaseVersion}
               </div>
               <figure className="mt-8 hidden max-w-3xl overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.14)] md:block">
                 <div className="flex items-center gap-2 border-b border-slate-200 bg-slate-50 px-4 py-3">
@@ -3238,7 +3238,7 @@ export function TenantApp() {
           <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
             <div className="max-w-4xl">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--apple-blue)]">
-                Tenant enterprise workspace
+                Service business workspace
               </div>
               <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[var(--apple-near-black)] lg:text-4xl">
                 {overview.tenant.name}
@@ -3250,7 +3250,7 @@ export function TenantApp() {
               </p>
               <div className="mt-6 flex flex-wrap gap-3 text-xs text-black/62">
                 <span className="rounded-full border border-black/6 bg-white/72 px-3 py-1.5">
-                  Tenant: {overview.tenant.slug}
+                  Business: {overview.tenant.slug}
                 </span>
                 <span className="rounded-full border border-black/6 bg-white/72 px-3 py-1.5">
                   Status: {overview.tenant.status ?? 'unknown'}
@@ -3290,11 +3290,11 @@ export function TenantApp() {
               <div className="grid gap-3 text-sm text-black/72 sm:grid-cols-2">
                 <div className="rounded-[1.25rem] border border-black/6 bg-white/72 px-4 py-3 backdrop-blur">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42">
-                    Access posture
+                    Signed-in access
                   </div>
                   <div className="mt-1 font-semibold text-[var(--apple-near-black)]">{roleDisplayLabel}</div>
                   <div className="mt-1 text-xs text-black/54">
-                    {overview.shell.read_only ? 'Preview only until sign-in' : 'Live operator access'}
+                    {overview.shell.read_only ? 'Read-only workspace access' : 'Live owner access'}
                   </div>
                 </div>
                 <div
@@ -3302,10 +3302,10 @@ export function TenantApp() {
                   title={`Release ${releaseLabel} (${releaseVersion})`}
                 >
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-black/42">
-                    Trust posture
+                    Trust status
                   </div>
-                  <div className="mt-1 font-semibold text-[var(--apple-near-black)]">Secure tenant access</div>
-                  <div className="mt-1 text-xs text-black/54">API-backed workspace</div>
+                  <div className="mt-1 font-semibold text-[var(--apple-near-black)]">Secure owner access</div>
+                  <div className="mt-1 text-xs text-black/54">Booking-backed workspace</div>
                 </div>
               </div>
               {session ? (
@@ -5206,7 +5206,7 @@ export function TenantApp() {
             <div className="space-y-6">
               <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
                 <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  Access posture
+                  Signed-in access
                 </div>
                 <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
                   Integration controls

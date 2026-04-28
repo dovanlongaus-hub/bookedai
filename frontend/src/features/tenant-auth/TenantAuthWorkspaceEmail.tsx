@@ -41,12 +41,12 @@ function formatRoleLabel(role: string | null | undefined) {
 
 function modeTitle(authMode: TenantAuthMode) {
   if (authMode === 'create') {
-    return 'Create tenant account';
+    return 'Create business account';
   }
   if (authMode === 'claim') {
     return 'Accept invite';
   }
-  return 'Access your tenant workspace';
+  return 'Access your business workspace';
 }
 
 function modeDescription(authMode: TenantAuthMode, isGateway: boolean) {
@@ -57,7 +57,7 @@ function modeDescription(authMode: TenantAuthMode, isGateway: boolean) {
     return 'Use the invited email to receive a code and activate tenant access safely.';
   }
   return isGateway
-    ? 'Use Google when your account is linked to a tenant. Use email code if you need a secure fallback.'
+    ? 'Use Google when your account is linked to a business. Use email code if you need a secure fallback.'
     : 'Use Google or email code to unlock tenant-owned changes for this workspace.';
 }
 
@@ -162,13 +162,13 @@ export function TenantAuthWorkspaceEmail({
     <article className="overflow-hidden rounded-lg border border-slate-200 bg-white p-5 shadow-[0_20px_48px_rgba(15,23,42,0.08)] sm:p-6">
       <div className="flex items-start justify-between gap-4">
         <div className="min-w-0">
-          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Tenant access</div>
+          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Owner access</div>
           <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
             {session ? 'Workspace connected' : modeTitle(authMode)}
           </h2>
           <p className="mt-2 max-w-xl text-sm leading-6 text-slate-600">
             {session
-              ? 'Your verified session is active for this tenant workspace.'
+              ? 'Your verified session is active for this business workspace.'
               : modeDescription(authMode, isGateway)}
           </p>
         </div>
@@ -266,7 +266,7 @@ export function TenantAuthWorkspaceEmail({
                   <div className="mt-1 text-xs leading-5 text-slate-500">
                     {authMode === 'create'
                       ? 'Creates the owner account and opens the new workspace.'
-                      : 'Uses the Google account linked to an active tenant membership.'}
+                      : 'Uses the Google account linked to an active business workspace.'}
                   </div>
                 </div>
                 <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white text-sm font-bold text-slate-700">
@@ -347,7 +347,7 @@ export function TenantAuthWorkspaceEmail({
                   <div>
                     <div className="text-sm font-semibold text-slate-950">Email and password</div>
                     <div className="mt-1 text-xs leading-5 text-slate-500">
-                      Sign in directly with the tenant email and password for this workspace.
+                      Sign in directly with the owner email and password for this workspace.
                     </div>
                   </div>
                   <label className="block">
@@ -370,7 +370,7 @@ export function TenantAuthWorkspaceEmail({
                       type="password"
                       value={passwordSignInValue}
                       onChange={(event) => setPasswordSignInValue(event.target.value)}
-                      placeholder="Enter tenant password"
+                      placeholder="Enter workspace password"
                       className="booked-form-input"
                       autoComplete="current-password"
                     />
@@ -407,7 +407,7 @@ export function TenantAuthWorkspaceEmail({
                     <input
                       value={createAccountForm.full_name}
                       onChange={(event) => setCreateAccountForm((current) => ({ ...current, full_name: event.target.value }))}
-                      placeholder="Tenant owner"
+                      placeholder="Business owner"
                       className="booked-form-input"
                       autoComplete="name"
                     />
@@ -522,12 +522,12 @@ export function TenantAuthWorkspaceEmail({
         </>
       )}
 
-      {authPending ? <div className="mt-4 text-sm text-slate-600">Verifying tenant account...</div> : null}
+      {authPending ? <div className="mt-4 text-sm text-slate-600">Verifying workspace account...</div> : null}
       {authError ? <div className="booked-alert-error mt-4">{authError}</div> : null}
       {tenantChoices.length ? (
         <div className="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-4">
           <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-700">
-            Choose tenant workspace
+            Choose business workspace
           </div>
           <div className="mt-2 text-sm leading-6 text-amber-900">
             This identity is linked to more than one tenant workspace. Open the exact workspace first, then finish sign-in there.

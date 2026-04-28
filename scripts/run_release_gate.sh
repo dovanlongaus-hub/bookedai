@@ -13,8 +13,9 @@ echo "[release-gate] production env example checksum"
 echo "[release-gate] frontend build + smoke"
 (
   cd "$FRONTEND_DIR"
-  npm run test:playwright:smoke
-  npm run test:playwright:tenant-smoke
+  npm run build
+  PLAYWRIGHT_SKIP_BUILD=1 npm run test:playwright:smoke
+  PLAYWRIGHT_SKIP_BUILD=1 npm run test:playwright:tenant-smoke
 )
 
 if [[ ! -x "$BACKEND_PYTHON" ]]; then

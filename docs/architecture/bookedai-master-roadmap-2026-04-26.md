@@ -659,5 +659,6 @@ Updated cumulative cadence:
 
 ## Change log
 
+- `2026-04-28` Zoho CRM booking lifecycle live UAT: phone-only Future Swim booking `v1-53a53835ae` synced lead/contact/deal/task to Zoho and reopened in the portal; release-gate follow-up restored Telegram human-handoff suppression coverage and hardened Playwright smoke runners.
 - `2026-04-26` initial publication, integrating the seven-lane review across the whole project arc from Phase 0 through the post-Sprint-22 horizon
 - `2026-04-26` UI/UX + Designer + Marketing review integration: eight Tier 1 quick-wins shipped (`QW-1` to `QW-8`), seven Tier 2 fixes (`FX-1` to `FX-7`) and ten Tier 3 refactors (`RF-1` to `RF-10`) added to the Phase 17/19/21/22 backlog, A/B matrix expanded from sixteen to twenty-four experiments
