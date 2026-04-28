@@ -54,7 +54,7 @@ Customer messages must flow through one shared policy instead of channel-specifi
 | Portal `support_request` audit/outbox case | Backend | Shipped | next-phase plan |
 | Telegram service-search + chat-booking + inline keyboard | Backend + AI | Shipped | messaging-automation-telegram-first-2026-04-26.md |
 | Chess academy parent status flow proof case | Product/PM + AI | Open (target Sprint 20) | next-phase plan |
-| **AI Mentor 1-1 embed channel production-verified** (loader cached, CORS valid, `embed=1` query honored, catalog renders) per [CR-009](../05-CHANGE-REQUESTS.md) | Frontend + Backend | Open (target M-01 D-1 rehearsal `11:30` slot) | [CR-009](../05-CHANGE-REQUESTS.md), [ai-mentor-pro-plugin-interface.md](../../../development/ai-mentor-pro-plugin-interface.md), migrations `013_ai_mentor_tenant_seed.sql` and `023_ai_mentor_contact_login_update.sql` |
+| **AI Mentor 1-1 embed channel production-verified** (loader cached, CORS valid, `embed=1` query honored, catalog renders) per [CR-009](../05-CHANGE-REQUESTS.md) | Frontend + Backend | Partial live verify `2026-04-28`: embed URL and loader returned `200`; browser catalog/booking proof and target CORS `OPTIONS 204` remain for M-01 D-1 rehearsal | [CR-009](../05-CHANGE-REQUESTS.md), [ai-mentor-pro-plugin-interface.md](../../../development/ai-mentor-pro-plugin-interface.md), migrations `013_ai_mentor_tenant_seed.sql` and `023_ai_mentor_contact_login_update.sql`, deploy `3f8bcb9` |
 | A/B activation: CH-1, CH-2, CH-3, CH-4, CH-5 | QA + Content | Sprint 20 wave 1 + Sprint 22 wave 2 | full-stack-review |
 
 ## Dependencies

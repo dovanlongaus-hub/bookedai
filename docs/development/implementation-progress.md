@@ -12,6 +12,14 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-28`
 
+Implementation update from `2026-04-28` (AI Mentor tenant sync, release gate, live deploy):
+
+- merged/pushed the AI Mentor tenant sync and public-intake hardening into `main` at `3c95d2a`, then stabilized the homepage A/B smoke test at `3f8bcb9` so release QA locks the intended SME service-business wording deterministically
+- verification passed before deploy: targeted backend pytest suite (`35 passed`) plus full frontend release gate (`build`, legacy smoke, live-read smoke, admin smoke, tenant smoke)
+- deployed live with `bash scripts/deploy_live_host.sh`; production backend/web/beta images rebuilt, containers restarted, proxy restarted, and the n8n booking intake workflow stayed active
+- live verification passed at `2026-04-28T03:33:43Z`: stack health passed, API health returned `ok`, and homepage/product/tenant URLs returned `200`
+- AI Mentor production shell checks passed: `https://product.bookedai.au/partner/ai-mentor-pro/embed?embed=1&tenant_ref=ai-mentor-doer` returned `200`, and `/partner-plugins/ai-mentor-pro-widget.js` returned `200` with immutable cache headers; static `OPTIONS` preflight currently returns `405`, so CORS-204 remains a follow-up if the tenant site needs explicit preflight compliance
+
 Implementation update from `2026-04-28` (AI Mentor 1-1 tenant contact/login refresh):
 
 - updated the AI Mentor 1-1 tenant baseline for `ai-mentor-doer`: login username/email is `aimentor@bookedai.au`, password is `FirstHundred1M$`, contact email is `aimentor@bookedai.au`, and phone/WhatsApp/Telegram/iMessage contact is `+84908444095`
