@@ -25,6 +25,8 @@ Current public runtime decision:
 
 - BookedAI is shipping the responsive web app as the primary current-phase product surface.
 - `bookedai.au` now has an executive acquisition homepage that explains the full BookedAI revenue-engine story in the first viewport, then keeps the real live search-to-booking workspace on-page for proof.
+- `bookedai.au` now includes a public `Agent activity proof` section plus `?demo=wsti` judge mode so WSTI/investor demos can show the visible loop from enquiry to match, booking reference, portal/payment posture, and follow-up/action evidence.
+- Security hardening from the WSTI/investor review is active: tenant bookings, leads, integrations, billing, team, and revenue metrics now require an authenticated tenant session; public booking remains supported through the `bookedai-au` fallback tenant; Stripe/payment return URLs only honor BookedAI-owned origins or local dev origins.
 - `pitch.bookedai.au` remains the deeper pitch and architecture-visualization surface for investors who want the longer company story.
 - `scripts/healthcheck_stack.sh` expects `bookedai.au` to serve the homepage shell directly with the current `Bookedai.au | The AI Revenue Engine for Service Businesses` title and still probes `pitch.bookedai.au` as the deeper pitch surface.
 - `scripts/compare_homepage_source_state.sh` checks the deployed Vite homepage source and metadata from the host worktree before deploy.
@@ -154,6 +156,7 @@ Core production services defined in [`docker-compose.prod.yml`](/home/dovanlong/
 
 - Website chat uses the direct request path `Website Chat UI -> POST /api/chat/send -> BookedAI AI Engine -> web response`; the older `/api/booking-assistant/chat` route remains as a compatibility alias
 - Website demo/product chat is a public BookedAI web-user surface: it can search all BookedAI catalog data and, when enabled, expand to Internet/public-web results
+- Public/product booking uses tenant slug `bookedai-au` (`BookedAI.au Web Booking`) as the BookedAI-owned fallback when a searched result has no provider tenant. The tenant login/contact baseline is `info@bookedai.au` / `FirstHundredM$`, with support phone/Telegram/WhatsApp/SMS `+61455301335`.
 - Telegram uses the provider request path `Telegram Bot -> POST /api/webhooks/telegram or /api/webhooks/bookedai-telegram -> BookedAI AI Engine -> Telegram sendMessage reply`
 - Telegram is a private customer-thread surface: the customer can search and chat like the website, but booking-specific answers require a booking reference or a safe single phone/email identity match from that chat; Telegram chat id alone is not a booking identity
 - `Telegram Bot API -> /api/webhooks/bookedai-telegram` is the first priority channel for the customer-facing Messaging Automation Layer; `/api/webhooks/telegram` remains a compatibility alias

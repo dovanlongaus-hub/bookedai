@@ -69,6 +69,15 @@ async def _resolve_tenant_id_stub(_request, _actor_context) -> str:
     return "tenant-test"
 
 
+async def _resolve_signed_tenant_context(*_args, **_kwargs):
+    return (
+        "default-production-tenant",
+        "tenant-test",
+        {"email": "owner@example.com", "tenant_ref": "default-production-tenant"},
+        {"email": "owner@example.com", "role": "tenant_admin", "status": "active"},
+    )
+
+
 async def _async_noop(*_args, **_kwargs):
     return None
 
@@ -277,6 +286,9 @@ class ApiV1TenantRoutesTestCase(TestCase):
         with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
             "api.v1_tenant_handlers.build_tenant_bookings_snapshot",
             _build_tenant_bookings_snapshot,
+        ), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
+            _resolve_signed_tenant_context,
         ), patch.object(
             TenantRepository,
             "resolve_tenant_id",
@@ -291,6 +303,19 @@ class ApiV1TenantRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["status_summary"]["active"], 2)
         self.assertEqual(payload["data"]["items"][0]["booking_reference"], "BR-1002")
         self.assertEqual(payload["meta"]["tenant_id"], "tenant-test")
+
+    def test_tenant_bookings_requires_tenant_session(self):
+        async def _resolve_tenant_id(*_args, **_kwargs):
+            return "tenant-test"
+
+        with patch.object(TenantRepository, "resolve_tenant_id", _resolve_tenant_id):
+            client = TestClient(create_test_app())
+            response = client.get("/api/v1/tenant/bookings?tenant_ref=default-production-tenant")
+
+        self.assertEqual(response.status_code, 401)
+        payload = response.json()
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["error"]["code"], "tenant_auth_required")
 
     def test_tenant_leads_returns_success_envelope(self):
         async def _resolve_tenant_id(*_args, **_kwargs):
@@ -330,6 +355,9 @@ class ApiV1TenantRoutesTestCase(TestCase):
         with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
             "api.v1_tenant_handlers.build_tenant_leads_snapshot",
             _build_tenant_leads_snapshot,
+        ), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
+            _resolve_signed_tenant_context,
         ), patch.object(
             TenantRepository,
             "resolve_tenant_id",
@@ -346,6 +374,21 @@ class ApiV1TenantRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["summary"]["total"], 2)
         self.assertEqual(payload["data"]["items"][0]["lead_id"], "lead-1001")
         self.assertEqual(payload["meta"]["tenant_id"], "tenant-test")
+
+    def test_tenant_leads_requires_tenant_session(self):
+        async def _resolve_tenant_id(*_args, **_kwargs):
+            return "tenant-test"
+
+        with patch.object(TenantRepository, "resolve_tenant_id", _resolve_tenant_id):
+            client = TestClient(create_test_app())
+            response = client.get(
+                "/api/v1/tenant/leads?tenant_ref=default-production-tenant&status=active"
+            )
+
+        self.assertEqual(response.status_code, 401)
+        payload = response.json()
+        self.assertEqual(payload["status"], "error")
+        self.assertEqual(payload["error"]["code"], "tenant_auth_required")
 
     def test_tenant_integrations_returns_success_envelope(self):
         async def _resolve_tenant_id(*_args, **_kwargs):
@@ -418,6 +461,9 @@ class ApiV1TenantRoutesTestCase(TestCase):
         with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
             "api.v1_tenant_handlers.build_tenant_integrations_snapshot",
             _build_tenant_integrations_snapshot,
+        ), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
+            _resolve_signed_tenant_context,
         ), patch.object(
             TenantRepository,
             "resolve_tenant_id",
@@ -431,7 +477,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["data"]["providers"][0]["provider"], "hubspot")
         self.assertEqual(payload["data"]["crm_retry_backlog"]["summary"]["retrying_records"], 2)
-        self.assertEqual(payload["data"]["access"]["write_mode"], "read_only")
+        self.assertEqual(payload["data"]["access"]["write_mode"], "provider_controls")
         self.assertEqual(payload["meta"]["tenant_id"], "tenant-test")
 
     def test_tenant_billing_returns_success_envelope(self):
@@ -497,6 +543,9 @@ class ApiV1TenantRoutesTestCase(TestCase):
         with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
             "api.v1_tenant_handlers.build_tenant_billing_snapshot",
             _build_tenant_billing_snapshot,
+        ), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
+            _resolve_signed_tenant_context,
         ), patch.object(
             TenantRepository,
             "resolve_tenant_id",
@@ -536,6 +585,9 @@ class ApiV1TenantRoutesTestCase(TestCase):
         with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
             "api.v1_tenant_handlers.build_tenant_team_snapshot",
             _build_tenant_team_snapshot,
+        ), patch(
+            "api.v1_tenant_handlers._resolve_tenant_request_context",
+            _resolve_signed_tenant_context,
         ), patch.object(
             TenantRepository,
             "resolve_tenant_id",
@@ -548,7 +600,7 @@ class ApiV1TenantRoutesTestCase(TestCase):
         payload = response.json()
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["data"]["summary"]["total_members"], 2)
-        self.assertFalse(payload["data"]["access"]["can_manage_team"])
+        self.assertTrue(payload["data"]["access"]["can_manage_team"])
 
     def test_tenant_billing_account_update_returns_refreshed_state(self):
         @asynccontextmanager
@@ -1800,6 +1852,86 @@ class ApiV1TenantRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["provider"], "password")
         self.assertEqual(payload["data"]["membership"]["tenant_slug"], "future-swim")
         self.assertIn("tenant_catalog_import", payload["data"]["capabilities"])
+
+    def test_tenant_password_auth_routes_email_account_to_credential_tenant_when_requested_tenant_differs(self):
+        fake_credential = SimpleNamespace(
+            tenant_id="tenant-ai-mentor",
+            tenant_slug="ai-mentor-doer",
+            email="aimentor@bookedai.au",
+            username="aimentor@bookedai.au",
+            password_salt="aimentor@bookedai.au-static-salt",
+            password_hash="3d2a23a72f72d2a55ebda79fad32528cc508166e21956d0f02f1c8904d7af2e7",
+            role="tenant_admin",
+            status="active",
+        )
+
+        @asynccontextmanager
+        async def _credential_session(_session_factory):
+            yield _WritableFakeSession()
+
+        async def _load_tenant_credential_by_email(*_args, **_kwargs):
+            return None
+
+        async def _load_tenant_credential(*_args, **_kwargs):
+            return fake_credential
+
+        async def _load_tenant_membership(*_args, **_kwargs):
+            return {
+                "tenant_id": "tenant-ai-mentor",
+                "tenant_slug": "ai-mentor-doer",
+                "email": "aimentor@bookedai.au",
+                "role": "tenant_admin",
+                "status": "active",
+            }
+
+        async def _resolve_tenant_id(*_args, **_kwargs):
+            return "tenant-chess"
+
+        async def _get_tenant_profile(_self, tenant_ref):
+            self.assertEqual(tenant_ref, "tenant-ai-mentor")
+            return {
+                "id": "tenant-ai-mentor",
+                "slug": "ai-mentor-doer",
+                "name": "AI Mentor 1-1 Pro",
+                "status": "active",
+                "timezone": "UTC",
+                "locale": "en-US",
+                "industry": "Education",
+            }
+
+        with patch("api.v1_tenant_handlers.get_session", _credential_session), patch(
+            "api.v1_tenant_handlers._load_tenant_credential_by_email",
+            _load_tenant_credential_by_email,
+        ), patch(
+            "api.v1_tenant_handlers._load_tenant_credential",
+            _load_tenant_credential,
+        ), patch(
+            "api.v1_tenant_handlers._load_tenant_membership",
+            _load_tenant_membership,
+        ), patch.object(
+            TenantRepository,
+            "resolve_tenant_id",
+            _resolve_tenant_id,
+        ), patch.object(
+            TenantRepository,
+            "get_tenant_profile",
+            _get_tenant_profile,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/tenant/auth/password",
+                json={
+                    "username": "aimentor@bookedai.au",
+                    "password": "FirstHundredM$",
+                    "tenant_ref": "co-mai-hung-chess-class",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["tenant"]["slug"], "ai-mentor-doer")
+        self.assertEqual(payload["data"]["membership"]["tenant_slug"], "ai-mentor-doer")
 
     def test_tenant_email_code_request_returns_delivery_metadata(self):
         @asynccontextmanager

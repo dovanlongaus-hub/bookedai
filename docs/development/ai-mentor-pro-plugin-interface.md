@@ -1,4 +1,4 @@
-# AI Mentor Pro Plugin Interface
+# AI Mentor 1-1 Pro Plugin Interface
 
 Date: `2026-04-28`
 
@@ -6,7 +6,7 @@ Date: `2026-04-28`
 
 This document defines the official partner-facing plugin interface for tenant `ai-mentor-doer`.
 
-It lets `AI Mentor Pro` use the BookedAI engine as the real runtime for:
+It lets `AI Mentor 1-1 Pro` use the BookedAI engine as the real runtime for:
 
 - chat
 - tenant-scoped search
@@ -33,9 +33,9 @@ Hosted plugin loader asset:
 Current tenant login and contact identity:
 
 - login username/email: `aimentor@bookedai.au`
-- password: `FirstHundred1M$`
+- password: `FirstHundredM$`
 - contact email: `aimentor@bookedai.au`
-- phone/WhatsApp/Telegram/iMessage: `+84908444095`
+- phone/WhatsApp/Telegram/iMessage: `+61481993178`
 
 ## Implementation notes
 

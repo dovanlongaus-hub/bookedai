@@ -12,6 +12,87 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-28`
 
+Implementation update from `2026-04-28` (product AI-search booking QA hardening, live closeout):
+
+- completed the proposed follow-up slice for `product.bookedai.au`: Stripe subscription webhook reconciliation, messaging-care identity hardening, AI Mentor partner-widget preflight CORS, and release/deploy verification
+- Stripe webhook handling now applies `customer.subscription.created`, `customer.subscription.updated`, and `customer.subscription.deleted` into tenant billing account/subscription state, tenant billing gateway settings, exact Stripe period dates, and audit evidence
+- Telegram/WhatsApp/shared messaging care now blocks bare booking-reference lookup from a new no-identity conversation and asks for the booking email/phone or secure portal link before exposing booking details or queueing change/cancel work
+- `frontend/nginx/default.conf` now serves `/partner-plugins/` through a `^~` location so widget GET remains cacheable while `OPTIONS` returns `204` with `Access-Control-Allow-Origin`, methods, headers, and max-age
+- `scripts/sync_app_env_from_supabase.sh` now keeps `https://api.bookedai.au` in `CORS_ALLOW_ORIGINS`, restoring public API TrustedHost health on deploy
+- verification passed: focused backend product/messaging/Stripe suite (`155 passed`), backend release unittest lane (`103 tests OK`), search eval (`14/14 passed`), frontend build, Playwright legacy/live-read/admin/tenant smoke lanes, deploy-live, stack health at `2026-04-28T14:12:25Z`, API health `200`, widget GET `200`, and widget OPTIONS `204`
+- published the live closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/141351-product-ai-search-booking-qa-live-closeout.md`
+- note: the monolithic `scripts/run_release_gate.sh` still reports the pre-existing `.env.production.example` checksum drift when run as a single command; equivalent release lanes above were run manually and passed
+
+Implementation update from `2026-04-28` (product AI-search booking QA hardening, local):
+
+- continued the multi-agent product review follow-up for `product.bookedai.au`, focused on enterprise mobile UX, AI search result clarity, chat-to-booking continuity, payment posture, and customer-care follow-up
+- implemented the first critical Stripe return fix: hosted Checkout success URLs now include `session_id={CHECKOUT_SESSION_ID}` while cancel URLs remain unchanged and payment status still depends on webhook/session reconciliation
+- hardened messaging-origin booking follow-up by minting portal access tokens, persisting only the token hash, and returning tokenized portal/QR links for customer-care recovery instead of relying on a bare booking reference
+- tightened the product/mobile QA surface by aligning trial CTA wording, event attendance wording, preview popup semantics, form selector stability, and 44px-class tap targets in the BookedAI product shell
+- verification passed locally: `.venv-backend/bin/pytest backend/tests/test_portal_token_security.py backend/tests/test_api_v1_booking_routes.py backend/tests/test_stripe_webhook_routes.py backend/tests/test_telegram_webhook_routes.py backend/tests/test_whatsapp_webhook_routes.py -q` (`123 passed`); `cd frontend && npx playwright test tests/product-app-regression.spec.ts tests/product-explicit-book-gate.spec.ts tests/product-popup-detail-no-noise.spec.ts --project=legacy` (`8 passed`); `npm run build` from `frontend`
+- published the local closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/134005-product-ai-search-booking-qa-hardening-local-closeout.md`
+- status: local hardening is complete; live deploy, subscription webhook reconciliation, and messaging identity hardening beyond portal-token links remain follow-up work
+
+Implementation update from `2026-04-28` (tenant logout returns to login gateway):
+
+- fixed the live tenant logout UX so signing out from a tenant workspace clears both the tenant-slug session and the gateway/default session, then returns to the original tenant login gateway
+- added a shared tenant login redirect helper so production logout returns to `https://tenant.bookedai.au/`, while local `/tenant/{slug}` routes return to `/tenant`
+- cleared the password email/value and transient auth state during logout so the next operator can sign in with a different tenant account from a clean login card
+- verification passed locally with `npm --prefix frontend exec tsc -- --noEmit` and `npm --prefix frontend run build`
+- deployed live with `bash scripts/deploy_live_host.sh`; the first deploy attempt exposed Docker root-disk pressure, so unused Docker builder cache/images were pruned before rerunning the deploy successfully
+- stack health passed at `2026-04-28T07:58:00Z`
+- live browser verification passed: `aimentor@bookedai.au / FirstHundredM$` logged into `https://tenant.bookedai.au/ai-mentor-doer`, Sign out returned to `https://tenant.bookedai.au/`, the sign-in card was visible, `Connected as` was gone, and tenant session localStorage keys were empty
+- published the closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/080026-tenant-logout-returns-to-login-gateway.md`
+
+Implementation update from `2026-04-28` (AI Mentor tenant mismatch login fix):
+
+- fixed the live `tenant.bookedai.au` password-login mismatch where `aimentor@bookedai.au` could be rejected with `This tenant account does not belong to the requested tenant` if the login form carried a different `tenant_ref`
+- changed tenant password authentication to return the credential-owned tenant session (`ai-mentor-doer`) after valid credentials instead of rejecting on a requested-tenant mismatch; the frontend already redirects to the authenticated tenant slug
+- passed the tenant session token into initial overview and bookings reads after redirect/reload so the AI Mentor workspace no longer falls back to unauthenticated tenant preview reads
+- added regression coverage proving a login request from `co-mai-hung-chess-class` with `aimentor@bookedai.au / FirstHundredM$` routes to tenant `ai-mentor-doer`
+- verification passed: `python3 -m py_compile backend/api/v1_tenant_handlers.py backend/api/v1_routes.py`, `.venv/bin/python -m pytest backend/tests/test_api_v1_tenant_routes.py -q` (`42 passed`), `npm --prefix frontend exec tsc -- --noEmit`, and `npm --prefix frontend run build`
+- deployed live with `bash scripts/deploy_live_host.sh`; stack health passed at `2026-04-28T04:39:48Z`; live API mismatch smoke returned `status: ok`, tenant `ai-mentor-doer`, name `AI Mentor 1-1 Pro`, email `aimentor@bookedai.au`, and role `tenant_admin`
+- live browser verification from `https://tenant.bookedai.au/` passed: password login redirected to `https://tenant.bookedai.au/ai-mentor-doer`, showed `AI Mentor 1-1 Pro`, and connected as `aimentor@bookedai.au` without the workspace attention error
+- published the closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/044231-ai-mentor-tenant-login-mismatch-fix.md`
+
+Implementation update from `2026-04-28` (Sprint B tenant/payment security hardening):
+
+- locked tenant operational reads so bookings, leads, integrations, billing, team, and revenue metrics now require an authenticated tenant session instead of exposing workspace data through `tenant_ref` preview access
+- tightened `actor_context.tenant_id` handling so unauthenticated callers cannot assert a raw tenant id; public-web and embedded-widget booking flows still resolve through the `bookedai-au` fallback tenant when appropriate
+- hardened payment intent creation with a tenant mismatch guard and payment return URL allowlisting; untrusted `Origin` headers fall back to `https://portal.bookedai.au`
+- added regression coverage for unauthenticated tenant bookings/leads, unauthenticated raw `actor_context.tenant_id`, cross-tenant payment references, and trusted versus untrusted payment return origins
+- repaired release-gate fixture drift by adding `stripe_webhook_secret=""` to lifecycle test `Settings` factories after the backend config gained the required Stripe webhook field
+- verification passed with `.venv-backend/bin/python -m pytest backend/tests/test_tenant_isolation.py backend/tests/test_api_v1_tenant_routes.py backend/tests/test_api_v1_booking_routes.py -q` (`59 passed`), backend release unittest lane (`102 tests OK`), and full `RUN_SEARCH_REPLAY_GATE=false bash scripts/run_release_gate.sh` (frontend smoke lanes, backend `102 tests`, search eval `14/14`, checksum OK)
+- deployed live with `bash scripts/deploy_live_host.sh`; stack health passed at `2026-04-28T04:41:07Z`
+- live security probes passed: unauthenticated tenant bookings, leads, and revenue metrics returned `401 tenant_auth_required`; unauthenticated raw `actor_context.tenant_id` returned `401`; chess tenant password auth returned a signed session; signed chess bookings/team reads returned `200`; public booking path fallback returned `200` under tenant `bookedai-au`; homepage WSTI shell returned `200`
+- status: Sprint B tenant/payment hardening is live and verified
+
+Implementation update from `2026-04-28` (AI Mentor 1-1 Pro tenant login refresh):
+
+- updated the `ai-mentor-doer` tenant baseline to display as `AI Mentor 1-1 Pro`
+- changed login/contact identity to `aimentor@bookedai.au` with password `FirstHundredM$`, and phone/WhatsApp/Telegram/iMessage contact to `+61481993178`
+- refreshed seed migration `013_ai_mentor_tenant_seed.sql` for new bootstraps and added idempotent migration `026_ai_mentor_pro_contact_login_update.sql` for already-seeded environments
+- applied migration `026` live on `supabase-db`; DB verification showed tenant name `AI Mentor 1-1 Pro`, active credential `aimentor@bookedai.au`, contact/WhatsApp/Telegram/plugin support phone `+61481993178`, and partner plugin name `AI Mentor 1-1 Pro`
+- API verification passed: `aimentor@bookedai.au / FirstHundredM$` returned `status: ok`, tenant `ai-mentor-doer`, name `AI Mentor 1-1 Pro`, and `tenant_admin`; the previous password now returns `401`
+- live browser verification on `https://tenant.bookedai.au/ai-mentor-doer` passed: password sign-in connected as `aimentor@bookedai.au`, showed `Tenant Admin`, and enabled tenant write controls such as catalog save/publish/archive
+- published the closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/042506-ai-mentor-1-1-pro-tenant-login-refresh.md`
+
+Implementation update from `2026-04-28` (chess tenant login refresh):
+
+- added migration `025_chess_tenant_contact_login_update.sql` to upgrade the `co-mai-hung-chess-class` tenant login/contact identity to `chess@bookedai.au` with password `FirstHundredM$`
+- the migration marks the stale `tenant1` demo credential inactive and aligns chess tenant membership, credential, service owner/business email, and tenant settings contact/login email to `chess@bookedai.au`
+- applied migration `025` live on `supabase-db`; API verification returned `status: ok` for `chess@bookedai.au / FirstHundredM$` and `tenant_admin` on `co-mai-hung-chess-class`, while the old `tenant1 / 123` credential returned `401`
+- live browser verification on `https://tenant.bookedai.au/co-mai-hung-chess-class` passed: password sign-in connected as `chess@bookedai.au`, showed `Tenant Admin`, and enabled tenant write controls such as catalog save/publish/archive
+- published the closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/041731-chess-tenant-login-refresh.md`
+
+Implementation update from `2026-04-28` (BookedAI public web booking tenant fallback):
+
+- added migration `024_bookedai_web_booking_tenant.sql` to seed the `bookedai-au` tenant as `BookedAI.au Web Booking` with login `info@bookedai.au`, password `FirstHundredM$`, and support email/phone/Telegram/WhatsApp/SMS `info@bookedai.au` / `+61455301335`
+- hardened the v1 booking handlers so public-web and embedded-widget booking calls that cannot resolve a supplied tenant/provider tenant fall back to the `bookedai-au` tenant instead of returning `Tenant session required`
+- kept the tenant-session mismatch guard intact: authenticated calls with a mismatched `actor_context.tenant_id` still reject with `403`
+- verification passed: `.venv-backend/bin/pytest -q backend/tests/test_api_v1_booking_routes.py` (`8 passed`), migration `024` applied on `supabase-db`, deploy-live completed through `bash scripts/deploy_live_host.sh`, stack health passed at `2026-04-28T04:00:02Z`, live path-resolve fallback returned `200`, and live booking-intent UAT created `v1-e13e9d61f0` under tenant `bookedai-au`
+- published the closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/040056-bookedai-public-web-booking-tenant-fallback.md`
+
 Implementation update from `2026-04-28` (AI Mentor tenant sync, release gate, live deploy):
 
 - merged/pushed the AI Mentor tenant sync and public-intake hardening into `main` at `3c95d2a`, then stabilized the homepage A/B smoke test at `3f8bcb9` so release QA locks the intended SME service-business wording deterministically
@@ -22,7 +103,7 @@ Implementation update from `2026-04-28` (AI Mentor tenant sync, release gate, li
 
 Implementation update from `2026-04-28` (AI Mentor 1-1 tenant contact/login refresh):
 
-- updated the AI Mentor 1-1 tenant baseline for `ai-mentor-doer`: login username/email is `aimentor@bookedai.au`, password is `FirstHundred1M$`, contact email is `aimentor@bookedai.au`, and phone/WhatsApp/Telegram/iMessage contact is `+84908444095`
+- updated the AI Mentor 1-1 tenant baseline for `ai-mentor-doer`: login username/email is `aimentor@bookedai.au`; this baseline is now superseded by the `AI Mentor 1-1 Pro` credential/contact refresh above
 - refreshed seed migration `013_ai_mentor_tenant_seed.sql` for new bootstraps and added idempotent migration `023_ai_mentor_contact_login_update.sql` for already-seeded environments
 - applied migration `023` through host-level Docker psql against `supabase-db`; verification showed active credential and membership on `aimentor@bookedai.au`, tenant settings contact email/phone updated, `10` AI Mentor service rows owned by the new email, and `0` stale `tenant3` credentials
 - published the closeout to Notion and Discord through `telegram_workspace_ops.py sync-doc`; archive entries: `docs/development/telegram-sync/2026-04-28/024447-ai-mentor-1-1-tenant-contact-and-login-refresh.md` and `docs/development/telegram-sync/2026-04-28/024650-ai-mentor-1-1-runtime-contact-login-applied.md`
@@ -1802,7 +1883,7 @@ Current focus areas:
 - AI Mentor Pro now also has an official BookedAI partner plugin interface: `AIMentorProApp` can run on `ai.longcare.au` or under `/partner/ai-mentor-pro`, the runtime is tenant-scoped with `deployment_mode = plugin_integrated`, generated builds now include `ai-mentor-pro.html`, and the repo ships `frontend/public/partner-plugins/ai-mentor-pro-widget.js` so the tenant website can mount the BookedAI engine as an inline or modal embed
 - tenant portal now also exposes a tenant-managed `Plugin` workspace on `tenant.bookedai.au/<tenant>#plugin`, backed by `tenant_settings`, so partner tenants can review runtime metadata, edit embed configuration, and copy official widget/button/iframe code for their own websites without codebase access
 - legacy booking assistant catalog/chat/session reads were also tenant-scoped for this lane through `tenant_ref` query handling in `backend/api/route_handlers.py`, while v1 search strictness was tightened for plugin-integrated tenant flows so the AI Mentor widget stays on the tenant's 10 mentoring packages instead of drifting into generic public-web results
-- tenant app auth now also supports a lightweight username-password path for pilot tenants through `backend/migrations/sql/008_tenant_password_credentials_seed.sql` and `/api/v1/tenant/auth/password`, with seeded credentials `tenant1` for `co-mai-hung-chess-class`, `tenant2` for `future-swim`, and `aimentor@bookedai.au` for `ai-mentor-doer`; `backend/migrations/sql/023_ai_mentor_contact_login_update.sql` upgrades older `tenant3 / 123` AI Mentor seeds to `aimentor@bookedai.au / FirstHundred1M$` and sets email/phone/WhatsApp/Telegram/iMessage contact channels to `aimentor@bookedai.au` plus `+84908444095`
+- tenant app auth now also supports a lightweight username-password path for pilot tenants through `backend/migrations/sql/008_tenant_password_credentials_seed.sql` and `/api/v1/tenant/auth/password`, with seeded credentials `tenant1` for `co-mai-hung-chess-class`, `tenant2` for `future-swim`, and `aimentor@bookedai.au` for `ai-mentor-doer`; `backend/migrations/sql/023_ai_mentor_contact_login_update.sql` upgraded older `tenant3 / 123` AI Mentor seeds, and `backend/migrations/sql/026_ai_mentor_pro_contact_login_update.sql` is now the current AI Mentor credential/contact baseline
 - tenant auth sign-in UX was widened again on `2026-04-26`: the live `TenantAuthWorkspaceEmail` gateway and tenant-scoped auth card now expose both `Email code` and `Email and password` sign-in panels side by side for `sign-in` mode, wired into `tenantPasswordAuth` from `TenantApp.tsx`, while the existing Google and email-code flows remain intact; verified with `cd frontend && npm run build`
 - a new reusable tenant-delivery requirements baseline now exists in `docs/development/tenant-implementation-requirements-framework.md`, defining how future branded tenant websites should inherit BookedAI platform behavior for tenant scope, assistant safety, lead capture, lifecycle messaging, CRM posture, and host activation
 - the Future Swim brief is now also normalized into a tenant-specific implementation reference at `docs/development/future-swim-tenant-use-case.md`, so later swim-school or kids-services tenants can inherit the same strict tenant-search policy, branded runtime approach, BookedAI receptionist model, and CRM-plus-email orchestration pattern without re-deriving the whole design from scratch
@@ -3003,3 +3084,10 @@ Current execution has also been running through a specialist multi-agent pattern
   - update: `FX-7` portal `booking_reference` URL canonicalization is closed live. `readPortalReferenceFromUrl()` in `frontend/src/apps/portal/PortalApp.tsx` now reads four sources (`booking_reference`, `bookingReference`, `ref`, and a new `readPortalReferenceFromHash()` helper that accepts `#v1-xxxx` plain refs as well as `#booking_reference=v1-xxxx`/`#ref=v1-xxxx` URLSearchParams form), keeps the first non-empty value as the canonical reference, emits a `console.warn` listing the conflicting alternative so support and operators can spot ambiguous links, and then rewrites the browser URL to a single `booking_reference` query param while removing `bookingReference`, `ref`, and hash sources after load.
   - update: synced `docs/development/full-stack-review-2026-04-26.md` and `docs/architecture/bookedai-master-roadmap-2026-04-26.md` Tier 2 sections to mark `FX-2`, `FX-5`, `FX-7` as closed with the implementation summary; `FX-1`, `FX-3`, `FX-4`, `FX-6` remain open and will be picked up in Sprint 20.
   - verification: `npm --prefix frontend exec tsc -- --noEmit`; `cd frontend && npx playwright test tests/portal-enterprise-workspace.spec.ts --workers=1 --reporter=line` (`6 passed`); `npm --prefix frontend run build`; `RUN_SEARCH_REPLAY_GATE=false bash scripts/run_release_gate.sh` passed with frontend smoke lanes, tenant smoke (`3 passed`), backend unittest (`52 tests OK`), and search eval (`14/14`); `python3 scripts/telegram_workspace_ops.py deploy-live`; `bash scripts/healthcheck_stack.sh`; live portal smoke confirmed `bookingReference` + `ref` + hash rewrote to `?booking_reference=v1-db55e991fd`, cleared hash, warned on conflict, and loaded the booking workspace.
+- `2026-04-28`
+  - lane: `WSTI investor-proof homepage pass`
+  - update: implemented the first follow-up from the multi-agent review by adding a public `Agent activity proof` surface to `frontend/src/apps/public/PublicApp.tsx`, showing `enquiry captured -> AI ranks options -> booking reference created -> follow-up queued` with evidence labels.
+  - update: added homepage channel truth labels (`Live`, `In rollout`, `Next`) so Web/Product/Telegram/Portal are distinguished from WhatsApp/email/widget rollout and SMS/billing next work.
+  - update: added WSTI judge mode at `bookedai.au/?demo=wsti`, which starts the prompt `Show WSTI AI events at Western Sydney Startup Hub this month`, shows a judge-facing banner, and keeps the live product workspace on-page.
+  - update: normalized homepage CTAs around proof (`See a live booking`, `Watch the audit trail`, `Run the WSTI proof path`, `Open the proof stack`) and cleaned pricing copy in `frontend/src/components/landing/data.ts` to `$49+/mo`.
+  - verification: `npm --prefix frontend run build`; `PLAYWRIGHT_SKIP_BUILD=1 npm --prefix frontend run test:playwright:legacy -- tests/public-homepage-responsive.spec.ts --workers=1` (`4 passed` through the legacy smoke subset); `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 PLAYWRIGHT_EXTERNAL_SERVER=0 npx playwright test tests/public-homepage-responsive.spec.ts --workers=1 --reporter=line` (`4 passed`); full frontend release gate passed (`build`, legacy smoke, live-read smoke, admin smoke, tenant smoke); `bash scripts/deploy_live_host.sh`; `bash scripts/healthcheck_stack.sh` passed at `2026-04-28T04:18:32Z`; live Playwright smoke for `https://bookedai.au/?homepage_variant=control&demo=wsti` confirmed the WSTI banner, Agent activity proof, channel truth labels, no horizontal overflow, and no console errors.

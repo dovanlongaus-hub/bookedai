@@ -55,9 +55,9 @@ The roadmap must keep three proof layers visible:
 | `17` | Full-flow stabilization (Phase 17 lock) | `active stabilization` | `Sprint 17`, `Sprint 19` overlay |
 | `18` | Revenue-ops ledger control | `partially active` | `Sprint 18`, `Sprint 19` overlay |
 | `19` | Customer-care and status agent | `started, parity gaps remain` | `Sprint 19`, `Sprint 20`, `Sprint 21` overlay |
-| `20` | Widget and plugin runtime | `planned` | `Sprint 20` |
+| `20` | Widget and plugin runtime | `partially active, AI Mentor widget CORS live` | `Sprint 20` |
 | `20.5` | Wallet and Stripe return continuity | `planned` | `Sprint 20.5` |
-| `21` | Billing, receivables, and subscription truth | `planned, scaffolds exist` | `Sprint 21` overlay |
+| `21` | Billing, receivables, and subscription truth | `partially active, Stripe subscription mirror live` | `Sprint 21` overlay |
 | `22` | Multi-tenant template generalization | `planned` | `Sprint 22` overlay |
 | `23` | Release governance and scale hardening | `partially active, hardening required` | `Sprint 22` overlay |
 
@@ -71,6 +71,10 @@ The review surfaced four structural risks. Each is anchored to the phase in whic
 - `R4` operational hygiene and CI/CD gap (`P0-6`, `P0-7`, `P0-8`, `P1-6`): originated across `Phase 6` and `Phase 9` when release discipline was treated as a local script rather than a CI gate; resolved in `Phase 23`
 
 This anchoring is documented in detail in `docs/development/full-stack-review-2026-04-26.md` and is what makes the forward Sprint 19-22 plan more than a punch list: each sprint is closing a gap that has a known origin sprint.
+
+## Latest Sprint 20-21 Closeout Note
+
+`2026-04-28`: the product AI-search booking QA follow-up is live. Stripe subscription webhook events now reconcile tenant billing/subscription truth, messaging customer-care now requires contact or same-conversation proof before using a bare booking reference, AI Mentor partner plugin preflight `OPTIONS` returns `204` on `product.bookedai.au`, and deploy env sync preserves `api.bookedai.au` in the backend TrustedHost/CORS source. Release verification passed through focused backend, frontend smoke, search eval, deploy-live, stack health, API health, widget GET, and widget preflight probes.
 
 ## Phase-by-phase summary
 
@@ -299,6 +303,8 @@ Active deliverables:
 - progressive search loading with skeleton and staged status
 - mobile no-overflow at `390px`
 - public and pitch proof surfaces can include the uploaded BookedAI product-evidence screenshot after the chess proof / inside Product proof to keep the vertical story connected to the broader product workspace
+- public homepage `Agent activity proof` makes the revenue loop visible for WSTI/investor demos: enquiry captured, AI match, booking reference, portal/payment posture, and follow-up/action evidence
+- homepage `?demo=wsti` starts the WSTI proof path from the Western Sydney Startup Hub event prompt while keeping the live search-to-booking workspace on-page
 
 Review-driven additions:
 
@@ -355,7 +361,7 @@ Review-driven additions:
 - `P0-2` WhatsApp provider posture decision (Meta Cloud or Twilio default)
 - `P0-3` Telegram secret-token verification plus Evolution HMAC verification (`closed live 2026-04-26`)
 - `P0-4` inbound webhook idempotency route gate and evidence indexes are live for WhatsApp, Evolution, and customer Telegram; Telegram UAT chat-id proof and evidence-drawer surfacing remain the follow-up
-- `P0-5` `actor_context.tenant_id` validator on public assistant routes (`closed live 2026-04-26`)
+- `P0-5` `actor_context.tenant_id` validator on public assistant routes (`closed live 2026-04-26`; refreshed locally 2026-04-28 to reject unauthenticated raw tenant ids, require signed tenant sessions for operational tenant reads, and enforce payment origin/tenant scope)
 - `P1-2` WhatsApp inline action controls and `BookedAI Manager Bot` sender identity alignment
 - `P1-3` WhatsApp webhook test parity with Telegram suite (`closed locally 2026-04-26`)
 - `P1-10` channel-aware email templates with `info@bookedai.au` and chat-channel mention
@@ -406,7 +412,7 @@ Planned in `Sprint 20.5`.
 Deliverables:
 
 - Apple Wallet `.pkpass` and Google Wallet pass for confirmed bookings
-- Stripe checkout `success_url` resolves to a booking-aware return URL
+- Stripe checkout `success_url` resolves to a booking-aware return URL — local partial complete on `2026-04-28` by adding `{CHECKOUT_SESSION_ID}` to success redirects; portal/session reconciliation remains
 - portal auto-login self-test for `?booking_reference=...`
 
 Review-driven pairing:
@@ -518,6 +524,7 @@ This plan is the canonical forward execution path. The same content is reflected
 - target phases: `17`, `19`, `23`
 - close all eight P0 items: `P0-1`, `P0-2`, `P0-3`, `P0-4`, `P0-5`, `P0-6`, `P0-7`, `P0-8`
 - ship `P1-7` accessibility and admin responsive
+- carry the `bookedai-au` Web Booking tenant fallback through release verification so public/product search-to-booking does not fail when a selected result has no provider tenant
 - exit gate: portal `v1-*` UAT green; CI blocks lint/type/test failures; OpenClaw rootless
 
 ### Sprint 20 — `2026-05-04 → 2026-05-10` — First Real Revenue Loop
@@ -659,6 +666,7 @@ Updated cumulative cadence:
 
 ## Change log
 
+- `2026-04-28` WSTI investor-proof homepage pass: added public Agent Activity proof, channel-truth labels, `?demo=wsti` judge mode, proof-oriented homepage CTAs, `$49+/mo` pricing copy, and focused homepage Playwright coverage.
 - `2026-04-28` Zoho CRM booking lifecycle live UAT: phone-only Future Swim booking `v1-53a53835ae` synced lead/contact/deal/task to Zoho and reopened in the portal; release-gate follow-up restored Telegram human-handoff suppression coverage and hardened Playwright smoke runners.
 - `2026-04-26` initial publication, integrating the seven-lane review across the whole project arc from Phase 0 through the post-Sprint-22 horizon
 - `2026-04-26` UI/UX + Designer + Marketing review integration: eight Tier 1 quick-wins shipped (`QW-1` to `QW-8`), seven Tier 2 fixes (`FX-1` to `FX-7`) and ten Tier 3 refactors (`RF-1` to `RF-10`) added to the Phase 17/19/21/22 backlog, A/B matrix expanded from sixteen to twenty-four experiments

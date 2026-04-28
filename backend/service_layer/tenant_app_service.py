@@ -2026,6 +2026,31 @@ def _normalize_lookup_phone(value: str | None) -> str | None:
     return f"+{normalized}"
 
 
+def _booking_row_matches_customer_identity(
+    booking_row: dict | object,
+    *,
+    customer_phone: str | None,
+    customer_email: str | None,
+) -> bool:
+    normalized_phone = _normalize_lookup_phone(customer_phone)
+    normalized_email = str(customer_email or "").strip().lower()
+    if not normalized_phone and not normalized_email:
+        return True
+
+    row_phone = _normalize_lookup_phone(
+        booking_row.get("customer_phone") if hasattr(booking_row, "get") else None
+    )
+    row_email = str(
+        booking_row.get("customer_email") if hasattr(booking_row, "get") else ""
+    ).strip().lower()
+
+    if normalized_phone and row_phone and normalized_phone == row_phone:
+        return True
+    if normalized_email and row_email and normalized_email == row_email:
+        return True
+    return False
+
+
 async def resolve_customer_care_booking_reference(
     session,
     *,
@@ -2037,6 +2062,16 @@ async def resolve_customer_care_booking_reference(
     if explicit_reference:
         booking_row = await _load_portal_booking_row(session, booking_reference=explicit_reference)
         if booking_row:
+            if not _booking_row_matches_customer_identity(
+                booking_row,
+                customer_phone=customer_phone,
+                customer_email=customer_email,
+            ):
+                return {
+                    "booking_reference": None,
+                    "resolved_by": "booking_reference_identity_mismatch",
+                    "candidate_count": 1,
+                }
             return {
                 "booking_reference": str(booking_row.get("booking_reference") or explicit_reference),
                 "resolved_by": "message_booking_reference",

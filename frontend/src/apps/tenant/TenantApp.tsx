@@ -19,6 +19,8 @@ import type {
   TenantPluginInterfaceResponse,
   RevenueAgentActionRun,
   TenantRevenueMetrics,
+  TenantStudentItem,
+  TenantStudentProgressUpdateRequest,
   TenantTeamResponse,
 } from '../../shared/contracts';
 import { releaseLabel, releaseVersion } from '../../shared/config/release';
@@ -46,6 +48,7 @@ import {
   TenantTeamWorkspace,
   type TenantInviteMemberFormState,
 } from '../../features/tenant-team/TenantTeamWorkspace';
+import { TenantStudentsWorkspace } from '../../features/tenant-students/TenantStudentsWorkspace';
 import {
   TenantPluginWorkspace,
   type TenantPluginFormState,
@@ -58,7 +61,7 @@ import {
 } from '../../shared/presenters/partnerMatch';
 import { getApiBaseUrl } from '../../shared/config/api';
 
-type TenantPanel = 'overview' | 'experience' | 'catalog' | 'plugin' | 'bookings' | 'leads' | 'operations' | 'integrations' | 'billing' | 'team';
+type TenantPanel = 'overview' | 'experience' | 'catalog' | 'plugin' | 'bookings' | 'leads' | 'students' | 'operations' | 'integrations' | 'billing' | 'team';
 type CatalogStatusFilter = 'all' | 'search-ready' | 'needs-review' | 'inactive';
 
 type TenantLoadState =
@@ -288,6 +291,7 @@ function resolveInitialPanel(): TenantPanel {
     || hash === 'integrations'
     || hash === 'billing'
     || hash === 'operations'
+    || hash === 'students'
     || hash === 'team'
   ) {
     return hash;
@@ -399,6 +403,19 @@ function redirectToTenantWorkspace(nextTenantSlug: string) {
   }
 
   window.location.assign(`/tenant/${normalizedSlug}`);
+}
+
+function redirectToTenantLoginGateway() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  if (window.location.hostname === 'tenant.bookedai.au') {
+    window.location.assign('https://tenant.bookedai.au/');
+    return;
+  }
+
+  window.location.assign('/tenant');
 }
 
 function metricCards(
@@ -905,6 +922,12 @@ export function TenantApp() {
   const [revenueMetrics, setRevenueMetrics] = useState<TenantRevenueMetrics | null>(null);
   const [leadsLoading, setLeadsLoading] = useState(false);
   const [leadsStatusFilter, setLeadsStatusFilter] = useState<string>('all');
+  const [students, setStudents] = useState<TenantStudentItem[] | null>(null);
+  const [studentsLoading, setStudentsLoading] = useState(false);
+  const [studentsError, setStudentsError] = useState<string | null>(null);
+  const [studentSubmittingId, setStudentSubmittingId] = useState<string | null>(null);
+  const [studentSaveMessage, setStudentSaveMessage] = useState<string | null>(null);
+  const [studentSaveError, setStudentSaveError] = useState<string | null>(null);
   const [operationsLoading, setOperationsLoading] = useState(false);
   const [operationsStatusFilter, setOperationsStatusFilter] = useState<string>('queued');
   const [operationsActions, setOperationsActions] = useState<RevenueAgentActionRun[]>([]);
@@ -1115,8 +1138,8 @@ export function TenantApp() {
       try {
         const [overviewEnvelope, bookingsEnvelope, pluginEnvelope, integrationsEnvelope, billingEnvelope, onboardingEnvelope, teamEnvelope, catalogEnvelope] =
           await Promise.all([
-            apiV1.getTenantOverview(nextTenantRef),
-            apiV1.getTenantBookings(nextTenantRef),
+            apiV1.getTenantOverview(nextTenantRef, session?.session_token ?? null),
+            apiV1.getTenantBookings(nextTenantRef, session?.session_token ?? null),
             apiV1.getTenantPluginInterface(nextTenantRef, session?.session_token ?? null),
             apiV1.getTenantIntegrations(nextTenantRef, session?.session_token ?? null),
             apiV1.getTenantBilling(nextTenantRef, session?.session_token ?? null),
@@ -1603,8 +1626,8 @@ export function TenantApp() {
       ?? nextSession?.tenant?.slug
       ?? tenantRef;
     const [overviewEnvelope, bookingsEnvelope, pluginEnvelope, integrationsEnvelope, billingEnvelope, onboardingEnvelope, teamEnvelope, catalogEnvelope] = await Promise.all([
-      apiV1.getTenantOverview(nextTenantRef),
-      apiV1.getTenantBookings(nextTenantRef),
+      apiV1.getTenantOverview(nextTenantRef, nextSession?.session_token ?? null),
+      apiV1.getTenantBookings(nextTenantRef, nextSession?.session_token ?? null),
       apiV1.getTenantPluginInterface(nextTenantRef, nextSession?.session_token ?? null),
       apiV1.getTenantIntegrations(nextTenantRef, nextSession?.session_token ?? null),
       apiV1.getTenantBilling(nextTenantRef, nextSession?.session_token ?? null),
@@ -1829,6 +1852,10 @@ export function TenantApp() {
     if (session?.tenant.slug) {
       writeStoredTenantSession(session.tenant.slug, null);
     }
+    if (tenantRef) {
+      writeStoredTenantSession(tenantRef, null);
+    }
+    writeStoredTenantSession(null, null);
     setSession(null);
     handleAuthModeChange('sign-in');
     setAuthError(null);
@@ -1836,13 +1863,9 @@ export function TenantApp() {
     setLastGoogleCredential(null);
     setEmailCodeDelivery(null);
     setEmailCodeValue('');
+    setPasswordSignInEmail('');
     setPasswordSignInValue('');
-    setImportMessage('Tenant session cleared. Preview remains available, but AI import is locked.');
-    if (!isGateway) {
-      void refreshTenantWorkspace(null).catch(() => {
-        // Keep current state if preview refresh fails after sign-out.
-      });
-    }
+    redirectToTenantLoginGateway();
   }
 
   async function handleRequestEmailCode(event: FormEvent<HTMLFormElement>) {
@@ -3192,6 +3215,12 @@ export function TenantApp() {
       icon: <SearchIcon className="h-4 w-4" />,
     },
     {
+      key: 'students',
+      label: 'Students',
+      description: 'Student roster, attendance, and progress notes.',
+      icon: <ShieldIcon className="h-4 w-4" />,
+    },
+    {
       key: 'operations',
       label: 'Ops',
       description: 'BookedAI follow-up, reminders, and automation state.',
@@ -3217,8 +3246,8 @@ export function TenantApp() {
     },
   ];
   const activePanelMeta = tenantPanels.find((item) => item.key === panel) ?? tenantPanels[0];
-  const activePanelGuide = panel !== 'leads' && panel !== 'operations'
-    ? overview.workspace.guides[panel === 'experience' ? 'experience' : panel as Exclude<typeof panel, 'leads' | 'operations'>]
+  const activePanelGuide = panel !== 'leads' && panel !== 'operations' && panel !== 'students'
+    ? overview.workspace.guides[panel === 'experience' ? 'experience' : panel as Exclude<typeof panel, 'leads' | 'operations' | 'students'>]
     : undefined;
   const introPreview = stripHtmlPreview(overview.workspace.introduction_html);
   const activationState = deriveTenantActivationState({ session, onboarding, overview });
@@ -3399,7 +3428,7 @@ export function TenantApp() {
 
           <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 {futureSwim ? 'Parent enquiries' : 'Sessions'}
               </div>
               <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
@@ -3410,7 +3439,7 @@ export function TenantApp() {
               </div>
             </div>
             <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 {futureSwim ? 'Lessons booked' : 'Bookings'}
               </div>
               <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
@@ -3421,7 +3450,7 @@ export function TenantApp() {
               </div>
             </div>
             <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 {futureSwim ? 'Lesson revenue' : 'Revenue'}
               </div>
               <div className="mt-1.5 text-3xl font-semibold tracking-tight text-emerald-700">
@@ -3430,7 +3459,7 @@ export function TenantApp() {
               <div className="mt-0.5 text-[11px] text-slate-500">captured value</div>
             </div>
             <div className="rounded-[1.2rem] border border-amber-100 bg-white px-4 py-4">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                 Next follow-up
               </div>
               <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
@@ -3611,7 +3640,7 @@ export function TenantApp() {
 
                 <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-6">
                   <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                       {futureSwim ? 'Parent enquiries' : 'Leads captured'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
@@ -3620,7 +3649,7 @@ export function TenantApp() {
                     <div className="mt-0.5 text-[11px] text-slate-500">{overview.summary.active_leads} active</div>
                   </div>
                   <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                       {futureSwim ? 'Lessons booked' : 'Bookings created'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
@@ -3629,7 +3658,7 @@ export function TenantApp() {
                     <div className="mt-0.5 text-[11px] text-slate-500">{futureSwim ? 'class conversion proof' : 'booking proof'}</div>
                   </div>
                   <div className="rounded-[1.2rem] border border-emerald-100 bg-white px-4 py-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                       {futureSwim ? 'Lesson revenue' : 'Paid revenue'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-emerald-700">
@@ -3638,7 +3667,7 @@ export function TenantApp() {
                     <div className="mt-0.5 text-[11px] text-slate-500">{futureSwim ? 'captured swim value' : 'captured value'}</div>
                   </div>
                   <div className="rounded-[1.2rem] border border-amber-100 bg-white px-4 py-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                       {futureSwim ? 'Uncollected lesson revenue' : 'Outstanding revenue'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-amber-700">
@@ -3647,7 +3676,7 @@ export function TenantApp() {
                     <div className="mt-0.5 text-[11px] text-slate-500">{futureSwim ? 'open family invoice posture' : 'open invoice posture'}</div>
                   </div>
                   <div className="rounded-[1.2rem] border border-sky-100 bg-white px-4 py-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                       {futureSwim ? 'Class demand signal' : 'Source contribution'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
@@ -3656,7 +3685,7 @@ export function TenantApp() {
                     <div className="mt-0.5 text-[11px] text-slate-500">{sourceContribution[0]?.[0] ?? 'No dominant source yet'}</div>
                   </div>
                   <div className="rounded-[1.2rem] border border-rose-100 bg-white px-4 py-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                       {futureSwim ? 'Parent follow-up' : 'Follow-up and CRM'}
                     </div>
                     <div className="mt-1.5 text-3xl font-semibold tracking-tight text-slate-950">
@@ -4824,7 +4853,7 @@ export function TenantApp() {
               <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
                 {Object.entries(bookings.portal_request_summary?.counts ?? {}).map(([key, value]) => (
                   <div key={key} className="rounded-[1rem] border border-slate-200 bg-slate-50 px-3 py-3">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                       {key.replace(/_/g, ' ')}
                     </div>
                     <div className="mt-1 text-2xl font-semibold text-slate-950">{value}</div>
@@ -4988,16 +5017,16 @@ export function TenantApp() {
                           <div className="min-w-0">
                             <div className="flex flex-wrap items-center gap-2">
                               <span className="text-sm font-semibold text-slate-950">{lead.name || 'Unknown'}</span>
-                              <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${statusClass}`}>
+                              <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${statusClass}`}>
                                 {lead.status ?? 'unknown'}
                               </span>
                               {lead.crm_sync_status && lead.crm_sync_status !== 'not_synced' ? (
-                                <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${crmClass}`}>
+                                <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${crmClass}`}>
                                   CRM {lead.crm_sync_status.replace(/_/g, ' ')}
                                 </span>
                               ) : null}
                               {lead.status && ['new', 'captured', 'contacted', 'engaged'].includes(lead.status) && !lead.follow_up_at ? (
-                                <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-[10px] font-medium text-amber-700">
+                                <span className="rounded-full border border-amber-100 bg-amber-50 px-2 py-0.5 text-xs font-medium text-amber-700">
                                   Follow-up needed
                                 </span>
                               ) : null}
@@ -5149,13 +5178,13 @@ export function TenantApp() {
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${tenantActionStatusClass(action.status)}`}>
+                            <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${tenantActionStatusClass(action.status)}`}>
                               {action.status.replace(/_/g, ' ')}
                             </span>
-                            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-500">
+                            <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-xs font-medium text-slate-500">
                               {action.priority}
                             </span>
-                            <span className={`rounded-full border px-2 py-0.5 text-[10px] font-medium ${tenantActionPolicyClass(action)}`}>
+                            <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${tenantActionPolicyClass(action)}`}>
                               {action.requires_approval ? 'approval needed' : 'policy gated'}
                             </span>
                           </div>
@@ -5274,7 +5303,7 @@ export function TenantApp() {
                               {connection.sync_mode ? ` • ${connection.sync_mode}` : ''}
                             </div>
                           </div>
-                          <span className={`rounded-full border px-2.5 py-1 text-[10px] font-semibold ${
+                          <span className={`rounded-full border px-2.5 py-1 text-xs font-semibold ${
                             connection.ready
                               ? 'border-emerald-200 bg-white text-emerald-700'
                               : 'border-amber-200 bg-white text-amber-700'

@@ -108,6 +108,14 @@ async def _fake_get_session(_session_factory):
     yield SimpleNamespace(execute=_fake_execute, commit=_async_noop)
 
 
+async def _fake_portal_guard(*_args, **_kwargs):
+    """Existing portal tests pre-date the access-token guard introduced for
+    P0-3. Returning None here lets those tests continue to focus on snapshot /
+    queue behaviour while dedicated coverage for the guard itself lives in
+    test_portal_token_security.py."""
+    return None
+
+
 class _WritableFakeSession:
     def __init__(self, execute_result=None):
         self._execute_result = execute_result
@@ -187,7 +195,7 @@ class ApiV1PortalRoutesTestCase(TestCase):
         with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
             "api.v1_tenant_handlers.build_portal_booking_snapshot",
             _build_portal_booking_snapshot,
-        ):
+        ), patch("api.v1_tenant_handlers._portal_guard", _fake_portal_guard):
             client = TestClient(create_test_app())
             response = client.get("/api/v1/portal/bookings/BR-PORTAL-1")
 
@@ -204,7 +212,7 @@ class ApiV1PortalRoutesTestCase(TestCase):
         with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
             "api.v1_tenant_handlers.build_portal_booking_snapshot",
             _build_portal_booking_snapshot,
-        ):
+        ), patch("api.v1_tenant_handlers._portal_guard", _fake_portal_guard):
             client = TestClient(create_test_app())
             response = client.get("/api/v1/portal/bookings/MISSING-REF")
 
@@ -242,7 +250,7 @@ class ApiV1PortalRoutesTestCase(TestCase):
         with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
             "api.v1_tenant_handlers.build_portal_customer_care_turn",
             _build_portal_customer_care_turn,
-        ):
+        ), patch("api.v1_tenant_handlers._portal_guard", _fake_portal_guard):
             client = TestClient(create_test_app())
             response = client.post(
                 "/api/v1/portal/bookings/BR-PORTAL-CARE/care-turn",
@@ -315,11 +323,12 @@ class ApiV1PortalRoutesTestCase(TestCase):
         self.assertIn("queued this as a support request", result["reply"])
 
     def test_portal_customer_care_turn_requires_message(self):
-        client = TestClient(create_test_app())
-        response = client.post(
-            "/api/v1/portal/bookings/BR-PORTAL-CARE/care-turn",
-            json={"message": ""},
-        )
+        with patch("api.v1_tenant_handlers._portal_guard", _fake_portal_guard):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/portal/bookings/BR-PORTAL-CARE/care-turn",
+                json={"message": ""},
+            )
 
         self.assertEqual(response.status_code, 422)
         payload = response.json()
@@ -340,7 +349,7 @@ class ApiV1PortalRoutesTestCase(TestCase):
         with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
             "api.v1_tenant_handlers.queue_portal_booking_request",
             _queue_portal_booking_request,
-        ):
+        ), patch("api.v1_tenant_handlers._portal_guard", _fake_portal_guard):
             client = TestClient(create_test_app())
             response = client.post(
                 "/api/v1/portal/bookings/BR-PORTAL-2/reschedule-request",
@@ -359,11 +368,12 @@ class ApiV1PortalRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["request_type"], "reschedule_request")
 
     def test_portal_cancel_request_requires_customer_note(self):
-        client = TestClient(create_test_app())
-        response = client.post(
-            "/api/v1/portal/bookings/BR-PORTAL-3/cancel-request",
-            json={},
-        )
+        with patch("api.v1_tenant_handlers._portal_guard", _fake_portal_guard):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/portal/bookings/BR-PORTAL-3/cancel-request",
+                json={},
+            )
 
         self.assertEqual(response.status_code, 422)
         payload = response.json()
@@ -384,7 +394,7 @@ class ApiV1PortalRoutesTestCase(TestCase):
         with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
             "api.v1_tenant_handlers.queue_portal_booking_request",
             _queue_portal_booking_request,
-        ):
+        ), patch("api.v1_tenant_handlers._portal_guard", _fake_portal_guard):
             client = TestClient(create_test_app())
             response = client.post(
                 "/api/v1/portal/bookings/BR-PORTAL-4/pause-request",
@@ -410,7 +420,7 @@ class ApiV1PortalRoutesTestCase(TestCase):
         with patch("api.v1_tenant_handlers.get_session", _fake_get_session), patch(
             "api.v1_tenant_handlers.queue_portal_booking_request",
             _queue_portal_booking_request,
-        ):
+        ), patch("api.v1_tenant_handlers._portal_guard", _fake_portal_guard):
             client = TestClient(create_test_app())
             response = client.post(
                 "/api/v1/portal/bookings/BR-PORTAL-5/downgrade-request",

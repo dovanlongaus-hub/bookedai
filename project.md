@@ -18,6 +18,39 @@ Latest public-search UX update date: `2026-04-25`.
 
 Current top product-surface priority: `responsive homepage web-app UX`.
 
+Latest product booking/AI-search hardening from `2026-04-28`:
+
+- follow-up slice is now live: Stripe subscription webhook events reconcile tenant billing state, messaging care requires contact/same-conversation verification before exposing booking details from a bare reference, and the AI Mentor partner widget supports `OPTIONS` preflight on `product.bookedai.au`
+- live deployment passed through `bash scripts/deploy_live_host.sh`; stack health passed at `2026-04-28T14:12:25Z`
+- live probes passed: `https://api.bookedai.au/api/health` returned `200`, `https://product.bookedai.au/partner-plugins/ai-mentor-pro-widget.js` returned `200`, and `OPTIONS` on the same widget returned `204` with wildcard CORS preflight headers
+- deploy env sync now preserves `https://api.bookedai.au` in `CORS_ALLOW_ORIGINS`, preventing the public API health host from falling out of the TrustedHost allowlist on future deploys
+- `product.bookedai.au` has a local enterprise QA follow-up slice for the full customer path: AI search, preview, explicit booking/request action, confirmation wording, payment posture, and care handoff
+- Stripe Checkout success return URLs now include `session_id={CHECKOUT_SESSION_ID}` so the portal/return surface can reconcile against the actual Checkout Session instead of treating the redirect as proof of payment
+- messaging-origin bookings now issue and persist hashed portal access tokens, returning tokenized portal/QR links so post-booking support does not rely on bare booking references alone
+- mobile product CTA/care flow and popup preview accessibility were tightened with larger tap targets, clearer trial CTA wording, dialog semantics, and updated Playwright UAT coverage
+- verification passed locally with backend booking/messaging/Stripe/Telegram/WhatsApp focused regression (`123 passed`), product Playwright UAT (`8 passed`), and frontend production build
+
+Latest public web booking tenant fallback from `2026-04-28`:
+
+- BookedAI-owned public/product booking flows now have an official fallback tenant slug, `bookedai-au`, named `BookedAI.au Web Booking`
+- when a public-web or embedded-widget booking call cannot resolve a provider/service tenant, v1 booking capture resolves to `bookedai-au` instead of failing with `Tenant session required`
+- the seeded tenant login/contact baseline is `info@bookedai.au` with password `FirstHundredM$`; tenant email is `info@bookedai.au`, and phone/Telegram/WhatsApp/SMS contact is `+61455301335`
+- migration `024` is applied live and `product.bookedai.au` booking UAT created fallback booking reference `v1-e13e9d61f0` under tenant `bookedai-au`
+
+Latest chess tenant login update from `2026-04-28`:
+
+- the `co-mai-hung-chess-class` tenant login/contact baseline is now `chess@bookedai.au` with password `FirstHundredM$`
+- migration `025_chess_tenant_contact_login_update.sql` upgrades older `tenant1 / 123` demo credentials, marks stale `tenant1` access inactive, and aligns chess service owner/business email plus tenant settings contact email to `chess@bookedai.au`
+- migration `025` is applied live; live API verification passed for `chess@bookedai.au / FirstHundredM$`, stale `tenant1 / 123` is rejected, and browser sign-in on `tenant.bookedai.au/co-mai-hung-chess-class` reaches a `Tenant Admin` workspace
+
+Latest AI Mentor tenant login update from `2026-04-28`:
+
+- the `ai-mentor-doer` tenant display name is now `AI Mentor 1-1 Pro`
+- the tenant login/contact baseline is `aimentor@bookedai.au` with password `FirstHundredM$`, and phone/Telegram/WhatsApp/iMessage contact is `+61481993178`
+- migration `026_ai_mentor_pro_contact_login_update.sql` upgrades the previous pilot credential/contact baseline, aligns tenant settings/plugin support fields and service owner/business email, and keeps stale demo credentials inactive
+- password login on `tenant.bookedai.au` now routes a valid AI Mentor credential back to its owning tenant (`ai-mentor-doer`) even if the login form was opened from another tenant path; live root-gateway browser smoke confirmed redirect to `/ai-mentor-doer` and a connected `aimentor@bookedai.au` workspace
+- tenant logout now clears both workspace and gateway/default session storage, then returns operators to `https://tenant.bookedai.au/` so a different tenant account can sign in from a clean login card
+
 Current canonical roadmap reference: `docs/architecture/bookedai-master-roadmap-2026-04-26.md` is the single end-to-end roadmap from Phase 0 through Phase 23 plus the post-Sprint-22 horizon. It integrates the seven-lane review captured in `docs/development/full-stack-review-2026-04-26.md` (architecture+UAT, frontend UI/UX, corporate/business, backend, API+integrations, DevOps, conversational chat) and is the authoritative source when this document conflicts with detailed phase or sprint artifacts on roadmap-level questions.
 
 Current PM execution control: `docs/development/phase-execution-operating-system-2026-04-26.md` defines the agent-lane operating model, phase closeout gates, UAT standard, deploy-live standard, and active Sprint 19 execution board. Phase `0-16` remain historical baselines; active execution starts from Phase/Sprint `17-23` and every phase must close UAT, deployment, documentation, Notion/Discord, and next-phase handoff before moving forward.
@@ -245,6 +278,15 @@ Latest homepage shortcut search update from `2026-04-26`:
 - the homepage search runtime now has a fast-preview layer for swim, chess, and WSTI/AI-event intent: it can show matching BookedAI catalog rows or the WSTI shortcut event card immediately while live ranking, event discovery, and booking-path checks continue in the background
 - the existing near-me guardrail remains in force: fast shortcut previews are suppressed for broad `near me` queries unless the user provides an explicit area such as Sydney, Caringbah, or Western Sydney Startup Hub
 
+Latest WSTI investor-proof homepage update from `2026-04-28`:
+
+- `bookedai.au` now surfaces a public `Agent activity proof` section so SME owners, WSTI judges, and investors can see the revenue loop as `enquiry captured -> AI ranks options -> booking reference created -> follow-up queued`
+- the homepage now labels channel truth explicitly as `Live`, `In rollout`, and `Next`, reducing overclaim risk while preserving the omnichannel AI Revenue Engine story
+- the homepage supports `?demo=wsti` judge mode, which starts the WSTI proof path with the prompt `Show WSTI AI events at Western Sydney Startup Hub this month`
+- hero and header CTAs now use proof-oriented language such as `See a live booking`, `Watch the audit trail`, `Run the WSTI proof path`, and `Open the proof stack`
+- pitch/pricing source copy now uses `$49+/mo` and frames rollout channels as labelled rollout surfaces rather than claiming every channel is equally live
+- verification passed with `npm --prefix frontend run build`, full frontend release gate (`test:release-gate`), exact `public-homepage-responsive.spec.ts`, live deploy through `bash scripts/deploy_live_host.sh`, stack health at `2026-04-28T04:18:32Z`, and live mobile smoke for `https://bookedai.au/?homepage_variant=control&demo=wsti` with `overflow=0` and no console errors
+
 Latest tenant A/B telemetry update from `2026-04-26`:
 
 - `tenant.bookedai.au` now has a lightweight tenant acquisition experiment matching the UAT recommendation: `tenant_variant=control` keeps the existing workspace promise, while `tenant_variant=revenue_ops` tests `Turn every enquiry into tracked revenue operations`
@@ -271,6 +313,7 @@ Latest product UAT enterprise polish from `2026-04-26`:
 
 - `product.bookedai.au` now carries semantic `h1/h2` landmarks and accessible names for icon-only controls, improving enterprise accessibility and procurement-readiness without changing the visual product shell
 - the product runtime now sends the `bookedai-au` tenant runtime context into the shared booking assistant, so downstream revenue-ops handoffs have tenant identity instead of depending on a blank public-web context
+- `bookedai-au` is now backed by a seeded tenant record, so public/product booking from search can create lead/booking intent records even when the selected result does not belong to a tenant catalog
 - mobile first-screen prompt cards no longer render as a cropped horizontal carousel; compact mobile now shows two full-width starter prompts plus concise guidance before the search composer
 - public result pricing now avoids misleading zero-price presentation by showing a `Price TBC` posture unless the provider/catalog gives a meaningful price posture or positive amount
 - no-result and confirmation copy now stays customer-safe: near-me failures ask for suburb/location, `Candidate not found` becomes provider-confirmation language, and transport/provider warnings are summarized as operations-review states while preserving booking reference and portal continuity
@@ -1671,7 +1714,8 @@ Latest confirmed tenant baseline on `2026-04-18`:
 - migration-safe rollout now also includes a repo-local verification helper that can be used after apply or wired into the release gate when database access exists
 - tenant publish rollout now also has a dedicated production-shadow rehearsal checklist so beta or shadow validation can be run as a repeatable operational sequence
 - the first official sample tenant is now a chess-class onboarding sample derived from a real uploaded PDF source, giving the tenant-catalog lane one concrete non-website onboarding baseline to inherit from
-- the current official seed set now also includes a third tenant, `ai-mentor-doer`, with published online private and group AI mentoring packages plus seeded email-password access for operator-led pilot use; current AI Mentor 1-1 login/contact identity is `aimentor@bookedai.au` with password `FirstHundred1M$`, and phone/WhatsApp/Telegram/iMessage contact is `+84908444095`
+- the current official seed set now also includes a third tenant, `ai-mentor-doer`, with published online private and group AI mentoring packages plus seeded email-password access for operator-led pilot use; current AI Mentor 1-1 Pro login/contact identity is `aimentor@bookedai.au` with password `FirstHundredM$`, and phone/WhatsApp/Telegram/iMessage contact is `+61481993178`
+- the official seed set also includes `bookedai-au` (`BookedAI.au Web Booking`) as the public/product fallback tenant for bookings without a provider tenant; login/contact identity is `info@bookedai.au` with password `FirstHundredM$`, and phone/Telegram/WhatsApp/SMS contact is `+61455301335`
 - `ai.longcare.au` is now wired as the official tenant-facing host for the AI Mentor Pro partner runtime, with a BookedAI-powered plugin interface and embed loader path for tenant-scoped chat, search, booking, payment, and follow-up
 
 Latest confirmed tenant baseline on `2026-04-19`:
@@ -1705,6 +1749,8 @@ Latest confirmed tenant baseline on `2026-04-19`:
   - authenticated tenant reads and writes in the Vite tenant shell now prefer the signed session's tenant slug over stale URL context once login is established
 - invite acceptance is now handled through the tenant auth gateway with email-first verification, while the older claim-and-set-password seam remains as compatibility support during the transition
 - billing, profile, subscription, and team mutations now append tenant audit events so later support drill-ins have real evidence to inherit from
+- tenant operational reads were hardened live on `2026-04-28`: bookings, leads, integrations, billing, team, and revenue metrics now require an authenticated tenant session instead of unauthenticated `tenant_ref` preview access; raw `actor_context.tenant_id` also requires a tenant session, while public-web booking flows continue through the `bookedai-au` fallback tenant
+- payment intent handling was hardened live on `2026-04-28`: cross-tenant booking references now return `403`, and Stripe return URLs only honor BookedAI-owned HTTPS origins or local development origins before falling back to `portal.bookedai.au`; full release gate, deploy-live, stack health, and live signed/unsigned tenant probes passed
 
 ## Internal Admin Baseline
 

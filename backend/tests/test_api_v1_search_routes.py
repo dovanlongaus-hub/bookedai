@@ -164,7 +164,9 @@ class ApiV1SearchRoutesTestCase(TestCase):
         )
 
     def test_start_chat_session_returns_standard_success_envelope(self):
-        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub):
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_booking_handlers._resolve_tenant_id", _resolve_tenant_id_stub
+        ):
             client = TestClient(create_test_app())
             response = client.post(
                 "/api/v1/conversations/sessions",
@@ -270,7 +272,9 @@ class ApiV1SearchRoutesTestCase(TestCase):
         self.assertEqual(payload["data"]["search"]["request_id"], "match-test")
 
     def test_create_lead_returns_validation_error_envelope(self):
-        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub):
+        with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_booking_handlers._resolve_tenant_id", _resolve_tenant_id_stub
+        ):
             client = TestClient(create_test_app())
             response = client.post(
                 "/api/v1/leads",
@@ -316,6 +320,8 @@ class ApiV1SearchRoutesTestCase(TestCase):
             captured_phase2_calls.append(kwargs)
 
         with patch("api.v1_search_handlers._resolve_tenant_id", _resolve_tenant_id_stub), patch(
+            "api.v1_booking_handlers._resolve_tenant_id", _resolve_tenant_id_stub
+        ), patch(
             "api.v1_booking_handlers.get_session",
             _fake_get_session,
         ), patch(

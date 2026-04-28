@@ -5,7 +5,7 @@
 insert into tenants (slug, name, status, timezone, locale, industry, service_area_summary)
 values (
   'ai-mentor-doer',
-  'AI Mentor 1-1',
+  'AI Mentor 1-1 Pro',
   'active',
   'UTC',
   'en-US',
@@ -34,7 +34,7 @@ select
     'delivery_modes', jsonb_build_array('private_1_1', 'group_1_n'),
     'group_minimum_students', 5,
     'partner_plugin_interface', jsonb_build_object(
-      'partner_name', 'AI Mentor Pro',
+      'partner_name', 'AI Mentor 1-1 Pro',
       'partner_website_url', 'https://ai.longcare.au',
       'bookedai_host', 'https://product.bookedai.au',
       'embed_path', '/partner/ai-mentor-pro/embed',
@@ -43,15 +43,15 @@ select
       'widget_id', 'ai-mentor-pro-plugin',
       'accent_color', '#1f7a6b',
       'button_label', 'Book AI Mentor',
-      'modal_title', 'AI Mentor Pro',
+      'modal_title', 'AI Mentor 1-1 Pro',
       'headline', 'Convert AI to your DOER',
       'prompt', 'Convert AI to your DOER',
       'inline_target_selector', '#ai-mentor-pro-bookedai',
       'support_email', 'aimentor@bookedai.au',
-      'support_phone', '+84908444095',
-      'support_whatsapp', '+84908444095',
-      'support_telegram', '+84908444095',
-      'support_imessage', '+84908444095',
+      'support_phone', '+61481993178',
+      'support_whatsapp', '+61481993178',
+      'support_telegram', '+61481993178',
+      'support_imessage', '+61481993178',
       'features', jsonb_build_object(
         'chat', true,
         'search', true,
@@ -63,18 +63,18 @@ select
       )
     ),
     'contact_email', 'aimentor@bookedai.au',
-    'contact_phone', '+84908444095',
+    'contact_phone', '+61481993178',
     'support_email', 'aimentor@bookedai.au',
-    'support_phone', '+84908444095',
-    'support_whatsapp', '+84908444095',
-    'support_telegram', '+84908444095',
-    'support_imessage', '+84908444095',
+    'support_phone', '+61481993178',
+    'support_whatsapp', '+61481993178',
+    'support_telegram', '+61481993178',
+    'support_imessage', '+61481993178',
     'tenant_notifications', jsonb_build_object(
       'email', 'aimentor@bookedai.au',
-      'phone', '+84908444095',
-      'whatsapp', '+84908444095',
-      'telegram', '+84908444095',
-      'imessage', '+84908444095'
+      'phone', '+61481993178',
+      'whatsapp', '+61481993178',
+      'telegram', '+61481993178',
+      'imessage', '+61481993178'
     )
   )
 from tenants
@@ -97,7 +97,7 @@ select
   tenant.id::text,
   tenant.slug,
   'aimentor@bookedai.au',
-  'AI Mentor 1-1',
+  'AI Mentor 1-1 Pro',
   'password',
   'aimentor@bookedai.au',
   'tenant_admin',
@@ -129,7 +129,7 @@ select
   'aimentor@bookedai.au',
   'aimentor@bookedai.au',
   'aimentor@bookedai.au-static-salt',
-  'e07c37a4eadff96b5dc8d9b7a56173aff1dd0be1b6c6cae039d4cd3b2f29eecb',
+  '3d2a23a72f72d2a55ebda79fad32528cc508166e21956d0f02f1c8904d7af2e7',
   'tenant_admin',
   'active'
 from tenants tenant
@@ -170,7 +170,7 @@ insert into service_merchant_profiles (
 )
 select
   seed.service_id,
-  'AI Mentor 1-1',
+  'AI Mentor 1-1 Pro',
   tenant.id::text,
   'aimentor@bookedai.au',
   'aimentor@bookedai.au',

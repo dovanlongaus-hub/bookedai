@@ -193,7 +193,10 @@ The PM now treats `Sprint 19` as the immediate execution board.
 - Automated verification: `.venv/bin/python -m py_compile backend/api/v1_routes.py backend/api/v1_booking_handlers.py backend/api/route_handlers.py`; `.venv/bin/python -m pytest backend/tests/test_api_v1_booking_routes.py backend/tests/test_chat_send_routes.py -q` passed with `8 passed`; `.venv/bin/python -m pytest backend/tests/test_api_v1_search_routes.py -q` passed with `21 passed`.
 - Live smoke: authenticated against the live tenant password endpoint and posted a mismatched public assistant booking-path request; production returned `403` with `actor_context.tenant_id does not match the authenticated tenant session.`
 - Verification refresh: `.venv/bin/python -m pytest backend/tests/test_api_v1_booking_routes.py backend/tests/test_api_v1_search_routes.py -q` passed with `28 passed`.
-- Status: P0-5 is closed live.
+- `2026-04-28` hardening refresh: `_resolve_tenant_id` now also rejects unauthenticated raw `actor_context.tenant_id`; tenant operational reads for bookings, leads, integrations, billing, team, and revenue metrics require an authenticated tenant session; payment intent creation rejects cross-tenant booking references and only returns to BookedAI-owned or local-dev origins.
+- Automated verification refresh: `.venv-backend/bin/python -m pytest backend/tests/test_tenant_isolation.py backend/tests/test_api_v1_tenant_routes.py backend/tests/test_api_v1_booking_routes.py -q` passed with `59 passed`; backend release unittest lane passed with `102 tests`; full `RUN_SEARCH_REPLAY_GATE=false bash scripts/run_release_gate.sh` passed with frontend smoke lanes, backend `102 tests`, search eval `14/14`, and checksum OK.
+- Live refresh: deployed with `bash scripts/deploy_live_host.sh`; stack health passed at `2026-04-28T04:41:07Z`; unauthenticated tenant bookings/leads/revenue metrics and raw `actor_context.tenant_id` probes returned `401`, signed chess tenant bookings/team reads returned `200`, and public booking fallback still returned `200` under `bookedai-au`.
+- Status: P0-5 remains closed live, and the `2026-04-28` tenant/payment hardening refresh is also live.
 
 ### `2026-04-26` Phase 17 P1-9 Future Swim Miranda URL Hotfix
 
@@ -224,6 +227,15 @@ The PM now treats `Sprint 19` as the immediate execution board.
 - Automated verification: `npm --prefix frontend run lint` (`tsc --noEmit`) passed; focused Telegram QA confirmed expected metadata evidence for `lifecycle_updates`, `crm_sync.deal`, `crm_sync.task`, `email_confirmation.message_id`, and nested email CRM task state.
 - UAT next step: complete tenant `chess` operator/customer UAT covering `Book n`, CRM/email side effects, Telegram deep-link reopen, portal reopen, and admin reliability spotlight evidence.
 - Status: local implementation is complete. Backend direct pytest reruns are still blocked by the current workspace test-environment gap, which is now a tracked enablement task before this item can be marked fully verified.
+
+### `2026-04-28` Phase 17/19 Public Web Booking Tenant Fallback
+
+- Scope: keep product/homepage search-to-booking capture working when the selected result has no tenant catalog owner or the public runtime tenant slug is not yet present.
+- Owner lanes: Backend, Data/Migrations, QA/UAT.
+- Implementation: migration `024_bookedai_web_booking_tenant.sql` seeds tenant slug `bookedai-au` as `BookedAI.au Web Booking`; v1 booking handlers now fall back to that tenant for public-web and embedded-widget calls that cannot resolve another tenant.
+- Guardrail: authenticated tenant-session mismatch validation remains unchanged; the fallback is limited to public booking surfaces.
+- Verification: targeted backend booking route pytest passed (`8 passed`); migration `024` applied live; deploy-live completed; stack health passed; live API probes confirmed path-resolve fallback `200` and booking-intent UAT `v1-e13e9d61f0` under `bookedai-au`.
+- Status: closed live; Notion and Discord closeout sent with archive `docs/development/telegram-sync/2026-04-28/040056-bookedai-public-web-booking-tenant-fallback.md`.
 
 ### `2026-04-27` Backend Live Redeploy And Operator Permission Boundary
 
@@ -286,3 +298,10 @@ The project does not restart from Phase `0`. Phase `0-16` remain historical deli
 
 - Zoho CRM booking lifecycle hardening is live-UAT verified with phone-only booking `v1-53a53835ae`: lead, contact, deal, and task all synced to Zoho and the booking reopened in the portal.
 - Release-gate hardening is applied for the next clean pass: frontend Playwright smoke runners build once, reuse `dist` preview, and combine legacy/admin cases; backend Telegram human-handoff suppression coverage is restored.
+
+## 2026-04-28 WSTI Investor-Proof Homepage Gate
+
+- Scope: Phase 17 public homepage proof and WSTI judge-mode polish after the multi-agent review.
+- Implementation: `bookedai.au` now has a public `Agent activity proof` section, channel truth labels (`Live`, `In rollout`, `Next`), `?demo=wsti` auto-start mode, proof-oriented CTAs, and `$49+/mo` pricing copy.
+- Verification: `npm --prefix frontend run build`; exact `public-homepage-responsive.spec.ts` (`4 passed`); full frontend release gate (`build`, legacy smoke, live-read smoke, admin smoke, tenant smoke); live deploy through `bash scripts/deploy_live_host.sh`.
+- Live smoke: `bash scripts/healthcheck_stack.sh` passed at `2026-04-28T04:18:32Z`; live Playwright smoke for `https://bookedai.au/?homepage_variant=control&demo=wsti` confirmed the WSTI banner, Agent activity proof, channel truth labels, `overflow=0`, and no console errors.
