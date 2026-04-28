@@ -126,6 +126,7 @@ export function AdminPage() {
     pendingHandoffsError,
     refreshPendingHandoffs,
     claimPendingHandoff,
+    releasePendingHandoff,
     claimingHandoffConversationId,
     partners,
     importedServices,
@@ -770,6 +771,9 @@ export function AdminPage() {
               }}
               onClaim={(conversationId) => {
                 void claimPendingHandoff(conversationId);
+              }}
+              onRelease={(conversationId) => {
+                void releasePendingHandoff(conversationId);
               }}
               claimingConversationId={claimingHandoffConversationId}
             />

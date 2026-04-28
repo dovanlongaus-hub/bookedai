@@ -325,6 +325,7 @@ class AdminPendingHandoffsResponse(BaseModel):
     total: int
     pending_count: int
     failed_count: int
+    claimed_count: int = 0
 
 
 class AdminClaimHandoffRequest(BaseModel):
@@ -338,6 +339,18 @@ class AdminClaimHandoffResponse(BaseModel):
     claimed_at: str
     claimed_by: str
     ttl_seconds: int
+
+
+class AdminReleaseHandoffRequest(BaseModel):
+    note: str | None = Field(default=None, max_length=500)
+
+
+class AdminReleaseHandoffResponse(BaseModel):
+    status: str
+    conversation_id: str
+    channel: str
+    released_at: str
+    released_by: str
 
 
 class PartnerProfileItem(BaseModel):
