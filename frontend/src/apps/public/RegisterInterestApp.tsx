@@ -3,9 +3,7 @@ import {
   BadgeCheck,
   Building2,
   Check,
-  CircleDollarSign,
   Rocket,
-  Sparkles,
 } from 'lucide-react';
 
 import { Footer } from '../../components/landing/Footer';
@@ -37,7 +35,7 @@ import {
 } from '../../components/landing/sections/pricing-shared';
 
 type DeploymentModeId = 'standalone_website' | 'dedicated_customer_app' | 'linked_full_portal';
-type OfferId = 'freemium' | 'launch10' | 'upgrade1' | 'upgrade2' | 'upgrade3';
+type OfferId = 'starter' | 'growth' | 'enterprise';
 
 const registerNavItems = [
   { id: 'offer', label: 'Offer' },
@@ -53,65 +51,65 @@ const deploymentModes: Array<{
   {
     id: 'standalone_website',
     title: 'Standalone website',
-    body: 'Best for SME teams that want to launch the live booking, payment, and email flow on their own website first.',
+    body: 'Best when you want BookedAI live on your own website first — bookings, payments, and confirmations on day one.',
   },
   {
     id: 'dedicated_customer_app',
     title: 'Dedicated customer app',
-    body: 'Best when the customer wants a separate branded app or cleaner booking surface while BookedAI handles the orchestration behind it.',
+    body: 'Best when you want a separate branded booking surface while BookedAI runs the orchestration behind it.',
   },
   {
     id: 'linked_full_portal',
     title: 'Linked full portal',
-    body: 'Best for teams that want the SME launch flow now and a broader BookedAI business workspace connected after rollout.',
+    body: 'Best when you want a fast public launch now plus the wider BookedAI workspace connected after rollout.',
   },
 ];
 
 const nextStepCards = [
   {
-    label: '1. Register',
-    detail: 'Share the SME details BookedAI needs to review and start setup.',
+    label: '1. Tell us about your bookings',
+    detail: 'Share the basics so a founder can review fit and prep the live demo.',
   },
   {
-    label: '2. Confirm',
-    detail: 'We send email, calendar links, and the next commercial step in one flow.',
+    label: '2. We confirm a time',
+    detail: 'You get an email, a calendar invite, and the next commercial step in one flow.',
   },
   {
-    label: '3. Go Live',
-    detail: 'Launch standalone, in-app, or linked to the wider BookedAI portal.',
+    label: '3. Go live',
+    detail: 'Launch standalone, in-app, or linked to the wider BookedAI workspace.',
   },
 ];
 
 const conversionHighlights = [
   {
-    label: 'Free cohort',
-    value: '10 SMEs',
-    detail: 'Online setup waived for the first qualified launch customers.',
+    label: 'Aligned commercial model',
+    value: 'Pay only when we book',
+    detail: 'Commission only applies to real bookings BookedAI captures or recovers.',
   },
   {
     label: 'Time to submit',
-    value: '~2 min',
-    detail: 'Short form built for QR traffic and mobile completion.',
+    value: 'About 2 minutes',
+    detail: 'Built for mobile and QR traffic — only the details we actually need.',
   },
   {
-    label: 'Commission trigger',
-    value: 'Real bookings only',
-    detail: 'Only when bookings complete through an installed BookedAI surface.',
+    label: 'First reply',
+    value: 'Within 24h',
+    detail: 'A founder reviews the fit, then walks you through the live tenant proof.',
   },
 ];
 
 const funnelStages = [
   {
-    title: 'Scan',
-    body: 'QR or CTA opens the registration flow.',
+    title: 'Tell us',
+    body: 'Share your booked-revenue picture today.',
   },
   {
     title: 'Choose',
-    body: 'Pick package, rollout mode, and setup path.',
+    body: 'Pick the engine, rollout mode, and setup path.',
   },
   {
-    title: 'Launch',
-    body: 'BookedAI follows up, confirms, and gets the surface live.',
+    title: 'Go live',
+    body: 'A founder confirms and walks you through the live demo.',
   },
 ];
 
@@ -127,60 +125,35 @@ const offerPackages: Array<{
   highlighted?: boolean;
 }> = [
   {
-    id: 'freemium',
-    title: 'Freemium',
-    badge: 'Entry',
+    id: 'starter',
+    title: 'Starter Engine',
+    badge: 'Free',
     backendPlanId: 'basic',
-    icon: Sparkles,
-    headline: 'Best for first activation, plugin, popup, or website booking assistant.',
-    body: 'A light entry path for SMEs that want BookedAI live on web or app surfaces first, then upgrade once real usage and booking patterns are visible.',
-    commissionNote:
-      'Commission only applies when a successful booking is completed through the BookedAI-installed plugin, website flow, app flow, or booking assistant popup.',
+    icon: BadgeCheck,
+    headline: 'Solo or micro team launching BookedAI on a single channel.',
+    body: 'Free SaaS at the bottom of the ladder. One channel, one service catalog, BookedAI Manager Bot, portal, payment QR, and email confirmations.',
+    commissionNote: '0% commission. Pure SaaS at A$0 setup and A$79/mo.',
   },
   {
-    id: 'launch10',
-    title: 'Free Setup for First 10 SMEs',
-    badge: 'Priority',
+    id: 'growth',
+    title: 'Growth Engine',
+    badge: 'Most picked',
     backendPlanId: 'standard',
-    icon: BadgeCheck,
-    headline: 'Online setup is waived for the first 10 qualified SME customers.',
-    body: 'Requires enough business detail for BookedAI to review the SME quickly and begin online setup follow-up right away.',
-    commissionNote:
-      'No commission is charged unless BookedAI creates a real confirmed booking through the installed BookedAI booking flow.',
+    icon: Rocket,
+    headline: 'Established business ready to run BookedAI as the AI Revenue Engine.',
+    body: 'All three channels (Telegram, WhatsApp, embed widget), agent queue, audit ledger, Stripe billing, CRM sync, and a monthly revenue summary.',
+    commissionNote: 'A$499 onboarding plus 3% on net booked revenue BookedAI captures.',
     highlighted: true,
   },
   {
-    id: 'upgrade1',
-    title: 'Pro',
-    badge: 'Scale',
-    backendPlanId: 'standard',
-    icon: Rocket,
-    headline: 'Best for SMEs ready to move from freemium into a stronger commercial rollout.',
-    body: 'Ideal when you want a cleaner installed booking flow, better follow-up, and a more conversion-focused BookedAI setup after the first activation stage.',
-    commissionNote:
-      'Commission only applies to successful bookings attributed to BookedAI surfaces installed into the website, app, or popup.',
-  },
-  {
-    id: 'upgrade2',
-    title: 'Pro Max',
-    badge: 'Growth',
-    backendPlanId: 'pro',
-    icon: CircleDollarSign,
-    headline: 'Recommended for stronger booking, follow-up, automation, and conversion workflows.',
-    body: 'Adds broader service journeys, deeper SME automation, and more operational depth once the initial proof-of-demand stage is passed.',
-    commissionNote:
-      'Commission starts only when real bookings close through the BookedAI-assisted installed flow.',
-  },
-  {
-    id: 'upgrade3',
-    title: 'Advance Customize',
-    badge: 'Advanced',
+    id: 'enterprise',
+    title: 'Enterprise Engine',
+    badge: 'Premium',
     backendPlanId: 'pro',
     icon: Building2,
-    headline: 'Best for broader automation, multi-location logic, and deeper portal or workflow customization.',
-    body: 'For SMEs and business teams who need a more tailored BookedAI package after the early launch stage is working.',
-    commissionNote:
-      'Commission is tied only to confirmed bookings generated via the installed BookedAI experience, not generic external bookings.',
+    headline: 'Multi-location, franchise, academy, or vertical platform.',
+    body: 'Multi-tenant template, SSO, white-label widget, retention automation, SLA, and a named customer success manager.',
+    commissionNote: 'A$2,500 to A$10,000 setup plus 5% on attributable revenue, floor and cap negotiated up front.',
   },
 ];
 
@@ -212,12 +185,10 @@ function buildRegistrationNotes(
     deploymentModes.find((mode) => mode.id === deploymentMode)?.title ?? deploymentMode;
   const offerLabel = offerPackages.find((offer) => offer.id === offerId)?.title ?? offerId;
   const fragments = [
-    `BookedAI offer selected: ${offerLabel}`,
+    `BookedAI engine selected: ${offerLabel}`,
     `Deployment mode: ${deploymentLabel}`,
     `Business website: ${businessWebsite.trim()}`,
-    'Homepage offer: first 10 SMEs receive free online setup',
-    'Commercial model: subscription or upgrade path plus commission only on successful bookings completed through the BookedAI-installed plugin, website flow, app flow, or booking assistant popup',
-    'Subscription intent: customer wants to start the BookedAI trial now',
+    'Commercial model: setup plus monthly plus commission only on real bookings BookedAI captures or recovers',
     formState.notes.trim() ? `Business notes: ${formState.notes.trim()}` : null,
   ];
 
@@ -226,34 +197,28 @@ function buildRegistrationNotes(
 
 function normalizeOfferId(value: string | null): OfferId | null {
   switch ((value || '').trim().toLowerCase()) {
-    case 'freemium':
+    case 'starter':
+    case 'starter-engine':
+    case 'basic':
     case 'free':
-      return 'freemium';
+    case 'freemium':
+      return 'starter';
+    case 'growth':
+    case 'growth-engine':
+    case 'standard':
     case 'launch10':
-    case 'top10':
-    case 'top-10':
-    case 'first10':
-    case 'first-10':
-      return 'launch10';
-    case 'upgrade1':
-    case 'upgrade-1':
-    case 'u1':
     case 'pro':
-      return 'upgrade1';
-    case 'upgrade2':
-    case 'upgrade-2':
-    case 'u2':
     case 'pro-max':
     case 'promax':
-      return 'upgrade2';
-    case 'upgrade3':
-    case 'upgrade-3':
-    case 'u3':
+      return 'growth';
+    case 'enterprise':
+    case 'enterprise-engine':
+    case 'advanced':
     case 'advance-customize':
     case 'advance_customize':
     case 'advanced-customize':
     case 'customize':
-      return 'upgrade3';
+      return 'enterprise';
     default:
       return null;
   }
@@ -293,7 +258,7 @@ export function RegisterInterestApp() {
   const [formState, setFormState] = useState<ConsultationFormState>(() =>
     buildInitialForm('standard'),
   );
-  const [selectedOfferId, setSelectedOfferId] = useState<OfferId>('launch10');
+  const [selectedOfferId, setSelectedOfferId] = useState<OfferId>('growth');
   const [businessWebsite, setBusinessWebsite] = useState('');
   const [deploymentMode, setDeploymentMode] = useState<DeploymentModeId>('standalone_website');
   const [submitError, setSubmitError] = useState('');
@@ -312,7 +277,7 @@ export function RegisterInterestApp() {
   const icsDownloadUrl = result ? buildIcsDownloadUrl(result) : null;
 
   useEffect(() => {
-    document.title = 'Register Interest | BookedAI SME Setup';
+    document.title = 'Talk to a BookedAI human | Register your interest';
   }, []);
 
   function updateFormState<K extends keyof ConsultationFormState>(
@@ -338,10 +303,11 @@ export function RegisterInterestApp() {
 
     const params = new URLSearchParams(window.location.search);
     const presetOffer =
+      normalizeOfferId(params.get('plan')) ??
       normalizeOfferId(params.get('offer')) ??
       normalizeOfferId(params.get('package')) ??
       normalizeOfferId(params.get('pkg')) ??
-      (params.get('source_detail') === 'homepage_qr' ? 'launch10' : null);
+      (params.get('source_detail') === 'homepage_qr' ? 'growth' : null);
     const presetDeployment =
       normalizeDeploymentMode(params.get('deployment')) ??
       normalizeDeploymentMode(params.get('mode')) ??
@@ -374,7 +340,7 @@ export function RegisterInterestApp() {
     }
 
     setCampaignPresetSummary(
-      summaryParts.length > 0 ? `Campaign defaults applied: ${summaryParts.join(' • ')}` : null,
+      summaryParts.length > 0 ? `Defaults applied from your link: ${summaryParts.join(' • ')}` : null,
     );
   }, []);
 
@@ -412,43 +378,43 @@ export function RegisterInterestApp() {
     const normalizedPhoneDigits = formState.customerPhone.trim().replace(/\D/g, '');
 
     if (formState.customerName.trim().length < 2) {
-      setSubmitError('Enter your name so we can personalise the setup path.');
+      setSubmitError('We need your name so we know how to greet you.');
       return;
     }
 
     if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(formState.customerEmail.trim())) {
-      setSubmitError('Enter a valid work email so we can send the confirmation and invite.');
+      setSubmitError('We need a valid email so we can send the confirmation and invite.');
       return;
     }
 
     if (normalizedPhoneDigits.length < 8) {
-      setSubmitError('Enter a valid phone number with at least 8 digits.');
+      setSubmitError('We need a phone number with at least 8 digits in case email bounces.');
       return;
     }
 
     if (formState.businessName.trim().length < 2) {
-      setSubmitError('Enter your business name.');
+      setSubmitError('We need your business name so we know who we are setting up.');
       return;
     }
 
     if (businessWebsite.trim().length < 4) {
-      setSubmitError('Enter the SME website or app URL so we can review the setup surface.');
+      setSubmitError('We need a website or app URL so we can review where BookedAI will run.');
       return;
     }
 
     if (formState.businessType.trim().length < 2) {
-      setSubmitError('Choose or enter the type of SME you run.');
+      setSubmitError('Pick or type the kind of business you run.');
       return;
     }
 
     if (formState.startupReferralEligible && formState.referralPartner.trim().length < 2) {
-      setSubmitError('Enter the accelerator or incubator that referred your startup.');
+      setSubmitError('Tell us which accelerator or incubator referred you.');
       return;
     }
 
     const preferredSlot = parsePreferredSlot(formState.preferredSlot);
     if (!preferredSlot) {
-      setSubmitError('Choose a valid preferred setup time.');
+      setSubmitError('Pick a valid time you would like to talk to a founder.');
       return;
     }
 
@@ -513,7 +479,9 @@ export function RegisterInterestApp() {
       }
     } catch (error) {
       setSubmitError(
-        error instanceof Error ? error.message : 'Unable to submit your registration right now.',
+        error instanceof Error
+          ? error.message
+          : 'Something went wrong on our side. Try again or email info@bookedai.au.',
       );
     } finally {
       setIsSubmitting(false);
@@ -521,9 +489,7 @@ export function RegisterInterestApp() {
   }
 
   return (
-    <main className="booked-shell min-h-screen bg-[linear-gradient(180deg,#f7fbff_0%,#eef4f8_38%,#fbfcfd_100%)] pb-10 text-[#1d1d1f]">
-      <div className="pointer-events-none fixed inset-0 z-0 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.11),transparent_24%),radial-gradient(circle_at_top_right,rgba(249,115,22,0.12),transparent_26%),linear-gradient(180deg,rgba(255,255,255,0.30)_0%,rgba(255,255,255,0)_30%,rgba(255,255,255,0.44)_100%)]" />
-
+    <main className="booked-shell min-h-screen bg-apple-light pb-10 text-apple-near-black">
       <div className="relative z-10">
         <Header
           navItems={registerNavItems}
@@ -533,67 +499,65 @@ export function RegisterInterestApp() {
 
         <SectionShell id="offer" className="pt-10 pb-8 sm:pt-14 lg:pt-18">
           <SectionCard className="relative overflow-hidden p-7 lg:p-9">
-            <div className="absolute inset-x-[16%] top-0 h-28 rounded-full bg-[radial-gradient(circle,rgba(37,99,235,0.15),transparent_72%)] blur-3xl" />
             <div className="relative grid gap-8 lg:grid-cols-[1.05fr_0.95fr] lg:items-start">
               <div>
-                <SignalPill className="px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-[#1459c7]">
-                  SME launch registration
+                <SignalPill className="px-4 py-2 text-[11px] uppercase tracking-[0.18em] text-apple-blue">
+                  Tell us about your booked revenue today
                 </SignalPill>
-                <h1 className="mt-5 max-w-[11ch] text-4xl font-semibold tracking-[-0.06em] text-[#1d1d1f] sm:text-6xl">
-                  Register your SME and get BookedAI live faster.
+                <h1 className="mt-5 max-w-[14ch] text-4xl font-semibold tracking-[-0.06em] text-apple-near-black sm:text-6xl">
+                  Talk to a BookedAI human.
                 </h1>
-                <p className="mt-4 max-w-2xl text-sm leading-7 text-black/68 sm:text-base sm:leading-8">
-                  Pick a package, share your SME details, and let BookedAI continue with setup,
-                  confirmation, and launch follow-up.
+                <p className="mt-4 max-w-2xl text-sm leading-7 text-black/72 sm:text-base sm:leading-8">
+                  Two minutes of context, then a founder walks you through the live tenant proof and how BookedAI would run for your business.
                 </p>
 
                 <div className="mt-6 grid gap-3 sm:grid-cols-3">
                   {conversionHighlights.map((item) => (
-                    <SectionCard key={item.label} tone="subtle" className="rounded-[1.35rem] px-4 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    <SectionCard key={item.label} tone="subtle" className="rounded-apple-large px-4 py-4">
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-black/56">
                         {item.label}
                       </div>
-                      <div className="mt-2 text-lg font-semibold tracking-[-0.03em] text-slate-950">
+                      <div className="mt-2 text-lg font-semibold tracking-[-0.03em] text-apple-near-black">
                         {item.value}
                       </div>
-                      <p className="mt-2 text-sm leading-6 text-black/66">{item.detail}</p>
+                      <p className="mt-2 text-sm leading-6 text-black/68">{item.detail}</p>
                     </SectionCard>
                   ))}
                 </div>
 
                 <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
                   <button type="button" onClick={scrollToForm} className="booked-button">
-                    Claim Free Setup
+                    Start free
                   </button>
                   <button
                     type="button"
                     onClick={openProductDemo}
                     className="booked-button-secondary"
                   >
-                    Open Product Demo
+                    Run the live demo
                   </button>
                   <button
                     type="button"
                     onClick={openHomepage}
                     className="booked-button-secondary"
                   >
-                    Open Live Product
+                    See live tenant proof
                   </button>
                 </div>
               </div>
 
               <div className="grid gap-4">
-                <SectionCard className="rounded-[1.75rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f4f8ff_100%)] p-5 shadow-none">
+                <SectionCard className="rounded-apple-large p-5 shadow-none">
                   <div className="flex items-center justify-between gap-3">
                     <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        Registration funnel
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-black/56">
+                        How it runs
                       </div>
-                      <div className="mt-2 text-xl font-semibold tracking-[-0.04em] text-slate-950">
-                        Scan to live in 3 clear moves.
+                      <div className="mt-2 text-xl font-semibold tracking-[-0.04em] text-apple-near-black">
+                        Three clear moves to live.
                       </div>
                     </div>
-                    <SignalPill className="px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-[#1459c7]">
+                    <SignalPill className="px-3 py-1 text-xs uppercase tracking-[0.14em] text-apple-blue">
                       Mobile first
                     </SignalPill>
                   </div>
@@ -602,14 +566,14 @@ export function RegisterInterestApp() {
                     {funnelStages.map((stage, index) => (
                       <div
                         key={stage.title}
-                        className="grid grid-cols-[auto_1fr] items-start gap-3 rounded-[1.2rem] border border-black/6 bg-white px-4 py-4"
+                        className="grid grid-cols-[auto_1fr] items-start gap-3 rounded-apple-large border border-black/8 bg-apple-white px-4 py-4"
                       >
-                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-[#1d4ed8] text-sm font-semibold text-white">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-full bg-apple-blue text-sm font-semibold text-apple-white">
                           {index + 1}
                         </div>
                         <div>
-                          <div className="text-sm font-semibold text-slate-950">{stage.title}</div>
-                          <p className="mt-1 text-sm leading-6 text-black/66">{stage.body}</p>
+                          <div className="text-sm font-semibold text-apple-near-black">{stage.title}</div>
+                          <p className="mt-1 text-sm leading-6 text-black/68">{stage.body}</p>
                         </div>
                       </div>
                     ))}
@@ -617,30 +581,17 @@ export function RegisterInterestApp() {
                 </SectionCard>
 
                 {[
-                  ['Starting price', '49$+ public entry plan for SME launches'],
-                  ['Subscription', '30-day free trial available now on BookedAI plans'],
-                  ['Commercial model', 'Commission is only charged after a real booking is completed through the BookedAI-installed plugin, website, app, or booking assistant popup'],
+                  ['Entry point', 'Starter Engine is free SaaS at A$0 setup, A$79/mo'],
+                  ['Aligned model', '3% on net booked revenue only on Growth Engine'],
+                  ['Pay only when we book', 'Commission only on real bookings BookedAI captures or recovers'],
                 ].map(([label, value]) => (
-                  <SectionCard key={label} tone="subtle" className="rounded-[1.5rem] p-5">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  <SectionCard key={label} tone="subtle" className="rounded-apple-large p-5">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-black/56">
                       {label}
                     </div>
-                    <div className="mt-2 text-base font-semibold text-slate-950">{value}</div>
+                    <div className="mt-2 text-base font-semibold text-apple-near-black">{value}</div>
                   </SectionCard>
                 ))}
-
-                <SectionCard
-                  tone="subtle"
-                  className="rounded-[1.65rem] border border-emerald-200/70 bg-[linear-gradient(180deg,rgba(236,253,245,0.95)_0%,rgba(240,253,250,0.95)_100%)] p-5"
-                >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                    Why this page converts
-                  </div>
-                  <p className="mt-3 text-sm leading-7 text-slate-700">
-                    Sales copy stays on the homepage. This page is built to turn QR scans and CTA
-                    clicks into real SME setup conversations.
-                  </p>
-                </SectionCard>
               </div>
             </div>
           </SectionCard>
@@ -649,14 +600,14 @@ export function RegisterInterestApp() {
         <SectionShell id="registration-form" className="py-8 lg:py-12">
           <div className="grid gap-6 lg:grid-cols-[0.92fr_1.08fr]">
             <SectionCard className="order-2 h-full p-6 lg:order-1 lg:p-7">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/56">
                 Launch routes
               </div>
-              <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
-                Choose the fastest way to go live.
+              <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-apple-near-black">
+                Where will customers actually book first?
               </h2>
-              <p className="mt-4 text-sm leading-7 text-black/66">
-                Pick the rollout mode that matches where your customers will actually book first.
+              <p className="mt-4 text-sm leading-7 text-black/68">
+                Pick the rollout mode that matches your real customer journey today.
               </p>
 
               <div className="mt-6 grid gap-3">
@@ -667,15 +618,16 @@ export function RegisterInterestApp() {
                       key={mode.id}
                       type="button"
                       onClick={() => setDeploymentMode(mode.id)}
+                      aria-pressed={isSelected}
                       className={[
-                        'rounded-[1.45rem] border px-5 py-4 text-left transition',
+                        'rounded-apple-large border px-5 py-4 text-left transition',
                         isSelected
-                          ? 'border-[#1459c7] bg-[#eff6ff] shadow-[0_12px_30px_rgba(37,99,235,0.10)]'
-                          : 'border-black/8 bg-white hover:border-[#1459c7]/35 hover:bg-slate-50',
+                          ? 'border-apple-blue bg-apple-blue/5'
+                          : 'border-black/8 bg-apple-white hover:border-apple-blue/40',
                       ].join(' ')}
                     >
-                      <div className="text-sm font-semibold text-slate-950">{mode.title}</div>
-                      <p className="mt-2 text-sm leading-6 text-black/66">{mode.body}</p>
+                      <div className="text-sm font-semibold text-apple-near-black">{mode.title}</div>
+                      <p className="mt-2 text-sm leading-6 text-black/68">{mode.body}</p>
                     </button>
                   );
                 })}
@@ -683,23 +635,19 @@ export function RegisterInterestApp() {
 
               <div className="mt-6 grid gap-3">
                 {nextStepCards.map((item) => (
-                  <SectionCard key={item.label} tone="subtle" className="rounded-[1.35rem] px-4 py-4">
-                    <div className="text-sm font-semibold text-slate-950">{item.label}</div>
-                    <p className="mt-2 text-sm leading-6 text-black/66">{item.detail}</p>
+                  <SectionCard key={item.label} tone="subtle" className="rounded-apple-large px-4 py-4">
+                    <div className="text-sm font-semibold text-apple-near-black">{item.label}</div>
+                    <p className="mt-2 text-sm leading-6 text-black/68">{item.detail}</p>
                   </SectionCard>
                 ))}
               </div>
 
-              <SectionCard
-                tone="subtle"
-                className="mt-6 rounded-[1.4rem] border border-cyan-200/70 bg-[linear-gradient(180deg,rgba(239,246,255,0.96)_0%,rgba(236,254,255,0.96)_100%)] px-4 py-4"
-              >
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
-                  Mobile conversion hint
+              <SectionCard tone="subtle" className="mt-6 rounded-apple-large px-4 py-4">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-apple-blue">
+                  Mobile first
                 </div>
-                <p className="mt-2 text-sm leading-6 text-slate-700">
-                  Form fields are intentionally front-loaded with the minimum details BookedAI needs
-                  to follow up online quickly after a QR scan.
+                <p className="mt-2 text-sm leading-6 text-black/72">
+                  Only the details we actually need to follow up after a QR scan. Deeper rollout details can wait for the call.
                 </p>
               </SectionCard>
             </SectionCard>
@@ -707,36 +655,36 @@ export function RegisterInterestApp() {
             <SectionCard className="order-1 p-6 lg:order-2 lg:p-7">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Registration form
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/56">
+                    Tell us about your bookings
                   </div>
-                  <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
-                    Choose the right BookedAI package and register now.
+                  <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-apple-near-black">
+                    Pick the engine and tell us where you book today.
                   </h2>
-                  <p className="mt-3 max-w-2xl text-sm leading-6 text-black/66">
-                    Short form first. Deeper rollout details can be confirmed in follow-up.
+                  <p className="mt-3 max-w-2xl text-sm leading-6 text-black/68">
+                    Short form first. We confirm the rest on the call.
                   </p>
                 </div>
-                <SignalPill className="bg-emerald-50 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-emerald-700">
-                  10 SME priority
+                <SignalPill className="px-3 py-1 text-xs uppercase tracking-[0.14em] text-apple-blue">
+                  Reply within 24h
                 </SignalPill>
               </div>
 
-              <form className="mt-6 grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit}>
+              <form className="mt-6 grid gap-4 sm:grid-cols-2" onSubmit={handleSubmit} noValidate>
                 {campaignPresetSummary ? (
-                  <SectionCard
-                    tone="subtle"
-                    className="sm:col-span-2 rounded-[1.35rem] border border-cyan-200/70 bg-[linear-gradient(180deg,rgba(239,246,255,0.96)_0%,rgba(236,254,255,0.96)_100%)] px-4 py-4"
-                  >
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-700">
-                      QR campaign preset
+                  <SectionCard tone="subtle" className="sm:col-span-2 rounded-apple-large px-4 py-4">
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-apple-blue">
+                      From your link
                     </div>
-                    <p className="mt-2 text-sm leading-6 text-slate-700">{campaignPresetSummary}</p>
+                    <p className="mt-2 text-sm leading-6 text-black/72">{campaignPresetSummary}</p>
                   </SectionCard>
                 ) : null}
 
                 <div className="sm:col-span-2">
-                  <div className="text-sm font-medium text-slate-700">BookedAI packages</div>
+                  <div className="text-sm font-medium text-apple-near-black">BookedAI engines</div>
+                  <p className="mt-1 text-xs text-black/56">
+                    Free at the bottom, premium at the top. Aligned in the middle on real booked revenue.
+                  </p>
                   <div className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
                     {offerPackages.map((offer) => {
                       const isSelected = selectedOfferId === offer.id;
@@ -747,47 +695,48 @@ export function RegisterInterestApp() {
                           type="button"
                           onClick={() => updateSelectedOffer(offer.id)}
                           className={[
-                            'group min-w-0 rounded-[1.15rem] border px-3.5 py-3 text-left transition sm:px-4',
+                            'group min-w-0 rounded-apple-large border px-3.5 py-3 text-left transition sm:px-4',
                             isSelected
-                              ? 'border-[#1459c7] bg-[#eff6ff] shadow-[0_10px_24px_rgba(37,99,235,0.10)]'
-                              : 'border-black/8 bg-white hover:border-[#1459c7]/35 hover:bg-slate-50',
+                              ? 'border-apple-blue bg-apple-blue/5'
+                              : 'border-black/8 bg-apple-white hover:border-apple-blue/40',
                           ].join(' ')}
                           aria-pressed={isSelected}
                         >
                           <div className="flex min-w-0 items-start gap-3">
                             <span
                               className={[
-                                'flex h-9 w-9 shrink-0 items-center justify-center rounded-[0.85rem]',
-                                isSelected ? 'bg-[#1459c7] text-white' : 'bg-slate-100 text-slate-600',
+                                'flex h-9 w-9 shrink-0 items-center justify-center rounded-apple-standard',
+                                isSelected ? 'bg-apple-blue text-apple-white' : 'bg-apple-light text-black/68',
                               ].join(' ')}
+                              aria-hidden="true"
                             >
                               {isSelected ? <Check className="h-4 w-4" /> : <OfferIcon className="h-4 w-4" />}
                             </span>
                             <span className="min-w-0 flex-1">
                               <span className="flex min-w-0 items-center justify-between gap-2">
-                                <span className="line-clamp-2 min-w-0 text-sm font-semibold leading-5 text-slate-950">
+                                <span className="line-clamp-2 min-w-0 text-sm font-semibold leading-5 text-apple-near-black">
                                   {offer.title}
                                 </span>
                                 <span
                                   className={[
-                                    'shrink-0 rounded-full px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em]',
+                                    'shrink-0 rounded-apple-pill px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em]',
                                     offer.highlighted
-                                      ? 'bg-emerald-50 text-emerald-700'
-                                      : 'bg-slate-100 text-slate-600',
+                                      ? 'bg-apple-blue/10 text-apple-blue'
+                                      : 'bg-apple-light text-black/68',
                                   ].join(' ')}
                                 >
                                   {offer.badge}
                                 </span>
                               </span>
-                              <span className="mt-1 line-clamp-2 block text-xs font-medium leading-5 text-[#1459c7]">
+                              <span className="mt-1 line-clamp-2 block text-xs font-medium leading-5 text-apple-blue">
                                 {offer.headline}
                               </span>
                             </span>
                           </div>
-                          <div className="mt-2 line-clamp-2 text-xs leading-5 text-black/60">
+                          <div className="mt-2 line-clamp-2 text-xs leading-5 text-black/68">
                             {offer.body}
                           </div>
-                          <div className="mt-2 line-clamp-2 text-[11px] leading-5 text-[#1459c7]">
+                          <div className="mt-2 line-clamp-2 text-[11px] leading-5 text-apple-blue">
                             {offer.commissionNote}
                           </div>
                         </button>
@@ -797,7 +746,7 @@ export function RegisterInterestApp() {
                 </div>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-700">Business name</span>
+                  <span className="text-sm font-medium text-apple-near-black">Business name</span>
                   <input
                     type="text"
                     value={formState.businessName}
@@ -805,24 +754,29 @@ export function RegisterInterestApp() {
                     placeholder="Your company or venue"
                     required
                     minLength={2}
-                    className="booked-field rounded-2xl px-4 py-3 text-sm"
+                    className="booked-field min-h-[44px] rounded-apple-comfortable px-4 py-3 text-base sm:text-sm"
+                    autoComplete="organization"
                   />
+                  <span className="text-xs text-black/56">So we know who we are setting up.</span>
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-700">Website or app URL</span>
+                  <span className="text-sm font-medium text-apple-near-black">Website or app URL</span>
                   <input
                     type="url"
                     value={businessWebsite}
                     onChange={(event) => setBusinessWebsite(event.target.value)}
                     placeholder="https://yourbusiness.com.au"
                     required
-                    className="booked-field rounded-2xl px-4 py-3 text-sm"
+                    className="booked-field min-h-[44px] rounded-apple-comfortable px-4 py-3 text-base sm:text-sm"
+                    inputMode="url"
+                    autoComplete="url"
                   />
+                  <span className="text-xs text-black/56">Where will BookedAI run on day one?</span>
                 </label>
 
                 <label className="flex flex-col gap-2 sm:col-span-2">
-                  <span className="text-sm font-medium text-slate-700">Business type</span>
+                  <span className="text-sm font-medium text-apple-near-black">Business type</span>
                   <input
                     list="register-interest-business-types"
                     value={formState.businessType}
@@ -830,7 +784,7 @@ export function RegisterInterestApp() {
                     placeholder="Salon, clinic, tutoring, trades, hospitality..."
                     required
                     minLength={2}
-                    className="booked-field rounded-2xl px-4 py-3 text-sm"
+                    className="booked-field min-h-[44px] rounded-apple-comfortable px-4 py-3 text-base sm:text-sm"
                   />
                   <datalist id="register-interest-business-types">
                     {businessTypeSuggestions.map((item) => (
@@ -840,19 +794,22 @@ export function RegisterInterestApp() {
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-700">Work email</span>
+                  <span className="text-sm font-medium text-apple-near-black">Work email</span>
                   <input
                     type="email"
                     value={formState.customerEmail}
                     onChange={(event) => updateFormState('customerEmail', event.target.value)}
                     placeholder="you@business.com.au"
                     required
-                    className="booked-field rounded-2xl px-4 py-3 text-sm"
+                    className="booked-field min-h-[44px] rounded-apple-comfortable px-4 py-3 text-base sm:text-sm"
+                    inputMode="email"
+                    autoComplete="email"
                   />
+                  <span className="text-xs text-black/56">We need an email so we can confirm and send the calendar invite.</span>
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-700">Phone number</span>
+                  <span className="text-sm font-medium text-apple-near-black">Phone number</span>
                   <input
                     type="tel"
                     value={formState.customerPhone}
@@ -860,12 +817,15 @@ export function RegisterInterestApp() {
                     placeholder="+61 ..."
                     required
                     minLength={8}
-                    className="booked-field rounded-2xl px-4 py-3 text-sm"
+                    className="booked-field min-h-[44px] rounded-apple-comfortable px-4 py-3 text-base sm:text-sm"
+                    inputMode="tel"
+                    autoComplete="tel"
                   />
+                  <span className="text-xs text-black/56">In case email bounces.</span>
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-700">Your name</span>
+                  <span className="text-sm font-medium text-apple-near-black">Your name</span>
                   <input
                     type="text"
                     value={formState.customerName}
@@ -873,18 +833,19 @@ export function RegisterInterestApp() {
                     placeholder="How should we address you?"
                     required
                     minLength={2}
-                    className="booked-field rounded-2xl px-4 py-3 text-sm"
+                    className="booked-field min-h-[44px] rounded-apple-comfortable px-4 py-3 text-base sm:text-sm"
+                    autoComplete="name"
                   />
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-700">Setup mode</span>
+                  <span className="text-sm font-medium text-apple-near-black">Setup mode</span>
                   <select
                     value={formState.onboardingMode}
                     onChange={(event) =>
                       updateFormState('onboardingMode', event.target.value as OnboardingMode)
                     }
-                    className="booked-field rounded-2xl px-4 py-3 text-sm"
+                    className="booked-field rounded-apple-comfortable px-4 py-3 text-sm"
                   >
                     <option value="online">Online setup</option>
                     <option value="onsite">Onsite setup</option>
@@ -892,22 +853,22 @@ export function RegisterInterestApp() {
                 </label>
 
                 <label className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-slate-700">Preferred setup time</span>
+                  <span className="text-sm font-medium text-apple-near-black">Preferred time to talk</span>
                   <input
                     type="datetime-local"
                     value={formState.preferredSlot}
                     onChange={(event) => updateFormState('preferredSlot', event.target.value)}
                     required
-                    className="booked-field rounded-2xl px-4 py-3 text-sm"
+                    className="booked-field rounded-apple-comfortable px-4 py-3 text-sm"
                   />
                 </label>
 
-                <details className="sm:col-span-2 rounded-[1.45rem] border border-black/8 bg-slate-50 px-4 py-4">
-                  <summary className="cursor-pointer list-none text-sm font-semibold text-slate-950">
+                <details className="sm:col-span-2 rounded-apple-large border border-black/8 bg-apple-light px-4 py-4">
+                  <summary className="cursor-pointer list-none text-sm font-semibold text-apple-near-black">
                     Optional details
                   </summary>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Add these only if they help BookedAI prepare the rollout faster.
+                  <p className="mt-2 text-sm leading-6 text-black/68">
+                    Helpful only if it speeds up the rollout.
                   </p>
 
                   <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -918,18 +879,17 @@ export function RegisterInterestApp() {
                         onChange={(event) =>
                           updateFormState('startupReferralEligible', event.target.checked)
                         }
-                        className="mt-1 h-4 w-4 rounded border-slate-300 bg-white text-[#2563eb]"
+                        className="mt-1 h-4 w-4 rounded border-black/20 bg-apple-white text-apple-blue"
                       />
-                      <span className="text-sm leading-6 text-slate-700">
-                        We are a startup team referred by an accelerator or incubator and want to claim
-                        the 3-month free subscription offer if eligible.
+                      <span className="text-sm leading-6 text-black/72">
+                        We are a startup team referred by an accelerator or incubator and would like to be considered for the 3-month free subscription offer.
                       </span>
                     </SectionCard>
 
                     {formState.startupReferralEligible ? (
                       <>
                         <label className="flex flex-col gap-2">
-                          <span className="text-sm font-medium text-slate-700">
+                          <span className="text-sm font-medium text-apple-near-black">
                             Accelerator or incubator
                           </span>
                           <input
@@ -937,72 +897,85 @@ export function RegisterInterestApp() {
                             value={formState.referralPartner}
                             onChange={(event) => updateFormState('referralPartner', event.target.value)}
                             placeholder="Startmate, UNSW Founders, Stone & Chalk..."
-                            className="booked-field rounded-2xl px-4 py-3 text-sm"
+                            className="booked-field rounded-apple-comfortable px-4 py-3 text-sm"
                           />
                         </label>
 
                         <label className="flex flex-col gap-2">
-                          <span className="text-sm font-medium text-slate-700">Startup city or hub</span>
+                          <span className="text-sm font-medium text-apple-near-black">Startup city or hub</span>
                           <input
                             type="text"
                             value={formState.referralLocation}
                             onChange={(event) => updateFormState('referralLocation', event.target.value)}
                             placeholder="Sydney, Melbourne, Brisbane..."
-                            className="booked-field rounded-2xl px-4 py-3 text-sm"
+                            className="booked-field rounded-apple-comfortable px-4 py-3 text-sm"
                           />
                         </label>
                       </>
                     ) : null}
 
                     <label className="flex flex-col gap-2 sm:col-span-2">
-                      <span className="text-sm font-medium text-slate-700">Launch notes</span>
+                      <span className="text-sm font-medium text-apple-near-black">Launch notes</span>
                       <textarea
                         value={formState.notes}
                         onChange={(event) => updateFormState('notes', event.target.value)}
                         rows={3}
                         placeholder="Key services, booking volume, or anything useful for setup."
-                        className="booked-field rounded-[1.5rem] px-4 py-3 text-sm"
+                        className="booked-field rounded-apple-large px-4 py-3 text-sm"
                       />
                     </label>
                   </div>
                 </details>
 
-                <SectionCard tone="subtle" className="sm:col-span-2 rounded-[1.45rem] px-5 py-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                <SectionCard tone="subtle" className="sm:col-span-2 rounded-apple-large px-5 py-4">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-black/56">
                     Your selected path
                   </div>
-                  <div className="mt-2 text-sm font-semibold text-slate-950">
+                  <div className="mt-2 text-sm font-semibold text-apple-near-black">
                     {selectedOffer.title}, mapped to {selectedPlan.name},{' '}
                     {formState.onboardingMode === 'onsite' ? 'onsite' : 'online'} setup,{' '}
                     {deploymentModes.find((mode) => mode.id === deploymentMode)?.title.toLowerCase()} rollout.
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-black/66">
-                    Commission is only charged when there is a real booking completed through the
-                    BookedAI-installed plugin, website integration, app integration, or booking
-                    assistant popup.
+                  <p className="mt-2 text-sm leading-6 text-black/68">
+                    Commission only applies to real bookings BookedAI captures or recovers — not seats.
                   </p>
                 </SectionCard>
 
                 {submitError ? (
-                  <div className="sm:col-span-2 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  <div
+                    role="alert"
+                    className="sm:col-span-2 rounded-apple-large border border-apple-danger/30 bg-apple-danger/10 px-4 py-3 text-sm text-apple-danger"
+                  >
                     {submitError}
                   </div>
                 ) : null}
 
-                <div className="sm:col-span-2 flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center">
+                <div className="sm:col-span-2 sticky bottom-0 left-0 right-0 z-10 flex flex-col gap-3 border-t border-black/5 bg-apple-light pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 -mx-4 px-4 sm:relative sm:mx-0 sm:px-0 sm:pt-0 sm:border-0 sm:flex-row sm:flex-wrap sm:items-center">
                   <button
                     type="submit"
                     disabled={isSubmitting}
-                    className="booked-button inline-flex min-h-12 items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
+                    className="booked-button inline-flex min-h-[44px] items-center justify-center gap-2 disabled:cursor-not-allowed disabled:opacity-70"
                   >
-                    {isSubmitting ? 'Submitting registration...' : 'Register SME and Continue'}
-                    <ArrowIcon />
+                    {isSubmitting ? (
+                      <>
+                        <span
+                          aria-hidden="true"
+                          className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-white/30 border-t-white"
+                        />
+                        <span>Sending your interest...</span>
+                      </>
+                    ) : (
+                      <>
+                        Send my interest
+                        <ArrowIcon />
+                      </>
+                    )}
                   </button>
                   <a
-                    href="mailto:info@bookedai.au?subject=BookedAI%20SME%20Setup%20Registration"
-                    className="booked-button-secondary inline-flex min-h-12 items-center justify-center"
+                    href="mailto:info@bookedai.au?subject=BookedAI%20setup%20enquiry"
+                    className="booked-button-secondary inline-flex min-h-[44px] items-center justify-center"
                   >
-                    Email Instead
+                    Talk to a founder by email
                   </a>
                 </div>
               </form>
@@ -1014,47 +987,46 @@ export function RegisterInterestApp() {
           <SectionCard className="p-6 lg:p-8">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-black/56">
                   Next steps
                 </div>
-                <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-slate-950">
-                  Confirmation, payment, and onboarding stay in one flow.
+                <h2 className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-apple-near-black">
+                  Confirmation, calendar, and rollout — in one flow.
                 </h2>
               </div>
-              <SignalPill className="px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-[#1459c7]">
-                BookedAI-owned conversion
+              <SignalPill className="px-3 py-1 text-xs uppercase tracking-[0.14em] text-apple-blue">
+                One conversation
               </SignalPill>
             </div>
 
             {result ? (
               <div className="mt-6 grid gap-5 lg:grid-cols-[0.9fr_1.1fr]">
-                <SectionCard tone="subtle" className="rounded-[1.55rem] p-5">
-                  <div className="text-sm font-semibold text-slate-950">
-                    {selectedOffer.title} registration confirmed
+                <SectionCard tone="subtle" className="rounded-apple-large p-5">
+                  <div className="text-sm font-semibold text-apple-near-black">
+                    {selectedOffer.title} — your interest is in.
                   </div>
-                  <p className="mt-3 text-sm leading-6 text-[#2563eb]">{result.trial_summary}</p>
-                  <p className="mt-3 text-sm leading-6 text-black/66">
+                  <p className="mt-3 text-sm leading-6 text-apple-blue">{result.trial_summary}</p>
+                  <p className="mt-3 text-sm leading-6 text-black/68">
                     Reference: {result.consultation_reference}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-black/66">
+                  <p className="mt-2 text-sm leading-6 text-black/68">
                     Preferred time: {formatConsultationDateTime(result)} {result.timezone}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-black/66">
+                  <p className="mt-2 text-sm leading-6 text-black/68">
                     Email status: {result.email_status === 'sent' ? 'Sent' : 'Pending manual follow-up'}
                   </p>
                   {result.startup_offer_summary ? (
-                    <p className="mt-2 text-sm leading-6 text-[#2563eb]">
+                    <p className="mt-2 text-sm leading-6 text-apple-blue">
                       {result.startup_offer_summary}
                     </p>
                   ) : null}
                   {result.onsite_travel_fee_note ? (
-                    <p className="mt-2 text-sm leading-6 text-black/66">
+                    <p className="mt-2 text-sm leading-6 text-black/68">
                       {result.onsite_travel_fee_note}
                     </p>
                   ) : null}
-                  <p className="mt-2 text-sm leading-6 text-[#1459c7]">
-                    Commission only becomes payable when a real booking is completed through the
-                    BookedAI-installed website flow, plugin, app, or booking assistant popup.
+                  <p className="mt-3 rounded-apple-large bg-apple-blue/5 px-4 py-3 text-sm leading-6 text-apple-near-black">
+                    We will reach out within 24h. In the meantime, run the live demo to see BookedAI close a real booking.
                   </p>
                 </SectionCard>
 
@@ -1077,7 +1049,7 @@ export function RegisterInterestApp() {
                       download={`bookedai-${result.consultation_reference}.ics`}
                       className="booked-button-secondary inline-flex items-center justify-center gap-2"
                     >
-                      Download ICS
+                      Download calendar invite
                       <ArrowIcon />
                     </a>
                   ) : null}
@@ -1089,7 +1061,7 @@ export function RegisterInterestApp() {
                       rel="noreferrer"
                       className="booked-button-secondary inline-flex items-center justify-center gap-2"
                     >
-                      Open Meeting Link
+                      Open meeting link
                       <ArrowIcon />
                     </a>
                   ) : null}
@@ -1101,32 +1073,32 @@ export function RegisterInterestApp() {
                       rel="noreferrer"
                       className="booked-button inline-flex items-center justify-center gap-2"
                     >
-                      Continue to Payment
+                      Continue to payment
                       <ArrowIcon />
                     </a>
                   ) : null}
 
                   <button
                     type="button"
-                    onClick={openHomepage}
+                    onClick={openProductDemo}
                     className="booked-button-secondary inline-flex items-center justify-center"
                   >
-                    Return to Homepage
+                    Run the live demo
                   </button>
                 </div>
               </div>
             ) : (
               <div className="mt-6 grid gap-4 md:grid-cols-3">
                 {[
-                  'Register your SME to secure the launch offer and trial path.',
-                  'Receive the onboarding email and the calendar-ready follow-up.',
-                  'Continue into payment only when the chosen rollout path is ready.',
+                  'Tell us about your bookings to lock in the engine and rollout path.',
+                  'Get the confirmation email and a calendar-ready follow-up.',
+                  'Move into payment only when the chosen rollout path is ready.',
                 ].map((item, index) => (
-                  <SectionCard key={item} tone="subtle" className="rounded-[1.45rem] p-5">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  <SectionCard key={item} tone="subtle" className="rounded-apple-large p-5">
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-black/56">
                       Step {index + 1}
                     </div>
-                    <p className="mt-3 text-sm leading-6 text-black/66">{item}</p>
+                    <p className="mt-3 text-sm leading-6 text-black/72">{item}</p>
                   </SectionCard>
                 ))}
               </div>

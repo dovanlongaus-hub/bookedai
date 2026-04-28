@@ -43,7 +43,7 @@ export function ProblemSection({ content, cards }: ProblemSectionProps) {
           <SectionCard key={item.label} as="article" tone="subtle" className="px-5 py-5">
             <div className="flex items-center justify-between gap-3">
               <div className="text-[2rem] font-semibold tracking-[-0.05em] text-[#1d1d1f]">{item.value}</div>
-              <SignalPill className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+              <SignalPill className="px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
                 Pressure
               </SignalPill>
             </div>
@@ -66,7 +66,7 @@ export function ProblemSection({ content, cards }: ProblemSectionProps) {
                     Help me now. Show me the best option. Make the next step obvious.
                   </div>
                 </div>
-                <div className="rounded-full bg-[#1d1d1f] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
+                <div className="rounded-full bg-[#1d1d1f] px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-white">
                   High intent
                 </div>
               </div>
@@ -74,7 +74,7 @@ export function ProblemSection({ content, cards }: ProblemSectionProps) {
               <div className="mt-5 grid gap-3">
                 {buyerExpectations.map((line, index) => (
                   <div key={line} className="flex items-start gap-3 rounded-[1.2rem] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1d1d1f] text-[10px] font-semibold text-white">
+                    <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-[#1d1d1f] text-xs font-semibold text-white">
                       {index + 1}
                     </div>
                     <div className="text-sm font-medium text-[#1d1d1f]">{line}</div>
@@ -94,7 +94,7 @@ export function ProblemSection({ content, cards }: ProblemSectionProps) {
                   The funnel shrinks before the team can help.
                 </div>
               </div>
-              <div className="rounded-full bg-rose-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-rose-700">
+              <div className="rounded-full bg-rose-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">
                 Revenue risk
               </div>
             </div>
@@ -129,7 +129,7 @@ export function ProblemSection({ content, cards }: ProblemSectionProps) {
             </div>
 
             <SectionCard as="article" className="p-6">
-              <SignalPill className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
+              <SignalPill className="px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
                 Commercial truth
               </SignalPill>
               <div className="mt-3 text-2xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">

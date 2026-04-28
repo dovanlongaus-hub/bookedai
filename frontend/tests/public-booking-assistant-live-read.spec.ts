@@ -283,7 +283,7 @@ async function openAssistant(page: Parameters<typeof test>[0]['page']) {
 
   if (!(await isVisible(inlineAssistantInput, 5000)) && !(await isVisible(homepageSearchInput, 5000))) {
     const fallbackTrigger = page
-      .getByRole('button', { name: /Try Now|Start Free Trial|Open live search|Start search|Search with BookedAI/i })
+      .getByRole('button', { name: /Try Now|Start a 30-day pilot|Start free|Open live search|Start search|Search with BookedAI/i })
       .first();
     await fallbackTrigger.click();
     await expect.poll(async () => {

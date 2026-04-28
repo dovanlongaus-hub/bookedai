@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 
 import { Footer } from '../../components/landing/Footer';
 import { Header } from '../../components/landing/Header';
@@ -32,6 +32,19 @@ import {
   roadmapHref,
   type HomepageLocale,
 } from './homepageContent';
+import {
+  competitorPlots,
+  defensibilityCards,
+  defensibilityLede,
+  liveEvidenceFrames,
+  marketSizeBuildBlocks,
+  marketSizeRows,
+  revenuePhases,
+  unitEconomicsContext,
+  unitEconomicsTiles,
+  whyNowSignals,
+  whyNowStats,
+} from './pitch-investor-slides';
 
 const productUrl = 'https://product.bookedai.au/';
 const demoLandingUrl = 'https://demo.bookedai.au/';
@@ -50,6 +63,13 @@ const pitchNavItems = [
   { id: 'solution', label: 'Solution' },
   { id: 'pricing', label: 'Pricing' },
   { id: 'architecture', label: 'Architecture', href: architectureUrl },
+  { id: 'why-now', label: 'Why Now' },
+  { id: 'market-size', label: 'Market' },
+  { id: 'competitive-map', label: 'Competition' },
+  { id: 'defensibility', label: 'Defensibility' },
+  { id: 'unit-economics', label: 'Unit Econ' },
+  { id: 'live-evidence', label: 'Live Evidence' },
+  { id: 'revenue-milestones', label: 'Revenue Milestones' },
   { id: 'roadmap-execution', label: 'Roadmap' },
   { id: 'surfaces', label: 'Surfaces' },
   { id: 'trust', label: 'Trust' },
@@ -80,7 +100,7 @@ const agentSurfaceCards = [
     body: 'demo.bookedai.au stays available as the lighter, explanation-first entry for buyers reviewing the product.',
     href: demoLandingUrl,
     cta: 'Open Demo',
-    tone: 'from-[#f5f3ff] to-white',
+    tone: 'from-sky-50 to-white',
   },
   {
     eyebrow: 'Commercial homepage',
@@ -94,45 +114,52 @@ const agentSurfaceCards = [
 
 const pricingPlans = [
   {
-    tier: 'Freemium',
-    price: 'Free',
-    caption: 'Validate demand capture at zero cost',
+    tier: 'Starter Engine',
+    price: 'A$79/mo',
+    setup: 'A$0 self-serve',
+    commission: '0% (pure SaaS)',
+    caption: 'Solo / micro teams (1-3 staff)',
     features: [
-      'AI booking assistant',
-      '1 booking channel',
-      'Basic conversation flow',
-      'Community support',
+      '1 channel (Telegram OR web widget)',
+      '1 service catalog',
+      'BookedAI Manager Bot + portal',
+      'Payment QR + email confirmations',
+      '50 booked/mo cap',
     ],
     highlight: false,
-    cta: 'Get started free',
+    cta: 'Start free',
   },
   {
-    tier: 'Pro',
-    price: '$49+/mo',
-    caption: 'Full booking workflow for growing SMEs',
+    tier: 'Growth Engine',
+    price: 'A$249/mo',
+    setup: 'A$499 onboarding',
+    commission: '3% on net booked revenue',
+    caption: 'Established SME (4-25 staff)',
     features: [
-      'Smart qualification engine',
-      'Multi-channel capture',
-      'Booking conversion analytics',
-      '1 month free at launch',
-      'Priority support',
+      'All 3 channels (Telegram + WhatsApp + widget)',
+      'Revenue-ops + customer-care agent queue',
+      'Audit ledger + Stripe billing + CRM sync',
+      'Monthly tenant revenue summary email',
+      '3% commission on net booked revenue',
     ],
     highlight: true,
-    cta: 'Start Pro trial',
+    cta: 'Start a 30-day pilot',
   },
   {
-    tier: 'Pro Max',
-    price: 'Custom',
-    caption: 'Enterprise revenue operations suite',
+    tier: 'Enterprise Engine',
+    price: 'A$999+/mo',
+    setup: 'A$2,500-A$10,000 custom',
+    commission: '5% on attributable revenue',
+    caption: 'Multi-location / franchise / academy (25+ staff or 3+ locations)',
     features: [
-      'Full tenant admin workspace',
-      'API integrations',
-      'Performance commission model',
-      'Admin oversight layer',
-      'Dedicated onboarding',
+      'Multi-tenant template + dedicated onboarding',
+      'White-label widget + webhook + API access',
+      'Retention / churn-rescue automation',
+      'Admin reliability lane + SLA + named CSM',
+      '5% commission with floor + cap negotiated',
     ],
     highlight: false,
-    cta: 'Talk to Sales',
+    cta: 'Talk to founder',
   },
 ];
 
@@ -254,7 +281,7 @@ function ArchitectureSnapshotImage() {
           <linearGradient id="pitchArchitectureCore" x1="305" y1="150" x2="674" y2="430" gradientUnits="userSpaceOnUse">
             <stop stopColor="#22d3ee" />
             <stop offset="0.5" stopColor="#60a5fa" />
-            <stop offset="1" stopColor="#8b5cf6" />
+            <stop offset="1" stopColor="#0071e3" />
           </linearGradient>
         </defs>
 
@@ -332,7 +359,7 @@ function PitchArchitectureFlowVisual() {
             <div className="mt-6 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
               {architectureCapabilityCards.map(([title, body]) => (
                 <div key={title} className="rounded-[1.2rem] border border-black/6 bg-white/82 px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
                     {title}
                   </div>
                   <div className="mt-1 text-sm leading-6 text-slate-700">{body}</div>
@@ -361,7 +388,7 @@ function PitchArchitectureFlowVisual() {
             <figcaption className="mt-4 grid gap-3 md:grid-cols-2">
               {architectureSupportRails.map(([title, body]) => (
                 <div key={title} className="min-w-0 rounded-[1.1rem] border border-slate-200 bg-white px-4 py-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1459c7]">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-[#1459c7]">
                     {title}
                   </div>
                   <div className="mt-1 text-sm leading-6 text-slate-700">{body}</div>
@@ -429,7 +456,7 @@ function MasterRoadmapPitchSection() {
             </div>
             <figcaption className="mt-4 grid gap-3 md:grid-cols-3">
               <div className="min-w-0 rounded-[1.1rem] border border-rose-200 bg-rose-50/60 px-4 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-rose-700">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">
                   Pre go-live · D-3 → D-0
                 </div>
                 <div className="mt-1 text-sm leading-6 text-slate-700">
@@ -437,7 +464,7 @@ function MasterRoadmapPitchSection() {
                 </div>
               </div>
               <div className="min-w-0 rounded-[1.1rem] border border-blue-200 bg-blue-50/60 px-4 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-blue-700">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">
                   Post go-live · weekly cadence
                 </div>
                 <div className="mt-1 text-sm leading-6 text-slate-700">
@@ -445,8 +472,8 @@ function MasterRoadmapPitchSection() {
                   governance.
                 </div>
               </div>
-              <div className="min-w-0 rounded-[1.1rem] border border-violet-200 bg-violet-50/60 px-4 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-violet-700">
+              <div className="min-w-0 rounded-[1.1rem] border border-sky-200 bg-sky-50/60 px-4 py-3">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-apple-blue">
                   Communication overlay
                 </div>
                 <div className="mt-1 text-sm leading-6 text-slate-700">
@@ -474,24 +501,25 @@ function PricingPitchSection({ openRegisterInterest }: PricingPitchSectionProps)
         <div className="grid gap-8 xl:grid-cols-[0.75fr_1.25fr] xl:items-start">
           <div>
             <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-              Commercial terms
+              AI Revenue Engine pricing
             </SignalPill>
             <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-              Start small, prove captured revenue, then expand the operating layer.
+              Pay only when BookedAI books real revenue.
             </h2>
             <p className="mt-4 text-sm leading-7 text-black/58">
-              The first buying step should feel easy for an SME: launch the assistant, capture enquiries,
-              and review booked outcomes before committing to heavier workflow automation.
+              We&apos;re free at the bottom, premium at the top, and aligned in the middle. {pricingContent.planCaption}
             </p>
 
             <div className="mt-6 rounded-[1.75rem] border border-black/6 bg-white/72 p-5 backdrop-blur">
               <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-black/42">
-                Starting from
+                Starts from
               </div>
               <div className="mt-2 text-5xl font-semibold tracking-[-0.07em] text-[#1d1d1f]">
                 {pricingContent.planPrice}
               </div>
-              <div className="mt-2 text-sm text-black/50">{pricingContent.planCaption}</div>
+              <div className="mt-2 text-sm text-black/50">
+                Setup fees scoped after a 10-min call. Commission applies only to bookings BookedAI captures or recovers.
+              </div>
             </div>
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -528,18 +556,20 @@ function PricingPitchSection({ openRegisterInterest }: PricingPitchSectionProps)
                 }`}
               >
                 {plan.highlight && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#1d4ed8] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-white">
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-[#1d4ed8] px-3 py-1 text-xs font-semibold uppercase tracking-[0.13em] text-white">
                     Most popular
                   </div>
                 )}
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/40">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-black/40">
                   {plan.tier}
                 </div>
                 <div className="mt-3 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f]">
                   {plan.price}
                 </div>
                 <div className="mt-1 text-[11px] text-black/48">{plan.caption}</div>
-                <ul className="mt-5 flex-1 space-y-2">
+                <div className="mt-2 text-[11px] text-black/55">{plan.setup}</div>
+                <div className="mt-1 text-[11px] font-semibold text-[#1d4ed8]">{plan.commission}</div>
+                <ul className="mt-4 flex-1 space-y-2">
                   {plan.features.map((feature) => (
                     <li key={feature} className="flex items-start gap-2 text-sm leading-6 text-black/62">
                       <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-[#1d4ed8]" />
@@ -613,7 +643,7 @@ function ChessProofSection() {
                 ['Runtime', 'API-backed demo'],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
                   <div className="mt-1 text-sm font-semibold leading-6 text-white">{value}</div>
                 </div>
               ))}
@@ -622,6 +652,382 @@ function ChessProofSection() {
         </div>
       </div>
     </section>
+  );
+}
+
+function InvestorSlideShell({
+  id,
+  kicker,
+  title,
+  subtitle,
+  audienceBadge = 'For investors',
+  children,
+}: {
+  id: string;
+  kicker: string;
+  title: string;
+  subtitle?: string;
+  audienceBadge?: string;
+  children: ReactNode;
+}) {
+  return (
+    <section id={id} className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+      <SectionCard className="overflow-hidden border border-apple-light/60 bg-apple-white px-5 py-6 shadow-apple-sm sm:px-7 lg:px-8 lg:py-8">
+        <div className="flex flex-wrap items-center gap-2">
+          <SignalPill className="w-fit border border-apple-light/70 bg-apple-light/60 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-apple-blue">
+            {kicker}
+          </SignalPill>
+          <span className="rounded-full border border-apple-light/70 bg-apple-light/40 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/56">
+            {audienceBadge}
+          </span>
+        </div>
+        <h2 className="mt-5 max-w-3xl text-3xl font-semibold tracking-[-0.05em] text-apple-near-black sm:text-4xl lg:text-[2.6rem] lg:leading-[1.08]">
+          {title}
+        </h2>
+        {subtitle && (
+          <p className="mt-4 max-w-3xl text-sm leading-7 text-apple-near-black/64 sm:text-base">{subtitle}</p>
+        )}
+        <div className="mt-6">{children}</div>
+      </SectionCard>
+    </section>
+  );
+}
+
+function WhyNowSlide() {
+  return (
+    <InvestorSlideShell
+      id="why-now"
+      kicker="Why now"
+      title="The operating-layer window for AU service SMEs is open in 2026."
+      subtitle="Three converging shifts make this the right year to build a multi-channel agent layer for service businesses — not 2023, not 2028."
+    >
+      <div className="grid gap-3 md:grid-cols-3">
+        {whyNowStats.map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-apple-large border border-apple-light/70 bg-apple-light/40 px-5 py-5"
+          >
+            <div className="text-3xl font-semibold tracking-[-0.05em] text-apple-near-black sm:text-4xl">
+              {stat.value}
+            </div>
+            <div className="mt-2 text-[11px] font-semibold uppercase tracking-[0.13em] text-apple-blue">
+              {stat.label}
+            </div>
+            <p className="mt-3 text-sm leading-6 text-apple-near-black/64">{stat.sub}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 grid gap-3 md:grid-cols-3">
+        {whyNowSignals.map((signal) => (
+          <div
+            key={signal.title}
+            className="rounded-apple-large border border-apple-light/60 bg-apple-white px-5 py-5"
+          >
+            <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-apple-blue">
+              {signal.title}
+            </div>
+            <p className="mt-2 text-sm leading-6 text-apple-near-black/68">{signal.body}</p>
+          </div>
+        ))}
+      </div>
+    </InvestorSlideShell>
+  );
+}
+
+function MarketSizeSlide() {
+  return (
+    <InvestorSlideShell
+      id="market-size"
+      kicker="Market size"
+      title="AU SAM ~ A$2.9B today. Global SAM US$30B+. Bottom-up paths to A$120M ARR."
+      subtitle="Two views: top-down market math and bottom-up tenant build. They converge on the same destination — a defensible nine-figure ARR business inside the AU + English-export footprint."
+    >
+      <div className="grid gap-4 md:grid-cols-3">
+        {marketSizeRows.map((row) => (
+          <div
+            key={row.label}
+            className="rounded-apple-large border border-apple-light/70 bg-apple-light/40 px-5 py-5"
+          >
+            <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-apple-blue">
+              {row.label}
+            </div>
+            <div className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-apple-near-black">
+              {row.value}
+            </div>
+            <div className="mt-1 text-sm font-semibold text-apple-near-black/72">{row.market}</div>
+            <p className="mt-2 text-sm leading-6 text-apple-near-black/60">{row.detail}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 rounded-apple-large border border-apple-light/60 bg-apple-white px-5 py-5">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-apple-blue">
+          Bottom-up build · year 1 → year 5
+        </div>
+        <ul className="mt-4 space-y-3">
+          {marketSizeBuildBlocks.map((block) => (
+            <li
+              key={block.kicker}
+              className="flex flex-col gap-1 rounded-apple-comfortable border border-apple-light/60 bg-apple-light/30 px-4 py-3 sm:flex-row sm:items-baseline sm:gap-4"
+            >
+              <div className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.13em] text-apple-blue">
+                {block.kicker}
+              </div>
+              <div className="text-sm leading-6 text-apple-near-black/70">{block.line}</div>
+            </li>
+          ))}
+        </ul>
+      </div>
+    </InvestorSlideShell>
+  );
+}
+
+function CompetitiveMapSlide() {
+  return (
+    <InvestorSlideShell
+      id="competitive-map"
+      kicker="Competitive map"
+      title="Vertical depth × AI-native + omnichannel — the upper-right quadrant is empty."
+      subtitle="Generic schedulers and legacy vertical SaaS occupy the bottom half. AI-native sales tools (GoHighLevel) lack vertical depth. BookedAI is the only stack engineered for both."
+    >
+      <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr] lg:items-start">
+        <div
+          className="relative rounded-apple-large border border-apple-light/70 bg-apple-light/30"
+          style={{ aspectRatio: '4 / 3' }}
+          role="img"
+          aria-label="2x2 competitive map: vertical depth on horizontal axis, AI-native plus omnichannel on vertical axis"
+        >
+          {/* Quadrant grid lines */}
+          <div className="absolute inset-0">
+            <div className="absolute left-1/2 top-0 h-full w-px bg-apple-near-black/12" />
+            <div className="absolute left-0 top-1/2 h-px w-full bg-apple-near-black/12" />
+          </div>
+          {/* Axis labels */}
+          <div className="absolute left-3 top-3 text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/56">
+            High AI + omnichannel
+          </div>
+          <div className="absolute bottom-3 left-3 text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/56">
+            Low AI · single channel
+          </div>
+          <div className="absolute bottom-3 right-3 text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/56">
+            Vertical depth →
+          </div>
+          {/* Plotted competitors */}
+          {competitorPlots.map((c) => {
+            const isUs = c.name === 'BookedAI';
+            return (
+              <div
+                key={c.name}
+                className="absolute -translate-x-1/2 translate-y-1/2"
+                style={{ left: `${c.vertical}%`, bottom: `${c.aiNative}%` }}
+              >
+                <div
+                  className={
+                    isUs
+                      ? 'rounded-apple-pill border border-apple-blue bg-apple-blue px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-apple-white shadow-apple-sm'
+                      : 'rounded-apple-pill border border-apple-near-black/12 bg-apple-white px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.13em] text-apple-near-black/72'
+                  }
+                >
+                  {c.name}
+                </div>
+                <div
+                  className={`mt-1 text-center text-xs ${
+                    isUs ? 'font-semibold text-apple-blue' : 'text-apple-near-black/56'
+                  }`}
+                >
+                  {c.tag}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <div className="space-y-3">
+          {competitorPlots.map((c) => (
+            <div
+              key={`legend-${c.name}`}
+              className={`rounded-apple-comfortable border px-4 py-3 ${
+                c.name === 'BookedAI'
+                  ? 'border-apple-blue/40 bg-apple-light'
+                  : 'border-apple-light/70 bg-apple-white'
+              }`}
+            >
+              <div
+                className={`text-sm font-semibold ${
+                  c.name === 'BookedAI' ? 'text-apple-blue' : 'text-apple-near-black'
+                }`}
+              >
+                {c.name}
+              </div>
+              <div className="mt-1 text-[12px] text-apple-near-black/60">{c.tag}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    </InvestorSlideShell>
+  );
+}
+
+function DefensibilitySlide() {
+  return (
+    <InvestorSlideShell
+      id="defensibility"
+      kicker="Defensibility"
+      title="Why BookedAI is not roadkill for OpenAI or Google."
+      subtitle={defensibilityLede}
+    >
+      <div className="grid gap-4 md:grid-cols-3">
+        {defensibilityCards.map((card) => (
+          <div
+            key={card.title}
+            className="flex h-full flex-col rounded-apple-large border border-apple-light/70 bg-apple-light/30 px-5 py-5"
+          >
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-apple-blue">
+              {card.kicker}
+            </div>
+            <h3 className="mt-3 text-xl font-semibold tracking-[-0.03em] text-apple-near-black">
+              {card.title}
+            </h3>
+            <p className="mt-3 flex-1 text-sm leading-6 text-apple-near-black/68">{card.body}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 rounded-apple-large border border-apple-light/60 bg-apple-white px-5 py-4 text-sm leading-6 text-apple-near-black/72">
+        Foundation models become commoditized inputs to our orchestration layer; the moat lives in the
+        audited, multi-tenant, channel-multiplied workflow our customers operate inside every day.
+      </div>
+    </InvestorSlideShell>
+  );
+}
+
+function UnitEconomicsSlide() {
+  return (
+    <InvestorSlideShell
+      id="unit-economics"
+      kicker="Unit economics"
+      title="A$400 CAC, A$6,000 LTV, 75% gross margin, 6-month payback."
+      subtitle="The Revenue Engine pricing structure is engineered so each tenant pays for itself inside half a year — and compounds upward via commission as they grow."
+    >
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        {unitEconomicsTiles.map((tile) => (
+          <div
+            key={tile.label}
+            className="flex h-full flex-col rounded-apple-large border border-apple-light/70 bg-apple-light/30 px-5 py-5"
+          >
+            <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-apple-blue">
+              {tile.label}
+            </div>
+            <div className="mt-3 text-4xl font-semibold tracking-[-0.05em] text-apple-near-black">
+              {tile.value}
+            </div>
+            <p className="mt-3 flex-1 text-sm leading-6 text-apple-near-black/64">{tile.sub}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-5 rounded-apple-large border border-apple-light/60 bg-apple-white px-5 py-4 text-sm leading-6 text-apple-near-black/72">
+        {unitEconomicsContext}
+      </div>
+    </InvestorSlideShell>
+  );
+}
+
+function LiveEvidenceSlide() {
+  return (
+    <InvestorSlideShell
+      id="live-evidence"
+      kicker="Live evidence"
+      title="Telegram booking → admin handoff → tenant Ops ledger, in under 30 seconds."
+      subtitle="Three synchronized surfaces show the same booking event in real time. The flow is wired today across @BookedAI_Manager_Bot, the admin Reliability lane, and the tenant Ops action_runs ledger."
+    >
+      <div className="grid gap-4 md:grid-cols-3">
+        {liveEvidenceFrames.map((frame) => (
+          <div
+            key={frame.step}
+            className="flex h-full flex-col rounded-apple-large border border-apple-light/70 bg-apple-light/30 p-4"
+          >
+            <div className="flex items-center gap-2">
+              <div className="flex h-7 w-7 items-center justify-center rounded-apple-pill bg-apple-near-black text-[11px] font-bold text-apple-white">
+                {frame.step}
+              </div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-apple-blue">
+                {frame.surface}
+              </div>
+            </div>
+            <h3 className="mt-3 text-base font-semibold tracking-[-0.02em] text-apple-near-black">
+              {frame.title}
+            </h3>
+            <div className="mt-3 flex-1 space-y-2 rounded-apple-comfortable border border-apple-light/70 bg-apple-white p-3">
+              {frame.conversation.map((line, idx) => (
+                <div
+                  key={`${frame.step}-${idx}`}
+                  className={
+                    line.from === 'customer'
+                      ? 'ml-auto max-w-[88%] rounded-apple-comfortable bg-apple-blue px-3 py-2 text-[12px] leading-5 text-apple-white'
+                      : line.from === 'agent'
+                        ? 'max-w-[88%] rounded-apple-comfortable bg-apple-light px-3 py-2 text-[12px] leading-5 text-apple-near-black'
+                        : 'rounded-apple-standard border border-apple-light/70 bg-apple-light/40 px-3 py-2 font-mono text-[11px] leading-5 text-apple-near-black/72'
+                  }
+                >
+                  {line.text}
+                </div>
+              ))}
+            </div>
+            <p className="mt-3 text-[12px] leading-5 text-apple-near-black/60">{frame.caption}</p>
+          </div>
+        ))}
+      </div>
+      <div className="mt-4 rounded-apple-comfortable border border-apple-light/60 bg-apple-light/40 px-4 py-3 text-[12px] leading-5 text-apple-near-black/64">
+        Note: rendered as styled placeholders. Live screen-recordings to be swapped in pre-WSTI demo
+        (see lane-5-investor-hackathon-narrative.md §A5 demo failure-mode checklist).
+      </div>
+    </InvestorSlideShell>
+  );
+}
+
+function RevenueMilestonesSlide() {
+  return (
+    <InvestorSlideShell
+      id="revenue-milestones"
+      kicker="Roadmap → revenue milestones"
+      title="Each phase unlocks a specific revenue lever — not just a feature."
+      subtitle="Phases 17 through 22+ overlay onto milestones M-02 through M-11 from the master roadmap. Investors see exactly which date corresponds to which revenue event."
+    >
+      <div className="space-y-3">
+        {revenuePhases.map((phase, idx) => (
+          <div
+            key={phase.phaseId}
+            className="grid gap-3 rounded-apple-large border border-apple-light/70 bg-apple-light/30 px-5 py-4 md:grid-cols-[0.9fr_1fr_1.6fr] md:items-center"
+          >
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.13em] text-apple-blue">
+                {phase.phaseId} · {phase.date}
+              </div>
+              <div className="mt-2 text-lg font-semibold tracking-[-0.02em] text-apple-near-black">
+                {phase.outcome}
+              </div>
+            </div>
+            <div className="rounded-apple-comfortable border border-apple-light/70 bg-apple-white px-3 py-2">
+              <div className="text-xs font-semibold uppercase tracking-[0.13em] text-apple-near-black/52">
+                Milestone
+              </div>
+              <div className="mt-1 text-sm font-semibold text-apple-near-black">
+                {phase.milestoneId}
+              </div>
+              <div className="mt-1 text-[12px] leading-5 text-apple-near-black/64">
+                {phase.milestoneTitle}
+              </div>
+            </div>
+            <div className="flex items-start gap-3">
+              <div
+                className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${
+                  idx === 0 ? 'bg-apple-success' : idx === revenuePhases.length - 1 ? 'bg-apple-blue' : 'bg-apple-near-black/40'
+                }`}
+                aria-hidden
+              />
+              <p className="text-sm leading-6 text-apple-near-black/68">{phase.revenueLine}</p>
+            </div>
+          </div>
+        ))}
+      </div>
+    </InvestorSlideShell>
   );
 }
 
@@ -757,7 +1163,7 @@ export function PitchDeckApp() {
                   onClick={() => openRegisterInterest('hero', 'pitch_hero_free_setup')}
                   className="rounded-full border border-black/8 px-6 py-3 text-sm font-semibold text-black/52 transition hover:-translate-y-0.5"
                 >
-                  Claim Free Setup
+                  Get free setup (limited)
                 </button>
                 <a
                   href={architectureUrl}
@@ -787,7 +1193,7 @@ export function PitchDeckApp() {
                     <div className="text-2xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-3xl">
                       {metric.value}
                     </div>
-                    <div className="mt-1 text-[10px] font-semibold uppercase tracking-[0.13em] text-black/44">
+                    <div className="mt-1 text-xs font-semibold uppercase tracking-[0.13em] text-black/44">
                       {metric.label}
                     </div>
                   </div>
@@ -861,7 +1267,7 @@ export function PitchDeckApp() {
                       : 'bg-[linear-gradient(180deg,#fefce8_0%,#ffffff_100%)]'
                 }`}
               >
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/38">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-black/38">
                   Revenue leak
                 </div>
                 <div className="mt-4 h-24 rounded-[1.2rem] border border-black/6 bg-white/80 p-4">
@@ -923,13 +1329,13 @@ export function PitchDeckApp() {
             {/* Right: flow rail + proof items */}
             <div className="space-y-4">
               <div className="rounded-[1.75rem] bg-[linear-gradient(135deg,#eff6ff_0%,#ffffff_52%,#f0fdf4_100%)] p-5">
-                <div className="mb-3 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/38">
+                <div className="mb-3 text-xs font-semibold uppercase tracking-[0.14em] text-black/38">
                   Revenue flow
                 </div>
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                   {flowSteps.map((step, index) => (
                     <div key={step} className="rounded-[1.35rem] border border-black/6 bg-white p-4 shadow-sm">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/36">
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-black/36">
                         Step {index + 1}
                       </div>
                       <div className="mt-3 text-sm font-semibold tracking-[-0.02em] text-[#1d1d1f]">
@@ -946,7 +1352,7 @@ export function PitchDeckApp() {
                     key={item.title}
                     className="rounded-[1.35rem] border border-black/6 bg-white/72 px-4 py-4 backdrop-blur"
                   >
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#1d4ed8]">
                       {item.eyebrow}
                     </div>
                     <h3 className="mt-3 text-base font-semibold tracking-[-0.02em] text-[#1d1d1f]">
@@ -966,7 +1372,7 @@ export function PitchDeckApp() {
         <div className="grid gap-5 xl:grid-cols-2">
           {/* Left: UI screenshots */}
           <SectionCard className="overflow-hidden px-6 py-6 sm:px-7 lg:px-8">
-            <SignalPill className="w-fit bg-[#f5f3ff] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#6d28d9]">
+            <SignalPill className="w-fit bg-sky-50 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-apple-blue">
               Product proof
             </SignalPill>
             <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
@@ -988,7 +1394,7 @@ export function PitchDeckApp() {
                     />
                   </div>
                   <div className="p-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/38">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-black/38">
                       {image.eyebrow}
                     </div>
                     <div className="mt-2 text-sm font-semibold leading-5 text-[#1d1d1f]">
@@ -1053,7 +1459,7 @@ export function PitchDeckApp() {
                       {[result.priceLabel, result.timingLabel, result.locationLabel].map((item) => (
                         <div
                           key={item}
-                          className="rounded-[0.9rem] border border-black/6 bg-[#f8fbff] px-2 py-2 text-[10px] font-semibold uppercase tracking-[0.08em] text-[#1d1d1f]"
+                          className="rounded-[0.9rem] border border-black/6 bg-[#f8fbff] px-2 py-2 text-xs font-semibold uppercase tracking-[0.08em] text-[#1d1d1f]"
                         >
                           {item}
                         </div>
@@ -1076,7 +1482,28 @@ export function PitchDeckApp() {
       {/* ── 6. ARCHITECTURE ─────────────────────────────────────────── */}
       <PitchArchitectureFlowVisual />
 
-      {/* ── 6.5 ROADMAP & EXECUTION PLAN ────────────────────────────── */}
+      {/* ── 6.1 WHY NOW ─────────────────────────────────────────────── */}
+      <WhyNowSlide />
+
+      {/* ── 6.2 MARKET SIZE ─────────────────────────────────────────── */}
+      <MarketSizeSlide />
+
+      {/* ── 6.3 COMPETITIVE MAP ─────────────────────────────────────── */}
+      <CompetitiveMapSlide />
+
+      {/* ── 6.4 DEFENSIBILITY ───────────────────────────────────────── */}
+      <DefensibilitySlide />
+
+      {/* ── 6.5 UNIT ECONOMICS ──────────────────────────────────────── */}
+      <UnitEconomicsSlide />
+
+      {/* ── 6.6 LIVE EVIDENCE ───────────────────────────────────────── */}
+      <LiveEvidenceSlide />
+
+      {/* ── 6.7 ROADMAP → REVENUE MILESTONES ────────────────────────── */}
+      <RevenueMilestonesSlide />
+
+      {/* ── 6.8 ROADMAP & EXECUTION PLAN (engineering view) ─────────── */}
       <MasterRoadmapPitchSection />
 
       {/* ── 7. SURFACES ─────────────────────────────────────────────── */}
@@ -1114,7 +1541,7 @@ export function PitchDeckApp() {
                   key={card.title}
                   className={`flex flex-col rounded-[1.6rem] border border-black/6 bg-gradient-to-br ${card.tone} px-5 py-5 shadow-sm`}
                 >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-black/40">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-black/40">
                     {card.eyebrow}
                   </div>
                   <div className="mt-3 text-base font-semibold tracking-[-0.02em] text-[#1d1d1f]">
@@ -1247,7 +1674,7 @@ export function PitchDeckApp() {
                   </div>
                   <div className="p-5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-black/40">
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-black/40">
                         {member.role}
                       </div>
                       <VisualChip tone="brand">Core team</VisualChip>
@@ -1259,7 +1686,7 @@ export function PitchDeckApp() {
                       {member.badges?.map((badge) => (
                         <span
                           key={badge}
-                          className="rounded-full bg-[#f3f6fb] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#314155]"
+                          className="rounded-full bg-[#f3f6fb] px-3 py-1 text-xs font-semibold uppercase tracking-[0.1em] text-[#314155]"
                         >
                           {badge}
                         </span>

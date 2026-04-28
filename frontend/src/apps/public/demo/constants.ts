@@ -1,6 +1,6 @@
 export const DEMO_PROMPTS = [
-  'Chess classes for my 8 year old in Sydney',
-  'Beginner trial class after school',
-  'Tournament pathway for my teenager',
-  'Online grandmaster coaching with reports',
+  'Beginner class — Sat 10am for my 8 year old',
+  'Swim lessons in Sydney next week',
+  'Personal trainer near me, 2 sessions per week',
+  'Online tutoring with weekly progress reports',
 ] as const;

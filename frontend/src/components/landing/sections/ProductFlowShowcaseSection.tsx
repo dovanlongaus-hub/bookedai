@@ -137,7 +137,7 @@ export function ProductFlowShowcaseSection({ demo }: ProductFlowShowcaseSectionP
                             key={label}
                             className="rounded-[1rem] bg-[#f5f5f7] px-3 py-3"
                           >
-                            <div className="text-[10px] uppercase tracking-[0.08em] text-black/48">
+                            <div className="text-xs uppercase tracking-[0.08em] text-black/48">
                               {label}
                             </div>
                             <div className="mt-1 text-xs font-semibold text-[#1d1d1f]">{value}</div>

@@ -321,7 +321,7 @@ function RoleCard({
 }) {
   return (
     <div className={`rounded-[1.7rem] border border-black/6 bg-gradient-to-br ${tone} p-5 shadow-[0_14px_32px_rgba(15,23,42,0.05)]`}>
-      <div className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${accent}`}>{eyebrow}</div>
+      <div className={`text-xs font-semibold uppercase tracking-[0.18em] ${accent}`}>{eyebrow}</div>
       <h3 className="mt-3 font-['Space_Grotesk'] text-[1.32rem] font-semibold tracking-[-0.05em] text-slate-950">{title}</h3>
       <p className="mt-3 text-sm leading-6 text-slate-600">{body}</p>
       <div className="mt-4 flex flex-wrap gap-2">
@@ -350,7 +350,7 @@ function InvestorArchitectureImage() {
             One image that shows how the whole platform works together
           </h3>
         </div>
-        <div className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-indigo-700">
+        <div className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-indigo-700">
           Investor-friendly visual
         </div>
       </div>
@@ -479,7 +479,7 @@ function InvestorArchitectureImage() {
         {investorArchitectureLegend.map((item) => (
           <div
             key={item.label}
-            className={`rounded-full px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${item.tone}`}
+            className={`rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] ${item.tone}`}
           >
             {item.label}
           </div>
@@ -521,12 +521,12 @@ export function ArchitectureInfographicSection({
                   <div className="flex flex-wrap gap-3">
                     {onStartTrial ? (
                       <button type="button" onClick={onStartTrial} className="booked-button">
-                        Open Web App
+                        Start free
                       </button>
                     ) : null}
                     {onBookDemo ? (
                       <button type="button" onClick={onBookDemo} className="booked-button-secondary">
-                        Talk to Sales
+                        Talk to a BookedAI human
                       </button>
                     ) : null}
                   </div>
@@ -539,10 +539,10 @@ export function ArchitectureInfographicSection({
               className="rounded-[2rem] border border-white/10 bg-[linear-gradient(145deg,#0f172a_0%,#0b1020_58%,#13213d_100%)] p-6 text-white shadow-[0_26px_80px_rgba(2,6,23,0.34)]"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <SignalPill variant="inverse" className="px-3 py-1 text-[10px] uppercase tracking-[0.16em]">
+                <SignalPill variant="inverse" className="px-3 py-1 text-xs uppercase tracking-[0.16em]">
                   Sales-deck architecture
                 </SignalPill>
-                <SignalPill variant="inverse" className="bg-white/10 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-white/84">
+                <SignalPill variant="inverse" className="bg-white/10 px-3 py-1 text-xs uppercase tracking-[0.16em] text-white/84">
                   Multi-surface SaaS
                 </SignalPill>
               </div>
@@ -554,7 +554,7 @@ export function ArchitectureInfographicSection({
               <div className="mt-5 grid gap-3">
                 {operatingSignals.map((signal, index) => (
                   <div key={signal} className="rounded-[1.3rem] border border-white/10 bg-white/7 px-4 py-4 backdrop-blur">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">
                       Signal 0{index + 1}
                     </div>
                     <p className="mt-2 text-sm leading-6 text-white/82">{signal}</p>
@@ -565,7 +565,7 @@ export function ArchitectureInfographicSection({
               <div className="mt-5 grid gap-3 sm:grid-cols-2">
                 {salesDeckStages.map((stage) => (
                   <div key={stage.label} className="rounded-[1.35rem] border border-white/10 bg-white/8 px-4 py-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">
                       Stage {stage.label}
                     </div>
                     <div className="mt-2 text-base font-semibold text-white">{stage.title}</div>
@@ -586,7 +586,7 @@ export function ArchitectureInfographicSection({
                   A summarized platform drawing before the deeper breakdown
                 </h3>
               </div>
-              <div className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+              <div className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
                 Visual summary
               </div>
             </div>
@@ -619,7 +619,7 @@ export function ArchitectureInfographicSection({
                 },
               ].map((item, index) => (
                 <div key={item.title} className="relative rounded-[1.55rem] border border-black/6 bg-white px-4 py-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)]">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
                     Layer 0{index + 1}
                   </div>
                   <div className="mt-2 text-lg font-semibold tracking-[-0.03em] text-slate-950">{item.title}</div>
@@ -667,7 +667,7 @@ export function ArchitectureInfographicSection({
                   The visible surfaces buyers can understand in one glance
                 </h3>
               </div>
-              <div className="rounded-full bg-sky-600 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+              <div className="rounded-full bg-sky-600 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white">
                 Buyer-friendly platform map
               </div>
             </div>
@@ -690,7 +690,7 @@ export function ArchitectureInfographicSection({
                     The flow from demand capture to reliable delivery
                   </h3>
                 </div>
-                <div className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                <div className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
                   Easy to pitch, deep enough to trust
                 </div>
               </div>
@@ -794,10 +794,10 @@ export function ArchitectureInfographicSection({
                   {architectureLayers.map((layer) => (
                     <div key={layer.id} className={`rounded-[1.5rem] border p-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)] ${layer.shellClassName}`}>
                       <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className={`rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${layer.badgeClassName}`}>
+                        <div className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${layer.badgeClassName}`}>
                           {layer.id}
                         </div>
-                        <div className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${layer.id === 'L3' ? 'text-white/70' : 'text-slate-500'}`}>
+                        <div className={`text-xs font-semibold uppercase tracking-[0.16em] ${layer.id === 'L3' ? 'text-white/70' : 'text-slate-500'}`}>
                           {layer.ownership}
                         </div>
                       </div>
@@ -842,7 +842,7 @@ export function ArchitectureInfographicSection({
                 <div className="mt-4 grid gap-3">
                   {governanceCards.map((card, index) => (
                     <div key={card.title} className="rounded-[1.4rem] border border-white/10 bg-white/8 px-4 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">
                         Principle 0{index + 1}
                       </div>
                       <div className="mt-2 text-base font-semibold text-white">{card.title}</div>
@@ -882,7 +882,7 @@ export function ArchitectureInfographicSection({
                     Recognizable platforms behind the operating stack
                   </h3>
                 </div>
-                <div className="rounded-full border border-black/6 bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                <div className="rounded-full border border-black/6 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
                   Production-aligned stack
                 </div>
               </div>
@@ -928,7 +928,7 @@ export function ArchitectureInfographicSection({
                     key={point}
                     className="rounded-[1.45rem] border border-white/10 bg-white/8 px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.06)]"
                   >
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-cyan-200">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-cyan-200">
                       Proof 0{index + 1}
                     </div>
                     <p className="mt-2 text-sm leading-6 text-white/82">{point}</p>

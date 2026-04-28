@@ -1,6 +1,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 
+import { AgentActivityDrawer } from '../../shared/components/AgentActivityDrawer';
 import { DemoBookingModal } from './demo/DemoBookingModal';
 import { DemoBookingPanel } from './demo/DemoBookingPanel';
 import { DemoChatStage } from './demo/DemoChatStage';
@@ -83,26 +84,11 @@ export function DemoLandingApp() {
             : 'chat';
 
   return (
-    <main className="bookedai-saas-shell min-h-screen bg-[#0B0F1A] text-white">
-      <div className="relative overflow-hidden">
-        <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(180deg,#07111F_0%,#0B0F1A_42%,#0E1422_100%)]" />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 opacity-[0.18] [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:72px_72px]"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 top-0 h-[420px] bg-[radial-gradient(ellipse_at_top,rgba(32,246,179,0.16),transparent_52%),radial-gradient(ellipse_at_72%_18%,rgba(0,209,255,0.12),transparent_44%)]"
-        />
+    <main className="apple-section-dark min-h-screen bg-black text-white">
+      <AgentActivityDrawer conversationId={experience.conversationId || null} />
+      <div className="relative">
         <motion.div
-          aria-hidden="true"
-          className="bookedai-ambient-line"
-          animate={{ opacity: [0.2, 0.65, 0.25], scaleX: [0.92, 1.04, 0.92] }}
-          transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
-        />
-
-        <motion.div
-          className="bookedai-cinematic-stage relative z-10 mx-auto flex min-h-screen w-full max-w-[1600px] flex-col gap-5 px-4 py-4 sm:px-6 sm:py-6 lg:px-8"
+          className="relative z-10 mx-auto flex min-h-screen w-full max-w-[1600px] flex-col gap-5 px-4 py-4 sm:px-6 sm:py-6 lg:px-8"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
@@ -117,19 +103,19 @@ export function DemoLandingApp() {
             <aside className="hidden min-h-0 2xl:block">
               <div className="sticky top-6 grid gap-4">
                 <DemoFlowRail stage={flowStage} booking={experience.booking} />
-                <div className="bookedai-saas-glass rounded-[24px] p-5">
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8EFCE0]">Business proof</div>
-                  <div className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
-                    Full academy loop in one session
-                  </div>
-                  <div className="mt-3 text-sm leading-6 text-slate-300">
-                    Intake, assessment, placement, booking, payment posture, parent report, and portal continuity stay connected to the same customer context.
-                  </div>
-                  <div className="mt-5 grid gap-2 text-sm text-slate-300">
-                    <div className="rounded-[16px] border border-white/10 bg-white/[0.035] px-3 py-2">Tenant truth first</div>
-                    <div className="rounded-[16px] border border-white/10 bg-white/[0.035] px-3 py-2">No fake paid state</div>
-                    <div className="rounded-[16px] border border-white/10 bg-white/[0.035] px-3 py-2">Portal-ready report preview</div>
-                  </div>
+                <div className="rounded-[24px] border border-white/10 bg-apple-dark-2 p-5">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-blue">Operator proof</div>
+                  <h3 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-white">
+                    A full revenue loop in one session
+                  </h3>
+                  <p className="mt-3 text-sm leading-6 text-white/70">
+                    Intake, match, booking, payment, and follow-up all stay tied to the same customer record — no manual handoff.
+                  </p>
+                  <ul className="mt-5 grid gap-2 text-sm text-white/70">
+                    <li className="rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2">Operator data first</li>
+                    <li className="rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2">No fake paid state</li>
+                    <li className="rounded-[16px] border border-white/10 bg-white/[0.04] px-3 py-2">Customer report ready</li>
+                  </ul>
                 </div>
               </div>
             </aside>
@@ -208,18 +194,12 @@ export function DemoLandingApp() {
           onConfirmPayment={() => void experience.confirmPaymentInline()}
         />
 
-        <motion.div
-          className="bookedai-depth-near"
-          animate={{ y: [0, -6, 3, 0] }}
-          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
-        >
-          <DemoFloatingCta
-            open={floatingCtaOpen}
-            onClose={closeFloatingCta}
-            onStartBooking={startBookingFromCta}
-            onBookDemo={bookDemoFromCta}
-          />
-        </motion.div>
+        <DemoFloatingCta
+          open={floatingCtaOpen}
+          onClose={closeFloatingCta}
+          onStartBooking={startBookingFromCta}
+          onBookDemo={bookDemoFromCta}
+        />
       </div>
     </main>
   );

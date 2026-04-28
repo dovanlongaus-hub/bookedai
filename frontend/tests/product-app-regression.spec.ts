@@ -42,6 +42,136 @@ type StubProductApisOptions = {
   bookingSessionBody?: Record<string, unknown> | null;
 };
 
+function buildV1Envelope(pathname: string, options: StubProductApisOptions) {
+  const bookingBody = options.bookingSessionBody ?? demoBookingSession;
+  const service = (bookingBody.service as Record<string, unknown> | undefined) ?? demoService;
+
+  if (pathname.endsWith('/v1/leads')) {
+    return {
+      status: 'ok',
+      data: {
+        lead_id: 'lead-product-test',
+        contact_id: 'contact-product-test',
+        conversation_id: 'conversation-product-test',
+      },
+    };
+  }
+
+  if (pathname.endsWith('/v1/bookings/intents')) {
+    return {
+      status: 'ok',
+      data: {
+        booking_intent_id: 'intent-product-test',
+        booking_reference: bookingBody.booking_reference ?? 'BR-3003',
+        portal: {
+          access_token: 'portal-token-product-test',
+          expires_at: '2026-05-02T12:00:00Z',
+        },
+        trust: {
+          recommended_booking_path: 'manual_review',
+          payment_allowed_now: false,
+          warnings: [],
+        },
+        warnings: [],
+        crm_sync: null,
+      },
+    };
+  }
+
+  if (pathname.endsWith('/v1/payments/intents')) {
+    return {
+      status: 'ok',
+      data: {
+        status: 'skipped',
+        payment_intent_id: null,
+        checkout_url: null,
+        warnings: [],
+      },
+    };
+  }
+
+  if (pathname.endsWith('/v1/email/messages/send')) {
+    return {
+      status: 'ok',
+      data: {
+        status: 'sent',
+        message_id: 'email-product-test',
+        warnings: [],
+      },
+    };
+  }
+
+  if (pathname.endsWith('/v1/sms/messages/send')) {
+    return {
+      status: 'ok',
+      data: {
+        status: 'skipped',
+        message_id: null,
+        provider: null,
+        warnings: [],
+      },
+    };
+  }
+
+  if (pathname.endsWith('/v1/whatsapp/messages/send')) {
+    return {
+      status: 'ok',
+      data: {
+        status: 'skipped',
+        message_id: null,
+        provider: null,
+        warnings: [],
+      },
+    };
+  }
+
+  if (pathname.endsWith('/v1/telegram/messages/send-by-phone')) {
+    return {
+      status: 'ok',
+      data: {
+        status: 'skipped',
+        message_id: null,
+        provider: null,
+        warnings: [],
+      },
+    };
+  }
+
+  if (pathname.endsWith('/v1/revenue-ops/handoffs')) {
+    return {
+      status: 'ok',
+      data: {
+        tenant_id: 'bookedai-au',
+        booking_reference: bookingBody.booking_reference ?? 'BR-3003',
+        booking_intent_id: 'intent-product-test',
+        lead_id: 'lead-product-test',
+        queued_actions: [],
+        outbox_event_id: 'outbox-product-test',
+        message: 'Revenue operations agent handoff queued.',
+      },
+    };
+  }
+
+  if (pathname.endsWith('/v1/customer-agent/turns')) {
+    return {
+      status: 'ok',
+      data: {
+        reply: options.services?.length || options.events?.length
+          ? 'I found a strong match for you.'
+          : 'Ready for search.',
+        matched_services: options.services ?? [],
+        matched_events: options.events ?? [],
+        suggested_service_id: service.id ?? options.services?.[0]?.id ?? null,
+      },
+    };
+  }
+
+  return {
+    status: 'ok',
+    data: {},
+  };
+}
+
 const demoService: ServiceCatalogItem = {
   id: 'svc-precision-fade',
   name: 'Precision Fade',
@@ -164,16 +294,11 @@ async function stubProductApis(
   }
 
   await page.route('**/api/v1/**', async (route) => {
+    const requestUrl = new URL(route.request().url());
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({
-        status: 'ok',
-        reply: services.length || events.length ? 'I found a strong match for you.' : 'Ready for search.',
-        matched_services: services,
-        matched_events: events,
-        suggested_service_id: services[0]?.id ?? null,
-      }),
+      body: JSON.stringify(buildV1Envelope(requestUrl.pathname, { ...options, services, events })),
     });
   });
 }
@@ -209,8 +334,8 @@ test.describe('product app regression', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openProductApp(page);
 
-    await expect(page.getByRole('button', { name: 'Free Trial', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Start Free Trial/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start free', exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /start a 30-day pilot/i })).toBeVisible();
     await expect(page.getByText(/Ready to use BookedAI for your business/i)).toBeVisible();
     await expect(page.getByText(/Chat, search, preview, booking, payment posture/i)).toBeVisible();
     await expect(page.getByText('Care', { exact: true }).first()).toBeVisible();
@@ -277,7 +402,7 @@ test.describe('product app regression', () => {
     await expect(page.getByText(/Ready to book/i).first()).toBeVisible();
     await expect(page.getByText(/Details/i).first()).toBeVisible();
     await expect(page.getByText(/Confirm/i).first()).toBeVisible();
-    await expect(page.getByText(/Care/i).first()).toBeVisible();
+    await expect(page.getByText('Care', { exact: true }).first()).toBeVisible();
 
     await page.getByLabel(/Name/i).fill('Desktop Customer');
     await page.getByRole('textbox', { name: 'Email', exact: true }).fill('desktop@example.com');
@@ -297,7 +422,7 @@ test.describe('product app regression', () => {
     await page.setViewportSize({ width: 1440, height: 1100 });
     await openProductApp(page);
 
-    await page.getByRole('button', { name: /Start Free Trial/i }).click();
+    await page.getByRole('button', { name: /start a 30-day pilot|start free/i }).first().click();
     await page.waitForURL(/\/register-interest\?/i);
 
     const url = new URL(page.url());
@@ -333,12 +458,14 @@ test.describe('product app regression', () => {
     });
 
     await runAssistantSearch(page, 'BookedAI demo event in Sydney');
-    await expect(page.getByRole('button', { name: /Book this event/i })).toBeVisible();
-    await page.getByRole('button', { name: /Book this event/i }).click();
+    await expect(page.getByRole('button', { name: /Request attendance/i })).toBeVisible();
+    await page.getByRole('button', { name: /Request attendance/i }).click();
 
     await expect(page.getByText(/Preferred attendance time/i)).toBeVisible();
     await expect(page.getByText(/Attendance summary/i)).toBeVisible();
-    await expect(page.getByRole('button', { name: /^Request attendance$/i }).first()).toBeVisible();
+    const attendanceForm = page.locator('form').filter({ hasText: /Preferred attendance time/i }).first();
+    const attendanceSubmit = attendanceForm.getByRole('button', { name: /^Request attendance$/i }).first();
+    await expect(attendanceSubmit).toBeVisible();
     await expect(page.getByText(/Ready to request/i)).toBeVisible();
     const phoneInput = page.getByRole('textbox', { name: /Phone/i });
     const helperId = await phoneInput.getAttribute('aria-describedby');
@@ -347,7 +474,7 @@ test.describe('product app regression', () => {
 
     await page.getByLabel(/Name/i).fill('Event Attendee');
     await page.getByRole('textbox', { name: 'Email', exact: true }).fill('attendee@example.com');
-    await page.getByRole('button', { name: /^Request attendance$/i }).first().click();
+    await attendanceSubmit.click();
 
     await expect(page.getByText(/Request, follow-up, and confirmation status/i)).toBeVisible();
     await expect(page.getByText(/What happened after your request was confirmed/i)).toBeVisible();

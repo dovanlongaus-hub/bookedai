@@ -36,7 +36,7 @@ type RegisterInterestSectionProps = {
 export function RegisterInterestSection({
   onRegisterNow,
   onSecondaryAction,
-  secondaryActionLabel = 'Open Product Demo',
+  secondaryActionLabel = 'Watch live demo',
 }: RegisterInterestSectionProps) {
   return (
     <SectionShell id="register-interest" className="py-14 lg:py-16">
@@ -72,7 +72,7 @@ export function RegisterInterestSection({
 
             <div className="mt-7 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
               <button type="button" onClick={onRegisterNow} className="booked-button">
-                Claim Free Setup
+                Get free setup (limited)
               </button>
               <button
                 type="button"
@@ -99,7 +99,7 @@ export function RegisterInterestSection({
                     Fastest path from homepage interest into BookedAI-owned onboarding.
                   </div>
                 </div>
-                <SignalPill className="bg-emerald-50 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-emerald-700">
+                <SignalPill className="bg-emerald-50 px-3 py-1 text-xs uppercase tracking-[0.14em] text-emerald-700">
                   Start from 49$+
                 </SignalPill>
               </div>
@@ -116,7 +116,7 @@ export function RegisterInterestSection({
 
                 <div className="grid gap-3">
                   <SectionCard tone="subtle" className="rounded-[1.3rem] px-4 py-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                       Starting price
                     </div>
                     <div className="mt-2 text-sm font-semibold text-[#1d1d1f]">
@@ -124,7 +124,7 @@ export function RegisterInterestSection({
                     </div>
                   </SectionCard>
                   <SectionCard tone="subtle" className="rounded-[1.3rem] px-4 py-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                       Free experience
                     </div>
                     <div className="mt-2 text-sm font-semibold text-[#1d1d1f]">
@@ -132,7 +132,7 @@ export function RegisterInterestSection({
                     </div>
                   </SectionCard>
                   <SectionCard tone="subtle" className="rounded-[1.3rem] px-4 py-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                       Commercial model
                     </div>
                     <div className="mt-2 text-sm font-semibold text-[#1d1d1f]">

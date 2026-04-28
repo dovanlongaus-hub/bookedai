@@ -38,12 +38,12 @@ export function TeamSection({
                 <div className="flex flex-wrap gap-3">
                   {onStartTrial ? (
                     <button type="button" onClick={onStartTrial} className="booked-button">
-                      Open Web App
+                      Start free
                     </button>
                   ) : null}
                   {onBookDemo ? (
                     <button type="button" onClick={onBookDemo} className="booked-button-secondary">
-                      Talk to Sales
+                      Talk to a founder
                     </button>
                   ) : null}
                 </div>
@@ -96,7 +96,7 @@ export function TeamSection({
                 </div>
                 <div className="flex flex-1 flex-col p-5 lg:p-6">
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                       {member.role}
                     </div>
                     <SignalPill variant="brand" className="bg-white px-3 py-1 text-[9px] text-slate-600">

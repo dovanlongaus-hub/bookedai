@@ -864,7 +864,7 @@ export function RoadmapSection({
                   Mini Gantt
                 </div>
                 <h4 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
-                  Milestones M0 to M4 across Sprint 1-10
+                  Milestones M0 to M4 across the launch timeline
                 </h4>
               </div>
               <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500 ring-1 ring-slate-200">

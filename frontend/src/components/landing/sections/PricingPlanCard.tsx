@@ -1,3 +1,4 @@
+import { AppleCTA } from '../ui/AppleCTA';
 import { SectionCard } from '../ui/SectionCard';
 import { SignalPill } from '../ui/SignalPill';
 import type { Plan, PlanId } from './pricing-shared';
@@ -7,12 +8,12 @@ type PricingPlanCardProps = {
   onOpenConsultation: (planId: PlanId, sourceCta: 'book_plan') => void;
 };
 
-function CheckIcon() {
+function CheckIcon({ className = 'h-4 w-4 text-[var(--apple-blue)]' }: { className?: string }) {
   return (
     <svg
       aria-hidden="true"
       viewBox="0 0 20 20"
-      className="h-4 w-4 text-[#2563eb]"
+      className={className}
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
@@ -46,27 +47,33 @@ export function PricingPlanCard({
   plan,
   onOpenConsultation,
 }: PricingPlanCardProps) {
-  const introTextClassName = plan.featured ? 'text-cyan-200' : 'text-[#2563eb]';
-  const titleClassName = plan.featured ? 'text-white' : 'text-slate-950';
-  const bodyClassName = plan.featured ? 'text-slate-300' : 'text-slate-600';
-  const microcopyClassName = plan.featured ? 'text-cyan-100' : 'text-slate-700';
-  const priceClassName = plan.featured ? 'text-white' : 'text-slate-950';
-  const priceNoteClassName = plan.featured ? 'text-slate-400' : 'text-slate-500';
-  const ctaClassName = plan.featured
-    ? 'booked-button-secondary bg-white text-slate-950 hover:bg-cyan-50'
-    : 'booked-button';
-  const featuredFacts = plan.featured
-    ? ['Default paid layer', 'Higher automation', 'Commission-ready']
-    : ['Clear entry path', 'Fast launch', 'Fit-first rollout'];
+  const isFeatured = Boolean(plan.featured);
+  const introTextClassName = isFeatured ? 'text-cyan-200' : 'text-[var(--apple-blue)]';
+  const titleClassName = isFeatured ? 'text-white' : 'text-slate-950';
+  const taglineClassName = isFeatured ? 'text-slate-300' : 'text-slate-600';
+  const microcopyClassName = isFeatured ? 'text-cyan-100' : 'text-slate-700';
+  const priceClassName = isFeatured ? 'text-white' : 'text-slate-950';
+  const priceNoteClassName = isFeatured ? 'text-slate-400' : 'text-slate-500';
+  const setupClassName = isFeatured ? 'text-slate-300' : 'text-slate-500';
+  const commissionClassName = isFeatured
+    ? 'text-cyan-100'
+    : 'text-[var(--apple-blue)]';
+  const supportingClassName = isFeatured ? 'text-slate-300' : 'text-slate-600';
 
   return (
     <SectionCard
       as="article"
-      tone={plan.featured ? 'dark' : 'base'}
+      tone={isFeatured ? 'dark' : 'base'}
       className={`group relative overflow-hidden p-7 transition duration-300 hover:-translate-y-2 sm:p-8 ${
-        plan.featured ? 'ring-1 ring-cyan-300/20' : ''
+        isFeatured ? 'ring-2 ring-[var(--apple-blue)]/40' : ''
       }`}
     >
+      <span id={plan.slug} aria-hidden="true" className="absolute -top-24" />
+      {plan.mostPopular ? (
+        <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2 whitespace-nowrap rounded-full bg-[var(--apple-blue)] px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white shadow">
+          Most popular
+        </div>
+      ) : null}
       <div
         aria-hidden="true"
         className="pointer-events-none absolute inset-x-6 top-0 h-24 rounded-full bg-cyan-300/12 blur-3xl"
@@ -80,102 +87,69 @@ export function PricingPlanCard({
             <div className={`text-xl font-semibold tracking-tight ${titleClassName}`}>
               {plan.name}
             </div>
-            <p className={`mt-2 text-sm leading-6 ${bodyClassName}`}>{plan.subtitle}</p>
+            <p className={`mt-2 text-sm leading-6 ${taglineClassName}`}>{plan.tagline}</p>
           </div>
-          <SignalPill
-            variant={plan.featured ? 'inverse' : 'brand'}
-            className={`px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${
-              plan.featured ? 'bg-cyan-300/18 text-cyan-100 ring-1 ring-cyan-200/35' : ''
-            }`}
-          >
-            {plan.badge}
-          </SignalPill>
-        </div>
-
-        <div className="mt-6 grid gap-3 sm:grid-cols-[1fr_auto] sm:items-end">
-          <div>
-            <div className="flex items-end gap-2">
-              <div className={`text-5xl font-semibold tracking-tight ${priceClassName}`}>{plan.price}</div>
-              <div className={`pb-2 text-sm font-medium ${priceNoteClassName}`}>/mo</div>
-            </div>
-            <p className={`mt-2 text-sm font-semibold ${plan.featured ? 'text-cyan-100' : 'text-[#2563eb]'}`}>
-              First 30 days free
-            </p>
-          </div>
-          <SignalPill
-            variant={plan.featured ? 'inverse' : 'chip'}
-            className={`justify-self-start px-3 py-1 text-[10px] uppercase tracking-[0.14em] ${
-              plan.featured ? 'bg-cyan-300/12 text-cyan-100 ring-1 ring-cyan-200/20' : 'bg-slate-100 text-slate-600'
-            }`}
-          >
-            {plan.featured ? 'Core recommendation' : 'Entry recommendation'}
-          </SignalPill>
-        </div>
-
-        <p className={`mt-3 text-sm font-medium ${microcopyClassName}`}>{plan.microcopy}</p>
-        {plan.supportingText ? (
-          <p className={`mt-2 text-sm leading-6 ${bodyClassName}`}>{plan.supportingText}</p>
-        ) : (
-          <div className="mt-2 h-12" aria-hidden="true" />
-        )}
-
-        <div className="mt-5 grid gap-2 sm:grid-cols-3">
-          {featuredFacts.map((item) => (
-            <SectionCard
-              key={item}
-              tone={plan.featured ? 'base' : 'subtle'}
-              className={`rounded-[1rem] px-3 py-3 text-xs font-semibold uppercase tracking-[0.12em] ${
-                plan.featured
-                  ? 'border border-white/10 bg-white/8 text-white/82 shadow-none'
-                  : 'text-slate-600'
+          {!plan.mostPopular ? (
+            <SignalPill
+              variant={isFeatured ? 'inverse' : 'brand'}
+              className={`px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] ${
+                isFeatured ? 'bg-cyan-300/18 text-cyan-100 ring-1 ring-cyan-200/35' : ''
               }`}
             >
-              {item}
-            </SectionCard>
-          ))}
+              {plan.badge}
+            </SignalPill>
+          ) : null}
         </div>
 
-        <ul className="mt-8 space-y-3">
-          {plan.features.map((feature) => (
+        <div className="mt-6">
+          <div className="flex items-end gap-2">
+            <div className={`text-5xl font-semibold tracking-tight ${priceClassName}`}>{plan.monthlyFee}</div>
+          </div>
+          <p className={`mt-2 text-sm font-medium ${setupClassName}`}>
+            {plan.setupFee}
+          </p>
+          <p className={`mt-2 text-sm font-semibold ${commissionClassName}`}>
+            {plan.commission}
+          </p>
+          <p className={`mt-2 text-xs uppercase tracking-[0.14em] ${priceNoteClassName}`}>
+            {plan.tagline}
+          </p>
+        </div>
+
+        <p className={`mt-4 text-sm font-medium ${microcopyClassName}`}>{plan.microcopy}</p>
+        {plan.supportingText ? (
+          <p className={`mt-2 text-sm leading-6 ${supportingClassName}`}>{plan.supportingText}</p>
+        ) : null}
+
+        <ul className="mt-6 space-y-3">
+          {plan.features.slice(0, 6).map((feature) => (
             <li
               key={feature}
-              className={`flex items-start gap-3 text-sm leading-6 ${plan.featured ? 'text-slate-200' : 'text-slate-700'}`}
+              className={`flex items-start gap-3 text-sm leading-6 ${isFeatured ? 'text-slate-200' : 'text-slate-700'}`}
             >
               <span
                 className={`mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full ${
-                  plan.featured ? 'bg-cyan-300/12' : 'bg-[#eaf3ff]'
+                  isFeatured ? 'bg-cyan-300/12' : 'bg-[var(--apple-blue)]/12'
                 }`}
               >
-                <CheckIcon />
+                <CheckIcon className={isFeatured ? 'h-4 w-4 text-cyan-200' : 'h-4 w-4 text-[var(--apple-blue)]'} />
               </span>
               <span>{feature}</span>
             </li>
           ))}
         </ul>
 
-        <div
-          className={`mt-8 rounded-[1.2rem] px-4 py-4 ${
-            plan.featured ? 'border border-white/10 bg-white/6 text-white/76' : 'bg-slate-50 text-slate-600'
-          }`}
-        >
-          <div className={`text-[10px] font-semibold uppercase tracking-[0.16em] ${plan.featured ? 'text-cyan-100' : 'text-slate-500'}`}>
-            Decision cue
-          </div>
-          <div className="mt-2 text-sm leading-6">
-            {plan.featured
-              ? 'Best when you want the strongest blend of automation, monthly clarity, and performance upside without moving into custom scope.'
-              : 'Best when you want the cleanest initial operating layer with a visible path into deeper rollout and performance-based upside later.'}
-          </div>
-        </div>
-
-        <button
-          type="button"
+        <AppleCTA
+          label={plan.cta.label}
+          intent={isFeatured ? 'secondary' : 'primary'}
+          size="lg"
+          fullWidth
           onClick={() => onOpenConsultation(plan.id, 'book_plan')}
-          className={`mt-8 flex w-full items-center justify-center gap-2 ${ctaClassName}`}
-        >
-          {plan.ctaLabel}
-          <ArrowIcon />
-        </button>
+          ariaLabel={`${plan.cta.label} — ${plan.name}`}
+          analyticsId={`pricing_plan_cta_${plan.id}`}
+          rightIcon={<ArrowIcon />}
+          className={`mt-8 ${isFeatured ? 'bg-white text-slate-950 hover:bg-cyan-50' : ''}`}
+        />
       </div>
     </SectionCard>
   );

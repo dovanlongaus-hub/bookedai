@@ -61,8 +61,8 @@ export function ImplementationSection({ content }: ImplementationSectionProps) {
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             {rolloutPhases.map((phase, index) => (
               <SectionCard key={phase.title} as="article" tone="subtle" className="rounded-[1.35rem] border border-black/6 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
-                  Phase 0{index + 1}
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  Step 0{index + 1}
                 </div>
                 <div className="mt-2 text-sm font-semibold text-[#1d1d1f]">{phase.title}</div>
                 <div className="mt-2 text-sm leading-6 text-black/62">{phase.body}</div>

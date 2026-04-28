@@ -28,6 +28,7 @@ import {
   isBookedAiChessTenantService,
   type BookingReadyServiceItem,
 } from '../../shared/presenters/partnerMatch';
+import { AgentActivityDrawer } from '../../shared/components/AgentActivityDrawer';
 import { PartnerMatchShortlist } from '../../shared/components/PartnerMatchShortlist';
 import type { MatchCandidate } from '../../shared/contracts';
 import { normalizePhoneForMessaging } from '../../shared/utils/phone';
@@ -188,8 +189,12 @@ type LiveReadBookingSummary = {
 
 type BookingReturnNotice = {
   tone: 'success' | 'warning';
+  status: 'paid' | 'cancelled' | 'expired';
   title: string;
   body: string;
+  bookingReference: string | null;
+  sessionId: string | null;
+  token: string | null;
 };
 
 const SEARCH_PROGRESS_STAGES = [
@@ -1893,6 +1898,120 @@ function hasNearMeIntent(query: string) {
   return /\b(near me|nearby|close to me|around me|in my area)\b/i.test(query);
 }
 
+type StripeReturnNoticeProps = {
+  notice: BookingReturnNotice;
+  portalUrl: string | null;
+  onDismiss: () => void;
+  onTryAgain: () => void;
+};
+
+function StripeReturnNotice({ notice, portalUrl, onDismiss, onTryAgain }: StripeReturnNoticeProps) {
+  const isPaid = notice.status === 'paid';
+  const wrapperToneClass = isPaid
+    ? 'border-emerald-200 bg-emerald-50 text-emerald-900'
+    : 'border-amber-200 bg-amber-50 text-amber-900';
+  const kickerToneClass = isPaid ? 'text-emerald-700' : 'text-amber-700';
+  const kickerLabel = isPaid
+    ? 'Payment confirmed'
+    : notice.status === 'expired'
+      ? 'Checkout expired'
+      : 'Payment cancelled';
+
+  const receiptHref = notice.sessionId ? `/receipt/${encodeURIComponent(notice.sessionId)}` : null;
+
+  return (
+    <section
+      data-testid="stripe-return-success-card"
+      data-stripe-return={notice.status}
+      role="status"
+      aria-live="polite"
+      className={`mb-4 rounded-[1.35rem] border ${wrapperToneClass} px-4 py-4 sm:px-5 sm:py-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)]`}
+    >
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+        <div className="min-w-0 flex-1">
+          <div className={`template-kicker text-xs font-semibold uppercase tracking-[0.18em] ${kickerToneClass}`}>
+            {kickerLabel}
+          </div>
+          <h2 className="mt-2 text-[1.05rem] font-semibold leading-snug tracking-[-0.01em]">
+            {notice.title}
+          </h2>
+          <p className="mt-2 max-w-[60ch] text-sm leading-6">
+            {isPaid && notice.bookingReference ? (
+              <>
+                Booking reference: <code className="rounded bg-white/70 px-1.5 py-0.5 font-mono text-[12px]">{notice.bookingReference}</code> · We've emailed your portal access link.
+              </>
+            ) : (
+              notice.body
+            )}
+          </p>
+
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            {isPaid ? (
+              portalUrl ? (
+                <a
+                  href={portalUrl}
+                  className="booked-button"
+                  data-testid="stripe-return-portal-cta"
+                  onClick={() => {
+                    if (typeof window !== 'undefined') {
+                      window.history.replaceState(null, '', '/');
+                    }
+                  }}
+                >
+                  Open my booking portal →
+                </a>
+              ) : (
+                <span
+                  className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/70 px-3 py-1.5 text-[12px] font-semibold text-emerald-800"
+                  data-testid="stripe-return-email-fallback"
+                >
+                  We'll email your booking link.
+                </span>
+              )
+            ) : (
+              <button
+                type="button"
+                className="booked-button"
+                onClick={onTryAgain}
+              >
+                Try again
+              </button>
+            )}
+
+            {isPaid && receiptHref ? (
+              <a
+                href={receiptHref}
+                className="booked-button-secondary"
+                data-testid="stripe-return-receipt-cta"
+              >
+                View receipt
+              </a>
+            ) : null}
+
+            {!isPaid ? (
+              <a
+                href="mailto:info@bookedai.au?subject=Booking%20support"
+                className="booked-button-secondary"
+              >
+                Message support
+              </a>
+            ) : null}
+          </div>
+        </div>
+
+        <button
+          type="button"
+          aria-label="Dismiss notification"
+          onClick={onDismiss}
+          className="self-start rounded-full border border-transparent bg-white/60 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600 transition hover:bg-white"
+        >
+          Dismiss
+        </button>
+      </div>
+    </section>
+  );
+}
+
 export function HomepageSearchExperience({
   content,
   sourcePath,
@@ -1986,29 +2105,101 @@ export function HomepageSearchExperience({
     }
   }
 
+  function buildStripeReturnPortalUrl(notice: BookingReturnNotice): string | null {
+    if (!notice.bookingReference) {
+      return null;
+    }
+
+    const search = new URLSearchParams();
+    search.set('booking_reference', notice.bookingReference);
+    if (notice.token) {
+      search.set('token', notice.token);
+    }
+
+    if (typeof window !== 'undefined') {
+      // Prefer same-origin portal handoff if the host already serves a /portal route
+      // (verified portal app is mounted under /portal in the public Vite shell).
+      try {
+        const origin = window.location.origin;
+        return `${origin.replace(/\/$/, '')}/portal/?${search.toString()}`;
+      } catch {
+        /* fall through to canonical portal */
+      }
+    }
+
+    return `https://portal.bookedai.au/?${search.toString()}`;
+  }
+
+  function dismissBookingReturn() {
+    setBookingReturnNotice(null);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState(null, '', '/');
+    }
+  }
+
+  function handleBookingReturnTryAgain() {
+    dismissBookingReturn();
+    setTimeout(() => {
+      searchComposerRef.current?.focus();
+    }, 0);
+  }
+
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
 
     const currentUrl = new URL(window.location.href);
-    const bookingStatus = currentUrl.searchParams.get('booking');
-    const bookingRef = currentUrl.searchParams.get('ref')?.trim() || null;
+    const params = currentUrl.searchParams;
 
-    if (bookingStatus === 'success' && bookingRef) {
+    // Forward-looking contract: ?status=paid|cancelled|expired&booking_reference=BAI-...&session_id=cs_...&token=...
+    // Legacy contract: ?booking=success|cancelled&ref=BAI-...
+    const rawStatus = (params.get('status') || '').trim().toLowerCase();
+    const legacyBooking = (params.get('booking') || '').trim().toLowerCase();
+    const bookingReferenceParam = params.get('booking_reference')?.trim() || null;
+    const legacyRef = params.get('ref')?.trim() || null;
+    const bookingReference = bookingReferenceParam || legacyRef;
+    const sessionId = params.get('session_id')?.trim() || null;
+    const token = params.get('token')?.trim() || null;
+
+    let resolvedStatus: 'paid' | 'cancelled' | 'expired' | null = null;
+    if (rawStatus === 'paid' || legacyBooking === 'success') {
+      resolvedStatus = 'paid';
+    } else if (rawStatus === 'cancelled' || rawStatus === 'cancel' || legacyBooking === 'cancelled') {
+      resolvedStatus = 'cancelled';
+    } else if (rawStatus === 'expired') {
+      resolvedStatus = 'expired';
+    }
+
+    if (resolvedStatus === 'paid') {
       setBookingReturnNotice({
         tone: 'success',
-        title: 'Payment complete',
-        body: `Booking ${bookingRef} has been sent through payment, confirmation, and follow-up.`,
+        status: 'paid',
+        title: 'Payment received — your booking is confirmed.',
+        body: bookingReference
+          ? `Booking reference ${bookingReference} · We've emailed your portal access link.`
+          : `We've emailed your booking link to your inbox.`,
+        bookingReference,
+        sessionId,
+        token,
       });
       return;
     }
 
-    if (bookingStatus === 'cancelled' && bookingRef) {
+    if (resolvedStatus === 'cancelled' || resolvedStatus === 'expired') {
+      const isExpired = resolvedStatus === 'expired';
       setBookingReturnNotice({
         tone: 'warning',
-        title: 'Payment not completed',
-        body: `Booking ${bookingRef} is still saved. Reopen the booking flow when you are ready to finish payment.`,
+        status: resolvedStatus,
+        title: isExpired
+          ? 'Payment was not completed — checkout expired.'
+          : 'Payment was not completed.',
+        body: bookingReference
+          ? `Booking ${bookingReference} is still saved. Try again or message support and we'll keep your spot.`
+          : "Your booking is still saved. Try again or message support — we'll keep your spot.",
+        bookingReference,
+        sessionId,
+        token,
       });
       return;
     }
@@ -3211,12 +3402,15 @@ export function HomepageSearchExperience({
       selectedService.summary ||
       'This is the active match carried forward into booking.'
     : 'Choose a ranked result to continue.';
+  // Intentional: paired hover-tints for `public-apple-shortcut-*` themed pills.
+  // `#eef4ff` (blue tint) and `#f6f0ff` (lavender tint) are decorative paper backgrounds
+  // that have no equivalent Apple token; kept as part of the shortcut-tone visual system.
   const shortcutToneClasses = [
-    'public-apple-shortcut-blue hover:bg-[#eef4ff]',
-    'public-apple-shortcut-green hover:bg-[#eef9ee]',
-    'public-apple-shortcut-amber hover:bg-[#fff3e6]',
+    'public-apple-shortcut-blue hover:bg-apple-paper-blue-100',
+    'public-apple-shortcut-green hover:bg-emerald-50',
+    'public-apple-shortcut-amber hover:bg-amber-50',
     'public-apple-shortcut-purple hover:bg-[#f6f0ff]',
-    'public-apple-shortcut-rose hover:bg-[#fff0f4]',
+    'public-apple-shortcut-rose hover:bg-rose-50',
   ];
   const workspaceStatus = searchLoading
     ? {
@@ -3245,12 +3439,12 @@ export function HomepageSearchExperience({
                 results.length > 0
                   ? `${results.length} ranked option${results.length === 1 ? '' : 's'} ready above. Review, then continue.`
                   : "Let's refine — tell me suburb, preferred time, or service detail to find the best fit.",
-              tone: 'border-slate-900/8 bg-white/78 text-[#172033]/72',
+              tone: 'border-slate-900/8 bg-white/78 text-apple-near-black/72',
             }
           : {
               label: 'Ready to receive',
               detail: 'Type a natural-language request below. Results appear here.',
-              tone: 'border-slate-900/8 bg-white/78 text-[#172033]/72',
+              tone: 'border-slate-900/8 bg-white/78 text-apple-near-black/72',
             };
   const activeSearchPrompt = SEARCH_PROGRESS_PROMPTS[searchProgressStageIndex] ?? SEARCH_PROGRESS_PROMPTS[0];
   const followUpQuestions = useMemo(
@@ -3429,6 +3623,17 @@ export function HomepageSearchExperience({
       ref={bookingPanelRef}
       className="mx-auto max-w-[1440px]"
     >
+      <AgentActivityDrawer
+        conversationId={bookingAssistantV1SessionIdRef.current}
+      />
+      {bookingReturnNotice ? (
+        <StripeReturnNotice
+          notice={bookingReturnNotice}
+          portalUrl={buildStripeReturnPortalUrl(bookingReturnNotice)}
+          onDismiss={dismissBookingReturn}
+          onTryAgain={handleBookingReturnTryAgain}
+        />
+      ) : null}
       <style>
         {`
           @keyframes homepage-result-entry {
@@ -3450,25 +3655,25 @@ export function HomepageSearchExperience({
         `}
       </style>
       <div className="public-search-results-shell grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
-        <section className="min-w-0 overflow-hidden rounded-[1.75rem] border border-[#e5e7eb] bg-[#f8fafc] shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
+        <section className="min-w-0 overflow-hidden rounded-[1.75rem] border border-slate-200 bg-slate-50 shadow-[0_18px_50px_rgba(15,23,42,0.06)]">
           <div className="px-3 py-3 sm:px-5 sm:py-5 lg:px-6 lg:py-6">
-            <div className="overflow-hidden rounded-[1.55rem] border border-[#e5e7eb] bg-white shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
-              <div className="border-b border-[#eef2f7] bg-[#fbfdff] px-3 py-3 sm:px-4">
+            <div className="overflow-hidden rounded-[1.55rem] border border-slate-200 bg-white shadow-[0_14px_40px_rgba(15,23,42,0.07)]">
+              <div className="border-b border-slate-200 bg-apple-paper-blue-50 px-3 py-3 sm:px-4">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#111827] text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]">
+                    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-apple-near-black text-white shadow-[0_10px_24px_rgba(15,23,42,0.16)]">
                       <SparkIcon className="h-4 w-4" />
                     </div>
                     <div className="min-w-0">
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#6b7280]">Message BookedAI</div>
-                      <div className="mt-1 text-sm font-medium text-[#111827]">Search, compare, open details, then book in one thread.</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Message BookedAI</div>
+                      <div className="mt-1 text-sm font-medium text-apple-near-black">Search, compare, open details, then book in one thread.</div>
                     </div>
                   </div>
                   <div className={`max-w-full rounded-full border px-3 py-1.5 text-[11px] font-semibold ${workspaceStatus.tone}`}>
                     {workspaceStatus.label}
                   </div>
                 </div>
-                <p className="mt-2 text-[11px] leading-5 text-[#64748b]">{workspaceStatus.detail}</p>
+                <p className="mt-2 text-[11px] leading-5 text-slate-500">{workspaceStatus.detail}</p>
               </div>
               <div className="max-h-[min(68vh,50rem)] space-y-4 overflow-y-auto px-3 py-4 sm:px-4 lg:px-5">
 
@@ -3478,19 +3683,19 @@ export function HomepageSearchExperience({
                   step.state === 'complete'
                     ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
                     : step.state === 'active'
-                      ? 'border-[#cfe1ff] bg-[#eef4ff] text-[#1a73e8]'
-                      : 'border-[#e5e7eb] bg-white text-[#64748b]';
+                      ? 'border-apple-paper-blue-300 bg-apple-paper-blue-100 text-apple-blue'
+                      : 'border-slate-200 bg-white text-slate-500';
                 const dot =
                   step.state === 'complete'
                     ? 'bg-emerald-500'
                     : step.state === 'active'
-                      ? 'bg-[#1a73e8]'
+                      ? 'bg-apple-blue'
                       : 'bg-slate-300';
                 return (
                   <div key={step.label} className={`rounded-[1.1rem] border px-3 py-3 ${tone}`}>
                     <div className="flex items-center gap-2">
                       <span className={`h-2.5 w-2.5 rounded-full ${dot}`} />
-                      <span className="text-[10px] font-semibold uppercase tracking-[0.16em]">
+                      <span className="text-xs font-semibold uppercase tracking-[0.16em]">
                         0{index + 1} {step.label}
                       </span>
                     </div>
@@ -3501,17 +3706,17 @@ export function HomepageSearchExperience({
             </div>
 
             {!hasActiveQuery ? (
-              <div className="mb-5 rounded-[1.35rem] border border-[#eeeeef] bg-[#fafafa] px-4 py-4 sm:px-5 sm:py-5">
+              <div className="mb-5 rounded-[1.35rem] border border-slate-200 bg-apple-light px-4 py-4 sm:px-5 sm:py-5">
                 <div className="flex items-start gap-3">
-                  <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#111827] text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)]">
+                  <div className="mt-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-apple-near-black text-white shadow-[0_10px_24px_rgba(15,23,42,0.12)]">
                     <SparkIcon className="h-4 w-4" />
                   </div>
                   <div className="min-w-0 flex-1">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b7280]">Assistant-led search</div>
-                    <div className="mt-2 text-[1.05rem] font-semibold tracking-[-0.02em] text-[#111827]">
+                    <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Assistant-led search</div>
+                    <div className="mt-2 text-[1.05rem] font-semibold tracking-[-0.02em] text-apple-near-black">
                       Start with what you need. I will ask for the missing signals before I rank results.
                     </div>
-                    <p className="mt-2 max-w-[62ch] text-sm leading-6 text-[#5f6368]">
+                    <p className="mt-2 max-w-[62ch] text-sm leading-6 text-slate-500">
                       This homepage is designed to turn messy service demand into a clear next step. Search starts like a conversation, then the booking path tightens as soon as area, timing, and fit are clear enough.
                     </p>
                     <div className="mt-4 grid gap-2 sm:grid-cols-3">
@@ -3520,7 +3725,7 @@ export function HomepageSearchExperience({
                         'Which area works best?',
                         'When do you need it?',
                       ].map((item) => (
-                        <div key={item} className="rounded-[1rem] border border-[#eeeeef] bg-white px-3 py-3 text-sm font-medium text-[#334155]">
+                        <div key={item} className="rounded-[1rem] border border-slate-200 bg-white px-3 py-3 text-sm font-medium text-slate-700">
                           {item}
                         </div>
                       ))}
@@ -3532,10 +3737,10 @@ export function HomepageSearchExperience({
 
             {currentQuery ? (
               <div className="mb-4 flex flex-wrap items-center gap-2">
-                <span className="rounded-full border border-[#d2e3fc] bg-[#eef4ff] px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                <span className="rounded-full border border-apple-paper-blue-200 bg-apple-paper-blue-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-apple-blue">
                   {content.ui.resultsQueryLabel}: "{currentQuery}"
                 </span>
-                <span className="rounded-full border border-[#e5e9f0] bg-[#f8fafc] px-3 py-1 text-[10px] font-medium text-[#5f6368]">
+                <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium text-slate-500">
                   {resultCountLabel}
                 </span>
               </div>
@@ -3554,19 +3759,19 @@ export function HomepageSearchExperience({
                       className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
                     >
                       <div
-                        className={`${hasInlineResults ? 'max-w-[min(56rem,94%)]' : 'max-w-[min(44rem,92%)]'} rounded-[1.35rem] px-4 py-3 text-sm leading-6 shadow-[0_8px_24px_rgba(60,64,67,0.05)] ${
+                        className={`${hasInlineResults ? 'max-w-[min(56rem,94%)]' : 'max-w-[min(44rem,92%)]'} rounded-[1.35rem] px-4 py-3 text-sm leading-6 shadow-apple-card ${
                           message.role === 'user'
-                            ? 'rounded-tr-[0.45rem] bg-[#111827] text-white'
-                            : 'rounded-tl-[0.45rem] border border-[#dbe7fb] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] text-[#2f3d4f]'
+                            ? 'rounded-tr-[0.45rem] bg-apple-near-black text-white'
+                            : 'rounded-tl-[0.45rem] border border-apple-paper-blue-200 bg-[linear-gradient(180deg,var(--apple-paper-blue-50)_0%,#ffffff_100%)] text-apple-paper-blue-navy-800'
                         }`}
                       >
                         {message.role === 'assistant' ? (
                           <div className="mb-2 flex flex-wrap items-center gap-2">
-                            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8] ring-1 ring-[#dbe7fb]">
+                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-apple-blue ring-1 ring-apple-paper-blue-200">
                               BookedAI answer
                             </span>
                             {hasInlineResults ? (
-                              <span className="rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-100">
+                              <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-100">
                                 Live search result
                               </span>
                             ) : null}
@@ -3575,14 +3780,14 @@ export function HomepageSearchExperience({
                         <div>{message.content}</div>
                         {inlineResults.length > 0 ? (
                           <div className="mt-3 grid gap-2.5">
-                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-[0.95rem] border border-[#e6edf8] bg-white/78 px-3 py-2">
+                            <div className="flex flex-wrap items-center justify-between gap-2 rounded-[0.95rem] border border-apple-paper-blue-200 bg-white/78 px-3 py-2">
                               <div>
-                                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">Top research</div>
-                                <div className="mt-0.5 text-[11px] leading-5 text-[#64748b]">
+                                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-apple-blue">Top research</div>
+                                <div className="mt-0.5 text-[11px] leading-5 text-slate-500">
                                   Review the best {inlineResults.length} option{inlineResults.length === 1 ? '' : 's'} in chat, then open details or book.
                                 </div>
                               </div>
-                              <span className="rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold text-[#475569] ring-1 ring-[#e5e7eb]">
+                              <span className="rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-apple-ring-neutral-100">
                                 {inlineResults.length} shown
                               </span>
                             </div>
@@ -3610,10 +3815,10 @@ export function HomepageSearchExperience({
                               return (
                               <article
                                 key={`${message.id}-${service.id}`}
-                                className="rounded-[1rem] border border-[#e6edf8] bg-white px-3 py-3 text-left shadow-[0_8px_22px_rgba(60,64,67,0.04)]"
+                                className="rounded-[1rem] border border-apple-paper-blue-200 bg-white px-3 py-3 text-left shadow-apple-card"
                               >
                                 <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className="rounded-full bg-[#f8fafc] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#64748b] ring-1 ring-[#e5e7eb]">
+                                  <span className="rounded-full bg-slate-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-slate-500 ring-1 ring-apple-ring-neutral-100">
                                     Option {resultIndex + 1}
                                   </span>
                                   {service.featured ? (
@@ -3622,11 +3827,11 @@ export function HomepageSearchExperience({
                                     </span>
                                   ) : null}
                                   {isBookedAiTenantMatch ? (
-                                    <span className="rounded-full bg-[#ecfdf5] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-800 ring-1 ring-emerald-200">
+                                    <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-emerald-800 ring-1 ring-emerald-200">
                                       BookedAI tenant
                                     </span>
                                   ) : null}
-                                  <span className="rounded-full bg-[#eef4ff] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-[#1a73e8]">
+                                  <span className="rounded-full bg-apple-paper-blue-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.12em] text-apple-blue">
                                     {service.category}
                                   </span>
                                 </div>
@@ -3635,11 +3840,11 @@ export function HomepageSearchExperience({
                                     <button
                                       type="button"
                                       onClick={() => commitServiceSelection(service)}
-                                      className="block max-w-full text-left text-sm font-semibold leading-5 text-[#111827] transition hover:text-[#1a73e8]"
+                                      className="block max-w-full text-left text-sm font-semibold leading-5 text-apple-near-black transition hover:text-apple-blue"
                                     >
                                       <span className="line-clamp-2">{service.name}</span>
                                     </button>
-                                    <div className="mt-1 line-clamp-1 text-[11px] font-medium leading-5 text-[#64748b]">
+                                    <div className="mt-1 line-clamp-1 text-[11px] font-medium leading-5 text-slate-500">
                                       {[service.venue_name, service.location || service.source_label].filter(Boolean).join(' • ') || 'BookedAI matched option'}
                                     </div>
                                   </div>
@@ -3648,27 +3853,27 @@ export function HomepageSearchExperience({
                                   {resultFacts.map((item) => (
                                     <span
                                       key={`${message.id}-${service.id}-${item}`}
-                                      className={`rounded-full px-2 py-1 text-[10px] font-semibold ${
+                                      className={`rounded-full px-2 py-1 text-xs font-semibold ${
                                         item === confidencePresentation.label
                                           ? confidencePresentation.tone === 'tenant'
                                             ? 'bg-emerald-50 text-emerald-800'
                                             : 'bg-amber-50 text-amber-800'
-                                          : 'bg-[#f8fafc] text-[#475569] ring-1 ring-[#e5e7eb]'
+                                          : 'bg-slate-50 text-slate-600 ring-1 ring-apple-ring-neutral-100'
                                       }`}
                                     >
                                       {item}
                                     </span>
                                   ))}
                                 </div>
-                                <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-[#475569]">
+                                <p className="mt-2 line-clamp-2 text-[11px] leading-5 text-slate-600">
                                   {bookingNote}
                                 </p>
-                                <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 border-t border-[#edf1f7] pt-3">
+                                <div className="mt-3 flex min-w-0 flex-wrap items-center gap-2 border-t border-slate-200 pt-3">
                                   <button
                                     type="button"
                                     onClick={() => openServicePreview(service)}
                                     aria-label={`View details for ${service.name}`}
-                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-apple-paper-blue-50"
                                   >
                                     <InfoIcon className="h-3.5 w-3.5" />
                                     Details
@@ -3679,7 +3884,7 @@ export function HomepageSearchExperience({
                                       target="_blank"
                                       rel="noreferrer"
                                       aria-label={`Open Google Maps location for ${service.name}`}
-                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-apple-paper-blue-50"
                                     >
                                       <MapPinIcon className="h-3.5 w-3.5" />
                                       Maps
@@ -3691,7 +3896,7 @@ export function HomepageSearchExperience({
                                       target="_blank"
                                       rel="noreferrer"
                                       aria-label={`Open provider website for ${service.name}`}
-                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-apple-paper-blue-50"
                                     >
                                       <LinkIcon className="h-3.5 w-3.5" />
                                       Provider
@@ -3701,7 +3906,7 @@ export function HomepageSearchExperience({
                                     <a
                                       href={phoneHref}
                                       aria-label={`Call ${service.name}`}
-                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                      className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-apple-paper-blue-50"
                                     >
                                       <PhoneIcon className="h-3.5 w-3.5" />
                                       Call
@@ -3710,7 +3915,7 @@ export function HomepageSearchExperience({
                                   <a
                                     href={mailHref}
                                     aria-label={`Email BookedAI about ${service.name}`}
-                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-apple-paper-blue-50"
                                   >
                                     <MailIcon className="h-3.5 w-3.5" />
                                     Mail
@@ -3719,7 +3924,7 @@ export function HomepageSearchExperience({
                                     type="button"
                                     onClick={() => commitServiceSelection(service)}
                                     aria-label={`Select ${service.name}`}
-                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-[#dedee3] bg-white px-2.5 text-[10px] font-semibold text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff]"
+                                    className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-apple-paper-blue-50"
                                   >
                                     <CheckIcon className="h-3.5 w-3.5" />
                                     Select
@@ -3728,7 +3933,7 @@ export function HomepageSearchExperience({
                                     type="button"
                                     onClick={() => commitServiceSelection(service, { openBooking: true, focusNameField: true })}
                                     aria-label={`Book ${service.name}`}
-                                    className="inline-flex h-8 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg border border-[#111827] bg-[#111827] px-3 text-[10px] font-semibold text-white transition hover:bg-[#1f2937]"
+                                    className="inline-flex h-8 min-w-[5.5rem] items-center justify-center gap-1.5 rounded-lg border border-apple-near-black bg-apple-near-black px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
                                   >
                                     <SparkIcon className="h-3.5 w-3.5" />
                                     Book
@@ -3740,8 +3945,8 @@ export function HomepageSearchExperience({
                           </div>
                         ) : null}
                         {message.suggestions?.length ? (
-                          <div className="mt-3 rounded-[1rem] border border-[#e6edf8] bg-white/70 px-3 py-3">
-                            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#64748b]">
+                          <div className="mt-3 rounded-[1rem] border border-apple-paper-blue-200 bg-white/70 px-3 py-3">
+                            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                               Suggested chat refinements
                             </div>
                             <div className="mt-2 flex flex-wrap gap-2">
@@ -3753,7 +3958,7 @@ export function HomepageSearchExperience({
                                     setSearchQuery(item.query);
                                     void runSearch(item.query);
                                   }}
-                                  className="rounded-full border border-[#dbe7fb] bg-white px-3 py-1.5 text-[11px] font-semibold text-[#1a73e8] transition hover:bg-[#f8fbff]"
+                                  className="rounded-full border border-apple-paper-blue-200 bg-white px-3 py-1.5 text-[11px] font-semibold text-apple-blue transition hover:bg-apple-paper-blue-50"
                                 >
                                   {item.label}
                                 </button>
@@ -3773,7 +3978,7 @@ export function HomepageSearchExperience({
                 {uniqueWarnings.map((warning) => (
                   <span
                     key={warning}
-                    className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-medium text-amber-700"
+                    className="rounded-full border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700"
                   >
                     {warning}
                   </span>
@@ -3782,17 +3987,17 @@ export function HomepageSearchExperience({
             ) : null}
 
             {geoHint ? (
-              <div className="mb-3 rounded-[1rem] border border-[#dbe7fb] bg-[#f8fbff] px-3.5 py-3 text-sm leading-6 text-[#31507b]">
+              <div className="mb-3 rounded-[1rem] border border-apple-paper-blue-200 bg-apple-paper-blue-50 px-3.5 py-3 text-sm leading-6 text-apple-paper-blue-navy-700">
                 {geoHint}
               </div>
             ) : null}
 
             {hasActiveQuery && assistantSummary && !hasAssistantChatReply ? (
               <div className="mb-5 flex items-start gap-3">
-                <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#0f3d7a] text-white shadow-[0_10px_24px_rgba(15,61,122,0.18)]">
+                <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-apple-paper-blue-navy-900 text-white shadow-[0_10px_24px_rgba(15,61,122,0.18)]">
                   <SparkIcon className="h-4 w-4" />
                 </div>
-                <div className="max-w-[48rem] rounded-[1.35rem] rounded-tl-[0.45rem] border border-[#dbe7fb] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-4 py-3 text-sm leading-6 text-[#2f3d4f] shadow-[0_8px_24px_rgba(7,27,64,0.04)]">
+                <div className="max-w-[48rem] rounded-[1.35rem] rounded-tl-[0.45rem] border border-apple-paper-blue-200 bg-[linear-gradient(180deg,var(--apple-paper-blue-50)_0%,#ffffff_100%)] px-4 py-3 text-sm leading-6 text-apple-paper-blue-navy-800 shadow-apple-card">
                   {assistantSummary}
                 </div>
               </div>
@@ -3800,15 +4005,15 @@ export function HomepageSearchExperience({
 
             <div className="space-y-3">
               {searchLoading ? (
-                <div className="rounded-[1.5rem] border border-[#d2e3fc] bg-[linear-gradient(180deg,#f8fbff_0%,#ffffff_100%)] px-5 py-5 lg:px-6 lg:py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
-                  <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">
+                <div className="rounded-[1.5rem] border border-apple-paper-blue-200 bg-[linear-gradient(180deg,var(--apple-paper-blue-50)_0%,#ffffff_100%)] px-5 py-5 lg:px-6 lg:py-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)]">
+                  <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-apple-blue">
                     <span className="relative inline-flex h-2.5 w-2.5">
-                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-[#1a73e8]/45" />
-                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-[#1a73e8]" />
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-apple-blue/45" />
+                      <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-apple-blue" />
                     </span>
                     {content.ui.resultsLoadingTitle}
                   </div>
-                  <p className="mt-2 text-sm leading-6 text-[#5f6368]">
+                  <p className="mt-2 text-sm leading-6 text-slate-500">
                     {currentQuery
                       ? results.length > 0
                         ? `I found ${results.length} early match${results.length === 1 ? '' : 'es'} for "${currentQuery}" and I am still checking maps, booking paths, and fit.`
@@ -3817,10 +4022,10 @@ export function HomepageSearchExperience({
                   </p>
                   <div className="mt-4 space-y-3">
                     <div className="flex items-start gap-3">
-                      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#1a73e8] text-white shadow-[0_10px_24px_rgba(26,115,232,0.16)]">
+                      <div className="mt-1 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-apple-blue text-white shadow-[0_10px_24px_rgba(26,115,232,0.16)]">
                         <SparkIcon className="h-4 w-4" />
                       </div>
-                      <div className="max-w-[44rem] rounded-[1.2rem] rounded-tl-[0.45rem] border border-[#dbe7fb] bg-white px-4 py-3 shadow-[0_10px_24px_rgba(60,64,67,0.05)]">
+                      <div className="max-w-[44rem] rounded-[1.2rem] rounded-tl-[0.45rem] border border-apple-paper-blue-200 bg-white px-4 py-3 shadow-apple-card">
                         <p className="mt-1 text-sm leading-6 text-slate-700">
                           I am searching now. If you add area, timing, budget, age, or preference in chat, I can tighten the results while they appear.
                         </p>
@@ -3835,13 +4040,13 @@ export function HomepageSearchExperience({
                             setSearchQuery((current) => `${current.trim()} ${item.suggestion}`.trim());
                             setComposerCollapsed(false);
                           }}
-                          className="flex w-full items-start justify-between gap-3 rounded-[1.1rem] border border-[#e6edf8] bg-[#fbfdff] px-3 py-3 text-left transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
+                          className="flex w-full items-start justify-between gap-3 rounded-[1.1rem] border border-apple-paper-blue-200 bg-apple-paper-blue-50 px-3 py-3 text-left transition hover:border-apple-paper-blue-300 hover:bg-apple-paper-blue-50"
                         >
                           <div className="min-w-0">
                             <div className="text-[11px] font-semibold text-slate-950">{item.question}</div>
                             <div className="mt-1 text-[11px] leading-5 text-slate-600">{item.suggestion}</div>
                           </div>
-                          <span className="shrink-0 rounded-full bg-[#eef4ff] px-2 py-1 text-[10px] font-semibold text-[#1a73e8]">
+                          <span className="shrink-0 rounded-full bg-apple-paper-blue-100 px-2 py-1 text-xs font-semibold text-apple-blue">
                             Add
                           </span>
                         </button>
@@ -3850,19 +4055,19 @@ export function HomepageSearchExperience({
                   </div>
                   <div className="mt-4 grid gap-2 sm:grid-cols-3">
                     {[0, 1, 2].map((item) => (
-                      <div key={item} className="h-20 rounded-[1rem] bg-[linear-gradient(180deg,#edf4ff_0%,#ffffff_100%)] ring-1 ring-[#dbe7fb]" />
+                      <div key={item} className="h-20 rounded-[1rem] bg-[linear-gradient(180deg,var(--apple-paper-blue-100)_0%,#ffffff_100%)] ring-1 ring-apple-paper-blue-200" />
                     ))}
                   </div>
                   <div className="mt-3 flex flex-wrap gap-2">
                     {['Checking fit', 'Ranking options', 'Preparing next step'].map((label) => (
-                      <div key={label} className="public-apple-toolbar-pill px-2.5 py-1 text-[10px] font-medium text-[#0f3d7a]">
+                      <div key={label} className="public-apple-toolbar-pill px-2.5 py-1 text-xs font-medium text-apple-paper-blue-navy-900">
                         {label}
                       </div>
                     ))}
                   </div>
                   {(showDelayedSearchNudge || intentSuggestions.length > 0) ? (
-                    <div className="mt-4 rounded-[1.1rem] border border-[#e6edf8] bg-[#fbfdff] px-4 py-4">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">Try nearby searches</div>
+                    <div className="mt-4 rounded-[1.1rem] border border-apple-paper-blue-200 bg-apple-paper-blue-50 px-4 py-4">
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-blue">Try nearby searches</div>
                       <p className="mt-1 text-[11px] leading-5 text-slate-600">{activeSearchPrompt}</p>
                       <div className="mt-3 flex flex-wrap gap-2">
                         {intentSuggestions.slice(0, 4).map((item) => (
@@ -3873,7 +4078,7 @@ export function HomepageSearchExperience({
                               setSearchQuery(item.query);
                               void runSearch(item.query);
                             }}
-                            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] hover:text-slate-950"
+                            className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-apple-paper-blue-300 hover:bg-apple-paper-blue-50 hover:text-slate-950"
                           >
                             {item.label}: {item.query}
                           </button>
@@ -3885,7 +4090,7 @@ export function HomepageSearchExperience({
               ) : null}
 
               {searchError ? (
-                <div className="rounded-[1.35rem] border border-[#f2b8b5] bg-[#fce8e6] px-4 py-4 text-sm leading-6 text-[#b3261e]">
+                <div className="rounded-[1.35rem] border border-rose-200 bg-rose-100 px-4 py-4 text-sm leading-6 text-rose-700">
                   {searchError}
                 </div>
               ) : null}
@@ -3896,22 +4101,22 @@ export function HomepageSearchExperience({
                   batchSize={3}
                   className="space-y-4"
                   listClassName="space-y-3"
-                  buttonClassName="public-apple-workspace-panel-soft rounded-[1.15rem] px-4 py-3 text-sm font-semibold text-[#111827] transition hover:bg-white"
+                  buttonClassName="public-apple-workspace-panel-soft rounded-[1.15rem] px-4 py-3 text-sm font-semibold text-apple-near-black transition hover:bg-white"
                   resetKey={`${currentQuery}-${results.length}`}
                   buttonLabel="See more results"
                   emptyState={
                     <div className="public-apple-empty-state rounded-[1.2rem] px-4 py-12 text-center sm:px-8 lg:py-16">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/42">
                         {currentQuery ? content.ui.noMatchTitle : content.ui.resultsEmptyTitle}
                       </div>
-                      <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-[#172033]/58">
+                      <p className="mx-auto mt-3 max-w-2xl text-sm leading-6 text-apple-near-black/58">
                         {currentQuery ? content.ui.noMatchBody : content.ui.resultsEmptyBody}
                       </p>
                       {currentQuery ? (
-                        <div className="mx-auto mt-4 max-w-3xl rounded-[1.1rem] border border-[#dfe8f3] bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-4 text-left">
-                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">Why this is still broad</div>
+                        <div className="mx-auto mt-4 max-w-3xl rounded-[1.1rem] border border-apple-paper-blue-200 bg-[linear-gradient(180deg,#ffffff_0%,var(--apple-paper-blue-50)_100%)] px-4 py-4 text-left">
+                          <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-apple-blue">Why this is still broad</div>
                           <p className="mt-2 text-sm leading-6 text-slate-600">{noResultReason}</p>
-                          <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">Better next searches</div>
+                          <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-apple-blue">Better next searches</div>
                           <div className="mt-3 flex flex-wrap gap-2">
                             {noResultSuggestions.map((item) => (
                               <button
@@ -3921,7 +4126,7 @@ export function HomepageSearchExperience({
                                   setSearchQuery(item.query);
                                   void runSearch(item.query);
                                 }}
-                                className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] hover:text-slate-950"
+                                className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-apple-paper-blue-300 hover:bg-apple-paper-blue-50 hover:text-slate-950"
                               >
                                 {item.title}: {item.query}
                               </button>
@@ -3929,7 +4134,7 @@ export function HomepageSearchExperience({
                           </div>
                           {intentSuggestions.length > 0 ? (
                             <>
-                              <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1a73e8]">Nearby intent</div>
+                              <div className="mt-4 text-[11px] font-semibold uppercase tracking-[0.16em] text-apple-blue">Nearby intent</div>
                               <div className="mt-3 flex flex-wrap gap-2">
                                 {intentSuggestions.slice(0, 4).map((item) => (
                                   <button
@@ -3939,7 +4144,7 @@ export function HomepageSearchExperience({
                                       setSearchQuery(item.query);
                                       void runSearch(item.query);
                                     }}
-                                    className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff] hover:text-slate-950"
+                                    className="rounded-full border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-700 transition hover:border-apple-paper-blue-300 hover:bg-apple-paper-blue-50 hover:text-slate-950"
                                   >
                                     {item.label}: {item.query}
                                   </button>
@@ -3952,21 +4157,21 @@ export function HomepageSearchExperience({
                     </div>
                   }
                   renderMeta={({ visibleCount, totalCount }) => (
-                    <div className="mb-1 flex items-start gap-3 rounded-[1.25rem] border border-[#e8edf3] bg-[#fbfdff] px-4 py-4 shadow-[0_8px_22px_rgba(60,64,67,0.04)]">
-                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#eef4ff] text-[#1a73e8]">
+                    <div className="mb-1 flex items-start gap-3 rounded-[1.25rem] border border-slate-200 bg-apple-paper-blue-50 px-4 py-4 shadow-apple-card">
+                      <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-apple-paper-blue-100 text-apple-blue">
                         <SparkIcon className="h-4 w-4" />
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center justify-between gap-3">
                           <div>
-                            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#5f6368]">
+                            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                               {content.ui.shortlistLabel}
                             </div>
-                            <div className="mt-1 text-base font-semibold text-[#202124]">
+                            <div className="mt-1 text-base font-semibold text-apple-near-black">
                               {currentQuery ? `Best matches for "${currentQuery}"` : content.ui.resultsTitle}
                             </div>
                           </div>
-                          <div className="rounded-full border border-[#e5e9f0] bg-white px-3 py-1 text-[11px] text-[#5f6368]">
+                          <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] text-slate-500">
                             {visibleCount} / {totalCount}
                           </div>
                         </div>
@@ -3998,17 +4203,19 @@ export function HomepageSearchExperience({
                     const smsHref = service.contact_phone
                       ? `sms:${service.contact_phone.replace(/[^\d+]/g, '')}?&body=${encodeURIComponent(`Hi, I am interested in ${service.name}.`)}`
                       : null;
+                    // Touch target ≥ 44×44 to honour Apple HIG and the
+                    // mobile-overhaul brief — buttons used to be 36×36.
                     const compactActionClass =
-                      'inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#dedee3] bg-white text-[#3c4043] transition hover:border-[#c9c9d1] hover:bg-[#f8fbff] hover:text-[#111827] disabled:cursor-not-allowed disabled:opacity-40';
+                      'inline-flex h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-700 transition hover:border-slate-300 hover:bg-apple-paper-blue-50 hover:text-apple-near-black disabled:cursor-not-allowed disabled:opacity-40';
                     return (
                       <div
                         key={service.id}
                         data-homepage-result-entry="true"
                         style={getResultEntryStyle(resultIndex)}
-                        className={`rounded-[1.35rem] border p-3 shadow-[0_12px_28px_rgba(60,64,67,0.06)] transition duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                        className={`rounded-[1.35rem] border p-3 shadow-apple-card transition duration-200 ease-[cubic-bezier(0.16,1,0.3,1)] ${
                           isSelected
-                            ? 'border-[#cbd5e1] bg-white shadow-[0_16px_34px_rgba(15,23,42,0.10)]'
-                            : 'border-[#e5e7eb] bg-white hover:border-[#cbd5e1] hover:shadow-[0_16px_34px_rgba(15,23,42,0.08)]'
+                            ? 'border-slate-300 bg-white shadow-[0_16px_34px_rgba(15,23,42,0.10)]'
+                            : 'border-slate-200 bg-white hover:border-slate-300 hover:shadow-[0_16px_34px_rgba(15,23,42,0.08)]'
                         }`}
                       >
                         <div className="flex items-start gap-3">
@@ -4020,32 +4227,32 @@ export function HomepageSearchExperience({
                                 className="h-full w-full object-cover"
                                 loading="lazy"
                               />
-                              <div className="absolute left-1 top-1 rounded-full bg-white/88 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.1em] text-[#64748b]">
+                              <div className="absolute left-1 top-1 rounded-full bg-white/88 px-1.5 py-0.5 text-[8px] font-semibold uppercase tracking-[0.1em] text-slate-500">
                                 Photo
                               </div>
                             </div>
                           ) : (
-                            <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-[1rem] border border-[#e5e7eb] bg-[#f8fafc] text-[11px] font-bold uppercase tracking-[0.16em] text-[#64748b] sm:h-[4.5rem] sm:w-[4.5rem]">
+                            <div className="flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-[1rem] border border-slate-200 bg-slate-50 text-[11px] font-bold uppercase tracking-[0.16em] text-slate-500 sm:h-[4.5rem] sm:w-[4.5rem]">
                               <span>{getServiceInitials(service)}</span>
                               <span className="mt-1 text-[7px] tracking-[0.12em] opacity-70">Preview</span>
                             </div>
                           )}
                           <div className="min-w-0 flex-1">
                             <div className="flex flex-wrap items-center gap-2">
-                              <span className="rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#64748b] ring-1 ring-[#e5e7eb]">
+                              <span className="rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 ring-1 ring-apple-ring-neutral-100">
                                 Option {resultIndex + 1}
                               </span>
                               {service.featured ? (
-                                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
                                   Top match
                                 </span>
                               ) : null}
                               {isBookedAiTenantMatch ? (
-                                <span className="rounded-full bg-[#ecfdf5] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-emerald-200">
+                                <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-800 ring-1 ring-emerald-200">
                                   BookedAI tenant
                                 </span>
                               ) : null}
-                              <span className="rounded-full bg-[#eef4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
+                              <span className="rounded-full bg-apple-paper-blue-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-apple-blue">
                                 {service.category}
                               </span>
                             </div>
@@ -4053,12 +4260,12 @@ export function HomepageSearchExperience({
                               type="button"
                               onClick={() => handleServiceSelect(service)}
                               className={`mt-2 block max-w-full text-left text-[1rem] font-semibold leading-6 transition ${
-                                isSelected ? 'text-[#111827]' : 'text-[#0f172a] hover:text-[#1a73e8]'
+                                isSelected ? 'text-apple-near-black' : 'text-apple-near-black hover:text-apple-blue'
                               }`}
                             >
                               <span className="line-clamp-2">{service.name}</span>
                             </button>
-                            <div className="mt-1 line-clamp-1 text-[12px] font-medium text-[#64748b]">
+                            <div className="mt-1 line-clamp-1 text-[12px] font-medium text-slate-500">
                               {[service.venue_name, service.location || service.source_label].filter(Boolean).join(' • ') || 'BookedAI matched option'}
                             </div>
                             <div className="mt-2 flex flex-wrap gap-1.5">
@@ -4070,7 +4277,7 @@ export function HomepageSearchExperience({
                                       ? confidencePresentation.tone === 'tenant'
                                         ? 'bg-emerald-50 text-emerald-800'
                                         : 'bg-amber-50 text-amber-800'
-                                      : 'bg-[#f8fafc] text-[#475569] ring-1 ring-[#e5e7eb]'
+                                      : 'bg-slate-50 text-slate-600 ring-1 ring-apple-ring-neutral-100'
                                   }`}
                                 >
                                   {item}
@@ -4078,7 +4285,7 @@ export function HomepageSearchExperience({
                               ))}
                             </div>
                             {(service.why_this_matches || service.next_step) ? (
-                              <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-[#475569]">
+                              <p className="mt-2 line-clamp-2 text-[12px] leading-5 text-slate-600">
                                 {service.why_this_matches || service.next_step}
                               </p>
                             ) : null}
@@ -4101,13 +4308,13 @@ export function HomepageSearchExperience({
                             ) : null}
                           </div>
                         </div>
-                        <div className="mt-3 flex min-w-0 items-center gap-2 overflow-x-auto border-t border-[#edf1f7] px-1 pt-3">
+                        <div className="mt-3 flex min-w-0 items-center gap-2 overflow-x-auto border-t border-slate-200 px-1 pt-3">
                           <button
                             type="button"
                             onClick={() => commitServiceSelection(service)}
                             aria-label={`Select ${service.name}`}
                             title="Select result"
-                            className={`${compactActionClass} ${isSelected ? 'border-[#1a73e8] bg-[#eef4ff] text-[#1a73e8]' : ''}`}
+                            className={`${compactActionClass} ${isSelected ? 'border-apple-blue bg-apple-paper-blue-100 text-apple-blue' : ''}`}
                           >
                             <CheckIcon className="h-4 w-4" />
                           </button>
@@ -4177,10 +4384,10 @@ export function HomepageSearchExperience({
                             onClick={() => commitServiceSelection(service, { openBooking: true, focusNameField: true })}
                             aria-label={`Book ${service.name}`}
                             title="Book this"
-                            className="inline-flex h-9 min-w-[6.5rem] shrink-0 items-center justify-center gap-1.5 rounded-xl border border-[#111827] bg-[#111827] px-3 text-[11px] font-semibold text-white transition hover:bg-[#1f2937]"
+                            className="inline-flex h-11 min-h-[44px] min-w-[5.5rem] shrink-0 items-center justify-center gap-1.5 rounded-xl border border-apple-near-black bg-apple-near-black px-3 text-[12px] font-semibold text-white transition hover:bg-slate-800"
                           >
                             <SparkIcon className="h-4 w-4" />
-                            {isBookedAiTenantMatch ? 'Book tenant' : 'Book'}
+                            {isBookedAiTenantMatch ? 'Book tenant' : 'Book →'}
                           </button>
                         </div>
                       </div>
@@ -4190,7 +4397,14 @@ export function HomepageSearchExperience({
               ) : null}
               </div>
               </div>
-              <div className="border-t border-[#eef2f7] bg-white px-3 py-3 sm:px-4">
+              {/*
+                Mobile-first composer surface. On phones (`< sm`) this row is
+                pinned to the bottom of the assistant pane and respects the
+                safe-area inset so the send button sits inside the thumb-zone.
+                On tablets/desktop it returns to inline flow. All interactive
+                buttons inside the composer expose a 44×44 touch target.
+              */}
+              <div className="sticky bottom-0 z-20 border-t border-slate-200 bg-white px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 sm:static sm:bg-white sm:px-4 sm:pb-3">
                 {attachedReferences.length > 0 ? (
                   <div className="mb-2 flex flex-wrap gap-2">
                     {attachedReferences.map((item) => (
@@ -4198,17 +4412,17 @@ export function HomepageSearchExperience({
                         key={item.id}
                         type="button"
                         onClick={() => removeAttachedReference(item.id)}
-                        className="inline-flex max-w-full items-center gap-1.5 rounded-full border border-[#e5e7eb] bg-[#f8fafc] px-3 py-1.5 text-[11px] font-semibold text-[#475569] transition hover:border-[#cbd5e1] hover:bg-white"
+                        className="inline-flex min-h-[36px] max-w-full items-center gap-1.5 rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-600 transition hover:border-slate-300 hover:bg-white"
                         title="Remove attachment"
                       >
                         <AttachmentIcon className="h-3.5 w-3.5 shrink-0" />
                         <span className="max-w-[12rem] truncate">{item.name}</span>
-                        <span className="text-[#94a3b8]">x</span>
+                        <span className="text-slate-400">x</span>
                       </button>
                     ))}
                   </div>
                 ) : null}
-                <div className="rounded-[1.25rem] border border-[#dfe5ee] bg-[#f8fafc] px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus-within:border-[#cbd5e1] focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(148,163,184,0.12)]">
+                <div className="rounded-[1.25rem] border border-slate-200 bg-slate-50 px-2.5 py-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9)] focus-within:border-slate-300 focus-within:bg-white focus-within:shadow-[0_0_0_4px_rgba(148,163,184,0.12)]">
                   <div className="flex items-end gap-2">
                     <input
                       ref={attachmentInputRef}
@@ -4224,7 +4438,7 @@ export function HomepageSearchExperience({
                       onClick={() => attachmentInputRef.current?.click()}
                       aria-label="Attach image text or file"
                       title="Attach image, text, or file"
-                      className="mb-1 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#e5e7eb] bg-white text-[#475569] transition hover:border-[#cbd5e1] hover:bg-[#f8fbff] hover:text-[#111827]"
+                      className="mb-1 inline-flex h-11 w-11 min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-600 transition hover:border-slate-300 hover:bg-apple-paper-blue-50 hover:text-apple-near-black"
                     >
                       <AttachmentIcon className="h-4 w-4" />
                     </button>
@@ -4233,9 +4447,12 @@ export function HomepageSearchExperience({
                       value={searchQuery}
                       onChange={(event) => setSearchQuery(event.target.value)}
                       onKeyDown={handleSearchComposerKeyDown}
-                      placeholder="Ask for a service, area, timing, budget, or attach a reference..."
+                      placeholder="Ask for a service, area, timing, or budget"
                       rows={1}
-                      className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-[15px] leading-6 text-[#111827] outline-none placeholder:text-[#8a94a6] sm:text-[1rem]"
+                      enterKeyHint="send"
+                      autoCorrect="on"
+                      spellCheck
+                      className="min-h-[44px] flex-1 resize-none border-0 bg-transparent px-1 py-2.5 text-[16px] leading-6 text-apple-near-black outline-none placeholder:text-slate-400 sm:text-[1rem]"
                       aria-label="Ask BookedAI"
                     />
                     <div className="mb-1 flex shrink-0 items-center gap-1.5">
@@ -4245,10 +4462,10 @@ export function HomepageSearchExperience({
                           onClick={handleVoiceSearch}
                           aria-label={voiceListening ? 'Stop voice input' : 'Start voice input'}
                           title={voiceListening ? 'Listening' : 'Voice'}
-                          className={`inline-flex h-10 w-10 items-center justify-center rounded-xl border transition ${
+                          className={`inline-flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border transition ${
                             voiceListening
-                              ? 'border-[#c9c9d1] bg-[#f0f0f2] text-[#111827]'
-                              : 'border-[#e5e7eb] bg-white text-[#475569] hover:border-[#cbd5e1] hover:bg-[#f8fbff] hover:text-[#111827]'
+                              ? 'border-slate-300 bg-apple-light text-apple-near-black'
+                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:bg-apple-paper-blue-50 hover:text-apple-near-black'
                           }`}
                         >
                           <MicIcon className="h-4 w-4" />
@@ -4260,7 +4477,7 @@ export function HomepageSearchExperience({
                         disabled={searchLoading || !searchQuery.trim()}
                         aria-label="Send search"
                         title="Send"
-                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#111827] text-white transition hover:bg-[#1f2937] disabled:cursor-not-allowed disabled:opacity-60"
+                        className="inline-flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-xl bg-apple-near-black text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <ArrowRightIcon className="h-4 w-4" />
                       </button>
@@ -4270,13 +4487,13 @@ export function HomepageSearchExperience({
                 <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                   <div className="flex flex-wrap gap-1.5">
                     {['Service', 'Area', 'Time', 'Budget'].map((item) => (
-                      <span key={item} className="rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-medium text-[#64748b] ring-1 ring-[#e5e7eb]">
+                      <span key={item} className="rounded-full bg-slate-50 px-2.5 py-1 text-xs font-medium text-slate-500 ring-1 ring-apple-ring-neutral-100">
                         {item}
                       </span>
                     ))}
                   </div>
-                  <span className="text-[10px] font-medium text-[#94a3b8]">
-                    Results scroll above. Enter sends, Shift+Enter adds a line.
+                  <span className="hidden text-xs font-medium text-slate-400 sm:inline">
+                    Enter sends, Shift+Enter adds a line.
                   </span>
                 </div>
                 {voiceError ? <div className="mt-2 text-xs text-rose-600">{voiceError}</div> : null}
@@ -4285,15 +4502,15 @@ export function HomepageSearchExperience({
           </div>
         </section>
 
-        <aside className="public-booking-sidebar min-w-0 rounded-[1.6rem] border border-[#e3e3e7] bg-white p-3 shadow-[0_18px_50px_rgba(15,23,42,0.06)] xl:sticky xl:self-start">
-          <div className="mb-3 hidden rounded-[1.2rem] border border-[#eeeeef] bg-[#fafafa] px-4 py-4 xl:block">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[#6b7280]">Booking flow</div>
-            <div className="mt-2 text-base font-semibold text-[#202124]">
+        <aside className="public-booking-sidebar min-w-0 rounded-[1.6rem] border border-slate-200 bg-white p-3 shadow-[0_18px_50px_rgba(15,23,42,0.06)] xl:sticky xl:self-start">
+          <div className="mb-3 hidden rounded-[1.2rem] border border-slate-200 bg-apple-light px-4 py-4 xl:block">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Booking flow</div>
+            <div className="mt-2 text-base font-semibold text-apple-near-black">
               One calm path from search to booking.
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {['Search', 'Choose', 'Book'].map((item) => (
-                <div key={item} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-[#4b5563] ring-1 ring-[#e3e3e7]">
+                <div key={item} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 ring-1 ring-apple-ring-neutral-200">
                   {item}
                 </div>
               ))}
@@ -4302,26 +4519,26 @@ export function HomepageSearchExperience({
           <div className="public-apple-workspace-panel rounded-[1.15rem] px-3.5 py-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/42">
                   {content.ui.bookingPanelTitle}
                 </div>
-                <div className="mt-2 text-[1rem] font-semibold tracking-[-0.02em] text-[#111827]">
+                <div className="mt-2 text-[1rem] font-semibold tracking-[-0.02em] text-apple-near-black">
                   {selectedService ? selectedService.name : content.ui.bookingPanelEmpty}
                 </div>
-                <p className="mt-2 text-sm leading-6 text-[#172033]/58">
+                <p className="mt-2 text-sm leading-6 text-apple-near-black/58">
                   {selectedService ? selectedServiceMeta : content.ui.resultsEmptyBody}
                 </p>
               </div>
-              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[0.9rem] bg-[#f5f7fb] text-[#6d28d9] ring-1 ring-slate-900/6 sm:inline-flex">
+              <div className="hidden h-10 w-10 shrink-0 items-center justify-center rounded-[0.9rem] bg-slate-50 text-apple-blue ring-1 ring-slate-900/6 sm:inline-flex">
                 <BrandButtonMark className="h-6 w-6" />
               </div>
             </div>
           </div>
 
-          <div className="hidden xl:block public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-[0_8px_22px_rgba(60,64,67,0.04)]">
+          <div className="hidden xl:block public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-apple-card">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">Progress</div>
-              <div className="rounded-full border border-[#e3e3e7] bg-white px-2.5 py-1 text-[10px] font-semibold text-[#5f6368]">
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/42">Progress</div>
+              <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">
                 {result ? 'Ready' : selectedService ? 'In motion' : 'Waiting'}
               </div>
             </div>
@@ -4332,13 +4549,13 @@ export function HomepageSearchExperience({
                   step.state === 'complete'
                     ? 'border-emerald-200 bg-emerald-50/70 text-emerald-700'
                     : step.state === 'active'
-                      ? 'border-[#d2e3fc] bg-[#eef4ff] text-[#1a73e8]'
+                      ? 'border-apple-paper-blue-200 bg-apple-paper-blue-100 text-apple-blue'
                       : 'border-slate-200 bg-white text-slate-500';
                 const dotClasses =
                   step.state === 'complete'
                     ? 'bg-emerald-500'
                     : step.state === 'active'
-                      ? 'bg-[#1a73e8]'
+                      ? 'bg-apple-blue'
                       : 'bg-slate-300';
 
                 return (
@@ -4350,7 +4567,7 @@ export function HomepageSearchExperience({
                       ) : null}
                     </div>
                     <div className={`min-w-0 flex-1 rounded-[0.95rem] border px-3 py-2.5 ${toneClasses}`}>
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em]">{step.label}</div>
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em]">{step.label}</div>
                       <div className="mt-1 text-sm leading-5">{step.detail}</div>
                     </div>
                   </div>
@@ -4359,17 +4576,17 @@ export function HomepageSearchExperience({
             </div>
           </div>
 
-          <div className="hidden xl:block public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-[0_10px_28px_rgba(60,64,67,0.05)]">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">Follow-up</div>
+          <div className="hidden xl:block public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-apple-card">
+            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/42">Follow-up</div>
             <div className="mt-3 space-y-2.5">
               {enterpriseJourneySteps.slice(0, 3).map((step) => (
                 <div key={step.id} className="rounded-[0.95rem] border border-slate-200 bg-white px-3 py-3">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="mt-1 text-sm font-semibold text-[#202124]">{step.title}</div>
-                      <div className="mt-1 text-[12px] leading-5 text-[#5f6368]">{step.description}</div>
+                      <div className="mt-1 text-sm font-semibold text-apple-near-black">{step.title}</div>
+                      <div className="mt-1 text-[12px] leading-5 text-slate-500">{step.description}</div>
                     </div>
-                    <div className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getEnterpriseStatusTone(step.status)}`}>
+                    <div className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${getEnterpriseStatusTone(step.status)}`}>
                       {getEnterpriseStatusLabel(step.status)}
                     </div>
                   </div>
@@ -4382,12 +4599,12 @@ export function HomepageSearchExperience({
             <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] border-[1.5px] border-emerald-200 bg-[linear-gradient(180deg,#ffffff_0%,#f6fff9_100%)] px-3.5 py-3.5 shadow-[0_16px_34px_rgba(16,185,129,0.10)]">
               <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="mt-2 text-sm font-semibold text-[#202124]">{selectedService.name}</div>
-                    <div className="mt-1 text-xs text-[#5f6368]">
+                    <div className="mt-2 text-sm font-semibold text-apple-near-black">{selectedService.name}</div>
+                    <div className="mt-1 text-xs text-slate-500">
                       {selectedService.category} • A${selectedService.amount_aud} • {selectedService.duration_minutes} min
                     </div>
                   {selectedService.location ? (
-                    <div className="mt-1 text-xs text-[#5f6368]">{selectedService.location}</div>
+                    <div className="mt-1 text-xs text-slate-500">{selectedService.location}</div>
                   ) : null}
                 </div>
                 <div className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-emerald-100 text-emerald-700">
@@ -4400,12 +4617,12 @@ export function HomepageSearchExperience({
                   <div className="text-sm leading-6 text-emerald-900">
                     {selectedServiceFlowNote}
                   </div>
-                  <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
+                  <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
                     Best path
                   </div>
                 </div>
                 {currentQuery ? (
-                  <div className="mt-2 inline-flex rounded-full bg-[#f8fafc] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368] ring-1 ring-slate-900/6">
+                  <div className="mt-2 inline-flex rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500 ring-1 ring-slate-900/6">
                     Query: "{currentQuery}"
                   </div>
                 ) : null}
@@ -4414,7 +4631,7 @@ export function HomepageSearchExperience({
               <div className="mt-3 rounded-[0.95rem] border border-emerald-200 bg-emerald-50 px-3 py-3 text-sm text-emerald-950">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
                       Brief
                     </div>
                     <div className="mt-1 font-semibold">Confirm details for the selected match</div>
@@ -4422,7 +4639,7 @@ export function HomepageSearchExperience({
                       Capture contact details, timing, and any decision-critical context. Reopen comparison only if the brief changes.
                     </div>
                   </div>
-                  <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
+                  <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
                     Locked
                   </div>
                 </div>
@@ -4430,7 +4647,7 @@ export function HomepageSearchExperience({
 
               {isBookedAiChessTenantService(selectedService) ? (
                 <div className="mt-3 rounded-[1rem] border border-emerald-200 bg-white px-3 py-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
                     Tenant booking channels
                   </div>
                   <p className="mt-1 text-xs leading-5 text-emerald-900">
@@ -4463,21 +4680,21 @@ export function HomepageSearchExperience({
           ) : null}
 
           {!result && !selectedService ? (
-            <div className="mt-3 rounded-[1.1rem] border border-dashed border-[#d9dce3] bg-[#fbfbfc] px-4 py-5 text-center">
-              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-[#111827] ring-1 ring-[#e3e3e7]">
+            <div className="mt-3 rounded-[1.1rem] border border-dashed border-slate-200 bg-apple-light px-4 py-5 text-center">
+              <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-apple-near-black ring-1 ring-apple-ring-neutral-200">
                 <SparkIcon className="h-4 w-4" />
               </div>
-              <div className="mt-3 text-sm font-semibold text-[#111827]">Booking form unlocks after a match is selected.</div>
-              <p className="mx-auto mt-2 max-w-[18rem] text-sm leading-6 text-[#6b7280]">
+              <div className="mt-3 text-sm font-semibold text-apple-near-black">Booking form unlocks after a match is selected.</div>
+              <p className="mx-auto mt-2 max-w-[18rem] text-sm leading-6 text-slate-500">
                 Keep the flow conversational first. Once a result is chosen, BookedAI carries that context into the booking brief.
               </p>
               <div className="mt-4 space-y-2 text-left">
                 {BOOKING_EMPTY_STEPS.map((item, index) => (
-                  <div key={item} className="flex items-center gap-3 rounded-xl border border-[#eeeeef] bg-white px-3 py-2.5">
-                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#f0f0f2] text-[11px] font-semibold text-[#4b5563]">
+                  <div key={item} className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-3 py-2.5">
+                    <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-apple-light text-[11px] font-semibold text-slate-600">
                       {index + 1}
                     </span>
-                    <span className="text-sm font-medium text-[#4b5563]">{item}</span>
+                    <span className="text-sm font-medium text-slate-600">{item}</span>
                   </div>
                 ))}
               </div>
@@ -4487,20 +4704,20 @@ export function HomepageSearchExperience({
           {!result && selectedService ? (
             <div
               ref={bookingFormRef}
-              className={`public-apple-workspace-panel mt-3 rounded-[1.1rem] p-3.5 shadow-[0_10px_28px_rgba(60,64,67,0.05)] ${
+              className={`public-apple-workspace-panel mt-3 rounded-[1.1rem] p-3.5 shadow-apple-card ${
                 selectedService && !bookingComposerOpen ? 'hidden' : ''
               }`}
             >
               <div className="mb-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[#172033]/42">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/42">
                   {content.ui.bookingPanelTitle}
                 </div>
-                <div className="mt-1 text-sm font-semibold text-[#111827]">
+                <div className="mt-1 text-sm font-semibold text-apple-near-black">
                   {selectedService ? content.ui.bookingButton : content.ui.bookingPanelEmpty}
                 </div>
                 {selectedService ? (
-                  <p className="mt-2 text-sm leading-6 text-[#172033]/62">
-                    Complete the booking brief for <span className="font-semibold text-[#111827]">{selectedService.name}</span>. This match stays locked for the request.
+                  <p className="mt-2 text-sm leading-6 text-apple-near-black/62">
+                    Complete the booking brief for <span className="font-semibold text-apple-near-black">{selectedService.name}</span>. This match stays locked for the request.
                   </p>
                 ) : null}
                 <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -4509,24 +4726,29 @@ export function HomepageSearchExperience({
                     ['2', 'Preferred time', 'Pick the best slot'],
                     ['3', 'Next step', 'Portal, QR, and follow-up'],
                   ].map(([number, title, body]) => (
-                    <div key={title} className="rounded-[0.95rem] border border-[#e5e7eb] bg-[#f8fafc] px-3 py-3">
+                    <div key={title} className="rounded-[0.95rem] border border-slate-200 bg-slate-50 px-3 py-3">
                       <div className="flex items-center gap-2">
-                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-[10px] font-bold text-[#1a73e8] ring-1 ring-[#dbe7fb]">
+                        <span className="flex h-5 w-5 items-center justify-center rounded-full bg-white text-xs font-bold text-apple-blue ring-1 ring-apple-paper-blue-200">
                           {number}
                         </span>
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-[#475569]">
+                        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-600">
                           {title}
                         </span>
                       </div>
-                      <div className="mt-2 text-[11px] leading-5 text-[#64748b]">{body}</div>
+                      <div className="mt-2 text-[11px] leading-5 text-slate-500">{body}</div>
                     </div>
                   ))}
                 </div>
               </div>
 
+              {/*
+                Booking form — mobile-first single column. Each input declares
+                inputMode + autoComplete so phone keyboards surface the right
+                key set and password managers populate the right fields.
+              */}
               <form onSubmit={handleBookingSubmit} className="space-y-3">
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#172033]/76">{content.ui.nameLabel}</span>
+                  <span className="mb-2 block text-sm font-medium text-apple-near-black/76">{content.ui.nameLabel}</span>
                   <input
                     ref={customerNameInputRef}
                     type="text"
@@ -4534,60 +4756,69 @@ export function HomepageSearchExperience({
                     onChange={(event) => setCustomerName(event.target.value)}
                     required
                     autoComplete="name"
-                    className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
+                    inputMode="text"
+                    enterKeyHint="next"
+                    placeholder="Your full name"
+                    className="public-apple-field h-12 min-h-[44px] w-full rounded-[0.95rem] px-4 text-[16px] outline-none transition sm:text-sm"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#172033]/76">{content.ui.emailLabel}</span>
+                  <span className="mb-2 block text-sm font-medium text-apple-near-black/76">{content.ui.emailLabel}</span>
                   <input
                     type="email"
                     value={customerEmail}
                     onChange={(event) => setCustomerEmail(event.target.value)}
                     autoComplete="email"
-                    className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
+                    inputMode="email"
+                    enterKeyHint="next"
+                    placeholder="you@example.com"
+                    className="public-apple-field h-12 min-h-[44px] w-full rounded-[0.95rem] px-4 text-[16px] outline-none transition sm:text-sm"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#172033]/76">{content.ui.phoneLabel}</span>
+                  <span className="mb-2 block text-sm font-medium text-apple-near-black/76">{content.ui.phoneLabel}</span>
                   <input
                     type="tel"
                     value={customerPhone}
                     onChange={(event) => setCustomerPhone(event.target.value)}
                     autoComplete="tel"
+                    inputMode="tel"
+                    enterKeyHint="next"
+                    placeholder="+61 4xx xxx xxx"
                     aria-describedby={customerPhoneHelperId}
-                    className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
+                    className="public-apple-field h-12 min-h-[44px] w-full rounded-[0.95rem] px-4 text-[16px] outline-none transition sm:text-sm"
                   />
                 </label>
-                <div id={customerPhoneHelperId} className="-mt-2 text-[11px] leading-5 text-[#64748b]">
+                <div id={customerPhoneHelperId} className="-mt-2 text-[11px] leading-5 text-slate-500">
                   Email or phone is enough; phone enables SMS and WhatsApp updates.
                 </div>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#172033]/76">{content.ui.dateTimeLabel}</span>
+                  <span className="mb-2 block text-sm font-medium text-apple-near-black/76">{content.ui.dateTimeLabel}</span>
                   <input
                     type="datetime-local"
                     value={preferredSlot}
                     onChange={(event) => setPreferredSlot(event.target.value)}
                     required
-                    className="public-apple-field h-11 w-full rounded-[0.95rem] px-4 text-sm outline-none transition"
+                    className="public-apple-field h-12 min-h-[44px] w-full rounded-[0.95rem] px-4 text-[16px] outline-none transition sm:text-sm"
                   />
                 </label>
 
                 <label className="block">
-                  <span className="mb-2 block text-sm font-medium text-[#172033]/76">{content.ui.notesLabel}</span>
+                  <span className="mb-2 block text-sm font-medium text-apple-near-black/76">{content.ui.notesLabel}</span>
                   <textarea
                     rows={4}
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                     placeholder={content.ui.notesPlaceholder}
-                    className="public-apple-field w-full rounded-[0.95rem] px-4 py-3 text-sm outline-none transition"
+                    className="public-apple-field w-full rounded-[0.95rem] px-4 py-3 text-[16px] outline-none transition sm:text-sm"
                   />
                 </label>
 
                 {submitError ? (
-                  <div className="rounded-[0.95rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  <div role="alert" className="rounded-[0.95rem] border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                     {submitError}
                   </div>
                 ) : null}
@@ -4595,9 +4826,24 @@ export function HomepageSearchExperience({
                 <button
                   type="submit"
                   disabled={submitLoading || !selectedService}
-                  className="public-apple-primary-button inline-flex h-10 w-full items-center justify-center gap-2 rounded-[0.95rem] px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
+                  aria-busy={submitLoading || undefined}
+                  className="public-apple-primary-button inline-flex h-12 min-h-[44px] w-full items-center justify-center gap-2 rounded-[0.95rem] px-5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  <SparkIcon className="h-4 w-4" />
+                  {submitLoading ? (
+                    <span
+                      aria-hidden="true"
+                      className="inline-block animate-spin"
+                      style={{
+                        width: '14px',
+                        height: '14px',
+                        border: '2px solid currentColor',
+                        borderTopColor: 'transparent',
+                        borderRadius: '9999px',
+                      }}
+                    />
+                  ) : (
+                    <SparkIcon className="h-4 w-4" />
+                  )}
                   {submitLoading ? content.ui.bookingSubmitting : content.ui.bookingButton}
                 </button>
                 <a
@@ -4609,10 +4855,10 @@ export function HomepageSearchExperience({
                   }}
                   target="_blank"
                   rel="noreferrer"
-                  className="public-apple-secondary-button inline-flex h-10 w-full items-center justify-center gap-2 rounded-[0.95rem] px-5 text-sm font-semibold transition"
+                  className="public-apple-secondary-button inline-flex h-12 min-h-[44px] w-full items-center justify-center gap-2 rounded-[0.95rem] px-5 text-sm font-semibold transition"
                 >
                   <MessageIcon className="h-4 w-4" />
-                  Need help in Telegram? Open BookedAI Manager Bot
+                  Continue on Telegram
                 </a>
               </form>
             </div>
@@ -4623,7 +4869,7 @@ export function HomepageSearchExperience({
               <div className="rounded-[1.2rem] bg-[linear-gradient(180deg,#5B8CFF_0%,#1A73E8_100%)] px-4 py-4 text-white shadow-[0_16px_36px_rgba(26,115,232,0.22)]">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">
-                    <div className="inline-flex rounded-full bg-white/18 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white/92">
+                    <div className="inline-flex rounded-full bg-white/18 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white/92">
                       {content.ui.thankYouTitle}
                     </div>
                     <div className="mt-3 text-[11px] font-semibold uppercase tracking-[0.16em] text-white/70">
@@ -4643,7 +4889,7 @@ export function HomepageSearchExperience({
                       Scan the QR or open the portal. This confirmation stays here as long as you need it.
                     </div>
                     <div className="mt-4 rounded-[1rem] bg-white/12 px-3 py-3 ring-1 ring-white/12">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70">
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
                         Customer portal and edit flow
                       </div>
                       <p className="mt-1 text-xs leading-5 text-white/82">
@@ -4653,7 +4899,7 @@ export function HomepageSearchExperience({
                         href={getBookingPortalUrl(result)}
                         target="_blank"
                         rel="noreferrer"
-                        className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-white transition hover:text-[#d2e3fc]"
+                        className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-white transition hover:text-apple-paper-blue-200"
                       >
                         portal.bookedai.au
                         <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current">
@@ -4662,7 +4908,7 @@ export function HomepageSearchExperience({
                           <path d="M12 9.5V12H4V4h2.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
                       </a>
-                      <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/82">
+                      <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-white/82">
                         {['Review details', 'Edit and submit', 'Request reschedule', 'Request cancellation'].map((item) => (
                           <span key={item} className="rounded-full bg-white/10 px-2.5 py-1 ring-1 ring-white/12">
                             {item}
@@ -4671,13 +4917,13 @@ export function HomepageSearchExperience({
                       </div>
                     </div>
                   </div>
-                  <div className="rounded-[1.25rem] bg-white p-2.5 text-[#202124] shadow-sm">
+                  <div className="rounded-[1.25rem] bg-white p-2.5 text-apple-near-black shadow-sm">
                     <img
                       src={getBookingQrCodeUrl(result)}
                       alt={`${content.ui.qrLabel} ${result.booking_reference} portal link`}
                       className="h-32 w-32 rounded-[1rem] bg-white object-cover"
                     />
-                    <div className="mt-2 rounded-[0.85rem] bg-[#f8f9fa] px-2 py-1 text-center text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368]">
+                    <div className="mt-2 rounded-[0.85rem] bg-slate-50 px-2 py-1 text-center text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                       Scan to open booking
                     </div>
                   </div>
@@ -4686,19 +4932,19 @@ export function HomepageSearchExperience({
 
               <div className="grid gap-3 sm:grid-cols-3">
                 <div className="public-apple-workspace-panel-soft rounded-[0.95rem] px-3 py-2.5">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5f6368]">Service</div>
-                  <div className="mt-1 text-sm font-semibold text-[#202124]">{result.service.name}</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Service</div>
+                  <div className="mt-1 text-sm font-semibold text-apple-near-black">{result.service.name}</div>
                 </div>
                 <div className="public-apple-workspace-panel-soft rounded-[1rem] px-3 py-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5f6368]">Price</div>
-                  <div className="mt-1 text-sm font-semibold text-[#202124]">{result.amount_label}</div>
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">Price</div>
+                  <div className="mt-1 text-sm font-semibold text-apple-near-black">{result.amount_label}</div>
                 </div>
                 <div className="public-apple-workspace-panel-soft rounded-[1rem] px-3 py-3">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5f6368]">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                     {content.ui.requestedSlotLabel}
                   </div>
-                  <div className="mt-1 text-sm font-semibold text-[#202124]">{result.requested_date}</div>
-                  <div className="mt-0.5 text-xs text-[#5f6368]">{result.requested_time}</div>
+                  <div className="mt-1 text-sm font-semibold text-apple-near-black">{result.requested_date}</div>
+                  <div className="mt-0.5 text-xs text-slate-500">{result.requested_time}</div>
                 </div>
               </div>
 
@@ -4750,11 +4996,11 @@ export function HomepageSearchExperience({
                     onClick={(item as { onTelegramClick?: (event: ReactMouseEvent<HTMLAnchorElement>) => void }).onTelegramClick}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
+                    className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4 transition hover:border-apple-paper-blue-300 hover:bg-apple-paper-blue-50"
                   >
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">{item.title}</div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-apple-blue">{item.title}</div>
                     <div className="mt-2 text-sm leading-6 text-slate-600">{item.body}</div>
-                    <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1a73e8]">
+                    <div className="mt-3 inline-flex rounded-full bg-apple-paper-blue-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-apple-blue">
                       {item.label}
                     </div>
                   </a>
@@ -4762,14 +5008,14 @@ export function HomepageSearchExperience({
               </div>
 
               <div className="public-apple-workspace-panel-soft rounded-[0.95rem] px-4 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#5f6368]">
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                   {content.ui.followUpLabel}
                 </div>
-                <div className="mt-1 text-sm font-semibold text-[#202124]">
+                <div className="mt-1 text-sm font-semibold text-apple-near-black">
                   {result.email_status === 'sent' ? 'Email sent' : 'Manual follow-up'}
                 </div>
-                <div className="mt-0.5 text-xs text-[#5f6368]">From info@bookedai.au to {result.contact_email}</div>
-                <div className="mt-2 text-xs leading-5 text-[#5f6368]">
+                <div className="mt-0.5 text-xs text-slate-500">From info@bookedai.au to {result.contact_email}</div>
+                <div className="mt-2 text-xs leading-5 text-slate-500">
                   The confirmation email should include the same portal link, booking reference, payment path, and calendar action so the customer can review or edit later without losing context.
                 </div>
               </div>
@@ -4777,8 +5023,8 @@ export function HomepageSearchExperience({
               <div className="grid gap-2 sm:grid-cols-3">
                 {bookingOutcomeSteps.map((step) => (
                   <div key={step.label} className="public-apple-workspace-panel rounded-[0.95rem] px-3 py-3">
-                    <div className="text-[11px] font-semibold text-[#202124]">{step.label}</div>
-                    <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${step.tone}`}>
+                    <div className="text-[11px] font-semibold text-apple-near-black">{step.label}</div>
+                    <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${step.tone}`}>
                       {step.value}
                     </div>
                   </div>
@@ -4787,7 +5033,7 @@ export function HomepageSearchExperience({
 
               {communicationPreviewCards.length > 0 ? (
                 <div className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Communication drafts
                   </div>
                   <div className="mt-1 text-sm font-semibold text-slate-950">
@@ -4807,12 +5053,12 @@ export function HomepageSearchExperience({
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div>
-                            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                            <div className="text-xs font-semibold uppercase tracking-[0.14em] opacity-70">
                               {card.channel}
                             </div>
                             <div className="mt-1 text-sm font-semibold">{card.title}</div>
                           </div>
-                          <div className="rounded-full bg-white/15 px-2.5 py-1 text-[10px] font-semibold">
+                          <div className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">
                             {card.recipient}
                           </div>
                         </div>
@@ -4829,14 +5075,14 @@ export function HomepageSearchExperience({
               <div className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4">
                 <div className="flex items-start justify-between gap-3">
                   <div>
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Delivery timeline
                     </div>
                     <div className="mt-1 text-sm font-semibold text-slate-950">
                       Traceable operations after booking capture
                     </div>
                   </div>
-                  <div className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                  <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
                     Ops trace
                   </div>
                 </div>
@@ -4844,20 +5090,20 @@ export function HomepageSearchExperience({
                   {operationTimeline.map((item) => (
                     <div
                       key={item.id}
-                      className="rounded-[1rem] bg-[#fbfbfd] px-3 py-3 ring-1 ring-slate-200"
+                      className="rounded-[1rem] bg-apple-light px-3 py-3 ring-1 ring-slate-200"
                     >
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="text-[11px] font-semibold text-slate-950">{item.title}</div>
                           <div className="mt-1 text-[11px] leading-5 text-slate-600">{item.detail}</div>
                           {item.reference ? (
-                            <div className="mt-2 inline-flex max-w-full rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                            <div className="mt-2 inline-flex max-w-full rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
                               Ref: {item.reference}
                             </div>
                           ) : null}
                         </div>
                         <div
-                          className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getEnterpriseStatusTone(item.status)}`}
+                          className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${getEnterpriseStatusTone(item.status)}`}
                         >
                           {getEnterpriseStatusLabel(item.status)}
                         </div>
@@ -4874,7 +5120,7 @@ export function HomepageSearchExperience({
                   rel="noreferrer"
                   aria-label="Open booking portal"
                   title="Portal"
-                  className="public-apple-primary-button inline-flex min-w-[4.5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
+                  className="public-apple-primary-button inline-flex min-w-[4.5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-xs font-semibold transition"
                 >
                   <QrIcon className="h-4 w-4" />
                   <span>Portal</span>
@@ -4889,7 +5135,7 @@ export function HomepageSearchExperience({
                         ? 'Open payment'
                         : 'Open payment follow-up'
                     }
-                    className="public-apple-primary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
+                    className="public-apple-primary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-xs font-semibold transition"
                   >
                     <SparkIcon className="h-4 w-4" />
                     <span>
@@ -4898,7 +5144,7 @@ export function HomepageSearchExperience({
                   </a>
                 ) : null}
                 {result.payment_url ? (
-                  <div className="inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] border border-slate-200 bg-white px-3 py-2.5 text-[10px] font-semibold text-slate-600">
+                  <div className="inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] border border-slate-200 bg-white px-3 py-2.5 text-xs font-semibold text-slate-600">
                     <SparkIcon className="h-4 w-4" />
                     <span>Payment</span>
                   </div>
@@ -4907,7 +5153,7 @@ export function HomepageSearchExperience({
                   href={`mailto:${result.contact_email && result.contact_email.includes('@') ? result.contact_email : 'info@bookedai.au'}?subject=${encodeURIComponent(`BookedAI booking ${result.booking_reference}`)}`}
                   aria-label="Email booking confirmation"
                   title="Email"
-                  className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
+                  className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-xs font-semibold transition"
                 >
                   <MailIcon className="h-4 w-4" />
                   <span>Email</span>
@@ -4918,7 +5164,7 @@ export function HomepageSearchExperience({
                     target="_blank"
                     rel="noreferrer"
                     aria-label="Add to calendar"
-                    className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
+                    className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-xs font-semibold transition"
                   >
                     <CalendarIcon className="h-4 w-4" />
                     <span>Add calendar</span>
@@ -4928,7 +5174,7 @@ export function HomepageSearchExperience({
                   type="button"
                   aria-label="Continue in chat"
                   onClick={focusSearchComposer}
-                  className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
+                  className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-xs font-semibold transition"
                 >
                   <MessageIcon className="h-4 w-4" />
                   <span>Chat</span>
@@ -4947,7 +5193,7 @@ export function HomepageSearchExperience({
                   target="_blank"
                   rel="noreferrer"
                   aria-label="Open Telegram booking care"
-                  className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
+                  className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-xs font-semibold transition"
                 >
                   <MessageIcon className="h-4 w-4" />
                   <span>Telegram</span>
@@ -4956,14 +5202,14 @@ export function HomepageSearchExperience({
                   type="button"
                   aria-label="Return home"
                   onClick={returnToHomepageSearch}
-                  className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-[10px] font-semibold transition"
+                  className="public-apple-secondary-button inline-flex min-w-[5rem] flex-col items-center justify-center gap-1 rounded-[0.95rem] px-3 py-2.5 text-xs font-semibold transition"
                 >
                   <HomeIcon className="h-4 w-4" />
                   <span>Home</span>
                 </button>
               </div>
 
-              <p className="text-xs leading-5 text-[#5f6368]">
+              <p className="text-xs leading-5 text-slate-500">
                 {result.meeting_status === 'scheduled'
                   ? 'A calendar event has been created and included in the booking flow. After payment, Stripe returns the customer to the homepage while the booking stays logged for follow-up.'
                   : result.calendar_add_url
@@ -4976,16 +5222,16 @@ export function HomepageSearchExperience({
       </div>
 
       {previewService ? (
-        <div className="fixed inset-0 z-40 flex items-end justify-center bg-[#0f172a]/52 p-3 sm:items-center sm:p-5">
-          <div className="w-full max-w-2xl overflow-hidden rounded-[1.5rem] border border-white/60 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] shadow-[0_28px_80px_rgba(15,23,42,0.28)] sm:p-0">
-            <div className="bg-[linear-gradient(135deg,#f8fbff_0%,#eef4ff_100%)] px-4 pb-4 pt-3.5 sm:px-5 sm:pb-5 sm:pt-4.5">
+        <div className="fixed inset-0 z-40 flex items-end justify-center bg-apple-near-black/52 p-3 sm:items-center sm:p-5">
+          <div className="w-full max-w-2xl overflow-hidden rounded-[1.5rem] border border-white/60 bg-[linear-gradient(180deg,#ffffff_0%,var(--apple-paper-blue-50)_100%)] shadow-apple-hero sm:p-0">
+            <div className="bg-[linear-gradient(135deg,var(--apple-paper-blue-50)_0%,var(--apple-paper-blue-100)_100%)] px-4 pb-4 pt-3.5 sm:px-5 sm:pb-5 sm:pt-4.5">
               <div className="mx-auto mb-3 h-1.5 w-12 rounded-full bg-slate-300/70 sm:hidden" />
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[1.2rem] font-semibold tracking-[-0.02em] text-[#111827]">
+                <div className="text-[1.2rem] font-semibold tracking-[-0.02em] text-apple-near-black">
                   {previewService.name}
                 </div>
-                <p className="mt-1 text-sm text-[#5f6368]">
+                <p className="mt-1 text-sm text-slate-500">
                   {[previewService.category, previewService.location].filter(Boolean).join(' • ') || 'Reviewed inside the BookedAI shortlist'}
                 </p>
               </div>
@@ -5000,9 +5246,9 @@ export function HomepageSearchExperience({
             </div>
 
             <div className="mt-4 flex flex-wrap gap-2">
-              <span className="rounded-full bg-white/86 px-3 py-1.5 text-[11px] font-semibold text-[#1a73e8] ring-1 ring-white/70">{`A$${previewService.amount_aud}`}</span>
-              <span className="rounded-full bg-white/86 px-3 py-1.5 text-[11px] font-semibold text-[#5f6368] ring-1 ring-white/70">{previewService.duration_minutes} min</span>
-              <span className="rounded-full bg-white/86 px-3 py-1.5 text-[11px] font-semibold text-[#5f6368] ring-1 ring-white/70">
+              <span className="rounded-full bg-white/86 px-3 py-1.5 text-[11px] font-semibold text-apple-blue ring-1 ring-white/70">{`A$${previewService.amount_aud}`}</span>
+              <span className="rounded-full bg-white/86 px-3 py-1.5 text-[11px] font-semibold text-slate-500 ring-1 ring-white/70">{previewService.duration_minutes} min</span>
+              <span className="rounded-full bg-white/86 px-3 py-1.5 text-[11px] font-semibold text-slate-500 ring-1 ring-white/70">
                 {previewService.booking_url ? 'Direct booking available' : 'BookedAI guided booking'}
               </span>
             </div>
@@ -5010,24 +5256,24 @@ export function HomepageSearchExperience({
 
             <div className="px-4 py-4 sm:px-5 sm:py-5">
             <div className="rounded-[1.15rem] border border-slate-200 bg-white px-4 py-3.5">
-              <div className="text-sm font-semibold text-[#111827]">
+              <div className="text-sm font-semibold text-apple-near-black">
                 {previewService.venue_name || previewService.source_label || previewService.name}
               </div>
-              <p className="mt-1 text-sm leading-6 text-[#5f6368]">
+              <p className="mt-1 text-sm leading-6 text-slate-500">
                 {previewService.location || 'Location details are confirmed during booking confirmation.'}
               </p>
-              <p className="mt-3 text-sm leading-6 text-[#5f6368]">
+              <p className="mt-3 text-sm leading-6 text-slate-500">
                 {previewService.summary || 'BookedAI matched this option as a relevant next step for the enquiry.'}
               </p>
               {previewService.source_label ? (
-                <div className="mt-3 inline-flex rounded-full bg-[#f5f7fb] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#5f6368]">
+                <div className="mt-3 inline-flex rounded-full bg-slate-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                   Source: {previewService.source_label}
                 </div>
               ) : null}
             </div>
 
-            <div className="mt-3 rounded-[1.15rem] border border-[#dfe8f3] bg-[#f8fbff] px-4 py-3.5">
-              <p className="mt-2 text-sm leading-6 text-[#31507b]">
+            <div className="mt-3 rounded-[1.15rem] border border-apple-paper-blue-200 bg-apple-paper-blue-50 px-4 py-3.5">
+              <p className="mt-2 text-sm leading-6 text-apple-paper-blue-navy-700">
                 {previewService.why_this_matches ||
                   previewService.next_step ||
                   previewService.summary ||

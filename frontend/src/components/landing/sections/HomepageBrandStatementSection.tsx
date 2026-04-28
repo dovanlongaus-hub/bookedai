@@ -46,7 +46,7 @@ export function HomepageBrandStatementSection() {
               {proofPills.map((item) => (
                 <div
                   key={item}
-                  className="rounded-full border border-white/85 bg-white/86 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
+                  className="rounded-full border border-white/85 bg-white/86 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 shadow-[0_10px_24px_rgba(15,23,42,0.04)]"
                 >
                   {item}
                 </div>
@@ -73,7 +73,7 @@ export function HomepageBrandStatementSection() {
                 key={item.label}
                 className="rounded-[1.35rem] border border-white/80 bg-white/88 px-4 py-4 shadow-[0_14px_28px_rgba(15,23,42,0.04)]"
               >
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   {item.label}
                 </div>
                 <div className="mt-2 text-sm font-semibold leading-6 text-slate-950">{item.value}</div>

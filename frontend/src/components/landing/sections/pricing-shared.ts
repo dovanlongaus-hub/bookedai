@@ -1,22 +1,35 @@
 import type { PricingConsultationResponse } from '../../../shared/contracts';
 
 export type PlanId = 'basic' | 'standard' | 'pro';
+export type PlanSlug = 'starter' | 'growth' | 'enterprise';
 export type ConsultationFlowMode = 'full' | 'guided';
 export type ConsultationStep = 'contact' | 'calendar' | 'confirmed';
 export type OnboardingMode = 'online' | 'onsite';
 
+export type PlanCta = {
+  label: string;
+  href: string;
+};
+
 export type Plan = {
   id: PlanId;
+  slug: PlanSlug;
   name: string;
+  tagline: string;
+  setupFee: string;
+  monthlyFee: string;
+  commission: string;
   price: string;
   subtitle: string;
   badge: string;
   ctaLabel: string;
+  cta: PlanCta;
   introLabel: string;
   microcopy: string;
   supportingText?: string;
   features: string[];
   featured?: boolean;
+  mostPopular?: boolean;
 };
 
 export type Recommendation = {
@@ -41,137 +54,171 @@ export type ConsultationFormState = {
 };
 
 export const highlightPoints = [
-  'Commercial model stays readable from first scope call to paid rollout',
-  'Entry path is intentionally low-friction, but still framed like a serious operating decision',
-  'Higher tiers add automation, visibility, and workflow depth while commission stays tied to real booked revenue',
+  'Free at the bottom, premium at the top, aligned in the middle on real booked revenue',
+  'Setup fee, monthly, and commission stay clearly separated so buyers can scan the model in one pass',
+  'Commission only applies to bookings BookedAI actually captures or recovers',
 ];
 
 export const topOffers = [
   {
-    eyebrow: 'Entry posture',
-    title: 'Enter cleanly, then expand only when workflow depth is justified',
-    body: 'The first package is designed to let teams prove fit and operating value before they commit to deeper automation or broader rollout scope.',
+    eyebrow: 'Aligned incentives',
+    title: 'Pay only when BookedAI books real revenue',
+    body: 'Starter is free SaaS, Growth adds 3% on net booked revenue, and Enterprise is 5% with a negotiated floor and cap. We win when you do.',
   },
   {
     eyebrow: 'Commercial clarity',
-    title: 'Keep the buying story legible instead of hiding it behind pricing noise',
-    body: 'The public pricing story is meant to show setup scope, monthly commitment, and performance upside in one clean sequence.',
+    title: 'Setup, subscription, and commission are clearly separated',
+    body: 'Onboarding scope is quoted up front, the monthly stays predictable, and performance commission is only introduced when the AI Revenue Engine is producing booked outcomes.',
   },
 ];
 
 export const setupOptions = [
   {
-    label: 'Online setup',
-    detail: 'Default path for most teams. Faster to launch, easier to approve, and cleaner to scale once workflow fit is proven.',
+    label: 'Self-serve onboarding (Starter)',
+    detail: 'Solo and micro teams can launch BookedAI on their own without a setup fee, on one channel and one service catalog.',
   },
   {
-    label: 'Onsite setup',
-    detail: 'Used when operational complexity, multi-location rollout, or in-person enablement makes a higher-touch launch commercially sensible.',
+    label: 'Guided onboarding (Growth)',
+    detail: 'A$499 onboarding scopes catalog import, brand setup, and channel wiring across Telegram, WhatsApp, and the embed widget.',
+  },
+  {
+    label: 'Custom rollout (Enterprise)',
+    detail: 'A$2,500-A$10,000 custom rollout for multi-location, franchise, or vertical platform deployments needing SSO and dedicated CSM.',
   },
 ];
+
+const registerInterestHref = '/register-interest';
 
 export const plans: Plan[] = [
   {
     id: 'basic',
-    name: 'Starter',
-    price: '49$+',
-    subtitle: 'Best for teams that want to prove demand capture and first workflow fit before expanding into a deeper operating rollout.',
-    badge: 'Entry layer',
-    ctaLabel: 'Review Starter',
-    introLabel: 'Initial deployment',
+    slug: 'starter',
+    name: 'Starter Engine',
+    tagline: 'Solo / micro teams (1-3 staff)',
+    setupFee: 'A$0 self-serve',
+    monthlyFee: 'A$79/mo',
+    commission: '0% (pure SaaS)',
+    price: 'A$79',
+    subtitle: 'Solo coach, single tradie, or 1-room clinic that wants a clean launch on one channel without a setup fee.',
+    badge: 'Starter Engine',
+    ctaLabel: 'Start free',
+    cta: {
+      label: 'Start free',
+      href: `${registerInterestHref}?plan=starter`,
+    },
+    introLabel: 'Self-serve',
     microcopy:
-      'Use Starter when the goal is to validate fit, control first response, and establish a cleaner operating path without overcommitting early.',
+      'Free SaaS at the bottom of the ladder. One channel, one service catalog, BookedAI Manager Bot, portal, payment QR, and email confirmations.',
     supportingText:
-      'Strong fit when you need a credible first deployment path for website demand capture and a simple booking lane at a clear entry price.',
+      'Capped at 50 booked/mo. Strong fit for proving demand capture before stepping up into the Growth tier.',
     features: [
-      'AI website chat',
-      'core enquiry capture',
-      'simple booking follow-through',
-      'starter activation path',
-      '1 focused service workflow',
-      'best for proving operating fit before expansion',
+      '1 channel (Telegram OR web widget)',
+      '1 service catalog',
+      'BookedAI Manager Bot + portal',
+      'Payment QR + email confirmations',
+      '50 booked/mo cap',
+      'Self-serve onboarding, no setup fee',
     ],
   },
   {
     id: 'standard',
-    name: 'Pro',
-    price: 'A$149',
-    subtitle: 'The default paid plan for teams that want stronger qualification, guided booking, and a more visible conversion engine.',
-    badge: 'Core operating plan',
-    ctaLabel: 'Review Pro',
-    introLabel: 'Growth layer',
+    slug: 'growth',
+    name: 'Growth Engine',
+    tagline: 'Established SME (4-25 staff)',
+    setupFee: 'A$499 onboarding',
+    monthlyFee: 'A$249/mo',
+    commission: '3% on net booked revenue',
+    price: 'A$249',
+    subtitle: 'Salon, clinic, swim school, or tutoring centre ready to run BookedAI as the AI Revenue Engine across every channel.',
+    badge: 'Most popular',
+    ctaLabel: 'Start a 30-day pilot',
+    cta: {
+      label: 'Start a 30-day pilot',
+      href: `${registerInterestHref}?plan=growth`,
+    },
+    introLabel: 'Aligned incentives',
     microcopy:
-      'The clearest paid path for teams that want BookedAI to move from helpful surface into a repeatable revenue flow.',
+      'Growth adds a 3% commission on net booked revenue captured or recovered through BookedAI. We are aligned on real bookings, not seats.',
     supportingText:
-      'Strong fit for growing service teams that need more qualification discipline, follow-up visibility, and commercial clarity without moving into custom scope.',
+      'Onboarding covers catalog import, brand wiring, and channel setup. Monthly tenant revenue summary email keeps the commercial story honest.',
     features: [
-      'everything in Starter',
-      'missed call SMS auto-reply',
-      'guided booking flow',
-      'SMS follow-up',
-      'calendar integration',
-      'weekly performance reporting',
+      'All 3 channels (Telegram + WhatsApp + embed widget)',
+      'Revenue-ops agent queue + customer-care agent',
+      'Audit ledger + Stripe billing',
+      'CRM sync',
+      'Monthly tenant revenue summary email',
+      'A$499 onboarding + 3% on net booked revenue',
     ],
     featured: true,
+    mostPopular: true,
   },
   {
     id: 'pro',
-    name: 'Pro Max',
-    price: 'A$349',
-    subtitle: 'For higher-volume or more complex service teams that need broader automation, deeper qualification, and multi-service or multi-location support.',
-    badge: 'Scale layer',
-    ctaLabel: 'Review Pro Max',
-    introLabel: 'Scale posture',
+    slug: 'enterprise',
+    name: 'Enterprise Engine',
+    tagline: 'Multi-location / franchise / academy (25+ staff or 3+ locations)',
+    setupFee: 'A$2,500-A$10,000 custom',
+    monthlyFee: 'A$999+/mo',
+    commission: '5% on attributable revenue (floor + cap negotiated)',
+    price: 'A$999+',
+    subtitle: 'Multi-location, franchise, academy, or vertical platform that needs the multi-tenant template, SSO, and a named CSM.',
+    badge: 'Enterprise Engine',
+    ctaLabel: 'Talk to founder',
+    cta: {
+      label: 'Talk to founder',
+      href: `${registerInterestHref}?plan=enterprise`,
+    },
+    introLabel: 'Premium at the top',
     microcopy:
-      'Built for businesses where operating depth, coordination, and commercial complexity justify a more advanced team workspace.',
+      'Custom rollout, vertical template config, SSO, white-label widget, retention/churn-rescue automation, SLA, and a named CSM.',
     supportingText:
-      'Best for multi-location clinics, hospitality groups, education providers, and service teams that need deeper automation and more visible business flow.',
+      'Setup fee scoped per contract. 5% commission on attributable booked revenue with floor and cap negotiated up front.',
     features: [
-      'everything in Pro',
-      'AI answers inbound calls',
-      'advanced booking and reminder automation',
-      'multi-service and multi-location support',
-      'CRM or workflow integration',
-      'team visibility dashboard',
+      'Multi-tenant template + dedicated onboarding',
+      'Admin reliability lane + audit ledger',
+      'White-label widget + webhook + API access',
+      'Retention / churn-rescue automation',
+      'SLA + named CSM',
+      'A$2,500-A$10,000 setup + 5% on attributable revenue',
     ],
   },
 ];
 
 export const recommendations: Recommendation[] = [
   {
-    label: 'Starter',
-    detail: 'Validate fit',
+    label: 'Starter Engine',
+    detail: 'Free SaaS, 1 channel, 50 bookings/mo cap',
   },
   {
-    label: 'Pro',
-    detail: 'Default paid path',
+    label: 'Growth Engine',
+    detail: 'A$249/mo + 3% on net booked revenue',
     featured: true,
   },
   {
-    label: 'Pro Max',
-    detail: 'Scale operations',
+    label: 'Enterprise Engine',
+    detail: 'A$999+/mo + 5% on attributable revenue',
   },
 ];
 
 export const pricingSignals = [
   {
     label: 'Entry point',
-    value: '49$+',
-    detail: 'Clear entry path for teams that want BookedAI live quickly without obscuring rollout scope',
+    value: 'A$0 setup',
+    detail: 'Starter Engine is free SaaS so solo and micro teams can launch BookedAI before committing to commission.',
   },
   {
     label: 'Buying ladder',
-    value: 'Starter -> Pro -> Pro Max',
-    detail: 'Move into higher-capability plans only as operating complexity and commercial upside deepen',
+    value: 'Starter -> Growth -> Enterprise',
+    detail: 'Step up only when AI Revenue Engine output justifies a deeper rollout, broader channels, and aligned commission.',
   },
   {
     label: 'Commercial model',
-    value: 'Setup fee + monthly + commission',
-    detail: 'Setup is scoped clearly, monthly plans stay predictable, and commission is tied only to real booked revenue',
+    value: 'Free at the bottom, aligned in the middle, premium at the top',
+    detail: 'Setup, monthly, and commission stay separated. Commission only applies to bookings BookedAI captures or recovers.',
   },
 ];
 
-export const visiblePlans = plans.slice(0, 2);
+export const visiblePlans = plans;
 export const advancedPlan = plans[2];
 
 export const businessTypeSuggestions = [

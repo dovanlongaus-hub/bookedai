@@ -204,7 +204,7 @@ export function useDemoBookingExperience() {
       id: createDemoId('assistant'),
       role: 'assistant',
       title: 'Start here',
-      body: 'Tell me the student age, current level, and goal. I will assess the fit, place the student, and open the right chess pathway.',
+      body: 'Tell me what you need, where, and roughly when. I will match the right service, take the booking, and post the deposit — live.',
     },
   ]);
   const [results, setResults] = useState<DemoService[]>([]);
@@ -240,12 +240,15 @@ export function useDemoBookingExperience() {
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [bookingModalStep, setBookingModalStep] = useState<DemoBookingModalStep>('details');
   const [isAutoPlaying, setIsAutoPlaying] = useState(false);
+  const [conversationId, setConversationId] = useState<string>('');
 
   useEffect(() => {
-    sessionIdRef.current = createPublicBookingAssistantSessionId();
+    const newSessionId = createPublicBookingAssistantSessionId();
+    sessionIdRef.current = newSessionId;
+    setConversationId(newSessionId);
     void primePublicBookingAssistantSession({
       sourcePage: sourcePath,
-      anonymousSessionId: sessionIdRef.current,
+      anonymousSessionId: newSessionId,
       runtimeConfig,
     });
   }, [runtimeConfig, sourcePath]);
@@ -1167,5 +1170,6 @@ export function useDemoBookingExperience() {
     closeBookingModal,
     submitBooking,
     confirmPaymentInline,
+    conversationId,
   };
 }

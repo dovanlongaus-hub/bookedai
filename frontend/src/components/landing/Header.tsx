@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   Building2,
   CheckCircle2,
@@ -16,6 +16,7 @@ import {
   Users,
 } from 'lucide-react';
 import { demoAppHref, googleLoginHref, productHref, roadmapHref, type NavItem } from './data';
+import { AppleCTA } from './ui/AppleCTA';
 import { BrandLockup } from './ui/BrandLockup';
 import { SignalPill } from './ui/SignalPill';
 
@@ -106,12 +107,14 @@ export function Header({
   navItems,
   onStartTrial,
   onBookDemo,
-  bookDemoLabel = 'Open Product Demo',
-  startTrialLabel = 'Claim Free Setup',
+  bookDemoLabel = 'Watch live demo',
+  startTrialLabel = 'Start free',
   utilityLinks,
   compactMenuOnly = false,
 }: HeaderProps) {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const menuToggleRef = useRef<HTMLButtonElement | null>(null);
+  const drawerFirstLinkRef = useRef<HTMLAnchorElement | null>(null);
   const resolvedNavItems = navItems.map(getNavItemModel);
   const resolvedUtilityLinks =
     utilityLinks ?? [
@@ -136,7 +139,7 @@ export function Header({
   }
 
   useEffect(() => {
-    document.body.style.overflow = isMobileMenuOpen && !compactMenuOnly ? 'hidden' : '';
+    document.body.style.overflow = isMobileMenuOpen ? 'hidden' : '';
 
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
@@ -145,6 +148,20 @@ export function Header({
     };
 
     window.addEventListener('keydown', handleKeyDown);
+
+    if (isMobileMenuOpen) {
+      const focusTimer = window.setTimeout(() => {
+        drawerFirstLinkRef.current?.focus();
+      }, 60);
+      return () => {
+        window.clearTimeout(focusTimer);
+        document.body.style.overflow = '';
+        window.removeEventListener('keydown', handleKeyDown);
+        if (typeof document !== 'undefined' && document.activeElement !== menuToggleRef.current) {
+          menuToggleRef.current?.focus();
+        }
+      };
+    }
 
     return () => {
       document.body.style.overflow = '';
@@ -157,22 +174,23 @@ export function Header({
   const menuToggleButton = (
     <button
       type="button"
+      ref={menuToggleRef}
       aria-expanded={isMobileMenuOpen}
-      aria-controls="mobile-nav"
-      aria-label={menuToggleLabel}
+      aria-controls={compactMenuOnly ? 'mobile-nav' : 'header-mobile-drawer'}
+      aria-label={isMobileMenuOpen ? 'Close menu' : 'Open menu'}
       onClick={() => setIsMobileMenuOpen((current) => !current)}
       className={[
-        'booked-menu-button inline-flex items-center justify-center rounded-full text-sm font-semibold text-[#1d1d1f] transition-transform duration-200 hover:scale-[1.02]',
+        'booked-menu-button inline-flex items-center justify-center rounded-full text-sm font-semibold text-apple-near-black transition-transform duration-200 hover:scale-[1.02] motion-reduce:transition-none',
         compactMenuOnly
-          ? 'h-14 w-14 border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(243,247,252,0.96)_100%)] shadow-[0_18px_40px_rgba(15,23,42,0.12),inset_0_1px_0_rgba(255,255,255,0.9)] backdrop-blur'
-          : 'h-10 px-4 md:!hidden',
+          ? 'h-14 w-14 border border-white/80 bg-white/95 shadow-apple backdrop-blur'
+          : 'h-11 min-w-[44px] px-3 lg:hidden',
       ].join(' ')}
     >
       <span
         className={[
           'flex flex-col gap-1.5',
           compactMenuOnly
-            ? 'rounded-full border border-black/6 bg-white/82 px-3 py-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]'
+            ? 'rounded-full border border-black/6 bg-white/82 px-3 py-3 shadow-apple-sm'
             : '',
         ].join(' ')}
       >
@@ -205,11 +223,11 @@ export function Header({
     <header className={compactMenuOnly ? 'relative z-30 px-4 pt-4 sm:px-6' : 'sticky top-0 z-30 px-3 pt-3 sm:px-4'}>
       {compactMenuOnly ? (
         <>
-          <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-[1.35rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,253,0.96)_100%)] px-3 py-2 shadow-[0_18px_50px_rgba(15,23,42,0.10)] backdrop-blur xl:hidden">
+          <div className="mx-auto flex w-full max-w-7xl items-center justify-between gap-3 rounded-[1.35rem] border border-white/80 bg-apple-light/95 px-3 py-2 shadow-apple backdrop-blur xl:hidden">
             <a
               href="/"
               onClick={closeMobileMenu}
-              className="min-w-0 rounded-[1.2rem] border border-black/6 bg-white px-2.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.05)]"
+              className="min-w-0 rounded-[1.2rem] border border-black/6 bg-white px-2.5 py-2 shadow-apple-sm"
             >
               <BrandLockup
                 compact
@@ -235,9 +253,9 @@ export function Header({
             </div>
           </div>
 
-          <aside className="group fixed left-4 top-4 bottom-4 z-40 hidden w-[5rem] flex-col overflow-hidden rounded-[1.75rem] border border-white/75 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,253,0.96)_100%)] p-2.5 shadow-[0_24px_80px_rgba(15,23,42,0.12)] backdrop-blur xl:flex hover:w-[14rem] focus-within:w-[14rem]">
+          <aside className="group fixed left-4 top-4 bottom-4 z-40 hidden w-[5rem] flex-col overflow-hidden rounded-[1.75rem] border border-white/75 bg-apple-light/95 p-2.5 shadow-apple backdrop-blur xl:flex hover:w-[14rem] focus-within:w-[14rem]">
             <div className="px-1">
-              <div className="flex items-center justify-center rounded-full bg-slate-100/90 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500 group-hover:justify-start group-focus-within:justify-start">
+              <div className="flex items-center justify-center rounded-full bg-slate-100/90 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 group-hover:justify-start group-focus-within:justify-start">
                 <span className={railLabelClass}>Navigate</span>
               </div>
             </div>
@@ -250,7 +268,7 @@ export function Header({
                   title={navItem.label}
                   className={railRowClass}
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-[#eef4fb] text-slate-700 shadow-[inset_0_1px_0_rgba(255,255,255,0.7)]">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-apple-light text-slate-700">
                     <MenuGlyph kind={getMenuGlyphKind(navItem.label)} />
                   </span>
                   <span className={railLabelClass}>
@@ -271,7 +289,7 @@ export function Header({
                     title={link.label}
                     className={railRowClass}
                   >
-                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-white text-slate-700 shadow-[0_10px_22px_rgba(15,23,42,0.05)]">
+                    <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-white text-slate-700 shadow-apple-sm">
                       <MenuGlyph kind={getMenuGlyphKind(link.label)} />
                     </span>
                     <span className={railLabelClass}>
@@ -287,7 +305,7 @@ export function Header({
                   onClick={onBookDemo}
                   className={`${railRowClass} bg-white/82`}
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-[#eef4fb] text-slate-700">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-apple-light text-slate-700">
                     <MenuGlyph kind="sales" />
                   </span>
                   <span className={railLabelClass}>
@@ -300,7 +318,7 @@ export function Header({
                 <button
                   type="button"
                   onClick={onStartTrial}
-                  className="mt-1 flex w-full items-center justify-center gap-3 rounded-[1.25rem] bg-[#1d1d1f] px-3 py-3 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(15,23,42,0.18)] transition-all duration-200 hover:translate-y-[-1px] group-hover:justify-start group-focus-within:justify-start"
+                  className="mt-1 flex w-full items-center justify-center gap-3 rounded-apple-standard bg-apple-near-black px-3 py-3 text-sm font-semibold text-white shadow-apple transition-all duration-200 hover:translate-y-[-1px] group-hover:justify-start group-focus-within:justify-start"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-white/10">
                     <MenuGlyph kind="trial" />
@@ -316,10 +334,10 @@ export function Header({
           </aside>
 
           <div className="mx-auto hidden w-full max-w-7xl xl:flex xl:justify-end">
-            <div className="flex items-center gap-3 rounded-[1.55rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(244,248,253,0.96)_100%)] px-3 py-2.5 shadow-[0_18px_50px_rgba(15,23,42,0.10)] backdrop-blur">
+            <div className="flex items-center gap-3 rounded-[1.55rem] border border-white/80 bg-apple-light/95 px-3 py-2.5 shadow-apple backdrop-blur">
               {exploreLinks.length > 0 ? (
                 <div className="flex items-center gap-2 rounded-[1.25rem] bg-white/70 px-2.5 py-2">
-                  <div className="px-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <div className="px-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Explore
                   </div>
                   <div className="flex items-center gap-1">
@@ -337,8 +355,8 @@ export function Header({
               ) : null}
 
               {workspaceAccessLinks.length > 0 ? (
-                <div className="flex items-center gap-2 rounded-[1.25rem] border border-slate-200/80 bg-white px-2.5 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
-                  <div className="px-1.5 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <div className="flex items-center gap-2 rounded-[1.25rem] border border-slate-200/80 bg-white px-2.5 py-2 shadow-apple-sm">
+                  <div className="px-1.5 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Workspace Access
                   </div>
                   <div className="flex items-center gap-1">
@@ -346,7 +364,7 @@ export function Header({
                       <a
                         key={link.href}
                         href={link.href}
-                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:shadow-[0_10px_20px_rgba(15,23,42,0.08)]"
+                        className="inline-flex items-center justify-center rounded-full border border-slate-200 bg-white px-3.5 py-2 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5 hover:shadow-apple-sm"
                       >
                         {link.label}
                       </a>
@@ -357,20 +375,20 @@ export function Header({
 
               <div className="mx-0.5 h-8 w-px bg-slate-200/80" />
 
-              <button
-                type="button"
+              <AppleCTA
+                label={bookDemoLabel}
+                intent="secondary"
                 onClick={onBookDemo}
-                className="booked-button-secondary whitespace-nowrap px-4 py-2 text-sm font-semibold"
-              >
-                {bookDemoLabel}
-              </button>
-              <button
-                type="button"
+                analyticsId="header_compact_book_demo"
+                className="whitespace-nowrap"
+              />
+              <AppleCTA
+                label={startTrialLabel}
+                intent="primary"
                 onClick={onStartTrial}
-                className="booked-button whitespace-nowrap px-4 py-2 text-sm font-semibold"
-              >
-                {startTrialLabel}
-              </button>
+                analyticsId="header_compact_start_trial"
+                className="whitespace-nowrap"
+              />
             </div>
           </div>
 
@@ -381,7 +399,7 @@ export function Header({
             <a
               href="/"
               onClick={closeMobileMenu}
-              className="min-w-0 max-w-[calc(100vw-7.5rem)] rounded-[1.35rem] border border-white/8 bg-white/[0.03] px-2.5 py-2 shadow-[0_10px_28px_rgba(15,23,42,0.14)] sm:max-w-none lg:rounded-[1.5rem] lg:px-3"
+              className="min-w-0 max-w-[calc(100vw-7.5rem)] rounded-[1.35rem] border border-white/8 bg-white/[0.03] px-2.5 py-2 shadow-apple-sm sm:max-w-none lg:rounded-[1.5rem] lg:px-3"
             >
               <BrandLockup
                 compact
@@ -396,39 +414,31 @@ export function Header({
             <div className="hidden items-center gap-2 xl:!flex">
               <SignalPill
                 variant="inverse"
-                className="px-3 py-1.5 text-[10px] uppercase tracking-[0.16em] text-white/78"
+                className="px-3 py-1.5 text-xs uppercase tracking-[0.16em] text-white/78"
               >
-                Startup-grade rollout
+                Live in production
               </SignalPill>
             </div>
 
-            <div className="hidden items-center gap-3 md:!flex">
+            <div className="hidden items-center gap-3 lg:!flex">
               {resolvedUtilityLinks.map((link) => (
                 <a key={link.href} href={link.href} className="booked-nav-link">
                   {link.label}
                 </a>
               ))}
-              <button
-                type="button"
-                onClick={onBookDemo}
-                className="booked-button-secondary px-4 py-2 text-sm font-semibold"
-              >
-                {bookDemoLabel}
-              </button>
-              <button
-                type="button"
+              <AppleCTA
+                label={startTrialLabel}
+                intent="primary"
                 onClick={onStartTrial}
-                className="booked-button px-4 py-2 text-sm font-semibold"
-              >
-                {startTrialLabel}
-              </button>
+                analyticsId="header_start_trial"
+              />
             </div>
 
             {menuToggleButton}
           </div>
 
           <nav
-            className="template-nav mx-auto hidden w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 md:!flex"
+            className="template-nav mx-auto hidden w-full max-w-7xl items-center justify-between gap-3 px-4 py-3 lg:!flex"
             aria-label="Primary"
           >
             <div className="flex flex-wrap items-center gap-2">
@@ -450,7 +460,7 @@ export function Header({
                 <SignalPill
                   key={item}
                   variant="inverse"
-                  className="px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-white/70"
+                  className="px-3 py-1 text-xs uppercase tracking-[0.14em] text-white/70"
                 >
                   {item}
                 </SignalPill>
@@ -464,19 +474,19 @@ export function Header({
         <div>
           <button
             type="button"
-            aria-label="Close mobile menu"
+            aria-label="Close menu"
             onClick={closeMobileMenu}
-            className={compactMenuOnly ? 'fixed inset-0 z-30 bg-transparent' : 'fixed inset-0 z-30 bg-[rgba(15,23,42,0.18)] backdrop-blur-[2px]'}
+            className={compactMenuOnly ? 'fixed inset-0 z-30 bg-transparent' : 'fixed inset-0 z-30 bg-apple-near-black/20 backdrop-blur-[2px]'}
           />
 
           {compactMenuOnly ? (
             <div
               id="mobile-nav"
-              className="absolute right-4 top-[4.8rem] z-40 w-[20.5rem] rounded-[1.75rem] border border-white/80 bg-[linear-gradient(180deg,rgba(255,255,255,0.98)_0%,rgba(245,248,255,0.98)_100%)] p-3 shadow-[0_22px_60px_rgba(15,23,42,0.16)] sm:right-6"
+              className="absolute right-4 top-[4.8rem] z-40 w-[20.5rem] rounded-[1.75rem] border border-white/80 bg-apple-light/98 p-3 shadow-apple sm:right-6"
             >
               <div className="flex items-center justify-between gap-3 rounded-[1.2rem] border border-black/6 bg-white/86 px-3 py-2.5">
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     Quick menu
                   </div>
                   <div className="mt-1 text-sm font-semibold text-slate-950">BookedAI</div>
@@ -493,9 +503,9 @@ export function Header({
                       key={navItem.id}
                       href={navItem.href ?? `#${navItem.id}`}
                       onClick={closeMobileMenu}
-                      className="flex items-center gap-3 rounded-[1.15rem] border border-black/6 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700 shadow-[0_8px_18px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:text-slate-950"
+                      className="flex items-center gap-3 rounded-[1.15rem] border border-black/6 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700 shadow-apple-sm transition hover:-translate-y-0.5 hover:text-slate-950"
                     >
-                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-[#f3f7fb] text-slate-700">
+                      <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-apple-light text-slate-700">
                         <MenuGlyph kind={getMenuGlyphKind(navItem.label)} />
                       </span>
                       <span className="min-w-0 flex-1">
@@ -510,7 +520,7 @@ export function Header({
               </nav>
 
               <div className="mt-3 border-t border-slate-200/80 pt-3">
-                <div className="mb-2 px-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <div className="mb-2 px-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                   Quick actions
                 </div>
                 <div className="flex flex-col gap-2">
@@ -519,7 +529,7 @@ export function Header({
                     key={link.href}
                     href={link.href}
                     onClick={closeMobileMenu}
-                    className="flex items-center gap-3 rounded-[1.15rem] border border-black/6 bg-[#f8fbff] px-3 py-3 text-left text-sm font-semibold text-slate-700"
+                    className="flex items-center gap-3 rounded-[1.15rem] border border-black/6 bg-apple-light px-3 py-3 text-left text-sm font-semibold text-slate-700"
                   >
                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-white text-slate-700">
                       <MenuGlyph kind={getMenuGlyphKind(link.label)} />
@@ -535,7 +545,7 @@ export function Header({
                   }}
                   className="flex items-center gap-3 rounded-[1.15rem] border border-black/6 bg-white px-3 py-3 text-left text-sm font-semibold text-slate-700"
                 >
-                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-[#f8fafc] text-slate-700">
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-apple-light text-slate-700">
                     <MenuGlyph kind="sales" />
                   </span>
                   <span className="block flex-1 text-sm font-semibold text-slate-900">{bookDemoLabel}</span>
@@ -546,7 +556,7 @@ export function Header({
                     closeMobileMenu();
                     onStartTrial();
                   }}
-                  className="mt-1 flex items-center gap-3 rounded-[1.2rem] bg-[#1d1d1f] px-3 py-3 text-left text-sm font-semibold text-white"
+                  className="mt-1 flex items-center gap-3 rounded-apple-standard bg-apple-near-black px-3 py-3 text-left text-sm font-semibold text-white"
                 >
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[1rem] bg-white/10">
                     <MenuGlyph kind="trial" />
@@ -558,72 +568,86 @@ export function Header({
             </div>
           ) : (
             <div
-              id="mobile-nav"
-              className="template-nav fixed inset-x-3 top-[5.35rem] z-40 mx-auto max-h-[calc(100vh-6.5rem)] w-auto overflow-y-auto rounded-[1.8rem] p-4 shadow-[0_24px_80px_rgba(15,23,42,0.16)]"
+              id="header-mobile-drawer"
+              role="dialog"
+              aria-modal="true"
+              aria-label="Site navigation"
+              className="template-nav fixed inset-y-0 right-0 z-40 flex w-[min(20rem,88vw)] flex-col gap-4 overflow-y-auto bg-apple-light p-4 shadow-apple animate-[slideInFromRight_220ms_ease-out] motion-reduce:animate-none"
+              style={{
+                paddingTop: 'calc(env(safe-area-inset-top) + 1rem)',
+                paddingBottom: 'calc(env(safe-area-inset-bottom) + 1rem)',
+              }}
             >
-              <div className="rounded-[1.4rem] border border-black/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.96)_0%,rgba(245,248,255,0.96)_100%)] p-4">
-                <div className="flex items-start justify-between gap-3">
-                  <BrandLockup
-                    compact
-                    surface="light"
-                    className="max-w-[17rem]"
-                    logoClassName="max-w-[11rem]"
-                    descriptorClassName="text-sm leading-6 text-black/66"
-                    eyebrowClassName="px-3 py-1 text-[10px] uppercase tracking-[0.14em]"
-                  />
-                  <div className="rounded-full bg-black/5 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/56">
-                    Mobile nav
-                  </div>
-                </div>
-
-                <div className="mt-4 grid gap-3">
-                  {resolvedUtilityLinks.map((link) => (
-                    <a
-                      key={link.href}
-                      href={link.href}
-                      onClick={closeMobileMenu}
-                      className="booked-button-secondary px-4 py-3 text-center text-sm font-semibold"
-                    >
-                      {link.label}
-                    </a>
-                  ))}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeMobileMenu();
-                      onBookDemo();
-                    }}
-                    className="booked-button-secondary px-4 py-3 text-center text-sm font-semibold"
-                  >
-                    {bookDemoLabel}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      closeMobileMenu();
-                      onStartTrial();
-                    }}
-                    className="booked-button px-4 py-3 text-sm font-semibold"
-                  >
-                    {startTrialLabel}
-                  </button>
-                </div>
+              <div className="flex items-start justify-between gap-3 rounded-[1.4rem] border border-black/6 bg-white/95 p-3">
+                <BrandLockup
+                  compact
+                  surface="light"
+                  className="max-w-[12rem]"
+                  logoClassName="max-w-[10rem]"
+                  descriptorClassName="hidden"
+                  eyebrowClassName="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={closeMobileMenu}
+                  aria-label="Close menu"
+                  className="inline-flex h-11 min-w-[44px] items-center justify-center rounded-full border border-black/6 bg-apple-light px-3 text-sm font-semibold text-apple-near-black transition hover:bg-white"
+                >
+                  Close
+                </button>
               </div>
 
-              <nav className="mt-4 flex flex-col gap-2" aria-label="Mobile primary">
-                {resolvedNavItems.map((navItem) => {
+              <nav className="flex flex-col gap-1.5" aria-label="Mobile primary">
+                {resolvedNavItems.map((navItem, index) => {
                   return (
                     <a
                       key={navItem.id}
+                      ref={index === 0 ? drawerFirstLinkRef : undefined}
                       href={navItem.href ?? `#${navItem.id}`}
                       onClick={closeMobileMenu}
-                      className="booked-menu-button justify-start rounded-2xl px-4 py-3 text-sm font-semibold"
+                      className="booked-menu-button min-h-[44px] justify-start rounded-2xl px-4 py-3 text-sm font-semibold"
                     >
                       {navItem.label}
                     </a>
                   );
                 })}
               </nav>
+
+              <div className="mt-auto grid gap-2 border-t border-black/5 pt-4">
+                {resolvedUtilityLinks.map((link) => (
+                  <a
+                    key={link.href}
+                    href={link.href}
+                    onClick={closeMobileMenu}
+                    className="booked-button-secondary min-h-[44px] px-4 py-3 text-center text-sm font-semibold"
+                  >
+                    {link.label}
+                  </a>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMobileMenu();
+                    onBookDemo();
+                  }}
+                  className="booked-button-secondary min-h-[44px] px-4 py-3 text-center text-sm font-semibold"
+                >
+                  {bookDemoLabel}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    closeMobileMenu();
+                    onStartTrial();
+                  }}
+                  className="booked-button min-h-[44px] px-4 py-3 text-sm font-semibold"
+                >
+                  {startTrialLabel}
+                </button>
+                <div className="mt-2 px-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-black/56">
+                  BookedAI
+                </div>
+              </div>
             </div>
           )}
         </div>

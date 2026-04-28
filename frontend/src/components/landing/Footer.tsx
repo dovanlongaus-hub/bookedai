@@ -5,14 +5,12 @@ import {
   adminHref,
   brandContactEmail,
   brandLinkedInHref,
-  brandPositioning,
   brandWhatsAppHref,
   brandXHref,
   privacyHref,
   productHref,
   roadmapHref,
   tenantHref,
-  googleRegisterHref,
   termsHref,
 } from './data';
 import { BrandLockup } from './ui/BrandLockup';
@@ -31,11 +29,52 @@ type FooterProps = {
   compact?: boolean;
 };
 
+const FOOTER_BRAND_TAGLINE =
+  'BookedAI · The AI Revenue Engine for service businesses';
+const FOOTER_CONTACT_PHONE = '+61 455 301 335';
+
+const FOOTER_COLUMNS: Array<{
+  heading: string;
+  links: Array<{ label: string; href: string }>;
+}> = [
+  {
+    heading: 'Product',
+    links: [
+      { label: 'Web app', href: productHref },
+      { label: 'Roadmap', href: roadmapHref },
+      { label: 'View live tenant', href: tenantHref },
+    ],
+  },
+  {
+    heading: 'For business owners',
+    links: [
+      { label: 'Start a 30-day pilot', href: '/register-interest' },
+      { label: 'Book a 10-min revenue demo', href: '/register-interest?source_section=footer' },
+      { label: 'Open the audit ledger', href: adminHref },
+    ],
+  },
+  {
+    heading: 'For investors',
+    links: [
+      { label: 'See live tenant proof', href: tenantHref },
+      { label: 'Talk to a founder', href: `mailto:${brandContactEmail}` },
+    ],
+  },
+  {
+    heading: 'Company',
+    links: [
+      { label: 'Privacy', href: privacyHref },
+      { label: 'Terms', href: termsHref },
+      { label: 'Accessibility', href: '/accessibility' },
+    ],
+  },
+];
+
 export function Footer({
   onStartTrial,
   onBookDemo,
-  startTrialLabel = 'Open Web App',
-  bookDemoLabel = 'Talk to Sales',
+  startTrialLabel = 'Start free',
+  bookDemoLabel = 'Talk to a BookedAI human',
   showBrandCopy = true,
   compact = false,
 }: FooterProps) {
@@ -44,10 +83,10 @@ export function Footer({
 
   return (
     <footer className={`mx-auto w-full max-w-7xl px-6 lg:px-8 ${compact ? 'pb-8 pt-3' : 'pb-12 pt-6'}`}>
-      <div className={`template-card overflow-hidden border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_100%)] shadow-[0_24px_64px_rgba(15,23,42,0.06)] ${compact ? 'px-4 py-5 sm:px-5' : 'px-6 py-8 lg:px-8'}`}>
-        <div className={`grid gap-6 ${showBrandCopy ? 'lg:grid-cols-[1.05fr_0.95fr]' : compact ? 'lg:grid-cols-[auto_minmax(0,1fr)]' : 'lg:grid-cols-[0.72fr_1.28fr]'} lg:items-start`}>
-          <div className="flex min-w-0 flex-col gap-4 sm:flex-row sm:items-start sm:gap-6">
-            <div className="flex w-fit max-w-full shrink-0 items-center overflow-hidden rounded-[1.25rem] border border-black/6 bg-[linear-gradient(180deg,rgba(255,255,255,0.68)_0%,rgba(248,250,252,0.9)_100%)] px-3 py-2 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+      <div className={`template-card overflow-hidden border border-black/6 bg-apple-light shadow-apple-sm ${compact ? 'px-4 py-5 sm:px-5' : 'px-6 py-8 lg:px-8'}`}>
+        <div className="grid gap-8 lg:grid-cols-[1fr_2fr] lg:items-start">
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="flex w-fit max-w-full shrink-0 items-center overflow-hidden rounded-apple-standard border border-black/6 bg-white px-3 py-2 shadow-apple-sm">
               <BrandLockup
                 surface="light"
                 showDescriptor={false}
@@ -57,10 +96,16 @@ export function Footer({
               />
             </div>
             {showBrandCopy && (
-              <div className="min-w-0 pt-1">
-                <div className="template-kicker text-[11px]">AI Revenue Engine for Service Businesses</div>
-                <p className="template-body mt-2 max-w-2xl text-sm leading-7">
-                  {brandPositioning}
+              <div className="min-w-0">
+                <p className="template-body text-sm leading-7 text-apple-near-black">
+                  {FOOTER_BRAND_TAGLINE}
+                </p>
+                <p className="mt-1 text-sm leading-6 text-black/60">
+                  <a href={`mailto:${brandContactEmail}`} className="template-link transition hover:underline">
+                    {brandContactEmail}
+                  </a>
+                  {' · '}
+                  {FOOTER_CONTACT_PHONE}
                 </p>
                 <div className="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
                   <SignalPill variant="brand" className="max-w-full px-3 py-1 text-left leading-5">
@@ -68,23 +113,17 @@ export function Footer({
                   </SignalPill>
                   <span className="template-body text-black/55">{releaseVersionLabel}</span>
                 </div>
-              </div>
-            )}
-          </div>
-
-          <div className={`grid gap-4 ${compact ? 'lg:justify-items-end' : ''}`}>
-            {!compact && (
-              <div className="grid gap-3 sm:grid-cols-3">
-                {[
-                  ['Buying ladder', 'Starter -> Pro -> Pro Max'],
-                  ['Commercial model', 'Scoped setup + monthly + commission'],
-                  ['Entry layer', '49$+'],
-                ].map(([label, value]) => (
-                  <div key={label} className="rounded-[1.25rem] border border-black/6 bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">{label}</div>
-                    <div className="mt-2 text-sm font-semibold text-slate-950">{value}</div>
-                  </div>
-                ))}
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <SocialLink href={brandWhatsAppHref} label="WhatsApp">
+                    <WhatsAppIcon />
+                  </SocialLink>
+                  <SocialLink href={brandLinkedInHref} label="LinkedIn">
+                    <LinkedInIcon />
+                  </SocialLink>
+                  <SocialLink href={brandXHref} label="X">
+                    <XIcon />
+                  </SocialLink>
+                </div>
               </div>
             )}
 
@@ -107,48 +146,48 @@ export function Footer({
               </button>
             </div>
           </div>
+
+          <nav
+            aria-label="Footer"
+            className={`grid gap-6 sm:grid-cols-2 lg:grid-cols-4 ${compact ? 'lg:gap-5' : ''}`}
+          >
+            {FOOTER_COLUMNS.map((column) => (
+              <div key={column.heading} className="min-w-0">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  {column.heading}
+                </div>
+                <ul className="mt-3 flex flex-col gap-2">
+                  {column.links.map((link) => (
+                    <li key={`${column.heading}-${link.label}`}>
+                      <a
+                        href={link.href}
+                        className="template-link text-sm text-apple-near-black transition hover:underline"
+                      >
+                        {link.label}
+                      </a>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </nav>
         </div>
 
-        <div className={`${compact ? 'mt-4 pt-4 text-xs' : 'mt-6 pt-6 text-sm'} flex flex-col gap-3 border-t border-black/8 text-black/60 md:flex-row md:items-center md:justify-between`}>
-          <div className="flex flex-wrap items-center gap-3">
-            <a href={`mailto:${brandContactEmail}`} className="template-link transition hover:underline">
-              {brandContactEmail}
-            </a>
-            <div className="flex flex-wrap items-center gap-2">
-              <SocialLink href={brandWhatsAppHref} label="WhatsApp">
-                <WhatsAppIcon />
-              </SocialLink>
-              <SocialLink href={brandLinkedInHref} label="LinkedIn">
-                <LinkedInIcon />
-              </SocialLink>
-              <SocialLink href={brandXHref} label="X">
-                <XIcon />
-              </SocialLink>
-            </div>
-          </div>
-          <div className={`flex flex-wrap ${compact ? 'gap-3' : 'gap-4'}`}>
-            <a href={productHref} className="template-link break-words transition hover:underline">
-              Web App
-            </a>
-            <a href={roadmapHref} className="template-link break-words transition hover:underline">
-              Roadmap
-            </a>
-            <a href={tenantHref} className="template-link break-words transition hover:underline">
-              Tenant Workspace
-            </a>
-            <a href={adminHref} className="template-link break-words transition hover:underline">
-              Admin Login
-            </a>
-            {!compact && (
-              <a href={googleRegisterHref} className="template-link break-words transition hover:underline">
-                Google Register
-              </a>
-            )}
+        <div
+          className={`${compact ? 'mt-4 pt-4 text-xs' : 'mt-6 pt-6 text-sm'} flex flex-col gap-3 border-t border-black/8 text-black/60 md:flex-row md:items-center md:justify-between`}
+        >
+          <span className="template-body text-xs text-black/55">
+            © {new Date().getFullYear()} BookedAI. All rights reserved.
+          </span>
+          <div className="flex flex-wrap gap-4">
             <a href={privacyHref} className="template-link break-words transition hover:underline">
-              Privacy Policy
+              Privacy
             </a>
             <a href={termsHref} className="template-link break-words transition hover:underline">
-              Terms of Service
+              Terms
+            </a>
+            <a href="/accessibility" className="template-link break-words transition hover:underline">
+              Accessibility
             </a>
           </div>
         </div>

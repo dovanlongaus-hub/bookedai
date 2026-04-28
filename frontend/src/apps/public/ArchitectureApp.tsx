@@ -37,8 +37,8 @@ const lanes = [
   {
     title: 'AI orchestration',
     label: 'Qualify',
-    tone: 'from-violet-50 to-white',
-    accent: 'bg-violet-500',
+    tone: 'from-sky-50 to-white',
+    accent: 'bg-apple-blue',
     items: ['Intent capture', 'Best-fit matching', 'Care answers', 'Revenue prompts', 'Policy checks'],
   },
   {
@@ -108,12 +108,14 @@ function TopNav() {
   return (
     <header className="sticky top-0 z-40 border-b border-slate-200/80 bg-white/86 px-4 py-3 backdrop-blur-xl sm:px-6 lg:px-8">
       <div className="mx-auto flex max-w-7xl items-center justify-between gap-4">
-        <a href="/" className="flex min-w-0 items-center gap-3">
+        <a href="/" className="flex min-w-0 items-center gap-3" aria-label="BookedAI home">
           <img
             src={brandUploadedLogoPath}
-            alt="BookedAI"
+            alt=""
+            aria-hidden="true"
             className="h-10 w-[10.5rem] max-w-[calc(100vw-13rem)] object-cover object-center sm:w-[12rem]"
           />
+          <span className="sr-only">BookedAI</span>
         </a>
         <nav className="hidden items-center gap-2 md:flex" aria-label="Architecture navigation">
           {[
@@ -124,18 +126,25 @@ function TopNav() {
             <a
               key={href}
               href={href}
-              className="rounded-full px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
+              className="inline-flex min-h-[44px] items-center rounded-full px-4 py-2 text-sm font-semibold text-slate-600 transition hover:bg-slate-100 hover:text-slate-950"
             >
               {label}
             </a>
           ))}
           <a
             href={registerUrl}
-            className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+            className="inline-flex min-h-[44px] items-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5"
           >
             Talk to Sales
           </a>
         </nav>
+        <a
+          href={registerUrl}
+          className="inline-flex min-h-[44px] items-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white md:hidden"
+          aria-label="Talk to Sales"
+        >
+          Talk to Sales
+        </a>
       </div>
     </header>
   );
@@ -151,14 +160,14 @@ function ArchitectureHeroDiagram() {
       <div className="relative">
         <div className="mb-4 flex items-center justify-between gap-3">
           <div>
-            <div className="text-[10px] font-semibold uppercase tracking-[0.22em] text-slate-500">
+            <div className="text-xs font-semibold uppercase tracking-[0.22em] text-slate-500">
               Architecture image
             </div>
             <figcaption className="mt-1 text-xl font-semibold tracking-[-0.04em] text-slate-950">
               Revenue engine control map
             </figcaption>
           </div>
-          <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+          <div className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
             Live system
           </div>
         </div>
@@ -167,7 +176,7 @@ function ArchitectureHeroDiagram() {
           <div className="grid gap-3">
             {['Web', 'Product', 'WhatsApp', 'Portal'].map((item, index) => (
               <div key={item} className="rounded-[1.15rem] border border-sky-100 bg-sky-50 px-4 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-600">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-600">
                   Surface {index + 1}
                 </div>
                 <div className="mt-1 text-sm font-semibold text-slate-950">{item}</div>
@@ -176,7 +185,7 @@ function ArchitectureHeroDiagram() {
           </div>
 
           <div className="relative flex min-h-[24rem] items-center justify-center rounded-[1.65rem] border border-slate-200 bg-slate-950 p-5 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
-            <div className="absolute inset-x-5 top-5 flex items-center justify-between text-[10px] font-semibold uppercase tracking-[0.16em] text-white/48">
+            <div className="absolute inset-x-5 top-5 flex items-center justify-between text-xs font-semibold uppercase tracking-[0.16em] text-white/48">
               <span>Intent</span>
               <span>Policy</span>
             </div>
@@ -197,7 +206,7 @@ function ArchitectureHeroDiagram() {
             ].map(([label, cls]) => (
               <div
                 key={label}
-                className={`absolute ${cls} rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-white/70`}
+                className={`absolute ${cls} rounded-full border border-white/12 bg-white/8 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-white/70`}
               >
                 {label}
               </div>
@@ -207,7 +216,7 @@ function ArchitectureHeroDiagram() {
           <div className="grid gap-3">
             {['Booking intent', 'Payment posture', 'Tenant Ops', 'Audit ledger'].map((item, index) => (
               <div key={item} className="rounded-[1.15rem] border border-emerald-100 bg-emerald-50 px-4 py-3">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
                   System {index + 1}
                 </div>
                 <div className="mt-1 text-sm font-semibold text-slate-950">{item}</div>
@@ -241,7 +250,7 @@ function LaneMap() {
             >
               <div className="flex items-center justify-between gap-3">
                 <div className={`h-3 w-3 rounded-full ${lane.accent}`} />
-                <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-600">
+                <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-slate-600">
                   {lane.label}
                 </div>
               </div>
@@ -281,7 +290,7 @@ export function ArchitectureApp() {
             <div className="inline-flex rounded-full border border-slate-200 bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.2em] text-slate-600 shadow-sm">
               BookedAI architecture showcase
             </div>
-            <h1 className="mt-6 max-w-3xl text-5xl font-semibold tracking-[-0.07em] text-slate-950 sm:text-6xl lg:text-7xl">
+            <h1 className="mt-6 max-w-3xl text-4xl font-semibold tracking-[-0.07em] text-slate-950 sm:text-6xl lg:text-7xl">
               Big-tech clarity for a revenue engine built around bookings.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
@@ -364,7 +373,7 @@ export function ArchitectureApp() {
         <div className="mx-auto max-w-7xl">
           <div className="flex flex-col justify-between gap-5 lg:flex-row lg:items-end">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-violet-700">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-apple-blue">
                 Visual proof
               </div>
               <h2 className="mt-4 max-w-3xl text-3xl font-semibold tracking-[-0.055em] text-slate-950 sm:text-5xl">
@@ -386,7 +395,7 @@ export function ArchitectureApp() {
                   src={image.src}
                   srcSet={image.srcSet}
                   sizes="(min-width: 1024px) 44vw, calc(100vw - 2rem)"
-                  alt={image.title}
+                  alt={`${image.title} — ${image.body}`}
                   className="aspect-[16/10] w-full object-cover object-top"
                   loading="eager"
                 />

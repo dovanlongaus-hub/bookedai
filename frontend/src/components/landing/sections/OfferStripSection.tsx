@@ -1,3 +1,4 @@
+import { AppleCTA } from '../ui/AppleCTA';
 import { SectionCard } from '../ui/SectionCard';
 import { SectionShell } from '../ui/SectionShell';
 import { SignalPill } from '../ui/SignalPill';
@@ -31,7 +32,7 @@ export function OfferStripSection({ onStartTrial, onSeePricing }: OfferStripSect
       <SectionCard className="overflow-hidden px-5 py-5 lg:px-6 lg:py-6">
         <div className="grid gap-4 lg:grid-cols-[0.86fr_1.14fr] lg:items-center">
           <div className="max-w-2xl">
-            <SignalPill className="px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-[#1459c7]">
+            <SignalPill className="px-3 py-1 text-xs uppercase tracking-[0.16em] text-[#1459c7]">
               Commercial snapshot
             </SignalPill>
             <h2 className="mt-3 text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f] sm:text-3xl">
@@ -43,12 +44,20 @@ export function OfferStripSection({ onStartTrial, onSeePricing }: OfferStripSect
             </p>
 
             <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
-              <button type="button" onClick={onStartTrial} className="booked-button">
-                Start Free Trial
-              </button>
-              <button type="button" onClick={onSeePricing} className="booked-button-secondary">
-                See Pricing
-              </button>
+              <AppleCTA
+                label="Start a 30-day pilot"
+                intent="primary"
+                size="lg"
+                onClick={onStartTrial}
+                analyticsId="offer_strip_primary"
+              />
+              <AppleCTA
+                label="See pricing"
+                intent="secondary"
+                size="lg"
+                onClick={onSeePricing}
+                analyticsId="offer_strip_see_pricing"
+              />
             </div>
           </div>
 
@@ -60,7 +69,7 @@ export function OfferStripSection({ onStartTrial, onSeePricing }: OfferStripSect
                 tone="subtle"
                 className="h-full rounded-[1.45rem] px-4 py-4"
               >
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                   {card.label}
                 </div>
                 <div className="mt-2 text-lg font-semibold tracking-[-0.03em] text-[#1d1d1f]">

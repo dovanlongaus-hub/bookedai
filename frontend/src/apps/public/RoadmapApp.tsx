@@ -234,7 +234,7 @@ function RoadmapSyncedVisuals({ content }: RoadmapSyncedVisualsProps) {
                     <li key={tenant.name} className="rounded-[1.1rem] border border-amber-200 bg-white px-4 py-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="text-sm font-semibold text-slate-950">{tenant.name}</div>
-                        <span className="rounded-full bg-amber-100 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-800">
+                        <span className="rounded-full bg-amber-100 px-2 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-amber-800">
                           {tenant.channel}
                         </span>
                       </div>
@@ -274,12 +274,12 @@ function RoadmapSyncedVisuals({ content }: RoadmapSyncedVisualsProps) {
                         <div className="text-sm font-semibold text-slate-950">
                           {milestone.id}
                           {milestone.hard ? (
-                            <span className="ml-2 rounded-full bg-rose-600 px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.14em] text-white">
+                            <span className="ml-2 rounded-full bg-rose-600 px-2 py-0.5 text-xs font-bold uppercase tracking-[0.14em] text-white">
                               Hard
                             </span>
                           ) : null}
                         </div>
-                        <span className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                        <span className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">
                           {milestone.date}
                         </span>
                       </div>
@@ -291,8 +291,8 @@ function RoadmapSyncedVisuals({ content }: RoadmapSyncedVisualsProps) {
             ) : null}
 
             {channelNote ? (
-              <article className="rounded-[1.5rem] border border-violet-200 bg-violet-50/60 p-5">
-                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-violet-700">
+              <article className="rounded-[1.5rem] border border-sky-200 bg-sky-50/60 p-5">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-apple-blue">
                   Communication scope · CR-010
                 </div>
                 <p className="mt-3 text-sm leading-7 text-slate-700">{channelNote}</p>

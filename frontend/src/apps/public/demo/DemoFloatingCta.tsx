@@ -20,10 +20,10 @@ function DemoQrCode() {
   ];
 
   return (
-    <svg viewBox="0 0 150 150" className="h-20 w-20 rounded-[16px] bg-white p-2">
+    <svg viewBox="0 0 150 150" className="h-20 w-20 rounded-[16px] bg-white p-2" aria-hidden="true">
       {pattern.map((row, y) =>
         row.split('').map((cell, x) =>
-          cell === '1' ? <rect key={`${x}-${y}`} x={x * 10} y={y * 10} width="10" height="10" rx="1.5" fill="#08111F" /> : null,
+          cell === '1' ? <rect key={`${x}-${y}`} x={x * 10} y={y * 10} width="10" height="10" rx="1.5" fill="#1d1d1f" /> : null,
         ),
       )}
     </svg>
@@ -44,49 +44,43 @@ export function DemoFloatingCta(props: {
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 18, scale: 0.96 }}
           transition={{ duration: 0.28, ease: [0.16, 1, 0.3, 1] }}
-          className="bookedai-saas-glass fixed bottom-6 right-4 z-40 w-[min(92vw,360px)] overflow-hidden rounded-[28px] p-4 shadow-[0_24px_90px_rgba(0,0,0,0.34)] sm:right-6"
+          className="fixed bottom-6 right-4 z-40 w-[min(92vw,360px)] overflow-hidden rounded-[28px] border border-white/10 bg-apple-dark-2 p-4 shadow-[0_24px_90px_rgba(0,0,0,0.4)] sm:right-6"
+          aria-labelledby="demo-floating-cta-title"
         >
-          <motion.div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-x-6 top-0 h-20 rounded-full bg-[linear-gradient(90deg,rgba(32,246,179,0),rgba(32,246,179,0.24),rgba(0,209,255,0))] blur-2xl"
-            animate={{ opacity: [0.35, 0.8, 0.35], scaleX: [0.92, 1.05, 0.92] }}
-            transition={{ duration: 3.4, repeat: Infinity, ease: 'easeInOut' }}
-          />
-
           <div className="relative">
             <div className="flex items-start justify-between gap-3">
               <div className="flex items-center gap-3">
                 <div className="relative">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-[linear-gradient(135deg,rgba(32,246,179,0.22),rgba(0,209,255,0.18))] text-sm font-semibold text-white">
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full border border-white/10 bg-apple-blue/15 text-sm font-semibold text-white">
                     DL
                   </div>
-                  <div className="absolute -bottom-1 -right-1 rounded-full border border-[#20F6B3]/20 bg-[#08111F] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-[#BFFFEF]">
+                  <div className="absolute -bottom-1 -right-1 rounded-full border border-apple-blue/30 bg-black px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] text-white">
                     Founder
                   </div>
                 </div>
                 <div>
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#BFFFEF]">Revenue leak</div>
-                  <div className="mt-1 text-sm leading-6 text-white">
-                    If you're still missing customers… you're losing revenue.
-                  </div>
+                  <div id="demo-floating-cta-title" className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-blue">Revenue leak</div>
+                  <p className="mt-1 text-sm leading-6 text-white">
+                    Every missed customer is missed revenue. Take the next 60 seconds.
+                  </p>
                 </div>
               </div>
 
               <button
                 type="button"
                 onClick={props.onClose}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/20 text-slate-300"
-                aria-label="Dismiss CTA"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-black/30 text-white/75 motion-safe:transition-all duration-200 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-blue/60"
+                aria-label="Dismiss revenue prompt"
               >
-                ×
+                <span aria-hidden="true">×</span>
               </button>
             </div>
 
-            <div className="mt-4 flex items-center gap-3 rounded-[22px] border border-white/10 bg-black/10 p-3">
+            <div className="mt-4 flex items-center gap-3 rounded-[22px] border border-white/10 bg-black/30 p-3">
               <DemoQrCode />
               <div className="min-w-0">
                 <div className="text-sm font-medium text-white">Scan to open on mobile</div>
-                <div className="mt-1 text-xs leading-5 text-slate-400">Keep booking on the go or share this with your team.</div>
+                <div className="mt-1 text-xs leading-5 text-white/60">Keep booking on the go or share with your team.</div>
               </div>
             </div>
 
@@ -94,16 +88,16 @@ export function DemoFloatingCta(props: {
               <button
                 type="button"
                 onClick={props.onStartBooking}
-                className="bookedai-saas-button-primary inline-flex flex-1 items-center justify-center rounded-full px-4 py-3 text-sm font-semibold"
+                className="inline-flex flex-1 min-h-[44px] items-center justify-center rounded-full bg-apple-blue px-4 py-3 text-sm font-semibold text-white shadow-[0_9px_22px_rgba(0,113,227,0.18)] motion-safe:transition-all duration-200 hover:bg-apple-blue-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-apple-dark-2"
               >
-                Start booking
+                Run the live demo
               </button>
               <button
                 type="button"
                 onClick={props.onBookDemo}
-                className="bookedai-saas-button-secondary inline-flex items-center justify-center rounded-full px-4 py-3 text-sm font-semibold text-white"
+                className="inline-flex min-h-[44px] items-center justify-center rounded-full border border-white/15 bg-white/[0.05] px-4 py-3 text-sm font-semibold text-white motion-safe:transition-all duration-200 hover:border-white/30 hover:bg-white/[0.1] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-blue/60"
               >
-                Book demo
+                Talk to a founder
               </button>
             </div>
           </div>

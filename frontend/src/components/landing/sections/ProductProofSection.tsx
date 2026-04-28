@@ -102,7 +102,7 @@ function SolutionJourneyCard({
       className={`rounded-[1.6rem] border border-black/6 bg-gradient-to-br ${tone} p-5 shadow-[0_14px_34px_rgba(15,23,42,0.05)] transition duration-200 hover:-translate-y-0.5`}
     >
       <div className="flex items-center justify-between gap-3">
-        <div className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-white">
+        <div className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white">
           Step {step}
         </div>
         <div className="h-2.5 w-2.5 rounded-full bg-[#1d4ed8]" />
@@ -115,7 +115,7 @@ function SolutionJourneyCard({
         {chips.map((chip) => (
           <div
             key={chip}
-            className="rounded-full border border-black/6 bg-white/92 px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600"
+            className="rounded-full border border-black/6 bg-white/92 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600"
           >
             {chip}
           </div>
@@ -137,7 +137,7 @@ function SolutionInfographic() {
             From customer intent to revenue flow in one image
           </h3>
         </div>
-        <SignalPill className="bg-slate-950 px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-white">
+        <SignalPill className="bg-slate-950 px-3 py-1 text-xs uppercase tracking-[0.16em] text-white">
           Investor + SME ready
         </SignalPill>
       </div>
@@ -255,7 +255,7 @@ function SolutionInfographic() {
         {infographicBadges.map((badge) => (
           <div
             key={badge}
-            className="rounded-full border border-black/6 bg-white px-3 py-1.5 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600"
+            className="rounded-full border border-black/6 bg-white px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600"
           >
             {badge}
           </div>
@@ -287,12 +287,12 @@ export function ProductProofSection({
                     <div className="flex flex-wrap gap-3">
                       {onStartTrial ? (
                         <button type="button" onClick={onStartTrial} className="booked-button">
-                          Open Web App
+                          Run the live demo
                         </button>
                       ) : null}
                       {onBookDemo ? (
                         <button type="button" onClick={onBookDemo} className="booked-button-secondary">
-                          Talk to Sales
+                          Talk to a BookedAI human
                         </button>
                       ) : null}
                     </div>
@@ -342,7 +342,7 @@ export function ProductProofSection({
                       A vertical flow that reads clearly in one pass
                     </h3>
                   </div>
-                  <div className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                  <div className="rounded-full border border-sky-200 bg-sky-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
                     Easy to scan
                   </div>
                 </div>

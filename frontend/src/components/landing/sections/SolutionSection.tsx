@@ -43,7 +43,7 @@ export function SolutionSection({
           <SectionHeading {...content} />
 
           <SectionCard className="mt-8 p-5">
-            <SignalPill className="px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
+            <SignalPill className="px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
               System view
             </SignalPill>
             <div className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">
@@ -89,9 +89,9 @@ export function SolutionSection({
                     <div className="mt-4 text-base font-semibold text-[#1d1d1f]">{step}</div>
                     <div className="mt-2 text-sm leading-6 text-black/62">{flowCaptions[index]}</div>
                     {index < flowSteps.length - 1 ? (
-                      <div className="mt-4 hidden h-1 rounded-full bg-[linear-gradient(90deg,#1d1d1f_0%,#0071e3_100%)] lg:block" />
+                      <div className="mt-4 hidden h-1 rounded-full bg-apple-blue lg:block" />
                     ) : (
-                      <div className="mt-4 hidden h-1 rounded-full bg-[#0071e3] lg:block" />
+                      <div className="mt-4 hidden h-1 rounded-full bg-apple-blue lg:block" />
                     )}
                   </div>
                 </SectionCard>
@@ -103,8 +103,8 @@ export function SolutionSection({
               <div className="mt-4 grid gap-3 sm:grid-cols-4">
                 {statusRail.map((item) => (
                   <div key={item.label} className="rounded-[1.15rem] bg-white px-4 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{item.label}</div>
-                    <div className={`mt-3 inline-flex rounded-full px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${item.tone}`}>
+                    <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{item.label}</div>
+                    <div className={`mt-3 inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${item.tone}`}>
                       {item.value}
                     </div>
                   </div>

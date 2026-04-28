@@ -118,8 +118,8 @@ export function AIMentorProApp() {
 
   useEffect(() => {
     document.title = queryState.embedMode
-      ? 'AI Mentor Pro Widget | Powered by BookedAI'
-      : 'AI Mentor Pro | Powered by BookedAI';
+      ? 'AI Mentor 1-1 Pro Widget | Live BookedAI tenant'
+      : 'AI Mentor 1-1 Pro | Live BookedAI tenant — book, pay, follow up';
   }, [queryState.embedMode]);
 
   function triggerPrompt(prompt: string) {
@@ -129,7 +129,7 @@ export function AIMentorProApp() {
 
   if (queryState.embedMode) {
     return (
-      <main className="min-h-screen bg-[linear-gradient(180deg,#08111f_0%,#0b1728_100%)] p-0 text-white">
+      <main className="min-h-screen bg-apple-black p-0 text-white">
         <div className="flex min-h-screen items-stretch justify-center">
           <div className="flex w-full max-w-[30rem] flex-1 items-stretch">
             <BookingAssistantDialog
@@ -139,7 +139,7 @@ export function AIMentorProApp() {
               embedded
               hideCloseControl
               layoutMode="product_app"
-              closeLabel="AI Mentor Pro"
+              closeLabel="AI Mentor 1-1 Pro"
               entrySourcePath="/partner/ai-mentor-pro/embed"
               initialQuery={initialQuery}
               initialQueryRequestId={initialQueryRequestId}
@@ -153,53 +153,60 @@ export function AIMentorProApp() {
   }
 
   return (
-    <main className="min-h-screen bg-[linear-gradient(180deg,#f4f8fb_0%,#edf6ff_42%,#f6fbff_100%)] text-[#0f172a]">
-      <div className="pointer-events-none fixed inset-0 overflow-hidden">
-        <div className="absolute left-[-6rem] top-[-7rem] h-72 w-72 rounded-full bg-sky-300/30 blur-3xl" />
-        <div className="absolute right-[-8rem] top-10 h-80 w-80 rounded-full bg-emerald-300/20 blur-3xl" />
-        <div className="absolute bottom-0 left-1/3 h-72 w-72 rounded-full bg-amber-200/25 blur-3xl" />
-      </div>
-
-      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 sm:px-8 lg:py-10">
+    <main className="min-h-screen bg-apple-light text-apple-near-black">
+      <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-5 py-6 sm:px-8 lg:py-10">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             <LogoMark
               variant="icon"
-              alt="AI Mentor Pro"
-              className="booked-brand-image booked-brand-image--soft h-11 w-11 rounded-[1rem] ring-1 ring-black/6"
+              alt="AI Mentor 1-1 Pro"
+              className="booked-brand-image booked-brand-image--soft h-11 w-11 rounded-[var(--apple-radius-comfortable)] ring-1 ring-black/5"
             />
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1459c7]">
-                AI Mentor Pro x BookedAI
-              </div>
-              <div className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-[#0f172a]">
-                Convert AI to your DOER
+              <div className="template-kicker">AI Mentor 1-1 Pro · Verified BookedAI tenant</div>
+              <div className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-apple-near-black">
+                Live mentorship business running on BookedAI
               </div>
             </div>
           </div>
 
           <a
             href="https://bookedai.au/"
-            className="rounded-full border border-black/8 bg-white/86 px-5 py-3 text-sm font-semibold text-[#0f172a] transition hover:border-[#1459c7] hover:text-[#1459c7]"
+            className="booked-button-secondary"
+            aria-label="Visit BookedAI homepage"
           >
             Powered by BookedAI
           </a>
         </header>
 
         <section className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr] lg:items-start">
-          <div className="rounded-[2rem] border border-white/70 bg-white/88 p-6 shadow-[0_28px_60px_rgba(15,23,42,0.08)] sm:p-8">
-            <div className="inline-flex rounded-full border border-sky-200 bg-sky-50 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1459c7]">
-              Official SME plugin interface
+          <div className="template-card p-6 sm:p-8">
+            <div className="inline-flex rounded-full border border-[var(--template-border)] bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--apple-blue)]">
+              Verified BookedAI tenant · Stripe · Calendar · Telegram · Email
             </div>
-            <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-[-0.06em] text-[#0f172a] sm:text-5xl">
-              Tenant-scoped AI mentoring search, booking, payment, and follow-up.
+            <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-[-0.05em] text-apple-near-black sm:text-5xl">
+              Watch BookedAI run a live mentorship business — book, pay, follow up.
             </h1>
-            <p className="mt-5 max-w-2xl text-base leading-8 text-slate-600 sm:text-lg">
-              This experience turns <span className="font-semibold text-slate-900">AI Mentor Pro</span> into a
-              BookedAI-powered SME surface. Visitors can chat, search the 10 AI mentoring offers, move into
-              booking, trigger payment-ready follow-through, and route the lead into email, CRM, and WhatsApp-aware
-              business flows from one tenant-scoped product.
+            <p className="mt-5 max-w-2xl text-base leading-8 text-[color:var(--apple-text-secondary)] sm:text-lg">
+              Real bookings, real Stripe payments, real audit ledger. Search the 10 published mentoring packages, move into checkout, and mentor follow-up runs through the same BookedAI operator console every business uses.
             </p>
+
+            <div className="mt-6 flex flex-wrap gap-3">
+              <a
+                href="#packages"
+                className="booked-button"
+                aria-label="Book a mentoring session"
+              >
+                Book a session
+              </a>
+              <a
+                href="#assistant"
+                className="booked-button-secondary"
+                aria-label="Run the live mentor demo"
+              >
+                Run the live demo
+              </a>
+            </div>
 
             <div className="mt-7 flex flex-wrap gap-3">
               {quickPrompts.map((prompt) => (
@@ -207,7 +214,8 @@ export function AIMentorProApp() {
                   key={prompt}
                   type="button"
                   onClick={() => triggerPrompt(prompt)}
-                  className="rounded-full border border-black/8 bg-[#eff6ff] px-4 py-2 text-sm font-semibold text-[#1459c7] transition hover:border-[#1459c7] hover:bg-white"
+                  className="template-chip transition hover:bg-white"
+                  aria-label={`Use prompt: ${prompt}`}
                 >
                   {prompt}
                 </button>
@@ -217,12 +225,12 @@ export function AIMentorProApp() {
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
               {[
                 'Chat + tenant-first search',
-                'Booking + payment follow-through',
-                'Email / CRM / WhatsApp ready',
+                'Booking + Stripe checkout',
+                'Email / Calendar / Telegram',
               ].map((item) => (
                 <div
                   key={item}
-                  className="rounded-[1.4rem] border border-black/6 bg-[linear-gradient(135deg,rgba(255,255,255,0.96)_0%,rgba(239,246,255,0.95)_100%)] px-4 py-4 text-sm font-semibold text-[#0f172a]"
+                  className="template-card-subtle px-4 py-4 text-sm font-semibold text-apple-near-black"
                 >
                   {item}
                 </div>
@@ -230,7 +238,7 @@ export function AIMentorProApp() {
             </div>
           </div>
 
-          <div className="flex min-h-0 w-full items-stretch">
+          <div id="assistant" className="flex min-h-0 w-full items-stretch">
             <BookingAssistantDialog
               content={bookingAssistantContent}
               isOpen
@@ -238,7 +246,7 @@ export function AIMentorProApp() {
               embedded
               hideCloseControl
               layoutMode="product_app"
-              closeLabel="AI Mentor Pro"
+              closeLabel="AI Mentor 1-1 Pro"
               entrySourcePath="/partner/ai-mentor-pro"
               initialQuery={initialQuery}
               initialQueryRequestId={initialQueryRequestId}
@@ -248,38 +256,52 @@ export function AIMentorProApp() {
           </div>
         </section>
 
-        <section className="rounded-[2rem] border border-white/70 bg-white/88 p-6 shadow-[0_24px_56px_rgba(15,23,42,0.06)] sm:p-8">
+        <section id="packages" className="template-card p-6 sm:p-8">
           <div className="flex flex-wrap items-end justify-between gap-4">
             <div>
-              <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#1459c7]">
-                AI Mentor product line
-              </div>
-              <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-[#0f172a]">
-                The 10 published packages now run through one BookedAI plugin surface.
+              <div className="template-kicker">Live operator catalogue</div>
+              <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-apple-near-black">
+                Ten published mentoring packages, one live BookedAI business.
               </h2>
             </div>
-            <div className="rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-700">
-              Group offers require minimum 5 students
-            </div>
+            <span className="template-chip">Group offers require minimum 5 students</span>
           </div>
 
           <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {packageCards.map((item) => (
               <article
                 key={item.title}
-                className="overflow-hidden rounded-[1.5rem] border border-black/6 bg-[#f8fbff] shadow-[0_18px_38px_rgba(15,23,42,0.05)]"
+                className="template-card-subtle overflow-hidden"
               >
-                <div className="aspect-[4/3] overflow-hidden bg-[#dbeafe]">
+                <div className="aspect-[4/3] overflow-hidden bg-white">
                   <img src={item.image} alt={item.title} className="h-full w-full object-cover" />
                 </div>
                 <div className="p-5">
-                  <div className="text-lg font-semibold tracking-[-0.03em] text-[#0f172a]">{item.title}</div>
-                  <div className="mt-2 text-sm font-semibold text-[#1459c7]">{item.price}</div>
+                  <div className="text-lg font-semibold tracking-[-0.03em] text-apple-near-black">{item.title}</div>
+                  <div className="mt-2 text-sm font-semibold text-[color:var(--apple-blue)]">{item.price}</div>
+                  <a
+                    href="#assistant"
+                    className="booked-button mt-4 inline-flex"
+                    aria-label={`Save my spot for ${item.title}`}
+                  >
+                    Save my spot
+                  </a>
                 </div>
               </article>
             ))}
           </div>
         </section>
+
+        <footer className="flex flex-wrap items-center justify-between gap-3 text-xs text-[color:var(--apple-text-tertiary)]">
+          <span>Verified BookedAI tenant · powered by BookedAI</span>
+          <a
+            href="https://bookedai.au/"
+            className="text-[color:var(--apple-blue)] hover:underline"
+            aria-label="Visit BookedAI homepage"
+          >
+            bookedai.au
+          </a>
+        </footer>
       </div>
     </main>
   );

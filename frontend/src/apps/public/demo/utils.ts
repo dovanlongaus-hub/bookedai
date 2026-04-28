@@ -175,10 +175,10 @@ function deriveImageUrl(candidate: MatchCandidate) {
 
   const seed = hashString(candidate.candidateId || candidate.serviceName || 'bookedai');
   const palette = [
-    '0d172a/20f6b3',
-    '132238/00d1ff',
-    '102033/9ae6ff',
-    '101826/7bf0d7',
+    '1d1d1f/0071e3',
+    '272729/ffffff',
+    '000000/0071e3',
+    '1d1d1f/f5f5f7',
   ];
   const selected = palette[seed % palette.length];
   return `https://placehold.co/720x480/${selected}?text=${encodeURIComponent(candidate.serviceName || 'BookedAI')}`;

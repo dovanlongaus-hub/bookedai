@@ -1,4 +1,5 @@
 import { brandName, type DemoContent, type HeroContent } from '../data';
+import { AppleCTA } from '../ui/AppleCTA';
 import { BrandLockup } from '../ui/BrandLockup';
 import { SectionCard } from '../ui/SectionCard';
 import { SectionShell } from '../ui/SectionShell';
@@ -66,7 +67,7 @@ export function HeroSection({
     },
     {
       label: 'Native later',
-      value: 'iOS and Android are deferred until the web flow, team controls, and release gates are more mature.',
+      value: 'iOS and Android are deferred until the web flow and operator controls are fully proven in production.',
     },
   ];
 
@@ -77,9 +78,7 @@ export function HeroSection({
       contentClassName="grid gap-5 sm:gap-6 lg:grid-cols-[0.88fr_1.12fr] lg:items-start lg:gap-7"
       width="wide"
     >
-      <SectionCard className="relative overflow-hidden border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f7fbff_55%,#f3f8fd_100%)] p-5 shadow-[0_28px_80px_rgba(15,23,42,0.06)] sm:p-6 lg:p-8 xl:p-9">
-        <div className="absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.18),transparent_62%)]" />
-        <div className="absolute bottom-0 right-0 h-48 w-48 rounded-full bg-[radial-gradient(circle,rgba(15,23,42,0.08),transparent_70%)]" />
+      <SectionCard className="relative overflow-hidden border border-black/6 bg-apple-light p-5 shadow-apple-sm sm:p-6 lg:p-8 xl:p-9">
 
         <div className="relative flex h-full flex-col">
           <SignalPill variant="brand" className="w-fit px-3.5 py-1.5 text-[13px] normal-case tracking-[0.04em] text-[#1d1d1f] sm:px-4 sm:text-sm">
@@ -96,28 +95,28 @@ export function HeroSection({
           </p>
 
           <div className="mt-6 flex flex-col gap-2.5 sm:mt-7 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-            <button
-              type="button"
+            <AppleCTA
+              label={content.primaryCta}
+              intent="primary"
+              size="lg"
               onClick={onStartTrial}
-              className="booked-button"
-            >
-              {content.primaryCta}
-            </button>
-            <button
-              type="button"
+              analyticsId="hero_primary_cta"
+            />
+            <AppleCTA
+              label={content.secondaryCta}
+              intent="secondary"
+              size="lg"
               onClick={onBookDemo}
-              className="booked-button-secondary"
-            >
-              {content.secondaryCta}
-            </button>
+              analyticsId="hero_secondary_cta"
+            />
             {onSeePricing ? (
-              <button
-                type="button"
+              <AppleCTA
+                label="See pricing"
+                intent="pill"
+                size="lg"
                 onClick={onSeePricing}
-                className="booked-button-secondary border-black/8 bg-white/82 text-[#1d1d1f]"
-              >
-                See Pricing
-              </button>
+                analyticsId="hero_see_pricing"
+              />
             ) : null}
           </div>
 
@@ -129,7 +128,7 @@ export function HeroSection({
                 key={item.label}
                 className="rounded-[1.2rem] border border-slate-200 bg-white px-4 py-3 shadow-[0_12px_28px_rgba(15,23,42,0.04)]"
               >
-                <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                   {item.label}
                 </div>
                 <div className="mt-2 text-sm font-semibold leading-6 text-slate-950">{item.value}</div>
@@ -138,7 +137,7 @@ export function HeroSection({
           </div>
 
           <div className="mt-6 rounded-[1.4rem] border border-sky-100 bg-[linear-gradient(180deg,#f5fbff_0%,#ffffff_100%)] p-4 shadow-[0_12px_28px_rgba(15,23,42,0.04)] sm:mt-7 sm:p-5">
-            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-700">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-700">
               Frontend delivery priority
             </div>
             <div className="mt-4 grid gap-3">
@@ -147,7 +146,7 @@ export function HeroSection({
                   key={item.label}
                   className="rounded-[1.1rem] border border-slate-200 bg-white px-4 py-3 shadow-[0_8px_18px_rgba(15,23,42,0.03)]"
                 >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     {item.label}
                   </div>
                   <div className="mt-2 text-sm font-semibold leading-6 text-slate-900">{item.value}</div>
@@ -178,7 +177,7 @@ export function HeroSection({
           <div className="relative flex flex-col gap-4 sm:gap-5">
             <div className="flex flex-col gap-3 rounded-[1.45rem] border border-black/5 bg-white/72 p-3.5 shadow-[0_12px_28px_rgba(15,23,42,0.04)] sm:gap-4 sm:rounded-[1.8rem] sm:p-4 sm:flex-row sm:items-start sm:justify-between">
               <div>
-                <SignalPill className="w-fit px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#1459c7] sm:text-[10px] sm:tracking-[0.16em]">
+                <SignalPill className="w-fit px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-[#1459c7] sm:text-xs sm:tracking-[0.16em]">
                   Live product proof
                 </SignalPill>
                 <div className="mt-3 max-w-[25rem] text-[1.3rem] font-semibold leading-tight tracking-[-0.04em] text-[#1d1d1f] sm:mt-4 sm:max-w-[28rem] sm:text-[1.85rem]">
@@ -188,7 +187,7 @@ export function HeroSection({
                   The homepage now shows the real shape of the product: demand enters, fit is qualified, the best option is visible, and conversion continuity remains intact from first contact to booking-ready action.
                 </div>
               </div>
-              <div className="flex items-center gap-2 self-start rounded-full bg-emerald-50/90 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-700 sm:text-[10px] sm:tracking-[0.16em]">
+              <div className="flex items-center gap-2 self-start rounded-full bg-emerald-50/90 px-3 py-1.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-emerald-700 sm:text-xs sm:tracking-[0.16em]">
                 <span className="h-2 w-2 rounded-full bg-emerald-500" />
                 {demo.status}
               </div>
@@ -236,7 +235,7 @@ export function HeroSection({
                     <div className="space-y-2 px-2.5 py-2.5 sm:space-y-2.5 sm:px-3 sm:py-3">
                       <div className="rounded-[1rem] border border-slate-200/85 bg-white/92 px-3 py-2.5 shadow-[0_8px_18px_rgba(15,23,42,0.03)]">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                             Live enquiry
                           </div>
                           <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-[#0071e3]">
@@ -265,7 +264,7 @@ export function HeroSection({
                       </div>
 
                       <div className="flex gap-3">
-                        <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/6 text-[10px] font-semibold text-[#0071e3]">
+                        <div className="mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-black/6 text-xs font-semibold text-[#0071e3]">
                           AI
                         </div>
                         <div className="max-w-[76%] rounded-[1.15rem] rounded-tl-md border border-slate-200 bg-white px-3 py-2.5 text-[11px] leading-4 text-slate-700 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
@@ -287,7 +286,7 @@ export function HeroSection({
                                 <div className="line-clamp-1 text-[12px] font-semibold text-slate-950">
                                   {primaryResult.name}
                                 </div>
-                                <div className="mt-1 line-clamp-1 text-[10px] text-slate-500">
+                                <div className="mt-1 line-clamp-1 text-xs text-slate-500">
                                   {primaryResult.category}
                                 </div>
                               </div>
@@ -305,7 +304,7 @@ export function HeroSection({
                                 </span>
                               ))}
                             </div>
-                            <div className="mt-2 line-clamp-2 text-[10px] leading-4 text-slate-700">
+                            <div className="mt-2 line-clamp-2 text-xs leading-4 text-slate-700">
                               {primaryResult.bestFor}
                             </div>
                           </div>
@@ -314,7 +313,7 @@ export function HeroSection({
 
                       <div className="rounded-[1.15rem] border border-slate-200/85 bg-white/94 p-3 shadow-[0_8px_18px_rgba(15,23,42,0.03)]">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                             Booking input ready
                           </div>
                           <div className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-slate-600">
@@ -330,7 +329,7 @@ export function HeroSection({
                               <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                                 {item.label}
                               </div>
-                              <div className="text-[10px] font-medium text-slate-700">{item.value}</div>
+                              <div className="text-xs font-medium text-slate-700">{item.value}</div>
                             </div>
                           ))}
                         </div>
@@ -338,7 +337,7 @@ export function HeroSection({
 
                       <div className="rounded-[1.15rem] border border-slate-200/85 bg-[linear-gradient(180deg,#fafcff_0%,#ffffff_100%)] p-3 shadow-[0_8px_18px_rgba(15,23,42,0.03)]">
                         <div className="flex items-center justify-between gap-2">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-400">
+                          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">
                             After book
                           </div>
                           <div className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-emerald-700">
@@ -351,7 +350,7 @@ export function HeroSection({
                               key={item.label}
                               className="flex items-center justify-between gap-3 rounded-[0.95rem] border border-slate-200 bg-white px-3 py-2"
                             >
-                              <div className="text-[10px] font-semibold text-slate-700">{item.label}</div>
+                              <div className="text-xs font-semibold text-slate-700">{item.label}</div>
                               <div className={`rounded-full px-2 py-1 text-[9px] font-semibold uppercase tracking-[0.1em] ${item.tone}`}>
                                 {item.value}
                               </div>
@@ -379,10 +378,10 @@ export function HeroSection({
                             key={item.title}
                             className="rounded-[0.95rem] border border-slate-200/80 bg-white/88 px-3 py-2 shadow-none"
                           >
-                            <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                            <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                               {item.title}
                             </div>
-                            <div className="mt-1 text-[10px] leading-4 text-slate-600">{item.body}</div>
+                            <div className="mt-1 text-xs leading-4 text-slate-600">{item.body}</div>
                           </div>
                         ))}
                       </div>

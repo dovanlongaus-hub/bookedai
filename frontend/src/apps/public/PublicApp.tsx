@@ -6,6 +6,7 @@ import {
   CalendarCheck2,
   CheckCircle2,
   CircleDollarSign,
+  ClipboardCheck,
   Gauge,
   MessageSquareText,
   PlayCircle,
@@ -17,6 +18,7 @@ import {
 
 import { brandUploadedLogoPath } from '../../components/landing/data';
 import { LogoMark } from '../../components/landing/ui/LogoMark';
+import { LiveBookingStrip, LiveBookingToast } from '../../shared/components/LiveBookingTicker';
 import { HomepageSearchExperience } from './HomepageSearchExperience';
 import { getHomepageContent, pitchDeckHref } from './homepageContent';
 
@@ -28,11 +30,12 @@ const tenantPreviewImageSrcSet =
   '/branding/optimized/tenant-login-hero-960.webp 960w, /branding/optimized/tenant-login-hero-1400.webp 1400w';
 const pitchVideoUrl = 'https://upload.bookedai.au/videos/9eb8/BhVuOlB2QXlBo-_nyOFCcA.mp4';
 const productProofImageUrl = 'https://upload.bookedai.au/images/df6e/iarJydFRgp1aWGk5UF0d7g.png';
-const homepageProductHref = 'https://product.bookedai.au/?source=homepage';
 const homepageFinalProductHref = 'https://product.bookedai.au/?source=homepage-cta';
 const metadataTitle = 'Bookedai.au | The AI Revenue Engine for Service Businesses';
 
 type HomepageExperimentVariant = 'control' | 'product_first';
+
+type HomepageAudience = 'sme' | 'judge' | 'vc';
 
 type HomepageEventWindow = Window & {
   dataLayer?: Array<Record<string, unknown>>;
@@ -41,11 +44,15 @@ type HomepageEventWindow = Window & {
 
 const HOMEPAGE_VARIANT_STORAGE_KEY = 'bookedai.homepage.variant';
 const HOMEPAGE_VARIANT_QUERY_PARAM = 'homepage_variant';
+const HOMEPAGE_AUDIENCE_STORAGE_KEY = 'bookedai.audience';
+const HOMEPAGE_AUDIENCE_QUERY_PARAMS = ['aud', 'audience'] as const;
+const WSTI_DEMO_QUERY_PARAM = 'demo';
+const wstiDemoSearch = 'Show WSTI AI events at Western Sydney Startup Hub this month';
 
 const suggestedSearches = [
   'Book Co Mai Hung Chess Sydney pilot class this week',
   'Find Future Swim kids swimming lessons near Caringbah this weekend',
-  'Show WSTI AI events at Western Sydney Startup Hub this month',
+  wstiDemoSearch,
   'Book an AI Mentor 1-1 session for startup growth this week',
   'Find a premium haircut near Sydney CBD today',
 ];
@@ -59,9 +66,9 @@ const navLinks = [
 ] as const;
 
 const executiveStats = [
-  { value: '24/7', label: 'demand capture', detail: 'website, calls, chat, and follow-up' },
-  { value: '1', label: 'booking path', detail: 'search, shortlist, booking, care' },
-  { value: 'Live', label: 'product proof', detail: 'real services, portal, and CRM flow' },
+  { value: '3', label: 'live tenants', detail: 'Chess, Future Swim, AI Mentor proof paths' },
+  { value: 'Live', label: 'web + Telegram', detail: 'portal return and customer-care handoff' },
+  { value: '<30s', label: 'booking to ledger', detail: 'reference, portal, and action evidence' },
 ] as const;
 
 const investorSignals = [
@@ -138,7 +145,40 @@ const customerPoints = [
 const proofRows = [
   ['Co Mai Hung Chess', 'Verified tenant booking', 'Grandmaster proof'],
   ['Future Swim', 'Team visibility', 'Vertical proof'],
-  ['WhatsApp Care', 'Booking status and changes', 'Care agent'],
+  ['WSTI demo path', 'Event search to proof trail', 'Hackathon proof'],
+] as const;
+
+const channelTruthRows = [
+  { label: 'Live', value: 'Web assistant, Product app, Telegram, Portal', tone: 'bg-[#eaf4f1] text-[#19684b]' },
+  { label: 'In rollout', value: 'WhatsApp inbound, Email/CRM follow-up, tenant widget proof', tone: 'bg-[#fff7df] text-[#7b5c10]' },
+  { label: 'Next', value: 'SMS expansion, more widgets, billing/receivables truth', tone: 'bg-[#eef2ff] text-[#354399]' },
+] as const;
+
+const agentActivityProofRows = [
+  {
+    step: '01',
+    title: 'Enquiry captured',
+    detail: 'Customer asks from web, Telegram, or the WSTI demo prompt.',
+    evidence: 'message event',
+  },
+  {
+    step: '02',
+    title: 'AI ranks options',
+    detail: 'Service/event shortlist keeps location, price posture, and next action visible.',
+    evidence: 'match result',
+  },
+  {
+    step: '03',
+    title: 'Booking reference created',
+    detail: 'BookedAI generates a durable portal path instead of ending at a chat answer.',
+    evidence: 'booking ref',
+  },
+  {
+    step: '04',
+    title: 'Follow-up queued',
+    detail: 'CRM, email, Telegram care, payment posture, and manual-review actions become inspectable.',
+    evidence: 'action ledger',
+  },
 ] as const;
 
 function normalizeHomepageVariant(value: string | null): HomepageExperimentVariant | null {
@@ -189,6 +229,95 @@ function resolveHomepageVariant(): HomepageExperimentVariant {
   return assignedVariant;
 }
 
+function normalizeHomepageAudience(value: string | null): HomepageAudience | null {
+  if (!value) {
+    return null;
+  }
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'sme' || normalized === 'owner' || normalized === 'sme_owner' || normalized === 'a') {
+    return 'sme';
+  }
+  if (normalized === 'judge' || normalized === 'wsti' || normalized === 'hackathon' || normalized === 'b') {
+    return 'judge';
+  }
+  if (normalized === 'vc' || normalized === 'investor' || normalized === 'investors' || normalized === 'c') {
+    return 'vc';
+  }
+  return null;
+}
+
+function readAudienceQueryParam(params: URLSearchParams): { rawValue: string | null; resolved: HomepageAudience | null } {
+  for (const key of HOMEPAGE_AUDIENCE_QUERY_PARAMS) {
+    const raw = params.get(key);
+    if (raw !== null) {
+      return { rawValue: raw, resolved: normalizeHomepageAudience(raw) };
+    }
+  }
+  return { rawValue: null, resolved: null };
+}
+
+function resolveHomepageAudience(): HomepageAudience {
+  if (typeof window === 'undefined') {
+    return 'sme';
+  }
+
+  const params = new URLSearchParams(window.location.search);
+  const { rawValue, resolved } = readAudienceQueryParam(params);
+
+  // Allow `?aud=clear` (or empty) to reset persisted selection.
+  if (rawValue !== null) {
+    const trimmed = rawValue.trim().toLowerCase();
+    if (trimmed === '' || trimmed === 'clear' || trimmed === 'reset') {
+      try {
+        window.sessionStorage.removeItem(HOMEPAGE_AUDIENCE_STORAGE_KEY);
+      } catch {
+        // sessionStorage may be unavailable (private mode); ignore.
+      }
+      return 'sme';
+    }
+    if (resolved) {
+      try {
+        window.sessionStorage.setItem(HOMEPAGE_AUDIENCE_STORAGE_KEY, resolved);
+      } catch {
+        // ignore
+      }
+      return resolved;
+    }
+  }
+
+  // Hostname / path heuristics for shareable links without explicit ?aud=.
+  const hostname = window.location.hostname.toLowerCase();
+  const pathname = window.location.pathname.toLowerCase();
+  if (hostname.startsWith('pitch.') || pathname.startsWith('/pitch') || pathname.startsWith('/demo')) {
+    try {
+      window.sessionStorage.setItem(HOMEPAGE_AUDIENCE_STORAGE_KEY, 'judge');
+    } catch {
+      // ignore
+    }
+    return 'judge';
+  }
+  if (pathname.startsWith('/investor')) {
+    try {
+      window.sessionStorage.setItem(HOMEPAGE_AUDIENCE_STORAGE_KEY, 'vc');
+    } catch {
+      // ignore
+    }
+    return 'vc';
+  }
+
+  // Persisted selection wins over the SME default so refreshes keep the variant.
+  try {
+    const stored = normalizeHomepageAudience(window.sessionStorage.getItem(HOMEPAGE_AUDIENCE_STORAGE_KEY));
+    if (stored) {
+      return stored;
+    }
+  } catch {
+    // ignore
+  }
+
+  return 'sme';
+}
+
 function trackHomepageEvent(eventName: string, payload: Record<string, unknown> = {}) {
   if (typeof window === 'undefined') {
     return;
@@ -209,7 +338,13 @@ function trackHomepageEvent(eventName: string, payload: Record<string, unknown> 
 export function PublicApp() {
   const homepageSearchContent = useMemo(() => getHomepageContent('en'), []);
   const homepageVariant = useMemo(() => resolveHomepageVariant(), []);
-  const isProductFirstVariant = homepageVariant === 'product_first';
+  const homepageAudience = useMemo<HomepageAudience>(() => resolveHomepageAudience(), []);
+  const isWstiDemoMode = useMemo(() => {
+    if (typeof window === 'undefined') {
+      return false;
+    }
+    return new URLSearchParams(window.location.search).get(WSTI_DEMO_QUERY_PARAM)?.trim().toLowerCase() === 'wsti';
+  }, []);
   const [submittedQuery, setSubmittedQuery] = useState<string | null>(null);
   const [submittedRequestId, setSubmittedRequestId] = useState(0);
   const sourcePath =
@@ -217,27 +352,60 @@ export function PublicApp() {
       ? `${window.location.pathname}${window.location.search}`
       : '/';
 
-  const heroCopy = isProductFirstVariant
-    ? {
-        eyebrow: 'The AI revenue engine for service businesses',
-        title: 'Never miss a paying enquiry again.',
-        body:
-          'BookedAI answers every chat, call, SMS, and DM in seconds — books the customer, takes the deposit, and follows up so your team can actually close out the day.',
-        primaryCta: 'See it book a real customer →',
-        secondaryCta: 'Talk to a BookedAI human (10 min)',
-      }
-    : {
-        eyebrow: 'The AI revenue engine for service businesses',
-        title: 'One AI agent layer. Every channel. Every booking. Audited.',
-        body:
-          'BookedAI runs a live multi-agent stack — intake, ranking, booking, payment, care — across web, WhatsApp, Telegram, SMS, and email, with an action ledger you can inspect.',
-        primaryCta: 'Run the live demo (60 sec)',
-        secondaryCta: 'Open the audit ledger',
-      };
+  const heroCopy =
+    homepageAudience === 'sme'
+      ? {
+          audienceBadge: 'For SME owners',
+          eyebrow: 'The AI revenue engine for service businesses',
+          title: 'Never miss a paying enquiry again.',
+          body:
+            'BookedAI answers every chat, call, SMS, and DM in seconds — books the customer, takes the deposit, and follows up so your team can actually close out the day.',
+          primaryCta: 'See it book a real customer',
+          secondaryCta: 'Talk to a BookedAI human (10 min)',
+        }
+      : homepageAudience === 'judge'
+        ? {
+            audienceBadge: 'For hackathon judges',
+            eyebrow: 'The AI revenue engine for service businesses',
+            title: 'One AI agent layer. Every channel. Every booking. Audited.',
+            body:
+              'BookedAI runs a live multi-agent stack — intake, ranking, booking, payment, care — across web, WhatsApp, Telegram, SMS, and email, with an action ledger you can inspect.',
+            primaryCta: 'Run the live demo (60 sec)',
+            secondaryCta: 'Open the audit ledger',
+          }
+        : {
+            audienceBadge: 'For investors',
+            eyebrow: 'The AI revenue engine for service businesses',
+            title: 'The revenue OS for the next 30M service businesses.',
+            body:
+              'BookedAI is an omnichannel agent layer that captures intent, books the customer, takes payment, and proves the revenue — turning fragmented service commerce into one auditable operating system.',
+            primaryCta: 'See live tenant proof',
+            secondaryCta: 'Read the investor pitch',
+          };
 
   useEffect(() => {
     trackHomepageEvent('homepage_variant_assigned', { variant: homepageVariant });
   }, [homepageVariant]);
+
+  useEffect(() => {
+    trackHomepageEvent('homepage_audience_assigned', {
+      variant: homepageVariant,
+      audience: homepageAudience,
+    });
+  }, [homepageAudience, homepageVariant]);
+
+  useEffect(() => {
+    if (!isWstiDemoMode) {
+      return;
+    }
+
+    trackHomepageEvent('homepage_wsti_demo_started', { variant: homepageVariant });
+    setSubmittedQuery(wstiDemoSearch);
+    setSubmittedRequestId((current) => current + 1);
+    window.setTimeout(() => {
+      document.getElementById('live-product')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 220);
+  }, [homepageVariant, isWstiDemoMode]);
 
   function navigateTo(href: string, eventName?: string, payload: Record<string, unknown> = {}) {
     if (typeof window === 'undefined') {
@@ -245,7 +413,12 @@ export function PublicApp() {
     }
 
     if (eventName) {
-      trackHomepageEvent(eventName, { variant: homepageVariant, href, ...payload });
+      trackHomepageEvent(eventName, {
+        variant: homepageVariant,
+        audience: homepageAudience,
+        href,
+        ...payload,
+      });
     }
     window.location.href = href;
   }
@@ -253,6 +426,7 @@ export function PublicApp() {
   function focusLiveProduct() {
     trackHomepageEvent('homepage_primary_cta_clicked', {
       variant: homepageVariant,
+      audience: homepageAudience,
       action: 'focus_search',
       href: '#live-product',
     });
@@ -262,13 +436,64 @@ export function PublicApp() {
     }, 160);
   }
 
+  function focusLiveTenantProof() {
+    trackHomepageEvent('homepage_primary_cta_clicked', {
+      variant: homepageVariant,
+      audience: homepageAudience,
+      action: 'focus_live_tenant_proof',
+      href: '#top',
+    });
+    // The top hero card already shows the live chess tenant proof; for VC visitors
+    // we keep them anchored at the live tenant proof tile.
+    document.getElementById('top')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function focusAuditLedger() {
+    trackHomepageEvent('homepage_secondary_cta_clicked', {
+      variant: homepageVariant,
+      audience: homepageAudience,
+      action: 'focus_audit_ledger',
+      href: '#agent-activity-proof',
+    });
+    document
+      .getElementById('agent-activity-proof')
+      ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   function handlePrimaryHeroAction() {
-    if (isProductFirstVariant) {
+    if (homepageAudience === 'sme') {
       focusLiveProduct();
       return;
     }
+    if (homepageAudience === 'judge') {
+      runSearch(wstiDemoSearch);
+      return;
+    }
+    // VC / investor — show them the live tenant proof tile.
+    focusLiveTenantProof();
+  }
 
-    navigateTo(homepageProductHref, 'homepage_primary_cta_clicked', { action: 'open_product' });
+  function handleSecondaryHeroAction() {
+    if (homepageAudience === 'sme') {
+      // SME owners: the secondary CTA is "Talk to a BookedAI human (10 min)" — route
+      // them to the investor/contact pitch deck which currently hosts the booking
+      // request. (Follow-up: dedicated owner-call CTA target.)
+      navigateTo(pitchDeckHref, 'homepage_secondary_cta_clicked', {
+        action: 'talk_to_human',
+        surface: 'hero',
+      });
+      return;
+    }
+    if (homepageAudience === 'judge') {
+      // Judges: scroll to the live agent activity proof / audit ledger surface.
+      focusAuditLedger();
+      return;
+    }
+    // VC / investor — open the investor pitch (same canonical pitchDeckHref).
+    navigateTo(pitchDeckHref, 'homepage_secondary_cta_clicked', {
+      action: 'open_investor_pitch',
+      surface: 'hero',
+    });
   }
 
   function runSearch(query: string) {
@@ -330,15 +555,24 @@ export function PublicApp() {
             </button>
             <button
               type="button"
-              onClick={() => navigateTo(homepageProductHref, 'homepage_primary_cta_clicked', { surface: 'header', action: 'open_product' })}
+              onClick={focusLiveProduct}
               className="inline-flex items-center gap-2 rounded-full bg-[#172033] px-4 py-2 text-sm font-semibold text-white shadow-[0_14px_32px_rgba(23,32,51,0.18)] transition hover:bg-[#263147]"
             >
-              Start in product
+              See a live booking
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>
         </div>
       </header>
+
+      {isWstiDemoMode ? (
+        <div className="border-b border-[#d8d0c0] bg-[#172033] px-4 py-3 text-white sm:px-6 lg:px-8">
+          <div className="mx-auto flex max-w-[1440px] flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between">
+            <div className="font-semibold">WSTI judge mode is running the live AI Summit proof path.</div>
+            <div className="text-slate-300">Prompt: {wstiDemoSearch}</div>
+          </div>
+        </div>
+      ) : null}
 
       <section id="top" className="relative px-4 pb-10 pt-7 sm:px-6 sm:pb-14 sm:pt-10 lg:px-8">
         <div className="mx-auto grid max-w-[1440px] gap-6 lg:grid-cols-[minmax(0,0.92fr)_minmax(520px,1.08fr)] lg:items-stretch">
@@ -347,6 +581,13 @@ export function PublicApp() {
               <div className="inline-flex items-center gap-2 rounded-full border border-[#d8d0c0] bg-[#f6f0e3] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#6c5a2e]">
                 <span className="h-2 w-2 rounded-full bg-[#2aa876]" />
                 {heroCopy.eyebrow}
+              </div>
+              <div
+                className="audience-badge mt-3"
+                data-audience={homepageAudience}
+                aria-label={`Audience variant: ${heroCopy.audienceBadge}`}
+              >
+                {heroCopy.audienceBadge}
               </div>
               <h1 className="mt-6 max-w-[14ch] text-[3.1rem] font-semibold leading-[0.95] tracking-[-0.055em] text-[#172033] sm:text-[4.75rem] lg:text-[5.55rem]">
                 {heroCopy.title}
@@ -383,12 +624,16 @@ export function PublicApp() {
                 </button>
                 <button
                   type="button"
-                  onClick={() => document.getElementById('why-bookedai')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                  onClick={handleSecondaryHeroAction}
                   className="inline-flex items-center justify-center gap-2 rounded-full border border-[#cfc7b8] bg-white px-5 py-3 text-sm font-bold text-[#172033] transition hover:border-[#9fb0c5]"
                 >
                   {heroCopy.secondaryCta}
                   <BarChart3 className="h-4 w-4" aria-hidden="true" />
                 </button>
+              </div>
+
+              <div className="mt-5 flex w-full">
+                <LiveBookingStrip className="w-full sm:w-auto" />
               </div>
             </div>
           </div>
@@ -423,7 +668,7 @@ export function PublicApp() {
                     <div className="grid grid-cols-4 gap-1.5 rounded-2xl border border-white/10 bg-white/[0.06] p-2">
                       {heroFlow.map((item, index) => (
                         <div key={item} className="min-w-0 rounded-xl bg-white/[0.07] px-2 py-2 text-center">
-                          <div className="text-[10px] font-bold text-[#8efce0]">0{index + 1}</div>
+                          <div className="text-xs font-bold text-[#8efce0]">0{index + 1}</div>
                           <div className="mt-1 text-[11px] font-semibold text-white">{item}</div>
                         </div>
                       ))}
@@ -465,6 +710,52 @@ export function PublicApp() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="agent-activity-proof" aria-labelledby="agent-activity-proof-title" className="px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-[1440px] gap-5 rounded-[2rem] border border-[#172033] bg-[#101827] p-5 text-white shadow-[0_30px_90px_rgba(23,32,51,0.2)] sm:p-7 lg:grid-cols-[0.74fr_1.26fr] lg:p-8">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#8efce0]">
+              <ClipboardCheck className="h-4 w-4" aria-hidden="true" />
+              Agent activity proof
+            </div>
+            <h2 id="agent-activity-proof-title" className="mt-5 max-w-xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-white sm:text-4xl">
+              The judge and owner can see the revenue loop, not just hear the pitch.
+            </h2>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
+              This is the public proof stack BookedAI should show in every serious demo: the customer
+              asks, the agent ranks, the booking reference opens the portal, and follow-up actions
+              become visible for the business.
+            </p>
+            <div className="mt-6 grid gap-2">
+              {channelTruthRows.map((item) => (
+                <div key={item.label} className="rounded-[1rem] border border-white/10 bg-white/[0.06] p-3">
+                  <div className={`inline-flex rounded-full px-2.5 py-1 text-xs font-bold uppercase tracking-[0.14em] ${item.tone}`}>
+                    {item.label}
+                  </div>
+                  <div className="mt-2 text-sm leading-6 text-slate-200">{item.value}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="grid gap-3">
+            {agentActivityProofRows.map((item) => (
+              <article key={item.step} className="grid gap-3 rounded-[1.25rem] border border-white/10 bg-white/[0.06] p-4 sm:grid-cols-[4.25rem_minmax(0,1fr)_auto] sm:items-center">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[#8efce0] text-base font-bold text-[#0b1120]">
+                  {item.step}
+                </div>
+                <div>
+                  <h3 className="text-base font-semibold text-white">{item.title}</h3>
+                  <p className="mt-1 text-sm leading-6 text-slate-300">{item.detail}</p>
+                </div>
+                <div className="w-fit rounded-full border border-white/12 bg-white/10 px-3 py-1.5 text-xs font-bold uppercase tracking-[0.14em] text-[#8efce0] sm:justify-self-end">
+                  {item.evidence}
+                </div>
+              </article>
+            ))}
           </div>
         </div>
       </section>
@@ -760,6 +1051,8 @@ export function PublicApp() {
           </div>
         </div>
       </section>
+
+      <LiveBookingToast />
     </main>
   );
 }

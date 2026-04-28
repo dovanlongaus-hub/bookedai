@@ -673,7 +673,7 @@ export function BookingAssistantSection({
         });
         if (!response.ok) {
           const payload = await response.json().catch(() => null);
-          throw new Error(resolveApiErrorMessage(payload, 'Unable to load service catalog.'));
+          throw new Error(resolveApiErrorMessage(payload, "We couldn't reach the service catalog. Try again in a moment."));
         }
 
         const payload = (await response.json()) as BookingAssistantCatalogResponse;
@@ -752,7 +752,7 @@ export function BookingAssistantSection({
       detail?: string;
     };
     if (!response.ok) {
-      throw new Error(resolveApiErrorMessage(payload, 'Unable to send message.'));
+      throw new Error(resolveApiErrorMessage(payload, "Couldn't send that message. Let's try again in a moment."));
     }
 
     return payload;
@@ -935,7 +935,7 @@ export function BookingAssistantSection({
         .map((service) => service.id);
       setCompareServiceIds(nextCompareIds);
     } catch (error) {
-      setChatError(error instanceof Error ? error.message : 'Unable to send message.');
+      setChatError(error instanceof Error ? error.message : "Couldn't send that message. Let's try again in a moment.");
     } finally {
       setLoading(false);
     }
@@ -999,7 +999,7 @@ export function BookingAssistantSection({
     event.preventDefault();
 
     if (!selectedService) {
-      setBookingError('Select a matched service before continuing to booking.');
+      setBookingError('Pick a service from the chat first so we can prepare the booking.');
       return;
     }
 
@@ -1016,7 +1016,7 @@ export function BookingAssistantSection({
 
     const slot = parsePreferredSlot(preferredSlot);
     if (!slot) {
-      setBookingError('Choose a valid preferred booking time.');
+      setBookingError('Pick a date and time that work for you.');
       return;
     }
 
@@ -1100,14 +1100,14 @@ export function BookingAssistantSection({
         detail?: string;
       };
       if (!response.ok) {
-        throw new Error(resolveApiErrorMessage(payload, 'Unable to create booking request.'));
+        throw new Error(resolveApiErrorMessage(payload, "Couldn't lock in that booking. Let's try again or reach out for help."));
       }
 
       setBookingResult(payload);
       setActivePreviewTab('booking');
     } catch (error) {
       setBookingError(
-        error instanceof Error ? error.message : 'Unable to create booking request.',
+        error instanceof Error ? error.message : "Couldn't lock in that booking. Let's try again or reach out for help.",
       );
     } finally {
       setBookingLoading(false);
@@ -1153,7 +1153,7 @@ export function BookingAssistantSection({
             <div className="mt-8 grid gap-3 sm:grid-cols-3 lg:grid-cols-1 xl:grid-cols-3">
               {previewSignals.map((item) => (
                 <SectionCard key={item.label} as="article" tone="subtle" className="rounded-[1.3rem] px-4 py-4">
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                     {item.label}
                   </div>
                   <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">
@@ -1174,7 +1174,7 @@ export function BookingAssistantSection({
                     Graphic-led product proof, not just a text demo.
                   </div>
                 </div>
-                <SignalPill className="px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-[#1459c7]">
+                <SignalPill className="px-3 py-1 text-xs uppercase tracking-[0.14em] text-[#1459c7]">
                   Interactive
                 </SignalPill>
               </div>
@@ -1192,7 +1192,7 @@ export function BookingAssistantSection({
 
               <div className="mt-5 flex flex-wrap gap-2">
                 {['Chat-first', 'Shortlist-ready', 'Booking-connected'].map((item) => (
-                  <SignalPill key={item} className="px-3 py-1.5 text-[10px] uppercase tracking-[0.14em] text-[#1459c7]">
+                  <SignalPill key={item} className="px-3 py-1.5 text-xs uppercase tracking-[0.14em] text-[#1459c7]">
                     {item}
                   </SignalPill>
                 ))}
@@ -1203,7 +1203,7 @@ export function BookingAssistantSection({
                 onClick={onOpenAssistant}
                 className="booked-button-secondary mt-6 w-full px-5 py-3 text-sm font-semibold"
               >
-                Open Full Assistant
+                Run the live demo →
               </button>
             </SectionCard>
           </SectionCard>
@@ -1222,10 +1222,10 @@ export function BookingAssistantSection({
                     </div>
                   </div>
                   <div className="flex flex-wrap gap-2">
-                    <SignalPill className="bg-emerald-50 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-emerald-700">
+                    <SignalPill className="bg-emerald-50 px-3 py-1 text-xs uppercase tracking-[0.14em] text-emerald-700">
                       {loading ? 'Searching' : 'Live'}
                     </SignalPill>
-                    <SignalPill className="bg-slate-100 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-600">
+                    <SignalPill className="bg-slate-100 px-3 py-1 text-xs uppercase tracking-[0.14em] text-slate-600">
                       {messages.length} messages
                     </SignalPill>
                   </div>
@@ -1277,13 +1277,13 @@ export function BookingAssistantSection({
                         </div>
 
                         <div className="mt-3 flex flex-wrap gap-2">
-                          <SignalPill className="bg-slate-100 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-600">
+                          <SignalPill className="bg-slate-100 px-3 py-1 text-xs uppercase tracking-[0.14em] text-slate-600">
                             Search
                           </SignalPill>
-                          <SignalPill className="bg-amber-50 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-amber-800">
+                          <SignalPill className="bg-amber-50 px-3 py-1 text-xs uppercase tracking-[0.14em] text-amber-800">
                             Match
                           </SignalPill>
-                          <SignalPill className="bg-emerald-50 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-emerald-700">
+                          <SignalPill className="bg-emerald-50 px-3 py-1 text-xs uppercase tracking-[0.14em] text-emerald-700">
                             Book
                           </SignalPill>
                         </div>
@@ -1413,7 +1413,7 @@ export function BookingAssistantSection({
                                                     isSelected ? 'bg-white/10 text-white' : 'bg-slate-50 text-slate-700'
                                                   }`}
                                                 >
-                                                  <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                                                  <div className="text-xs font-semibold uppercase tracking-[0.14em] opacity-70">
                                                     {fact.label}
                                                   </div>
                                                   <div className="mt-1 text-xs leading-5 font-medium">
@@ -1503,13 +1503,13 @@ export function BookingAssistantSection({
                                                 className="h-full w-full object-cover"
                                                 loading="lazy"
                                               />
-                                              <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-800">
+                                              <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-800">
                                                 {getEventVisualLabel(event)}
                                               </div>
                                             </div>
                                           ) : (
                                             <div className="flex aspect-[16/8] w-full items-end bg-[linear-gradient(135deg,#dbeafe_0%,#ecfeff_48%,#dcfce7_100%)] p-3">
-                                              <div className="rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-700">
+                                              <div className="rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-slate-700">
                                                 {event.is_wsti_priority ? 'WSTI featured event' : 'Sydney AI event'}
                                               </div>
                                             </div>
@@ -1517,7 +1517,7 @@ export function BookingAssistantSection({
                                           <div className="p-3">
                                             <div className="flex flex-wrap items-center gap-2">
                                               <div
-                                                className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] ${
+                                                className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${
                                                   event.is_wsti_priority
                                                     ? 'bg-emerald-100 text-emerald-700'
                                                     : 'bg-sky-100 text-sky-700'
@@ -1667,9 +1667,10 @@ export function BookingAssistantSection({
                                 <button
                                   type="submit"
                                   disabled={loading || !chatInput.trim()}
-                                  className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                                  aria-label="Send message"
+                                  className="rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:cursor-not-allowed disabled:opacity-60"
                                 >
-                                  {loading ? '...' : 'Send'}
+                                  {loading ? 'Sending…' : 'Send'}
                                 </button>
                               </div>
                             </form>
@@ -1687,14 +1688,14 @@ export function BookingAssistantSection({
                                   {selectedService ? selectedService.name : 'Waiting for a selected service'}
                                 </div>
                               </div>
-                              <div className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                              <div className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white">
                                 {selectedService ? 'Ready' : 'Idle'}
                               </div>
                             </div>
 
                             {selectedService ? (
                               <>
-                                <div className="mt-4 overflow-hidden rounded-[1.2rem] border border-slate-200 bg-slate-50">
+                                <div className="mt-4 overflow-hidden rounded-[1.2rem] border border-slate-200 bg-slate-50" role="region" aria-label="Selected service summary">
                                   {extractServiceImageUrl(selectedService) ? (
                                     <div className="relative aspect-[16/8] w-full overflow-hidden bg-slate-100">
                                       <img
@@ -1703,7 +1704,7 @@ export function BookingAssistantSection({
                                         className="h-full w-full object-cover"
                                         loading="lazy"
                                       />
-                                      <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-800">
+                                      <div className="absolute left-3 top-3 rounded-full bg-white/90 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-800">
                                         {getServiceVisualLabel(selectedService)}
                                       </div>
                                     </div>
@@ -1737,7 +1738,7 @@ export function BookingAssistantSection({
                                       key={`booking-tab-${fact.label}`}
                                       className="rounded-[1rem] bg-slate-50 px-3 py-3 text-xs text-slate-700"
                                     >
-                                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                         {fact.label}
                                       </div>
                                       <div className="mt-1 leading-5 font-medium text-slate-800">
@@ -1785,7 +1786,7 @@ export function BookingAssistantSection({
                               </>
                             ) : (
                               <div className="mt-4 rounded-[1rem] bg-[#f8fafc] px-4 py-4 text-sm leading-6 text-slate-600">
-                                Pick a service in the chat tab first. Once selected, this booking tab becomes the clear next step and stays synced with the form below.
+                                Let's try a different angle. Tell the chat which service or outcome matters most, then this booking tab will pick it up and stay synced with the form below.
                               </div>
                             )}
                           </div>
@@ -1897,7 +1898,7 @@ export function BookingAssistantSection({
                             { label: 'Fulfilment', value: bookingResult ? 'Email + payment + workflow ready' : 'Email and payment prepared next' },
                           ].map((fact) => (
                             <div key={fact.label} className="rounded-[1rem] bg-white px-3 py-3 text-xs text-slate-700">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                 {fact.label}
                               </div>
                               <div className="mt-1 leading-5 font-medium text-slate-800">{fact.value}</div>
@@ -1986,9 +1987,9 @@ export function BookingAssistantSection({
                       <button
                         type="submit"
                         disabled={bookingLoading || !selectedService}
-                        className="w-full rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                        className="w-full rounded-full bg-slate-950 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--apple-blue)] disabled:cursor-not-allowed disabled:opacity-60"
                       >
-                        {bookingLoading ? 'Preparing booking...' : 'Create booking and continue to payment'}
+                        {bookingLoading ? 'Securing your spot…' : 'Create booking and continue to payment'}
                       </button>
                     </div>
                   </form>

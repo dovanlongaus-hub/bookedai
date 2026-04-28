@@ -11,16 +11,16 @@ type TrustSectionProps = {
 };
 
 const headingContent = {
-  kicker: 'Trust',
+  kicker: 'Proof',
   kickerClassName: 'text-emerald-600',
-  title: `Give buyers and investors enough proof to take ${brandName} seriously in the first minute`,
-  body: 'Keep the strongest proof realistic, compact, and easy to scan so buyers can judge fit quickly while investors can recognise commercial discipline without reading a wall of claims.',
+  title: `Real bookings. Real businesses. Live revenue running through ${brandName}.`,
+  body: 'Operators using BookedAI to recover after-hours enquiries, route fit-aware suggestions, and post bookings to the audit ledger before the team even logs in.',
 };
 
 const trustSignals = [
-  { label: 'Commercial model', value: 'Legible' },
-  { label: 'Proof style', value: 'Grounded' },
-  { label: 'Scale posture', value: 'Visible' },
+  { label: 'Live tenants', value: '3 in production' },
+  { label: 'Channels wired', value: '5 (web, SMS, WhatsApp, Telegram, email)' },
+  { label: 'Booking → ledger', value: '< 30s' },
 ];
 
 export function TrustSection({ items, faqItems }: TrustSectionProps) {
@@ -33,7 +33,7 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
           <div className="mt-8 grid gap-3">
             {trustSignals.map((item) => (
               <SectionCard key={item.label} as="article" tone="subtle" className="rounded-[1.35rem] border border-black/6 bg-white px-5 py-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                   {item.label}
                 </div>
                 <div className="mt-2 text-xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">
@@ -43,20 +43,20 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
             ))}
           </div>
 
-          <SectionCard className="mt-5 rounded-[1.8rem] border border-black/6 bg-white p-5 shadow-[0_14px_34px_rgba(15,23,42,0.04)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[#1459c7]">
-              Trust frame
+          <SectionCard className="mt-5 rounded-[1.8rem] border border-black/6 bg-white p-5 shadow-apple-sm">
+            <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-apple-blue">
+              What buyers actually check
             </div>
-            <div className="mt-3 text-xl font-semibold tracking-[-0.03em] text-[#1d1d1f]">
-              Credibility is the goal, not noise.
+            <div className="mt-3 text-xl font-semibold tracking-[-0.03em] text-apple-near-black">
+              Concrete proof beats positioning.
             </div>
             <div className="mt-4 grid gap-3">
               {[
-                'Show how the operating path works from demand to booking outcome.',
-                'Use compact proof blocks instead of inflated enterprise language.',
-                'Answer scale, rollout, and credibility questions before the buyer needs to ask.',
+                'Live tenants you can open: chess.bookedai.au, futureswim.bookedai.au, ai-mentor.bookedai.au.',
+                'Bookings posted to the audit ledger inside 30 seconds, with attribution to channel and source.',
+                'Operators answer fewer manual questions per week; revenue stops leaking after-hours.',
               ].map((item) => (
-                <div key={item} className="rounded-[1.05rem] border border-black/6 bg-[linear-gradient(180deg,#ffffff_0%,#f8fbff_100%)] px-4 py-3 text-sm leading-6 text-black/72">
+                <div key={item} className="rounded-[1.05rem] border border-black/6 bg-white px-4 py-3 text-sm leading-6 text-black/72">
                   {item}
                 </div>
               ))}
@@ -73,7 +73,7 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
                   Short proof that makes adoption feel safer.
                 </div>
               </div>
-              <SignalPill className="bg-emerald-50 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-emerald-700">
+              <SignalPill className="bg-emerald-50 px-3 py-1 text-xs uppercase tracking-[0.14em] text-emerald-700">
                 Scan first
               </SignalPill>
             </div>
@@ -90,7 +90,7 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
                     <div className="flex h-10 w-10 items-center justify-center rounded-full bg-[#1d1d1f] text-[11px] font-semibold text-white">
                       {String(index + 1).padStart(2, '0')}
                     </div>
-                    <SignalPill className="bg-white px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-600">
+                    <SignalPill className="bg-white px-3 py-1 text-xs uppercase tracking-[0.14em] text-slate-600">
                       Customer cue
                     </SignalPill>
                   </div>
@@ -112,7 +112,7 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
                   The questions that usually decide whether buyers move forward.
                 </div>
               </div>
-              <div className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
+              <div className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-white">
                 Short answers
               </div>
             </div>

@@ -207,12 +207,12 @@ export function PartnersSection({
                 <div className="flex flex-wrap gap-3">
                   {onStartTrial ? (
                     <button type="button" onClick={onStartTrial} className="booked-button">
-                      Open Web App
+                      Start free
                     </button>
                   ) : null}
                   {onBookDemo ? (
                     <button type="button" onClick={onBookDemo} className="booked-button-secondary">
-                      Talk to Sales
+                      Talk to a BookedAI human
                     </button>
                   ) : null}
                 </div>
@@ -235,7 +235,7 @@ export function PartnersSection({
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
             {trustMetrics.map((item) => (
               <SectionCard key={item.label} tone="subtle" className="rounded-[1.25rem] px-4 py-4">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                   {item.label}
                 </div>
                 <div className="mt-2 text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f]">{item.value}</div>
@@ -265,10 +265,10 @@ export function PartnersSection({
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
-                Partner trust
+                Tools BookedAI integrates with
               </div>
               <div className="mt-2 text-2xl font-bold text-slate-950">
-                Credibility support, kept in the background where it belongs
+                Live integrations with the platforms our customers already trust.
               </div>
             </div>
             <SignalPill className="border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
@@ -330,10 +330,10 @@ export function PartnersSection({
                             {item.name}
                           </div>
                           <div className="mt-2 flex flex-wrap gap-2">
-                            <SignalPill className="bg-sky-50 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-sky-700">
+                            <SignalPill className="bg-sky-50 px-2.5 py-1 text-xs uppercase tracking-[0.12em] text-sky-700">
                               {item.category ?? 'Infrastructure'}
                             </SignalPill>
-                            <SignalPill className="bg-slate-100 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-slate-600">
+                            <SignalPill className="bg-slate-100 px-2.5 py-1 text-xs uppercase tracking-[0.12em] text-slate-600">
                               Startup support
                             </SignalPill>
                           </div>
@@ -384,10 +384,10 @@ export function PartnersSection({
                             {item.name}
                           </div>
                           <div className="mt-2 flex flex-wrap gap-2">
-                            <SignalPill className="bg-emerald-50 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-emerald-700">
+                            <SignalPill className="bg-emerald-50 px-2.5 py-1 text-xs uppercase tracking-[0.12em] text-emerald-700">
                               {item.category ?? 'Partner'}
                             </SignalPill>
-                            <SignalPill className="bg-slate-100 px-2.5 py-1 text-[10px] uppercase tracking-[0.12em] text-slate-600">
+                            <SignalPill className="bg-slate-100 px-2.5 py-1 text-xs uppercase tracking-[0.12em] text-slate-600">
                               Visible ecosystem
                             </SignalPill>
                           </div>

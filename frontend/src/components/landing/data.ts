@@ -400,7 +400,7 @@ export const heroContent: HeroContent = {
   bodyRest:
     'Instead of stitching together chat, triage, scheduling, CRM, and follow-up manually, your team gets one responsive web experience that makes the revenue path clear on desktop, tablet, and mobile.',
   note: 'Start with the live web app on bookedai.au. Native mobile can follow once the core customer and booking journey is fully proven.',
-  primaryCta: 'See bookings BookedAI is winning live',
+  primaryCta: 'See it close a real booking →',
   secondaryCta: 'Book a 10-min revenue demo',
   primaryHref: productHref,
   secondaryHref: '/register-interest',
@@ -557,7 +557,7 @@ export const implementationContent: SectionContent = {
 export const solutionCards: InfoCard[] = [
   {
     title: 'Instant response',
-    body: 'Every channel gets a fast first reply with the same tone and service flow.',
+    body: 'Live channels get a fast first reply with the same tone and service flow; rollout channels stay clearly labelled.',
   },
   {
     title: 'Smart qualification',
@@ -585,17 +585,17 @@ export const metrics: Metric[] = [
 export const pricingContent: PricingContent = {
   kicker: 'Pricing',
   kickerClassName: 'text-indigo-400',
-  title: 'Simple enough for SMEs to buy, structured enough for enterprise growth.',
-  body: 'The commercial model is designed to stay easy to approve, easy to understand, and credible as BookedAI grows from demand capture into a fuller revenue workflow.',
-  planLabel: 'Starting plan',
-  planPrice: '49$+',
-  planCaption: 'entry pricing for SMEs launching BookedAI on a clean customer flow',
+  title: 'Pay only when BookedAI books real revenue.',
+  body: 'Three tiers tied to the AI Revenue Engine. Free at the bottom, aligned in the middle, premium at the top.',
+  planLabel: 'Starts from',
+  planPrice: 'A$79/mo',
+  planCaption: 'Starter Engine is free SaaS for solo and micro teams. Growth and Enterprise tie commission to real booked revenue.',
   planFeatures: [
-    'Plans start from 49$+',
-    'Lightweight entry path for low-friction activation',
-    '1 month free on Pro and Pro Max',
-    'Setup fee quoted clearly when rollout scope needs it',
-    'Commission charged only on successful BookedAI-attributed bookings',
+    'Starter Engine: A$79/mo, A$0 setup, 0% commission (pure SaaS)',
+    'Growth Engine: A$249/mo + A$499 onboarding + 3% on net booked revenue',
+    'Enterprise Engine: A$999+/mo + A$2,500-A$10,000 setup + 5% on attributable revenue',
+    'Setup fees scoped after a 10-min call',
+    'Commission applies only to bookings BookedAI captures or recovers',
   ],
   primaryCta: 'Start free — pay only on booked revenue',
   primaryHref: productHref,
@@ -605,7 +605,7 @@ export const ctaContent: CallToActionContent = {
   kicker: 'Call to action',
   title: 'Ready to replace fragmented enquiry handling with a cleaner revenue system?',
   body: 'Open the live responsive web app or talk to us about the launch path that best fits your customer volume, team capacity, and growth ambition.',
-  primaryCta: 'Start capturing missed bookings',
+  primaryCta: 'Start capturing missed bookings →',
   secondaryCta: 'Talk to a BookedAI human',
   primaryHref: productHref,
   secondaryHref: '/register-interest',
@@ -636,14 +636,14 @@ export const trustItems: TrustItem[] = [
 
 export const faqItems: FAQItem[] = [
   {
-    question: 'How does the Starter entry layer work?',
+    question: 'How does the Starter Engine tier work?',
     answer:
-      'Starter is the low-friction entry layer for teams that want to validate demand capture, response quality, and booking flow fit quickly. When the operating case is proven, the path into Pro or Pro Max is already visible.',
+      'Starter Engine is free SaaS at A$79/mo with no setup fee and 0% commission. It covers one channel (Telegram or web widget), one service catalog, BookedAI Manager Bot, portal, payment QR, and email confirmations, capped at 50 bookings/mo. When the AI Revenue Engine is proving real booking output, the path into Growth or Enterprise is already visible.',
   },
   {
-    question: 'What does the commercial model look like after the launch offer?',
+    question: 'What does the commercial model look like across the three tiers?',
     answer:
-      'After the first 10-SME free setup cohort, BookedAI charges a clearly scoped setup fee, then a monthly operating plan, and only adds commission when BookedAI is helping generate real booked outcomes through the installed flow.',
+      'Setup, monthly subscription, and commission stay clearly separated. Starter Engine is A$0 setup + A$79/mo + 0% commission. Growth Engine is A$499 onboarding + A$249/mo + 3% on net booked revenue. Enterprise Engine is A$2,500-A$10,000 setup + A$999+/mo + 5% on attributable revenue with a negotiated floor and cap.',
   },
   {
     question: 'Does this expand into a real business workflow, or stay as a front-end widget?',
@@ -703,9 +703,9 @@ export const videoDemoContent: VideoDemoContent = {
     'Real options instead of vague replies',
     'A confirmed next step at the end',
   ],
-  primaryCta: 'Watch Demo Hub',
+  primaryCta: 'Watch the 60-sec walkthrough',
   primaryHref: videoDemoHref,
-  secondaryCta: 'Book Live Demo',
+  secondaryCta: 'Run the live demo →',
   secondaryHref: demoCtaHref,
 };
 

@@ -229,7 +229,7 @@ export function FutureSwimApp() {
   }
 
   useEffect(() => {
-    document.title = 'Future Swim | Premium swim booking experience powered by BookedAI';
+    document.title = 'Future Swim | Live BookedAI tenant — bookings, payments, follow-up';
   }, []);
 
   useEffect(() => {
@@ -472,57 +472,75 @@ export function FutureSwimApp() {
   }
 
   return (
-    <main className="min-h-screen overflow-hidden bg-[#f6fbff] text-[#11324a]">
-      <div className="pointer-events-none fixed inset-0 bg-[radial-gradient(circle_at_top_left,rgba(97,226,255,0.2),transparent_28%),radial-gradient(circle_at_top_right,rgba(255,153,119,0.18),transparent_24%),linear-gradient(180deg,#f6fbff_0%,#fffaf5_46%,#eef9ff_100%)]" />
-      <div className="pointer-events-none fixed inset-x-0 top-0 h-[28rem] bg-[linear-gradient(180deg,rgba(12,72,117,0.12),transparent)]" />
-
-      <div className="relative z-10 mx-auto max-w-7xl px-5 pb-16 pt-6 sm:px-8 lg:px-10 lg:pb-24">
+    <main className="min-h-screen bg-apple-light text-apple-near-black">
+      <div className="mx-auto max-w-7xl px-5 pb-16 pt-6 sm:px-8 lg:px-10 lg:pb-24">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-[0.3em] text-[#0c7aae]">Future Swim booking concierge</div>
-            <div className="mt-2 font-serif text-3xl tracking-[-0.03em] text-[#10314c]">Enterprise-grade enrolment experience</div>
+            <div className="template-kicker">Future Swim · Verified BookedAI tenant</div>
+            <div className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-apple-near-black">
+              Live swim school running on BookedAI
+            </div>
           </div>
           <div className="flex flex-wrap gap-3">
             <a
               href="#centres"
-              className="rounded-full border border-[#cfe5f1] bg-white/90 px-5 py-3 text-sm font-semibold text-[#11324a] shadow-[0_14px_28px_rgba(17,50,74,0.06)]"
+              className="booked-button-secondary"
+              aria-label="View available swim centres"
             >
-              View centres
+              View live tenant
             </a>
             <a
               href="#booking-flow"
-              className="rounded-full bg-[#11324a] px-5 py-3 text-sm font-semibold text-white shadow-[0_18px_36px_rgba(17,50,74,0.18)]"
+              className="booked-button"
+              aria-label="Save my spot in a Future Swim class"
             >
-              Start booking
+              Save my spot
             </a>
           </div>
         </header>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
-          <div className="overflow-hidden rounded-[2.25rem] border border-[#d6eef6] bg-[linear-gradient(145deg,#0d3b63_0%,#0f5f89_48%,#1da0b8_100%)] p-8 text-white shadow-[0_36px_80px_rgba(9,45,71,0.22)] sm:p-10">
-            <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/88 backdrop-blur">
-              Redesigned for families, with real bookings and current pricing
+          <div className="template-card-dark p-8 sm:p-10">
+            <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/88">
+              Verified BookedAI tenant · Stripe · WhatsApp · Calendar
             </div>
-            <h1 className="mt-6 max-w-4xl font-serif text-5xl leading-[0.95] tracking-[-0.05em] text-white sm:text-6xl lg:text-[4.6rem]">
-              A calmer, more premium Future Swim website with BookedAI fully wired into the booking flow.
+            <h1 className="mt-6 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl md:leading-[0.98]">
+              Watch BookedAI run a live swim school — bookings, payments, and follow-up.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-white/82">
-              This Future Swim experience combines calm, parent-focused design with a built-in AI receptionist. Discover centres, see current pricing, ask for the right fit, and send an enquiry or booking request.
+              Real bookings, real Stripe payments, real audit ledger. Search the live Future Swim catalogue, choose a centre, and your booking moves into the same operator console every BookedAI business runs on.
             </p>
 
+            <div className="mt-8 flex flex-wrap gap-3">
+              <a
+                href="#booking-flow"
+                className="booked-button"
+                aria-label="Run the live Future Swim demo"
+              >
+                Run the live demo
+              </a>
+              <a
+                href="https://bookedai.au/"
+                className="booked-button-secondary apple-button-secondary-dark"
+                aria-label="Talk to a BookedAI human about this tenant"
+              >
+                Talk to a BookedAI human
+              </a>
+            </div>
+
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-[1.7rem] border border-white/12 bg-white/10 p-5 backdrop-blur">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#bdefff]">Centres in flow</div>
+              <div className="rounded-[var(--apple-radius-large)] border border-white/12 bg-white/10 p-5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/74">Centres in flow</div>
                 <div className="mt-3 text-4xl font-semibold tracking-[-0.04em]">{heroMetrics.centreCount || '6'}</div>
-                <div className="mt-2 text-sm text-white/74">Future Swim venues surfaced from the current catalogue.</div>
+                <div className="mt-2 text-sm text-white/74">Live Future Swim venues from the operator catalogue.</div>
               </div>
-              <div className="rounded-[1.7rem] border border-white/12 bg-white/10 p-5 backdrop-blur">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#bdefff]">Current pricing</div>
+              <div className="rounded-[var(--apple-radius-large)] border border-white/12 bg-white/10 p-5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/74">Current pricing</div>
                 <div className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{heroMetrics.priceBand}</div>
-                <div className="mt-2 text-sm text-white/74">Loaded from the live BookedAI Future Swim catalogue.</div>
+                <div className="mt-2 text-sm text-white/74">Loaded from the live BookedAI operator catalogue.</div>
               </div>
-              <div className="rounded-[1.7rem] border border-white/12 bg-white/10 p-5 backdrop-blur">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[#bdefff]">Featured centres</div>
+              <div className="rounded-[var(--apple-radius-large)] border border-white/12 bg-white/10 p-5">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/74">Featured centres</div>
                 <div className="mt-3 text-4xl font-semibold tracking-[-0.04em]">{heroMetrics.featuredCount || '4'}</div>
                 <div className="mt-2 text-sm text-white/74">Priority venues ready for parent-facing promotion.</div>
               </div>
@@ -542,49 +560,51 @@ export function FutureSwimApp() {
             </div>
           </div>
 
-          <aside className="rounded-[2.25rem] border border-[#dbe9f3] bg-white/88 p-7 shadow-[0_30px_70px_rgba(17,50,74,0.08)] backdrop-blur sm:p-8">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0c7aae]">What makes this different</div>
-            <h2 className="mt-3 font-serif text-4xl leading-tight tracking-[-0.04em] text-[#11324a]">
-              Built for real families. Real bookings. Current pricing.
+          <aside className="template-card p-7 sm:p-8">
+            <div className="template-kicker">What makes this different</div>
+            <h2 className="mt-3 text-4xl font-semibold leading-tight tracking-[-0.04em] text-apple-near-black">
+              Real bookings. Real Stripe payments. Real audit ledger.
             </h2>
             <div className="mt-6 space-y-3">
               {reassurancePoints.map((item) => (
-                <div key={item} className="rounded-[1.4rem] bg-[#f5fbff] px-5 py-4 text-sm leading-7 text-[#426178]">
+                <div key={item} className="template-card-subtle px-5 py-4 text-sm leading-7 text-[color:var(--apple-text-secondary)]">
                   {item}
                 </div>
               ))}
             </div>
-            <div className="mt-6 rounded-[1.6rem] border border-[#ffe0d4] bg-[linear-gradient(180deg,#fff5ef_0%,#fffdfb_100%)] p-5">
-              <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#d66f4b]">Pricing note</div>
-              <p className="mt-3 text-sm leading-7 text-[#5f514d]">
-                All prices shown reflect the current Future Swim catalogue. Contact your preferred centre directly to confirm exact class fees and available spots.
+            <div className="mt-6 template-card-subtle p-5">
+              <div className="template-kicker">Pricing note</div>
+              <p className="mt-3 text-sm leading-7 text-[color:var(--apple-text-secondary)]">
+                Prices reflect the live Future Swim operator catalogue. Confirm exact class fees and open spots with your preferred centre.
               </p>
             </div>
           </aside>
         </section>
 
         <section className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="rounded-[2rem] border border-[#dbe9f3] bg-white/88 p-7 shadow-[0_24px_60px_rgba(17,50,74,0.07)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0c7aae]">Find your centre</div>
-            <h2 className="mt-3 font-serif text-4xl tracking-[-0.04em] text-[#11324a]">Search the way a parent speaks</h2>
-            <p className="mt-4 text-sm leading-7 text-[#57758b]">
-              Tell us your child's age, confidence level, and preferred area. We'll shortlist the best-fit Future Swim centres for you.
+          <div className="template-card p-7">
+            <div className="template-kicker">Find your centre</div>
+            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-apple-near-black">Search the way a parent speaks</h2>
+            <p className="mt-4 text-sm leading-7 text-[color:var(--apple-text-secondary)]">
+              Tell us your child&apos;s age, confidence level, and preferred area. We&apos;ll shortlist the best-fit Future Swim centres for you.
             </p>
 
             <form className="mt-6" onSubmit={handleSearchSubmit}>
               <textarea
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
-                className="min-h-40 w-full rounded-[1.7rem] border border-[#d5e8f1] bg-[#f8fcff] px-5 py-4 text-sm leading-7 text-[#11324a] outline-none placeholder:text-[#84a0b4]"
+                className="min-h-40 w-full rounded-[var(--apple-radius-large)] border border-[var(--template-border)] bg-white px-5 py-4 text-base leading-7 text-apple-near-black outline-none placeholder:text-[color:var(--apple-text-tertiary)] sm:text-sm"
                 placeholder="My child is 4, nervous in the water, and we would prefer a weekend beginner class near Caringbah or Miranda."
+                aria-label="Describe your child to find the best Future Swim centre"
               />
               <div className="mt-4 flex flex-wrap gap-3">
                 <button
                   type="submit"
                   disabled={searchPending}
-                  className="rounded-full bg-[#11324a] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_30px_rgba(17,50,74,0.15)] disabled:opacity-70"
+                  className="booked-button"
+                  aria-label="Find best-fit Future Swim centres"
                 >
-                  {searchPending ? 'Searching Future Swim...' : 'Find best-fit centres'}
+                  {searchPending ? 'Searching Future Swim…' : 'Find best-fit centres'}
                 </button>
                 <button
                   type="button"
@@ -593,7 +613,8 @@ export function FutureSwimApp() {
                     setSearchError('');
                     setConversation((current) => current.slice(0, 1));
                   }}
-                  className="rounded-full border border-[#d5e8f1] bg-white px-6 py-3 text-sm font-semibold text-[#11324a]"
+                  className="booked-button-secondary"
+                  aria-label="Reset shortlist"
                 >
                   Reset shortlist
                 </button>
@@ -604,57 +625,55 @@ export function FutureSwimApp() {
               {conversation.map((message, index) => (
                 <div
                   key={`${message.role}-${index}`}
-                  className={`rounded-[1.35rem] px-4 py-3 text-sm leading-7 ${
+                  className={`rounded-[var(--apple-radius-comfortable)] px-4 py-3 text-sm leading-7 ${
                     message.role === 'assistant'
-                      ? 'bg-[#f3fbff] text-[#35596b]'
-                      : 'bg-[#11324a] text-white'
+                      ? 'template-card-subtle text-[color:var(--apple-text-secondary)]'
+                      : 'bg-apple-near-black text-white'
                   }`}
                 >
                   {message.content}
                 </div>
               ))}
               {searchError ? (
-                <div className="rounded-[1.35rem] border border-[#ffd9cd] bg-[#fff3ef] px-4 py-3 text-sm text-[#a55a42]">
+                <div className="rounded-[var(--apple-radius-comfortable)] template-card-subtle px-4 py-3 text-sm text-apple-near-black">
                   {searchError}
                 </div>
               ) : null}
             </div>
           </div>
 
-          <div id="centres" className="rounded-[2rem] border border-[#dbe9f3] bg-white/88 p-7 shadow-[0_24px_60px_rgba(17,50,74,0.07)]">
+          <div id="centres" className="template-card p-7">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0c7aae]">Current catalogue</div>
-                <h2 className="mt-3 font-serif text-4xl tracking-[-0.04em] text-[#11324a]">Future Swim centres and products</h2>
+                <div className="template-kicker">Live operator catalogue</div>
+                <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-apple-near-black">Future Swim centres and products</h2>
               </div>
-              <div className="rounded-full bg-[#f2fbff] px-4 py-2 text-xs font-semibold text-[#426178]">Live catalogue driven</div>
+              <span className="template-chip">Live catalogue</span>
             </div>
 
             <div className="mt-6 space-y-4">
-              {catalogPending ? <div className="rounded-[1.4rem] bg-[#f5fbff] px-5 py-4 text-sm text-[#57758b]">Loading Future Swim catalogue...</div> : null}
-              {catalogError ? <div className="rounded-[1.4rem] border border-[#ffd9cd] bg-[#fff3ef] px-5 py-4 text-sm text-[#a55a42]">{catalogError}</div> : null}
+              {catalogPending ? <div className="template-card-subtle px-5 py-4 text-sm text-[color:var(--apple-text-secondary)]">Loading Future Swim catalogue…</div> : null}
+              {catalogError ? <div className="template-card-subtle px-5 py-4 text-sm text-apple-near-black">{catalogError}</div> : null}
               {!catalogPending && !catalogError && !displayedResults.length ? (
-                <div className="rounded-[1.4rem] bg-[#f5fbff] px-5 py-4 text-sm text-[#57758b]">No Future Swim centres are currently visible in the catalogue.</div>
+                <div className="template-card-subtle px-5 py-4 text-sm text-[color:var(--apple-text-secondary)]">No Future Swim centres are currently visible in the catalogue.</div>
               ) : null}
               {displayedResults.map((result) => {
                 const selected = formState.selectedServiceId === result.candidateId;
                 return (
                   <article
                     key={result.candidateId}
-                    className={`rounded-[1.7rem] border p-5 transition ${
-                      selected ? 'border-[#0c7aae] bg-[#f1fbff]' : 'border-[#e5eef4] bg-[#fbfdff]'
+                    className={`rounded-[var(--apple-radius-large)] border p-5 transition ${
+                      selected ? 'border-[var(--apple-blue)] bg-white' : 'template-card-subtle'
                     }`}
                   >
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                       <div>
-                        <div className="text-[11px] font-semibold uppercase tracking-[0.22em] text-[#0c7aae]">
-                          {result.venueName || 'Future Swim'}
-                        </div>
-                        <h3 className="mt-2 font-serif text-3xl tracking-[-0.04em] text-[#11324a]">{result.serviceName}</h3>
-                        <p className="mt-3 max-w-2xl text-sm leading-7 text-[#5c7690]">{result.summary}</p>
-                        <div className="mt-3 text-sm font-medium text-[#35596b]">{result.location}</div>
+                        <div className="template-kicker">{result.venueName || 'Future Swim'}</div>
+                        <h3 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-apple-near-black">{result.serviceName}</h3>
+                        <p className="mt-3 max-w-2xl text-sm leading-7 text-[color:var(--apple-text-secondary)]">{result.summary}</p>
+                        <div className="mt-3 text-sm font-medium text-[color:var(--apple-text-secondary)]">{result.location}</div>
                       </div>
-                      <div className="rounded-[1.35rem] bg-white px-4 py-3 text-sm font-semibold text-[#11324a] shadow-[0_12px_24px_rgba(17,50,74,0.06)]">
+                      <div className="rounded-[var(--apple-radius-comfortable)] bg-white px-4 py-3 text-sm font-semibold text-apple-near-black shadow-sm">
                         {formatPrice(result.displayPrice, result.amountAud)}
                       </div>
                     </div>
@@ -662,7 +681,8 @@ export function FutureSwimApp() {
                       <button
                         type="button"
                         onClick={() => setFormState((current) => ({ ...current, selectedServiceId: result.candidateId }))}
-                        className="rounded-full bg-[#11324a] px-4 py-2 text-sm font-semibold text-white"
+                        className="booked-button"
+                        aria-label={selected ? 'Centre selected for booking' : `Choose ${result.venueName || 'this centre'}`}
                       >
                         {selected ? 'Selected for booking' : 'Choose this centre'}
                       </button>
@@ -671,7 +691,8 @@ export function FutureSwimApp() {
                           href={result.sourceUrl || result.bookingUrl || '#'}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-full border border-[#d5e8f1] bg-white px-4 py-2 text-sm font-semibold text-[#11324a]"
+                          className="booked-button-secondary"
+                          aria-label={`Open ${result.venueName || 'Future Swim'} page in a new tab`}
                         >
                           View Future Swim page
                         </a>
@@ -681,7 +702,8 @@ export function FutureSwimApp() {
                           href={result.mapUrl}
                           target="_blank"
                           rel="noreferrer"
-                          className="rounded-full border border-[#d5e8f1] bg-white px-4 py-2 text-sm font-semibold text-[#11324a]"
+                          className="booked-button-secondary"
+                          aria-label={`Open map for ${result.venueName || 'this centre'}`}
                         >
                           Open map
                         </a>
@@ -695,52 +717,61 @@ export function FutureSwimApp() {
         </section>
 
         <section id="booking-flow" className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="rounded-[2rem] border border-[#cfe7df] bg-[linear-gradient(180deg,#ecfff7_0%,#f9fffd_100%)] p-7 shadow-[0_24px_60px_rgba(17,50,74,0.07)]">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#0a8a69]">How it works</div>
-            <h2 className="mt-3 font-serif text-4xl tracking-[-0.04em] text-[#11324a]">From parent request to booked follow-up</h2>
-            <div className="mt-6 space-y-4 text-sm leading-7 text-[#426178]">
-              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">1. Search stays focused on Future Swim only — no other providers are recommended.</div>
-              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">2. The parent selects a centre or lesson card with current pricing and source links.</div>
-              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">3. Fill in your contact details, child age, and any notes for the team.</div>
-              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">4. With a preferred date and time, a booking request is created and confirmed by email.</div>
-              <div className="rounded-[1.35rem] bg-white/80 px-5 py-4">5. A confirmation email is sent to you, and the Future Swim team follows up to confirm your spot.</div>
-            </div>
+          <div className="template-card-subtle p-7">
+            <div className="template-kicker">How it works</div>
+            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-apple-near-black">From parent request to booked follow-up</h2>
+            <ol className="mt-6 space-y-4 text-sm leading-7 text-[color:var(--apple-text-secondary)]">
+              <li className="rounded-[var(--apple-radius-comfortable)] bg-white px-5 py-4">1. Search stays focused on Future Swim only — no other businesses are recommended.</li>
+              <li className="rounded-[var(--apple-radius-comfortable)] bg-white px-5 py-4">2. The parent selects a centre or lesson card with current pricing and source links.</li>
+              <li className="rounded-[var(--apple-radius-comfortable)] bg-white px-5 py-4">3. Fill in your contact details, child age, and any notes for the team.</li>
+              <li className="rounded-[var(--apple-radius-comfortable)] bg-white px-5 py-4">4. With a preferred date and time, a booking request is created and confirmed by email.</li>
+              <li className="rounded-[var(--apple-radius-comfortable)] bg-white px-5 py-4">5. A confirmation email is sent to you, and the Future Swim team follows up to confirm your spot.</li>
+            </ol>
           </div>
 
-          <form onSubmit={handleInquirySubmit} className="rounded-[2rem] border border-[#ffdcd1] bg-[linear-gradient(180deg,#fff6f1_0%,#ffffff_100%)] p-7 shadow-[0_24px_60px_rgba(17,50,74,0.07)]">
+          <form onSubmit={handleInquirySubmit} className="template-card p-7">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
-                <div className="text-[11px] font-semibold uppercase tracking-[0.24em] text-[#d66f4b]">Your details</div>
-                <h2 className="mt-3 font-serif text-4xl tracking-[-0.04em] text-[#11324a]">Send the request into BookedAI</h2>
+                <div className="template-kicker">Your details</div>
+                <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-apple-near-black">Save my spot</h2>
               </div>
-              <div className="rounded-full bg-white/80 px-4 py-2 text-xs font-semibold text-[#7a5c53]">
-                {selectedResult?.venueName || 'Select a centre'}
-              </div>
+              <span className="template-chip">{selectedResult?.venueName || 'Select a centre'}</span>
             </div>
 
             <div className="mt-6 grid gap-4 md:grid-cols-2">
               <input
                 value={formState.parentName}
                 onChange={(event) => setFormState((current) => ({ ...current, parentName: event.target.value }))}
-                className="rounded-[1.3rem] border border-[#f0dbd4] bg-white px-4 py-3 text-sm outline-none"
+                className="min-h-[44px] rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-base outline-none sm:text-sm"
                 placeholder="Parent name"
+                aria-label="Parent name"
+                autoComplete="name"
               />
               <input
+                type="email"
                 value={formState.email}
                 onChange={(event) => setFormState((current) => ({ ...current, email: event.target.value }))}
-                className="rounded-[1.3rem] border border-[#f0dbd4] bg-white px-4 py-3 text-sm outline-none"
+                className="min-h-[44px] rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-base outline-none sm:text-sm"
                 placeholder="Email"
+                aria-label="Email"
+                inputMode="email"
+                autoComplete="email"
               />
               <input
+                type="tel"
                 value={formState.phone}
                 onChange={(event) => setFormState((current) => ({ ...current, phone: event.target.value }))}
-                className="rounded-[1.3rem] border border-[#f0dbd4] bg-white px-4 py-3 text-sm outline-none"
+                className="min-h-[44px] rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-base outline-none sm:text-sm"
                 placeholder="Phone"
+                aria-label="Phone"
+                inputMode="tel"
+                autoComplete="tel"
               />
               <select
                 value={formState.childAge}
                 onChange={(event) => setFormState((current) => ({ ...current, childAge: event.target.value }))}
-                className="rounded-[1.3rem] border border-[#f0dbd4] bg-white px-4 py-3 text-sm outline-none"
+                className="rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-sm outline-none"
+                aria-label="Child age"
               >
                 {['2', '3', '4', '5', '6'].map((age) => (
                   <option key={age} value={age}>{`Child age: ${age}`}</option>
@@ -749,7 +780,8 @@ export function FutureSwimApp() {
               <select
                 value={formState.confidenceLevel}
                 onChange={(event) => setFormState((current) => ({ ...current, confidenceLevel: event.target.value }))}
-                className="rounded-[1.3rem] border border-[#f0dbd4] bg-white px-4 py-3 text-sm outline-none md:col-span-2"
+                className="rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-sm outline-none md:col-span-2"
+                aria-label="Confidence level"
               >
                 {['Nervous beginner', 'Comfortable beginner', 'Improving confidence', 'Ready for progression'].map((level) => (
                   <option key={level} value={level}>{level}</option>
@@ -759,59 +791,73 @@ export function FutureSwimApp() {
                 type="date"
                 value={formState.preferredDate}
                 onChange={(event) => setFormState((current) => ({ ...current, preferredDate: event.target.value }))}
-                className="rounded-[1.3rem] border border-[#f0dbd4] bg-white px-4 py-3 text-sm outline-none"
+                className="rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-sm outline-none"
+                aria-label="Preferred date"
               />
               <input
                 type="time"
                 value={formState.preferredTime}
                 onChange={(event) => setFormState((current) => ({ ...current, preferredTime: event.target.value }))}
-                className="rounded-[1.3rem] border border-[#f0dbd4] bg-white px-4 py-3 text-sm outline-none"
+                className="rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-sm outline-none"
+                aria-label="Preferred time"
               />
             </div>
 
             <textarea
               value={formState.notes}
               onChange={(event) => setFormState((current) => ({ ...current, notes: event.target.value }))}
-              className="mt-4 min-h-32 w-full rounded-[1.3rem] border border-[#f0dbd4] bg-white px-4 py-3 text-sm leading-7 outline-none"
-              placeholder="Anything Future Swim should know, such as water confidence, prior lessons, sibling needs, preferred days, or whether you want an assessment first."
+              className="mt-4 min-h-32 w-full rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-sm leading-7 outline-none"
+              placeholder="Anything Future Swim should know — water confidence, prior lessons, sibling needs, preferred days, or whether you want an assessment first."
+              aria-label="Notes for Future Swim"
             />
 
-            <div className="mt-4 rounded-[1.35rem] bg-white/80 px-4 py-4 text-sm leading-7 text-[#6a5a55]">
-              Add a preferred date and time to lock in a booking request. Without them, your enquiry is still recorded and the team will follow up to find a suitable time.
+            <div className="mt-4 template-card-subtle px-4 py-4 text-sm leading-7 text-[color:var(--apple-text-secondary)]">
+              Add a preferred date and time to lock in the booking. Without them, your enquiry is still recorded and the team will follow up to find a time.
             </div>
 
             <button
               type="submit"
               disabled={leadPending}
-              className="mt-5 rounded-full bg-[#ff7b58] px-6 py-3 text-sm font-semibold text-white shadow-[0_18px_30px_rgba(255,123,88,0.2)] disabled:opacity-70"
+              className="booked-button mt-5 min-h-[44px]"
+              aria-label="Save my spot in this Future Swim class"
             >
-              {leadPending ? 'Submitting...' : 'Send booking request'}
+              {leadPending ? 'Submitting…' : 'Save my spot'}
             </button>
 
             {leadStatus ? (
-              <div className="mt-4 rounded-[1.6rem] border border-[#b6e7d8] bg-[linear-gradient(135deg,#ecfff7_0%,#ffffff_100%)] px-5 py-5 text-[#0b6b56] shadow-[0_18px_36px_rgba(11,107,86,0.08)]">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.22em]">Thank you</div>
-                <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-[#074d3f]">
+              <div className="mt-4 template-card-subtle px-5 py-5">
+                <div className="template-kicker">Thank you</div>
+                <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-apple-near-black">
                   Your booking request has been received.
                 </div>
-                <p className="mt-2 text-sm leading-7">{leadStatus}</p>
+                <p className="mt-2 text-sm leading-7 text-[color:var(--apple-text-secondary)]">{leadStatus}</p>
                 <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <div className="rounded-full bg-white px-3 py-1.5 text-xs font-semibold text-[#0b6b56] ring-1 ring-[#cfe7df]">
-                    Returning to the main screen in {thankYouReturnCountdown}s
-                  </div>
+                  <span className="template-chip">Returning to the main screen in {thankYouReturnCountdown}s</span>
                   <button
                     type="button"
                     onClick={returnToMainScreenAfterBooking}
-                    className="rounded-full bg-[#0b6b56] px-4 py-2 text-xs font-semibold text-white"
+                    className="booked-button-secondary"
+                    aria-label="Return to the main screen now"
                   >
                     Return now
                   </button>
                 </div>
               </div>
             ) : null}
-            {leadError ? <div className="mt-4 rounded-[1.35rem] border border-[#ffd9cd] bg-[#fff3ef] px-4 py-3 text-sm text-[#a55a42]">{leadError}</div> : null}
+            {leadError ? <div className="mt-4 template-card-subtle px-4 py-3 text-sm text-apple-near-black">{leadError}</div> : null}
           </form>
         </section>
+
+        <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 text-xs text-[color:var(--apple-text-tertiary)]">
+          <span>Verified BookedAI tenant · powered by BookedAI</span>
+          <a
+            href="https://bookedai.au/"
+            className="text-[var(--apple-blue)] hover:underline"
+            aria-label="Visit BookedAI homepage"
+          >
+            bookedai.au
+          </a>
+        </footer>
       </div>
     </main>
   );

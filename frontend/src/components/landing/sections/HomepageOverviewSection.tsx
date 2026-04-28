@@ -112,7 +112,7 @@ export function HomepageOverviewSection({
                   },
                 ].map((item) => (
                   <div key={item.label} className="rounded-[1.2rem] border border-white/80 bg-white px-4 py-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       {item.label}
                     </div>
                     <div className="mt-2 text-sm font-semibold leading-6 text-slate-900">{item.value}</div>
@@ -122,7 +122,7 @@ export function HomepageOverviewSection({
             </div>
 
             <div className="mt-6 rounded-[1.7rem] border border-slate-200 bg-white/90 p-4 shadow-[0_16px_34px_rgba(15,23,42,0.05)]">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+              <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                 Executive readout
               </div>
               <div className="mt-4 grid gap-3">
@@ -131,7 +131,7 @@ export function HomepageOverviewSection({
                     key={item.label}
                     className="rounded-[1.15rem] border border-slate-200 bg-slate-50 px-4 py-4"
                   >
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       {item.label}
                     </div>
                     <div className="mt-2 text-sm font-semibold leading-6 text-slate-950">{item.value}</div>
@@ -155,12 +155,12 @@ export function HomepageOverviewSection({
               <div className="mt-6 flex flex-wrap gap-3">
                 {onStartTrial ? (
                   <button type="button" onClick={onStartTrial} className="booked-button">
-                    Open Web App
+                    Start free
                   </button>
                 ) : null}
                 {onBookDemo ? (
                   <button type="button" onClick={onBookDemo} className="booked-button-secondary">
-                    Talk to Sales
+                    Talk to a BookedAI human
                   </button>
                 ) : null}
               </div>
@@ -176,10 +176,10 @@ export function HomepageOverviewSection({
                     className={`block rounded-[1.6rem] border border-black/6 bg-gradient-to-br ${stage.tone} p-5 shadow-[0_14px_32px_rgba(15,23,42,0.04)] transition duration-200 hover:-translate-y-0.5`}
                   >
                     <div className="flex items-center justify-between gap-3">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-black/42">
+                      <div className="text-xs font-semibold uppercase tracking-[0.18em] text-black/42">
                         Stage {stage.eyebrow}
                       </div>
-                      <div className="rounded-full bg-white/90 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-black/58">
+                      <div className="rounded-full bg-white/90 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-black/58">
                         Jump
                       </div>
                     </div>
@@ -201,14 +201,14 @@ export function HomepageOverviewSection({
             <SectionCard className="rounded-[1.7rem] border border-sky-100 bg-[linear-gradient(180deg,#f6fbff_0%,#ffffff_100%)] p-5 shadow-[0_22px_60px_rgba(15,23,42,0.06)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-600">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-sky-600">
                     Why this helps us
                   </div>
                   <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
                     The page now shows clearer product meaning, stronger buying logic, and a cleaner path to action.
                   </div>
                 </div>
-                <SignalPill className="px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-sky-700">
+                <SignalPill className="px-3 py-1 text-xs uppercase tracking-[0.16em] text-sky-700">
                   Visual narrative
                 </SignalPill>
               </div>

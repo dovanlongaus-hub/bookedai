@@ -35,17 +35,17 @@ export function PricingRecommendationPanel({
         <div>
           <div className="template-kicker text-sm">Need help choosing?</div>
           <h3 className="template-title mt-3 max-w-[10ch] text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-            Choose the layer that matches your current operating maturity
+            Choose the engine that matches your operating maturity
           </h3>
           <p className="template-body mt-4 max-w-[26rem] text-base leading-7">
-            Starter is the easiest credible first step, Pro is the default paid path for most teams,
-            and Pro Max stays off the main lane until operational complexity is real.
+            Starter Engine is free SaaS to validate fit, Growth Engine is the default aligned-incentive path for most SMEs,
+            and Enterprise Engine takes over when scale, SLA, and a dedicated CSM matter.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             {[
-              'Starter for fit validation',
-              'Pro as default paid layer',
-              'Custom scope only when complexity is real',
+              'Starter for free SaaS validation',
+              'Growth as the aligned default',
+              'Enterprise when scale + SLA matter',
             ].map((item) => (
               <SignalPill key={item} className="px-3 py-2 text-[11px]">
                 {item}
@@ -55,12 +55,12 @@ export function PricingRecommendationPanel({
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
             {[
-              ['Fast approval', 'Start with Starter when the goal is fit validation without procurement-style friction'],
-              ['Default paid path', 'Pro is the clearest paid operating layer for most teams'],
-              ['Custom only when needed', 'Keep Pro Max and custom scope off the main buying lane until complexity is justified'],
+              ['Free at the bottom', 'Starter Engine is A$79/mo with no setup fee and 0% commission so solo and micro teams can prove fit fast.'],
+              ['Aligned in the middle', 'Growth Engine is A$249/mo + A$499 onboarding + 3% on net booked revenue captured or recovered through BookedAI.'],
+              ['Premium at the top', 'Enterprise Engine is A$999+/mo with custom rollout, white-label, SLA, named CSM, and 5% on attributable revenue (floor + cap negotiated).'],
             ].map(([title, body]) => (
               <SectionCard key={title} tone="subtle" className="rounded-[1.15rem] px-4 py-4">
-                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">{title}</div>
+                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{title}</div>
                 <div className="mt-2 text-sm leading-6 text-slate-700">{body}</div>
               </SectionCard>
             ))}
@@ -76,7 +76,7 @@ export function PricingRecommendationPanel({
                   One recommendation rail is easier to trust than a pricing maze.
                 </div>
               </div>
-              <SignalPill className="bg-slate-950 px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-white">
+              <SignalPill className="bg-slate-950 px-3 py-1 text-xs uppercase tracking-[0.14em] text-white">
                 Guided choice
               </SignalPill>
             </div>
@@ -94,7 +94,7 @@ export function PricingRecommendationPanel({
                 >
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1d1d1f] text-[10px] font-semibold text-white">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-full bg-[#1d1d1f] text-xs font-semibold text-white">
                         {index + 1}
                       </div>
                       <div>
@@ -105,7 +105,7 @@ export function PricingRecommendationPanel({
                       </div>
                     </div>
                     {item.featured ? (
-                      <SignalPill className="bg-white px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-cyan-700">
+                      <SignalPill className="bg-white px-3 py-1 text-xs uppercase tracking-[0.14em] text-cyan-700">
                         Recommended
                       </SignalPill>
                     ) : null}
@@ -121,7 +121,7 @@ export function PricingRecommendationPanel({
             aria-label="Book Recommended Plan"
             className="booked-button mt-3 inline-flex items-center justify-center gap-2"
           >
-            Review Recommended Pro
+            Start a 30-day Growth pilot
             <ArrowIcon />
           </button>
         </div>

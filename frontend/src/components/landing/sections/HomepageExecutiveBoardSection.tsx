@@ -90,7 +90,7 @@ export function HomepageExecutiveBoardSection() {
                   key={item.title}
                   className={`rounded-[1.45rem] border border-black/6 bg-gradient-to-br ${item.tone} px-5 py-4 shadow-[0_14px_30px_rgba(15,23,42,0.04)]`}
                 >
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                     {item.label}
                   </div>
                   <div className="mt-2 text-[1.08rem] font-semibold tracking-[-0.03em] text-slate-950">
@@ -106,14 +106,14 @@ export function HomepageExecutiveBoardSection() {
             <SectionCard className="rounded-[1.9rem] border border-slate-200 bg-[linear-gradient(180deg,#fbfdff_0%,#f2f8ff_100%)] p-5 shadow-[0_18px_42px_rgba(15,23,42,0.05)]">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
-                  <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-slate-500">
+                  <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                     Visual flow
                   </div>
                   <div className="mt-2 text-[1.35rem] font-semibold tracking-[-0.04em] text-slate-950">
                     BookedAI web app in one scan
                   </div>
                 </div>
-                <SignalPill className="px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-700">
+                <SignalPill className="px-3 py-1 text-xs uppercase tracking-[0.14em] text-slate-700">
                   Responsive web first
                 </SignalPill>
               </div>
@@ -123,7 +123,7 @@ export function HomepageExecutiveBoardSection() {
                   <div key={item.step} className="relative">
                     <div className="rounded-[1.35rem] border border-white/90 bg-white/96 px-4 py-4 shadow-[0_12px_26px_rgba(15,23,42,0.04)]">
                       <div className="flex items-center justify-between gap-3">
-                        <div className="rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-white">
+                        <div className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-white">
                           {item.step}
                         </div>
                         <div className="h-2.5 w-2.5 rounded-full bg-sky-500" />
@@ -136,7 +136,7 @@ export function HomepageExecutiveBoardSection() {
                         {item.chips.map((chip) => (
                           <div
                             key={chip}
-                            className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600"
+                            className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-slate-600"
                           >
                             {chip}
                           </div>

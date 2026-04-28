@@ -12,7 +12,6 @@ import { PricingConsultationModal } from './PricingConsultationModal';
 import { PricingPlanCard } from './PricingPlanCard';
 import { PricingRecommendationPanel } from './PricingRecommendationPanel';
 import {
-  advancedPlan,
   buildGoogleCalendarUrl,
   buildIcsDownloadUrl,
   buildInitialForm,
@@ -67,41 +66,6 @@ const pricingModelPillars = [
     detail: 'Introduced only when the rollout context and booked-revenue path are clear.',
   },
 ];
-
-function CheckIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      className="h-5 w-5 text-cyan-300"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M5 10.5l3.1 3.1L15.5 6.4" />
-    </svg>
-  );
-}
-
-function ArrowIcon() {
-  return (
-    <svg
-      aria-hidden="true"
-      viewBox="0 0 20 20"
-      className="h-4 w-4"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M4.25 10h11.5" />
-      <path d="m10.75 4.5 5.25 5.5-5.25 5.5" />
-    </svg>
-  );
-}
 
 export function PricingSection() {
   const sectionRef = useRef<HTMLElement | null>(null);
@@ -392,16 +356,16 @@ export function PricingSection() {
 
         <div className="mx-auto max-w-4xl text-center">
           <SignalPill className="inline-flex items-center justify-center px-4 py-2 text-[11px] uppercase tracking-[0.24em]">
-            Entry from 49$+ • clearer commercial ladder • commission on real booked revenue
+            AI Revenue Engine • Free at the bottom, aligned in the middle, premium at the top
           </SignalPill>
           <h2 className="template-title mt-6 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-            Commercial packaging that feels easier to approve and more serious to scale
+            Pay only when BookedAI books real revenue.
           </h2>
           <p className="template-body mx-auto mt-5 max-w-2xl text-lg leading-8">
-            The pricing story is designed to win quickly without sounding lightweight: clear entry path, clear rollout scope, predictable monthly layer, and performance upside tied to real booked revenue.
+            We&apos;re free at the bottom, premium at the top, and aligned in the middle.
           </p>
           <p className="template-body mx-auto mt-4 max-w-3xl text-sm leading-6 sm:text-base">
-            Built for service teams who want a clearer booking business, not only a cheaper chatbot. Launch standalone on your website, as a dedicated booking app, or as part of the broader BookedAI portal path.
+            Three tiers tied to the AI Revenue Engine: Starter Engine is free SaaS for solo and micro teams, Growth Engine is A$249/mo + 3% on net booked revenue for established SMEs, and Enterprise Engine is A$999+/mo + 5% on attributable revenue for multi-location and platform deployments.
           </p>
 
           <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
@@ -431,7 +395,7 @@ export function PricingSection() {
                   The homepage should make the commercial model legible before the buyer ever opens the deeper product experience.
                 </div>
               </div>
-              <div className="rounded-full bg-slate-950 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
+              <div className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-white">
                 Fast scan
               </div>
             </div>
@@ -464,14 +428,14 @@ export function PricingSection() {
           <SectionCard className="p-7 sm:p-8">
             <div>
               <p className="template-kicker text-sm">
-                Special offers first
+                AI Revenue Engine pricing
               </p>
               <h3 className="template-title mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-                Freemium first, then Pro, then Pro Max as the revenue engine gets deeper
+                Starter free, Growth aligned, Enterprise premium
               </h3>
             </div>
               <p className="template-body mt-5 max-w-2xl text-base leading-7">
-              Pick the package that matches your current operating maturity. Every registration and booking action should continue into the same onboarding, timing, confirmation, and commercial follow-through path without hiding implementation scope or performance logic.
+              Pick the engine that matches your operating maturity. Setup, monthly subscription, and performance commission stay clearly separated, so every step of the AI Revenue Engine ladder is easy to approve.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {topOffers.map((offer) => (
@@ -496,28 +460,28 @@ export function PricingSection() {
                     Buying story
                   </div>
                   <div className="mt-2 text-lg font-semibold text-slate-950">
-                    Start with the lightest sensible commercial step, then expand into Pro or Pro Max once the operating case is proven.
+                    Start free on Starter, step up to Growth when you want BookedAI to capture real booked revenue, and move to Enterprise when scale and SLA become the constraint.
                   </div>
                 </div>
-                <SignalPill className="bg-white px-3 py-1 text-[10px] uppercase tracking-[0.14em] text-slate-600">
-                  Clear approval path
+                <SignalPill className="bg-white px-3 py-1 text-xs uppercase tracking-[0.14em] text-slate-600">
+                  Aligned with bookings
                 </SignalPill>
               </div>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Buyers should be able to see the launch path, setup scope, monthly layer, and performance logic in one pass.
+                Setup fees scoped after a 10-min call. Commission applies only to bookings BookedAI captures or recovers.
               </p>
             </SectionCard>
           </SectionCard>
 
           <SectionCard className="p-7 sm:p-8">
-            <div className="text-sm font-medium uppercase tracking-[0.18em] text-[#1459c7]">
-              Rollout scope
+            <div className="text-sm font-medium uppercase tracking-[0.18em] text-[var(--apple-blue)]">
+              Onboarding scope
             </div>
-            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-[#1d1d1f]">
-              Keep launch simple, and only add complexity when the operation actually needs it
+            <h3 className="mt-3 text-2xl font-semibold tracking-tight text-[var(--apple-near-black)]">
+              Self-serve at the bottom, scoped onboarding in the middle, custom rollout at the top
             </h3>
             <p className="mt-4 text-base leading-7 text-slate-600">
-              Most teams can launch online first, either as a standalone website flow or a dedicated booking app. If you need onsite support, training, or a more hands-on rollout, that scope is quoted separately so the monthly layer stays clean and the commercial story stays credible.
+              Starter is self-serve with no setup fee. Growth includes A$499 onboarding for catalog import, brand, and channel wiring. Enterprise is custom rollout from A$2,500 to A$10,000 covering vertical template config, SSO, and dedicated CSM.
             </p>
             <div className="mt-6 grid gap-3">
               {setupOptions.map((item) => (
@@ -543,7 +507,7 @@ export function PricingSection() {
           </SectionCard>
         </div>
 
-        <div className="mt-8 grid gap-6 lg:grid-cols-[1fr_1fr_0.9fr]">
+        <div className="mt-8 grid gap-6 lg:grid-cols-3">
           {visiblePlans.map((plan) => (
             <PricingPlanCard
               key={plan.id}
@@ -553,67 +517,11 @@ export function PricingSection() {
               }
             />
           ))}
-          <SectionCard as="article" className="relative overflow-hidden p-7 sm:p-8">
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute inset-x-6 top-0 h-24 rounded-full bg-cyan-300/10 blur-3xl"
-            />
-            <div className="relative">
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1459c7]">
-                    For complex teams
-                  </div>
-                  <div className="text-xl font-semibold tracking-tight text-[#1d1d1f]">
-                    {advancedPlan.name}
-                  </div>
-                  <p className="mt-2 text-sm leading-6 text-slate-600">
-                    Multi-location, deeper automation, or broader operational rollout that needs custom scope and higher-touch commercial shaping.
-                  </p>
-                </div>
-                <SignalPill className="px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] text-[#1459c7] ring-1 ring-black/6">
-                  Talk to us
-                </SignalPill>
-              </div>
-
-              <div className="mt-8 text-4xl font-semibold tracking-tight text-[#1d1d1f]">
-                Custom scope
-              </div>
-              <p className="mt-2 text-sm font-medium text-[#1459c7]">
-                Usually starts from {advancedPlan.price}/mo after your 1 month free period
-              </p>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                We keep advanced rollout off the main buying path so smaller teams can decide quickly, while larger service teams can still enter with the right scope, oversight, and performance model.
-              </p>
-
-              <ul className="mt-8 space-y-3">
-                {advancedPlan.features.slice(1).map((feature) => (
-                  <li key={feature} className="flex items-start gap-3 text-sm leading-6 text-slate-700">
-                    <span className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-cyan-50">
-                      <CheckIcon />
-                    </span>
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              <button
-                type="button"
-                onClick={() =>
-                  openConsultation(
-                    advancedPlan.id,
-                    'guided',
-                    'book_advanced_plan',
-                    'advanced_plan_card',
-                  )}
-                className="booked-button-secondary mt-8 flex w-full items-center justify-center gap-2"
-              >
-                Review Pro Max Scope
-                <ArrowIcon />
-              </button>
-            </div>
-          </SectionCard>
         </div>
+
+        <p className="mt-6 text-center text-sm leading-6 text-slate-600 sm:text-base">
+          Setup fees scoped after a 10-min call. Commission applies only to bookings BookedAI captures or recovers.
+        </p>
 
         <PricingRecommendationPanel
           recommendations={recommendations}

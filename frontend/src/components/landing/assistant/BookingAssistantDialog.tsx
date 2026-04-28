@@ -1,5 +1,6 @@
 import {
   FormEvent,
+  KeyboardEvent as ReactKeyboardEvent,
   MouseEvent as ReactMouseEvent,
   PointerEvent,
   useEffect,
@@ -228,6 +229,17 @@ type ChatMessage = {
 
 type PublicAssistantLiveReadResult = Awaited<ReturnType<typeof getPublicBookingAssistantLiveReadRecommendation>>;
 
+type BookingAssistantDialogPartnerConfig = {
+  services_endpoint?: string;
+  booking_endpoint?: string;
+  portal_endpoint_prefix?: string;
+  capabilities?: string[];
+  features?: {
+    post_booking_feedback?: boolean;
+    monthly_reminder_default?: boolean;
+  };
+};
+
 type BookingAssistantDialogProps = {
   content: BookingAssistantContent;
   isOpen: boolean;
@@ -242,6 +254,7 @@ type BookingAssistantDialogProps = {
   initialQueryRequestId?: number;
   surfaceVariant?: 'default' | 'homepage_search';
   runtimeConfig?: PublicBookingAssistantRuntimeConfig | null;
+  partnerConfig?: BookingAssistantDialogPartnerConfig | null;
 };
 
 type ProductSheetSnap = 'peek' | 'half' | 'full';
@@ -597,26 +610,26 @@ function validateBookingForm(params: {
   const trimmedPhone = customerPhone.trim();
 
   if (trimmedName.length < 2) {
-    return 'Enter a customer name with at least 2 characters.';
+    return 'We need your name (at least 2 characters) so the operator knows who is booking.';
   }
 
   if (!trimmedEmail && !trimmedPhone) {
-    return 'Enter an email address or phone number.';
+    return 'We need an email or phone number so we can send your confirmation.';
   }
 
   if (trimmedEmail && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(trimmedEmail)) {
-    return 'Enter a valid email address.';
+    return 'That email looks off — please double-check it so we can reach you.';
   }
 
   if (trimmedPhone) {
     const digitsOnly = trimmedPhone.replace(/\D/g, '');
     if (digitsOnly.length < 8) {
-      return 'Enter a valid phone number with at least 8 digits.';
+      return 'That phone number looks short — please include the full number with at least 8 digits.';
     }
   }
 
   if (!preferredSlot) {
-    return 'Choose a preferred booking time.';
+    return 'Pick a preferred time so the operator can plan around you.';
   }
 
   return null;
@@ -1122,7 +1135,7 @@ function buildServiceConfidenceNotes(service: ServiceCatalogItem) {
 
 function buildBookabilityLabel(service: ServiceCatalogItem) {
   if (isBookedAiChessTenantService(service)) {
-    return 'BookedAI tenant';
+    return 'Verified BookedAI operator';
   }
   if (service.category.toLowerCase().includes('housing') || service.category.toLowerCase().includes('property')) {
     return service.booking_url ? 'Consultation ready' : 'Project consult';
@@ -1230,6 +1243,7 @@ function buildBookingOutcomeSteps(result: BookingAssistantSessionResponse) {
 function getBookingPortalUrl(
   result: BookingAssistantSessionResponse,
   action?: 'edit' | 'reschedule' | 'cancel',
+  portalPrefix?: string | null,
 ) {
   if (result.portal_url?.trim()) {
     const url = new URL(result.portal_url.trim());
@@ -1239,15 +1253,20 @@ function getBookingPortalUrl(
     return url.toString();
   }
 
-  return `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(result.booking_reference)}${action ? `&action=${encodeURIComponent(action)}` : ''}`;
+  const prefix = portalPrefix?.trim() || 'https://portal.bookedai.au/';
+  const separator = prefix.includes('?') ? '&' : '?';
+  return `${prefix}${separator}booking_reference=${encodeURIComponent(result.booking_reference)}${action ? `&action=${encodeURIComponent(action)}` : ''}`;
 }
 
-function getBookingQrCodeUrl(result: BookingAssistantSessionResponse) {
+function getBookingQrCodeUrl(
+  result: BookingAssistantSessionResponse,
+  portalPrefix?: string | null,
+) {
   if (result.qr_code_url?.trim()) {
     return result.qr_code_url.trim();
   }
 
-  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(getBookingPortalUrl(result))}`;
+  return `https://api.qrserver.com/v1/create-qr-code/?size=240x240&data=${encodeURIComponent(getBookingPortalUrl(result, undefined, portalPrefix))}`;
 }
 
 function buildTelegramCareUrl(params: {
@@ -1664,8 +1683,9 @@ function buildCommunicationPreviewCards(params: {
   customerName: string;
   customerEmail: string;
   customerPhone: string;
+  portalPrefix?: string | null;
 }) {
-  const { result, customerName, customerEmail, customerPhone } = params;
+  const { result, customerName, customerEmail, customerPhone, portalPrefix } = params;
   const displayName = customerName.trim() || 'Customer';
   const normalizedEmail = customerEmail.trim().toLowerCase();
   const normalizedPhone = normalizePhoneForMessaging(customerPhone) ?? customerPhone.trim();
@@ -1690,7 +1710,7 @@ function buildCommunicationPreviewCards(params: {
       tone: 'dark',
       recipient: normalizedEmail,
       summary: 'Sent from info@bookedai.au with reference, payment status, and calendar link.',
-      body: `From: info@bookedai.au\nSubject: Your ${serviceLabel} booking is confirmed\n\nHi ${displayName},\n\nThanks for choosing ${serviceLabel}. Your booking reference is ${result.booking_reference}.\nRequested slot: ${slotLine}.\n${paymentLine}\n${calendarLine}\nPortal: ${getBookingPortalUrl(result)}\n\nThe BookedAI team`,
+      body: `From: info@bookedai.au\nSubject: Your ${serviceLabel} booking is confirmed\n\nHi ${displayName},\n\nThanks for choosing ${serviceLabel}. Your booking reference is ${result.booking_reference}.\nRequested slot: ${slotLine}.\n${paymentLine}\n${calendarLine}\nPortal: ${getBookingPortalUrl(result, undefined, portalPrefix)}\n\nThe BookedAI team`,
     });
   }
 
@@ -1702,7 +1722,7 @@ function buildCommunicationPreviewCards(params: {
       tone: 'light',
       recipient: normalizedPhone,
       summary: 'A short reminder with your booking reference and portal link.',
-      body: `${displayName}, your ${serviceLabel} booking ref is ${result.booking_reference}. Slot: ${slotLine}. ${paymentReadyCopy(result)} Portal: ${getBookingPortalUrl(result)}`,
+      body: `${displayName}, your ${serviceLabel} booking ref is ${result.booking_reference}. Slot: ${slotLine}. ${paymentReadyCopy(result)} Portal: ${getBookingPortalUrl(result, undefined, portalPrefix)}`,
     });
     cards.push({
       id: 'whatsapp',
@@ -1724,7 +1744,7 @@ function buildCommunicationPreviewCards(params: {
     summary: result.automation?.telegram?.status === 'sent'
       ? 'Telegram follow-up was sent to the linked BookedAI Manager Bot chat.'
       : 'Telegram follow-up is ready once the customer opens BookedAI Manager Bot and links the phone.',
-    body: `Booking reference: ${result.booking_reference}\nCustomer: ${displayName}\nService: ${serviceLabel}\nRequested slot: ${slotLine}\nPortal: ${getBookingPortalUrl(result)}\nTelegram: ${buildTelegramCareUrl({ bookingReference: result.booking_reference, serviceName: result.service.name })}\n\nTelegram bots can message only linked chats. Open BookedAI Manager Bot from this link to continue with the same booking reference, product context, reschedule requests, cancellation, and service questions.`,
+    body: `Booking reference: ${result.booking_reference}\nCustomer: ${displayName}\nService: ${serviceLabel}\nRequested slot: ${slotLine}\nPortal: ${getBookingPortalUrl(result, undefined, portalPrefix)}\nTelegram: ${buildTelegramCareUrl({ bookingReference: result.booking_reference, serviceName: result.service.name })}\n\nTelegram bots can message only linked chats. Open BookedAI Manager Bot from this link to continue with the same booking reference, product context, reschedule requests, cancellation, and service questions.`,
   });
 
   return cards;
@@ -1767,12 +1787,28 @@ export function BookingAssistantDialog({
   initialQueryRequestId = 0,
   surfaceVariant = 'default',
   runtimeConfig = null,
+  partnerConfig = null,
 }: BookingAssistantDialogProps) {
+  const partnerPortalPrefix = partnerConfig?.portal_endpoint_prefix?.trim() || null;
+  const partnerBookingEndpoint = partnerConfig?.booking_endpoint?.trim() || null;
+  const partnerServicesEndpoint = partnerConfig?.services_endpoint?.trim() || null;
+  const partnerPostBookingFeedbackEnabled = Boolean(
+    partnerConfig?.features?.post_booking_feedback,
+  );
+  function resolvePortalUrl(
+    target: BookingAssistantSessionResponse,
+    action?: 'edit' | 'reschedule' | 'cancel',
+  ) {
+    return getBookingPortalUrl(target, action, partnerPortalPrefix);
+  }
+  function resolveQrCodeUrl(target: BookingAssistantSessionResponse) {
+    return getBookingQrCodeUrl(target, partnerPortalPrefix);
+  }
   const isProductAppLayout = standalone && layoutMode === 'product_app';
   const isDefaultPopupLayout = !standalone && layoutMode === 'default';
   const isEmbeddedStandaloneLayout = standalone && embedded;
   const isHomepageSearchSurface = isEmbeddedStandaloneLayout && surfaceVariant === 'homepage_search';
-  const standaloneEyebrow = standalone ? brandDescriptor : 'Start Free Trial';
+  const standaloneEyebrow = standalone ? brandDescriptor : 'Start free';
   const standaloneTitle = isHomepageSearchSurface
     ? `${brandName} search results`
     : standalone
@@ -1841,6 +1877,7 @@ export function BookingAssistantDialog({
   } | null>(null);
   const recognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const dialogBodyRef = useRef<HTMLDivElement | null>(null);
+  const dialogContentRootRef = useRef<HTMLDivElement | null>(null);
   const chatInputRef = useRef<HTMLInputElement | null>(null);
   const dialogTriggerElementRef = useRef<HTMLElement | null>(null);
   const compactProductScrollTopRef = useRef(0);
@@ -1891,6 +1928,20 @@ export function BookingAssistantDialog({
     return `${url.pathname}${url.search}`;
   }
 
+  function resolveBookingEndpoint(defaultPathname: string) {
+    if (partnerBookingEndpoint) {
+      return partnerBookingEndpoint;
+    }
+    return buildAssistantApiUrl(defaultPathname);
+  }
+
+  function resolveServicesEndpoint(defaultPathname: string) {
+    if (partnerServicesEndpoint) {
+      return partnerServicesEndpoint;
+    }
+    return buildAssistantApiUrl(defaultPathname);
+  }
+
   async function requestLegacyBookingSession(params: {
     serviceId: string;
     customerName: string;
@@ -1900,7 +1951,7 @@ export function BookingAssistantDialog({
     requestedTime: string;
     notes: string | null;
   }) {
-    const response = await fetch(buildAssistantApiUrl('/booking-assistant/session'), {
+    const response = await fetch(resolveBookingEndpoint('/booking-assistant/session'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -1929,12 +1980,13 @@ export function BookingAssistantDialog({
 
     if (!response.ok) {
       throw new Error(
-        (payload as { detail?: string } | null)?.detail || 'Unable to create booking session.',
+        (payload as { detail?: string } | null)?.detail
+          || "We couldn't start your booking right now. Let's try again in a moment.",
       );
     }
 
     if (!payload) {
-      throw new Error('Unable to create booking session.');
+      throw new Error("We couldn't start your booking right now. Let's try again in a moment.");
     }
 
     return payload as BookingAssistantSessionResponse;
@@ -2318,12 +2370,12 @@ export function BookingAssistantDialog({
       }
 
       try {
-        const response = await fetch(buildAssistantApiUrl('/booking-assistant/catalog'), {
+        const response = await fetch(resolveServicesEndpoint('/booking-assistant/catalog'), {
           signal: controller.signal,
         });
         if (!response.ok) {
           const payload = await response.json().catch(() => null);
-          throw new Error(resolveApiErrorMessage(payload, 'Unable to load service catalog'));
+          throw new Error(resolveApiErrorMessage(payload, "We couldn't load the service list right now. Let's try again in a moment."));
         }
 
         const data = (await response.json()) as BookingAssistantCatalogResponse;
@@ -2407,11 +2459,11 @@ export function BookingAssistantDialog({
     }
 
     if (!response.ok) {
-      throw new Error(resolveApiErrorMessage(payload, 'Unable to send message'));
+      throw new Error(resolveApiErrorMessage(payload, "We couldn't send your message right now. Let's try again in a moment."));
     }
 
     if (!payload || typeof payload === 'string') {
-      throw new Error('Unable to send message');
+      throw new Error("We couldn't send your message right now. Let's try again in a moment.");
     }
 
     return payload;
@@ -2551,6 +2603,39 @@ export function BookingAssistantDialog({
     triggerElement.focus({ preventScroll: true });
     dialogTriggerElementRef.current = null;
   }, [embedded, isOpen, standalone]);
+
+  useEffect(() => {
+    if (!isOpen || standalone) {
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      const root = dialogContentRootRef.current;
+      if (!root) {
+        return;
+      }
+      const active = typeof document !== 'undefined' ? document.activeElement : null;
+      if (active instanceof HTMLElement && root.contains(active)) {
+        return;
+      }
+      const customerNameInput = customerNameInputRef.current;
+      if (customerNameInput && root.contains(customerNameInput)) {
+        customerNameInput.focus({ preventScroll: true });
+        return;
+      }
+      const chatInput = chatInputRef.current;
+      if (chatInput && root.contains(chatInput)) {
+        chatInput.focus({ preventScroll: true });
+        return;
+      }
+      const firstFocusable = root.querySelector<HTMLElement>(
+        'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+      );
+      firstFocusable?.focus({ preventScroll: true });
+    }, 60);
+    return () => {
+      window.clearTimeout(timer);
+    };
+  }, [isOpen, standalone]);
 
   useEffect(() => {
     if (
@@ -2910,9 +2995,10 @@ export function BookingAssistantDialog({
             customerName,
             customerEmail,
             customerPhone,
+            portalPrefix: partnerPortalPrefix,
           })
         : [],
-    [customerEmail, customerName, customerPhone, result],
+    [customerEmail, customerName, customerPhone, partnerPortalPrefix, result],
   );
   const operationTimeline = useMemo(
     () => (result ? buildOperationTimeline(result) : []),
@@ -2988,7 +3074,7 @@ export function BookingAssistantDialog({
       return;
     }
     let cancelled = false;
-    const portalUrl = getBookingPortalUrl(result);
+    const portalUrl = resolvePortalUrl(result);
     generateQrCodeDataUrl(portalUrl)
       .then((dataUrl) => {
         if (!cancelled) {
@@ -3009,7 +3095,7 @@ export function BookingAssistantDialog({
     if (!result) {
       return;
     }
-    const value = kind === 'reference' ? result.booking_reference : getBookingPortalUrl(result);
+    const value = kind === 'reference' ? result.booking_reference : resolvePortalUrl(result);
     const ok = await copyTextToClipboard(value);
     if (ok) {
       setCopyState({ kind, ts: Date.now() });
@@ -3023,7 +3109,7 @@ export function BookingAssistantDialog({
     if (!result) {
       return;
     }
-    const portalUrl = getBookingPortalUrl(result);
+    const portalUrl = resolvePortalUrl(result);
     await downloadQrCodePng(portalUrl, `bookedai-${result.booking_reference}.png`);
   }
 
@@ -3031,7 +3117,7 @@ export function BookingAssistantDialog({
     if (!result) {
       return null;
     }
-    const portalUrl = getBookingPortalUrl(result);
+    const portalUrl = resolvePortalUrl(result);
     const lines = [
       `Booking confirmed: ${result.service?.name ?? 'BookedAI booking'}`,
       `Reference: ${result.booking_reference}`,
@@ -3128,7 +3214,7 @@ export function BookingAssistantDialog({
     if (!startsAt) {
       return;
     }
-    const portalUrl = getBookingPortalUrl(result);
+    const portalUrl = resolvePortalUrl(result);
     const description = [
       `Reference: ${result.booking_reference}`,
       result.amount_label ? `Price: ${result.amount_label}` : null,
@@ -3295,7 +3381,7 @@ export function BookingAssistantDialog({
                 }`}
               >
                 <span
-                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[10px] font-bold ${
+                  className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
                     isCompleted
                       ? 'bg-emerald-500 text-white'
                       : isActive
@@ -3644,7 +3730,9 @@ export function BookingAssistantDialog({
       }
     } catch (error) {
       const messageText =
-        error instanceof Error ? error.message : 'Unable to send message';
+        error instanceof Error
+          ? error.message
+          : "We couldn't send your message right now. Let's try again in a moment.";
       setChatError(messageText);
       setMessages((current) => {
         const last = current[current.length - 1];
@@ -3733,7 +3821,7 @@ export function BookingAssistantDialog({
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!selectedService && !selectedEvent) {
-      setSubmitError('Please select a service or event from the search results before continuing.');
+      setSubmitError('Pick a service or event from the search results above so we know what to book.');
       return;
     }
 
@@ -3750,7 +3838,7 @@ export function BookingAssistantDialog({
 
     const slot = parsePreferredSlot(preferredSlot);
     if (!slot) {
-      setSubmitError('Choose a valid preferred booking time.');
+      setSubmitError('That time looks invalid — please pick a date and time you would like.');
       return;
     }
 
@@ -3763,7 +3851,7 @@ export function BookingAssistantDialog({
     const normalizedNotes = notes.trim() || null;
 
     if (selectedEvent && !selectedService) {
-      const response = await fetch(buildAssistantApiUrl('/booking-assistant/session'), {
+      const response = await fetch(resolveBookingEndpoint('/booking-assistant/session'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3801,12 +3889,12 @@ export function BookingAssistantDialog({
         throw new Error(
           resolveApiErrorMessage(
             payload ?? rawResponseText,
-            'Unable to create attendance request',
+            "We couldn't send your attendance request right now. Let's try again or message support.",
           ),
         );
       }
       if (!payload) {
-        throw new Error('Attendance request returned an empty response');
+        throw new Error("We couldn't reach the organiser right now. Let's try again in a moment.");
       }
 
       setResult(payload as BookingAssistantSessionResponse);
@@ -3815,7 +3903,7 @@ export function BookingAssistantDialog({
     }
 
     if (!selectedService) {
-      setSubmitError('Please select a service or event from the search results before continuing.');
+      setSubmitError('Pick a service or event from the search results above so we know what to book.');
       setLoading(false);
       return;
     }
@@ -3892,7 +3980,7 @@ export function BookingAssistantDialog({
                 ? liveReadSummary.pathType
                 : authoritativeResult.trust.recommended_booking_path ?? bookingResult.workflow_status,
             paymentLink: bookingResult.payment_url,
-            portalUrl: getBookingPortalUrl(bookingResult),
+            portalUrl: resolvePortalUrl(bookingResult),
           });
 
           setResult({
@@ -3925,7 +4013,7 @@ export function BookingAssistantDialog({
         });
       }
 
-      const response = await fetch(buildAssistantApiUrl('/booking-assistant/session'), {
+      const response = await fetch(resolveBookingEndpoint('/booking-assistant/session'), {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3955,20 +4043,22 @@ export function BookingAssistantDialog({
         throw new Error(
           resolveApiErrorMessage(
             payload ?? rawResponseText,
-            'Unable to create booking request',
+            "We couldn't reach the operator right now. Let's try again or message support.",
           ),
         );
       }
 
       if (!payload) {
-        throw new Error('Booking request returned an empty response');
+        throw new Error("We couldn't reach the operator right now. Let's try again in a moment.");
       }
 
       setResult(payload as BookingAssistantSessionResponse);
       setProductModuleTab('confirmed');
     } catch (error) {
       const message =
-        error instanceof Error ? error.message : 'Unable to create booking request';
+        error instanceof Error
+          ? error.message
+          : "We couldn't reach the operator right now. Let's try again or message support.";
       setSubmitError(message);
     } finally {
       setLoading(false);
@@ -3978,7 +4068,7 @@ export function BookingAssistantDialog({
   function toggleVoiceCapture() {
     const SpeechRecognition = getSpeechRecognitionConstructor();
     if (!SpeechRecognition) {
-      setVoiceError('Voice input is not supported in this browser.');
+      setVoiceError("This browser doesn't support voice input — try Chrome or type your search instead.");
       return;
     }
 
@@ -4008,7 +4098,7 @@ export function BookingAssistantDialog({
       void sendChatMessage(transcript);
     };
     recognition.onerror = (event) => {
-      setVoiceError(`Voice capture failed: ${event.error}`);
+      setVoiceError(`We couldn't capture your voice (${event.error}). Tap the mic again or type your request.`);
       setIsListening(false);
     };
     recognition.onend = () => {
@@ -4020,12 +4110,56 @@ export function BookingAssistantDialog({
     recognition.start();
   }
 
+  function handleDialogKeyDown(event: ReactKeyboardEvent<HTMLDivElement>) {
+    if (event.key !== 'Tab' || standalone) {
+      return;
+    }
+    const root = dialogContentRootRef.current;
+    if (!root) {
+      return;
+    }
+    const focusableSelector =
+      'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
+    const focusable = Array.from(
+      root.querySelectorAll<HTMLElement>(focusableSelector),
+    ).filter((element) => {
+      if (element.hasAttribute('hidden')) {
+        return false;
+      }
+      const rect = element.getBoundingClientRect();
+      if (rect.width === 0 && rect.height === 0) {
+        return false;
+      }
+      return true;
+    });
+    if (focusable.length === 0) {
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = typeof document !== 'undefined' ? document.activeElement : null;
+    if (event.shiftKey) {
+      if (active === first || !root.contains(active)) {
+        event.preventDefault();
+        last.focus();
+      }
+      return;
+    }
+    if (active === last) {
+      event.preventDefault();
+      first.focus();
+    }
+  }
+
   if (!isOpen) {
     return null;
   }
 
   return (
     <div
+      role={standalone ? undefined : 'dialog'}
+      aria-modal={standalone ? undefined : true}
+      aria-label={standalone ? undefined : 'Booking assistant'}
       className={
         standalone
           ? isProductAppLayout
@@ -4061,6 +4195,8 @@ export function BookingAssistantDialog({
         }
       >
         <div
+          ref={dialogContentRootRef}
+          onKeyDown={handleDialogKeyDown}
           className={`relative flex w-full flex-col ${
             standalone
               ? isProductAppLayout
@@ -4113,7 +4249,7 @@ export function BookingAssistantDialog({
               <div className="min-w-0">
                 {isHomepageSearchSurface ? (
                   <div className="flex min-w-0 items-center gap-3">
-                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d2e3fc] bg-[#e8f0fe] text-[10px] font-bold uppercase tracking-[0.12em] text-[#1a73e8] sm:h-10 sm:w-10 sm:text-[11px]">
+                    <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-[#d2e3fc] bg-[#e8f0fe] text-xs font-bold uppercase tracking-[0.12em] text-[#1a73e8] sm:h-10 sm:w-10 sm:text-[11px]">
                       AI
                     </div>
                     <div className="min-w-0">
@@ -4128,14 +4264,14 @@ export function BookingAssistantDialog({
                 ) : isProductAppLayout ? (
                   <div className={`flex items-center justify-between gap-2 ${shouldCondenseProductChrome ? '' : 'sm:gap-3'}`}>
                     <div className="flex min-w-0 items-center gap-2">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-950 text-[10px] font-bold text-white sm:h-8 sm:w-8">
+                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-slate-950 text-xs font-bold text-white sm:h-8 sm:w-8">
                         AI
                       </div>
                       <div className="min-w-0">
                         <div className="line-clamp-1 text-[12px] font-semibold tracking-tight text-slate-950">
                           {brandName}
                         </div>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-500">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-500">
                           <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
                           <span>{catalogError ? 'Assistant offline' : productFlowModeLabel}</span>
                         </div>
@@ -4146,7 +4282,7 @@ export function BookingAssistantDialog({
                         {productMicroSignals.map((signal) => (
                           <span
                             key={signal}
-                            className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-600"
+                            className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600"
                           >
                             {signal}
                           </span>
@@ -4163,7 +4299,7 @@ export function BookingAssistantDialog({
                           : hasConversationStarted
                           ? isCompactMobileViewport
                             ? 'text-[9px] sm:text-sm'
-                            : 'text-[10px] sm:text-sm'
+                            : 'text-xs sm:text-sm'
                           : 'text-[11px] sm:text-sm'
                       }`}
                     >
@@ -4212,7 +4348,7 @@ export function BookingAssistantDialog({
                     type="button"
                     aria-label={voiceRepliesEnabled ? 'Voice on' : 'Voice off'}
                     onClick={() => setVoiceRepliesEnabled((current) => !current)}
-                    className={`inline-flex h-8 w-8 items-center justify-center rounded-full border transition ${
+                    className={`inline-flex h-11 w-11 items-center justify-center rounded-full border transition ${
                       voiceRepliesEnabled
                         ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
                         : 'border-slate-200 bg-white text-slate-500'
@@ -4229,7 +4365,7 @@ export function BookingAssistantDialog({
                     className={`rounded-full border border-slate-200 bg-white font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50 ${
                       standalone
                         ? isProductAppLayout
-                          ? 'h-8 w-8 px-0 py-0 text-[12px]'
+                          ? 'h-11 w-11 px-0 py-0 text-[12px]'
                           : 'px-3 py-1.5 text-xs sm:px-4 sm:py-2 sm:text-sm'
                         : hasConversationStarted
                         ? isCompactMobileViewport
@@ -4321,7 +4457,7 @@ export function BookingAssistantDialog({
                 onClick={() => setVoiceRepliesEnabled((current) => !current)}
                 className={`rounded-full font-semibold transition ${isProductAppLayout ? 'hidden' : hasConversationStarted
                   ? isCompactMobileViewport
-                    ? 'px-2 py-1 text-[10px]'
+                    ? 'px-2 py-1 text-xs'
                     : 'px-2.5 py-1.5 text-[11px]'
                   : 'px-3 py-2 text-xs'} ${
                   voiceRepliesEnabled
@@ -4347,9 +4483,9 @@ export function BookingAssistantDialog({
                     setProductSheetSnap('peek');
                     setActiveMobilePanel('chat');
                   }}
-                  className={`rounded-full font-semibold transition ${isProductAppLayout ? 'px-2.5 py-1.5 text-[10px]' : hasConversationStarted
+                  className={`rounded-full font-semibold transition ${isProductAppLayout ? 'px-2.5 py-1.5 text-xs' : hasConversationStarted
                     ? isCompactMobileViewport
-                      ? 'px-2.5 py-1 text-[10px]'
+                      ? 'px-2.5 py-1 text-xs'
                       : 'px-3 py-1.5 text-[11px]'
                     : 'px-3 py-2 text-xs'} ${
                     activeMobilePanel === 'chat'
@@ -4369,9 +4505,9 @@ export function BookingAssistantDialog({
                     setActiveMobilePanel('booking');
                   }}
                   disabled={isDefaultPopupMobileViewport && !hasSelectionReadyForBooking}
-                  className={`relative rounded-full font-semibold transition ${isProductAppLayout ? 'px-2.5 py-1.5 text-[10px]' : hasConversationStarted
+                  className={`relative rounded-full font-semibold transition ${isProductAppLayout ? 'px-2.5 py-1.5 text-xs' : hasConversationStarted
                     ? isCompactMobileViewport
-                      ? 'px-2.5 py-1 text-[10px]'
+                      ? 'px-2.5 py-1 text-xs'
                       : 'px-3 py-1.5 text-[11px]'
                     : 'px-3 py-2 text-xs'} ${
                     activeMobilePanel === 'booking'
@@ -4431,7 +4567,7 @@ export function BookingAssistantDialog({
                       className={`font-semibold text-slate-950 ${
                         hasConversationStarted
                           ? isCompactMobileViewport
-                            ? 'text-[10px] sm:text-sm'
+                            ? 'text-xs sm:text-sm'
                             : 'text-[11px] sm:text-sm'
                           : 'text-sm'
                       }`}
@@ -4453,7 +4589,7 @@ export function BookingAssistantDialog({
                         className={`text-slate-500 sm:mt-1 sm:text-[11px] ${
                           isCompactMobileViewport
                             ? 'mt-0 text-[9px]'
-                            : 'mt-0.5 text-[10px]'
+                            : 'mt-0.5 text-xs'
                         }`}
                       >
                         Results are pinned in the chat below for fast follow-through.
@@ -4465,7 +4601,7 @@ export function BookingAssistantDialog({
                       hasConversationStarted
                         ? isCompactMobileViewport
                           ? 'px-1.5 py-0.5 text-[9px]'
-                          : 'px-2 py-0.5 text-[10px]'
+                          : 'px-2 py-0.5 text-xs'
                         : 'px-3 py-1 text-xs'
                     }`}
                   >
@@ -4497,7 +4633,7 @@ export function BookingAssistantDialog({
                 }`}>
                   <div className="flex items-center justify-between gap-3">
                     <div className="min-w-0">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                         {hasSelectionReadyForBooking ? 'Booking is ready' : 'Search naturally'}
                       </div>
                       <div className="mt-1 line-clamp-1 text-[13px] font-semibold text-slate-950">
@@ -4518,12 +4654,12 @@ export function BookingAssistantDialog({
                         <button
                           type="button"
                           onClick={focusBookingDetails}
-                          className="rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-slate-800"
+                          className="min-h-[44px] rounded-full bg-slate-950 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-slate-800"
                         >
                           Continue
                         </button>
                       ) : (
-                        <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold text-emerald-700">
+                        <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
                           Ready to book
                         </div>
                       )}
@@ -4554,14 +4690,14 @@ export function BookingAssistantDialog({
                       <div className="rounded-[1rem] border border-slate-200 bg-white/94 px-3 py-2 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
                         <div className="flex items-center justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                               {productFlowModeLabel}
                             </div>
                             <div className="mt-1 text-[12px] font-semibold leading-4 text-slate-950">
                               Ask naturally — search, preview, book, and follow up in one flow.
                             </div>
                           </div>
-                          <div className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                          <div className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
                             Live
                           </div>
                         </div>
@@ -4570,7 +4706,7 @@ export function BookingAssistantDialog({
                       <div className="overflow-hidden rounded-[1.35rem] border border-slate-200 bg-[linear-gradient(155deg,#0f172a_0%,#111827_48%,#1d4ed8_100%)] p-3.5 text-white shadow-[0_14px_38px_rgba(15,23,42,0.16)]">
                         <div className="flex flex-wrap items-start justify-between gap-3">
                           <div className="min-w-0">
-                            <div className="inline-flex items-center rounded-full bg-white/12 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-sky-100">
+                            <div className="inline-flex items-center rounded-full bg-white/12 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-sky-100">
                               {productFlowModeLabel}
                             </div>
                             <div className="mt-2 text-[1rem] font-semibold leading-6 tracking-tight">
@@ -4589,7 +4725,7 @@ export function BookingAssistantDialog({
                                 <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-sky-100">
                                   {signal.label}
                                 </div>
-                                <div className="mt-1 line-clamp-2 text-[10px] leading-4 text-slate-100">
+                                <div className="mt-1 line-clamp-2 text-xs leading-4 text-slate-100">
                                   {signal.value}
                                 </div>
                               </div>
@@ -4604,14 +4740,14 @@ export function BookingAssistantDialog({
                     }`}>
                       <div className="flex items-center justify-between gap-3">
                         <div>
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                             Try a real search
                           </div>
                           <div className="mt-1 text-[13px] font-semibold text-slate-950">
                             Start with one tap or type below.
                           </div>
                         </div>
-                        <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                        <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
                           Search first
                         </div>
                       </div>
@@ -4637,7 +4773,7 @@ export function BookingAssistantDialog({
                           >
                             <div className="flex items-center justify-between gap-2">
                               <div className="min-w-0 text-sm font-semibold text-slate-950">{topic.label}</div>
-                              <div className="rounded-full bg-slate-950 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-white">
+                              <div className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-white">
                                 Try
                               </div>
                             </div>
@@ -4740,7 +4876,7 @@ export function BookingAssistantDialog({
                                       </div>
                                     </div>
                                   ) : (
-                                    <div className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-[1rem] border text-[10px] font-bold uppercase tracking-[0.16em] ${
+                                    <div className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-[1rem] border text-xs font-bold uppercase tracking-[0.16em] ${
                                       isSelected ? 'border-white/15 bg-white/10 text-white/70' : 'border-slate-200 bg-slate-50 text-slate-500'
                                     }`}>
                                       <span>{getServiceInitials(service)}</span>
@@ -4749,21 +4885,21 @@ export function BookingAssistantDialog({
                                   )}
                                   <div className="min-w-0 flex-1">
                                     <div className="flex flex-wrap items-center gap-1.5">
-                                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
                                         isSelected ? 'bg-white text-slate-950' : 'bg-emerald-50 text-emerald-700'
                                       }`}>
                                         {decisionBadge}
                                       </span>
-                                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
                                         isSelected ? 'bg-white/10 text-white' : 'bg-sky-50 text-sky-700'
                                       }`}>
                                         {service.category}
                                       </span>
                                       {isBookedAiTenantMatch ? (
-                                        <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
                                           isSelected ? 'bg-emerald-300 text-slate-950' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
                                         }`}>
-                                          Verified tenant
+                                          Verified operator
                                         </span>
                                       ) : null}
                                     </div>
@@ -4779,7 +4915,7 @@ export function BookingAssistantDialog({
                                   {serviceFacts.map((fact) => (
                                     <span
                                       key={`${service.id}-${fact}`}
-                                      className={`inline-flex max-w-full rounded-full px-2.5 py-1.5 text-[10px] font-semibold ${
+                                      className={`inline-flex max-w-full rounded-full px-2.5 py-1.5 text-xs font-semibold ${
                                         isSelected ? 'bg-white/10 text-white' : 'bg-slate-50 text-slate-700'
                                       }`}
                                     >
@@ -4850,7 +4986,7 @@ export function BookingAssistantDialog({
                                   <button
                                     type="button"
                                     onClick={() => openServicePreview(service)}
-                                    className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
+                                    className={`min-h-[44px] rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
                                       isSelected
                                         ? 'border-white/20 bg-white/10 text-white hover:bg-white/15'
                                         : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
@@ -4863,7 +4999,7 @@ export function BookingAssistantDialog({
                                       href={googleMapsUrl}
                                       target="_blank"
                                       rel="noreferrer"
-                                      className={`rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
+                                      className={`inline-flex min-h-[44px] items-center rounded-full border px-3 py-1.5 text-[11px] font-semibold transition ${
                                         isSelected
                                           ? 'border-white/20 bg-white/10 text-white hover:bg-white/15'
                                           : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
@@ -4878,7 +5014,7 @@ export function BookingAssistantDialog({
                                       handleSelectService(service.id);
                                       focusBookingDetails();
                                     }}
-                                    className={`rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
+                                    className={`min-h-[44px] rounded-full px-3 py-1.5 text-[11px] font-semibold transition ${
                                       isSelected
                                         ? 'bg-emerald-400 text-slate-950 hover:bg-emerald-300'
                                         : 'bg-slate-950 text-white hover:bg-slate-800'
@@ -4921,7 +5057,7 @@ export function BookingAssistantDialog({
                                 <div className="min-w-0 flex-1">
                                   <div className="flex flex-wrap items-center gap-1.5">
                                     <div
-                                      className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                      className={`rounded-full px-2 py-0.5 text-xs font-semibold uppercase tracking-[0.14em] ${
                                         event.is_wsti_priority
                                           ? 'bg-emerald-100 text-emerald-700'
                                           : 'bg-sky-100 text-sky-700'
@@ -4957,23 +5093,23 @@ export function BookingAssistantDialog({
                                   href={event.url}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-100"
+                                  className="inline-flex min-h-[44px] items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-100"
                                 >
                                   View details
                                 </a>
                                 <button
                                   type="button"
                                   onClick={() => handleSelectEvent(event)}
-                                  className="inline-flex items-center rounded-full bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-500"
+                                  className="inline-flex min-h-[44px] items-center rounded-full bg-emerald-600 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-emerald-500"
                                 >
-                                  Book this event →
+                                  Request attendance
                                 </button>
                                 {event.map_url ? (
                                   <a
                                     href={event.map_url}
                                     target="_blank"
                                     rel="noreferrer"
-                                    className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-100"
+                                    className="inline-flex min-h-[44px] items-center rounded-full border border-slate-200 bg-slate-50 px-3 py-1.5 text-[11px] font-semibold text-slate-700 transition hover:bg-slate-100"
                                   >
                                     Map
                                   </a>
@@ -5011,7 +5147,7 @@ export function BookingAssistantDialog({
                       <div className="line-clamp-1 text-[11px] font-semibold text-slate-950">
                         {selectedService?.name ?? selectedEvent?.title ?? 'Ready to continue'}
                       </div>
-                      <div className="text-[10px] text-emerald-700">
+                      <div className="text-xs text-emerald-700">
                         {selectedService
                           ? `${formatServicePrice(selectedService)} · ${selectedService.duration_minutes} min — review booking below`
                           : selectedEvent
@@ -5022,7 +5158,7 @@ export function BookingAssistantDialog({
                     <button
                       type="button"
                       onClick={focusBookingDetails}
-                      className="shrink-0 rounded-full bg-slate-950 px-3 py-1.5 text-[10px] font-semibold text-white transition hover:bg-slate-800"
+                      className="shrink-0 rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800"
                     >
                       Book →
                     </button>
@@ -5053,9 +5189,10 @@ export function BookingAssistantDialog({
                       <button
                         type="button"
                         onClick={shouldUseCompactPopupMobileUI ? focusPopupBookingDetails : focusBookingDetails}
-                        className="shrink-0 rounded-full bg-slate-950 px-2.5 py-1.5 text-[9px] font-semibold text-white transition hover:bg-slate-800"
+                        aria-label="Continue to booking details"
+                        className="shrink-0 min-h-[44px] rounded-full bg-slate-950 px-3 py-2 text-[9px] font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
                       >
-                        Book
+                        Continue
                       </button>
                     </div>
                   </div>
@@ -5081,6 +5218,8 @@ export function BookingAssistantDialog({
                         ref={chatInputRef}
                         id="assistant-chat-input"
                         type="text"
+                        inputMode="text"
+                        autoComplete="off"
                         value={chatInput}
                         onChange={(event) => setChatInput(event.target.value)}
                         placeholder={
@@ -5088,10 +5227,10 @@ export function BookingAssistantDialog({
                             ? 'Try: best swim lesson near Caringbah this weekend'
                             : content.searchPlaceholder
                         }
-                        className={`w-full rounded-2xl border border-slate-200 bg-white text-slate-700 outline-none transition focus:border-slate-400 ${
+                        className={`w-full min-h-[44px] rounded-2xl border border-slate-200 bg-white text-slate-700 outline-none transition focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-sky-500 ${
                           isProductAppLayout || shouldUseCompactPopupMobileUI
-                            ? 'bg-slate-50 pl-9 pr-3 py-2.5 text-[13px] focus:bg-white'
-                            : 'bg-slate-50 px-4 py-3 text-sm focus:bg-white'
+                            ? 'bg-slate-50 pl-9 pr-3 py-2.5 text-base focus:bg-white sm:text-[13px]'
+                            : 'bg-slate-50 px-4 py-3 text-base focus:bg-white sm:text-sm'
                         }`}
                       />
                     </div>
@@ -5099,11 +5238,12 @@ export function BookingAssistantDialog({
                       type="button"
                       onClick={toggleVoiceCapture}
                       aria-label={isListening ? 'Stop voice input' : 'Start voice input'}
-                      className={`rounded-full font-semibold transition ${
+                      aria-pressed={isListening}
+                      className={`rounded-full font-semibold transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 ${
                         isListening
                           ? 'booking-listening bg-rose-600 text-white hover:bg-rose-500'
                           : 'border border-black/10 bg-white text-slate-700 hover:border-black/15 hover:bg-slate-50'
-                      } ${isProductAppLayout || shouldUseCompactPopupMobileUI ? 'flex h-10 w-10 shrink-0 items-center justify-center px-0 py-0 text-[11px]' : 'w-full px-5 py-3 text-sm sm:w-auto'}`}
+                      } ${isProductAppLayout || shouldUseCompactPopupMobileUI ? 'flex h-11 w-11 shrink-0 items-center justify-center px-0 py-0 text-[11px]' : 'min-h-[44px] w-full px-5 py-3 text-sm sm:w-auto'}`}
                     >
                       {isProductAppLayout || shouldUseCompactPopupMobileUI ? (
                         <svg aria-hidden="true" viewBox="0 0 16 16" className="h-3.5 w-3.5 fill-none stroke-current">
@@ -5118,8 +5258,8 @@ export function BookingAssistantDialog({
                       type="submit"
                       disabled={chatLoading || !chatInput.trim()}
                       aria-label="Send search"
-                      className={`rounded-full bg-slate-950 font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60 ${
-                        isProductAppLayout || shouldUseCompactPopupMobileUI ? 'flex h-10 min-w-10 shrink-0 items-center justify-center px-3 py-0 text-[11px]' : 'w-full px-5 py-3 text-sm sm:w-auto'
+                      className={`rounded-full bg-slate-950 font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${
+                        isProductAppLayout || shouldUseCompactPopupMobileUI ? 'flex h-11 min-w-11 shrink-0 items-center justify-center px-3 py-0 text-[11px]' : 'min-h-[44px] w-full px-5 py-3 text-sm sm:w-auto'
                       }`}
                     >
                       {isProductAppLayout || shouldUseCompactPopupMobileUI ? (
@@ -5132,35 +5272,35 @@ export function BookingAssistantDialog({
                 </form>
 
                 {chatError ? (
-                  <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  <div role="alert" className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                     <div>{chatError}</div>
                     {latestCustomerRequirement ? (
                       <button
                         type="button"
                         onClick={() => { setChatError(''); setChatInput(latestCustomerRequirement); }}
-                        className="mt-2 inline-flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-900 transition hover:bg-rose-200"
+                        className="mt-2 inline-flex min-h-[44px] items-center gap-1 rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-900 transition hover:bg-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2"
                       >
-                        Retry last search
+                        Try that search again
                       </button>
                     ) : null}
                   </div>
                 ) : null}
                 {voiceError ? (
-                  <div className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
+                  <div role="alert" className="mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-700">
                     <div>{voiceError}</div>
-                    {!voiceError.includes('not supported') ? (
+                    {!voiceError.toLowerCase().includes("doesn't support") ? (
                       <button
                         type="button"
                         onClick={() => { setVoiceError(''); toggleVoiceCapture(); }}
-                        className="mt-2 inline-flex items-center gap-1 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-200"
+                        className="mt-2 inline-flex min-h-[44px] items-center gap-1 rounded-full bg-amber-100 px-3 py-1.5 text-xs font-semibold text-amber-900 transition hover:bg-amber-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500 focus-visible:ring-offset-2"
                       >
-                        Try again
+                        Try the mic again
                       </button>
                     ) : null}
                   </div>
                 ) : null}
                 {catalogError ? (
-                  <div className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  <div role="alert" className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                     {catalogError}
                   </div>
                 ) : null}
@@ -5191,7 +5331,7 @@ export function BookingAssistantDialog({
                           setProductSheetSnap(tab.id === 'confirmed' || tab.id === 'details' ? 'full' : 'half');
                           scrollToProductSection(tab.id);
                         }}
-                        className={`flex min-h-8 shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[0.85rem] border px-2.5 py-1.5 text-center text-[10px] font-semibold transition ${
+                        className={`flex min-h-[44px] shrink-0 items-center justify-center gap-1 whitespace-nowrap rounded-[0.85rem] border px-3 py-2 text-center text-xs font-semibold transition ${
                           productModuleTab === tab.id
                             ? 'border-slate-950 bg-slate-950 text-white shadow-[0_12px_28px_rgba(15,23,42,0.14)]'
                             : tab.disabled
@@ -5226,7 +5366,7 @@ export function BookingAssistantDialog({
                     isCompactMobileViewport ? 'flex-wrap' : ''
                   }`}>
                     <div className="min-w-0">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                         {hasSelectionReadyForBooking ? 'Selected service' : 'Booking flow'}
                       </div>
                       <div className={`mt-1 font-semibold text-slate-950 ${isCompactMobileViewport ? 'text-[12px]' : 'text-[13px]'}`}>
@@ -5245,12 +5385,12 @@ export function BookingAssistantDialog({
                         <button
                           type="button"
                           onClick={focusBookingDetails}
-                          className="rounded-full bg-slate-950 px-3 py-1.5 text-[10px] font-semibold text-white transition hover:bg-slate-800"
+                          className="rounded-full bg-slate-950 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-slate-800"
                         >
                           Book now →
                         </button>
                       ) : (
-                        <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold text-emerald-700">
+                        <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
                           Select a result above
                         </div>
                       )}
@@ -5281,10 +5421,10 @@ export function BookingAssistantDialog({
                           step.status === 'active'
                             ? 'bg-white text-slate-950'
                             : 'bg-slate-100 text-slate-600'
-                        } ${isCompactMobileViewport ? 'h-5 w-5 text-[9px]' : 'h-6 w-6 text-[10px]'}`}>
+                        } ${isCompactMobileViewport ? 'h-5 w-5 text-[9px]' : 'h-6 w-6 text-xs'}`}>
                           {index + 1}
                         </div>
-                        <div className={`mt-2 font-semibold ${isCompactMobileViewport ? 'text-[9px] leading-3' : 'text-[10px]'}`}>{step.label}</div>
+                        <div className={`mt-2 font-semibold ${isCompactMobileViewport ? 'text-[9px] leading-3' : 'text-xs'}`}>{step.label}</div>
                       </div>
                     ))}
                   </div>
@@ -5462,7 +5602,7 @@ export function BookingAssistantDialog({
                   <div className="mt-4 rounded-[1.35rem] border-[1.5px] border-emerald-300 bg-[linear-gradient(180deg,#f0fdf4_0%,#ecfdf3_100%)] p-4 shadow-[0_14px_32px_rgba(16,185,129,0.12)]">
                     <div className="flex items-center justify-between gap-3">
                       <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
                           Selected for booking
                         </div>
                         <div className="mt-1 text-sm font-semibold text-emerald-950">
@@ -5480,7 +5620,7 @@ export function BookingAssistantDialog({
                         </div>
                       </div>
                       <div className="flex flex-col items-end gap-2">
-                        <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
+                        <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
                           {selectedService ? 'Top match' : 'Selected event'}
                         </div>
                         <button
@@ -5506,8 +5646,8 @@ export function BookingAssistantDialog({
                     listClassName="grid gap-3"
                     emptyState={
                       <div className="mt-4 rounded-[1.15rem] border border-dashed border-slate-200 bg-[#fbfbfd] px-4 py-5 text-center">
-                        <div className="text-[12px] font-semibold text-slate-950">No results to show</div>
-                        <div className="mt-1 text-[11px] leading-5 text-slate-500">Refine your search above — try adding location or more detail.</div>
+                        <div className="text-[12px] font-semibold text-slate-950">Let's try a different angle</div>
+                        <div className="mt-1 text-[11px] leading-5 text-slate-500">Tell us a suburb, time, or which service matters most and we'll find a fit.</div>
                       </div>
                     }
                     renderMeta={({ visibleCount, totalCount }) =>
@@ -5561,7 +5701,7 @@ export function BookingAssistantDialog({
                                   </div>
                                 </div>
                               ) : (
-                                <div className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-[1rem] border text-[10px] font-bold uppercase tracking-[0.16em] ${
+                                <div className={`flex h-16 w-16 shrink-0 flex-col items-center justify-center rounded-[1rem] border text-xs font-bold uppercase tracking-[0.16em] ${
                                   isSelected ? 'border-white/15 bg-white/10 text-white/70' : 'border-slate-200 bg-slate-50 text-slate-500'
                                 }`}>
                                   <span>{getServiceInitials(service)}</span>
@@ -5570,26 +5710,26 @@ export function BookingAssistantDialog({
                               )}
                               <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                <div className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
                                   isSelected ? 'bg-white text-slate-950' : 'bg-emerald-50 text-emerald-700'
                                 }`}>
                                   {decisionBadge}
                                 </div>
-                                <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                <div className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
                                   isSelected ? 'bg-white/10 text-white' : 'bg-sky-50 text-sky-700'
                                 }`}>
                                   {service.category}
                                 </div>
-                                <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                <div className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
                                   isSelected ? 'bg-emerald-300 text-slate-950' : 'bg-emerald-50 text-emerald-700'
                                 }`}>
                                   {buildBookabilityLabel(service)}
                                 </div>
                                 {isBookedAiTenantMatch ? (
-                                  <div className={`rounded-full px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] ${
+                                  <div className={`rounded-full px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] ${
                                     isSelected ? 'bg-emerald-300 text-slate-950' : 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-100'
                                   }`}>
-                                    Verified tenant
+                                    Verified operator
                                   </div>
                                 ) : null}
                               </div>
@@ -5601,7 +5741,7 @@ export function BookingAssistantDialog({
                                 {serviceFacts.map((fact) => (
                                   <div
                                     key={`${service.id}-compact-${fact}`}
-                                    className={`inline-flex max-w-full items-center rounded-full px-2.5 py-1.5 text-[10px] font-medium ${
+                                    className={`inline-flex max-w-full items-center rounded-full px-2.5 py-1.5 text-xs font-medium ${
                                       isSelected ? 'bg-white/10 text-white' : 'bg-white text-slate-700'
                                     }`}
                                   >
@@ -5750,7 +5890,7 @@ export function BookingAssistantDialog({
                         >
                           <div className="flex items-start justify-between gap-3">
                             <div>
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                              <div className="text-xs font-semibold uppercase tracking-[0.14em] opacity-70">
                                 {buildDecisionBadge(service, comparisonPair, index, latestCustomerRequirement)}
                               </div>
                               <div className="mt-1 text-sm font-semibold">{service.name}</div>
@@ -5776,14 +5916,15 @@ export function BookingAssistantDialog({
 
                 {!isSearchResolving && !visibleSuggestedServices.length && hasFirstSearchResult ? (
                   <div className="mt-4 rounded-[1.25rem] border border-dashed border-slate-200 bg-[#fbfbfd] px-4 py-5 text-center">
-                    <div className="text-[12px] font-semibold text-slate-950">No matches found</div>
-                    <div className="mt-1 text-[11px] leading-5 text-slate-500">Try narrowing with a suburb, budget, or specific requirement.</div>
+                    <div className="text-[12px] font-semibold text-slate-950">Let's try a different angle</div>
+                    <div className="mt-1 text-[11px] leading-5 text-slate-500">Tell us a suburb, budget, or which service matters most and we'll find a fit.</div>
                     <button
                       type="button"
                       onClick={focusCompactSearchComposer}
-                      className="mt-3 inline-flex items-center gap-1 rounded-full bg-slate-950 px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-slate-800"
+                      aria-label="Refine your search"
+                      className="mt-3 inline-flex min-h-[44px] items-center gap-1 rounded-full bg-slate-950 px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2"
                     >
-                      Refine search
+                      Refine my search
                     </button>
                   </div>
                 ) : null}
@@ -5804,7 +5945,7 @@ export function BookingAssistantDialog({
                 {isDefaultPopupMobileViewport ? (
                   <div className="flex items-center justify-between gap-3 rounded-[1.15rem] border border-slate-200 bg-[#fbfbfd] px-3 py-2.5">
                     <div>
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                         Booking details
                       </div>
                       <div className="mt-1 text-[12px] font-semibold text-slate-950">
@@ -5830,7 +5971,7 @@ export function BookingAssistantDialog({
                     ].map(({ step, label, done }, index, arr) => (
                       <div key={step} className="flex flex-1 items-center gap-1.5">
                         <div className="flex flex-col items-center gap-0.5">
-                          <div className={`flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold ${
+                          <div className={`flex h-6 w-6 items-center justify-center rounded-full text-xs font-bold ${
                             done ? 'bg-emerald-500 text-white' : step === 2 ? 'bg-slate-950 text-white' : 'bg-slate-200 text-slate-500'
                           }`}>
                             {done ? '✓' : step}
@@ -5860,16 +6001,16 @@ export function BookingAssistantDialog({
                             {selectedService.category} • {selectedService.duration_minutes} min • {formatServicePrice(selectedService)}
                           </div>
                         </div>
-                        <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white">✓ Selected</span>
+                        <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white">✓ Selected</span>
                       </div>
                       <div className="mt-3 rounded-[1rem] bg-white/80 px-3 py-2 text-xs leading-5 text-emerald-900 ring-1 ring-emerald-200/70">
                         <span className="font-semibold">Focus now:</span> confirm contact details, preferred timing, and anything the provider needs to action the request quickly.
                       </div>
                       {isBookedAiChessTenantService(selectedService) ? (
                         <div className="mt-3 rounded-[1rem] bg-white px-3 py-3 text-xs leading-5 text-emerald-900 ring-1 ring-emerald-200/80">
-                          <div className="font-semibold">BookedAI tenant flow is enabled.</div>
+                          <div className="font-semibold">Full BookedAI booking flow is enabled.</div>
                           <div className="mt-1">
-                            After booking, the customer gets Stripe/payment handling, QR booking confirmation, calendar, email, messaging follow-up, Telegram/customer-care handoff, and a portal link for review or changes.
+                            After booking, you'll get Stripe/payment handling, a QR booking confirmation, calendar invite, email, messaging follow-up, Telegram support handoff, and a portal link to review or change details.
                           </div>
                           <div className="mt-2 flex flex-wrap gap-1.5">
                             {BOOKEDAI_TENANT_CAPABILITY_CHIPS.slice(2).map((item) => (
@@ -5896,7 +6037,7 @@ export function BookingAssistantDialog({
                               : ''}
                           </div>
                         </div>
-                        <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-[10px] font-bold text-white">✓ Selected</span>
+                        <span className="rounded-full bg-emerald-500 px-2.5 py-1 text-xs font-bold text-white">✓ Selected</span>
                       </div>
                       <div className="mt-3 rounded-[1rem] bg-white/80 px-3 py-2 text-xs leading-5 text-emerald-900 ring-1 ring-emerald-200/70">
                         <span className="font-semibold">Focus now:</span> confirm contact details, attendance timing, and anything the organiser needs to action the request quickly.
@@ -5913,7 +6054,7 @@ export function BookingAssistantDialog({
                     }`}>
                       <div className="flex items-start justify-between gap-3">
                         <div>
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
                             Ready to book
                           </div>
                           <div className="mt-1 text-sm font-semibold text-slate-950">
@@ -5936,7 +6077,7 @@ export function BookingAssistantDialog({
                         {selectedService ? (
                           <>
                             <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                 Price
                               </div>
                               <div className="mt-1 text-sm font-semibold text-slate-950">
@@ -5944,7 +6085,7 @@ export function BookingAssistantDialog({
                               </div>
                             </div>
                             <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                 Duration
                               </div>
                               <div className="mt-1 text-sm font-semibold text-slate-950">
@@ -5952,7 +6093,7 @@ export function BookingAssistantDialog({
                               </div>
                             </div>
                             <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                 Location
                               </div>
                               <div className="mt-1 text-[11px] font-medium leading-4 text-slate-700">
@@ -5960,7 +6101,7 @@ export function BookingAssistantDialog({
                               </div>
                             </div>
                             <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                 Best for
                               </div>
                               <div className="mt-1 text-[11px] font-medium leading-4 text-slate-700">
@@ -5971,7 +6112,7 @@ export function BookingAssistantDialog({
                         ) : selectedEvent ? (
                           <>
                             <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                 Schedule
                               </div>
                               <div className="mt-1 text-sm font-semibold text-slate-950">
@@ -5979,7 +6120,7 @@ export function BookingAssistantDialog({
                               </div>
                             </div>
                             <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                 Organiser
                               </div>
                               <div className="mt-1 text-sm font-semibold text-slate-950">
@@ -5987,7 +6128,7 @@ export function BookingAssistantDialog({
                               </div>
                             </div>
                             <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                 Location
                               </div>
                               <div className="mt-1 text-[11px] font-medium leading-4 text-slate-700">
@@ -5995,7 +6136,7 @@ export function BookingAssistantDialog({
                               </div>
                             </div>
                             <div className="rounded-2xl bg-white px-3 py-3 ring-1 ring-slate-200">
-                              <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                              <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                                 Booking step
                               </div>
                               <div className="mt-1 text-[11px] font-medium leading-4 text-slate-700">
@@ -6025,14 +6166,14 @@ export function BookingAssistantDialog({
                   <div className="mt-3 rounded-[1.25rem] border border-slate-200 bg-[#fbfbfd] px-4 py-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                           Your booking journey
                         </div>
                         <div className="mt-1 text-sm font-semibold text-slate-950">
                           From search to booking, payment, and follow-up
                         </div>
                       </div>
-                      <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600 ring-1 ring-slate-200">
+                      <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 ring-1 ring-slate-200">
                         Active
                       </div>
                     </div>
@@ -6054,7 +6195,7 @@ export function BookingAssistantDialog({
                             <div className="mt-1 text-[11px] leading-5 text-slate-600">{step.description}</div>
                           </div>
                           <div
-                            className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getEnterpriseStatusTone(step.status)}`}
+                            className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${getEnterpriseStatusTone(step.status)}`}
                           >
                             {getEnterpriseStatusLabel(step.status)}
                           </div>
@@ -6092,7 +6233,7 @@ export function BookingAssistantDialog({
 
                 {isProductAppLayout && !isCompactMobileViewport ? (
                   <div className="rounded-[1.25rem] border border-slate-200 bg-[#fbfbfd] p-4">
-                    <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Booking journey
                     </div>
                     <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -6105,7 +6246,7 @@ export function BookingAssistantDialog({
                               : 'bg-white text-slate-600 ring-1 ring-slate-200'
                           }`}
                         >
-                          <div className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-semibold ${
+                          <div className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
                             step.status === 'active'
                               ? 'bg-white text-slate-950'
                               : 'bg-slate-100 text-slate-600'
@@ -6121,15 +6262,17 @@ export function BookingAssistantDialog({
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block text-sm text-slate-600">
-                    <span className="mb-2 block font-medium text-slate-700">Name <span className="text-rose-500">*</span></span>
+                    <span className="mb-2 block font-medium text-slate-700">Name <span className="text-rose-500" aria-hidden="true">*</span></span>
                     <input
                       ref={customerNameInputRef}
                       required
                       type="text"
                       autoComplete="name"
+                      inputMode="text"
+                      aria-required="true"
                       value={customerName}
                       onChange={(event) => setCustomerName(event.target.value)}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+                      className="w-full min-h-[44px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-700 outline-none transition focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-sky-500 sm:text-sm"
                     />
                   </label>
                   <label className="block text-sm text-slate-600">
@@ -6137,11 +6280,12 @@ export function BookingAssistantDialog({
                     <input
                       type="email"
                       autoComplete="email"
+                      inputMode="email"
                       value={customerEmail}
                       onChange={(event) => setCustomerEmail(event.target.value)}
                       placeholder="your@email.com"
                       aria-describedby={customerContactHelperId}
-                      className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+                      className="w-full min-h-[44px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-700 outline-none transition focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-sky-500 sm:text-sm"
                     />
                   </label>
                 </div>
@@ -6151,11 +6295,12 @@ export function BookingAssistantDialog({
                   <input
                     type="tel"
                     autoComplete="tel"
+                    inputMode="tel"
                     value={customerPhone}
                     onChange={(event) => setCustomerPhone(event.target.value)}
                     placeholder="+61 4xx xxx xxx"
                     aria-describedby={`${customerContactHelperId} ${customerPhoneHelperId}`}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+                    className="w-full min-h-[44px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-700 outline-none transition focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-sky-500 sm:text-sm"
                   />
                   <span id={customerContactHelperId} className="mt-2 block text-xs text-slate-500">
                     At least one of email or phone is required.
@@ -6167,16 +6312,17 @@ export function BookingAssistantDialog({
 
                 <label className="block text-sm text-slate-600">
                   <span className="mb-2 block font-medium text-slate-700">
-                    {selectedEvent ? 'Preferred attendance time' : 'Preferred time'} <span className="text-rose-500">*</span>
+                    {selectedEvent ? 'Preferred attendance time' : 'Preferred time'} <span className="text-rose-500" aria-hidden="true">*</span>
                   </span>
                   <input
                     required
                     type="datetime-local"
+                    aria-required="true"
                     value={preferredSlot}
                     onChange={(event) => setPreferredSlot(event.target.value)}
                     min={`${minDate}T08:00`}
                     step={900}
-                    className="w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+                    className="w-full min-h-[44px] rounded-2xl border border-slate-200 bg-white px-4 py-3 text-base text-slate-700 outline-none transition focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-sky-500 sm:text-sm"
                   />
                   <span className="mt-2 block text-xs text-slate-500">
                     {selectedEvent
@@ -6194,12 +6340,12 @@ export function BookingAssistantDialog({
                     value={notes}
                     onChange={(event) => setNotes(event.target.value)}
                     placeholder={bookingRequirementConfig.placeholder}
-                    className="w-full rounded-[1.5rem] border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700 outline-none transition focus:border-slate-400"
+                    className="w-full rounded-[1.5rem] border border-slate-200 bg-white px-4 py-3 text-base text-slate-700 outline-none transition focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-sky-500 sm:text-sm"
                   />
                 </label>
 
                 {submitError ? (
-                  <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                  <div role="alert" aria-live="polite" className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
                     <div>{submitError}</div>
                     <button
                       type="button"
@@ -6213,9 +6359,9 @@ export function BookingAssistantDialog({
                           setActiveMobilePanel('chat');
                         }
                       }}
-                      className="mt-2 inline-flex items-center gap-1 rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-900 transition hover:bg-rose-200"
+                      className="mt-2 inline-flex min-h-[44px] items-center gap-1 rounded-full bg-rose-100 px-3 py-1.5 text-xs font-semibold text-rose-900 transition hover:bg-rose-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-500 focus-visible:ring-offset-2"
                     >
-                      ← Back to results
+                      <span aria-hidden="true">←</span> Back to search results
                     </button>
                   </div>
                 ) : null}
@@ -6224,7 +6370,7 @@ export function BookingAssistantDialog({
                   <div className="rounded-[1.35rem] border border-slate-200 bg-[#fbfbfd] px-4 py-3 text-sm">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                           {selectedEvent ? 'Attendance summary' : 'Booking summary'}
                         </div>
                         <div className="mt-0.5 line-clamp-1 text-[13px] font-semibold text-slate-950">
@@ -6236,7 +6382,7 @@ export function BookingAssistantDialog({
                             : `${selectedEvent ? formatEventDate(selectedEvent.start_at) : ''}${selectedEvent && (selectedEvent.venue_name || selectedEvent.location) ? ` • ${[selectedEvent.venue_name, selectedEvent.location].filter(Boolean).join(' • ')}` : ''}`}
                         </div>
                       </div>
-                      <span className={`rounded-full px-2.5 py-1 text-[10px] font-semibold ${
+                      <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${
                         selectedService && selectedService.booking_url ? 'bg-emerald-50 text-emerald-700' : 'bg-slate-100 text-slate-600'
                       }`}>
                         {selectedService
@@ -6252,7 +6398,7 @@ export function BookingAssistantDialog({
                 <button
                   type="submit"
                   disabled={loading || (!selectedService && !selectedEvent)}
-                  className={`w-full rounded-full px-5 py-3.5 text-sm font-semibold text-white transition disabled:cursor-not-allowed disabled:opacity-60 ${
+                  className={`w-full min-h-[44px] rounded-full px-5 py-3.5 text-sm font-semibold text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 ${
                     loading
                       ? 'bg-slate-700'
                       : selectedService || selectedEvent
@@ -6262,8 +6408,8 @@ export function BookingAssistantDialog({
                 >
                   {loading
                     ? selectedEvent
-                      ? 'Preparing your attendance request...'
-                      : 'Preparing your booking...'
+                      ? 'Sending attendance request…'
+                      : 'Saving your booking…'
                     : selectedEvent
                       ? 'Request attendance'
                       : content.submitLabel}
@@ -6278,7 +6424,7 @@ export function BookingAssistantDialog({
                   }}
                   target="_blank"
                   rel="noreferrer"
-                  className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
+                className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
                 >
                   <MessageCircle className="h-4 w-4" />
                   Need help in Telegram? Open BookedAI Manager Bot
@@ -6289,13 +6435,13 @@ export function BookingAssistantDialog({
                     <div className="rounded-[1.15rem] border border-slate-200 bg-[linear-gradient(180deg,#ffffff_0%,#f8fafc_100%)] px-3 py-2.5 shadow-[0_10px_22px_rgba(15,23,42,0.06)]">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-700">
+                          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
                             {selectedEvent ? 'Ready to request' : 'Ready to book'}
                           </div>
                           <div className="mt-0.5 line-clamp-1 text-[13px] font-semibold text-slate-950">
                             {selectedService?.name ?? selectedEvent?.title}
                           </div>
-                          <div className="mt-0.5 line-clamp-1 text-[10px] leading-4 text-slate-500">
+                          <div className="mt-0.5 line-clamp-1 text-xs leading-4 text-slate-500">
                             {selectedService
                               ? `${formatServicePrice(selectedService)} • ${selectedService.duration_minutes} min • ${buildBestForLabel(selectedService, latestCustomerRequirement)}`
                               : selectedEvent
@@ -6306,14 +6452,14 @@ export function BookingAssistantDialog({
                         <button
                           type="submit"
                           disabled={loading || (!selectedService && !selectedEvent)}
-                          className="shrink-0 rounded-full bg-slate-950 px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="shrink-0 min-h-[44px] rounded-full bg-slate-950 px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-slate-800 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                         >
-                          {loading ? 'Preparing...' : selectedEvent ? 'Request attendance' : 'Book now'}
+                          {loading ? 'Saving…' : selectedEvent ? 'Request attendance' : 'Continue to booking'}
                         </button>
                       </div>
 
                       <div className="mt-1.5 flex items-center justify-between gap-2">
-                        <div className="min-w-0 line-clamp-1 text-[10px] leading-4 text-slate-500">
+                        <div className="min-w-0 line-clamp-1 text-xs leading-4 text-slate-500">
                           {selectedService
                             ? buildServiceLocationLabel(selectedService)
                             : [selectedEvent?.venue_name, selectedEvent?.location].filter(Boolean).join(' • ') || 'Location shared after confirmation'}
@@ -6346,7 +6492,7 @@ export function BookingAssistantDialog({
                             <span className="text-lg">✓</span>
                           </div>
                           <div className="min-w-0">
-                            <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-300">
+                            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
                               Booking secured
                             </div>
                             <div className="flex items-center gap-2">
@@ -6356,7 +6502,7 @@ export function BookingAssistantDialog({
                               <button
                                 type="button"
                                 onClick={() => handleCopyBookingValue('reference')}
-                                className="inline-flex items-center gap-1 rounded-full bg-white/12 px-2 py-0.5 text-[10px] font-semibold text-white/85 ring-1 ring-white/12 transition hover:bg-white/18"
+                                className="inline-flex items-center gap-1 rounded-full bg-white/12 px-2 py-0.5 text-xs font-semibold text-white/85 ring-1 ring-white/12 transition hover:bg-white/18"
                                 aria-label="Copy booking reference"
                               >
                                 {copyState.kind === 'reference' ? '✓ Copied' : 'Copy'}
@@ -6386,27 +6532,27 @@ export function BookingAssistantDialog({
                           Your booking portal
                         </div>
                         <a
-                          href={getBookingPortalUrl(result)}
+                          href={resolvePortalUrl(result)}
                           target="_blank"
                           rel="noreferrer"
                           className="rounded-[1.25rem] bg-white p-2.5 shadow-[0_10px_28px_rgba(15,23,42,0.18)] transition hover:scale-[1.02]"
                           aria-label="Open booking portal"
                         >
                           <img
-                            src={bookingQrDataUrl || getBookingQrCodeUrl(result)}
+                            src={bookingQrDataUrl || resolveQrCodeUrl(result)}
                             alt={`QR code for ${result.booking_reference}`}
                             className="h-32 w-32 rounded-[0.85rem] bg-white object-cover sm:h-36 sm:w-36"
                           />
                         </a>
                         <div className="flex items-center gap-1.5">
-                          <div className="rounded-full bg-white/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/85 ring-1 ring-white/12">
+                          <div className="rounded-full bg-white/12 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white/85 ring-1 ring-white/12">
                             Scan to sign in
                           </div>
                           <button
                             type="button"
                             onClick={handleDownloadBookingQr}
                             disabled={!bookingQrDataUrl}
-                            className="rounded-full bg-white/12 px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-white/85 ring-1 ring-white/12 transition hover:bg-white/18 disabled:opacity-50"
+                            className="rounded-full bg-white/12 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-white/85 ring-1 ring-white/12 transition hover:bg-white/18 disabled:opacity-50"
                             aria-label="Download QR PNG"
                           >
                             Save PNG
@@ -6417,7 +6563,7 @@ export function BookingAssistantDialog({
 
                     <div className="mt-5 grid gap-2 sm:grid-cols-3">
                       <a
-                        href={getBookingPortalUrl(result)}
+                        href={resolvePortalUrl(result)}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center justify-center gap-1.5 rounded-[1rem] bg-white px-4 py-3 text-center text-[12px] font-semibold text-slate-950 transition hover:bg-slate-50"
@@ -6494,7 +6640,7 @@ export function BookingAssistantDialog({
                   <div className="booked-print-hide overflow-hidden rounded-[1.5rem] border border-slate-200 bg-[#fbfbfd] p-4 text-slate-700">
                     <div className="flex flex-wrap items-start justify-between gap-4">
                       <div className="min-w-0">
-                        <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-700 ring-1 ring-emerald-100">
+                        <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 ring-1 ring-emerald-100">
                           Booking summary
                         </div>
                         <div className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
@@ -6514,7 +6660,7 @@ export function BookingAssistantDialog({
                             Use the portal link above to review booking details, edit the request, reschedule, cancel, or save this booking. The same portal link is also used by email, messaging, Telegram, and customer-care follow-up.
                           </p>
                           <a
-                            href={getBookingPortalUrl(result)}
+                            href={resolvePortalUrl(result)}
                             target="_blank"
                             rel="noreferrer"
                             className="mt-2 inline-flex items-center gap-2 text-[12px] font-semibold text-[#1a73e8] transition hover:text-slate-950"
@@ -6526,7 +6672,7 @@ export function BookingAssistantDialog({
                               <path d="M12 9.5V12H4V4h2.5" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                             </svg>
                           </a>
-                          <div className="mt-3 flex flex-wrap gap-2 text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-600">
+                          <div className="mt-3 flex flex-wrap gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-slate-600">
                             {['Review details', 'Edit and submit', 'Request reschedule', 'Request cancellation'].map((item) => (
                               <span key={item} className="rounded-full bg-slate-100 px-2.5 py-1 ring-1 ring-slate-200">
                                 {item}
@@ -6561,14 +6707,14 @@ export function BookingAssistantDialog({
                         <div className="mt-1 text-[12px] font-semibold text-slate-950">
                           {result.requested_date}
                         </div>
-                        <div className="mt-0.5 text-[10px] text-slate-500">{result.requested_time}</div>
+                        <div className="mt-0.5 text-xs text-slate-500">{result.requested_time}</div>
                       </div>
                     </div>
                   </div>
 
                   <div className="mt-5 grid grid-cols-1 gap-2 text-slate-600 sm:grid-cols-2">
                     <div className="rounded-[1rem] bg-[#f5f5f7] px-3 py-3">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                         Requested slot
                       </div>
                       <div className="mt-1 text-[12px] font-semibold text-slate-950">
@@ -6579,7 +6725,7 @@ export function BookingAssistantDialog({
                       </div>
                     </div>
                     <div className="rounded-[1rem] bg-[#f5f5f7] px-3 py-3">
-                      <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                         Follow-up
                       </div>
                       <div className="mt-1 text-[12px] font-semibold text-slate-950">
@@ -6600,25 +6746,25 @@ export function BookingAssistantDialog({
                         title: 'Review booking',
                         body: 'Open the portal to review the current booking details and booking reference.',
                         label: 'Open portal',
-                        href: getBookingPortalUrl(result),
+                        href: resolvePortalUrl(result),
                       },
                       {
                         title: 'Edit details',
                         body: 'Change your details or preferred time and resubmit directly from the portal.',
                         label: 'Edit in portal',
-                        href: getBookingPortalUrl(result, 'edit'),
+                        href: resolvePortalUrl(result, 'edit'),
                       },
                       {
                         title: 'Reschedule request',
                         body: 'If the slot changed, request a new time from the same portal flow.',
                         label: 'Request reschedule',
-                        href: getBookingPortalUrl(result, 'reschedule'),
+                        href: resolvePortalUrl(result, 'reschedule'),
                       },
                       {
                         title: 'Cancel request',
                         body: 'If your plans have changed, submit a cancellation request through the portal.',
                         label: 'Request cancellation',
-                        href: getBookingPortalUrl(result, 'cancel'),
+                        href: resolvePortalUrl(result, 'cancel'),
                       },
                       {
                         title: 'Telegram care',
@@ -6646,18 +6792,37 @@ export function BookingAssistantDialog({
                       >
                         <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">{item.title}</div>
                         <div className="mt-2 text-sm leading-6 text-slate-600">{item.body}</div>
-                        <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-2.5 py-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-[#1a73e8]">
+                        <div className="mt-3 inline-flex rounded-full bg-[#eef4ff] px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-[#1a73e8]">
                           {item.label}
                         </div>
                       </a>
                     ))}
                   </div>
 
+                  {partnerPostBookingFeedbackEnabled || runtimeConfig?.tenantRef === 'ai-mentor-doer' ? (
+                    <div className="mt-4 rounded-[1rem] border border-slate-200 bg-white p-4">
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-[#1a73e8]">
+                        After your session
+                      </div>
+                      <div className="mt-2 text-sm leading-6 text-slate-700">
+                        Tell us how the session went so we can match the next mentor block to your goals.
+                      </div>
+                      <a
+                        href={`/aimentor/feedback?booking_reference=${encodeURIComponent(result.booking_reference)}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="booked-button-secondary mt-3 inline-flex min-h-[44px] items-center justify-center px-4 py-2 text-sm font-semibold"
+                      >
+                        Send my feedback
+                      </a>
+                    </div>
+                  ) : null}
+
                   <div className="mt-4 grid gap-2 sm:grid-cols-3">
                     {buildBookingOutcomeSteps(result).map((step) => (
                       <div key={step.label} className="rounded-[1rem] bg-[#f5f5f7] px-3 py-3">
                         <div className="text-[11px] font-semibold text-slate-950">{step.label}</div>
-                        <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-[10px] font-semibold ${step.tone}`}>
+                        <div className={`mt-2 inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${step.tone}`}>
                           {step.value}
                         </div>
                       </div>
@@ -6667,14 +6832,14 @@ export function BookingAssistantDialog({
                   <div className="mt-5 rounded-[1.4rem] border border-slate-200 bg-[#fbfbfd] p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                           What happens next
                         </div>
                         <div className="mt-1 text-sm font-semibold text-slate-950">
                           Request, follow-up, and confirmation status
                         </div>
                       </div>
-                      <div className="rounded-full bg-white px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600 ring-1 ring-slate-200">
+                      <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 ring-1 ring-slate-200">
                         Current
                       </div>
                     </div>
@@ -6697,7 +6862,7 @@ export function BookingAssistantDialog({
                               <div className="mt-1 text-[11px] leading-5 text-slate-600">{step.description}</div>
                             </div>
                             <div
-                              className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getEnterpriseStatusTone(step.status)}`}
+                              className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${getEnterpriseStatusTone(step.status)}`}
                             >
                               {getEnterpriseStatusLabel(step.status)}
                             </div>
@@ -6714,7 +6879,7 @@ export function BookingAssistantDialog({
                       ...(result.automation?.revenueOps?.warnings ?? []),
                     ]).length ? (
                       <div className="mt-3 rounded-[1rem] border border-amber-200 bg-amber-50 px-3 py-3">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-amber-700">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-amber-700">
                           Action may be required
                         </div>
                         <div className="mt-2 space-y-1 text-[11px] leading-5 text-amber-900">
@@ -6736,14 +6901,14 @@ export function BookingAssistantDialog({
                   <div className="mt-5 rounded-[1.4rem] border border-slate-200 bg-white p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                           Confirmation messages
                         </div>
                         <div className="mt-1 text-sm font-semibold text-slate-950">
                           Email, messaging, and customer-care handoffs
                         </div>
                       </div>
-                      <div className="rounded-full bg-emerald-50 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                      <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
                         Ready
                       </div>
                     </div>
@@ -6762,12 +6927,12 @@ export function BookingAssistantDialog({
                           >
                             <div className="flex items-center justify-between gap-3 border-b border-black/5 px-3 py-2.5">
                               <div>
-                                <div className="text-[10px] font-semibold uppercase tracking-[0.14em] opacity-70">
+                                <div className="text-xs font-semibold uppercase tracking-[0.14em] opacity-70">
                                   {card.channel}
                                 </div>
                                 <div className="mt-0.5 text-[12px] font-semibold">{card.title}</div>
                               </div>
-                              <div className="max-w-[11rem] truncate rounded-full bg-white/70 px-2.5 py-1 text-[10px] font-semibold text-slate-700">
+                              <div className="max-w-[11rem] truncate rounded-full bg-white/70 px-2.5 py-1 text-xs font-semibold text-slate-700">
                                 {card.recipient}
                               </div>
                             </div>
@@ -6800,14 +6965,14 @@ export function BookingAssistantDialog({
                   <div className="mt-5 rounded-[1.4rem] border border-slate-200 bg-white p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div>
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                           Confirmation timeline
                         </div>
                         <div className="mt-1 text-sm font-semibold text-slate-950">
                           What happened after your request was confirmed
                         </div>
                       </div>
-                      <div className="rounded-full bg-slate-100 px-3 py-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-600">
+                      <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600">
                         Timeline
                       </div>
                     </div>
@@ -6822,13 +6987,13 @@ export function BookingAssistantDialog({
                               <div className="text-[11px] font-semibold text-slate-950">{item.title}</div>
                               <div className="mt-1 text-[11px] leading-5 text-slate-600">{item.detail}</div>
                               {item.reference ? (
-                                <div className="mt-2 inline-flex max-w-full rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-600 ring-1 ring-slate-200">
+                                <div className="mt-2 inline-flex max-w-full rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
                                   Ref: {item.reference}
                                 </div>
                               ) : null}
                             </div>
                             <div
-                              className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-semibold ${getEnterpriseStatusTone(item.status)}`}
+                              className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${getEnterpriseStatusTone(item.status)}`}
                             >
                               {getEnterpriseStatusLabel(item.status)}
                             </div>
@@ -6849,7 +7014,7 @@ export function BookingAssistantDialog({
                             ? 'Open payment'
                             : 'Open payment follow-up'
                         }
-                        className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] bg-slate-950 px-3 py-2.5 text-[10px] font-semibold text-white transition hover:bg-slate-800"
+                        className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] bg-slate-950 px-3 py-2.5 text-xs font-semibold text-white transition hover:bg-slate-800"
                       >
                         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current">
                           <path d="M4 7.5h16v9H4z" strokeWidth="1.8" rx="2" />
@@ -6864,7 +7029,7 @@ export function BookingAssistantDialog({
                         target="_blank"
                         rel="noreferrer"
                         aria-label="Add to calendar"
-                        className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] border border-black/10 bg-white px-3 py-2.5 text-[10px] font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
+                        className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] border border-black/10 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
                       >
                         <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current">
                           <path d="M7 3.5v3M17 3.5v3M4 8.5h16M5.5 6h13a1.5 1.5 0 0 1 1.5 1.5v10A1.5 1.5 0 0 1 18.5 19h-13A1.5 1.5 0 0 1 4 17.5v-10A1.5 1.5 0 0 1 5.5 6Z" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -6876,7 +7041,7 @@ export function BookingAssistantDialog({
                       type="button"
                       aria-label="Return home"
                       onClick={returnToMainBookedAiScreen}
-                      className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] border border-black/10 bg-white px-3 py-2.5 text-[10px] font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
+                      className="inline-flex min-w-[5.25rem] flex-col items-center justify-center gap-1 rounded-[1rem] border border-black/10 bg-white px-3 py-2.5 text-xs font-semibold text-slate-700 transition hover:border-black/15 hover:bg-slate-50"
                     >
                       <svg aria-hidden="true" viewBox="0 0 24 24" className="h-4 w-4 fill-none stroke-current">
                         <path d="M4 10.5 12 4l8 6.5" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -6903,21 +7068,26 @@ export function BookingAssistantDialog({
                     onClick={() => setPreviewService(null)}
                     className="absolute inset-0"
                   />
-                  <div className="relative z-10 flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
+                  <div
+                    role="dialog"
+                    aria-modal="true"
+                    aria-labelledby="service-preview-title"
+                    className="relative z-10 flex max-h-[90dvh] w-full max-w-md flex-col overflow-hidden rounded-[1.6rem] border border-slate-200 bg-white shadow-[0_28px_80px_rgba(15,23,42,0.28)]"
+                  >
                     <div className="shrink-0 bg-[linear-gradient(135deg,#f8fafc_0%,#eef6ff_52%,#f0fdf4_100%)] px-4 py-4 sm:px-5">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-700">
+                          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-sky-700">
                             Quick preview
                           </div>
-                          <div className="mt-1 text-[1.05rem] font-semibold leading-6 text-slate-950">
+                          <h2 id="service-preview-title" className="mt-1 text-[1.05rem] font-semibold leading-6 text-slate-950">
                             {previewService.name}
-                          </div>
+                          </h2>
                           <div className="mt-1 flex flex-wrap gap-1.5">
-                            <span className="rounded-full bg-white px-2.5 py-1 text-[10px] font-semibold text-slate-700 ring-1 ring-slate-200">
+                            <span className="rounded-full bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 ring-1 ring-slate-200">
                               {previewService.category}
                             </span>
-                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-700">
+                            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
                               {buildBookabilityLabel(previewService)}
                             </span>
                           </div>
@@ -6925,7 +7095,7 @@ export function BookingAssistantDialog({
                         <button
                           type="button"
                           onClick={() => setPreviewService(null)}
-                          className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-950"
+                          className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 transition hover:border-slate-300 hover:text-slate-950"
                         >
                           ×
                         </button>
@@ -6948,7 +7118,7 @@ export function BookingAssistantDialog({
                           </div>
                         )}
                         <div className="min-w-0">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                             Place preview
                           </div>
                           <div className="mt-1 line-clamp-2 text-sm font-semibold text-slate-950">
@@ -6966,7 +7136,7 @@ export function BookingAssistantDialog({
 
                       <div className="grid grid-cols-2 gap-2">
                         <div className="rounded-[1rem] bg-slate-50 px-3 py-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                             Price
                           </div>
                           <div className="mt-1 text-sm font-semibold text-slate-950">
@@ -6974,7 +7144,7 @@ export function BookingAssistantDialog({
                           </div>
                         </div>
                         <div className="rounded-[1rem] bg-slate-50 px-3 py-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                             Duration
                           </div>
                           <div className="mt-1 text-sm font-semibold text-slate-950">
@@ -6982,7 +7152,7 @@ export function BookingAssistantDialog({
                           </div>
                         </div>
                         <div className="col-span-2 rounded-[1rem] bg-slate-50 px-3 py-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                             Location
                           </div>
                           <div className="mt-1 text-sm font-medium text-slate-700">
@@ -6990,7 +7160,7 @@ export function BookingAssistantDialog({
                           </div>
                         </div>
                         <div className="col-span-2 rounded-[1rem] bg-emerald-50 px-3 py-3">
-                          <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-700">
+                          <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
                             Why it matches
                           </div>
                           <div className="mt-1 text-sm font-medium text-emerald-950">
@@ -7000,7 +7170,7 @@ export function BookingAssistantDialog({
                       </div>
 
                       <div className="rounded-[1rem] border border-slate-200 bg-white px-3 py-3">
-                        <div className="text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                        <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
                           Provider details
                         </div>
                         <div className="mt-2 space-y-1.5 text-sm text-slate-600">

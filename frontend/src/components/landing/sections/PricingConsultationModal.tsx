@@ -160,7 +160,7 @@ export function PricingConsultationModal({
               >
                 {plans.map((plan) => (
                   <option key={plan.id} value={plan.id}>
-                    {plan.name} ({plan.price}/mo after free subscription period)
+                    {plan.name} ({plan.monthlyFee}{plan.commission && plan.commission !== '0% (pure SaaS)' ? ` + ${plan.commission}` : ''})
                   </option>
                 ))}
               </select>
@@ -319,7 +319,7 @@ export function PricingConsultationModal({
             <label className="flex flex-col gap-2">
               <span className="text-sm font-medium text-slate-700">Selected package</span>
               <input
-                value={`${selectedPlan.name} (${selectedPlan.price}/mo after ${formState.startupReferralEligible ? '3-month' : '30-day'} free subscription period)`}
+                value={`${selectedPlan.name} (${selectedPlan.monthlyFee}${selectedPlan.commission && selectedPlan.commission !== '0% (pure SaaS)' ? ` + ${selectedPlan.commission}` : ''})`}
                 readOnly
                 className="booked-field rounded-2xl px-4 py-3 text-sm text-slate-600"
               />
