@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime
 
 from sqlalchemy import text
 
@@ -216,3 +217,330 @@ class BookingIntentRepository(BaseRepository):
             "booking_intent_id": row["booking_intent_id"],
             "contact_id": row.get("contact_id"),
         }
+
+    async def store_portal_access_token(
+        self,
+        *,
+        booking_reference: str,
+        token_hash: str,
+        expires_at: datetime,
+    ) -> bool:
+        """Persist the SHA-256 hash of a freshly minted portal access token."""
+        normalized_reference = (booking_reference or "").strip()
+        normalized_hash = (token_hash or "").strip()
+        if not normalized_reference or not normalized_hash:
+            return False
+
+        result = await self.session.execute(
+            text(
+                """
+                update booking_intents
+                set
+                  portal_access_token_hash = :token_hash,
+                  portal_access_token_expires_at = :expires_at,
+                  portal_access_token_revoked_at = null,
+                  updated_at = now()
+                where booking_reference = :booking_reference
+                returning id::text
+                """
+            ),
+            {
+                "booking_reference": normalized_reference,
+                "token_hash": normalized_hash,
+                "expires_at": expires_at,
+            },
+        )
+        return result.scalar_one_or_none() is not None
+
+    async def load_portal_access_token_record(
+        self,
+        *,
+        booking_reference: str,
+    ) -> dict[str, object | None] | None:
+        """Return stored portal access token metadata for verification."""
+        normalized_reference = (booking_reference or "").strip()
+        if not normalized_reference:
+            return None
+
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  portal_access_token_hash,
+                  portal_access_token_expires_at,
+                  portal_access_token_revoked_at
+                from booking_intents
+                where booking_reference = :booking_reference
+                limit 1
+                """
+            ),
+            {"booking_reference": normalized_reference},
+        )
+        row = result.mappings().first()
+        if not row:
+            return None
+        return dict(row)
+
+    async def configure_reminder_cadence(
+        self,
+        *,
+        booking_reference: str,
+        cadence: str | None,
+        next_at: datetime | None,
+    ) -> dict[str, object | None] | None:
+        """Configure or clear the recurring reminder for a booking."""
+        normalized_reference = (booking_reference or "").strip()
+        if not normalized_reference:
+            return None
+
+        result = await self.session.execute(
+            text(
+                """
+                update booking_intents
+                set
+                  reminder_cadence = :cadence,
+                  reminder_next_at = :next_at,
+                  updated_at = now()
+                where booking_reference = :booking_reference
+                returning
+                  id::text as booking_intent_id,
+                  tenant_id::text as tenant_id,
+                  reminder_cadence,
+                  reminder_next_at,
+                  reminder_last_sent_at
+                """
+            ),
+            {
+                "booking_reference": normalized_reference,
+                "cadence": (cadence or "").strip() or None,
+                "next_at": next_at,
+            },
+        )
+        row = result.mappings().first()
+        if not row:
+            return None
+        return dict(row)
+
+    async def load_reminder_state(
+        self,
+        *,
+        booking_reference: str,
+    ) -> dict[str, object | None] | None:
+        normalized_reference = (booking_reference or "").strip()
+        if not normalized_reference:
+            return None
+
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  id::text as booking_intent_id,
+                  tenant_id::text as tenant_id,
+                  reminder_cadence,
+                  reminder_next_at,
+                  reminder_last_sent_at
+                from booking_intents
+                where booking_reference = :booking_reference
+                limit 1
+                """
+            ),
+            {"booking_reference": normalized_reference},
+        )
+        row = result.mappings().first()
+        if not row:
+            return None
+        return dict(row)
+
+    async def list_reminders_due(
+        self,
+        *,
+        cadence: str = "monthly",
+        limit: int = 50,
+    ) -> list[dict[str, object | None]]:
+        """Return bookings whose monthly reminder is due to fire."""
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  bi.id::text as booking_intent_id,
+                  bi.tenant_id::text as tenant_id,
+                  bi.booking_reference,
+                  bi.service_name,
+                  bi.requested_date,
+                  bi.requested_time,
+                  bi.timezone,
+                  bi.reminder_cadence,
+                  bi.reminder_next_at,
+                  bi.reminder_last_sent_at,
+                  c.full_name as customer_name,
+                  c.email as customer_email,
+                  c.phone as customer_phone
+                from booking_intents bi
+                left join contacts c on c.id = bi.contact_id
+                where bi.reminder_cadence = :cadence
+                  and bi.reminder_next_at is not null
+                  and bi.reminder_next_at <= now()
+                order by bi.reminder_next_at asc
+                limit :limit
+                """
+            ),
+            {"cadence": cadence, "limit": max(int(limit or 1), 1)},
+        )
+        return [dict(row._mapping) for row in result]
+
+    async def mark_reminder_sent(
+        self,
+        *,
+        booking_reference: str,
+        next_at: datetime,
+    ) -> bool:
+        normalized_reference = (booking_reference or "").strip()
+        if not normalized_reference:
+            return False
+
+        result = await self.session.execute(
+            text(
+                """
+                update booking_intents
+                set
+                  reminder_last_sent_at = now(),
+                  reminder_next_at = :next_at,
+                  updated_at = now()
+                where booking_reference = :booking_reference
+                returning id::text
+                """
+            ),
+            {
+                "booking_reference": normalized_reference,
+                "next_at": next_at,
+            },
+        )
+        return result.scalar_one_or_none() is not None
+
+    async def list_feedback_requests_due(
+        self,
+        *,
+        elapsed_hours: int = 24,
+        limit: int = 50,
+    ) -> list[dict[str, object | None]]:
+        """Return confirmed bookings whose session ended ``elapsed_hours`` ago
+        and whose post-session feedback prompt has not yet been dispatched.
+
+        Session end is derived from ``requested_date + requested_time`` in the
+        booking timezone (defaulting to UTC). Tenants must have the
+        ``post_booking_feedback`` feature enabled in
+        ``tenants.partner_config_jsonb -> 'features' ->> 'post_booking_feedback'
+        = 'true'`` OR be the legacy ``ai-mentor-doer`` slug used as the launch
+        partner.
+        """
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  bi.id::text as booking_intent_id,
+                  bi.tenant_id::text as tenant_id,
+                  bi.booking_reference,
+                  bi.service_name,
+                  bi.requested_date,
+                  bi.requested_time,
+                  bi.timezone,
+                  bi.status,
+                  c.full_name as customer_name,
+                  c.email as customer_email,
+                  c.phone as customer_phone,
+                  t.slug as tenant_slug,
+                  t.partner_config_jsonb as tenant_partner_config
+                from booking_intents bi
+                left join contacts c on c.id = bi.contact_id
+                left join tenants t on t.id = bi.tenant_id
+                where bi.status = 'confirmed'
+                  and bi.feedback_request_sent_at is null
+                  and bi.requested_date is not null
+                  and (
+                    coalesce(
+                      (bi.requested_date || ' ' || coalesce(bi.requested_time, '00:00'))::timestamp
+                        at time zone coalesce(nullif(bi.timezone, ''), 'UTC'),
+                      now()
+                    )
+                  ) + (:elapsed_hours::int * interval '1 hour') < now()
+                  and (
+                    (t.partner_config_jsonb -> 'features' ->> 'post_booking_feedback') = 'true'
+                    or t.slug = 'ai-mentor-doer'
+                  )
+                order by bi.requested_date asc, bi.requested_time asc
+                limit :limit
+                """
+            ),
+            {
+                "elapsed_hours": int(max(elapsed_hours, 0)),
+                "limit": max(int(limit or 1), 1),
+            },
+        )
+        return [dict(row._mapping) for row in result]
+
+    async def mark_feedback_request_sent(
+        self,
+        *,
+        booking_reference: str,
+    ) -> bool:
+        normalized_reference = (booking_reference or "").strip()
+        if not normalized_reference:
+            return False
+
+        result = await self.session.execute(
+            text(
+                """
+                update booking_intents
+                set
+                  feedback_request_sent_at = now(),
+                  updated_at = now()
+                where booking_reference = :booking_reference
+                  and feedback_request_sent_at is null
+                returning id::text
+                """
+            ),
+            {"booking_reference": normalized_reference},
+        )
+        return result.scalar_one_or_none() is not None
+
+    async def fetch_booking_with_contact(
+        self,
+        *,
+        booking_reference: str,
+    ) -> dict[str, object | None] | None:
+        """Lookup booking + linked contact + tenant for downstream consumers.
+
+        Used by the Zoho CRM feedback note consumer so the worker can look
+        up the contact's email/phone in a single SQL round-trip rather than
+        chaining repository calls.
+        """
+        normalized_reference = (booking_reference or "").strip()
+        if not normalized_reference:
+            return None
+
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  bi.id::text as booking_intent_id,
+                  bi.tenant_id::text as tenant_id,
+                  bi.booking_reference,
+                  bi.service_name,
+                  c.full_name as customer_name,
+                  c.email as customer_email,
+                  c.phone as customer_phone,
+                  t.slug as tenant_slug,
+                  t.partner_config_jsonb as tenant_partner_config
+                from booking_intents bi
+                left join contacts c on c.id = bi.contact_id
+                left join tenants t on t.id = bi.tenant_id
+                where bi.booking_reference = :booking_reference
+                limit 1
+                """
+            ),
+            {"booking_reference": normalized_reference},
+        )
+        row = result.mappings().first()
+        if not row:
+            return None
+        return dict(row)

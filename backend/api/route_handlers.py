@@ -28,6 +28,7 @@ from config import Settings, get_settings
 from core.customer_booking_contact import DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
 from core.feature_flags import is_flag_enabled
 from core.logging import get_logger
+from core.admin_auth import verify_admin_password
 from core.session_tokens import (
     SessionTokenError,
     create_admin_session_token,
@@ -931,6 +932,90 @@ async def _verify_evolution_webhook_signature(request: Request) -> None:
         received_signature=received_signature,
     ):
         raise HTTPException(status_code=403, detail="Evolution webhook signature mismatch")
+
+
+async def _verify_whatsapp_meta_signature(request: Request, raw_body: bytes) -> None:
+    """Verify Meta WhatsApp ``x-hub-signature-256`` HMAC.
+
+    Behaviour matrix (P1-S1):
+      * ``WHATSAPP_META_APP_SECRET`` set + signature present + matches -> pass.
+      * ``WHATSAPP_META_APP_SECRET`` set + signature missing/mismatch -> 401.
+      * ``WHATSAPP_META_APP_SECRET`` empty + ``WHATSAPP_META_SIGNATURE_STRICT``
+        true                                            -> 401 (refuse to accept
+        unsigned traffic in strict mode).
+      * ``WHATSAPP_META_APP_SECRET`` empty + strict false -> log a warning and
+        allow (preserves backward compat for staging that has not yet rotated
+        an app secret).
+    """
+    settings_obj = getattr(request.app.state, "settings", None)
+    expected_secret = str(getattr(settings_obj, "whatsapp_meta_app_secret", "") or "").strip()
+    strict = bool(getattr(settings_obj, "whatsapp_meta_signature_strict", False))
+    environment = str(getattr(settings_obj, "environment", "") or "").strip().lower()
+    received_signature = str(request.headers.get("x-hub-signature-256") or "").strip()
+
+    if not expected_secret:
+        if strict:
+            logger.warning(
+                "whatsapp_meta_signature_missing_secret_strict",
+                extra={
+                    "event_type": "whatsapp_meta_signature_missing_secret_strict",
+                    "tenant_id": None,
+                    "status": 401,
+                    "route": "/api/webhooks/whatsapp",
+                    "request_id": "",
+                    "integration_name": "whatsapp_meta",
+                    "conversation_id": "",
+                    "booking_reference": "",
+                    "job_name": "",
+                    "job_id": "",
+                },
+            )
+            raise HTTPException(
+                status_code=401,
+                detail="WhatsApp Meta webhook signature required",
+            )
+        log_level = "critical" if environment == "production" else "warning"
+        getattr(logger, log_level if log_level != "critical" else "warning")(
+            "whatsapp_meta_signature_unconfigured",
+            extra={
+                "event_type": "whatsapp_meta_signature_unconfigured",
+                "tenant_id": None,
+                "status": 0,
+                "route": "/api/webhooks/whatsapp",
+                "request_id": "",
+                "integration_name": "whatsapp_meta",
+                "conversation_id": "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": environment or "unknown",
+            },
+        )
+        return
+
+    if not received_signature or not _verify_hmac_sha256_signature(
+        body=raw_body,
+        secret=expected_secret,
+        received_signature=received_signature,
+    ):
+        logger.warning(
+            "whatsapp_meta_signature_rejected",
+            extra={
+                "event_type": "whatsapp_meta_signature_rejected",
+                "tenant_id": None,
+                "status": 401,
+                "route": "/api/webhooks/whatsapp",
+                "request_id": "",
+                "integration_name": "whatsapp_meta",
+                "conversation_id": "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": "missing" if not received_signature else "mismatch",
+            },
+        )
+        raise HTTPException(
+            status_code=401,
+            detail="Invalid Meta webhook signature",
+        )
 
 
 def _iter_meta_whatsapp_payload(
@@ -2342,6 +2427,20 @@ async def healthcheck() -> dict[str, str]:
     return {"status": "ok", "service": "backend"}
 
 
+async def admin_ai_cost_status(
+    request: Request,
+    x_admin_token: str | None = Header(default=None, alias="X-Admin-Token"),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+) -> dict[str, object]:
+    """Admin visibility into the in-process AI cost circuit breaker."""
+
+    require_admin_access(request, x_admin_token=x_admin_token, authorization=authorization)
+    from core.ai_cost_breaker import get_breaker
+
+    snapshot = get_breaker().snapshot()
+    return {"status": "ok", "ai_cost": snapshot}
+
+
 @api.get("/customer-agent/health")
 async def customer_agent_health(
     request: Request,
@@ -3098,9 +3197,16 @@ async def whatsapp_webhook(request: Request) -> dict[str, object]:
     normalized_messages: list[tuple[TawkMessage, dict[str, object]]] = []
 
     if "application/json" in content_type:
+        # P1-S1: read the raw body BEFORE parsing so we can HMAC-verify the
+        # exact bytes Meta signed. ``request.json()`` consumes the stream so
+        # we must capture ``request.body()`` first.
+        raw_body = await request.body()
+        await _verify_whatsapp_meta_signature(request, raw_body)
+        if not raw_body:
+            return {"status": "ignored", "messages_processed": 0, "reason": "empty_body"}
         try:
-            payload = await request.json()
-        except JSONDecodeError as exc:
+            payload = json.loads(raw_body.decode("utf-8"))
+        except (UnicodeDecodeError, JSONDecodeError) as exc:
             raise HTTPException(status_code=400, detail="Webhook payload must be valid JSON") from exc
         if not isinstance(payload, dict):
             raise HTTPException(status_code=400, detail="WhatsApp payload must be a JSON object")
@@ -3755,8 +3861,63 @@ async def booking_callback(
 async def admin_login(payload: AdminLoginRequest, request: Request) -> AdminSessionResponse:
     cfg: Settings = request.app.state.settings
     username = payload.username.strip()
-    if username.lower() != cfg.admin_username.strip().lower() or payload.password != cfg.admin_password:
+    expected_username = (cfg.admin_username or "").strip()
+    stored_hash = str(getattr(cfg, "admin_password_hash", "") or "").strip()
+    legacy_plaintext = str(getattr(cfg, "admin_password", "") or "")
+
+    # P1-S2: constant-time username compare (timing-leak hardening).
+    username_ok = bool(expected_username) and hmac.compare_digest(
+        username.lower().encode("utf-8"),
+        expected_username.lower().encode("utf-8"),
+    )
+
+    password_ok = False
+    used_legacy_fallback = False
+    if stored_hash:
+        password_ok = verify_admin_password(payload.password, stored_hash)
+    elif legacy_plaintext:
+        # Backward-compat for ops who have not yet rotated to ADMIN_PASSWORD_HASH.
+        password_ok = hmac.compare_digest(
+            (payload.password or "").encode("utf-8"),
+            legacy_plaintext.encode("utf-8"),
+        )
+        used_legacy_fallback = password_ok
+        logger.warning(
+            "admin_login_plaintext_fallback",
+            extra={
+                "event_type": "admin_login_plaintext_fallback",
+                "tenant_id": None,
+                "status": 0,
+                "route": "/api/admin/login",
+                "request_id": "",
+                "integration_name": "admin",
+                "conversation_id": "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": "ADMIN_PASSWORD_HASH not configured; falling back to plaintext ADMIN_PASSWORD compare. Rotate via scripts/hash_admin_password.py.",
+            },
+        )
+
+    if not username_ok or not password_ok:
         raise HTTPException(status_code=401, detail="Invalid admin credentials")
+
+    if used_legacy_fallback:
+        logger.warning(
+            "admin_login_plaintext_fallback_succeeded",
+            extra={
+                "event_type": "admin_login_plaintext_fallback_succeeded",
+                "tenant_id": None,
+                "status": 200,
+                "route": "/api/admin/login",
+                "request_id": "",
+                "integration_name": "admin",
+                "conversation_id": "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": username,
+            },
+        )
+
     session_token, expires_at = create_admin_session_token(cfg, username)
     return AdminSessionResponse(
         status="ok",

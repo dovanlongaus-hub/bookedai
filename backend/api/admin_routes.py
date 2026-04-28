@@ -118,6 +118,11 @@ router.add_api_route(
     methods=["GET"],
 )
 router.add_api_route(
+    "/admin/ai/cost-status",
+    handlers.admin_ai_cost_status,
+    methods=["GET"],
+)
+router.add_api_route(
     "/admin/services",
     handlers.admin_services,
     methods=["GET"],

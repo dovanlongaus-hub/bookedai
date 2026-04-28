@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 from datetime import datetime, timezone
 import json
+import logging
 import os
 import shlex
 import shutil
@@ -13,6 +14,9 @@ import errno
 import urllib.error
 import urllib.request
 from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -82,10 +86,20 @@ def is_trusted_host_deploy_user() -> bool:
 
 
 def is_host_shell_enabled() -> bool:
-    return os.getenv("BOOKEDAI_ENABLE_HOST_SHELL", "1").strip().lower() in {
+    """Return whether the Telegram operator host-shell lane is enabled.
+
+    Security posture (P1-S4, 2026-04-28): defaults to OFF. The host-shell lane
+    lets the trusted Telegram operator run arbitrary `/bin/bash -lc` commands
+    on the host, so a leaked bot token or compromised Telegram chat could
+    bypass the program allowlist. Set ``BOOKEDAI_ENABLE_HOST_SHELL=1`` ONLY
+    on a dedicated ops host with a tightly-scoped Telegram trusted-user
+    allowlist. Missing env var = OFF.
+    """
+    return os.getenv("BOOKEDAI_ENABLE_HOST_SHELL", "0").strip().lower() in {
         "1",
         "true",
         "yes",
+        "y",
         "on",
     }
 
@@ -150,7 +164,8 @@ def run_host_command(command: list[str]) -> int:
 def run_host_shell(command: str, *, cwd: Path | None = None) -> int:
     if not is_host_shell_enabled():
         raise ValueError(
-            "host-shell is disabled. Set BOOKEDAI_ENABLE_HOST_SHELL=1 to enable the default trusted operator full-host lane."
+            "host-shell is disabled (BOOKEDAI_ENABLE_HOST_SHELL defaults OFF since 2026-04-28 / P1-S4). "
+            "Set BOOKEDAI_ENABLE_HOST_SHELL=1 ONLY on a dedicated ops host to enable the trusted operator full-host lane."
         )
     shell_command = command if not cwd else f"cd {shlex.quote(str(cwd))} && {command}"
     return run_host_argv(["/bin/bash", "-lc", shell_command])
@@ -1253,7 +1268,19 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _warn_if_host_shell_enabled() -> None:
+    if is_host_shell_enabled():
+        logger.warning(
+            "BOOKEDAI_ENABLE_HOST_SHELL is enabled - Telegram operator can run arbitrary "
+            "host shell commands. Disable on shared hosts; only enable on a dedicated ops "
+            "host with a tightly-scoped BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS allowlist."
+        )
+
+
 def main() -> int:
+    if not logging.getLogger().handlers:
+        logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
+    _warn_if_host_shell_enabled()
     parser = build_parser()
     args = parser.parse_args()
     required_actions_by_command = {

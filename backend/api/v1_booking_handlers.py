@@ -1,11 +1,19 @@
 from __future__ import annotations
 
-from urllib.parse import quote, urlencode
+from datetime import UTC, datetime, timedelta
+from urllib.parse import quote, urlencode, urlparse
 
 import httpx
-from fastapi import Request
+from fastapi import HTTPException, Request
+from pydantic import BaseModel, Field
 
 from core.logging import get_logger
+from core.portal_tokens import (
+    PortalAccessTokenIssue,
+    PortalTokenError,
+    generate_portal_access_token,
+)
+from repositories.booking_feedback_repository import BookingFeedbackRepository
 
 _logger = get_logger("bookedai.api.v1_booking_handlers")
 
@@ -23,6 +31,7 @@ from api.v1_routes import (
     ResolveBookingPathRequestPayload,
     ServiceMerchantProfile,
     StartChatSessionRequestPayload,
+    TenantRepository,
     ValidationAppError,
     _build_capabilities,
     _error_response,
@@ -43,6 +52,52 @@ from api.v1_routes import (
 )
 
 
+# Tenants opted into automatic monthly customer check-ins on booking creation.
+# AI Mentor 1-1 Pro is the canonical pilot for the partner-style aimentor.bookedai.au
+# subdomain — we wire the cadence in here so we don't need a tenant-settings round-trip.
+MONTHLY_REMINDER_DEFAULT_TENANT_SLUGS = {"ai-mentor-doer"}
+MONTHLY_REMINDER_INTERVAL_DAYS = 30
+
+
+PUBLIC_BOOKING_DEFAULT_TENANT_SLUG = "bookedai-au"
+PUBLIC_BOOKING_FALLBACK_CHANNELS = {"public_web", "embedded_widget"}
+
+
+def _is_public_booking_actor(actor_context) -> bool:
+    channel = str(getattr(actor_context, "channel", "") or "").strip().lower()
+    return channel in PUBLIC_BOOKING_FALLBACK_CHANNELS
+
+
+async def _resolve_public_booking_fallback_tenant_id(request: Request) -> str | None:
+    async with get_session(request.app.state.session_factory) as session:
+        return await TenantRepository(RepositoryContext(session=session)).resolve_tenant_id(
+            PUBLIC_BOOKING_DEFAULT_TENANT_SLUG
+        )
+
+
+async def _resolve_booking_flow_tenant_id(request: Request, actor_context) -> str | None:
+    try:
+        return await _resolve_tenant_id(request, actor_context)
+    except HTTPException as error:
+        if error.status_code != 401 or not _is_public_booking_actor(actor_context):
+            raise
+
+        fallback_tenant_id = await _resolve_public_booking_fallback_tenant_id(request)
+        if fallback_tenant_id:
+            return fallback_tenant_id
+        raise
+
+
+PORTAL_BASE_URL = "https://portal.bookedai.au"
+
+
+def _build_portal_link(booking_reference: str, access_token: str | None) -> str:
+    base = f"{PORTAL_BASE_URL}/?ref={quote(booking_reference, safe='')}"
+    if access_token:
+        base += f"&token={quote(access_token, safe='')}"
+    return base
+
+
 def _build_booking_confirmation_whatsapp_text(
     *,
     customer_name: str | None,
@@ -51,6 +106,7 @@ def _build_booking_confirmation_whatsapp_text(
     requested_time: str | None,
     timezone: str | None,
     booking_reference: str,
+    portal_url: str | None = None,
 ) -> str:
     name_line = f"Hi {customer_name}," if customer_name else "Hi,"
     parts = [
@@ -65,6 +121,8 @@ def _build_booking_confirmation_whatsapp_text(
         parts.append(f"\U0001f4c5 Date: {slot}")
     if timezone:
         parts.append(f"\U0001f30f Timezone: {timezone}")
+    if portal_url:
+        parts.append(f"\U0001f517 Manage booking: {portal_url}")
     parts.append(
         "\n\nReply here anytime for help with your booking — status, changes, payment, or anything else. We're here!"
     )
@@ -76,15 +134,54 @@ def _normalize_text(value: object | None) -> str | None:
     return normalized or None
 
 
-def _build_payment_return_url(request: Request, booking_reference: str, status: str) -> str:
-    origin = _normalize_text(request.headers.get("origin"))
-    if origin:
-        return f"{origin.rstrip('/')}/?booking={quote(status)}&ref={quote(booking_reference)}"
+def _resolve_reminder_anchor(*, requested_date: str | None) -> datetime:
+    """Pick the anchor used for the first reminder.
 
-    return (
+    Prefers the customer's requested booking date when present so reminders
+    fall ~30 days after the actual session. Falls back to "now" so the
+    cadence still kicks in for fast-track or async bookings.
+    """
+    raw = (requested_date or "").strip()
+    if raw:
+        for fmt in ("%Y-%m-%d", "%Y/%m/%d", "%d-%m-%Y", "%d/%m/%Y"):
+            try:
+                parsed = datetime.strptime(raw, fmt)
+                return parsed.replace(tzinfo=UTC)
+            except ValueError:
+                continue
+    return datetime.now(tz=UTC)
+
+
+def _is_allowed_payment_return_origin(origin: str | None) -> bool:
+    parsed = urlparse(str(origin or "").strip())
+    hostname = (parsed.hostname or "").lower()
+    scheme = (parsed.scheme or "").lower()
+    if scheme == "https" and (hostname == "bookedai.au" or hostname.endswith(".bookedai.au")):
+        return True
+    return scheme == "http" and hostname in {"localhost", "127.0.0.1"}
+
+
+def _build_payment_return_url(
+    request: Request,
+    booking_reference: str,
+    status: str,
+    *,
+    include_checkout_session_id: bool = False,
+) -> str:
+    origin = _normalize_text(request.headers.get("origin"))
+    if origin and _is_allowed_payment_return_origin(origin):
+        url = f"{origin.rstrip('/')}/?booking={quote(status)}&ref={quote(booking_reference)}"
+        if include_checkout_session_id:
+            url += "&session_id={CHECKOUT_SESSION_ID}"
+        return url
+
+    url = (
         "https://portal.bookedai.au/"
         f"?booking_reference={quote(booking_reference)}&payment={quote(status)}"
     )
+    if include_checkout_session_id:
+        url += "&session_id={CHECKOUT_SESSION_ID}"
+    return url
 
 
 async def _create_public_stripe_checkout_session(
@@ -151,7 +248,7 @@ async def _resolve_service_tenant_id(session, service_id: str | None) -> str | N
 
 
 async def create_lead(request: Request, payload: CreateLeadRequestPayload):
-    tenant_id = await _resolve_tenant_id(request, payload.actor_context)
+    tenant_id = await _resolve_booking_flow_tenant_id(request, payload.actor_context)
     try:
         normalized_email = (payload.contact.email or "").strip().lower() or None
         normalized_phone = (payload.contact.phone or "").strip() or None
@@ -235,7 +332,7 @@ async def create_lead(request: Request, payload: CreateLeadRequestPayload):
 
 
 async def start_chat_session(request: Request, payload: StartChatSessionRequestPayload):
-    tenant_id = await _resolve_tenant_id(request, payload.actor_context)
+    tenant_id = await _resolve_booking_flow_tenant_id(request, payload.actor_context)
     conversation_id = payload.anonymous_session_id or f"conv_{uuid4().hex[:16]}"
     channel_session_id = f"{payload.channel}_{uuid4().hex[:12]}"
     return _success_response(
@@ -253,7 +350,7 @@ async def start_chat_session(request: Request, payload: StartChatSessionRequestP
 
 
 async def resolve_booking_path(request: Request, payload: ResolveBookingPathRequestPayload):
-    tenant_id = await _resolve_tenant_id(request, payload.actor_context)
+    tenant_id = await _resolve_booking_flow_tenant_id(request, payload.actor_context)
     availability_state = payload.availability_state or "availability_unknown"
     booking_confidence = payload.booking_confidence or "unverified"
     path_type, next_step, warnings, payment_allowed = resolve_booking_path_policy(
@@ -279,7 +376,7 @@ async def resolve_booking_path(request: Request, payload: ResolveBookingPathRequ
 
 
 async def create_booking_intent(request: Request, payload: CreateBookingIntentRequestPayload):
-    tenant_id = await _resolve_tenant_id(request, payload.actor_context)
+    tenant_id = await _resolve_booking_flow_tenant_id(request, payload.actor_context)
     try:
         normalized_email = (payload.contact.email or "").strip().lower() or None
         normalized_phone = (payload.contact.phone or "").strip() or None
@@ -321,6 +418,34 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
             )
 
             booking_reference = f"v1-{uuid4().hex[:10]}"
+            settings = getattr(request.app.state, "settings", None)
+            portal_token_max_age_days = int(
+                getattr(settings, "portal_token_max_age_days", 365) or 365
+            )
+            portal_access_token: PortalAccessTokenIssue | None = None
+            try:
+                portal_access_token = generate_portal_access_token(
+                    booking_reference,
+                    max_age_days=portal_token_max_age_days,
+                )
+            except PortalTokenError as exc:
+                _logger.warning(
+                    "portal_access_token_issue_failed",
+                    extra={
+                        "event_type": "portal_access_token_issue_failed",
+                        "tenant_id": str(effective_tenant_id or ""),
+                        "status": 0,
+                        "route": "/api/v1/booking/intent",
+                        "request_id": "",
+                        "integration_name": "portal_tokens",
+                        "conversation_id": "",
+                        "booking_reference": booking_reference,
+                        "job_name": "",
+                        "job_id": "",
+                    },
+                    exc_info=exc,
+                )
+
             booking_intent_id = await booking_repository.upsert_booking_intent(
                 tenant_id=effective_tenant_id,
                 contact_id=contact_id,
@@ -344,6 +469,70 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                     }
                 ),
             )
+            if portal_access_token is not None:
+                try:
+                    await booking_repository.store_portal_access_token(
+                        booking_reference=booking_reference,
+                        token_hash=portal_access_token.token_hash,
+                        expires_at=portal_access_token.expires_at,
+                    )
+                except Exception as exc:
+                    _logger.warning(
+                        "portal_access_token_persist_failed",
+                        extra={
+                            "event_type": "portal_access_token_persist_failed",
+                            "tenant_id": str(effective_tenant_id or ""),
+                            "status": 0,
+                            "route": "/api/v1/booking/intent",
+                            "request_id": "",
+                            "integration_name": "portal_tokens",
+                            "conversation_id": "",
+                            "booking_reference": booking_reference,
+                            "job_name": "",
+                            "job_id": "",
+                        },
+                        exc_info=exc,
+                    )
+                    portal_access_token = None
+
+            # AI Mentor partner-style flow: auto-enable monthly check-in reminders
+            # so the customer always gets a touchpoint 30 days after their session,
+            # without the booking surface having to opt in on every request.
+            try:
+                tenant_profile = await TenantRepository(
+                    RepositoryContext(session=session)
+                ).get_tenant_profile(effective_tenant_id)
+                tenant_slug = (tenant_profile or {}).get("slug") if tenant_profile else None
+                if tenant_slug in MONTHLY_REMINDER_DEFAULT_TENANT_SLUGS:
+                    reminder_anchor = _resolve_reminder_anchor(
+                        requested_date=payload.desired_slot.date if payload.desired_slot else None,
+                    )
+                    next_at = reminder_anchor + timedelta(
+                        days=MONTHLY_REMINDER_INTERVAL_DAYS
+                    )
+                    await booking_repository.configure_reminder_cadence(
+                        booking_reference=booking_reference,
+                        cadence="monthly",
+                        next_at=next_at,
+                    )
+            except Exception as exc:
+                _logger.warning(
+                    "monthly_reminder_default_enable_failed",
+                    extra={
+                        "event_type": "monthly_reminder_default_enable_failed",
+                        "tenant_id": str(effective_tenant_id or ""),
+                        "status": 0,
+                        "route": "/api/v1/booking/intent",
+                        "request_id": "",
+                        "integration_name": "lifecycle_reminder",
+                        "conversation_id": "",
+                        "booking_reference": booking_reference,
+                        "job_name": "",
+                        "job_id": "",
+                    },
+                    exc_info=exc,
+                )
+
             lead_sync_result = await orchestrate_lead_capture(
                 session,
                 tenant_id=effective_tenant_id,
@@ -425,6 +614,10 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
             try:
                 from schemas import TawkMessage
                 from services import store_event
+                portal_link = _build_portal_link(
+                    booking_reference,
+                    portal_access_token.plaintext if portal_access_token else None,
+                )
                 confirmation_text = _build_booking_confirmation_whatsapp_text(
                     customer_name=payload.contact.full_name,
                     service_name=service.name if service else None,
@@ -432,6 +625,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                     requested_time=payload.desired_slot.time if payload.desired_slot else None,
                     timezone=payload.desired_slot.timezone if payload.desired_slot else None,
                     booking_reference=booking_reference,
+                    portal_url=portal_link,
                 )
                 await request.app.state.communication_service.send_whatsapp(
                     to=normalized_phone,
@@ -489,10 +683,25 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
         booking_path_options = [recommended_path]
         if recommended_path != "request_callback":
             booking_path_options.append("request_callback")
+        portal_response_link = _build_portal_link(
+            booking_reference,
+            portal_access_token.plaintext if portal_access_token else None,
+        )
         return _success_response(
             {
                 "booking_intent_id": booking_intent_id,
                 "booking_reference": booking_reference,
+                "portal": {
+                    "url": portal_response_link,
+                    "access_token": (
+                        portal_access_token.plaintext if portal_access_token else None
+                    ),
+                    "expires_at": (
+                        portal_access_token.expires_at.isoformat()
+                        if portal_access_token
+                        else None
+                    ),
+                },
                 "trust": {
                     "availability_state": availability_state,
                     "verified": verified,
@@ -537,7 +746,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
 
 
 async def create_payment_intent(request: Request, payload: CreatePaymentIntentRequestPayload):
-    tenant_id = await _resolve_tenant_id(request, payload.actor_context)
+    tenant_id = await _resolve_booking_flow_tenant_id(request, payload.actor_context)
     try:
         async with get_session(request.app.state.session_factory) as session:
             normalized_booking_intent_id = _normalize_text(payload.booking_intent_id)
@@ -577,6 +786,16 @@ async def create_payment_intent(request: Request, payload: CreatePaymentIntentRe
                 )
 
             effective_tenant_id = _normalize_text(booking_row.get("booking_tenant_id")) or tenant_id
+            if tenant_id and effective_tenant_id and effective_tenant_id != tenant_id:
+                raise AppError(
+                    code="payment_booking_tenant_mismatch",
+                    message="Booking intent does not belong to the resolved tenant.",
+                    status_code=403,
+                    details={
+                        "booking_intent_id": normalized_booking_intent_id,
+                        "tenant_id": tenant_id,
+                    },
+                )
             resolved_booking_intent_id = (
                 _normalize_text(booking_row.get("booking_intent_id"))
                 or normalized_booking_intent_id
@@ -609,7 +828,12 @@ async def create_payment_intent(request: Request, payload: CreatePaymentIntentRe
                         service_name=service_name,
                         amount_aud=float(amount_aud),
                         customer_email=_normalize_text(booking_row.get("customer_email")),
-                        success_url=_build_payment_return_url(request, booking_reference, "success"),
+                        success_url=_build_payment_return_url(
+                            request,
+                            booking_reference,
+                            "success",
+                            include_checkout_session_id=True,
+                        ),
                         cancel_url=_build_payment_return_url(request, booking_reference, "cancelled"),
                     )
                     checkout_url = _normalize_text(stripe_session.get("checkout_url"))
@@ -694,3 +918,239 @@ async def create_payment_intent(request: Request, payload: CreatePaymentIntentRe
         )
     except AppError as error:
         return _error_response(error, tenant_id=tenant_id, actor_context=payload.actor_context)
+
+
+# ----- Reminder + feedback (AI Mentor partner-style flow) ----------------------
+#
+# These endpoints sit on the booking router (alongside intent + payment) because
+# they are scoped per booking_reference and reuse the same portal access-token
+# guard the customer portal already uses (see api/v1_tenant_handlers._verify_portal_access).
+
+
+class ConfigureBookingReminderPayload(BaseModel):
+    cadence: str = Field("monthly")
+    enabled: bool = True
+
+
+class SubmitBookingFeedbackPayload(BaseModel):
+    rating: int
+    comment: str | None = None
+    would_recommend: bool | None = None
+    channel: str | None = None
+
+
+async def _portal_guard_for_booking(
+    request: Request, booking_reference: str
+) -> AppError | None:
+    # Imported lazily to avoid a circular import between booking and tenant handlers.
+    from api.v1_tenant_handlers import _portal_guard
+
+    return await _portal_guard(request, booking_reference)
+
+
+async def configure_booking_reminder(
+    booking_reference: str,
+    request: Request,
+    payload: ConfigureBookingReminderPayload,
+):
+    guard_error = await _portal_guard_for_booking(request, booking_reference)
+    if guard_error is not None:
+        return _error_response(guard_error, tenant_id=None, actor_context=None)
+
+    cadence = (payload.cadence or "").strip().lower()
+    if cadence and cadence != "monthly":
+        return _error_response(
+            ValidationAppError(
+                "Only a monthly reminder cadence is supported today.",
+                details={"cadence": ["unsupported_cadence"]},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        booking_repository = BookingIntentRepository(RepositoryContext(session=session))
+        if not payload.enabled:
+            updated = await booking_repository.configure_reminder_cadence(
+                booking_reference=booking_reference,
+                cadence=None,
+                next_at=None,
+            )
+        else:
+            next_at = datetime.now(tz=UTC) + timedelta(
+                days=MONTHLY_REMINDER_INTERVAL_DAYS
+            )
+            updated = await booking_repository.configure_reminder_cadence(
+                booking_reference=booking_reference,
+                cadence="monthly",
+                next_at=next_at,
+            )
+        if updated is None:
+            return _error_response(
+                AppError(
+                    code="booking_reminder_target_not_found",
+                    message="The requested booking reference could not be found for reminder configuration.",
+                    status_code=404,
+                    details={"booking_reference": booking_reference},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+        await session.commit()
+
+    return _success_response(
+        {
+            "booking_reference": booking_reference,
+            "reminder_cadence": updated.get("reminder_cadence"),
+            "reminder_next_at": (
+                updated.get("reminder_next_at").isoformat()
+                if isinstance(updated.get("reminder_next_at"), datetime)
+                else updated.get("reminder_next_at")
+            ),
+            "reminder_last_sent_at": (
+                updated.get("reminder_last_sent_at").isoformat()
+                if isinstance(updated.get("reminder_last_sent_at"), datetime)
+                else updated.get("reminder_last_sent_at")
+            ),
+            "enabled": payload.enabled,
+        },
+        tenant_id=str(updated.get("tenant_id") or "") or None,
+        actor_context=None,
+    )
+
+
+async def disable_booking_reminder(
+    booking_reference: str,
+    request: Request,
+):
+    """Portal opt-out shortcut so the unsubscribe link can call a stable URL."""
+    return await configure_booking_reminder(
+        booking_reference,
+        request,
+        ConfigureBookingReminderPayload(cadence="monthly", enabled=False),
+    )
+
+
+async def submit_booking_feedback(
+    booking_reference: str,
+    request: Request,
+    payload: SubmitBookingFeedbackPayload,
+):
+    guard_error = await _portal_guard_for_booking(request, booking_reference)
+    if guard_error is not None:
+        return _error_response(guard_error, tenant_id=None, actor_context=None)
+
+    rating = int(payload.rating or 0)
+    if rating < 1 or rating > 5:
+        return _error_response(
+            ValidationAppError(
+                "Rating must be a whole number between 1 and 5.",
+                details={"rating": ["out_of_range"]},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    normalized_comment = (payload.comment or "").strip() or None
+    normalized_channel = (payload.channel or "portal_app").strip() or "portal_app"
+
+    async with get_session(request.app.state.session_factory) as session:
+        booking_repository = BookingIntentRepository(RepositoryContext(session=session))
+        booking_state = await booking_repository.load_reminder_state(
+            booking_reference=booking_reference
+        )
+        if booking_state is None:
+            return _error_response(
+                AppError(
+                    code="booking_feedback_target_not_found",
+                    message="The requested booking reference could not be found for feedback intake.",
+                    status_code=404,
+                    details={"booking_reference": booking_reference},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        tenant_id = str(booking_state.get("tenant_id") or "") or None
+        if not tenant_id:
+            return _error_response(
+                AppError(
+                    code="booking_feedback_tenant_unresolved",
+                    message="The booking is missing a tenant anchor required for feedback intake.",
+                    status_code=409,
+                    details={"booking_reference": booking_reference},
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        feedback_repository = BookingFeedbackRepository(
+            RepositoryContext(session=session, tenant_id=tenant_id)
+        )
+
+        deduped = await feedback_repository.find_recent_feedback(
+            booking_reference=booking_reference,
+            rating=rating,
+            within_minutes=5,
+        )
+        if deduped is not None:
+            return _success_response(
+                {
+                    "feedback_id": deduped.get("feedback_id"),
+                    "thanks": "Thanks for your feedback.",
+                    "dedupe": True,
+                },
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+
+        feedback_id = await feedback_repository.insert_feedback(
+            booking_reference=booking_reference,
+            tenant_id=tenant_id,
+            rating=rating,
+            comment=normalized_comment,
+            would_recommend=payload.would_recommend,
+            channel=normalized_channel,
+        )
+
+        # Outbox-only audit + downstream notify trigger. The outbox consumer is
+        # responsible for routing this event to ops + Zoho CRM as a contact note.
+        # Comment text is stored verbatim in booking_feedback for ops review,
+        # but excluded from the audit/outbox payload to avoid PII leakage.
+        await _record_phase2_write_activity(
+            session,
+            tenant_id=tenant_id,
+            actor_context=None,
+            audit_event_type="booking_feedback.submitted",
+            entity_type="booking_feedback",
+            entity_id=feedback_id,
+            audit_payload={
+                "booking_reference": booking_reference,
+                "rating": rating,
+                "would_recommend": payload.would_recommend,
+                "channel": normalized_channel,
+                "comment_present": bool(normalized_comment),
+            },
+            outbox_event_type="booking_feedback.recorded",
+            outbox_payload={
+                "feedback_id": feedback_id,
+                "booking_reference": booking_reference,
+                "tenant_id": tenant_id,
+                "rating": rating,
+                "would_recommend": payload.would_recommend,
+                "channel": normalized_channel,
+            },
+            idempotency_key=(
+                f"booking-feedback:{feedback_id}" if feedback_id else None
+            ),
+        )
+        await session.commit()
+
+    return _success_response(
+        {
+            "feedback_id": feedback_id,
+            "thanks": "Thanks for your feedback.",
+        },
+        tenant_id=tenant_id,
+        actor_context=None,
+    )

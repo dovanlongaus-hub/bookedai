@@ -124,6 +124,7 @@ class Settings:
     whatsapp_verify_token: str
     admin_username: str
     admin_password: str
+    admin_password_hash: str
     admin_api_token: str
     admin_session_ttl_hours: int
     expose_api_docs: bool
@@ -141,7 +142,10 @@ class Settings:
     whatsapp_evolution_api_key: str = ""
     whatsapp_evolution_instance: str = "bookedai"
     whatsapp_evolution_webhook_secret: str = ""
+    whatsapp_meta_app_secret: str = ""
+    whatsapp_meta_signature_strict: bool = False
     whatsapp_fallback_provider: str = ""
+    environment: str = ""
     bookedai_customer_telegram_bot_token: str = ""
     bookedai_customer_telegram_webhook_secret_token: str = ""
     bookedai_support_telegram_chat_ids: str = ""
@@ -149,6 +153,8 @@ class Settings:
     telegram_webhook_secret_token: str = ""
     customer_booking_support_email: str = DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
     customer_booking_support_phone: str = DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE
+    portal_token_strict: bool = False
+    portal_token_max_age_days: int = 365
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -191,6 +197,68 @@ def env_str(name: str, default: str = "") -> str:
     return raw.strip()
 
 
+# --- CORS allow-origins defaults --------------------------------------------
+# Production canonical origins. NEVER include localhost / 127.0.0.1 here.
+# Adding new tenant subdomains here keeps the default safe even if an
+# operator forgets to set CORS_ALLOW_ORIGINS for a fresh deploy.
+PRODUCTION_CORS_ORIGINS: tuple[str, ...] = (
+    "https://bookedai.au",
+    "https://www.bookedai.au",
+    "https://product.bookedai.au",
+    "https://portal.bookedai.au",
+    "https://tenant.bookedai.au",
+    "https://admin.bookedai.au",
+    "https://pitch.bookedai.au",
+    "https://api.bookedai.au",
+    "https://upload.bookedai.au",
+    "https://futureswim.bookedai.au",
+    "https://chess.bookedai.au",
+    "https://demo.bookedai.au",
+    "https://beta.bookedai.au",
+)
+
+# Staging-only origins — production list PLUS staging subdomains.
+STAGING_CORS_ORIGINS: tuple[str, ...] = PRODUCTION_CORS_ORIGINS + (
+    "https://staging.bookedai.au",
+    "https://staging-api.bookedai.au",
+    "https://staging-tenant.bookedai.au",
+    "https://staging-portal.bookedai.au",
+)
+
+# Development / test origins — adds localhost loopbacks to the production list
+# so a fresh `make dev` works without setting CORS_ALLOW_ORIGINS explicitly.
+DEVELOPMENT_LOOPBACK_CORS_ORIGINS: tuple[str, ...] = (
+    "http://localhost:3000",
+    "http://localhost:5173",
+    "http://localhost:8000",
+    "http://localhost:8001",
+    "http://127.0.0.1:3000",
+    "http://127.0.0.1:5173",
+    "http://127.0.0.1:8000",
+    "http://127.0.0.1:8001",
+)
+DEVELOPMENT_CORS_ORIGINS: tuple[str, ...] = (
+    DEVELOPMENT_LOOPBACK_CORS_ORIGINS + PRODUCTION_CORS_ORIGINS
+)
+
+
+def default_cors_allow_origins(environment: str) -> str:
+    """Return the comma-separated CORS allow-origins default for the given env.
+
+    Production defaults purposefully exclude localhost so an unset
+    CORS_ALLOW_ORIGINS env var cannot accidentally widen the policy.
+    """
+    env = (environment or "").strip().lower()
+    if env in {"production", "prod", "live"}:
+        origins = PRODUCTION_CORS_ORIGINS
+    elif env in {"staging", "stage", "preprod", "pre-production"}:
+        origins = STAGING_CORS_ORIGINS
+    else:
+        # development, test, ci, or unset
+        origins = DEVELOPMENT_CORS_ORIGINS
+    return ",".join(origins)
+
+
 def derive_zoho_accounts_base_url(*candidate_api_urls: str) -> str:
     host_to_accounts_url = {
         "www.zohoapis.com": "https://accounts.zoho.com",
@@ -213,9 +281,14 @@ def derive_zoho_accounts_base_url(*candidate_api_urls: str) -> str:
 
 
 def get_settings() -> Settings:
+    environment_value = env_str("BOOKEDAI_ENVIRONMENT", env_str("ENVIRONMENT", ""))
+    cors_allow_origins_value = os.getenv(
+        "CORS_ALLOW_ORIGINS",
+        default_cors_allow_origins(environment_value),
+    )
     openai_api_key = env_str("OPENAI_API_KEY", "")
     openai_base_url = env_str("OPENAI_BASE_URL", "https://api.openai.com/v1")
-    openai_model = env_str("OPENAI_MODEL", "gpt-5-mini")
+    openai_model = env_str("OPENAI_MODEL", "claude-opus-4-5")
     ai_provider = env_str("AI_PROVIDER", "")
     ai_api_key = env_str("AI_API_KEY", openai_api_key)
     ai_base_url = env_str("AI_BASE_URL", "") or openai_base_url
@@ -249,10 +322,7 @@ def get_settings() -> Settings:
         ),
         public_app_url=os.getenv("PUBLIC_APP_URL", "https://bookedai.au"),
         public_api_url=os.getenv("PUBLIC_API_URL", "https://api.bookedai.au"),
-        cors_allow_origins=os.getenv(
-            "CORS_ALLOW_ORIGINS",
-            "http://localhost:3000,http://localhost:5173,https://bookedai.au,https://www.bookedai.au,https://admin.bookedai.au,https://beta.bookedai.au,https://product.bookedai.au,https://demo.bookedai.au,https://pitch.bookedai.au,https://portal.bookedai.au,https://tenant.bookedai.au,https://futureswim.bookedai.au,https://chess.bookedai.au,https://upload.bookedai.au",
-        ),
+        cors_allow_origins=cors_allow_origins_value,
         supabase_url=os.getenv("SUPABASE_URL", "https://supabase.bookedai.au"),
         supabase_anon_key=os.getenv("SUPABASE_ANON_KEY", ""),
         supabase_service_role_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
@@ -410,12 +480,16 @@ def get_settings() -> Settings:
         whatsapp_evolution_api_key=os.getenv("WHATSAPP_EVOLUTION_API_KEY", ""),
         whatsapp_evolution_instance=os.getenv("WHATSAPP_EVOLUTION_INSTANCE", "bookedai"),
         whatsapp_evolution_webhook_secret=os.getenv("WHATSAPP_EVOLUTION_WEBHOOK_SECRET", ""),
+        whatsapp_meta_app_secret=os.getenv("WHATSAPP_META_APP_SECRET", ""),
+        whatsapp_meta_signature_strict=env_bool("WHATSAPP_META_SIGNATURE_STRICT", False),
         whatsapp_fallback_provider=os.getenv("WHATSAPP_FALLBACK_PROVIDER", ""),
+        environment=environment_value,
         admin_username=os.getenv("ADMIN_USERNAME", "admin"),
         admin_password=os.getenv(
             "ADMIN_BOOTSTRAP_PASSWORD",
             os.getenv("ADMIN_PASSWORD", ""),
         ),
+        admin_password_hash=os.getenv("ADMIN_PASSWORD_HASH", ""),
         admin_api_token=os.getenv("ADMIN_API_TOKEN", ""),
         session_signing_secret=os.getenv("SESSION_SIGNING_SECRET", ""),
         tenant_session_signing_secret=os.getenv("TENANT_SESSION_SIGNING_SECRET", ""),
@@ -437,4 +511,6 @@ def get_settings() -> Settings:
             "UPLOAD_PUBLIC_BASE_URL", "https://upload.bookedai.au"
         ),
         upload_max_file_size_bytes=env_int("UPLOAD_MAX_FILE_SIZE_BYTES", 50 * 1024 * 1024),
+        portal_token_strict=env_bool("BOOKEDAI_PORTAL_TOKEN_STRICT", False),
+        portal_token_max_age_days=env_int("BOOKEDAI_PORTAL_TOKEN_MAX_AGE_DAYS", 365),
     )

@@ -6,6 +6,13 @@ from fastapi import Header, Request
 from httpx import HTTPError
 from pydantic import BaseModel
 
+from core.logging import get_logger
+from core.portal_tokens import PortalTokenError, verify_portal_access_token
+from rate_limit import TooManyRequestsError
+from repositories.booking_intent_repository import BookingIntentRepository
+
+_portal_logger = get_logger("bookedai.api.v1_tenant_handlers.portal")
+
 from api.v1_routes import (
     ActorContextPayload,
     AppError,
@@ -127,6 +134,170 @@ class PortalCustomerCareTurnRequestPayload(BaseModel):
     message: str
     customer_email: str | None = None
     customer_phone: str | None = None
+
+
+def _tenant_session_required_error(
+    *,
+    tenant_id: str | None,
+    tenant_ref: str | None,
+    message: str = "Sign in with an active tenant account before viewing workspace data.",
+) -> AppError:
+    return AppError(
+        code="tenant_auth_required",
+        message=message,
+        status_code=401,
+        details={"tenant_ref": tenant_ref, "tenant_id": tenant_id},
+    )
+
+
+def _portal_token_strict(request: Request) -> bool:
+    settings = getattr(request.app.state, "settings", None)
+    return bool(getattr(settings, "portal_token_strict", False))
+
+
+def _extract_portal_token(request: Request) -> str | None:
+    raw = request.query_params.get("token") or request.headers.get("x-portal-token")
+    if not raw:
+        return None
+    normalized = str(raw).strip()
+    return normalized or None
+
+
+async def _enforce_portal_rate_limit(request: Request, booking_reference: str) -> AppError | None:
+    limiter = getattr(request.app.state, "rate_limiter", None)
+    if limiter is None:
+        return None
+    try:
+        await limiter.enforce(
+            f"portal:{booking_reference}",
+            request.client.host if request.client else "unknown",
+            limit=20,
+            window_seconds=60,
+        )
+    except TooManyRequestsError as exc:
+        return AppError(
+            code="portal_rate_limited",
+            message=(
+                "Too many portal requests for this booking. "
+                f"Retry in {exc.retry_after_seconds} seconds."
+            ),
+            status_code=429,
+            details={
+                "booking_reference": booking_reference,
+                "retry_after_seconds": exc.retry_after_seconds,
+            },
+        )
+    return None
+
+
+async def _verify_portal_access(
+    request: Request,
+    booking_reference: str,
+) -> AppError | None:
+    """Validate the portal access token for the requested booking reference.
+
+    Returns None when the request is permitted to proceed. Returns an AppError
+    describing the failure otherwise. When the booking has no stored token
+    hash yet (legacy bookings created before migration 027) the feature flag
+    ``portal_token_strict`` controls whether the request is accepted with a
+    WARNING log (default) or rejected with a 401.
+    """
+    normalized_reference = str(booking_reference or "").strip()
+    if not normalized_reference:
+        return AppError(
+            code="portal_booking_not_found",
+            message="A booking reference is required for the customer portal.",
+            status_code=404,
+            details={"booking_reference": booking_reference},
+        )
+
+    presented_token = _extract_portal_token(request)
+
+    async with get_session(request.app.state.session_factory) as session:
+        booking_repository = BookingIntentRepository(RepositoryContext(session=session))
+        record = await booking_repository.load_portal_access_token_record(
+            booking_reference=normalized_reference,
+        )
+
+    if record is None:
+        return AppError(
+            code="portal_booking_not_found",
+            message="The requested booking reference could not be found for the customer portal.",
+            status_code=404,
+            details={"booking_reference": normalized_reference},
+        )
+
+    stored_hash = str(record.get("portal_access_token_hash") or "").strip() or None
+    expires_at = record.get("portal_access_token_expires_at")
+    revoked_at = record.get("portal_access_token_revoked_at")
+
+    if stored_hash is None:
+        if _portal_token_strict(request):
+            return AppError(
+                code="portal_access_token_required",
+                message="A portal access token is required for this booking.",
+                status_code=401,
+                details={"booking_reference": normalized_reference},
+            )
+        _portal_logger.warning(
+            "portal_access_legacy_booking_grace",
+            extra={
+                "event_type": "portal_access_legacy_booking_grace",
+                "tenant_id": "",
+                "status": 0,
+                "route": str(request.url.path),
+                "request_id": "",
+                "integration_name": "portal_tokens",
+                "conversation_id": "",
+                "booking_reference": normalized_reference,
+                "job_name": "",
+                "job_id": "",
+            },
+        )
+        return None
+
+    if not presented_token:
+        return AppError(
+            code="portal_access_token_required",
+            message="A portal access token is required for this booking.",
+            status_code=401,
+            details={"booking_reference": normalized_reference},
+        )
+
+    try:
+        valid = verify_portal_access_token(
+            plaintext=presented_token,
+            stored_hash=stored_hash,
+            expires_at=expires_at,
+            revoked_at=revoked_at,
+        )
+    except PortalTokenError:
+        return AppError(
+            code="portal_access_token_required",
+            message="A portal access token is required for this booking.",
+            status_code=401,
+            details={"booking_reference": normalized_reference},
+        )
+
+    if not valid:
+        return AppError(
+            code="portal_access_token_invalid",
+            message="The portal access token is invalid, expired, or has been revoked.",
+            status_code=403,
+            details={"booking_reference": normalized_reference},
+        )
+
+    return None
+
+
+async def _portal_guard(
+    request: Request,
+    booking_reference: str,
+) -> AppError | None:
+    rate_error = await _enforce_portal_rate_limit(request, booking_reference)
+    if rate_error is not None:
+        return rate_error
+    return await _verify_portal_access(request, booking_reference)
 
 
 async def _resolve_available_google_tenant_slug(
@@ -687,7 +858,7 @@ async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequ
 
         tenant_repository = TenantRepository(RepositoryContext(session=session))
         tenant_id = str(credential.tenant_id or "").strip()
-        tenant_profile = await tenant_repository.get_tenant_profile(payload.tenant_ref or tenant_id)
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_id)
         if not tenant_profile:
             return _error_response(
                 AppError(
@@ -699,19 +870,6 @@ async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequ
                 tenant_id=None,
                 actor_context=None,
             )
-
-        if payload.tenant_ref:
-            requested_tenant_id = await tenant_repository.resolve_tenant_id(payload.tenant_ref)
-            if requested_tenant_id and requested_tenant_id != tenant_id:
-                return _error_response(
-                    AppError(
-                        code="tenant_auth_tenant_mismatch",
-                        message="This tenant account does not belong to the requested tenant.",
-                        status_code=403,
-                    ),
-                    tenant_id=requested_tenant_id,
-                    actor_context=None,
-                )
 
         membership = await _load_tenant_membership(
             session,
@@ -1030,6 +1188,16 @@ async def tenant_bookings(request: Request, authorization: str | None = Header(d
         request,
         authorization=authorization,
     )
+    if not tenant_session:
+        return _error_response(
+            _tenant_session_required_error(
+                tenant_id=tenant_id,
+                tenant_ref=tenant_ref,
+                message="Sign in with an active tenant account before viewing booking requests.",
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
     async with get_session(request.app.state.session_factory) as session:
         if not tenant_id:
             return _error_response(
@@ -1065,6 +1233,16 @@ async def tenant_leads(
         request,
         authorization=authorization,
     )
+    if not tenant_session:
+        return _error_response(
+            _tenant_session_required_error(
+                tenant_id=tenant_id,
+                tenant_ref=tenant_ref,
+                message="Sign in with an active tenant account before viewing lead data.",
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
     async with get_session(request.app.state.session_factory) as session:
         if not tenant_id:
             return _error_response(
@@ -1264,6 +1442,16 @@ async def tenant_integrations(request: Request, authorization: str | None = Head
         request,
         authorization=authorization,
     )
+    if not tenant_session:
+        return _error_response(
+            _tenant_session_required_error(
+                tenant_id=tenant_id,
+                tenant_ref=tenant_ref,
+                message="Sign in with an active tenant account before viewing integration posture.",
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
     async with get_session(request.app.state.session_factory) as session:
         if not tenant_id:
             return _error_response(
@@ -1477,6 +1665,16 @@ async def tenant_billing(request: Request, authorization: str | None = Header(de
         request,
         authorization=authorization,
     )
+    if not tenant_session:
+        return _error_response(
+            _tenant_session_required_error(
+                tenant_id=tenant_id,
+                tenant_ref=tenant_ref,
+                message="Sign in with an active tenant account before viewing billing data.",
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
     async with get_session(request.app.state.session_factory) as session:
         if not tenant_id:
             return _error_response(
@@ -2139,6 +2337,16 @@ async def tenant_team(request: Request, authorization: str | None = Header(defau
         request,
         authorization=authorization,
     )
+    if not tenant_session:
+        return _error_response(
+            _tenant_session_required_error(
+                tenant_id=tenant_id,
+                tenant_ref=tenant_ref,
+                message="Sign in with an active tenant account before viewing team members.",
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
     async with get_session(request.app.state.session_factory) as session:
         if not tenant_id:
             return _error_response(
@@ -2652,6 +2860,10 @@ async def tenant_catalog(request: Request, authorization: str | None = Header(de
     )
 
 async def portal_booking_detail(booking_reference: str, request: Request):
+    guard_error = await _portal_guard(request, booking_reference)
+    if guard_error is not None:
+        return _error_response(guard_error, tenant_id=None, actor_context=None)
+
     async with get_session(request.app.state.session_factory) as session:
         snapshot = await build_portal_booking_snapshot(
             session,
@@ -2678,6 +2890,10 @@ async def portal_customer_care_turn(
     request: Request,
     payload: PortalCustomerCareTurnRequestPayload,
 ):
+    guard_error = await _portal_guard(request, booking_reference)
+    if guard_error is not None:
+        return _error_response(guard_error, tenant_id=None, actor_context=None)
+
     normalized_message = str(payload.message or "").strip()
     if not normalized_message:
         return _error_response(
@@ -2726,6 +2942,10 @@ async def portal_booking_reschedule_request(
     request: Request,
     payload: PortalBookingActionRequestPayload,
 ):
+    guard_error = await _portal_guard(request, booking_reference)
+    if guard_error is not None:
+        return _error_response(guard_error, tenant_id=None, actor_context=None)
+
     if not (payload.customer_note or payload.preferred_date or payload.preferred_time):
         return _error_response(
             ValidationAppError(
@@ -2766,6 +2986,10 @@ async def portal_booking_cancel_request(
     request: Request,
     payload: PortalBookingActionRequestPayload,
 ):
+    guard_error = await _portal_guard(request, booking_reference)
+    if guard_error is not None:
+        return _error_response(guard_error, tenant_id=None, actor_context=None)
+
     if not payload.customer_note:
         return _error_response(
             ValidationAppError(
@@ -2806,6 +3030,10 @@ async def portal_booking_pause_request(
     request: Request,
     payload: PortalBookingActionRequestPayload,
 ):
+    guard_error = await _portal_guard(request, booking_reference)
+    if guard_error is not None:
+        return _error_response(guard_error, tenant_id=None, actor_context=None)
+
     if not payload.customer_note:
         return _error_response(
             ValidationAppError(
@@ -2846,6 +3074,10 @@ async def portal_booking_downgrade_request(
     request: Request,
     payload: PortalBookingActionRequestPayload,
 ):
+    guard_error = await _portal_guard(request, booking_reference)
+    if guard_error is not None:
+        return _error_response(guard_error, tenant_id=None, actor_context=None)
+
     if not payload.customer_note:
         return _error_response(
             ValidationAppError(
@@ -3380,10 +3612,20 @@ async def tenant_revenue_metrics(
     authorization: str | None = Header(default=None),
 ):
     """Revenue capture metrics: bookings confirmed, missed revenue, capture rate."""
-    tenant_ref, tenant_id, _tenant_session, _membership = await _resolve_tenant_request_context(
+    tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
         request,
         authorization=authorization,
     )
+    if not tenant_session:
+        return _error_response(
+            _tenant_session_required_error(
+                tenant_id=tenant_id,
+                tenant_ref=tenant_ref,
+                message="Sign in with an active tenant account before viewing revenue metrics.",
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
     days = 30
     async with get_session(request.app.state.session_factory) as session:
         reporting = ReportingRepository(

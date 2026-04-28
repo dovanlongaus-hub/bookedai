@@ -10,3 +10,18 @@ router.add_api_route("/conversations/sessions", handlers.start_chat_session, met
 router.add_api_route("/bookings/path/resolve", handlers.resolve_booking_path, methods=["POST"])
 router.add_api_route("/bookings/intents", handlers.create_booking_intent, methods=["POST"])
 router.add_api_route("/payments/intents", handlers.create_payment_intent, methods=["POST"])
+router.add_api_route(
+    "/booking/{booking_reference}/reminders/configure",
+    handlers.configure_booking_reminder,
+    methods=["POST"],
+)
+router.add_api_route(
+    "/portal/bookings/{booking_reference}/reminders/disable",
+    handlers.disable_booking_reminder,
+    methods=["POST"],
+)
+router.add_api_route(
+    "/booking/{booking_reference}/feedback",
+    handlers.submit_booking_feedback,
+    methods=["POST"],
+)

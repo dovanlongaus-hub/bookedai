@@ -153,6 +153,23 @@ class TenantIsolationLeadsTestCase(TestCase):
         body = response.json()
         self.assertIn("Tenant session required", body.get("detail", ""))
 
+    def test_authenticated_leads_rejects_actor_tenant_id_without_session(self):
+        app = _build_test_app()
+        client = TestClient(app)
+        response = client.post(
+            "/api/v1/leads",
+            json=_tenant_lead_payload(
+                actor_context={
+                    "channel": "public_web",
+                    "tenant_id": "tenant-alpha-id",
+                },
+            ),
+        )
+
+        self.assertEqual(response.status_code, 401)
+        body = response.json()
+        self.assertIn("Tenant session required", body.get("detail", ""))
+
     def test_authenticated_leads_rejects_mismatched_tenant_session(self):
         app = _build_test_app()
         session_token, _expires = create_tenant_session_token(

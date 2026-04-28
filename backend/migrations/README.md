@@ -37,6 +37,12 @@ The first schema package focuses on:
 21. messaging channel session continuity
 22. inbound webhook idempotency evidence indexes
 23. AI Mentor 1-1 login and contact-channel update
+24. BookedAI public web booking fallback tenant
+25. Co Mai Hung chess tenant login/contact update
+26. AI Mentor 1-1 Pro login/contact update
+27. customer portal per-booking access token columns and lookup index
+28. Co Mai Hung chess tenant full catalog publish at A$35/hour for public search
+29. Tenant partner-config JSONB column and lookup index for the multi-tenant Partner Config API
 
 ## Execution rules
 
@@ -71,8 +77,20 @@ The first schema package focuses on:
 - `sql/021_messaging_channel_sessions.sql`
 - `sql/022_inbound_webhook_idempotency_evidence_indexes.sql`
 - `sql/023_ai_mentor_contact_login_update.sql`
+- `sql/024_bookedai_web_booking_tenant.sql`
+- `sql/025_chess_tenant_contact_login_update.sql`
+- `sql/026_ai_mentor_pro_contact_login_update.sql`
+- `sql/027_portal_access_token.sql`
+- `sql/028_chess_tenant_publish_full_catalog_aud_35_per_hour.sql`
+- `sql/029_tenant_partner_config.sql`
 
 ## Notes
 
 - these files are intentionally written as migration-ready SQL, not yet wired to a formal migration runner
 - if the team introduces Alembic later, these SQL files should still be treated as the canonical first phase design
+
+## Ops change log
+
+### 2026-04-28 P1-S4 - host-shell default flipped to OFF
+
+`BOOKEDAI_ENABLE_HOST_SHELL` now defaults to `0` (OFF) in `scripts/telegram_workspace_ops.py` when the env var is unset. Previously, missing/unset = ON, which meant a leaked Telegram bot token or compromised operator chat could bypass the program allowlist via the `host-shell` lane and run arbitrary `/bin/bash -lc` commands. Ops hosts that rely on the host-shell lane must now explicitly set `BOOKEDAI_ENABLE_HOST_SHELL=1` in their env file (only on dedicated ops hosts with a tightly-scoped `BOOKEDAI_TELEGRAM_TRUSTED_USER_IDS` allowlist). The script also emits a startup `WARNING` log when the flag is enabled so the elevated posture is visible in logs.

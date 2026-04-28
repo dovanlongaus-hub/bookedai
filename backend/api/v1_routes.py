@@ -1240,6 +1240,11 @@ async def _resolve_tenant_id(request: Request, actor_context: ActorContextPayloa
                         status_code=403,
                         detail="actor_context.tenant_id does not match the authenticated tenant session.",
                     )
+            else:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Tenant session required for actor_context.tenant_id.",
+                )
             return requested_tenant_id
 
     # ``tenant_ref`` path: used by server-to-server callers (background workers,
@@ -3527,7 +3532,7 @@ async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequ
 
         tenant_repository = TenantRepository(RepositoryContext(session=session))
         tenant_id = str(credential.tenant_id or "").strip()
-        tenant_profile = await tenant_repository.get_tenant_profile(payload.tenant_ref or tenant_id)
+        tenant_profile = await tenant_repository.get_tenant_profile(tenant_id)
         if not tenant_profile:
             return _error_response(
                 AppError(
@@ -3539,19 +3544,6 @@ async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequ
                 tenant_id=None,
                 actor_context=None,
             )
-
-        if payload.tenant_ref:
-            requested_tenant_id = await tenant_repository.resolve_tenant_id(payload.tenant_ref)
-            if requested_tenant_id and requested_tenant_id != tenant_id:
-                return _error_response(
-                    AppError(
-                        code="tenant_auth_tenant_mismatch",
-                        message="This tenant account does not belong to the requested tenant.",
-                        status_code=403,
-                    ),
-                    tenant_id=requested_tenant_id,
-                    actor_context=None,
-                )
 
         membership = await _load_tenant_membership(
             session,

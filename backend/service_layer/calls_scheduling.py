@@ -11,8 +11,15 @@ from config import Settings
 from schemas import BookingAssistantSessionRequest, DemoBookingRequest, PricingConsultationRequest, ServiceCatalogItem
 
 
-def build_customer_portal_url(base_url: str, booking_reference: str) -> str:
-    return f"{base_url.rstrip('/')}/?booking_reference={quote(booking_reference, safe='')}"
+def build_customer_portal_url(
+    base_url: str,
+    booking_reference: str,
+    access_token: str | None = None,
+) -> str:
+    base = f"{base_url.rstrip('/')}/?booking_reference={quote(booking_reference, safe='')}"
+    if access_token:
+        base += f"&token={quote(access_token, safe='')}"
+    return base
 
 
 def build_qr_code_url(target_url: str) -> str:

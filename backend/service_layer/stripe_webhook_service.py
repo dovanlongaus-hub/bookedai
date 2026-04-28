@@ -15,10 +15,12 @@ import hashlib
 import hmac
 import json
 import time
+from datetime import UTC, datetime
 from typing import Any
 
 from sqlalchemy import text
 
+from repositories.audit_repository import AuditLogRepository
 from repositories.base import RepositoryContext
 from repositories.idempotency_repository import IdempotencyRepository
 from repositories.payment_intent_repository import PaymentIntentRepository
@@ -34,7 +36,19 @@ SUPPORTED_EVENT_TYPES: frozenset[str] = frozenset(
         "checkout.session.expired",
         "checkout.session.async_payment_succeeded",
         "checkout.session.async_payment_failed",
+        "customer.subscription.created",
+        "customer.subscription.updated",
+        "customer.subscription.deleted",
         "payment_intent.payment_failed",
+    }
+)
+
+STRIPE_SUBSCRIPTION_EVENT_TYPES: frozenset[str] = frozenset(
+    {
+        "checkout.session.completed",
+        "customer.subscription.created",
+        "customer.subscription.updated",
+        "customer.subscription.deleted",
     }
 )
 
@@ -129,6 +143,22 @@ def _amount_aud_from_cents(amount_cents: object | None, currency: str | None) ->
     return round(cents / 100.0, 2)
 
 
+def _metadata_dict(value: object | None) -> dict[str, object]:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _datetime_from_stripe_epoch(value: object | None) -> datetime | None:
+    if value is None:
+        return None
+    try:
+        timestamp = int(value)
+    except (TypeError, ValueError):
+        return None
+    if timestamp <= 0:
+        return None
+    return datetime.fromtimestamp(timestamp, tz=UTC)
+
+
 def _extract_event_handles(event: dict[str, Any]) -> dict[str, Any]:
     """Pull booking_reference + payment status from a Stripe event payload."""
     event_type = _normalized_text(event.get("type")) or ""
@@ -179,6 +209,69 @@ def _extract_event_handles(event: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _extract_subscription_handles(event: dict[str, Any]) -> dict[str, Any]:
+    event_type = _normalized_text(event.get("type")) or ""
+    data_object = (
+        event.get("data", {}).get("object") if isinstance(event.get("data"), dict) else None
+    )
+    if not isinstance(data_object, dict):
+        data_object = {}
+
+    metadata = _metadata_dict(data_object.get("metadata"))
+    event_is_checkout = event_type == "checkout.session.completed"
+    checkout_mode = _normalized_text(data_object.get("mode"))
+    subscription_id = _normalized_text(
+        data_object.get("subscription") if event_is_checkout else data_object.get("id")
+    )
+    customer_id = _normalized_text(data_object.get("customer"))
+    tenant_id = _normalized_text(metadata.get("tenant_id"))
+    tenant_slug = _normalized_text(metadata.get("tenant_slug"))
+    if event_is_checkout and not tenant_id and checkout_mode == "subscription":
+        tenant_id = _normalized_text(data_object.get("client_reference_id"))
+
+    plan_code = _normalized_text(metadata.get("plan_code"))
+    status = _normalized_text(data_object.get("status"))
+    if event_is_checkout and checkout_mode == "subscription":
+        status = "active"
+    if event_type == "customer.subscription.deleted":
+        status = status or "canceled"
+
+    customer_email = _normalized_text(data_object.get("customer_email"))
+    if not customer_email:
+        customer_details = data_object.get("customer_details")
+        if isinstance(customer_details, dict):
+            customer_email = _normalized_text(customer_details.get("email"))
+
+    current_period_start = _datetime_from_stripe_epoch(data_object.get("current_period_start"))
+    current_period_end = _datetime_from_stripe_epoch(data_object.get("current_period_end"))
+
+    source = _normalized_text(metadata.get("source"))
+    is_tenant_billing = bool(
+        event_type in STRIPE_SUBSCRIPTION_EVENT_TYPES
+        and (
+            checkout_mode == "subscription"
+            or source == "tenant_billing_workspace"
+            or tenant_id
+            or tenant_slug
+            or (subscription_id and event_type.startswith("customer.subscription."))
+        )
+    )
+
+    return {
+        "is_tenant_billing": is_tenant_billing,
+        "event_type": event_type,
+        "tenant_id": tenant_id,
+        "tenant_slug": tenant_slug,
+        "plan_code": plan_code,
+        "status": status,
+        "subscription_id": subscription_id,
+        "customer_id": customer_id,
+        "customer_email": customer_email,
+        "current_period_start": current_period_start,
+        "current_period_end": current_period_end,
+    }
+
+
 async def _resolve_booking_reference_tenant_id(
     session,
     *,
@@ -202,6 +295,168 @@ async def _resolve_booking_reference_tenant_id(
     return str(value).strip() if value else None
 
 
+async def _resolve_tenant_id_by_stripe_customer_id(session, *, customer_id: str | None) -> str | None:
+    normalized = (customer_id or "").strip()
+    if not normalized:
+        return None
+    result = await session.execute(
+        text(
+            """
+            select tenant_id::text
+            from tenant_settings
+            where settings_json->'billing_gateway'->>'stripe_customer_id' = :customer_id
+            limit 1
+            """
+        ),
+        {"customer_id": normalized},
+    )
+    value = result.scalar_one_or_none()
+    return str(value).strip() if value else None
+
+
+async def _resolve_subscription_tenant_id(
+    session,
+    *,
+    tenant_repository: TenantRepository,
+    handles: dict[str, Any],
+) -> str | None:
+    for candidate in (handles.get("tenant_id"), handles.get("tenant_slug")):
+        resolved = await tenant_repository.resolve_tenant_id(_normalized_text(candidate))
+        if resolved:
+            return str(resolved).strip()
+    return await _resolve_tenant_id_by_stripe_customer_id(
+        session,
+        customer_id=_normalized_text(handles.get("customer_id")),
+    )
+
+
+def _subscription_period_days(handles: dict[str, Any]) -> int:
+    start = handles.get("current_period_start")
+    end = handles.get("current_period_end")
+    if isinstance(start, datetime) and isinstance(end, datetime) and end > start:
+        return max(1, (end - start).days or 1)
+    return 30
+
+
+async def _reconcile_tenant_subscription_event(
+    session,
+    *,
+    event_id: str | None,
+    tenant_repository: TenantRepository,
+    handles: dict[str, Any],
+) -> dict[str, Any]:
+    tenant_id = await _resolve_subscription_tenant_id(
+        session,
+        tenant_repository=tenant_repository,
+        handles=handles,
+    )
+    if not tenant_id:
+        return {
+            "status": "ignored",
+            "event_id": event_id,
+            "event_type": handles["event_type"],
+            "reason": "tenant_subscription_context_missing",
+        }
+
+    settings = await tenant_repository.get_tenant_settings(tenant_id)
+    billing_gateway = dict(settings.get("billing_gateway") or {}) if isinstance(settings, dict) else {}
+    customer_id = _normalized_text(handles.get("customer_id")) or _normalized_text(
+        billing_gateway.get("stripe_customer_id")
+    )
+    plan_code = _normalized_text(handles.get("plan_code")) or _normalized_text(
+        billing_gateway.get("stripe_checkout_plan_code")
+    ) or "starter"
+    subscription_status = _normalized_text(handles.get("status")) or "active"
+
+    billing_account = await tenant_repository.upsert_billing_account(
+        tenant_id=tenant_id,
+        billing_email=_normalized_text(handles.get("customer_email")),
+        merchant_mode=None,
+    )
+    subscription = await tenant_repository.upsert_subscription(
+        tenant_id=tenant_id,
+        billing_account_id=billing_account.get("id"),
+        plan_code=plan_code,
+        status=subscription_status,
+        started_at=handles.get("current_period_start") if isinstance(handles.get("current_period_start"), datetime) else datetime.now(UTC),
+        ended_at=(
+            handles.get("current_period_end")
+            if subscription_status in {"canceled", "incomplete_expired", "unpaid"}
+            and isinstance(handles.get("current_period_end"), datetime)
+            else None
+        ),
+    )
+    if subscription_status in {"active", "trialing", "past_due"}:
+        period_status = "trial_open" if subscription_status == "trialing" else "open"
+        if isinstance(handles.get("current_period_start"), datetime) and isinstance(
+            handles.get("current_period_end"), datetime
+        ):
+            await tenant_repository.replace_subscription_period_from_stripe(
+                subscription_id=str(subscription.get("id") or ""),
+                period_start=handles["current_period_start"],
+                period_end=handles["current_period_end"],
+                status=period_status,
+            )
+        else:
+            await tenant_repository.replace_subscription_period(
+                subscription_id=str(subscription.get("id") or ""),
+                period_days=_subscription_period_days(handles),
+                status=period_status,
+            )
+
+    next_gateway = {
+        **billing_gateway,
+        "stripe_customer_id": customer_id,
+        "stripe_subscription_id": _normalized_text(handles.get("subscription_id")),
+        "stripe_subscription_status": subscription_status,
+        "stripe_subscription_plan_code": plan_code,
+        "stripe_subscription_current_period_start": (
+            handles["current_period_start"].isoformat()
+            if isinstance(handles.get("current_period_start"), datetime)
+            else None
+        ),
+        "stripe_subscription_current_period_end": (
+            handles["current_period_end"].isoformat()
+            if isinstance(handles.get("current_period_end"), datetime)
+            else None
+        ),
+        "stripe_last_event_id": event_id,
+        "stripe_last_event_type": handles["event_type"],
+        "last_synced_at": datetime.now(UTC).isoformat(),
+    }
+    await tenant_repository.upsert_tenant_settings(
+        tenant_id=tenant_id,
+        settings_json={"billing_gateway": next_gateway},
+    )
+    await AuditLogRepository(
+        RepositoryContext(session=session, tenant_id=tenant_id)
+    ).append_entry(
+        event_type="tenant.billing.stripe_subscription_reconciled",
+        entity_type="subscription",
+        entity_id=str(subscription.get("id") or ""),
+        actor_type="stripe_webhook",
+        actor_id=event_id,
+        tenant_id=tenant_id,
+        payload={
+            "stripe_event_id": event_id,
+            "stripe_event_type": handles["event_type"],
+            "stripe_customer_id": customer_id,
+            "stripe_subscription_id": _normalized_text(handles.get("subscription_id")),
+            "subscription_status": subscription_status,
+            "plan_code": plan_code,
+        },
+    )
+    return {
+        "status": "applied",
+        "event_id": event_id,
+        "event_type": handles["event_type"],
+        "tenant_id": tenant_id,
+        "subscription_status": subscription_status,
+        "subscription_id": _normalized_text(handles.get("subscription_id")),
+        "plan_code": plan_code,
+    }
+
+
 async def reconcile_stripe_event(
     session,
     *,
@@ -213,6 +468,7 @@ async def reconcile_stripe_event(
     diagnostic fields for callers to log/return.
     """
     handles = _extract_event_handles(event)
+    subscription_handles = _extract_subscription_handles(event)
     event_id = _normalized_text(event.get("id"))
     event_type = handles["event_type"]
 
@@ -253,6 +509,14 @@ async def reconcile_stripe_event(
         payload={"event_type": event_type, "object": event.get("data", {}).get("object")},
         status="received",
     )
+
+    if subscription_handles["is_tenant_billing"]:
+        return await _reconcile_tenant_subscription_event(
+            session,
+            event_id=event_id,
+            tenant_repository=tenant_repository,
+            handles=subscription_handles,
+        )
 
     if event_type not in SUPPORTED_EVENT_TYPES or not handles["payment_status"]:
         return {
