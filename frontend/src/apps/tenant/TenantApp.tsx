@@ -5134,6 +5134,21 @@ export function TenantApp() {
           </section>
         ) : null}
 
+        {panel === 'students' ? (
+          <TenantStudentsWorkspace
+            students={students}
+            loading={studentsLoading}
+            errorMessage={studentsError}
+            onRefresh={() => {
+              void handleRefreshStudents();
+            }}
+            submittingContactId={studentSubmittingId}
+            saveMessage={studentSaveMessage}
+            saveErrorMessage={studentSaveError}
+            onSaveProgress={handleSaveStudentProgress}
+          />
+        ) : null}
+
         {panel === 'operations' ? (
           <section className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
             <div className="space-y-6">

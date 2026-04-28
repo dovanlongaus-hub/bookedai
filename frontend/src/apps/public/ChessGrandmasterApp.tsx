@@ -2,7 +2,7 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 
 import '../../theme/chess-tokens.css';
 import { createPublicBookingAssistantLeadAndBookingIntent } from '../../components/landing/assistant/publicBookingAssistantV1';
-import { PaymentSelection, type PaymentSelectionDictionary } from '../../components/chess/PaymentSelection';
+import { PaymentSelection } from '../../components/chess/PaymentSelection';
 import { apiV1, type ChessPaymentOption } from '../../shared/api/v1';
 import type { MatchCandidate } from '../../shared/contracts';
 
@@ -1839,7 +1839,7 @@ export function ChessGrandmasterApp() {
                 {paymentRequest ? (
                   <PaymentSelection
                     locale={locale}
-                    dict={t.payment as PaymentSelectionDictionary}
+                    dict={t.payment}
                     options={paymentOptions}
                     loading={paymentLoading}
                     error={paymentError || null}
