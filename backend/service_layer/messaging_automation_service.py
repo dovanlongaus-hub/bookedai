@@ -185,8 +185,12 @@ class MessagingAutomationService:
                     locale=locale,
                 )
         elif slash_intent == "support":
-            return self._build_support_handoff_result(
+            return await self._dispatch_support_handoff(
+                session,
                 channel=normalized_channel,
+                conversation_id=conversation_key,
+                tenant_id=tenant_ref,
+                channel_state=channel_state,
                 message=message,
                 identity_metadata=identity_metadata,
                 locale=locale,
@@ -209,8 +213,12 @@ class MessagingAutomationService:
                     locale=locale,
                 )
             if keyboard_intent == "support":
-                return self._build_support_handoff_result(
+                return await self._dispatch_support_handoff(
+                    session,
                     channel=normalized_channel,
+                    conversation_id=conversation_key,
+                    tenant_id=tenant_ref,
+                    channel_state=channel_state,
                     message=message,
                     identity_metadata=identity_metadata,
                     locale=locale,
@@ -1428,7 +1436,8 @@ class MessagingAutomationService:
         for item in scored_rows[: self.policy.max_service_options]:
             display_price = str(getattr(item, "display_price", "") or "").strip()
             amount = getattr(item, "amount_aud", None)
-            price = display_price or (f"AUD {amount:g}" if isinstance(amount, (int, float)) and amount > 0 else "Price TBC")
+            amount_value = float(amount) if isinstance(amount, (int, float)) and amount > 0 else None
+            price = display_price or (f"AUD {amount:g}" if amount_value else "Price TBC")
             option = {
                 "index": len(options) + 1,
                 "candidate_id": str(getattr(item, "service_id", "") or ""),
@@ -1441,6 +1450,8 @@ class MessagingAutomationService:
                 "booking_url": self._safe_http_url(getattr(item, "booking_url", "")),
                 "source_url": self._safe_http_url(getattr(item, "source_url", "")),
                 "price": price,
+                "amount_aud": amount_value,
+                "currency_code": "AUD",
                 "duration_minutes": getattr(item, "duration_minutes", None),
                 "tenant_id": str(getattr(item, "tenant_id", "") or ""),
                 "source_type": "service_catalog",
@@ -2008,6 +2019,13 @@ class MessagingAutomationService:
                     "timezone": "Australia/Sydney",
                     "booking_path": "request_callback",
                     "payment_status": "pending",
+                    "amount_aud": (
+                        float(selected_option.get("amount_aud"))
+                        if isinstance(selected_option.get("amount_aud"), (int, float))
+                        and selected_option.get("amount_aud") > 0
+                        else None
+                    ),
+                    "currency_code": str(selected_option.get("currency_code") or "AUD").upper() or "AUD",
                 },
                 "reply_controls": self._booking_care_reply_controls(
                     booking_reference,
@@ -2193,6 +2211,71 @@ class MessagingAutomationService:
                     "telegram_parse_mode": "HTML",
                 },
             },
+        )
+
+    def _build_support_handoff_recent_result(
+        self,
+        *,
+        channel: str,
+        identity_metadata: dict[str, object],
+        locale: str = "en",
+    ) -> MessagingAutomationResult:
+        body = self._localized(
+            "support_handoff_recent",
+            locale,
+            support_email=DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
+        )
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="support_handoff_recent",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "support_handoff_recent",
+                "human_handoff_requested": False,
+                "support_handoff_debounced": True,
+                "locale": locale,
+                "reply_controls": {
+                    "telegram_reply_markup": self._home_reply_keyboard(locale),
+                    "telegram_parse_mode": "HTML",
+                },
+            },
+        )
+
+    async def _dispatch_support_handoff(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        channel_state: dict[str, object] | None,
+        message: TawkMessage,
+        identity_metadata: dict[str, object],
+        locale: str = "en",
+    ) -> MessagingAutomationResult:
+        if self._is_support_handoff_recent(
+            (channel_state or {}).get("session_metadata") if isinstance(channel_state, dict) else None
+        ):
+            return self._build_support_handoff_recent_result(
+                channel=channel,
+                identity_metadata=identity_metadata,
+                locale=locale,
+            )
+        await self._mark_support_handoff_dispatched(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=identity_metadata,
+            existing_state=channel_state,
+        )
+        return self._build_support_handoff_result(
+            channel=channel,
+            message=message,
+            identity_metadata=identity_metadata,
+            locale=locale,
         )
 
     def _build_cancel_confirm_result(
@@ -2569,6 +2652,68 @@ class MessagingAutomationService:
             return False
         return True
 
+    @classmethod
+    def _is_support_handoff_recent(cls, session_metadata: dict[str, object] | None) -> bool:
+        if not isinstance(session_metadata, dict):
+            return False
+        recorded = str(session_metadata.get("support_handoff_recorded_at") or "").strip()
+        if not recorded:
+            return False
+        try:
+            recorded_at = datetime.fromisoformat(recorded)
+        except ValueError:
+            return False
+        if recorded_at.tzinfo is None:
+            recorded_at = recorded_at.replace(tzinfo=UTC)
+        if datetime.now(UTC) - recorded_at > timedelta(seconds=cls.SUPPORT_HANDOFF_DEBOUNCE_SECONDS):
+            return False
+        return True
+
+    async def _mark_support_handoff_dispatched(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        customer_identity: dict[str, object],
+        existing_state: dict[str, object] | None = None,
+    ) -> None:
+        if not conversation_id:
+            return
+        existing_metadata = (existing_state or {}).get("session_metadata") if existing_state else {}
+        if not isinstance(existing_metadata, dict):
+            existing_metadata = {}
+        merged_metadata = {
+            **existing_metadata,
+            "support_handoff_recorded_at": datetime.now(UTC).isoformat(),
+        }
+        await self._upsert_channel_session_state(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=customer_identity,
+            service_search_query=(existing_state or {}).get("service_search_query"),
+            service_options=[
+                item
+                for item in ((existing_state or {}).get("service_options") or [])
+                if isinstance(item, dict)
+            ],
+            reply_controls=(existing_state or {}).get("reply_controls") or {},
+            last_ai_intent="support_handoff",
+            last_workflow_status="answered",
+            metadata=merged_metadata,
+        )
+
+    @classmethod
+    def render_support_handoff_failed(cls, *, locale: str, support_email: str) -> str:
+        return cls._localized(
+            "support_handoff_failed",
+            cls._resolve_locale(locale),
+            support_email=support_email,
+        )
+
     SUPPORTED_LOCALES = ("en", "vi")
     DEFAULT_LOCALE = "en"
 
@@ -2657,6 +2802,31 @@ class MessagingAutomationService:
                 "Trong lúc đó mình vẫn theo dõi tin nhắn ở đây."
             ),
         },
+        "support_handoff_failed": {
+            "en": (
+                "I tried to ping the BookedAI team channel but couldn't reach it just now.\n\n"
+                "Please email <b>{support_email}</b> with your booking reference and the question — "
+                "the team will reply from there. I'll keep listening here in case you want to send "
+                "more details."
+            ),
+            "vi": (
+                "Mình đã cố thông báo cho đội BookedAI nhưng kênh nội bộ tạm thời không phản hồi.\n\n"
+                "Bạn email cho <b>{support_email}</b> kèm mã booking và câu hỏi — đội sẽ trả lời "
+                "qua email. Mình vẫn theo dõi ở đây nếu bạn muốn gửi thêm thông tin."
+            ),
+        },
+        "support_handoff_recent": {
+            "en": (
+                "I've already pinged the BookedAI team for this conversation a moment ago. "
+                "They'll jump in shortly.\n\n"
+                "If it's urgent, email <b>{support_email}</b> with your booking reference."
+            ),
+            "vi": (
+                "Mình vừa gửi thông báo cho đội BookedAI về cuộc trò chuyện này. "
+                "Họ sẽ vào trả lời sớm.\n\n"
+                "Nếu gấp, bạn email <b>{support_email}</b> kèm mã booking."
+            ),
+        },
         "keyboard_find_service": {"en": "Find a service", "vi": "Tìm dịch vụ"},
         "keyboard_my_bookings": {"en": "My bookings", "vi": "Booking của tôi"},
         "keyboard_talk_support": {"en": "Talk to support", "vi": "Gặp hỗ trợ"},
@@ -2736,6 +2906,7 @@ class MessagingAutomationService:
     }
 
     CANCEL_INTENT_TTL_SECONDS = 600
+    SUPPORT_HANDOFF_DEBOUNCE_SECONDS = 300
 
     @classmethod
     def _resolve_locale(cls, language_code: str | None) -> str:

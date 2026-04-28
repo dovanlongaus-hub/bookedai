@@ -51,7 +51,12 @@ async def _async_noop(*_args, **_kwargs):
 
 @asynccontextmanager
 async def _fake_get_session(_session_factory):
-    yield SimpleNamespace(execute=_fake_execute, commit=_async_noop)
+    yield SimpleNamespace(
+        execute=_fake_execute,
+        commit=_async_noop,
+        add=lambda _row: None,
+        flush=_async_noop,
+    )
 
 
 class _FakeTelegramCommunicationService:
@@ -1758,6 +1763,108 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertEqual(len(communication_service.sent), 4)
         # If sequential: ~4 × 0.15 = 0.6s. With gather: ~0.15s + overhead. Allow 0.45s ceiling.
         self.assertLess(elapsed, 0.45, msg=f"fan-out took {elapsed:.3f}s — expected concurrent")
+
+    def test_support_handoff_failure_overrides_reply_with_email_fallback_copy(self):
+        captured_calls: list[dict[str, object]] = []
+        staff_chat_ids = {"111", "222"}
+
+        class _FailingTelegramCommunicationService(_FakeTelegramCommunicationService):
+            async def send_telegram(self, **kwargs):
+                self.sent.append(kwargs)
+                if str(kwargs.get("chat_id") or "") in staff_chat_ids:
+                    raise RuntimeError("staff chat unreachable")
+                return SimpleNamespace(
+                    provider="telegram_bot",
+                    delivery_status="sent",
+                    provider_message_id="42",
+                    warnings=[],
+                )
+
+        communication_service = _FailingTelegramCommunicationService()
+
+        async def _store_event(_session, **kwargs):
+            captured_calls.append(kwargs)
+
+        with patch("api.route_handlers.get_session", _fake_get_session), patch(
+            "api.route_handlers.store_event",
+            _store_event,
+        ):
+            app = create_test_app()
+            app.state.settings = SimpleNamespace(
+                bookedai_customer_telegram_webhook_secret_token="telegram-secret",
+                bookedai_customer_telegram_bot_token="customer-bot-token",
+                booking_business_email="info@bookedai.au",
+                bookedai_support_telegram_chat_ids="111,222",
+            )
+            app.state.communication_service = communication_service
+            client = TestClient(app)
+            response = client.post(
+                "/api/webhooks/bookedai-telegram",
+                headers={"X-Telegram-Bot-Api-Secret-Token": "telegram-secret"},
+                json={
+                    "update_id": 7000,
+                    "message": {
+                        "message_id": 70,
+                        "from": {"id": 999, "first_name": "Long"},
+                        "chat": {"id": 123456, "type": "private"},
+                        "text": "/support",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        # Customer reply is the message routed to the conversation chat_id (123456).
+        customer_reply = next(
+            item for item in communication_service.sent if str(item["chat_id"]) == "123456"
+        )
+        self.assertIn("couldn't reach", customer_reply["body"])
+        # Lifecycle metadata records the fan-out failure.
+        handoff = captured_calls[0]["metadata"]["lifecycle_updates"]["support_handoff"]
+        self.assertEqual(handoff["targets"], 2)
+        self.assertEqual(handoff["delivered_count"], 0)
+        self.assertTrue(handoff["all_failed"])
+        # The metadata also flags the failure so admin tools can surface it.
+        self.assertTrue(captured_calls[0]["metadata"].get("support_handoff_failed"))
+        self.assertEqual(
+            captured_calls[0]["metadata"]["customer_care_status"], "support_handoff_failed"
+        )
+
+    def test_support_handoff_is_debounced_within_5_minutes(self):
+        from service_layer.messaging_automation_service import MessagingAutomationService
+        from datetime import datetime, timedelta, UTC
+
+        # Simulate a stored session with a recent handoff timestamp.
+        recent_iso = datetime.now(UTC).isoformat()
+        stale_iso = (datetime.now(UTC) - timedelta(seconds=400)).isoformat()
+
+        self.assertTrue(
+            MessagingAutomationService._is_support_handoff_recent(
+                {"support_handoff_recorded_at": recent_iso}
+            )
+        )
+        self.assertFalse(
+            MessagingAutomationService._is_support_handoff_recent(
+                {"support_handoff_recorded_at": stale_iso}
+            )
+        )
+        self.assertFalse(MessagingAutomationService._is_support_handoff_recent({}))
+        self.assertFalse(MessagingAutomationService._is_support_handoff_recent(None))
+
+    def test_support_handoff_recent_result_skips_fanout_and_uses_debounce_copy(self):
+        from service_layer.messaging_automation_service import MessagingAutomationService
+
+        result = MessagingAutomationService(
+            public_search_service=None
+        )._build_support_handoff_recent_result(
+            channel="telegram",
+            identity_metadata={},
+            locale="en",
+        )
+
+        self.assertEqual(result.ai_intent, "support_handoff_recent")
+        self.assertFalse(result.metadata.get("human_handoff_requested"))
+        self.assertTrue(result.metadata.get("support_handoff_debounced"))
+        self.assertIn("already pinged", result.ai_reply)
 
     def test_telegram_change_time_callback_shows_reschedule_date_picker(self):
         captured_calls: list[dict[str, object]] = []
