@@ -13,7 +13,7 @@ from urllib.parse import quote, urlencode
 from uuid import uuid4
 
 import httpx
-from fastapi import APIRouter, Header, HTTPException, Request
+from fastapi import Header, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import String, and_, cast, desc, or_, select, text
@@ -106,7 +106,6 @@ from services import _build_google_maps_url
 from workers.outbox import dispatch_phase2_outbox_event, run_tracked_outbox_dispatch
 
 
-router = APIRouter(prefix="/api/v1")
 logger = get_logger("bookedai.api.v1")
 
 SEMANTIC_DOMAIN_STOP_WORDS = {
@@ -1211,6 +1210,19 @@ async def _resolve_tenant_catalog_service(
 
 
 async def _resolve_tenant_id(request: Request, actor_context: ActorContextPayload | None) -> str | None:
+    """Resolve tenant scope for an authenticated v1 request.
+
+    Security contract (P0-2):
+      - The caller MUST supply either a valid tenant session bearer token
+        (verified via ``_resolve_tenant_session``) or a server-trusted
+        ``actor_context.tenant_ref`` that already passed an upstream auth check
+        (e.g. internal job runners, webhook adapters seeded with a tenant slug).
+      - The legacy "fall back to the platform default tenant when no actor
+        context is supplied" branch has been removed. Anonymous callers must
+        instead use the public-tenant endpoints (e.g. /api/v1/public/leads/{slug})
+        which resolve the tenant explicitly from a URL slug + rate limit.
+    """
+
     if actor_context and actor_context.tenant_id:
         requested_tenant_id = str(actor_context.tenant_id or "").strip()
         if requested_tenant_id:
@@ -1230,6 +1242,10 @@ async def _resolve_tenant_id(request: Request, actor_context: ActorContextPayloa
                     )
             return requested_tenant_id
 
+    # ``tenant_ref`` path: used by server-to-server callers (background workers,
+    # webhook adapters, internal tenant ops scripts) that propagate a tenant
+    # slug they have already authenticated upstream. We resolve it through the
+    # tenant repository so unknown / inactive tenants are rejected below.
     tenant_ref = str(actor_context.tenant_ref or "").strip() if actor_context else ""
     if tenant_ref:
         async with get_session(request.app.state.session_factory) as session:
@@ -1237,8 +1253,14 @@ async def _resolve_tenant_id(request: Request, actor_context: ActorContextPayloa
             if tenant_id:
                 return tenant_id
 
-    async with get_session(request.app.state.session_factory) as session:
-        return await TenantRepository(RepositoryContext(session=session)).get_default_tenant_id()
+    raise HTTPException(
+        status_code=401,
+        detail=(
+            "Tenant session required: provide a valid tenant bearer token with a "
+            "matching actor_context.tenant_id, or call the public tenant-scoped "
+            "endpoint (e.g. /api/v1/public/leads/{tenant_slug})."
+        ),
+    )
 
 
 async def _record_phase2_write_activity(
@@ -1989,7 +2011,6 @@ def _build_public_web_fallback_candidates(web_results: list[dict[str, Any]]) -> 
     return normalized_candidates
 
 
-@router.post("/leads")
 async def create_lead(request: Request, payload: CreateLeadRequestPayload):
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     try:
@@ -2069,7 +2090,6 @@ async def create_lead(request: Request, payload: CreateLeadRequestPayload):
         return _error_response(error, tenant_id=tenant_id, actor_context=payload.actor_context)
 
 
-@router.post("/conversations/sessions")
 async def start_chat_session(request: Request, payload: StartChatSessionRequestPayload):
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     conversation_id = payload.anonymous_session_id or f"conv_{uuid4().hex[:16]}"
@@ -2088,7 +2108,6 @@ async def start_chat_session(request: Request, payload: StartChatSessionRequestP
     )
 
 
-@router.post("/matching/search")
 async def search_candidates(request: Request, payload: SearchCandidatesRequestPayload):
     actor_context = ActorContextPayload(
         channel=payload.channel_context.channel,
@@ -2553,7 +2572,6 @@ async def search_candidates(request: Request, payload: SearchCandidatesRequestPa
     )
 
 
-@router.post("/booking-trust/checks")
 async def check_availability(request: Request, payload: CheckAvailabilityRequestPayload):
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     async with get_session(request.app.state.session_factory) as session:
@@ -2591,7 +2609,6 @@ async def check_availability(request: Request, payload: CheckAvailabilityRequest
     )
 
 
-@router.post("/bookings/path/resolve")
 async def resolve_booking_path(request: Request, payload: ResolveBookingPathRequestPayload):
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     availability_state = payload.availability_state or "availability_unknown"
@@ -2618,7 +2635,6 @@ async def resolve_booking_path(request: Request, payload: ResolveBookingPathRequ
     )
 
 
-@router.post("/bookings/intents")
 async def create_booking_intent(request: Request, payload: CreateBookingIntentRequestPayload):
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     try:
@@ -2817,7 +2833,6 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
         return _error_response(error, tenant_id=tenant_id, actor_context=payload.actor_context)
 
 
-@router.post("/payments/intents")
 async def create_payment_intent(request: Request, payload: CreatePaymentIntentRequestPayload):
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     try:
@@ -2895,7 +2910,6 @@ async def create_payment_intent(request: Request, payload: CreatePaymentIntentRe
         return _error_response(error, tenant_id=tenant_id, actor_context=payload.actor_context)
 
 
-@router.post("/email/messages/send")
 async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequestPayload):
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     try:
@@ -3009,7 +3023,6 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
         return _error_response(error, tenant_id=tenant_id, actor_context=payload.actor_context)
 
 
-@router.post("/sms/messages/send")
 async def send_sms_message(request: Request, payload: SendCommunicationMessageRequestPayload):
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     try:
@@ -3092,7 +3105,6 @@ async def send_sms_message(request: Request, payload: SendCommunicationMessageRe
         )
 
 
-@router.post("/whatsapp/messages/send")
 async def send_whatsapp_message(request: Request, payload: SendCommunicationMessageRequestPayload):
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     try:
@@ -3175,7 +3187,6 @@ async def send_whatsapp_message(request: Request, payload: SendCommunicationMess
         )
 
 
-@router.get("/integrations/providers/status")
 async def integration_provider_statuses(request: Request):
     actor_context = ActorContextPayload(channel="admin", role="integration_preview", deployment_mode="headless_api")
     tenant_id = await _resolve_tenant_id(request, actor_context)
@@ -3214,7 +3225,6 @@ async def integration_provider_statuses(request: Request):
     )
 
 
-@router.get("/integrations/reconciliation/summary")
 async def integration_reconciliation_summary(request: Request):
     actor_context = ActorContextPayload(channel="admin", role="integration_preview", deployment_mode="headless_api")
     tenant_id = await _resolve_tenant_id(request, actor_context)
@@ -3227,7 +3237,6 @@ async def integration_reconciliation_summary(request: Request):
     )
 
 
-@router.get("/integrations/attention")
 async def integration_attention(request: Request):
     actor_context = ActorContextPayload(channel="admin", role="integration_preview", deployment_mode="headless_api")
     tenant_id = await _resolve_tenant_id(request, actor_context)
@@ -3242,7 +3251,6 @@ async def integration_attention(request: Request):
     )
 
 
-@router.get("/integrations/attention/triage")
 async def integration_attention_triage(request: Request):
     actor_context = ActorContextPayload(channel="admin", role="integration_preview", deployment_mode="headless_api")
     tenant_id = await _resolve_tenant_id(request, actor_context)
@@ -3255,7 +3263,6 @@ async def integration_attention_triage(request: Request):
     )
 
 
-@router.get("/integrations/crm-sync/backlog")
 async def integration_crm_sync_backlog(request: Request):
     actor_context = ActorContextPayload(channel="admin", role="integration_preview", deployment_mode="headless_api")
     tenant_id = await _resolve_tenant_id(request, actor_context)
@@ -3268,7 +3275,6 @@ async def integration_crm_sync_backlog(request: Request):
     )
 
 
-@router.get("/integrations/reconciliation/details")
 async def integration_reconciliation_details(request: Request):
     actor_context = ActorContextPayload(channel="admin", role="integration_preview", deployment_mode="headless_api")
     tenant_id = await _resolve_tenant_id(request, actor_context)
@@ -3281,7 +3287,6 @@ async def integration_reconciliation_details(request: Request):
     )
 
 
-@router.get("/integrations/runtime-activity")
 async def integration_runtime_activity(request: Request):
     actor_context = ActorContextPayload(channel="admin", role="integration_preview", deployment_mode="headless_api")
     tenant_id = await _resolve_tenant_id(request, actor_context)
@@ -3294,7 +3299,6 @@ async def integration_runtime_activity(request: Request):
     )
 
 
-@router.get("/integrations/outbox/dispatched-audit")
 async def integration_outbox_dispatched_audit(request: Request):
     actor_context = ActorContextPayload(channel="admin", role="integration_preview", deployment_mode="headless_api")
     tenant_id = await _resolve_tenant_id(request, actor_context)
@@ -3314,7 +3318,6 @@ async def integration_outbox_dispatched_audit(request: Request):
     )
 
 
-@router.get("/integrations/outbox/backlog")
 async def integration_outbox_backlog(request: Request):
     actor_context = ActorContextPayload(channel="admin", role="integration_preview", deployment_mode="headless_api")
     tenant_id = await _resolve_tenant_id(request, actor_context)
@@ -3327,7 +3330,6 @@ async def integration_outbox_backlog(request: Request):
     )
 
 
-@router.post("/tenant/auth/google")
 async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestPayload):
     cfg: Settings = request.app.state.settings
     google_identity = await _verify_google_identity_token(cfg, id_token=payload.id_token)
@@ -3492,7 +3494,6 @@ async def tenant_google_auth(request: Request, payload: TenantGoogleAuthRequestP
     )
 
 
-@router.post("/tenant/auth/password")
 async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequestPayload):
     cfg: Settings = request.app.state.settings
     normalized_username = payload.username.strip().lower()
@@ -3611,7 +3612,6 @@ async def tenant_password_auth(request: Request, payload: TenantPasswordAuthRequ
     )
 
 
-@router.post("/tenant/account/create")
 async def tenant_create_account(request: Request, payload: TenantCreateAccountRequestPayload):
     cfg: Settings = request.app.state.settings
     normalized_email = payload.email.strip().lower()
@@ -3703,7 +3703,6 @@ async def tenant_create_account(request: Request, payload: TenantCreateAccountRe
     )
 
 
-@router.post("/tenant/account/claim")
 async def tenant_claim_account(request: Request, payload: TenantClaimAccountRequestPayload):
     cfg: Settings = request.app.state.settings
     normalized_email = payload.email.strip().lower()
@@ -3925,7 +3924,6 @@ def _apply_catalog_quality_to_service(service: ServiceMerchantProfile) -> list[s
     return quality_warnings
 
 
-@router.post("/integrations/outbox/dispatch")
 async def dispatch_outbox_events(request: Request, payload: DispatchOutboxRequestPayload):
     actor_context = payload.actor_context or ActorContextPayload(
         channel="admin",
@@ -3957,7 +3955,6 @@ async def dispatch_outbox_events(request: Request, payload: DispatchOutboxReques
     )
 
 
-@router.post("/integrations/outbox/replay")
 async def replay_outbox_event(request: Request, payload: ReplayOutboxEventRequestPayload):
     actor_context = payload.actor_context or ActorContextPayload(
         channel="admin",
@@ -4016,7 +4013,6 @@ async def replay_outbox_event(request: Request, payload: ReplayOutboxEventReques
     )
 
 
-@router.get("/tenant/overview")
 async def tenant_overview(request: Request, authorization: str | None = Header(default=None)):
     tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
         request,
@@ -4048,7 +4044,6 @@ async def tenant_overview(request: Request, authorization: str | None = Header(d
     )
 
 
-@router.get("/tenant/bookings")
 async def tenant_bookings(request: Request, authorization: str | None = Header(default=None)):
     tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
         request,
@@ -4080,7 +4075,6 @@ async def tenant_bookings(request: Request, authorization: str | None = Header(d
     )
 
 
-@router.get("/tenant/leads")
 async def tenant_leads(
     request: Request,
     authorization: str | None = Header(default=None),
@@ -4117,7 +4111,6 @@ async def tenant_leads(
     )
 
 
-@router.get("/tenant/integrations")
 async def tenant_integrations(request: Request, authorization: str | None = Header(default=None)):
     tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
         request,
@@ -4163,7 +4156,6 @@ async def tenant_integrations(request: Request, authorization: str | None = Head
     )
 
 
-@router.patch("/tenant/integrations/providers/{provider}")
 async def tenant_integration_provider_update(
     request: Request,
     provider: str,
@@ -4275,7 +4267,6 @@ async def tenant_integration_provider_update(
     )
 
 
-@router.get("/tenant/billing")
 async def tenant_billing(request: Request, authorization: str | None = Header(default=None)):
     tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
         request,
@@ -4311,7 +4302,6 @@ async def tenant_billing(request: Request, authorization: str | None = Header(de
     )
 
 
-@router.patch("/tenant/billing/account")
 async def tenant_billing_account_update(
     request: Request,
     payload: TenantBillingAccountUpdateRequestPayload,
@@ -4380,7 +4370,6 @@ async def tenant_billing_account_update(
     )
 
 
-@router.post("/tenant/billing/subscription")
 async def tenant_billing_subscription_update(
     request: Request,
     payload: TenantSubscriptionUpdateRequestPayload,
@@ -4482,7 +4471,6 @@ async def tenant_billing_subscription_update(
     )
 
 
-@router.post("/tenant/billing/invoices/{invoice_id}/mark-paid")
 async def tenant_billing_invoice_mark_paid(
     request: Request,
     invoice_id: str,
@@ -4574,7 +4562,6 @@ async def tenant_billing_invoice_mark_paid(
     )
 
 
-@router.get("/tenant/billing/invoices/{invoice_id}/receipt")
 async def tenant_billing_invoice_receipt(
     request: Request,
     invoice_id: str,
@@ -4622,7 +4609,6 @@ async def tenant_billing_invoice_receipt(
     )
 
 
-@router.get("/tenant/onboarding")
 async def tenant_onboarding(request: Request, authorization: str | None = Header(default=None)):
     tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
         request,
@@ -4654,7 +4640,6 @@ async def tenant_onboarding(request: Request, authorization: str | None = Header
     )
 
 
-@router.get("/tenant/team")
 async def tenant_team(request: Request, authorization: str | None = Header(default=None)):
     tenant_ref, tenant_id, tenant_session, membership = await _resolve_tenant_request_context(
         request,
@@ -4691,7 +4676,6 @@ async def tenant_team(request: Request, authorization: str | None = Header(defau
     )
 
 
-@router.patch("/tenant/profile")
 async def tenant_profile_update(
     request: Request,
     payload: TenantProfileUpdateRequestPayload,
@@ -4812,7 +4796,6 @@ async def tenant_profile_update(
     )
 
 
-@router.post("/tenant/team/invite")
 async def tenant_team_invite(
     request: Request,
     payload: TenantInviteMemberRequestPayload,
@@ -4924,7 +4907,6 @@ async def tenant_team_invite(
     )
 
 
-@router.patch("/tenant/team/members/{member_email}")
 async def tenant_team_member_update(
     request: Request,
     member_email: str,
@@ -5020,7 +5002,6 @@ async def tenant_team_member_update(
     )
 
 
-@router.post("/tenant/team/members/{member_email}/resend-invite")
 async def tenant_team_member_resend_invite(
     request: Request,
     member_email: str,
@@ -5139,7 +5120,6 @@ async def tenant_team_member_resend_invite(
     )
 
 
-@router.get("/tenant/catalog")
 async def tenant_catalog(request: Request, authorization: str | None = Header(default=None)):
     tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
         request,
@@ -5175,7 +5155,6 @@ async def tenant_catalog(request: Request, authorization: str | None = Header(de
     )
 
 
-@router.get("/portal/bookings/{booking_reference}")
 async def portal_booking_detail(booking_reference: str, request: Request):
     async with get_session(request.app.state.session_factory) as session:
         snapshot = await build_portal_booking_snapshot(
@@ -5198,7 +5177,6 @@ async def portal_booking_detail(booking_reference: str, request: Request):
     return _success_response(snapshot, tenant_id=None, actor_context=None)
 
 
-@router.post("/portal/bookings/{booking_reference}/reschedule-request")
 async def portal_booking_reschedule_request(
     booking_reference: str,
     request: Request,
@@ -5240,7 +5218,6 @@ async def portal_booking_reschedule_request(
     return _success_response(result, tenant_id=None, actor_context=None)
 
 
-@router.post("/portal/bookings/{booking_reference}/cancel-request")
 async def portal_booking_cancel_request(
     booking_reference: str,
     request: Request,
@@ -5282,7 +5259,6 @@ async def portal_booking_cancel_request(
     return _success_response(result, tenant_id=None, actor_context=None)
 
 
-@router.post("/tenant/catalog/import-website")
 async def tenant_catalog_import_website(
     request: Request,
     payload: TenantCatalogImportRequestPayload,
@@ -5443,7 +5419,6 @@ async def tenant_catalog_import_website(
     )
 
 
-@router.patch("/tenant/catalog/{service_id}")
 async def tenant_catalog_update_service(
     service_id: str,
     request: Request,
@@ -5520,7 +5495,6 @@ async def tenant_catalog_update_service(
     )
 
 
-@router.post("/tenant/catalog/{service_id}/publish")
 async def tenant_catalog_publish_service(
     service_id: str,
     request: Request,
@@ -5605,7 +5579,6 @@ async def tenant_catalog_publish_service(
     )
 
 
-@router.post("/tenant/catalog/{service_id}/archive")
 async def tenant_catalog_archive_service(
     service_id: str,
     request: Request,
@@ -5679,7 +5652,6 @@ async def tenant_catalog_archive_service(
     )
 
 
-@router.post("/integrations/crm-sync/retry")
 async def retry_crm_sync(request: Request, payload: RetryCrmSyncRequestPayload):
     actor_context = payload.actor_context or ActorContextPayload(
         channel="admin",

@@ -66,6 +66,7 @@ class Settings:
     stripe_secret_key: str
     stripe_publishable_key: str
     stripe_currency: str
+    stripe_webhook_secret: str
     zoho_crm_api_base_url: str
     zoho_calendar_api_base_url: str
     zoho_bookings_api_base_url: str
@@ -297,6 +298,7 @@ def get_settings() -> Settings:
         stripe_secret_key=os.getenv("STRIPE_SECRET_KEY", ""),
         stripe_publishable_key=os.getenv("STRIPE_PUBLISHABLE_KEY", ""),
         stripe_currency=os.getenv("STRIPE_CURRENCY", "aud"),
+        stripe_webhook_secret=os.getenv("STRIPE_WEBHOOK_SECRET", ""),
         zoho_crm_api_base_url=zoho_crm_api_base_url,
         zoho_calendar_api_base_url=os.getenv(
             "ZOHO_CALENDAR_API_BASE_URL", "https://calendar.zoho.com/api/v1"

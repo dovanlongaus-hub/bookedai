@@ -57,13 +57,13 @@
   --color-brand-red: #EF4444;
   --color-brand-border: rgba(255,255,255,0.08);
 
-  /* Typography */
-  --font-display: "Space Grotesk", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --font-body:    "DM Sans", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Typography — Apple SF Pro / Inter stack ONLY (no DM Sans, no Space Grotesk) */
+  --font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", system-ui, Helvetica, Arial, sans-serif;
+  --font-body:    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", system-ui, Helvetica, Arial, sans-serif;
   --font-mono:    "SF Mono", SFMono-Regular, ui-monospace, Menlo, Monaco, "Courier New", monospace;
-  --font-bookedai-display: "Space Grotesk", Inter, sans-serif;
-  --font-bookedai-sans: "DM Sans", Inter, sans-serif;
-  --font-sans: "DM Sans", Inter, sans-serif;
+  --font-bookedai-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", system-ui, sans-serif;
+  --font-bookedai-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", system-ui, sans-serif;
+  --font-sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", system-ui, sans-serif;
   --text-bookedai-hero-display: clamp(3rem, 6vw, 5.5rem);
   --text-bookedai-h1: clamp(2.5rem, 5vw, 4.5rem);
   --text-bookedai-h2: clamp(2rem, 4vw, 3rem);
@@ -94,7 +94,7 @@
   --shadow-bookedai-float: 0 20px 70px rgba(2,6,23,0.46);
   --shadow-card: 0 10px 40px rgba(2,6,23,0.38);
   --shadow-glow: 0 0 0 1px rgba(255,255,255,0.06), 0 18px 60px rgba(139,92,246,0.16);
-  --background-image-brand-gradient: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 42%, #4F8CFF 100%);
+  --background-image-brand-gradient: var(--color-apple-blue);
   --background-image-hero-glow: radial-gradient(circle at top left, rgba(139,92,246,0.24), transparent 45%);
   --background-image-green-glow: radial-gradient(circle at top right, rgba(79,140,255,0.16), transparent 40%);
   --background-image-amber-glow: radial-gradient(circle at center top, rgba(196,181,253,0.16), transparent 28%);
@@ -122,7 +122,7 @@
   }
 
   body {
-    background: #f7f8fb;
+    background: #f5f5f7;
     color: var(--text-primary);
     font-family: var(--font-body);
   }
@@ -155,10 +155,7 @@
   }
 
   .gradient-text {
-    background: linear-gradient(135deg, #8B5CF6 0%, #A78BFA 44%, #4F8CFF 100%);
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: var(--color-apple-blue);
   }
 
   .section-y {
@@ -450,13 +447,14 @@
   }
 
   .public-apple-primary-button {
-    background: linear-gradient(135deg, #7c3aed 0%, #8b5cf6 50%, #4f8cff 100%);
+    background: var(--color-apple-blue);
+    border-radius: 8px;
     color: white;
-    box-shadow: 0 12px 28px rgba(124,58,237,0.16);
+    box-shadow: 0 9px 22px rgba(0, 113, 227, 0.14);
   }
 
   .public-apple-primary-button:hover {
-    filter: brightness(1.02);
+    background: var(--color-apple-blue-hover);
   }
 
   .public-apple-empty-state {

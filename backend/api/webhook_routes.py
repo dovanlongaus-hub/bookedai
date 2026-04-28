@@ -38,6 +38,11 @@ router.add_api_route(
     methods=["POST"],
 )
 router.add_api_route(
+    "/webhooks/stripe",
+    handlers.stripe_webhook,
+    methods=["POST"],
+)
+router.add_api_route(
     "/automation/booking-callback",
     handlers.booking_callback,
     methods=["POST"],

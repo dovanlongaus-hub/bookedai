@@ -1671,7 +1671,7 @@ Latest confirmed tenant baseline on `2026-04-18`:
 - migration-safe rollout now also includes a repo-local verification helper that can be used after apply or wired into the release gate when database access exists
 - tenant publish rollout now also has a dedicated production-shadow rehearsal checklist so beta or shadow validation can be run as a repeatable operational sequence
 - the first official sample tenant is now a chess-class onboarding sample derived from a real uploaded PDF source, giving the tenant-catalog lane one concrete non-website onboarding baseline to inherit from
-- the current official seed set now also includes a third tenant, `ai-mentor-doer`, with published online private and group AI mentoring packages plus seeded username-password access for operator-led pilot use
+- the current official seed set now also includes a third tenant, `ai-mentor-doer`, with published online private and group AI mentoring packages plus seeded email-password access for operator-led pilot use; current AI Mentor 1-1 login/contact identity is `aimentor@bookedai.au` with password `FirstHundred1M$`, and phone/WhatsApp/Telegram/iMessage contact is `+84908444095`
 - `ai.longcare.au` is now wired as the official tenant-facing host for the AI Mentor Pro partner runtime, with a BookedAI-powered plugin interface and embed loader path for tenant-scoped chat, search, booking, payment, and follow-up
 
 Latest confirmed tenant baseline on `2026-04-19`:

@@ -1,6 +1,6 @@
 # AI Mentor Pro Plugin Interface
 
-Date: `2026-04-21`
+Date: `2026-04-28`
 
 ## Purpose
 
@@ -29,6 +29,13 @@ Embeddable partner runtime:
 Hosted plugin loader asset:
 
 - `/partner-plugins/ai-mentor-pro-widget.js`
+
+Current tenant login and contact identity:
+
+- login username/email: `aimentor@bookedai.au`
+- password: `FirstHundred1M$`
+- contact email: `aimentor@bookedai.au`
+- phone/WhatsApp/Telegram/iMessage: `+84908444095`
 
 ## Implementation notes
 

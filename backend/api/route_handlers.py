@@ -155,6 +155,12 @@ from service_layer.lifecycle_ops_service import (
 from service_layer.communication_service import render_bookedai_confirmation_email
 from service_layer.messaging_automation_service import MessagingAutomationService
 from service_layer.prompt9_semantic_search_service import Prompt9SemanticSearchService
+from service_layer.stripe_webhook_service import (
+    StripeSignatureError,
+    parse_stripe_event,
+    reconcile_stripe_event,
+    verify_stripe_signature,
+)
 from service_layer.tenant_app_service import (
     build_portal_customer_care_turn,
     infer_portal_request_type_from_message,
@@ -3616,6 +3622,87 @@ async def evolution_webhook(request: Request) -> dict[str, object]:
     return {"status": "processed", "messages_processed": 1}
 
 
+@api.post("/webhooks/stripe")
+async def stripe_webhook(request: Request) -> dict[str, object]:
+    cfg: Settings = request.app.state.settings
+    secret = str(getattr(cfg, "stripe_webhook_secret", "") or "").strip()
+    raw_body = await request.body()
+    signature_header = request.headers.get("stripe-signature") or ""
+
+    try:
+        verify_stripe_signature(
+            payload=raw_body,
+            signature_header=signature_header,
+            secret=secret,
+        )
+    except StripeSignatureError as exc:
+        logger.warning(
+            "stripe_webhook_signature_rejected",
+            extra={
+                "event_type": "stripe_webhook_signature_rejected",
+                "tenant_id": None,
+                "status": 401,
+                "route": "/api/webhooks/stripe",
+                "request_id": "",
+                "integration_name": "stripe",
+                "conversation_id": "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": str(exc),
+            },
+        )
+        raise HTTPException(status_code=401, detail="Stripe webhook signature invalid") from exc
+
+    try:
+        event = parse_stripe_event(raw_body)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    async with get_session(request.app.state.session_factory) as session:
+        try:
+            outcome = await reconcile_stripe_event(session, event=event)
+            await session.commit()
+        except Exception as exc:
+            await session.rollback()
+            logger.warning(
+                "stripe_webhook_processing_failed",
+                extra={
+                    "event_type": "stripe_webhook_processing_failed",
+                    "tenant_id": None,
+                    "status": 0,
+                    "route": "/api/webhooks/stripe",
+                    "request_id": "",
+                    "integration_name": "stripe",
+                    "conversation_id": "",
+                    "booking_reference": "",
+                    "job_name": "",
+                    "job_id": str(event.get("id") or ""),
+                },
+                exc_info=exc,
+            )
+            raise HTTPException(
+                status_code=500,
+                detail="Stripe webhook processing failed",
+            ) from exc
+
+    logger.info(
+        "stripe_webhook_processed",
+        extra={
+            "event_type": "stripe_webhook_processed",
+            "tenant_id": outcome.get("tenant_id"),
+            "status": 200,
+            "route": "/api/webhooks/stripe",
+            "request_id": "",
+            "integration_name": "stripe",
+            "conversation_id": "",
+            "booking_reference": str(outcome.get("booking_reference") or ""),
+            "job_name": str(outcome.get("event_type") or ""),
+            "job_id": str(outcome.get("event_id") or ""),
+        },
+    )
+    return outcome
+
+
 @api.post("/automation/booking-callback")
 async def booking_callback(
     request: Request,
@@ -5079,5 +5166,4 @@ async def _notify_staff_handoff_claim(
                 },
                 exc_info=exc,
             )
-
     await asyncio.gather(*(_deliver(chat_id) for chat_id in chat_ids))

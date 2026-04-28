@@ -47,7 +47,11 @@ select
       'headline', 'Convert AI to your DOER',
       'prompt', 'Convert AI to your DOER',
       'inline_target_selector', '#ai-mentor-pro-bookedai',
-      'support_email', 'hello@ai.longcare.au',
+      'support_email', 'aimentor@bookedai.au',
+      'support_phone', '+84908444095',
+      'support_whatsapp', '+84908444095',
+      'support_telegram', '+84908444095',
+      'support_imessage', '+84908444095',
       'features', jsonb_build_object(
         'chat', true,
         'search', true,
@@ -57,6 +61,20 @@ select
         'crm', true,
         'whatsapp', true
       )
+    ),
+    'contact_email', 'aimentor@bookedai.au',
+    'contact_phone', '+84908444095',
+    'support_email', 'aimentor@bookedai.au',
+    'support_phone', '+84908444095',
+    'support_whatsapp', '+84908444095',
+    'support_telegram', '+84908444095',
+    'support_imessage', '+84908444095',
+    'tenant_notifications', jsonb_build_object(
+      'email', 'aimentor@bookedai.au',
+      'phone', '+84908444095',
+      'whatsapp', '+84908444095',
+      'telegram', '+84908444095',
+      'imessage', '+84908444095'
     )
   )
 from tenants
@@ -78,10 +96,10 @@ insert into tenant_user_memberships (
 select
   tenant.id::text,
   tenant.slug,
-  'tenant3@bookedai.local',
-  'Tenant 3',
+  'aimentor@bookedai.au',
+  'AI Mentor 1-1',
   'password',
-  'tenant3',
+  'aimentor@bookedai.au',
   'tenant_admin',
   'active'
 from tenants tenant
@@ -108,10 +126,10 @@ insert into tenant_user_credentials (
 select
   tenant.id::text,
   tenant.slug,
-  'tenant3@bookedai.local',
-  'tenant3',
-  'tenant3-static-salt',
-  'd0f5c31a812713fca168ad02228d827e5bcf0798170536a839f1792099aec88d',
+  'aimentor@bookedai.au',
+  'aimentor@bookedai.au',
+  'aimentor@bookedai.au-static-salt',
+  'e07c37a4eadff96b5dc8d9b7a56173aff1dd0be1b6c6cae039d4cd3b2f29eecb',
   'tenant_admin',
   'active'
 from tenants tenant
@@ -154,8 +172,8 @@ select
   seed.service_id,
   'AI Mentor 1-1',
   tenant.id::text,
-  'tenant3@bookedai.local',
-  'tenant3@bookedai.local',
+  'aimentor@bookedai.au',
+  'aimentor@bookedai.au',
   seed.name,
   'Education',
   seed.summary,

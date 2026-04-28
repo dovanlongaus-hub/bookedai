@@ -400,8 +400,8 @@ export const heroContent: HeroContent = {
   bodyRest:
     'Instead of stitching together chat, triage, scheduling, CRM, and follow-up manually, your team gets one responsive web experience that makes the revenue path clear on desktop, tablet, and mobile.',
   note: 'Start with the live web app on bookedai.au. Native mobile can follow once the core customer and booking journey is fully proven.',
-  primaryCta: 'Try BookedAI Free',
-  secondaryCta: 'Schedule a Consultation',
+  primaryCta: 'See bookings BookedAI is winning live',
+  secondaryCta: 'Book a 10-min revenue demo',
   primaryHref: productHref,
   secondaryHref: '/register-interest',
 };
@@ -577,9 +577,9 @@ export const flowSteps = [
 ];
 
 export const metrics: Metric[] = [
-  { value: '+35%', label: 'More Bookings' },
-  { value: '24/7', label: 'Reception Coverage' },
-  { value: '0', label: 'Cold Leads' },
+  { value: '3', label: 'Live Tenants' },
+  { value: '5', label: 'Channels Wired' },
+  { value: '<30s', label: 'Booking → Ledger' },
 ];
 
 export const pricingContent: PricingContent = {
@@ -597,7 +597,7 @@ export const pricingContent: PricingContent = {
     'Setup fee quoted clearly when rollout scope needs it',
     'Commission charged only on successful BookedAI-attributed bookings',
   ],
-  primaryCta: 'Try BookedAI Free',
+  primaryCta: 'Start free — pay only on booked revenue',
   primaryHref: productHref,
 };
 
@@ -605,8 +605,8 @@ export const ctaContent: CallToActionContent = {
   kicker: 'Call to action',
   title: 'Ready to replace fragmented enquiry handling with a cleaner revenue system?',
   body: 'Open the live responsive web app or talk to us about the launch path that best fits your customer volume, team capacity, and growth ambition.',
-  primaryCta: 'Try BookedAI Free',
-  secondaryCta: 'Schedule a Consultation',
+  primaryCta: 'Start capturing missed bookings',
+  secondaryCta: 'Talk to a BookedAI human',
   primaryHref: productHref,
   secondaryHref: '/register-interest',
   supportingText:

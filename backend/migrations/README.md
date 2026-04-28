@@ -30,6 +30,13 @@ The first schema package focuses on:
 14. Future Swim CRM-linked lifecycle sample seed for full lead-to-booking demo flow
 15. tenant email-login verification-code support
 16. cross-industry simulated full-flow booking test pack for QA and operator demos
+17. academy snapshot read models
+18. academy subscription and agent-action run tracking
+19. admin runtime schema hardening
+20. Future Swim Miranda booking URL hotfix
+21. messaging channel session continuity
+22. inbound webhook idempotency evidence indexes
+23. AI Mentor 1-1 login and contact-channel update
 
 ## Execution rules
 
@@ -57,6 +64,13 @@ The first schema package focuses on:
 - `sql/014_future_swim_crm_linked_flow_sample.sql`
 - `sql/015_tenant_email_login_codes.sql`
 - `sql/016_cross_industry_full_flow_test_pack.sql`
+- `sql/017_academy_snapshot_read_models.sql`
+- `sql/018_academy_subscription_and_agent_action_runs.sql`
+- `sql/019_admin_runtime_schema_hardening.sql`
+- `sql/020_future_swim_miranda_booking_url_hotfix.sql`
+- `sql/021_messaging_channel_sessions.sql`
+- `sql/022_inbound_webhook_idempotency_evidence_indexes.sql`
+- `sql/023_ai_mentor_contact_login_update.sql`
 
 ## Notes
 

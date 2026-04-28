@@ -188,4 +188,16 @@ __all__ = [
     "store_event",
     "submit_demo_brief",
     "sync_demo_booking_from_brief",
+    "reconcile_stripe_event",
+    "verify_stripe_signature",
+    "parse_stripe_event",
+    "StripeSignatureError",
 ]
+
+
+from service_layer.stripe_webhook_service import (
+    StripeSignatureError,
+    parse_stripe_event,
+    reconcile_stripe_event,
+    verify_stripe_signature,
+)

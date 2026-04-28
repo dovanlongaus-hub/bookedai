@@ -1,4 +1,8 @@
 /*
+ * Source of truth: --apple-blue must equal #0071e3.
+ * Sync with minimal-bento-template.css line 18 and styles.css @theme (--color-apple-blue).
+ * If these three diverge, the design system breaks. Audit before editing.
+ *
  * BOOKEDAI — Apple Design Token Reference
  *
  * This file documents all available design tokens.

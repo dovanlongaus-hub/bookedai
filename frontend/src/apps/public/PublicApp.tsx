@@ -220,19 +220,19 @@ export function PublicApp() {
   const heroCopy = isProductFirstVariant
     ? {
         eyebrow: 'The AI revenue engine for service businesses',
-        title: 'Turn more website visitors, calls, and enquiries into confirmed bookings.',
+        title: 'Never miss a paying enquiry again.',
         body:
-          'BookedAI.au helps service businesses capture demand, guide customers to the right service, and move them from first contact to booking with less drop-off.',
-        primaryCta: 'Start in product',
-        secondaryCta: 'See how it works',
+          'BookedAI answers every chat, call, SMS, and DM in seconds — books the customer, takes the deposit, and follows up so your team can actually close out the day.',
+        primaryCta: 'See it book a real customer →',
+        secondaryCta: 'Talk to a BookedAI human (10 min)',
       }
     : {
         eyebrow: 'The AI revenue engine for service businesses',
-        title: 'Turn more website visitors, calls, and enquiries into confirmed bookings.',
+        title: 'One AI agent layer. Every channel. Every booking. Audited.',
         body:
-          'BookedAI.au helps service businesses capture demand, guide customers to the right service, and move them from first contact to booking with less drop-off.',
-        primaryCta: 'Start in product',
-        secondaryCta: 'See how it works',
+          'BookedAI runs a live multi-agent stack — intake, ranking, booking, payment, care — across web, WhatsApp, Telegram, SMS, and email, with an action ledger you can inspect.',
+        primaryCta: 'Run the live demo (60 sec)',
+        secondaryCta: 'Open the audit ledger',
       };
 
   useEffect(() => {

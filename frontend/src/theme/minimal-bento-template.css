@@ -9,15 +9,15 @@
 :root {
   color-scheme: light;
 
-  /* Fonts — reference-template inspired pairing adapted for BookedAI */
-  --apple-font-display: "Space Grotesk", "SF Pro Display", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
-  --apple-font-text:    "DM Sans", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Inter", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  /* Fonts — Apple SF Pro on Apple devices, Inter as fallback. NO DM Sans, NO Space Grotesk. */
+  --apple-font-display: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Inter", "Helvetica Neue", system-ui, Helvetica, Arial, sans-serif;
+  --apple-font-text:    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Helvetica Neue", system-ui, Helvetica, Arial, sans-serif;
   --apple-font-mono:    "SF Mono", SFMono-Regular, ui-monospace, Menlo, Monaco, "Courier New", monospace;
 
   /* Core palette */
-  --apple-blue:         #4f8cff;
-  --apple-blue-hover:   #6aa0ff;
-  --apple-blue-active:  #3f79df;
+  --apple-blue:         #0071e3;
+  --apple-blue-hover:   #0077ed;
+  --apple-blue-active:  #006edb;
   --apple-link-light:   #2157d7;
   --apple-link-dark:    #84b7ff;
 
@@ -124,10 +124,7 @@ body {
   margin: 0;
   min-width: 320px;
   overflow-x: hidden;
-  background:
-    radial-gradient(circle at top left, rgba(79, 140, 255, 0.10), transparent 24%),
-    radial-gradient(circle at top right, rgba(139, 92, 246, 0.07), transparent 20%),
-    linear-gradient(180deg, #fafbfe 0%, var(--apple-light) 52%, #eef3f9 100%);
+  background-color: var(--apple-light);
   color: var(--apple-near-black);
   font-family: var(--apple-font-text);
   font-size: 17px;
@@ -191,13 +188,9 @@ pre {
   font-family: var(--apple-font-text);
 }
 
-/* Public landing shell — light Apple gray */
+/* Public landing shell — light Apple gray (binary, no gradient per design system) */
 .booked-shell {
-  background:
-    radial-gradient(circle at top left, rgba(79, 140, 255, 0.14), transparent 28%),
-    radial-gradient(circle at top right, rgba(34, 197, 94, 0.10), transparent 24%),
-    radial-gradient(circle at center top, rgba(249, 115, 22, 0.08), transparent 20%),
-    linear-gradient(180deg, #f8fbff 0%, var(--apple-light) 42%, #eef4fb 100%);
+  background-color: var(--apple-light);
 }
 
 /* Product shell — pure black for immersive product experience */
@@ -1506,8 +1499,8 @@ pre {
 }
 
 .booked-tenant-shell :is(button)[class*="bg-slate-950"] {
-  background: linear-gradient(135deg, #4f8cff 0%, #3f7cff 52%, #22c55e 100%);
-  box-shadow: 0 14px 34px rgba(79, 140, 255, 0.22);
+  background: var(--apple-blue);
+  box-shadow: 0 14px 34px rgba(0, 113, 227, 0.22);
 }
 
 
