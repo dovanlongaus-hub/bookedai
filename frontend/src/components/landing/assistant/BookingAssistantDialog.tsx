@@ -1,4 +1,13 @@
-import { FormEvent, PointerEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import {
+  FormEvent,
+  MouseEvent as ReactMouseEvent,
+  PointerEvent,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { MessageCircle } from 'lucide-react';
 
 import {
@@ -8,6 +17,7 @@ import {
   type BookingAssistantContent,
 } from '../data';
 import { apiV1 } from '../../../shared/api';
+import { createCustomerHandoffSession } from '../../../shared/api/handoff';
 import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../../shared/config/api';
 import { resolveApiErrorMessage } from '../../../shared/api/client';
 import {
@@ -3077,6 +3087,31 @@ export function BookingAssistantDialog({
       body: summary.body,
     });
     window.location.href = mailto;
+  }
+
+  /**
+   * Phase C handoff click handler. Mints a customer_handoff_session row server-side
+   * with the booking ref / search query / selected service so the bot opens the
+   * conversation already aware of context. Falls back to the legacy `?start=bk.` /
+   * `?start=svc.` deeplink (the synchronous href) on API failure so the link is
+   * never broken.
+   */
+  async function handleTelegramCareClick(
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    params: { bookingReference?: string | null; serviceName?: string | null },
+  ) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    event.preventDefault();
+    const trimmedQuery = pendingSearchQuery.trim();
+    const handoff = await createCustomerHandoffSession({
+      source: 'product_homepage',
+      bookingReference: params.bookingReference ?? null,
+      serviceQuery: trimmedQuery || params.serviceName || null,
+      serviceSlug: params.serviceName ?? null,
+    });
+    window.open(handoff.deeplink, '_blank', 'noopener,noreferrer');
   }
 
   function handleAddToCalendar() {
@@ -6233,6 +6268,11 @@ export function BookingAssistantDialog({
 
                 <a
                   href={buildTelegramCareUrl({ serviceName: selectedService?.name ?? selectedEvent?.title ?? null })}
+                  onClick={(event) => {
+                    void handleTelegramCareClick(event, {
+                      serviceName: selectedService?.name ?? selectedEvent?.title ?? null,
+                    });
+                  }}
                   target="_blank"
                   rel="noreferrer"
                   className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
@@ -6585,11 +6625,18 @@ export function BookingAssistantDialog({
                           bookingReference: result.booking_reference,
                           serviceName: result.service.name,
                         }),
+                        onTelegramClick: (event: ReactMouseEvent<HTMLAnchorElement>) => {
+                          void handleTelegramCareClick(event, {
+                            bookingReference: result.booking_reference,
+                            serviceName: result.service.name,
+                          });
+                        },
                       },
                     ].map((item) => (
                       <a
                         key={item.title}
                         href={item.href}
+                        onClick={(item as { onTelegramClick?: (event: ReactMouseEvent<HTMLAnchorElement>) => void }).onTelegramClick}
                         target="_blank"
                         rel="noreferrer"
                         className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"

@@ -2,6 +2,7 @@ import {
   ChangeEvent,
   FormEvent,
   KeyboardEvent as ReactKeyboardEvent,
+  MouseEvent as ReactMouseEvent,
   useEffect,
   useId,
   useMemo,
@@ -11,6 +12,7 @@ import {
 
 import { brandShortIconPath, demoContent } from '../../components/landing/data';
 import { apiV1 } from '../../shared/api';
+import { createCustomerHandoffSession } from '../../shared/api/handoff';
 import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../shared/config/api';
 import { resolveApiErrorMessage } from '../../shared/api/client';
 import { isPublicBookingAssistantV1LiveReadEnabled } from '../../shared/config/publicBookingAssistant';
@@ -2152,6 +2154,32 @@ export function HomepageSearchExperience({
       bookingPanelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       searchComposerRef.current?.focus();
     }, 80);
+  }
+
+  /**
+   * Phase C handoff click handler. Mints a customer_handoff_session row server-side
+   * carrying the current product.bookedai.au context (booking ref, search query,
+   * selected service) and opens the resulting `?start=hsess_<id>` deeplink so the
+   * bot opens the conversation already aware of what the customer was doing on the
+   * homepage. Falls back transparently to the legacy `?start=bk.` / `?start=svc.`
+   * deeplink if the API call fails so the link is never broken.
+   */
+  async function handleTelegramCareClick(
+    event: ReactMouseEvent<HTMLAnchorElement>,
+    params: { bookingReference?: string | null; serviceName?: string | null },
+  ) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    event.preventDefault();
+    const trimmedQuery = currentQuery.trim();
+    const result = await createCustomerHandoffSession({
+      source: 'product_homepage',
+      bookingReference: params.bookingReference ?? null,
+      serviceQuery: trimmedQuery || params.serviceName || null,
+      serviceSlug: params.serviceName ?? null,
+    });
+    window.open(result.deeplink, '_blank', 'noopener,noreferrer');
   }
 
   async function handleSearchComposerKeyDown(event: ReactKeyboardEvent<HTMLTextAreaElement>) {
@@ -4571,6 +4599,11 @@ export function HomepageSearchExperience({
                 </button>
                 <a
                   href={buildTelegramCareUrl({ serviceName: selectedService?.name ?? null })}
+                  onClick={(event) => {
+                    void handleTelegramCareClick(event, {
+                      serviceName: selectedService?.name ?? null,
+                    });
+                  }}
                   target="_blank"
                   rel="noreferrer"
                   className="public-apple-secondary-button inline-flex h-10 w-full items-center justify-center gap-2 rounded-[0.95rem] px-5 text-sm font-semibold transition"
@@ -4700,11 +4733,18 @@ export function HomepageSearchExperience({
                         bookingReference: result.booking_reference,
                         serviceName: result.service.name,
                       }),
+                      onTelegramClick: (event: ReactMouseEvent<HTMLAnchorElement>) => {
+                        void handleTelegramCareClick(event, {
+                          bookingReference: result.booking_reference,
+                          serviceName: result.service.name,
+                        });
+                      },
                     },
                   ].map((item) => (
                   <a
                     key={item.title}
                     href={item.href}
+                    onClick={(item as { onTelegramClick?: (event: ReactMouseEvent<HTMLAnchorElement>) => void }).onTelegramClick}
                     target="_blank"
                     rel="noreferrer"
                     className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4 transition hover:border-[#cfe1ff] hover:bg-[#f8fbff]"
@@ -4895,6 +4935,12 @@ export function HomepageSearchExperience({
                     bookingReference: result.booking_reference,
                     serviceName: result.service.name,
                   })}
+                  onClick={(event) => {
+                    void handleTelegramCareClick(event, {
+                      bookingReference: result.booking_reference,
+                      serviceName: result.service.name,
+                    });
+                  }}
                   target="_blank"
                   rel="noreferrer"
                   aria-label="Open Telegram booking care"
