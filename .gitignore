@@ -15,6 +15,7 @@ __pycache__/
 artifacts/
 test-results/
 output/
+!pitch-deck/output/
 tmp/
 tmp_pg/
 storage/
