@@ -28,6 +28,8 @@ bookedai-video/out/
 frontend/node_modules/
 frontend/dist/
 frontend/dist-widget/
+frontend/dist-chess/
+frontend/dist-aimentor/
 frontend/tmp-*
 supabase/.env
 supabase/.env.old
