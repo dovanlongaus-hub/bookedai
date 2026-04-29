@@ -337,10 +337,13 @@ test.describe('product app regression', () => {
     await expect(page.getByRole('button', { name: /start a 30-day pilot/i })).toHaveCount(0);
     await expect(page.getByText(/Ready to use BookedAI for your business/i)).toHaveCount(0);
     await expect(page.getByText(/Chat, search, preview, booking, payment posture/i)).toHaveCount(0);
-    await expect(page.getByRole('button', { name: /Chess/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Future Swim/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /AI Event WSTI/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: /AI Mentor 1-1/i })).toBeVisible();
+    // Welcome state now uses Humanitix-inspired emoji category chips with
+    // shorter labels (Chess / Swim / AI Mentor / Events / Restaurant). Tenant
+    // service cards render below as the primary bookable inventory.
+    await expect(page.getByRole('button', { name: /Chess/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Swim/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Events/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /AI Mentor/i }).first()).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
     await page.screenshot({ path: testInfo.outputPath('product-app-mobile.png') });
