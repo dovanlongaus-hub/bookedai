@@ -14,11 +14,12 @@ Date: `2026-04-28`
 
 Implementation update from `2026-04-29` (tenant enterprise workspace shell, local):
 
-- redesigned the tenant workspace shell in `frontend/src/apps/tenant/TenantApp.tsx` into a more enterprise operator console: sticky top bar, icon action controls, desktop icon rail, sticky left workspace menu, right-side content frame, and mobile bottom icon navigation
+- redesigned the tenant workspace shell in `frontend/src/apps/tenant/TenantApp.tsx` into a more enterprise operator console: sticky top bar, icon action controls, 2xl desktop icon rail, sticky left workspace menu, right-side content frame, contextual panel actions, and mobile bottom icon navigation
 - kept existing tenant API/state logic intact while improving scan order from tenant identity and trust posture into active workspace, metrics, panel content, and role-aware actions
-- added a mocked tenant workspace Playwright UAT/A-B path that covers desktop and mobile navigation, command palette opening, random panel switching across Catalog/Bookings/Ops/Team, screenshots, and no-horizontal-overflow assertions
-- verification passed: `npm --prefix frontend run build`; `cd frontend && npx playwright test tests/tenant-gateway.spec.ts --project=legacy` (`5 passed`); `cd frontend && npx playwright test tests/tenant-gateway.spec.ts --project=legacy --grep "tenant workspace enterprise shell"` (`1 passed`); `cd frontend && git diff --check -- src/apps/tenant/TenantApp.tsx`
-- published the local closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-29/121358-tenant-enterprise-workspace-shell-redesign.md`
+- follow-up visual review fixed the 1280px content squeeze by moving the icon rail to 2xl, stabilized the mobile bottom icon grid, and limited primary header CTAs to the panels where they make sense
+- added a mocked tenant workspace Playwright UAT/A-B path that covers desktop and mobile navigation, command palette opening, random panel switching across all tenant panels, control/revenue-ops variant stability, screenshots, and no-horizontal-overflow assertions
+- verification passed: `npm --prefix frontend exec tsc -- --noEmit`; `npm --prefix frontend run build`; `cd frontend && npx playwright test tests/tenant-gateway.spec.ts --project=legacy` (`6 passed`); `cd frontend && npx playwright test tests/tenant-gateway.spec.ts --project=legacy --grep "tenant workspace enterprise shell"` (`1 passed`); `npm --prefix frontend run test:playwright:tenant-smoke` (`6 passed`); `git diff --check -- frontend/src/apps/tenant/TenantApp.tsx frontend/tests/tenant-gateway.spec.ts`
+- published the local closeout and follow-up to Notion and Discord; archive entries: `docs/development/telegram-sync/2026-04-29/121358-tenant-enterprise-workspace-shell-redesign.md` and `docs/development/telegram-sync/2026-04-29/125748-tenant-enterprise-workspace-deep-qa-follow-up.md`
 - status: local tenant enterprise shell redesign and UAT coverage are complete; live deploy was not run in this pass
 
 Implementation update from `2026-04-29` (homepage search relevance and shortlist UX, local):
