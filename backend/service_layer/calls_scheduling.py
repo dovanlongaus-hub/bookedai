@@ -2,14 +2,105 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import json
+import re
 from typing import Any
-from urllib.parse import quote, urlencode
-from zoneinfo import ZoneInfo
+from urllib.parse import parse_qs, quote, urlencode, urlparse
 
 import httpx
+from zoneinfo import ZoneInfo
 
 from config import Settings
 from schemas import BookingAssistantSessionRequest, DemoBookingRequest, PricingConsultationRequest, ServiceCatalogItem
+
+
+# Zoho Calendar's auto-zmeeting integration returns the HOST start URL
+# in `app_data.meetingdata.meetinglink`:
+#
+#   https://meeting.zoho.com.au/meeting/meeting-start?key=1428156531&x-meeting-org=7006570952
+#
+# That URL only works for the meeting host. When forwarded to a
+# customer/learner, Zoho rejects them. The attendee-side public URL is
+# `/meeting/{key}` which auto-redirects through the join lobby. This
+# helper picks the best attendee-facing URL it can:
+#
+#   1. Any of the known attendee-link field names
+#   2. Transform meetinglink (host) → /meeting/{key} (attendee)
+#   3. Fall back to the raw meetinglink (still better than nothing —
+#      the host can manually share the join URL)
+
+_ZOHO_HOST_START_PATTERN = re.compile(
+    r"^(https?://[^/]+)/meeting/meeting-start/?$"
+)
+
+
+def _attendee_join_url_from_zoho(
+    meeting_data: dict | None,
+    raw_meeting_link: str | None = None,
+) -> str | None:
+    """Pick the best attendee-facing meeting URL from a Zoho response.
+
+    Args:
+        meeting_data: ``app_data.meetingdata`` block (or any dict the Zoho
+            API returns). Common attendee-link field names are scanned.
+        raw_meeting_link: optional override / fallback URL (the existing
+            ``meetinglink`` value).
+
+    Returns:
+        The attendee-friendly URL, or ``None`` if no usable URL.
+    """
+    candidates: list[str] = []
+    if isinstance(meeting_data, dict):
+        for key in (
+            "joinurl",
+            "join_url",
+            "joinLink",
+            "joinlink",
+            "attendeesUrl",
+            "attendees_url",
+            "attendeeUrl",
+            "attendee_url",
+            "publicJoinUrl",
+            "publicLink",
+        ):
+            value = str(meeting_data.get(key) or "").strip()
+            if value:
+                candidates.append(value)
+    if raw_meeting_link:
+        candidates.append(str(raw_meeting_link).strip())
+
+    for url in candidates:
+        if not url:
+            continue
+        # If the URL is already an attendee/join URL, keep it.
+        lower = url.lower()
+        if any(
+            marker in lower
+            for marker in (
+                "joinmeeting",
+                "/joinwithkey/",
+                "/join/",
+                "joinurl",
+                "join.zoho",
+            )
+        ):
+            return url
+        # Transform a Zoho host-start URL to the attendee landing page.
+        # Pattern: .../meeting/meeting-start?key=X&x-meeting-org=Y
+        try:
+            parsed = urlparse(url)
+        except Exception:  # noqa: BLE001
+            return url
+        if parsed.path.rstrip("/").endswith("/meeting/meeting-start"):
+            params = parse_qs(parsed.query or "")
+            key_values = params.get("key") or params.get("meetingKey") or []
+            key = (key_values[0] if key_values else "").strip()
+            if key:
+                return f"{parsed.scheme}://{parsed.netloc}/meeting/{key}"
+        # Otherwise return the URL as-is — better than nothing; the host
+        # will at minimum receive the same link they expect.
+        return url
+
+    return None
 
 
 def build_customer_portal_url(
@@ -296,7 +387,10 @@ async def create_zoho_meeting_for_booking(
     event = ((payload_data.get("events") or [None])[0] or {}) if isinstance(payload_data, dict) else {}
     app_data = event.get("app_data") if isinstance(event.get("app_data"), dict) else {}
     meeting_data = app_data.get("meetingdata") if isinstance(app_data.get("meetingdata"), dict) else {}
-    meeting_link = str(meeting_data.get("meetinglink") or "").strip() or None
+    raw_meeting_link = str(meeting_data.get("meetinglink") or "").strip() or None
+    # Pick attendee-side URL — prevents customers receiving a host-start
+    # link that Zoho rejects when they click it from the welcome email.
+    meeting_link = _attendee_join_url_from_zoho(meeting_data, raw_meeting_link)
     event_url = str(event.get("viewEventURL") or "").strip() or None
     return meeting_link, event_url
 
@@ -358,6 +452,7 @@ async def create_zoho_calendar_event(
     event = ((payload_data.get("events") or [None])[0] or {}) if isinstance(payload_data, dict) else {}
     app_data = event.get("app_data") if isinstance(event.get("app_data"), dict) else {}
     meeting_data = app_data.get("meetingdata") if isinstance(app_data.get("meetingdata"), dict) else {}
-    meeting_link = str(meeting_data.get("meetinglink") or "").strip() or None
+    raw_meeting_link = str(meeting_data.get("meetinglink") or "").strip() or None
+    meeting_link = _attendee_join_url_from_zoho(meeting_data, raw_meeting_link)
     event_url = str(event.get("viewEventURL") or "").strip() or None
     return meeting_link, event_url
