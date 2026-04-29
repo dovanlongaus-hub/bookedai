@@ -12,6 +12,43 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-28`
 
+Implementation update from `2026-04-29` (product live-read warning-only search recovery, local):
+
+- fixed the product assistant search path where live-read could return warnings/semantic grounding without candidates, causing the chat placeholder to be replaced by an empty shortlist and making the product screen feel like it disappeared after search
+- changed `BookingAssistantDialog.tsx` so warning-only live-read no longer clears visible results when instant catalog or legacy chat matches exist; it keeps the closest catalog matches visible with clear fallback copy while the user can refine suburb/time/provider details
+- added a legacy chat fallback only for the no-candidate/no-instant-match branch so very fast user searches before catalog hydration can still render matched service cards
+- added product Playwright coverage for the warning-only live-read branch on Android-sized mobile, asserting fallback copy, visible result card, select/book CTA, and no horizontal overflow
+- verification passed: `npm --prefix frontend run build`; `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh live-read tests/product-app-regression.spec.ts --workers=1 --reporter=line` (`9 passed`); `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh legacy tests/product-app-regression.spec.ts --workers=1 --reporter=line` (`8 passed`, `1 skipped`); `git diff --check`
+- published the local closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-29/051707-product-live-read-search-recovery.md`
+- status: local product search recovery is complete; production still needs a live deploy to receive this fix
+
+Implementation update from `2026-04-29` (AI model routing and internet-search readiness):
+
+- corrected backend AI defaults so OpenAI is the primary provider by default (`OPENAI_API_KEY`, `OPENAI_MODEL=gpt-5-mini`) instead of inheriting the stale Claude model name through `OPENAI_MODEL`
+- added Anthropic/Claude fallback wiring through `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, and `ANTHROPIC_MODEL`; structured AI calls now try OpenAI first and then Claude via the Anthropic Messages API when configured
+- kept internet/public-web service search OpenAI-backed because it depends on the Responses `web_search` tool; sourced external options continue to return as `public_web_search`
+- updated local `.env`, `.env.example`, Docker compose env forwarding, the customer-agent manifest, admin config exposure, README, and project docs to match OpenAI-primary / Claude-fallback posture
+- verification passed: `python3 -m py_compile backend/config.py backend/services.py backend/api/route_handlers.py`; `./.venv/bin/python -m pytest backend/tests/test_config.py backend/tests/test_booking_assistant_service.py -q` (`21 passed`); `git diff --check`
+- status: local routing implementation is complete; real Claude fallback requires a valid `ANTHROPIC_API_KEY` in runtime secrets before live UAT
+
+Implementation update from `2026-04-29` (Anthropic-compatible fallback live deploy):
+
+- configured runtime fallback through `https://taphoaapi.info.vn/v1` after provider smoke showed `/messages` returns `404` and `/v1/messages` is the correct Anthropic-compatible path
+- switched runtime fallback model to `claude-sonnet-4-6` because the provider reported `claude-opus-4-5` unavailable and listed `claude-sonnet-4-6` as supported
+- added backend parsing for Anthropic-compatible `text/event-stream` responses so fallback output from the proxy can be read as structured text
+- verification passed: provider smoke returned HTTP `200` and output `{"ok":true}`; `py_compile`; focused backend pytest (`22 passed`); frontend build; product regression (`8 passed`, `1 skipped`); `git diff --check`
+- live deploy passed through `bash scripts/deploy_live_host.sh`; live backend container config confirmed Anthropic fallback key/base/model present; API health, product HTTP 200, and production browser smoke at `390`, `412`, and `1440` widths passed with input visible, overflow `0`, console errors `0`, and failed requests `0`
+- status: Anthropic-compatible fallback is live; archive entry: `docs/development/telegram-sync/2026-04-29/053805-anthropic-fallback-taphoa-live-deploy.md`
+
+Implementation update from `2026-04-29` (product deep QA/UAT/A-B/aggressive live review):
+
+- confirmed repo is already on `main`; pending deployed changes are being committed directly to `main` rather than merged from a feature branch
+- ran focused backend product/search/booking/chat regression (`64 passed`), frontend production build, product legacy Playwright (`10 passed`, `1 skipped`), and product live-read Playwright (`11 passed`)
+- ran production aggressive browser smoke against `product.bookedai.au` across `390`, `412`, `1366`, and `1440` widths with SME/control, product-first/judge, investor/source, and public-web search probes; all `4/4` scenarios had visible results, no raw error copy, overflow `0`, console errors `0`, and failed requests `0`
+- captured visual sanity screenshots under `output/playwright/product-deepqa-*.png`
+- known non-product drift: the broader shared `public-booking-assistant-live-read` suite still has homepage/public-assistant selector/copy/source-label contract failures; product-only lanes passed and this drift remains separate from the product release gate
+- status: product lane is green for QA, UAT, A/B/source/audience smoke, aggressive production smoke, and visual sanity; archive entry: `docs/development/telegram-sync/2026-04-29/054755-product-deep-qa-uat-ab-aggressive-live-review.md`
+
 Implementation update from `2026-04-29` (product search/booking execution planning):
 
 - created `docs/development/product-search-booking-execution-plan-2026-04-29.md` as the implementation bridge for the next product coding pass

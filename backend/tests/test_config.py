@@ -46,3 +46,53 @@ def test_evolution_webhook_secret_env_is_loaded(monkeypatch):
     settings = get_settings()
 
     assert settings.whatsapp_evolution_webhook_secret == "evolution-webhook-secret"
+
+
+def test_ai_defaults_to_openai_model(monkeypatch):
+    for name in (
+        "AI_PROVIDER",
+        "AI_API_KEY",
+        "AI_BASE_URL",
+        "AI_MODEL",
+        "AI_FALLBACK_PROVIDER",
+        "AI_FALLBACK_API_KEY",
+        "AI_FALLBACK_BASE_URL",
+        "AI_FALLBACK_MODEL",
+        "OPENAI_MODEL",
+        "ANTHROPIC_API_KEY",
+    ):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
+
+    settings = get_settings()
+
+    assert settings.ai_provider == "openai"
+    assert settings.ai_api_key == "openai-key"
+    assert settings.ai_model == "gpt-5-mini"
+    assert settings.openai_model == "gpt-5-mini"
+
+
+def test_anthropic_key_becomes_ai_fallback_when_explicit_fallback_is_blank(monkeypatch):
+    monkeypatch.setenv("OPENAI_API_KEY", "openai-key")
+    monkeypatch.setenv("ANTHROPIC_API_KEY", "anthropic-key")
+    monkeypatch.setenv("ANTHROPIC_MODEL", "claude-opus-4-5")
+    for name in (
+        "AI_PROVIDER",
+        "AI_API_KEY",
+        "AI_BASE_URL",
+        "AI_MODEL",
+        "AI_FALLBACK_PROVIDER",
+        "AI_FALLBACK_API_KEY",
+        "AI_FALLBACK_BASE_URL",
+        "AI_FALLBACK_MODEL",
+        "ANTHROPIC_BASE_URL",
+    ):
+        monkeypatch.delenv(name, raising=False)
+
+    settings = get_settings()
+
+    assert settings.ai_provider == "openai"
+    assert settings.ai_fallback_provider == "anthropic"
+    assert settings.ai_fallback_api_key == "anthropic-key"
+    assert settings.ai_fallback_base_url == "https://api.anthropic.com/v1"
+    assert settings.ai_fallback_model == "claude-opus-4-5"

@@ -282,6 +282,7 @@ python3 scripts/telegram_workspace_ops.py sync-repo-docs --skip-discord
 - `N8N_BASIC_AUTH_PASSWORD`
 - `N8N_ENCRYPTION_KEY`
 - `OPENAI_API_KEY`
+- optional `ANTHROPIC_API_KEY`, `ANTHROPIC_BASE_URL`, and `ANTHROPIC_MODEL` for Claude fallback when the primary OpenAI route is unavailable
 - `N8N_BOOKING_WEBHOOK_URL`
 - `N8N_API_KEY` or `N8N_WEBHOOK_BEARER_TOKEN`
 - `DISCORD_WEBHOOK_URL` if you want admin reliability handoff summaries pushed into a Discord channel
@@ -686,7 +687,12 @@ Example root `.env` values:
 
 ```env
 OPENAI_MODEL=gpt-5-mini
+ANTHROPIC_API_KEY=your-anthropic-key
+ANTHROPIC_BASE_URL=https://api.anthropic.com/v1
+ANTHROPIC_MODEL=claude-opus-4-5
+AI_PROVIDER=
 AI_MODEL=
+AI_FALLBACK_PROVIDER=
 EMAIL_SMTP_HOST=smtp.zoho.com.au
 EMAIL_SMTP_PORT=587
 EMAIL_SMTP_USERNAME=info@bookedai.au
@@ -725,13 +731,15 @@ docker compose -f docker-compose.prod.yml --env-file .env up -d --build backend
 
 ## OpenAI setup
 
-BookedAI uses OpenAI for booking search and answer generation.
+BookedAI uses OpenAI as the default provider for booking search and answer generation. Claude can be configured as the fallback for structured AI replies through Anthropic auth. Internet/public-web service search remains OpenAI-backed because it uses the OpenAI Responses `web_search` tool.
 
 Required root `.env` values:
 
 ```env
 OPENAI_API_KEY=your-openai-key
 OPENAI_MODEL=gpt-5-mini
+ANTHROPIC_API_KEY=your-anthropic-key
+ANTHROPIC_MODEL=claude-opus-4-5
 AI_MODEL=
 ```
 

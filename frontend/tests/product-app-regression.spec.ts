@@ -40,7 +40,10 @@ type StubProductApisOptions = {
   services?: ServiceCatalogItem[];
   events?: AIEventItem[];
   bookingSessionBody?: Record<string, unknown> | null;
+  liveReadSearchBody?: Record<string, unknown> | null;
 };
+
+const isLiveReadMode = process.env.PLAYWRIGHT_PUBLIC_ASSISTANT_MODE === 'live-read';
 
 function buildV1Envelope(pathname: string, options: StubProductApisOptions) {
   const bookingBody = options.bookingSessionBody ?? demoBookingSession;
@@ -134,6 +137,20 @@ function buildV1Envelope(pathname: string, options: StubProductApisOptions) {
         provider: null,
         warnings: [],
       },
+    };
+  }
+
+  if (pathname.endsWith('/v1/matching/search')) {
+    return {
+      status: 'ok',
+      data: options.liveReadSearchBody ?? {
+        request_id: 'match-product-test',
+        candidates: [],
+        recommendations: [],
+        confidence: null,
+        warnings: [],
+      },
+      meta: { version: 'v1', tenant_id: 'bookedai-au' },
     };
   }
 
@@ -414,6 +431,36 @@ test.describe('product app regression', () => {
     await expectNoHorizontalOverflow(page);
 
     await page.screenshot({ path: testInfo.outputPath('product-app-mobile-full-flow.png'), fullPage: true });
+  });
+
+  test('live-read warning-only search keeps catalog results visible in chat', async ({ page }) => {
+    test.skip(!isLiveReadMode, 'Live-read fallback assertion only applies when v1 live-read is enabled.');
+    await page.setViewportSize({ width: 412, height: 915 });
+    await openProductApp(page, {
+      services: [demoService],
+      liveReadSearchBody: {
+        request_id: 'match-warning-only',
+        candidates: [],
+        recommendations: [],
+        confidence: {
+          score: 0.31,
+          reason: 'Live ranking needs another pass.',
+          gating_state: 'low',
+        },
+        warnings: ['Live ranking is still catching up.'],
+        semantic_assist: {
+          normalized_query: 'precision fade in sydney',
+          inferred_category: 'Hair',
+          inferred_location: 'Sydney',
+        },
+      },
+    });
+
+    await runAssistantSearch(page, 'Need a precision fade in Sydney');
+    await expect(page.getByText(/closest catalog match/i)).toBeVisible();
+    await expect(page.getByText(/Precision Fade/i).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /Select & book|Select to book/i }).first()).toBeVisible();
+    await expectNoHorizontalOverflow(page);
   });
 
   test('android-sized after-booking screen keeps order actions contained', async ({ page }) => {

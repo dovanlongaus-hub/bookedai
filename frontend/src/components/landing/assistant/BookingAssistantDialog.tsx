@@ -3875,6 +3875,31 @@ export function BookingAssistantDialog({
         : liveRead.rankedCandidates
             .map((candidate) => candidate.candidateId)
             .filter((candidateId): candidateId is string => Boolean(candidateId));
+      const liveReadHasCandidates =
+        groundedLiveReadCandidateIds.length > 0 || liveRead.rankedCandidates.length > 0;
+      if (
+        hasLiveReadSearchGrounding &&
+        !liveReadHasCandidates &&
+        instantMatches.length === 0 &&
+        payload.matched_services.length === 0
+      ) {
+        const legacyFallbackPayload = await withTimeout(
+          requestChatReply(nextMessages, null).catch(() => null),
+          1600,
+        );
+        if (legacyFallbackPayload?.matched_services.length || legacyFallbackPayload?.matched_events.length) {
+          payload = {
+            ...payload,
+            matched_services: legacyFallbackPayload.matched_services,
+            matched_events: legacyFallbackPayload.matched_events,
+            suggested_service_id:
+              legacyFallbackPayload.suggested_service_id ?? payload.suggested_service_id,
+          };
+        }
+      }
+      const fallbackMatchedServices = instantMatches.length
+        ? instantMatches
+        : curateServiceMatches(payload.matched_services);
       const v1CandidateIds = hasLiveReadSearchGrounding
         ? groundedLiveReadCandidateIds
         : shadowSearch.candidateIds;
@@ -3891,18 +3916,26 @@ export function BookingAssistantDialog({
         ? groundedLiveReadCandidateIds
         : shadowSearch.candidateIds;
       const v1SearchGrounded = hasLiveReadSearchGrounding || shadowSearch.resolved;
-      const mergedMatchedServices = v1SearchGrounded
+      const shouldUseInstantSearchFallback =
+        v1SearchGrounded && !liveReadHasCandidates && fallbackMatchedServices.length > 0;
+      const mergedMatchedServices = shouldUseInstantSearchFallback
+        ? fallbackMatchedServices
+        : v1SearchGrounded
         ? curateServiceMatches(shadowMatchedServices, candidatePriorityIds)
         : curateServiceMatches(
             [...payload.matched_services, ...shadowMatchedServices],
             candidatePriorityIds,
           );
-      const suggestedServiceId = v1SearchGrounded
+      const suggestedServiceId = shouldUseInstantSearchFallback
+        ? fallbackMatchedServices[0]?.id ?? null
+        : v1SearchGrounded
         ? liveRead.suggestedServiceId ?? shadowMatchedServices[0]?.id ?? null
         : payload.suggested_service_id ?? shadowMatchedServices[0]?.id ?? null;
       const nextSelectedServiceId =
         suggestedServiceId ?? mergedMatchedServices[0]?.id ?? null;
-      const assistantReply = v1SearchGrounded
+      const assistantReply = shouldUseInstantSearchFallback
+        ? `Live ranking is still catching up. I kept ${fallbackMatchedServices.length} closest catalog match${fallbackMatchedServices.length === 1 ? '' : 'es'} visible so you can compare now; add a suburb, time, or provider name if you want me to narrow it further.`
+        : v1SearchGrounded
         ? buildLiveReadAssistantReply({
             rankedCount: mergedMatchedServices.length,
             warnings: liveRead.warnings,
@@ -3918,7 +3951,8 @@ export function BookingAssistantDialog({
       const shouldClearHistoricalMatches =
         v1SearchGrounded &&
         mergedMatchedServices.length === 0 &&
-        payload.matched_events.length === 0;
+        payload.matched_events.length === 0 &&
+        fallbackMatchedServices.length === 0;
 
       const finalAssistantMessage: ChatMessage = {
         role: 'assistant',

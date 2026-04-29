@@ -577,3 +577,101 @@ class BookingAssistantServiceTestCase(IsolatedAsyncioTestCase):
             )
 
         self.assertEqual(results, [])
+
+    async def test_structured_json_falls_back_to_anthropic_messages_api(self):
+        captured_requests: list[dict[str, object]] = []
+
+        class _FakeResponse:
+            def __init__(self, payload: dict[str, object]):
+                self._payload = payload
+                self.headers = {"content-type": "application/json"}
+
+            def raise_for_status(self):
+                if "api.openai.com" in str(self._payload["endpoint"]):
+                    request = httpx.Request("POST", str(self._payload["endpoint"]))
+                    response = httpx.Response(500, request=request, text="openai down")
+                    raise httpx.HTTPStatusError("openai down", request=request, response=response)
+                return None
+
+            def json(self):
+                return {
+                    "content": [
+                        {
+                            "type": "text",
+                            "text": '{"reply":"Claude fallback ready"}',
+                        }
+                    ],
+                    "usage": {"input_tokens": 12, "output_tokens": 6},
+                }
+
+        class _FakeAsyncClient:
+            def __init__(self, *args, **kwargs):
+                self.timeout = kwargs.get("timeout")
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, exc_type, exc, tb):
+                return False
+
+            async def post(self, endpoint, *, headers, json):
+                captured = {"endpoint": endpoint, "headers": headers, "json": json}
+                captured_requests.append(captured)
+                return _FakeResponse(captured)
+
+        settings = replace(
+            get_settings(),
+            ai_provider="openai",
+            ai_api_key="openai-key",
+            ai_base_url="https://api.openai.com/v1",
+            ai_model="gpt-5-mini",
+            ai_fallback_provider="anthropic",
+            ai_fallback_api_key="anthropic-key",
+            ai_fallback_base_url="https://api.anthropic.com/v1",
+            ai_fallback_model="claude-opus-4-5",
+        )
+        service = OpenAIService(settings)
+
+        with patch("services.httpx.AsyncClient", _FakeAsyncClient):
+            output_text = await service._generate_structured_json(
+                prompt="reply",
+                payload={"message": "hello"},
+                schema_name="test_reply",
+                schema={
+                    "type": "object",
+                    "additionalProperties": False,
+                    "properties": {"reply": {"type": "string"}},
+                    "required": ["reply"],
+                },
+            )
+
+        self.assertEqual(output_text, '{"reply":"Claude fallback ready"}')
+        self.assertEqual(len(captured_requests), 2)
+        self.assertEqual(captured_requests[1]["endpoint"], "https://api.anthropic.com/v1/messages")
+        self.assertEqual(captured_requests[1]["headers"]["x-api-key"], "anthropic-key")
+        self.assertEqual(captured_requests[1]["headers"]["anthropic-version"], "2023-06-01")
+        self.assertEqual(captured_requests[1]["json"]["model"], "claude-opus-4-5")
+
+    def test_anthropic_event_stream_output_text_is_supported(self):
+        parsed = OpenAIService._parse_anthropic_event_stream(
+            "\n".join(
+                [
+                    'event: message_start',
+                    'data: {"message":{"usage":{"input_tokens":10,"output_tokens":1}},"type":"message_start"}',
+                    'event: content_block_start',
+                    'data: {"content_block":{"text":"","type":"text"},"index":1,"type":"content_block_start"}',
+                    'event: content_block_delta',
+                    'data: {"delta":{"text":"{\\"ok\\":","type":"text_delta"},"index":1,"type":"content_block_delta"}',
+                    'event: content_block_delta',
+                    'data: {"delta":{"text":"true}","type":"text_delta"},"index":1,"type":"content_block_delta"}',
+                    'event: message_delta',
+                    'data: {"delta":{"stop_reason":"end_turn"},"type":"message_delta","usage":{"output_tokens":20}}',
+                    'event: message_stop',
+                    'data: {"type":"message_stop"}',
+                ]
+            )
+        )
+
+        self.assertEqual(parsed["output_text"], '{"ok":true}')
+        self.assertEqual(parsed["usage"]["input_tokens"], 10)
+        self.assertEqual(parsed["usage"]["output_tokens"], 20)

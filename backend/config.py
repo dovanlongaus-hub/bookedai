@@ -155,6 +155,9 @@ class Settings:
     customer_booking_support_phone: str = DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE
     portal_token_strict: bool = False
     portal_token_max_age_days: int = 365
+    anthropic_api_key: str = ""
+    anthropic_base_url: str = "https://api.anthropic.com/v1"
+    anthropic_model: str = "claude-opus-4-5"
 
 
 def env_bool(name: str, default: bool) -> bool:
@@ -289,15 +292,35 @@ def get_settings() -> Settings:
     )
     openai_api_key = env_str("OPENAI_API_KEY", "")
     openai_base_url = env_str("OPENAI_BASE_URL", "https://api.openai.com/v1")
-    openai_model = env_str("OPENAI_MODEL", "claude-opus-4-5")
+    openai_model = env_str("OPENAI_MODEL", "gpt-5-mini")
+    anthropic_api_key = env_str("ANTHROPIC_API_KEY", "")
+    anthropic_base_url = env_str("ANTHROPIC_BASE_URL", "https://api.anthropic.com/v1")
+    anthropic_model = env_str("ANTHROPIC_MODEL", "claude-opus-4-5")
     ai_provider = env_str("AI_PROVIDER", "")
-    ai_api_key = env_str("AI_API_KEY", openai_api_key)
     ai_base_url = env_str("AI_BASE_URL", "") or openai_base_url
     ai_model = env_str("AI_MODEL", "") or openai_model
+    resolved_ai_provider = ai_provider or ("openai" if "api.openai.com" in ai_base_url else "compatible")
+    ai_api_key = (
+        openai_api_key
+        if resolved_ai_provider.strip().lower() == "openai"
+        else env_str("AI_API_KEY", openai_api_key)
+    )
     ai_fallback_provider = env_str("AI_FALLBACK_PROVIDER", "")
     ai_fallback_api_key = env_str("AI_FALLBACK_API_KEY", "")
-    ai_fallback_base_url = env_str("AI_FALLBACK_BASE_URL", "") or "https://api.openai.com/v1"
-    ai_fallback_model = env_str("AI_FALLBACK_MODEL", "") or openai_model
+    ai_fallback_base_url = env_str("AI_FALLBACK_BASE_URL", "")
+    ai_fallback_model = env_str("AI_FALLBACK_MODEL", "")
+    if ai_fallback_provider.strip().lower() in {"anthropic", "claude"}:
+        ai_fallback_api_key = anthropic_api_key or ai_fallback_api_key
+        ai_fallback_base_url = ai_fallback_base_url or anthropic_base_url
+        ai_fallback_model = ai_fallback_model or anthropic_model
+    elif not ai_fallback_api_key and anthropic_api_key:
+        ai_fallback_provider = ai_fallback_provider or "anthropic"
+        ai_fallback_api_key = anthropic_api_key
+        ai_fallback_base_url = ai_fallback_base_url or anthropic_base_url
+        ai_fallback_model = ai_fallback_model or anthropic_model
+    else:
+        ai_fallback_base_url = ai_fallback_base_url or "https://api.openai.com/v1"
+        ai_fallback_model = ai_fallback_model or openai_model
     semantic_search_enabled = env_bool("SEMANTIC_SEARCH_ENABLED", False)
     semantic_search_provider = env_str("SEMANTIC_SEARCH_PROVIDER", "") or ai_provider or "openai"
     semantic_search_api_key = env_str("SEMANTIC_SEARCH_API_KEY", "") or ai_api_key
@@ -328,7 +351,7 @@ def get_settings() -> Settings:
         supabase_anon_key=os.getenv("SUPABASE_ANON_KEY", ""),
         supabase_service_role_key=os.getenv("SUPABASE_SERVICE_ROLE_KEY", ""),
         supabase_log_table=os.getenv("SUPABASE_LOG_TABLE", "conversation_events"),
-        ai_provider=ai_provider or ("openai" if "api.openai.com" in ai_base_url else "compatible"),
+        ai_provider=resolved_ai_provider,
         ai_api_key=ai_api_key,
         ai_base_url=ai_base_url,
         ai_model=ai_model,
@@ -336,6 +359,9 @@ def get_settings() -> Settings:
         ai_fallback_api_key=ai_fallback_api_key,
         ai_fallback_base_url=ai_fallback_base_url,
         ai_fallback_model=ai_fallback_model,
+        anthropic_api_key=anthropic_api_key,
+        anthropic_base_url=anthropic_base_url,
+        anthropic_model=anthropic_model,
         openai_api_key=openai_api_key,
         openai_base_url=openai_base_url,
         openai_model=openai_model,

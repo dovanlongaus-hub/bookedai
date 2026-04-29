@@ -125,6 +125,14 @@ class AIProviderConfig:
     def is_openai(self) -> bool:
         return "api.openai.com" in self.base_url
 
+    @property
+    def is_anthropic(self) -> bool:
+        return self.label.strip().lower() in {"anthropic", "claude"} or "api.anthropic.com" in self.base_url
+
+    @property
+    def anthropic_messages_endpoint(self) -> str:
+        return f"{self.base_url.rstrip('/')}/messages"
+
 
 @dataclass(frozen=True)
 class PricingPlanDefinition:
@@ -2453,6 +2461,14 @@ class OpenAIService:
         breaker = get_breaker()
         breaker.assert_open()  # raises AICircuitBreakerOpen
 
+        if provider.is_anthropic:
+            return await self._generate_anthropic_structured_json(
+                provider=provider,
+                prompt=prompt,
+                payload=payload,
+                schema=schema,
+            )
+
         request_payload = {
             "model": provider.model,
             "input": [
@@ -2507,6 +2523,65 @@ class OpenAIService:
 
         return self._extract_openai_output_text(data)
 
+    async def _generate_anthropic_structured_json(
+        self,
+        *,
+        provider: AIProviderConfig,
+        prompt: str,
+        payload: dict[str, Any],
+        schema: dict[str, Any],
+    ) -> str:
+        from core.ai_cost_breaker import get_breaker
+
+        breaker = get_breaker()
+        breaker.assert_open()
+
+        request_payload = {
+            "model": provider.model,
+            "max_tokens": 1200,
+            "system": (
+                f"{prompt}\n\n"
+                "Return only valid JSON matching this JSON Schema. "
+                "Do not wrap the JSON in markdown or explanatory text.\n"
+                f"JSON Schema: {json.dumps(schema)}"
+            ),
+            "messages": [
+                {
+                    "role": "user",
+                    "content": json.dumps(payload),
+                }
+            ],
+        }
+        headers = {
+            "x-api-key": provider.api_key,
+            "anthropic-version": "2023-06-01",
+            "Content-Type": "application/json",
+        }
+
+        async with httpx.AsyncClient(timeout=self.settings.openai_timeout_seconds) as client:
+            response = await client.post(
+                provider.anthropic_messages_endpoint,
+                headers=headers,
+                json=request_payload,
+            )
+            response.raise_for_status()
+            content_type = response.headers.get("content-type", "")
+            if "text/event-stream" in content_type:
+                data = self._parse_anthropic_event_stream(response.text)
+            else:
+                data = response.json()
+
+        try:
+            usage = data.get("usage") if isinstance(data, dict) else None
+            tokens_in = int((usage or {}).get("input_tokens") or 0)
+            tokens_out = int((usage or {}).get("output_tokens") or 0)
+        except Exception:
+            tokens_in = 0
+            tokens_out = 0
+        breaker.record_call(tokens_in=tokens_in, tokens_out=tokens_out)
+
+        return self._extract_anthropic_output_text(data)
+
     @staticmethod
     def _extract_openai_output_text(data: dict[str, Any]) -> str:
         output_text = data.get("output_text")
@@ -2518,6 +2593,55 @@ class OpenAIService:
                 if content.get("type") in {"output_text", "text"} and content.get("text"):
                     return str(content["text"]).strip()
         return ""
+
+    @staticmethod
+    def _extract_anthropic_output_text(data: dict[str, Any]) -> str:
+        if data.get("output_text"):
+            return str(data["output_text"]).strip()
+
+        text_parts: list[str] = []
+        for item in data.get("content", []):
+            if not isinstance(item, dict):
+                continue
+            if item.get("type") == "text" and item.get("text"):
+                text_parts.append(str(item["text"]))
+        return "\n".join(text_parts).strip()
+
+    @staticmethod
+    def _parse_anthropic_event_stream(stream_text: str) -> dict[str, Any]:
+        text_parts: list[str] = []
+        usage: dict[str, Any] = {}
+        for line in stream_text.splitlines():
+            if not line.startswith("data: "):
+                continue
+            try:
+                event = json.loads(line[6:])
+            except json.JSONDecodeError:
+                continue
+            message = event.get("message")
+            if isinstance(message, dict):
+                message_usage = message.get("usage")
+                if isinstance(message_usage, dict):
+                    usage.update(message_usage)
+            delta = event.get("delta")
+            if isinstance(delta, dict):
+                if delta.get("type") == "text_delta" and delta.get("text"):
+                    text_parts.append(str(delta["text"]))
+                delta_usage = event.get("usage")
+                if isinstance(delta_usage, dict):
+                    usage.update(delta_usage)
+            content_block = event.get("content_block")
+            if (
+                isinstance(content_block, dict)
+                and content_block.get("type") == "text"
+                and content_block.get("text")
+            ):
+                text_parts.append(str(content_block["text"]))
+        return {
+            "content": [{"type": "text", "text": "".join(text_parts).strip()}],
+            "output_text": "".join(text_parts).strip(),
+            "usage": usage,
+        }
 
     @staticmethod
     def fallback_decision(message: TawkMessage) -> AIBookingDecision:
