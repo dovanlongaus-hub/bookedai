@@ -55,6 +55,7 @@ The current priority content hypotheses are:
 
 Latest next-phase update from `2026-04-25`:
 
+- `2026-04-29` product search/booking execution plan is now the implementation bridge for the next coding pass: `docs/development/product-search-booking-execution-plan-2026-04-29.md` assigns role/skill ownership across Phase 17 product UI, Phase 19 identity/care, Phase 20.5 wallet continuity, Phase 21 search/payment truth, and Phase 23 release governance.
 - `2026-04-29` public pitch/homepage SME messaging pass is closed locally: `pitch.bookedai.au` and `bookedai.au` now carry the launch offer for a booking-ready landing page, dedicated email, dedicated CRM, and configured booking/meeting flow; `/architecture` and the pitch deck now use buyer-readable booking activity/follow-up/business workspace language instead of internal ledger/runtime wording; Chess and AI Mentor proof cases now show BookedAI-powered email/CRM/scheduling more clearly. Verification passed with frontend build and focused Playwright pitch/homepage/architecture coverage (`8 passed`).
 - `2026-04-29` product QA/UAT deep pass is closed locally with live production smoke: local product UAT/regression, after-booking mobile/Android/desktop coverage, product live-read popup coverage, standard live-read smoke, focused backend booking/care/payment/messaging/calendar tests, and live `product.bookedai.au` responsive smoke all passed. The only remaining QA signal is broad homepage/live-read contract drift outside the product popup lane, which should be handled by splitting product vs homepage live-read gates and refreshing homepage selectors/source-label expectations.
 - `2026-04-29` product after-booking order-detail UX is closed locally for Phase 17/20.5 continuity: the confirmation state now reads as a professional order screen with order summary, view details, portal/QR access, payment action, Apple Wallet and Google Wallet pass entry points, print/share/email, and mobile-contained order details. Regression now covers mobile, Android-sized, and desktop after-booking layouts with no overflow; frontend build and product Playwright (`8 passed`) verified the change.
@@ -983,6 +984,12 @@ Next recommended sequence:
 2. Run a canonical booking-to-portal-to-follow-up trace with a new reference.
 3. Expand the shared messaging fixtures so Telegram, WhatsApp, web chat, and portal care prove the same policy.
 4. Backfill ledger evidence and release-gate checks before moving into widget/plugin distribution.
+
+## 2026-04-29 Pitch SME Polish Follow-Up
+
+- `pitch.bookedai.au` follow-up polish is locally complete: the pitch now leads with the booking-ready SME setup, moves the launch offer earlier, and keeps the deeper commercial/scale material as supporting proof.
+- `/architecture` now presents the system map in buyer-safe language: customer-safe governance, business workspace proof, customer/admin separation, reusable business templates, and proof/follow-up history instead of internal audit/tenant phrasing.
+- Verification passed with frontend production build, focused pitch/architecture Playwright (`4 passed`), `git diff --check`, and scoped copy grep for removed public-facing internal phrases.
 
 ## Sprint 19-22 cross-stack execution overlay (2026-04-26 review)
 

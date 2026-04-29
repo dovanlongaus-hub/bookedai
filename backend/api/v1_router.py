@@ -24,6 +24,9 @@ from api.v1_tenant_ai_mentor_progress_routes import (
 )
 from api.v1_tenant_chess_progress_routes import router as tenant_chess_progress_router
 from api.v1_tenant_routes import router as tenant_router
+from api.v1_tenant_zoho_integration_routes import (
+    router as tenant_zoho_integration_router,
+)
 
 
 router = APIRouter()
@@ -49,3 +52,4 @@ router.include_router(sandbox_router)
 router.include_router(tenant_ai_mentor_progress_router)
 router.include_router(tenant_chess_progress_router)
 router.include_router(tenant_router)
+router.include_router(tenant_zoho_integration_router)

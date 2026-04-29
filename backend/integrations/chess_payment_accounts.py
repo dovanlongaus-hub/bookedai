@@ -18,11 +18,12 @@ from typing import Final
 
 
 CHESS_VND_BANK: Final[dict[str, str]] = {
-    "bank_name": "Vietcombank",
-    # NAPAS BIN for Vietcombank used by the VietQR.io public QR generator.
-    "bank_bin": "970436",
-    "account_holder": "DO VAN LONG",
-    "account_number": "0071000985789",
+    "bank_name": "Techcombank",
+    # NAPAS BIN for Techcombank (Vietnam Technological and Commercial Joint Stock Bank)
+    # used by the VietQR.io public QR generator.
+    "bank_bin": "970407",
+    "account_holder": "NGUYEN THI MAI HUNG",
+    "account_number": "949396959999",
 }
 
 CHESS_AUD_BANK: Final[dict[str, str]] = {

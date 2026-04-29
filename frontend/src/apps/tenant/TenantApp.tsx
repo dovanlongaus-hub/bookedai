@@ -50,6 +50,7 @@ import {
   type TenantInviteMemberFormState,
 } from '../../features/tenant-team/TenantTeamWorkspace';
 import { TenantStudentsWorkspace } from '../../features/tenant-students/TenantStudentsWorkspace';
+import { TenantIntegrationsWorkspace } from '../../features/tenant-integrations/TenantIntegrationsWorkspace';
 import {
   TenantPluginWorkspace,
   type TenantPluginFormState,
@@ -3345,7 +3346,7 @@ export function TenantApp() {
     {
       key: 'integrations',
       label: 'Integrations',
-      description: 'Provider posture, alerts, and retry signals.',
+      description: 'Zoho Calendar, Zoho CRM, notification CCs.',
       icon: <DatabaseIcon className="h-4 w-4" />,
     },
     {
@@ -5359,6 +5360,12 @@ export function TenantApp() {
               </div>
             </article>
           </section>
+        ) : null}
+
+        {panel === 'integrations' ? (
+          <div className="space-y-6">
+            <TenantIntegrationsWorkspace session={session} />
+          </div>
         ) : null}
 
         {panel === 'integrations' ? (

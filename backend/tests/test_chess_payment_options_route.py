@@ -92,13 +92,13 @@ class ChessPaymentOptionsRouteTestCase(TestCase):
         self.assertFalse(stripe_option.get("configured"))
         self.assertNotIn("stripe_checkout_url", stripe_option)
 
-        # VND QR option carries the Vietcombank BIN.
+        # VND QR option carries the Techcombank BIN.
         vnd_option = options[1]
         self.assertEqual(vnd_option["type"], "vnd_bank_qr")
-        self.assertEqual(vnd_option["account_number"], "0071000985789")
-        self.assertEqual(vnd_option["bank_name"], "Vietcombank")
-        self.assertIn("970436", vnd_option["qr_image_url"])
-        self.assertIn("0071000985789", vnd_option["qr_image_url"])
+        self.assertEqual(vnd_option["account_number"], "949396959999")
+        self.assertEqual(vnd_option["bank_name"], "Techcombank")
+        self.assertIn("970407", vnd_option["qr_image_url"])
+        self.assertIn("949396959999", vnd_option["qr_image_url"])
         self.assertIn("amount=1300000", vnd_option["qr_image_url"])
         self.assertTrue(vnd_option["transfer_reference"].startswith("CHESS-"))
 

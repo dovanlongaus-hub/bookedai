@@ -63,6 +63,9 @@ from service_layer.calls_scheduling import (
     create_zoho_meeting_for_booking,
     zoho_calendar_configured,
 )
+from service_layer.zoho_tenant_credentials import (
+    resolve_tenant_zoho_calendar_credentials,
+)
 from service_layer.payment_lifecycle_service import (
     get_booking_payment_status,
     mark_booking_paid,
@@ -1248,10 +1251,33 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                         extra={"reused_from_schedule_slot": True},
                     )
 
+            # Resolve per-tenant Zoho Calendar credentials (with platform
+            # fallback). This lets the chess academy + AI Mentor tenants own
+            # their Zoho subscription end-to-end while existing single-tenant
+            # deployments keep using the platform-wide env credentials.
+            #
+            # Defensive ``getattr`` for ``request.app.state.settings`` —
+            # legacy contract tests stand up a minimal ``app.state`` with no
+            # ``settings`` attribute and expect the booking flow to skip the
+            # Zoho block silently rather than 500.
+            booking_settings = getattr(request.app.state, "settings", None)
+            tenant_calendar_credentials = None
+            if booking_settings is not None:
+                try:
+                    tenant_calendar_credentials = await resolve_tenant_zoho_calendar_credentials(
+                        session,
+                        tenant_id=effective_tenant_id,
+                        settings=booking_settings,
+                    )
+                except Exception:  # noqa: BLE001
+                    tenant_calendar_credentials = None
             if (
                 zoho_meeting_url is None
                 and normalized_email
-                and zoho_calendar_configured(getattr(request.app.state, "settings", None))
+                and zoho_calendar_configured(
+                    booking_settings,
+                    tenant_credentials=tenant_calendar_credentials,
+                )
                 and payload.desired_slot
                 and payload.desired_slot.date
                 and payload.desired_slot.time
@@ -1270,7 +1296,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                         or 45
                     )
                     zoho_meeting_url, zoho_calendar_event_url = await create_zoho_meeting_for_booking(
-                        settings=request.app.state.settings,
+                        settings=booking_settings,
                         booking_reference=booking_reference,
                         service_name=(service.name if service else None) or "BookedAI session",
                         customer_name=payload.contact.full_name,
@@ -1280,6 +1306,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                         timezone_name=payload.desired_slot.timezone,
                         duration_minutes=duration_minutes,
                         notes=payload.notes,
+                        tenant_credentials=tenant_calendar_credentials,
                     )
                     if zoho_meeting_url or zoho_calendar_event_url:
                         await booking_repository.update_zoho_meeting_metadata(

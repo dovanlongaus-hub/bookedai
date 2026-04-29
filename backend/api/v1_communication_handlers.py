@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from fastapi import Request
+from fastapi import HTTPException
 from sqlalchemy import desc, select
 
 from api.v1_routes import (
@@ -24,7 +25,134 @@ from api.v1_routes import (
 )
 from db import MessagingChannelSession
 from repositories.base import RepositoryContext
+from repositories.tenant_repository import TenantRepository
 from service_layer.communication_service import normalize_e164
+from service_layer.zoho_tenant_credentials import resolve_tenant_cc_emails
+
+
+# Lifecycle templates that should automatically CC the tenant's operator
+# inbox. Booking confirmation/cancel/reschedule and the chess academy's
+# weekly progress update all touch the customer relationship — the operator
+# needs to follow up so we route a copy of every send through the tenant's
+# `cc_emails` list (with `chess@bookedai.au` as a sane fallback for the
+# chess tenant).
+_AUTO_CC_TEMPLATE_KEYS = {
+    "bookedai_booking_confirmation",
+    "bookedai_booking_reschedule",
+    "bookedai_booking_cancellation",
+    "chess_progress_update",
+}
+
+_CHESS_TENANT_FALLBACK_CC = "chess@bookedai.au"
+_CHESS_TENANT_SLUGS = {"co-mai-hung-chess-class"}
+_PUBLIC_BOOKING_DEFAULT_TENANT_SLUG = "bookedai-au"
+_PUBLIC_BOOKING_FALLBACK_CHANNELS = {"public_web", "embedded_widget"}
+
+
+def _is_public_booking_actor(actor_context) -> bool:
+    channel = str(getattr(actor_context, "channel", "") or "").strip().lower()
+    return channel in _PUBLIC_BOOKING_FALLBACK_CHANNELS
+
+
+async def _resolve_public_booking_fallback_tenant_id(request: Request) -> str | None:
+    async with get_session(request.app.state.session_factory) as session:
+        return await TenantRepository(RepositoryContext(session=session)).resolve_tenant_id(
+            _PUBLIC_BOOKING_DEFAULT_TENANT_SLUG
+        )
+
+
+async def _resolve_public_safe_tenant_id(request: Request, actor_context) -> str | None:
+    try:
+        return await _resolve_tenant_id(request, actor_context)
+    except HTTPException as error:
+        if error.status_code != 401 or not _is_public_booking_actor(actor_context):
+            raise
+        fallback_tenant_id = await _resolve_public_booking_fallback_tenant_id(request)
+        if fallback_tenant_id:
+            return fallback_tenant_id
+        raise
+
+
+async def _resolve_lifecycle_cc_list(
+    request: Request,
+    *,
+    template_key: str,
+    explicit_cc: list[str],
+    explicit_to: list[str],
+    booking_reference: str | None,
+    tenant_id: str | None,
+) -> list[str]:
+    """Compute the final CC list for a lifecycle email send.
+
+    For the booking-related + chess progress templates we automatically
+    augment the caller-supplied ``cc`` list with the tenant's operator
+    inboxes, so the tenant can follow up with their own customer base.
+    Resolution order:
+      1. Caller-supplied ``cc`` (always honoured, never dropped).
+      2. ``tenant_settings.settings_json.cc_emails`` array, when present.
+      3. ``tenant_settings.settings_json.operator_email``, when present.
+      4. ``chess@bookedai.au`` as a last-resort fallback for the chess tenant
+         specifically — this guarantees the operator stays informed even if
+         migration 039 has not been applied yet on that environment.
+    De-duplicates against ``to`` so a customer who is also listed as a
+    tenant operator does not receive two copies.
+    """
+    normalized_cc = list(explicit_cc or [])
+    if template_key not in _AUTO_CC_TEMPLATE_KEYS:
+        return normalized_cc
+
+    from repositories.booking_intent_repository import BookingIntentRepository
+    from repositories.tenant_repository import TenantRepository
+
+    resolved_tenant_id = tenant_id
+    tenant_slug: str | None = None
+    settings_json: dict[str, object] = {}
+    try:
+        async with get_session(request.app.state.session_factory) as session:
+            tenant_repository = TenantRepository(RepositoryContext(session=session))
+            if not resolved_tenant_id and booking_reference:
+                booking_repository = BookingIntentRepository(
+                    RepositoryContext(session=session)
+                )
+                booking = await booking_repository.fetch_meeting_metadata(
+                    booking_reference=booking_reference,
+                )
+                if booking and booking.get("tenant_id"):
+                    resolved_tenant_id = str(booking.get("tenant_id"))
+            if resolved_tenant_id:
+                tenant_profile = await tenant_repository.get_tenant_profile(
+                    resolved_tenant_id
+                )
+                tenant_slug = (tenant_profile or {}).get("slug")
+                settings_json = await tenant_repository.get_tenant_settings(
+                    resolved_tenant_id
+                )
+    except Exception:  # noqa: BLE001
+        # Best-effort enrichment — never break the lifecycle send because
+        # the CC lookup tripped on a transient DB error. The customer-facing
+        # email still goes out to ``to``; the operator simply misses the
+        # auto-CC for that one message.
+        return normalized_cc
+
+    auto_cc = resolve_tenant_cc_emails(
+        settings_json,
+        base_to=list(explicit_to or []) + list(normalized_cc),
+    )
+    if (
+        not auto_cc
+        and tenant_slug in _CHESS_TENANT_SLUGS
+        and _CHESS_TENANT_FALLBACK_CC.lower() not in {item.lower() for item in (explicit_to or [])}
+        and _CHESS_TENANT_FALLBACK_CC.lower() not in {item.lower() for item in normalized_cc}
+    ):
+        auto_cc = [_CHESS_TENANT_FALLBACK_CC]
+
+    seen_lower = {item.lower() for item in normalized_cc}
+    for candidate in auto_cc:
+        if candidate.lower() in seen_lower:
+            continue
+        normalized_cc.append(candidate)
+        seen_lower.add(candidate.lower())
+    return normalized_cc
 
 
 def _normalize_phone_for_telegram_lookup(value: str) -> str:
@@ -146,7 +274,7 @@ async def _augment_booking_email_variables(
 
 
 async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequestPayload):
-    tenant_id = await _resolve_tenant_id(request, payload.actor_context)
+    tenant_id = await _resolve_public_safe_tenant_id(request, payload.actor_context)
     try:
         if not payload.to:
             raise ValidationAppError(
@@ -185,11 +313,27 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
         delivery_status = "queued"
         warnings: list[str] = []
 
+        # Auto-add the tenant's operator inbox(es) to the CC list for
+        # booking confirmation / reschedule / cancel + chess progress
+        # templates, so the tenant operator stays in the loop without the
+        # frontend or webhook caller having to thread it through.
+        booking_reference_for_cc = str(
+            (payload.variables or {}).get("booking_reference") or ""
+        ).strip() or None
+        resolved_cc = await _resolve_lifecycle_cc_list(
+            request,
+            template_key=payload.template_key,
+            explicit_cc=list(payload.cc or []),
+            explicit_to=list(payload.to or []),
+            booking_reference=booking_reference_for_cc,
+            tenant_id=tenant_id,
+        )
+
         smtp_configured = email_service.smtp_configured()
         if smtp_configured:
             await email_service.send_email(
                 to=payload.to,
-                cc=payload.cc,
+                cc=resolved_cc,
                 subject=subject,
                 text=body,
                 html=html,
@@ -209,7 +353,8 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
                 event_payload={
                     "template_key": payload.template_key,
                     "recipient_count": len(payload.to),
-                    "cc_count": len(payload.cc),
+                    "cc_count": len(resolved_cc),
+                    "auto_cc_applied": len(resolved_cc) > len(payload.cc or []),
                 },
             )
             email_crm_sync_result = await orchestrate_email_sent_sync(
@@ -270,7 +415,7 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
 
 
 async def send_sms_message(request: Request, payload: SendCommunicationMessageRequestPayload):
-    tenant_id = await _resolve_tenant_id(request, payload.actor_context)
+    tenant_id = await _resolve_public_safe_tenant_id(request, payload.actor_context)
     try:
         communication_service: CommunicationService = request.app.state.communication_service
         result = await communication_service.send_sms(
@@ -352,7 +497,7 @@ async def send_sms_message(request: Request, payload: SendCommunicationMessageRe
 
 
 async def send_whatsapp_message(request: Request, payload: SendCommunicationMessageRequestPayload):
-    tenant_id = await _resolve_tenant_id(request, payload.actor_context)
+    tenant_id = await _resolve_public_safe_tenant_id(request, payload.actor_context)
     try:
         communication_service: CommunicationService = request.app.state.communication_service
         result = await communication_service.send_whatsapp(
@@ -434,7 +579,7 @@ async def send_whatsapp_message(request: Request, payload: SendCommunicationMess
 
 
 async def send_telegram_message_by_phone(request: Request, payload: SendCommunicationMessageRequestPayload):
-    tenant_id = await _resolve_tenant_id(request, payload.actor_context)
+    tenant_id = await _resolve_public_safe_tenant_id(request, payload.actor_context)
     try:
         normalized_phone = _normalize_phone_for_telegram_lookup(payload.to)
         communication_service: CommunicationService = request.app.state.communication_service

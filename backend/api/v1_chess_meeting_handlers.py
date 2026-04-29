@@ -42,6 +42,9 @@ from service_layer.calls_scheduling import (
     create_zoho_meeting_for_booking,
     zoho_calendar_configured,
 )
+from service_layer.zoho_tenant_credentials import (
+    resolve_tenant_zoho_calendar_credentials,
+)
 
 
 _logger = get_logger("bookedai.api.v1_chess_meeting_handlers")
@@ -128,10 +131,22 @@ async def regenerate_chess_booking_meeting(
         )
 
     settings = getattr(request.app.state, "settings", None)
-    if not zoho_calendar_configured(settings):
-        return _zoho_unconfigured_response(tenant_id=tenant_id)
 
     async with get_session(request.app.state.session_factory) as session:
+        # Resolve per-tenant Zoho calendar credentials (falls back to platform
+        # creds when the tenant has not configured their own). This allows
+        # tenants such as chess@bookedai.au to regenerate Zoho meeting links
+        # against their own Zoho One subscription.
+        tenant_calendar_credentials = await resolve_tenant_zoho_calendar_credentials(
+            session,
+            tenant_id=tenant_id,
+            settings=settings,
+        )
+        if not zoho_calendar_configured(
+            settings,
+            tenant_credentials=tenant_calendar_credentials,
+        ):
+            return _zoho_unconfigured_response(tenant_id=tenant_id)
         booking_repository = BookingIntentRepository(
             RepositoryContext(session=session, tenant_id=tenant_id)
         )
@@ -257,6 +272,7 @@ async def regenerate_chess_booking_meeting(
                 timezone_name=timezone_name,
                 duration_minutes=duration_minutes,
                 notes=None,
+                tenant_credentials=tenant_calendar_credentials,
             )
         except Exception as exc:  # noqa: BLE001
             _logger.warning(

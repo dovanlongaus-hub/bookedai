@@ -57,21 +57,23 @@ const productProofImageUrl = 'https://upload.bookedai.au/images/df6e/iarJydFRgp1
 
 const pitchNavItems = [
   { id: 'hero', label: 'Overview' },
-  { id: 'pitch-video', label: 'Pitch Video' },
-  { id: 'proof', label: 'Product' },
   { id: 'problem', label: 'Problem' },
   { id: 'solution', label: 'Solution' },
-  { id: 'pricing', label: 'Pricing' },
-  { id: 'architecture', label: 'Architecture', href: architectureUrl },
+  { id: 'proof', label: 'Live Proof' },
+  { id: 'live-evidence', label: 'Evidence' },
+  { id: 'pitch-video', label: 'Video' },
+  { id: 'pricing', label: 'Plans' },
+  { id: 'launch-offer', label: 'GTM Wedge' },
+  { id: 'architecture', label: 'How It Works', href: architectureUrl },
   { id: 'why-now', label: 'Why Now' },
-  { id: 'market-size', label: 'Market' },
-  { id: 'competitive-map', label: 'Competition' },
-  { id: 'defensibility', label: 'Defensibility' },
-  { id: 'unit-economics', label: 'Unit Econ' },
+  { id: 'market-size', label: 'Scale' },
+  { id: 'competitive-map', label: 'Alternatives' },
+  { id: 'defensibility', label: 'Moat' },
+  { id: 'unit-economics', label: 'Economics' },
   { id: 'live-evidence', label: 'Live Evidence' },
-  { id: 'revenue-milestones', label: 'Revenue Milestones' },
+  { id: 'revenue-milestones', label: 'Rollout' },
   { id: 'roadmap-execution', label: 'Roadmap' },
-  { id: 'surfaces', label: 'Surfaces' },
+  { id: 'surfaces', label: 'Live Links' },
   { id: 'trust', label: 'Trust' },
 ];
 
@@ -87,7 +89,7 @@ const problemFunnel = [
 
 const agentSurfaceCards = [
   {
-    eyebrow: 'Product agent',
+    eyebrow: 'Live product',
     title: 'Live AI booking flow',
     body: 'product.bookedai.au runs the live search, shortlist, booking capture, and team follow-through in one session.',
     href: productUrl,
@@ -95,7 +97,7 @@ const agentSurfaceCards = [
     tone: 'from-[#eef6ff] to-white',
   },
   {
-    eyebrow: 'Demo preview',
+    eyebrow: 'Buyer preview',
     title: 'Story-led product preview',
     body: 'demo.bookedai.au stays available as the lighter, explanation-first entry for buyers reviewing the product.',
     href: demoLandingUrl,
@@ -105,7 +107,7 @@ const agentSurfaceCards = [
   {
     eyebrow: 'Commercial homepage',
     title: 'Product-first landing',
-    body: 'bookedai.au stays lean and fast. The pitch carries the deeper commercial and investor narrative.',
+    body: 'bookedai.au stays lean and fast. The pitch carries the deeper SME offer, live cases, rollout story, and commercial proof.',
     href: 'https://bookedai.au/',
     cta: 'View Homepage',
     tone: 'from-[#ecfdf5] to-white',
@@ -172,7 +174,7 @@ const architectureCapabilityCards = [
 const architectureImageNodes = [
   ['Capture', 'Web, product, widget, WhatsApp'],
   ['Orchestrate', 'Customer AI + matching policy'],
-  ['Convert', 'Lead, booking, payment posture'],
+  ['Convert', 'Lead, booking, payment status'],
   ['Operate', 'Team workspace + follow-up history'],
 ];
 
@@ -194,7 +196,7 @@ const launchOfferCards = [
   },
   {
     title: 'Dedicated CRM',
-    body: 'Leads, bookings, payment posture, and customer-care notes are organized in a CRM workspace configured around the business.',
+    body: 'Leads, bookings, payment status, and customer-care notes are organized in a CRM workspace configured around the business.',
   },
   {
     title: 'Booking + meeting setup',
@@ -212,6 +214,29 @@ const liveCaseCards = [
     title: 'aimentor.bookedai.au',
     body: 'AI Mentor 1-1 Pro shows a service-specific page, dedicated aimentor@bookedai.au email, CRM-style enrolment capture, Stripe checkout, and Zoho Meeting scheduling.',
     href: 'https://aimentor.bookedai.au/',
+  },
+] as const;
+
+const smeSetupSummaryCards = [
+  {
+    step: '01',
+    title: 'Launch page',
+    body: 'A service-specific landing page that explains the offer, captures demand, and gives customers a clear booking path.',
+  },
+  {
+    step: '02',
+    title: 'Dedicated inbox',
+    body: 'A clean booking email identity for confirmations, reminders, customer handoff, and follow-up.',
+  },
+  {
+    step: '03',
+    title: 'CRM workspace',
+    body: 'Leads, bookings, meeting notes, payment status, and next actions organized around the way the SME works.',
+  },
+  {
+    step: '04',
+    title: 'Booking engine',
+    body: 'Calendar slots, meeting links, payment next steps, and reminders preconfigured before the first campaign goes live.',
   },
 ] as const;
 
@@ -246,11 +271,11 @@ function PitchVideoSection() {
                 Pitch video
               </SignalPill>
               <h2 className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
-                Watch the BookedAI story before diving into the deck.
+                See the whole BookedAI solution in one guided walkthrough.
               </h2>
               <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
-                A short visual walkthrough for the commercial narrative: customer demand, AI booking,
-                team visibility, and why the platform is built around real revenue outcomes.
+                A short visual walkthrough of the SME journey: capture demand, qualify the customer,
+                book the right next step, and give the business a visible follow-up workflow.
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
@@ -319,22 +344,22 @@ function ArchitectureSnapshotImage() {
 
         <rect x="48" y="42" width="884" height="476" rx="42" fill="white" fillOpacity="0.08" stroke="white" strokeOpacity="0.16" />
         <text x="84" y="94" fill="#a7f3d0" fontSize="18" fontWeight="700" letterSpacing="4">
-          BOOKEDAI ARCHITECTURE
+          BOOKEDAI REVENUE ENGINE
         </text>
         <text x="84" y="130" fill="white" fontSize="34" fontWeight="700">
-          Revenue engine from demand to booking clarity
+          From enquiry to booked follow-up
         </text>
 
         <rect x="308" y="166" width="364" height="216" rx="34" fill="url(#pitchArchitectureCore)" fillOpacity="0.95" />
         <rect x="332" y="190" width="316" height="168" rx="26" fill="#061525" fillOpacity="0.72" stroke="white" strokeOpacity="0.2" />
         <text x="490" y="240" textAnchor="middle" fill="white" fontSize="30" fontWeight="800">
-          AI Revenue Core
+          Booking Revenue Core
         </text>
         <text x="490" y="277" textAnchor="middle" fill="#dbeafe" fontSize="18" fontWeight="600">
           {'qualify -> book -> follow up'}
         </text>
         <text x="490" y="316" textAnchor="middle" fill="#a7f3d0" fontSize="16" fontWeight="700" letterSpacing="2.4">
-          AUDITABLE · TENANT-SAFE · API-BACKED
+          VISIBLE · CUSTOMER-SAFE · CRM-READY
         </text>
 
         {architectureImageNodes.map(([title, body], index) => {
@@ -363,7 +388,7 @@ function ArchitectureSnapshotImage() {
 
         <rect x="84" y="440" width="812" height="46" rx="23" fill="white" fillOpacity="0.1" stroke="white" strokeOpacity="0.16" />
         <text x="490" y="470" textAnchor="middle" fill="#e0f2fe" fontSize="16" fontWeight="700">
-          Stripe · WhatsApp · n8n · CRM · FastAPI · Supabase · Docker · Cloudflare
+          Landing pages · Email · CRM · Calendar · Meetings · Payments · Portal
         </text>
       </svg>
     </div>
@@ -380,12 +405,12 @@ function PitchArchitectureFlowVisual() {
               Architecture image
             </SignalPill>
             <h2 className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl lg:text-5xl">
-              A multi-layer revenue engine, visualized like a technical buyer expects.
+              The system behind the page is simple: capture, book, follow up, prove.
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
-              BookedAI is not a single chatbot screen. It is a connected system of acquisition
-              surfaces, AI orchestration, booking records, integrations, team handoff, and follow-up
-              controls built to turn service demand into visible revenue workflow.
+              BookedAI is not just a chatbot. It combines customer pages, AI intake, booking records,
+              calendar and meeting setup, payment next steps, and a business workspace so every
+              enquiry can move toward revenue.
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
@@ -404,13 +429,13 @@ function PitchArchitectureFlowVisual() {
                 href={architectureUrl}
                 className="rounded-full bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
               >
-                Open full architecture
+                Open full system map
               </a>
               <a
                 href={roadmapHref}
                 className="rounded-full border border-black/8 bg-white/80 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
               >
-                View roadmap
+                View rollout plan
               </a>
             </div>
           </div>
@@ -451,7 +476,7 @@ function MasterRoadmapPitchSection() {
               id="pitch-master-roadmap-title"
               className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl lg:text-[2.6rem] lg:leading-[1.08]"
             >
-              Master Roadmap — 8 Weeks to Production Scale
+              Rollout roadmap: proof cases first, repeatable SME setup next.
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
               The commercial rollout is organized around a simple promise: launch real SME booking
@@ -481,7 +506,7 @@ function MasterRoadmapPitchSection() {
             <div className="overflow-hidden rounded-[1.45rem] border border-slate-200 bg-white">
               <img
                 src="/roadmap/master-roadmap-2026-04-11-to-06-07.svg"
-                alt="BookedAI Master Roadmap from 2026-04-11 Phase 0 reset through 2026-06-07 Phase 23 closeout, organized in five workstream swim lanes (Pre Go-Live, Go-Live Sprint, Post Go-Live, Communication Layer, Tenant Runtimes) with milestones M-01 through M-11 and a hard GO-LIVE LOCK on 2026-04-30"
+                alt="BookedAI Master Roadmap from 2026-04-11 Phase 0 reset through 2026-06-07 Phase 23 closeout, organized in five launch workstreams with milestones M-01 through M-11 and a hard go-live lock on 2026-04-30"
                 className="block h-auto w-full"
                 loading="lazy"
               />
@@ -497,11 +522,10 @@ function MasterRoadmapPitchSection() {
               </div>
               <div className="min-w-0 rounded-[1.1rem] border border-blue-200 bg-blue-50/60 px-4 py-3">
                 <div className="text-xs font-semibold uppercase tracking-[0.14em] text-blue-700">
-                  Post go-live · weekly cadence
+                  Post go-live cadence
                 </div>
                 <div className="mt-1 text-sm leading-6 text-slate-700">
-                  Widget, wallet/Stripe, billing follow-up, business templates, and release checks.
-                  governance.
+                  Widget, wallet/Stripe, billing follow-up, business templates, and weekly release checks.
                 </div>
               </div>
               <div className="min-w-0 rounded-[1.1rem] border border-sky-200 bg-sky-50/60 px-4 py-3">
@@ -559,20 +583,20 @@ function PricingPitchSection({ openRegisterInterest }: PricingPitchSectionProps)
                 href={architectureUrl}
                 className="rounded-full border border-black/8 bg-white/80 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
               >
-                View Architecture
+                View system map
               </a>
               <button
                 type="button"
                 onClick={() => openRegisterInterest('pricing', 'pitch_pricing_register')}
                 className="rounded-full bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
               >
-                Open SME Registration
+                Register pilot
               </button>
               <a
                 href={productUrl}
                 className="rounded-full border border-black/8 bg-white/80 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
               >
-                Open Web App
+                Open live product
               </a>
             </div>
           </div>
@@ -641,15 +665,15 @@ function LaunchOfferSection({ openRegisterInterest }: PricingPitchSectionProps) 
         <div className="grid gap-8 xl:grid-cols-[0.75fr_1.25fr] xl:items-start">
           <div>
             <SignalPill className="w-fit border border-white/12 bg-white/10 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#8efce0]">
-              SME launch offer
+              Go-to-market wedge
             </SignalPill>
             <h2 className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
-              Launch with your own booking page, email, CRM, and meeting flow.
+              Repeatable SME deployment package.
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
-              For early SME customers, BookedAI does more than install a chat widget. We set up a
-              business-ready revenue flow: a refreshed landing page, dedicated email identity,
-              CRM workspace, calendar, booking slots, and meeting or payment follow-up.
+              The launch package is the repeatable wedge: every pilot gets a booking-ready page,
+              dedicated email identity, CRM workspace, calendar, booking slots, and meeting or
+              payment follow-up.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <button
@@ -657,7 +681,7 @@ function LaunchOfferSection({ openRegisterInterest }: PricingPitchSectionProps) 
                 onClick={() => openRegisterInterest('call_to_action', 'sme_launch_offer')}
                 className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#172033] transition hover:-translate-y-0.5 hover:bg-[#eef4f2]"
               >
-                Claim launch setup
+                Join pilot cohort
               </button>
               <a
                 href="https://chess.bookedai.au/"
@@ -752,12 +776,64 @@ function ChessProofSection() {
   );
 }
 
+function SMESetupOverviewSection({ openRegisterInterest }: PricingPitchSectionProps) {
+  return (
+    <section id="sme-setup" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+      <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f7fbff_44%,#eef7f4_100%)] px-6 py-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:px-7 lg:px-8">
+        <div className="grid gap-7 xl:grid-cols-[0.68fr_1.32fr] xl:items-start">
+          <div>
+            <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#0f766e]">
+              Repeatable deployment
+            </SignalPill>
+            <h2 className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
+              A packaged rollout motion, not one-off implementation work.
+            </h2>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
+              BookedAI launches the customer-facing page and the business workflow together, then
+              reuses that playbook across service categories, locations, and pilot customers.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => openRegisterInterest('call_to_action', 'sme_setup_overview')}
+                className="rounded-full bg-[#1d1d1f] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5"
+              >
+                Register pilot interest
+              </button>
+              <a
+                href="https://aimentor.bookedai.au/"
+                className="rounded-full border border-black/8 bg-white/80 px-5 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
+              >
+                See AI Mentor case
+              </a>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {smeSetupSummaryCards.map((card) => (
+              <article key={card.title} className="rounded-[1.35rem] border border-black/6 bg-white/82 p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)]">
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
+                  {card.step}
+                </div>
+                <h3 className="mt-3 text-lg font-semibold tracking-[-0.035em] text-[#1d1d1f]">
+                  {card.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{card.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </SectionCard>
+    </section>
+  );
+}
+
 function InvestorSlideShell({
   id,
   kicker,
   title,
   subtitle,
-  audienceBadge = 'For investors',
+  audienceBadge = 'Business case',
   children,
 }: {
   id: string;
@@ -795,8 +871,8 @@ function WhyNowSlide() {
     <InvestorSlideShell
       id="why-now"
       kicker="Why now"
-      title="The operating-layer window for AU service SMEs is open in 2026."
-      subtitle="Three converging shifts make this the right year to build a multi-channel agent layer for service businesses — not 2023, not 2028."
+      title="The booking gap for AU service SMEs is open right now."
+      subtitle="Customers expect fast replies, business owners want fewer admin steps, and AI can finally connect intake, booking, payment next steps, and follow-up in one practical workflow."
     >
       <div className="grid gap-3 md:grid-cols-3">
         {whyNowStats.map((stat) => (
@@ -835,9 +911,9 @@ function MarketSizeSlide() {
   return (
     <InvestorSlideShell
       id="market-size"
-      kicker="Market size"
-      title="AU SAM ~ A$2.9B today. Global SAM US$30B+. Bottom-up paths to A$120M ARR."
-      subtitle="Two views: top-down market math and bottom-up tenant build. They converge on the same destination — a defensible nine-figure ARR business inside the AU + English-export footprint."
+      kicker="Scale case"
+      title="AU SAM ~ A$2.9B today. Global SAM US$30B+. The wedge starts with missed local bookings."
+      subtitle="Two views: top-down market math and bottom-up SME rollout. They point to the same opportunity: a repeatable revenue workflow for service businesses across Australia and English-speaking export markets."
     >
       <div className="grid gap-4 md:grid-cols-3">
         {marketSizeRows.map((row) => (
@@ -882,9 +958,9 @@ function CompetitiveMapSlide() {
   return (
     <InvestorSlideShell
       id="competitive-map"
-      kicker="Competitive map"
-      title="Vertical depth × AI-native + omnichannel — the upper-right quadrant is empty."
-      subtitle="Generic schedulers and legacy vertical SaaS occupy the bottom half. AI-native sales tools (GoHighLevel) lack vertical depth. BookedAI is the only stack engineered for both."
+      kicker="Alternatives"
+      title="BookedAI sits between booking software, CRM, and AI assistants."
+      subtitle="Generic schedulers stop at the calendar. CRMs need manual work. Chatbots often lose the booking context. BookedAI connects the page, intake, CRM, calendar, and follow-up around one customer journey."
     >
       <div className="grid gap-5 lg:grid-cols-[1.3fr_0.7fr] lg:items-start">
         <div
@@ -988,8 +1064,8 @@ function DefensibilitySlide() {
         ))}
       </div>
       <div className="mt-5 rounded-apple-large border border-apple-light/60 bg-apple-white px-5 py-4 text-sm leading-6 text-apple-near-black/72">
-        Foundation models become commoditized inputs to our orchestration layer; the moat lives in the
-        audited, multi-tenant, channel-multiplied workflow our customers operate inside every day.
+        Foundation models become commoditized inputs to the workflow; the moat lives in the
+        configured service journeys, CRM history, integrations, and repeatable rollout playbook customers use every day.
       </div>
     </InvestorSlideShell>
   );
@@ -999,9 +1075,9 @@ function UnitEconomicsSlide() {
   return (
     <InvestorSlideShell
       id="unit-economics"
-      kicker="Unit economics"
+      kicker="Commercial model"
       title="A$400 CAC, A$6,000 LTV, 75% gross margin, 6-month payback."
-      subtitle="The Revenue Engine pricing structure is engineered so each tenant pays for itself inside half a year — and compounds upward via commission as they grow."
+      subtitle="The Revenue Engine pricing structure is designed so each SME setup can pay for itself quickly, then expand as BookedAI captures or recovers more attributable bookings."
     >
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {unitEconomicsTiles.map((tile) => (
@@ -1079,9 +1155,9 @@ function RevenueMilestonesSlide() {
   return (
     <InvestorSlideShell
       id="revenue-milestones"
-      kicker="Roadmap → revenue milestones"
-      title="Each phase unlocks a specific revenue lever — not just a feature."
-      subtitle="Phases 17 through 22+ overlay onto milestones M-02 through M-11 from the master roadmap. Investors see exactly which date corresponds to which revenue event."
+      kicker="Rollout milestones"
+      title="Each phase unlocks a specific revenue lever, not just a feature."
+      subtitle="The roadmap ties launch work to commercial outcomes: live cases, payment status, outbound follow-up, templates, and repeatable setup for the next SME customer."
     >
       <div className="space-y-3">
         {revenuePhases.map((phase, idx) => (
@@ -1186,8 +1262,8 @@ export function PitchDeckApp() {
         navItems={pitchNavItems}
         onStartTrial={() => openRegisterInterest('header', 'pitch_header_register')}
         onBookDemo={openProductDemo}
-        startTrialLabel="Talk to Sales"
-        bookDemoLabel="Open Web App"
+        startTrialLabel="Book Investor Demo"
+        bookDemoLabel="Open Live Product"
         utilityLinks={[
           { label: 'Product', href: productUrl },
           { label: 'Architecture', href: architectureUrl },
@@ -1203,7 +1279,7 @@ export function PitchDeckApp() {
             {/* Left: brand narrative + CTAs */}
             <div className="flex flex-col gap-5">
               <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-                Executive pitch · pitch.bookedai.au
+                Investor and judge pitch · pitch.bookedai.au
               </SignalPill>
 
               <BrandLockup
@@ -1215,13 +1291,13 @@ export function PitchDeckApp() {
               />
 
               <h1 className="max-w-2xl text-4xl font-semibold tracking-[-0.06em] text-[#1d1d1f] sm:text-5xl lg:text-[3.4rem] lg:leading-[1.09]">
-                Convert service enquiries into confirmed bookings, follow-up, and revenue visibility.
+                BookedAI is the AI Revenue Engine for service businesses.
               </h1>
 
               <p className="max-w-xl text-base leading-8 text-black/60 sm:text-lg">
-                BookedAI responds instantly, qualifies customer intent, recommends the right service,
-                and carries every booking into a visible business workflow. Built first for Australian
-                service businesses.
+                We capture fragmented service enquiries across web, chat, messaging, email, and
+                calls, then turn them into booking references, payment and follow-up status, and
+                business-visible revenue evidence.
               </p>
 
               {/* Industry type chips */}
@@ -1242,27 +1318,26 @@ export function PitchDeckApp() {
                   href={productUrl}
                   className="rounded-full bg-[#1d1d1f] px-6 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-[#111]"
                 >
-                  Open Web App
+                  See live booking proof
                 </a>
-                <button
-                  type="button"
-                  onClick={() => openRegisterInterest('hero', 'pitch_hero_sales')}
+                <a
+                  href="#market-size"
                   className="rounded-full border border-black/12 bg-white/80 px-6 py-3 text-sm font-semibold text-[#1d1d1f] transition hover:-translate-y-0.5"
                 >
-                  Talk to Sales
-                </button>
+                  View investor deck
+                </a>
                 <button
                   type="button"
                   onClick={() => openRegisterInterest('hero', 'pitch_hero_free_setup')}
                   className="rounded-full border border-black/8 px-6 py-3 text-sm font-semibold text-black/52 transition hover:-translate-y-0.5"
                 >
-                  Get free setup (limited)
+                  Join SME pilot
                 </button>
                 <a
                   href={architectureUrl}
                   className="rounded-full border border-black/8 bg-white/70 px-6 py-3 text-sm font-semibold text-black/62 transition hover:-translate-y-0.5"
                 >
-                  View Architecture
+                  Open system map
                 </a>
               </div>
             </div>
@@ -1394,7 +1469,7 @@ export function PitchDeckApp() {
                 {solutionContent.kicker}
               </SignalPill>
               <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-                Close the gap between enquiry, booking, payment posture, and follow-up.
+                Close the gap between enquiry, booking, payment status, and follow-up.
               </h2>
               <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">
                 The product gives every enquiry a fast first response, enough context to qualify fit,
@@ -1572,6 +1647,8 @@ export function PitchDeckApp() {
       {/* ── 5. PRICING ──────────────────────────────────────────────── */}
       <PricingPitchSection openRegisterInterest={openRegisterInterest} />
 
+      <SMESetupOverviewSection openRegisterInterest={openRegisterInterest} />
+
       <LaunchOfferSection openRegisterInterest={openRegisterInterest} />
 
       {/* ── 6. ARCHITECTURE ─────────────────────────────────────────── */}
@@ -1614,7 +1691,7 @@ export function PitchDeckApp() {
               </h2>
               <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">
                 The pitch keeps the commercial narrative. The product host runs the live booking
-                agent. The demo stays light and explanation-first. No mixed runtime, no context loss.
+                assistant. The demo stays light and explanation-first. Each link has a clear buyer job.
               </p>
               <div className="mt-6 flex flex-wrap gap-3">
                 <a href={productUrl} className="booked-button">
@@ -1805,10 +1882,11 @@ export function PitchDeckApp() {
                 {ctaContent.kicker}
               </SignalPill>
               <h2 className="mt-4 max-w-2xl break-words text-2xl font-semibold tracking-[-0.04em] text-white sm:text-3xl">
-                Move from pitch to live revenue flow.
+                Move from pitch proof to pilot traction.
               </h2>
               <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300">
-                Open the product, review the architecture, or register the business for launch setup.
+                Open the live product, review the system map, or join the SME pilot cohort that turns
+                the launch package into repeatable go-to-market proof.
               </p>
             </div>
             <div className="flex min-w-0 flex-col gap-3 sm:flex-row md:justify-end">
@@ -1816,14 +1894,14 @@ export function PitchDeckApp() {
                 href={productUrl}
                 className="rounded-full bg-white px-5 py-3 text-center text-sm font-semibold text-[#172033] transition hover:-translate-y-0.5 hover:bg-[#eef4f2]"
               >
-                Open Web App
+                Open live product
               </a>
               <button
                 type="button"
                 onClick={() => openRegisterInterest('call_to_action', 'pitch_final_cta_sales')}
                 className="rounded-full border border-white/16 bg-white/[0.08] px-5 py-3 text-center text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/[0.14]"
               >
-                Talk to Sales
+                Join SME pilot
               </button>
             </div>
           </div>
@@ -1833,8 +1911,8 @@ export function PitchDeckApp() {
       <Footer
         onStartTrial={() => openRegisterInterest('footer', 'pitch_footer_register')}
         onBookDemo={openProductDemo}
-        startTrialLabel="Open SME Registration"
-        bookDemoLabel="Open Web App"
+        startTrialLabel="Join SME Pilot"
+        bookDemoLabel="Open Live Product"
         showBrandCopy={false}
         compact
       />

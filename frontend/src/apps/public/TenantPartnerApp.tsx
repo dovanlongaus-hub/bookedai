@@ -90,7 +90,7 @@ const CAPABILITY_LABEL_MAP: Record<string, string> = {
   monthly_check_in: 'Auto monthly check-ins',
   feedback: 'Post-booking feedback',
   post_booking_feedback: 'Post-booking feedback',
-  audit_ledger: 'Audit ledger',
+  audit_ledger: 'Booking history',
   portal: 'Portal access tokens',
   portal_access: 'Portal access tokens',
   ai_search: 'AI search composer',

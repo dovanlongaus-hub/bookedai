@@ -35,7 +35,7 @@ test.describe('pitch architecture viz', () => {
     // Hero heading anchors the pitch surface.
     await expect(
       page.getByRole('heading', {
-        name: /Convert service enquiries into confirmed bookings, follow-up, and revenue visibility/i,
+        name: /BookedAI is the AI Revenue Engine for service businesses/i,
       }),
     ).toBeVisible({ timeout: 15000 });
 

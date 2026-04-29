@@ -7,7 +7,7 @@ from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException
 from fastapi.testclient import TestClient
 
 BACKEND_ROOT = Path(__file__).resolve().parents[1]
@@ -34,6 +34,7 @@ def create_test_app() -> FastAPI:
         admin_password="test-admin-password",
         admin_session_ttl_hours=8,
         google_oauth_client_id="google-client-id",
+        public_app_url="https://bookedai.au",
     )
     app.state.email_service = SimpleNamespace(
         smtp_configured=lambda: False,
@@ -56,6 +57,17 @@ def create_test_app() -> FastAPI:
 
 async def _resolve_tenant_id_stub(_request, _actor_context) -> str:
     return "tenant-test"
+
+
+async def _resolve_tenant_id_requires_session(_request, _actor_context) -> str:
+    raise HTTPException(
+        status_code=401,
+        detail=(
+            "Tenant session required: provide a valid tenant bearer token with a "
+            "matching actor_context.tenant_id, or call the public tenant-scoped endpoint "
+            "(e.g. /api/v1/public/leads/{tenant_slug})."
+        ),
+    )
 
 
 async def _async_noop(*_args, **_kwargs):
@@ -125,6 +137,43 @@ class _WritableFakeSession:
 
 
 class Apiv1CommunicationRoutes(TestCase):
+    def test_public_web_lifecycle_email_uses_bookedai_public_fallback_tenant(self):
+        app = create_test_app()
+        app.state.email_service = SimpleNamespace(
+            smtp_configured=lambda: False,
+            send_email=_async_noop,
+        )
+
+        async def _resolve_public_tenant(_self, tenant_ref):
+            self.assertEqual(tenant_ref, "bookedai-au")
+            return "tenant-bookedai-public"
+
+        with patch("api.v1_communication_handlers._resolve_tenant_id", _resolve_tenant_id_requires_session), patch(
+            "api.v1_communication_handlers.TenantRepository.resolve_tenant_id",
+            _resolve_public_tenant,
+        ), patch(
+            "api.v1_communication_handlers.get_session",
+            _fake_get_session,
+        ):
+            client = TestClient(app)
+            response = client.post(
+                "/api/v1/email/messages/send",
+                json={
+                    "template_key": "bookedai_booking_confirmation",
+                    "to": ["hello@example.com"],
+                    "variables": {"booking_reference": "v1-public"},
+                    "actor_context": {
+                        "channel": "public_web",
+                        "tenant_ref": "bookedai-au",
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["meta"]["tenant_id"], "tenant-bookedai-public")
+
     def test_send_lifecycle_email_returns_success_envelope_when_smtp_unconfigured(self):
         app = create_test_app()
         app.state.email_service = SimpleNamespace(

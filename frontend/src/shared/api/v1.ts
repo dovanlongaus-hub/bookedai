@@ -1415,6 +1415,116 @@ export async function tenantUpdateStudentProgress(
   );
 }
 
+export type TenantZohoService = 'calendar' | 'crm';
+
+export interface TenantZohoCalendarConnectionState {
+  connected: boolean;
+  connected_at?: string | null;
+  connected_by_user_email?: string | null;
+  calendar_uid?: string | null;
+  accounts_base_url?: string | null;
+}
+
+export interface TenantZohoCrmConnectionState {
+  connected: boolean;
+  connected_at?: string | null;
+  connected_by_user_email?: string | null;
+  api_base_url?: string | null;
+}
+
+export interface TenantIntegrationsState {
+  zoho_calendar: TenantZohoCalendarConnectionState;
+  zoho_crm: TenantZohoCrmConnectionState;
+  cc_emails: string[];
+  operator_email: string;
+}
+
+export interface ZohoAuthorizeUrlResponse {
+  authorize_url: string;
+  redirect_uri: string;
+  state: string;
+  scope_note: string;
+}
+
+export interface ZohoTestResult {
+  ok: boolean;
+  latency_ms: number;
+  sample?: Record<string, unknown> | null;
+  message?: string;
+}
+
+export interface TenantUpdateCcEmailsResponse {
+  cc_emails: string[];
+}
+
+export interface TenantZohoDisconnectResponse {
+  ok: boolean;
+}
+
+export async function tenantGetIntegrations(sessionToken?: string | null) {
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantIntegrationsState>('/v1/tenants/me/integrations', { headers });
+}
+
+export async function tenantGetZohoAuthorizeUrl(
+  sessionToken: string | null | undefined,
+  service: TenantZohoService,
+) {
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<ZohoAuthorizeUrlResponse>(
+    `/v1/tenants/me/integrations/zoho/${encodeURIComponent(service)}/authorize-url?service=${encodeURIComponent(service)}`,
+    { headers },
+  );
+}
+
+export async function tenantTestZoho(
+  sessionToken: string | null | undefined,
+  service: TenantZohoService,
+) {
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<ZohoTestResult>(
+    `/v1/tenants/me/integrations/zoho/${encodeURIComponent(service)}/test`,
+    { method: 'POST', headers },
+  );
+}
+
+export async function tenantDisconnectZoho(
+  sessionToken: string | null | undefined,
+  service: TenantZohoService,
+) {
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantZohoDisconnectResponse>(
+    `/v1/tenants/me/integrations/zoho/${encodeURIComponent(service)}`,
+    { method: 'DELETE', headers },
+  );
+}
+
+export async function tenantUpdateCcEmails(
+  sessionToken: string | null | undefined,
+  ccEmails: string[],
+) {
+  const headers = new Headers();
+  if (sessionToken) {
+    headers.set('Authorization', `Bearer ${sessionToken}`);
+  }
+  return requestV1Envelope<TenantUpdateCcEmailsResponse>(
+    '/v1/tenants/me/cc-emails',
+    withJsonBody({ cc_emails: ccEmails }, { method: 'PATCH', headers }),
+  );
+}
+
 export async function getTenantIntegrations(tenantRef?: string | null, sessionToken?: string | null) {
   const query = tenantRef ? `?tenant_ref=${encodeURIComponent(tenantRef)}` : '';
   const headers = new Headers();
@@ -2732,5 +2842,10 @@ export const apiV1 = {
   getTenantLeads,
   tenantListStudents,
   tenantUpdateStudentProgress,
+  tenantGetIntegrations,
+  tenantGetZohoAuthorizeUrl,
+  tenantTestZoho,
+  tenantDisconnectZoho,
+  tenantUpdateCcEmails,
   getAgentActivity,
 };

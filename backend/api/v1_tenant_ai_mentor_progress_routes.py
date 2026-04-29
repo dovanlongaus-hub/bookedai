@@ -37,3 +37,8 @@ router.add_api_route(
     handlers.tenant_aimentor_zoho_credentials_save,
     methods=["PATCH"],
 )
+router.add_api_route(
+    "/tenants/me/aimentor-zoho-credentials/test",
+    handlers.tenant_aimentor_zoho_test_connection,
+    methods=["POST"],
+)

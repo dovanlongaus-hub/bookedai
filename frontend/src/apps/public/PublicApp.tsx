@@ -32,7 +32,7 @@ const tenantPreviewImageSrcSet =
 const pitchVideoUrl = 'https://upload.bookedai.au/videos/9eb8/BhVuOlB2QXlBo-_nyOFCcA.mp4';
 const productProofImageUrl = 'https://upload.bookedai.au/images/df6e/iarJydFRgp1aWGk5UF0d7g.png';
 const homepageFinalProductHref = 'https://product.bookedai.au/?source=homepage-cta';
-const metadataTitle = 'Bookedai.au | The AI Revenue Engine for Service Businesses';
+const metadataTitle = 'BookedAI.au | Booking-ready AI setup for service businesses';
 
 type HomepageExperimentVariant = 'control' | 'product_first';
 
@@ -67,16 +67,16 @@ const navLinks = [
 ] as const;
 
 const executiveStats = [
-  { value: '3', label: 'live customer examples', detail: 'Chess, Future Swim, AI Mentor proof paths' },
-  { value: 'Live', label: 'web + Telegram', detail: 'portal return and customer-care handoff' },
-  { value: '<30s', label: 'booking follow-up', detail: 'reference, portal, and next-step evidence' },
+  { value: '3', label: 'live service examples', detail: 'Chess, swim school, and AI Mentor proof paths' },
+  { value: 'Done-for-you', label: 'launch setup', detail: 'page, inbox, CRM, calendar, and follow-up configured' },
+  { value: '<30s', label: 'next-step capture', detail: 'booking reference, portal, and customer follow-up' },
 ] as const;
 
 const investorSignals = [
-  { label: 'What matters most', value: 'capture qualified enquiries before they go cold' },
-  { label: 'Conversion path', value: 'move from first contact to booking faster' },
-  { label: 'Follow-up', value: 'keep CRM, email, and customer care aligned' },
-  { label: 'Visibility', value: 'show what was booked and what needs action' },
+  { label: 'Capture', value: 'respond before a ready-to-book customer goes cold' },
+  { label: 'Convert', value: 'turn first contact into a clear booking step' },
+  { label: 'Follow up', value: 'keep email, CRM, and customer care aligned' },
+  { label: 'Manage', value: 'see what was booked and what needs action' },
 ] as const;
 
 const heroFlow = ['Demand', 'Match', 'Book', 'Operate'] as const;
@@ -84,19 +84,19 @@ const heroFlow = ['Demand', 'Match', 'Book', 'Operate'] as const;
 const launchSetupCards = [
   {
     title: 'Custom landing page',
-    body: 'A fresh page for your service, offer, location, and booking CTA.',
+    body: 'Your offer, prices, proof, and booking CTA live on one clear page.',
   },
   {
     title: 'Dedicated email',
-    body: 'A clear inbox for enquiries, confirmations, and customer follow-up.',
+    body: 'Enquiries and confirmations go through a business-ready booking inbox.',
   },
   {
     title: 'Dedicated CRM',
-    body: 'Leads, bookings, payment posture, and care notes organized in one place.',
+    body: 'Leads, bookings, notes, payment status, and follow-up stay in one workspace.',
   },
   {
     title: 'Booking + meeting setup',
-    body: 'Calendar, slots, meeting links, payment next steps, and reminders configured before launch.',
+    body: 'Calendar slots, meeting links, reminders, and payment next steps are configured before launch.',
   },
 ] as const;
 
@@ -114,12 +114,12 @@ const outcomeCards = [
   {
     icon: CalendarCheck2,
     title: 'Booking continuity',
-    body: 'The same flow carries booking intent into confirmation, portal, payment posture, and follow-up.',
+    body: 'The same flow carries booking intent into confirmation, portal, payment next step, and follow-up.',
   },
   {
     icon: BarChart3,
     title: 'Business visibility',
-    body: 'Tenant and admin workspaces expose action runs, reliability posture, support queues, and evidence.',
+    body: 'Your team sees bookings, follow-up tasks, customer notes, and payment status without chasing separate tools.',
   },
 ] as const;
 
@@ -139,7 +139,7 @@ const platformLayers = [
   {
     icon: CircleDollarSign,
     title: 'Revenue core',
-    body: 'Booking intents, payment readiness, confirmations, QR portal return, email, calendar, and CRM sync.',
+    body: 'Booking requests, payment status, confirmations, portal return, email, calendar, and CRM sync.',
     tag: 'Convert',
   },
   {
@@ -150,22 +150,16 @@ const platformLayers = [
   },
 ] as const;
 
-const investorPoints = [
-  'A wedge into local service commerce where missed intent still leaks into calls, DMs, forms, and manual follow-up.',
-  'A reusable agentic booking layer that can move from one vertical proof into many tenant templates.',
-  'A product architecture with commercial surfaces, action history, and customer-care loop already connected.',
-] as const;
-
 const customerPoints = [
   'Start from a customer sentence, not a rigid booking form.',
-  'Keep lead capture, best option, confirmation, payment posture, and support in one journey.',
+  'Keep lead capture, best option, confirmation, payment next step, and support in one journey.',
   'Give your team visibility into what happened, what is blocked, and what needs human review.',
 ] as const;
 
 const proofRows = [
-  ['Co Mai Hung Chess', 'Verified tenant booking', 'Grandmaster proof'],
-  ['Future Swim', 'Team visibility', 'Vertical proof'],
-  ['WSTI demo path', 'Event search to proof trail', 'Hackathon proof'],
+  ['Co Mai Hung Chess', 'Live class enquiry to booking flow', 'Live proof case'],
+  ['Future Swim', 'Service page, booking path, and team follow-up', 'SME service proof'],
+  ['AI Mentor 1-1 Pro', 'Dedicated page, booking email, CRM, and meeting setup', 'Coaching proof'],
 ] as const;
 
 const channelTruthRows = [
@@ -196,7 +190,7 @@ const agentActivityProofRows = [
   {
     step: '04',
     title: 'Follow-up queued',
-    detail: 'CRM, email, Telegram care, payment posture, and manual-review actions become inspectable.',
+    detail: 'CRM, email, customer care, payment status, and team follow-up become easy to review.',
     evidence: 'follow-up trail',
   },
 ] as const;
@@ -376,20 +370,20 @@ export function PublicApp() {
     homepageAudience === 'sme'
       ? {
           audienceBadge: 'For SME owners',
-          eyebrow: 'The AI revenue engine for service businesses',
-          title: 'Never miss a paying enquiry again.',
+          eyebrow: 'Done-for-you AI booking setup',
+          title: 'Get a booking-ready sales page for your service business.',
           body:
-            'BookedAI gives your business a booking-ready landing page, dedicated email, dedicated CRM, and AI follow-up flow so every chat, call, SMS, and DM has a clear next step.',
-          primaryCta: 'See it book a real customer',
+            'BookedAI sets up your landing page, booking email, CRM, calendar, meeting links, and AI follow-up so every enquiry has a clear path to book.',
+          primaryCta: 'See a live booking flow',
           secondaryCta: 'Get my booking page set up',
         }
       : homepageAudience === 'judge'
         ? {
             audienceBadge: 'For hackathon judges',
             eyebrow: 'The AI revenue engine for service businesses',
-            title: 'One AI agent layer. Every channel. Every booking. Audited.',
+          title: 'One AI booking layer. Every channel. Every booking. Visible.',
             body:
-              'BookedAI runs a live AI booking stack across web, WhatsApp, Telegram, SMS, and email, with booking activity you can inspect.',
+            'BookedAI runs a live AI booking stack across web, WhatsApp, Telegram, SMS, and email, with booking activity judges can inspect.',
             primaryCta: 'Run the live demo (60 sec)',
             secondaryCta: 'View booking activity',
           }
@@ -399,7 +393,7 @@ export function PublicApp() {
             title: 'The revenue OS for the next 30M service businesses.',
             body:
               'BookedAI is an omnichannel agent layer that captures intent, books the customer, takes payment, and proves the revenue across one measurable operating system.',
-            primaryCta: 'See live tenant proof',
+            primaryCta: 'See live booking proof',
             secondaryCta: 'Read the investor pitch',
           };
 
@@ -605,7 +599,7 @@ export function PublicApp() {
               >
                 {heroCopy.audienceBadge}
               </div>
-              <h1 className="mt-6 max-w-[14ch] text-[2.17rem] font-semibold leading-[0.95] tracking-[-0.055em] text-[#172033] sm:text-[3.325rem] lg:text-[3.885rem]">
+              <h1 className="mt-6 max-w-[18ch] text-[2.17rem] font-semibold leading-[0.98] tracking-[-0.055em] text-[#172033] sm:text-[3.325rem] lg:text-[3.885rem]">
                 {heroCopy.title}
               </h1>
               <p className="mt-6 max-w-2xl text-[1.08rem] leading-8 text-[#586173] sm:text-xl sm:leading-9">
@@ -675,7 +669,7 @@ export function PublicApp() {
                     <div>
                       <div className="inline-flex items-center gap-2 rounded-full border border-white/12 bg-white/10 px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.14em] text-[#8efce0]">
                         <CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />
-                        Live tenant proof
+                        Live customer proof
                       </div>
                       <h2 className="mt-3 max-w-xl text-2xl font-semibold leading-tight tracking-[-0.04em] text-white sm:text-3xl">
                         See demand become booked revenue.
@@ -786,12 +780,11 @@ export function PublicApp() {
               Agent activity proof
             </div>
             <h2 id="agent-activity-proof-title" className="mt-5 max-w-xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-white sm:text-4xl">
-              The judge and owner can see the revenue loop, not just hear the pitch.
+              The owner and team can see the revenue loop, not just hear a promise.
             </h2>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
-              This is the public proof stack BookedAI should show in every serious demo: the customer
-              asks, the agent ranks, the booking reference opens the portal, and follow-up actions
-              become visible for the business.
+              This is the public proof stack: the customer asks, BookedAI ranks the next best step,
+              the booking reference opens the portal, and follow-up becomes visible for the business.
             </p>
             <div className="mt-6 grid gap-2">
               {channelTruthRows.map((item) => (
@@ -835,9 +828,8 @@ export function PublicApp() {
               A real product surface that carries the customer journey forward.
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-[#586173] sm:text-base">
-              The homepage keeps the chess vertical visible first, then shows broader BookedAI.au
-              proof: a real customer-facing workspace that connects discovery, booking,
-              follow-up, and business visibility.
+              See the workspace behind the customer page: enquiries, booking details, payment status,
+              follow-up, and team notes stay connected after the first conversation.
             </p>
           </div>
 
@@ -862,11 +854,11 @@ export function PublicApp() {
               Pitch video
             </div>
             <h2 className="mt-5 max-w-xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-white sm:text-4xl">
-              Watch the story, then try the live booking system.
+              Watch the story, then try the live booking flow.
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
-              The video gives visitors a fast investor and buyer overview before they compare the
-              live product, architecture, and business proof below.
+              The video gives business owners a quick overview before they try the live product and
+              compare the setup offer below.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <a
@@ -914,8 +906,8 @@ export function PublicApp() {
             </div>
             <p className="max-w-3xl text-base leading-8 text-[#586173] sm:text-lg">
               Local service businesses do not lose revenue only because they lack traffic. They lose
-              it because intent arrives fragmented across search, chat, calls, forms, payment links,
-              and staff follow-up. BookedAI joins those moments into one agentic booking system.
+              it because intent arrives across search, chat, calls, forms, payment links, and staff
+              follow-up. BookedAI joins those moments into one AI booking system.
             </p>
           </div>
 
@@ -967,7 +959,7 @@ export function PublicApp() {
               </h2>
               <p className="mt-3 max-w-3xl text-sm leading-7 text-[#586173] sm:text-base">
                 Try the customer-facing agent below. It keeps search, shortlist, booking intent,
-                payment posture, confirmation, and follow-up in one commercial flow.
+                payment next step, confirmation, and follow-up in one commercial flow.
               </p>
             </div>
             <div className="flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:overflow-x-visible sm:pb-0">
@@ -1012,7 +1004,7 @@ export function PublicApp() {
                 src={tenantPreviewImageUrl}
                 srcSet={tenantPreviewImageSrcSet}
                 sizes="(min-width: 1024px) 42vw, calc(100vw - 2rem)"
-                alt="BookedAI tenant operations workspace preview"
+                alt="BookedAI business workspace preview"
                 className="aspect-[16/10] w-full object-cover object-top"
                 loading="lazy"
                 width={1400}
@@ -1052,12 +1044,16 @@ export function PublicApp() {
       <section className="px-4 py-10 sm:px-6 lg:px-8">
         <div className="mx-auto grid max-w-[1440px] gap-5 lg:grid-cols-2">
           <div className="rounded-[2rem] border border-[#d8d0c0] bg-white p-6 shadow-[0_20px_54px_rgba(86,73,50,0.08)] sm:p-8">
-            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a6b24]">For investors</div>
+            <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8a6b24]">For business owners</div>
             <h2 className="mt-3 text-3xl font-semibold tracking-[-0.04em] text-[#172033] sm:text-4xl">
-              A vertical AI commerce wedge with reusable infrastructure.
+              We set up the front door and the follow-up engine together.
             </h2>
             <div className="mt-6 space-y-3">
-              {investorPoints.map((point) => (
+              {[
+                'Your service offer, booking CTA, contact details, proof, and next steps live on a page customers can act on.',
+                'Your team receives cleaner enquiries with booking context, contact details, preferred time, and payment next step.',
+                'Your CRM, email, meeting links, and follow-up workflow are configured around the way your business sells.',
+              ].map((point) => (
                 <div key={point} className="flex gap-3 rounded-2xl bg-[#fbf7ee] p-4">
                   <CheckCircle2 className="mt-0.5 h-5 w-5 shrink-0 text-[#2aa876]" aria-hidden="true" />
                   <p className="text-sm leading-7 text-[#586173]">{point}</p>
@@ -1088,28 +1084,28 @@ export function PublicApp() {
           <div>
             <div className="text-[11px] font-bold uppercase tracking-[0.18em] text-[#8efce0]">Ready to move faster?</div>
             <h2 className="mt-3 max-w-3xl text-3xl font-semibold leading-tight tracking-[-0.04em] sm:text-5xl">
-              Start with the product flow, then inspect the company story.
+              Get your booking page, inbox, CRM, and meeting flow set up.
             </h2>
             <p className="mt-4 max-w-2xl text-base leading-8 text-slate-300">
-              Use the live app for customer proof, the pitch for investor context, and the roadmap
-              for what is shipping next.
+              Start with a focused launch setup for one service, offer, or location. BookedAI helps
+              turn more enquiries into booked next steps without adding more admin.
             </p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row lg:shrink-0">
             <button
               type="button"
-              onClick={() => navigateTo(homepageFinalProductHref, 'homepage_primary_cta_clicked', { surface: 'footer', action: 'open_product' })}
+              onClick={() => navigateTo('/register-interest?source_section=homepage_footer_launch_setup', 'homepage_primary_cta_clicked', { surface: 'footer', action: 'claim_launch_setup' })}
               className="inline-flex items-center justify-center gap-2 rounded-full bg-white px-5 py-3 text-sm font-bold text-[#172033] transition hover:bg-[#eef4f2]"
             >
-              Start with BookedAI
+              Get my booking page set up
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </button>
             <button
               type="button"
-              onClick={() => navigateTo(pitchDeckHref, 'homepage_pitch_clicked', { surface: 'footer' })}
+              onClick={() => navigateTo(homepageFinalProductHref, 'homepage_primary_cta_clicked', { surface: 'footer', action: 'open_product' })}
               className="inline-flex items-center justify-center gap-2 rounded-full border border-white/18 bg-white/[0.08] px-5 py-3 text-sm font-bold text-white transition hover:bg-white/[0.14]"
             >
-              Pitch deck
+              See live product
               <ArrowRight className="h-4 w-4" aria-hidden="true" />
             </button>
           </div>

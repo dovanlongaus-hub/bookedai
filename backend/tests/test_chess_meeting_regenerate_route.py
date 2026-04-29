@@ -129,11 +129,27 @@ class RegenerateMeetingZohoUnconfiguredTestCase(TestCase):
     def test_returns_503_when_zoho_not_configured(self):
         """Without ``ZOHO_CALENDAR_UID`` (and no OAuth credentials), the
         endpoint must surface ``503 zoho_calendar_unconfigured`` so the
-        tenant operator UI can prompt for Zoho configuration."""
+        tenant operator UI can prompt for Zoho configuration.
+
+        The Wave 16 per-tenant Zoho refactor opens a DB session early so
+        the tenant credential resolver can run before the configured-check;
+        we therefore patch ``get_session`` + ``resolve_tenant_zoho_calendar_credentials``
+        to return ``None`` (i.e. neither the tenant nor the platform has
+        Zoho configured) so the handler still falls into the 503 branch.
+        """
         app = _make_app(zoho_configured=False)
+
+        async def _none_resolver(*_args, **_kwargs):
+            return None
+
         with patch(
             "api.v1_chess_meeting_handlers._resolve_tenant_request_context",
             _resolve_signed_tenant_context,
+        ), patch(
+            "api.v1_chess_meeting_handlers.get_session", _fake_get_session
+        ), patch(
+            "api.v1_chess_meeting_handlers.resolve_tenant_zoho_calendar_credentials",
+            _none_resolver,
         ):
             client = TestClient(app)
             response = client.post(

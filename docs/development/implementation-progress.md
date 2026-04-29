@@ -12,6 +12,24 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-28`
 
+Implementation update from `2026-04-29` (product search/booking execution planning):
+
+- created `docs/development/product-search-booking-execution-plan-2026-04-29.md` as the implementation bridge for the next product coding pass
+- assigned role and skill ownership for search relevance/location truth, product assistant UI states, after-booking order detail, customer identity/prefill, wallet pass generation, QA/release gates, and customer-care continuity
+- mapped the work into Phase 17, Phase 19, Phase 20.5, Phase 21, and Phase 23 with acceptance gates and an immediate P0/P1/P2 coding backlog
+- synced the plan into `project.md`, the current phase/sprint execution plan, and the master roadmap changelog
+- published the planning closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-29/022513-product-search-and-booking-execution-plan.md`
+- verification: documentation-only change plus `git diff --check`
+- status: planning is ready for coding handoff; the highest-priority implementation item is backend/live-read location mismatch suppression, followed by product/homepage live-read gate split
+
+Implementation update from `2026-04-29` (product professional user review and location relevance guardrail, local):
+
+- reviewed live `product.bookedai.au` from a professional user perspective on mobile-sized flow with chess, swim, and WSTI/event prompts; production UI had no overflow, console errors, or failed requests, but search relevance can still feel demo-like when a query names Sydney/Miranda and catalog fallback surfaces other-state results
+- added a local instant-search guardrail in `BookingAssistantDialog.tsx`: when a query contains a clear location such as Sydney, Miranda, Caringbah, Brisbane, Carlton, or Western Sydney, services that do not match the requested location text are penalized before being shown as top instant matches
+- verification passed: `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh legacy tests/product-app-regression.spec.ts tests/product-explicit-book-gate.spec.ts tests/product-popup-detail-no-noise.spec.ts --workers=1 --reporter=line` (`10 passed`); `npm --prefix frontend run build`; `git diff --check`
+- published the local closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-29/021154-product-professional-review-and-location-guardrail.md`
+- status: local relevance guardrail is complete; live deploy and deeper backend ranking/location extraction remain follow-up work
+
 Implementation update from `2026-04-29` (public pitch/homepage SME messaging pass, local):
 
 - reviewed `pitch.bookedai.au`, `/architecture`, `bookedai.au`, `chess.bookedai.au`, and `aimentor.bookedai.au` through content-marketing, content-writing, frontend-design, and Playwright lenses, with a spawned content review agent providing a parallel wording audit
@@ -3211,6 +3229,14 @@ The `bookedai.au` public assistant now keeps lead capture on the public tenant-s
 - tenant-session backend errors such as `Tenant session required` and `actor_context.tenant_id` are converted into customer-safe recovery copy in the chat submit surfaces
 - homepage booking error UI now renders as a compact recovery card with a clear return-to-results action instead of exposing raw API detail
 - verification passed: frontend typecheck, production build, focused live-read booking submit Playwright test, live deploy, homepage asset probe, backend health probe, and live public lead smoke for tenant slug `bookedai-au`
+
+## 2026-04-29 Pitch.bookedai.au SME Polish Follow-Up
+
+- update: re-polished `frontend/src/apps/public/PitchDeckApp.tsx` so the first viewport and early sections sell the complete SME setup: booking-ready landing page, dedicated email, CRM workspace, AI intake, booking/calendar/meeting setup, payment next steps, and follow-up workflow.
+- update: added an early `What SMEs get` section, moved the launch offer above the pitch video, reframed navigation and CTAs around `Launch Offer`, `How It Works`, `Scale`, `Rollout`, and `Claim launch setup`, and tightened the final CTA to `Get the booking-ready setup for your SME.`
+- update: reworded `/architecture` customer-facing copy in `frontend/src/apps/public/ArchitectureApp.tsx` away from internal tenant/audit/ledger language and changed the partner capability label for audit-ledger style features to `Booking history`.
+- update: published the closeout to Notion and Discord; archive entry is `docs/development/telegram-sync/2026-04-29/031156-pitch-bookedai-sme-polish-follow-up.md`.
+- verification: `npm --prefix frontend run build`; `cd frontend && npx playwright test tests/pitch-deck-rendering.spec.ts tests/pitch-architecture-viz.spec.ts --project=legacy` (`4 passed`); `git diff --check`; scoped copy grep found no public-facing hits for the removed internal pitch phrases.
 - `2026-04-26`
   - lane: `Sprint 19 follow-on FX-2/FX-5/FX-7 closures`
   - update: with the eight Sprint 19 P0 items already mostly closed (only operator-side `P0-2` WhatsApp provider posture remains), shipped three Tier 2 fixes from `docs/development/full-stack-review-2026-04-26.md`. The `Phase 17` and `Phase 19` backlog now records `FX-2`, `FX-5`, `FX-7` as `closed` with the carry-forward note for direct-fetch cleanup left under `FX-2`.

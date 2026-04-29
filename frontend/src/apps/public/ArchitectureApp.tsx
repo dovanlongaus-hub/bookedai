@@ -75,8 +75,8 @@ const capabilityCards = [
   },
   {
     icon: ShieldCheck,
-    title: 'Enterprise governance',
-    body: 'Policy-gated automation, audit records, tenant boundaries, and manual-review fallbacks are first-class surfaces.',
+    title: 'Customer-safe governance',
+    body: 'Policy-gated automation, review records, customer data boundaries, and manual-review fallbacks are first-class surfaces.',
   },
 ] as const;
 
@@ -92,16 +92,16 @@ const proofImages = [
     src: '/branding/optimized/tenant-login-hero-1400.webp',
     srcSet:
       '/branding/optimized/tenant-login-hero-960.webp 960w, /branding/optimized/tenant-login-hero-1400.webp 1400w',
-    title: 'Tenant operations proof',
-    body: 'The tenant gateway and workspace demonstrate how teams inherit booking context instead of raw chat noise.',
+    title: 'Business workspace proof',
+    body: 'The business gateway and workspace demonstrate how teams inherit booking context instead of raw chat noise.',
   },
 ] as const;
 
 const enterpriseRows = [
   ['Reliability', 'Health checks, route visibility, policy outcomes, and manual-review posture are visible in admin tools.'],
-  ['Security boundary', 'Tenant, portal, and admin surfaces stay separated while sharing booking references and audit context.'],
+  ['Security boundary', 'Customer, portal, and admin surfaces stay separated while sharing the booking context teams need.'],
   ['Integration posture', 'Email, calendar, CRM, payment posture, WhatsApp, and workflow automation are modeled as recoverable rails.'],
-  ['Scale pattern', 'A single vertical proof can become a reusable tenant template without rewriting the customer journey.'],
+  ['Scale pattern', 'A single vertical proof can become a reusable business template without rewriting the customer journey.'],
 ] as const;
 
 function TopNav() {
@@ -135,15 +135,15 @@ function TopNav() {
             href={registerUrl}
             className="inline-flex min-h-[44px] items-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white transition hover:-translate-y-0.5"
           >
-            Talk to Sales
+            Claim launch setup
           </a>
         </nav>
         <a
           href={registerUrl}
           className="inline-flex min-h-[44px] items-center rounded-full bg-slate-950 px-4 py-2 text-sm font-semibold text-white md:hidden"
-          aria-label="Talk to Sales"
+          aria-label="Claim launch setup"
         >
-          Talk to Sales
+          Claim launch setup
         </a>
       </div>
     </header>
@@ -200,9 +200,9 @@ function ArchitectureHeroDiagram() {
             </div>
             {[
               ['AI', 'left-5 top-20'],
-              ['Ops', 'right-5 top-20'],
+              ['Team', 'right-5 top-20'],
               ['Care', 'left-5 bottom-20'],
-              ['Ledger', 'right-5 bottom-20'],
+              ['Proof', 'right-5 bottom-20'],
             ].map(([label, cls]) => (
               <div
                 key={label}
@@ -310,7 +310,7 @@ export function ArchitectureApp() {
                 href={registerUrl}
                 className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:-translate-y-0.5"
               >
-                Talk to Sales
+                Claim launch setup
               </a>
             </div>
 
@@ -466,7 +466,7 @@ export function ArchitectureApp() {
               Open live product
             </a>
             <a href={registerUrl} className="rounded-full border border-slate-200 px-5 py-3 text-sm font-semibold text-slate-950">
-              Talk to Sales
+              Claim launch setup
             </a>
           </div>
         </div>

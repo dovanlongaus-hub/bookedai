@@ -281,13 +281,16 @@ export function ProductApp() {
               className="h-10 w-[8.5rem] max-w-[calc(100vw-13rem)] shrink-0 object-cover object-center sm:w-[10.75rem]"
             />
             <div className="hidden items-center gap-1.5 md:flex">
-              <span className="template-chip">Search to booking</span>
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
+                <span aria-hidden="true">✨</span>
+                Search → Booking
+              </span>
             </div>
           </div>
 
           <div className="flex shrink-0 items-center gap-1.5">
             <div className="hidden items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 sm:flex sm:px-2.5">
-              <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
               <span className="text-xs font-semibold text-emerald-700">{productFlowLabel}</span>
             </div>
 
@@ -307,7 +310,7 @@ export function ProductApp() {
                     referrerPolicy="no-referrer"
                   />
                 ) : (
-                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-slate-950 text-white">
+                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#7c3aed_0%,#9333ea_100%)] text-white shadow-[0_4px_10px_rgba(124,58,237,0.28)]">
                     <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
                   </span>
                 )}
@@ -315,13 +318,13 @@ export function ProductApp() {
               </button>
 
               {accountMenuOpen ? (
-                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(20rem,calc(100vw-1.5rem))] rounded-[1.2rem] border border-black/8 bg-white p-3 text-slate-700 shadow-[0_24px_60px_rgba(15,23,42,0.16)]">
+                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(20rem,calc(100vw-1.5rem))] rounded-[1.4rem] border border-violet-100 bg-white p-3.5 text-slate-700 shadow-[0_24px_60px_rgba(124,58,237,0.18)]">
                   {customerProfile ? (
                     <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Booking profile</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Booking profile</div>
                       <div className="mt-2 text-sm font-semibold text-slate-950">{customerProfile.name}</div>
                       <div className="mt-0.5 text-xs text-slate-500">{customerProfile.email}</div>
-                      <div className="mt-3 rounded-[1rem] bg-emerald-50 px-3 py-2 text-[11px] leading-4 text-emerald-800">
+                      <div className="mt-3 rounded-[1rem] border border-violet-100 bg-violet-50 px-3 py-2 text-[11px] leading-4 text-violet-800">
                         Future booking forms will use this name and email unless you edit them.
                       </div>
                       <button
@@ -330,7 +333,7 @@ export function ProductApp() {
                           setCustomerProfile(null);
                           setAccountMenuOpen(false);
                         }}
-                        className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:bg-slate-50"
+                        className="mt-3 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 transition hover:border-violet-200 hover:bg-violet-50"
                       >
                         <LogOut className="h-3.5 w-3.5" aria-hidden="true" />
                         Sign out
@@ -338,7 +341,7 @@ export function ProductApp() {
                     </div>
                   ) : (
                     <div>
-                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-500">Faster booking</div>
+                      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Faster booking</div>
                       <div className="mt-1 text-sm font-semibold text-slate-950">Save your name and email once.</div>
                       <div className="mt-2 text-xs leading-5 text-slate-500">
                         BookedAI can prefill future booking requests from this browser.
@@ -354,7 +357,7 @@ export function ProductApp() {
                             autoComplete="name"
                             value={emailSignInName}
                             onChange={(event) => setEmailSignInName(event.target.value)}
-                            className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm font-medium outline-none focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-sky-500"
+                            className="mt-1 w-full rounded-2xl border border-violet-100 bg-violet-50/40 px-3 py-2.5 text-sm font-medium outline-none transition focus:border-violet-400 focus:bg-white focus-visible:ring-2 focus-visible:ring-violet-500"
                           />
                         </label>
                         <label className="block text-xs font-semibold text-slate-600">
@@ -365,12 +368,12 @@ export function ProductApp() {
                             inputMode="email"
                             value={emailSignInEmail}
                             onChange={(event) => setEmailSignInEmail(event.target.value)}
-                            className="mt-1 w-full rounded-2xl border border-slate-200 px-3 py-2.5 text-sm font-medium outline-none focus:border-slate-400 focus-visible:ring-2 focus-visible:ring-sky-500"
+                            className="mt-1 w-full rounded-2xl border border-violet-100 bg-violet-50/40 px-3 py-2.5 text-sm font-medium outline-none transition focus:border-violet-400 focus:bg-white focus-visible:ring-2 focus-visible:ring-violet-500"
                           />
                         </label>
                         <button
                           type="submit"
-                          className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full bg-slate-950 px-4 text-xs font-semibold text-white transition hover:bg-slate-800"
+                          className="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full bg-violet-600 px-4 text-xs font-semibold text-white transition hover:bg-violet-700 hover:shadow-[0_8px_22px_rgba(124,58,237,0.32)]"
                         >
                           <Mail className="h-3.5 w-3.5" aria-hidden="true" />
                           Continue with email
@@ -423,17 +426,21 @@ export function ProductApp() {
 
         {/* Single compact flow strip. Keep the first screen focused on chat. */}
         <div className="relative z-10 hidden px-3 pb-2 sm:block sm:px-5">
-          <div className="mx-auto flex max-w-[56rem] items-center gap-2 rounded-[1rem] border border-black/6 bg-white/72 px-3 py-1.5 shadow-[0_8px_24px_rgba(15,23,42,0.04)] backdrop-blur-sm sm:justify-between sm:gap-3 sm:px-4 sm:py-2">
+          <div className="mx-auto flex max-w-[56rem] items-center gap-2 rounded-[1.1rem] border border-violet-100 bg-[linear-gradient(135deg,rgba(250,245,255,0.95),rgba(255,255,255,0.85))] px-3 py-1.5 shadow-[0_10px_28px_rgba(124,58,237,0.06)] backdrop-blur-sm sm:justify-between sm:gap-3 sm:px-4 sm:py-2">
             <div className="hidden min-w-0 flex-1 sm:block">
               <div className="truncate text-xs font-semibold text-[var(--apple-near-black)]">
                 {productFlowDescription}
               </div>
             </div>
             <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 sm:flex-none sm:overflow-visible sm:pb-0">
-              {productFlowSteps.map((step) => (
+              {productFlowSteps.map((step, stepIndex) => (
                 <span
                   key={step}
-                  className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold leading-5 text-slate-600 sm:px-2.5 sm:py-1 sm:text-xs"
+                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-5 sm:px-2.5 sm:py-1 sm:text-xs ${
+                    stepIndex === 0
+                      ? 'bg-violet-600 text-white shadow-[0_4px_12px_rgba(124,58,237,0.25)]'
+                      : 'bg-violet-50 text-violet-700 ring-1 ring-violet-100'
+                  }`}
                 >
                   {step}
                 </span>

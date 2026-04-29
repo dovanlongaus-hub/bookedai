@@ -1,29 +1,9 @@
-import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 import '../../theme/chess-tokens.css';
-import { createPublicBookingAssistantLeadAndBookingIntent } from '../../components/landing/assistant/publicBookingAssistantV1';
-import { PaymentSelection } from '../../components/chess/PaymentSelection';
-import { CourseIllustration, type CourseIllustrationVariant } from '../../components/chess/CourseIllustration';
+import { ChessBookingChat, type ChessProgramKeyHint } from '../../components/chess/ChessBookingChat';
+import { type CourseIllustrationVariant } from '../../components/chess/CourseIllustration';
 import { ChessPieceIllustration } from '../../components/chess/ChessPieceIllustration';
-import { ChessLogoLockup, ChessLogoMark } from '../../components/chess/ChessLogo';
-import {
-  IconBoard,
-  IconCertificate,
-  IconClock,
-  IconKnight,
-  IconLichess,
-  IconTrophy,
-  IconZoom,
-} from '../../components/chess/ChessIcons';
-import { OrderConfirmation } from '../../components/chess/OrderConfirmation';
-import { TimeSlotPicker } from '../../components/chess/TimeSlotPicker';
-import {
-  apiV1,
-  type ChessCatalogMatch,
-  type ChessCourseSlot,
-  type ChessPaymentOption,
-} from '../../shared/api/v1';
-import type { MatchCandidate } from '../../shared/contracts';
 
 // Launch promo countdown end (Asia/Ho_Chi_Minh = UTC+7). Bump this date to
 // extend the launch banner; keeping it as a top-level constant means there is
@@ -32,45 +12,6 @@ const LAUNCH_PROMO_END_DATE = new Date('2026-05-12T23:59:59+07:00');
 const PROMO_BANNER_DISMISSED_KEY = 'chess.promoBanner.dismissedAt';
 
 type Locale = 'en' | 'vi';
-
-type ConversationMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-};
-
-type InquiryFormState = {
-  customerName: string;
-  email: string;
-  phone: string;
-  studentAge: string;
-  trainingGoal: string;
-  preferredFormat: string;
-  preferredDate: string;
-  preferredTime: string;
-  selectedServiceId: string;
-  selectedSlotId: string;
-  notes: string;
-};
-
-type BookingAssistantCatalogResponse = {
-  status?: string;
-  services?: Array<{
-    id?: string;
-    name?: string;
-    category?: string | null;
-    summary?: string | null;
-    amount_aud?: number | null;
-    display_price?: string | null;
-    location?: string | null;
-    venue_name?: string | null;
-    booking_url?: string | null;
-    map_url?: string | null;
-    source_url?: string | null;
-    image_url?: string | null;
-    featured?: boolean;
-    tags?: string[] | null;
-  }>;
-};
 
 type ProgramTier = {
   key: string;
@@ -229,7 +170,7 @@ const programs: ProgramTier[] = [
 // of truth — these locally derived numbers are only sent so the backend can echo / validate them.
 const VND_PER_AUD = 16500;
 
-type ChessProgramKey = (typeof programs)[number]['key'];
+type ChessProgramKey = 'beginner' | 'private' | 'tournament' | 'elite';
 
 interface ChessProgramAmounts {
   programKey: ChessProgramKey;
@@ -254,31 +195,26 @@ function resolveProgramAmounts(programKey: ChessProgramKey): ChessProgramAmounts
   }
 }
 
-function inferProgramKeyFromService(
-  candidate: MatchCandidate | null,
-  formGoal: string,
-  formFormat: string,
-): ChessProgramKey {
-  const haystacks = [
-    candidate?.candidateId ?? '',
-    candidate?.serviceName ?? '',
-    formGoal,
-    formFormat,
-  ]
-    .map((value) => value.toLowerCase())
-    .join(' | ');
+function inferProgramKeyFromName(serviceName: string): ChessProgramKey {
+  const haystack = (serviceName || '').toLowerCase();
   if (
-    haystacks.includes('elite') ||
-    haystacks.includes('cao cấp') ||
-    haystacks.includes('cao cap') ||
-    haystacks.includes('premium')
+    haystack.includes('elite') ||
+    haystack.includes('cao cấp') ||
+    haystack.includes('cao cap') ||
+    haystack.includes('premium')
   ) {
     return 'elite';
   }
-  if (haystacks.includes('tournament')) {
+  if (haystack.includes('tournament') || haystack.includes('thi đấu') || haystack.includes('thi dau')) {
     return 'tournament';
   }
-  if (haystacks.includes('private') || haystacks.includes('1-1') || haystacks.includes('1 kèm 1')) {
+  if (
+    haystack.includes('private') ||
+    haystack.includes('1-1') ||
+    haystack.includes('1 kèm 1') ||
+    haystack.includes('1-on-1') ||
+    haystack.includes('kèm riêng')
+  ) {
     return 'private';
   }
   return 'beginner';
@@ -325,6 +261,7 @@ const dict = {
       name: 'WGM Nguyễn Thị Mai Hưng',
       meta: 'Woman Grandmaster · Vietnam · Born 1994 in Bắc Giang · Peak FIDE 2357',
       quote: 'Chess is the discipline of seeing one move further than your opponent.',
+      portraitAlt: 'WGM Nguyễn Thị Mai Hưng — Vietnamese Woman Grandmaster',
     },
     profile: {
       eyebrowMeet: 'Meet your coach',
@@ -333,6 +270,7 @@ const dict = {
         'WGM Nguyễn Thị Mai Hưng is a Vietnamese Woman Grandmaster, born 28 January 1994 in Bắc Giang. She earned the WIM title in 2010 and the WGM title in 2014, with a peak FIDE rating of 2357 reached in October 2016.',
         "Her competitive record includes the 2013 Vietnamese Women's Chess Championship, multiple Asian Youth Championship titles (U12 in 2005, U14 in 2007, U16 in 2010), the 2013 Asian Junior Championship (U20 girls), team and individual gold at the 2009 Women's Asian Team Championship, and individual bronze at the 2011 World Women's Team Championship. She has represented Vietnam in five Women's Chess Olympiads (2010, 2012, 2014, 2016, 2018).",
         'All sessions are online — Mai Hưng teaches via Lichess board + Zoom video, with Zoho Meeting for 1-on-1 video conferencing and a Zoho Calendar reminder for every booking. Lessons available in English or Vietnamese for students from age 6 through adult improvers.',
+        "Most recently, in April 2026 she represented Vietnam at the O2C Doeberl Cup in Canberra — Australia's premier Grand Prix tournament since 1963 — where she won the Best Female prize in the Premier (Master-level) division.",
       ],
       portraitCaption: 'WGM Nguyễn Thị Mai Hưng — academy portrait',
       portraitVideoCta: 'Watch a 2-min preview',
@@ -346,6 +284,8 @@ const dict = {
       eyebrowAchievements: 'Track record',
       achievementsTitle: 'A career on the board, with the medals to show for it.',
       achievements: [
+        '2026 — Best Female, O2C Doeberl Cup Premier (Australia, April)',
+        '2024-2025 — Active competitive play, Vietnamese national-level events',
         '2014 — WGM title awarded by FIDE',
         '2016 — Peak FIDE rating 2357',
         "2013 — Vietnamese Women's Chess Champion",
@@ -618,7 +558,7 @@ const dict = {
       amountLabel: 'Amount',
       copy: 'Copy',
       copied: 'Copied',
-      qrAlt: 'Vietcombank QR code for the chess academy account',
+      qrAlt: 'Techcombank QR code for WGM Mai Hưng chess academy',
       instructionsHeading: 'How to pay',
       vndInstructions: [
         'Open your bank app and choose the QR / chuyển khoản option.',
@@ -679,6 +619,66 @@ const dict = {
       en: 'EN',
       vi: 'VI',
     },
+    book: {
+      eyebrow: 'Chat to book',
+      banner: '💬 Book with WGM Mai Hưng — chat below',
+      floatingLabel: 'Open booking chat',
+    },
+    chat: {
+      header: 'Chat to book',
+      reset: 'Reset',
+      inputPlaceholder: 'Type a message…',
+      send: 'Send',
+      voiceTooltip: 'Voice coming soon',
+      intro:
+        "Hi! I'm here to help you find the right chess class with WGM Mai Hưng. What are you looking for?",
+      searching: 'Looking through the academy catalog…',
+      searchHits: 'Here are the best matches:',
+      searchEmpty:
+        "I couldn't find a strong match yet. Try describing the student's age and goal, or tap browse all.",
+      searchError: 'Sorry — search is temporarily unavailable. Please try again in a moment.',
+      pickSlotPrompt: 'Great choice. When works for you?',
+      slotsLoading: 'Loading available sessions…',
+      slotsEmpty:
+        'No scheduled cohorts in the next 4 weeks for this class. We can still capture your details and the coach will arrange a custom slot.',
+      slotsError: 'We could not load live sessions just now.',
+      slotSpotsLeft: (count: number) => `${count} spots left`,
+      slotSpotsLast: (count: number) => `Only ${count} left`,
+      collectingName: 'What name should the booking be under?',
+      collectingEmail: 'What email should we send the meeting link to?',
+      collectingPhone: 'Phone number? (optional — skip if you prefer)',
+      reviewing: 'Quick check before we hold your spot:',
+      submitting: 'Holding your spot…',
+      payment:
+        "Pick a payment method — or skip and we'll send a payment link by email.",
+      bookAnother: 'Book another',
+      done: 'Done',
+      edit: 'Edit',
+      confirm: 'Confirm',
+      skipPhone: 'Skip phone',
+      browseAll: 'Browse all classes',
+      chooseCourse: 'Choose this',
+      selected: 'Selected',
+      errorEmail: "That email doesn't look right — could you try again?",
+      errorName: 'Could you give me at least a first name?',
+      reviewLineCourse: (name: string) => `Class: ${name}`,
+      reviewLineSlot: (datetime: string) => `When: ${datetime}`,
+      reviewLineContact: (name: string, email: string) => `Contact: ${name} · ${email}`,
+      reviewSlotTbc: 'When: to be confirmed by email',
+      cohortDefault: 'Chess class',
+      ariaThread: 'Booking conversation',
+      inputLabel: 'Message to the booking assistant',
+      quickReplies: [
+        'My child is 8, just starting',
+        'Adult improver, weekends',
+        'Tournament prep, ages 12+',
+        'Private 1-on-1 with recordings',
+      ],
+      ctaBanner: '💬 Book with WGM Mai Hưng — chat below',
+      defaultName: 'Chess academy parent',
+      bookingError:
+        'Something went wrong saving your spot. Try again or email chess@bookedai.au.',
+    },
   },
   vi: {
     htmlTitle: 'Học viện Cờ vua GM Mai Hùng — Học cờ cùng Đại kiện tướng Việt Nam',
@@ -720,6 +720,7 @@ const dict = {
       name: 'WGM Nguyễn Thị Mai Hưng',
       meta: 'Đại kiện tướng nữ · Việt Nam · Sinh 1994 tại Bắc Giang · Elo cao nhất 2357',
       quote: 'Cờ vua là kỷ luật của việc nhìn xa hơn đối thủ một nước.',
+      portraitAlt: 'WGM Nguyễn Thị Mai Hưng — Đại kiện tướng cờ vua nữ Việt Nam',
     },
     profile: {
       eyebrowMeet: 'Gặp huấn luyện viên',
@@ -728,6 +729,7 @@ const dict = {
         'WGM Nguyễn Thị Mai Hưng là Đại kiện tướng cờ vua nữ của Việt Nam, sinh ngày 28/01/1994 tại Bắc Giang. Cô đạt danh hiệu WIM năm 2010 và WGM năm 2014, đỉnh cao Elo FIDE 2357 (tháng 10/2016).',
         'Thành tích thi đấu nổi bật gồm: vô địch nữ Việt Nam 2013, nhiều lần vô địch giải Trẻ Châu Á (U12 năm 2005, U14 năm 2007, U16 năm 2010), vô địch Trẻ Châu Á U20 nữ năm 2013, huy chương vàng đồng đội + cá nhân tại Giải Đồng đội Châu Á nữ 2009, huy chương đồng cá nhân Giải Đồng đội Thế giới nữ 2011. Cô đại diện Việt Nam tham dự 5 kỳ Olympiad cờ vua nữ (2010, 2012, 2014, 2016, 2018).',
         'Tất cả buổi học hiện diễn ra online — Mai Hưng dạy qua bàn cờ Lichess + video Zoom, với Zoho Meeting cho buổi 1-1 và nhắc lịch tự động qua Zoho Calendar cho mỗi buổi đặt. Có thể học bằng Tiếng Anh hoặc Tiếng Việt cho học viên từ 6 tuổi đến người lớn cải thiện.',
+        'Gần nhất, tháng 4/2026 cô đại diện Việt Nam tại giải O2C Doeberl Cup tại Canberra — giải Grand Prix hàng đầu Úc từ năm 1963 — nơi cô giành giải Best Female (Nữ xuất sắc nhất) trong bảng Premier (Master).',
       ],
       portraitCaption: 'WGM Nguyễn Thị Mai Hưng — ảnh chính thức của học viện',
       portraitVideoCta: 'Xem giới thiệu 2 phút',
@@ -741,6 +743,8 @@ const dict = {
       eyebrowAchievements: 'Hành trang',
       achievementsTitle: 'Sự nghiệp trên bàn cờ và những huy chương đi kèm.',
       achievements: [
+        '2026 — Best Female, O2C Doeberl Cup Premier (Úc, tháng 4)',
+        '2024-2025 — Tích cực thi đấu các giải trong nước',
         '2014 — Đạt danh hiệu WGM (FIDE)',
         '2016 — Đỉnh cao Elo FIDE 2357',
         '2013 — Vô địch nữ Việt Nam',
@@ -1015,7 +1019,7 @@ const dict = {
       amountLabel: 'Số tiền',
       copy: 'Sao chép',
       copied: 'Đã sao chép',
-      qrAlt: 'Mã QR Vietcombank của Học viện Cờ vua',
+      qrAlt: 'Mã QR Techcombank của Học viện Cờ vua WGM Mai Hưng',
       instructionsHeading: 'Hướng dẫn thanh toán',
       vndInstructions: [
         'Mở ứng dụng ngân hàng và chọn chức năng QR / chuyển khoản.',
@@ -1076,22 +1080,68 @@ const dict = {
       en: 'EN',
       vi: 'VI',
     },
+    book: {
+      eyebrow: 'Trò chuyện để đặt lớp',
+      banner: '💬 Đặt lớp với WGM Mai Hưng — trò chuyện bên dưới',
+      floatingLabel: 'Mở chat đặt lớp',
+    },
+    chat: {
+      header: 'Trò chuyện để đặt lớp',
+      reset: 'Bắt đầu lại',
+      inputPlaceholder: 'Nhập tin nhắn…',
+      send: 'Gửi',
+      voiceTooltip: 'Tính năng giọng nói sắp ra mắt',
+      intro:
+        'Xin chào! Tôi giúp bạn tìm lớp cờ vua phù hợp với WGM Mai Hưng. Bạn đang quan tâm điều gì?',
+      searching: 'Đang tìm trong học viện…',
+      searchHits: 'Đây là các lớp phù hợp nhất:',
+      searchEmpty:
+        'Hiện chưa tìm được lớp phù hợp. Hãy mô tả tuổi học viên và mục tiêu, hoặc bấm xem tất cả.',
+      searchError: 'Tìm kiếm tạm thời không khả dụng. Vui lòng thử lại sau giây lát.',
+      pickSlotPrompt: 'Tuyệt vời. Khi nào bạn muốn học?',
+      slotsLoading: 'Đang tải các buổi học…',
+      slotsEmpty:
+        'Hiện chưa có buổi học công khai trong 4 tuần tới cho lớp này. Chúng tôi vẫn ghi nhận và giáo viên sẽ sắp xếp lịch riêng.',
+      slotsError: 'Không tải được lịch buổi học lúc này.',
+      slotSpotsLeft: (count: number) => `Còn ${count} chỗ`,
+      slotSpotsLast: (count: number) => `Chỉ còn ${count} chỗ`,
+      collectingName: 'Tên người đăng ký?',
+      collectingEmail: 'Email để gửi link buổi học?',
+      collectingPhone: 'Số điện thoại? (không bắt buộc)',
+      reviewing: 'Kiểm tra nhanh trước khi giữ chỗ:',
+      submitting: 'Đang giữ chỗ…',
+      payment:
+        'Chọn cách thanh toán — hoặc bỏ qua, chúng tôi sẽ gửi link qua email.',
+      bookAnother: 'Đặt lớp khác',
+      done: 'Hoàn tất',
+      edit: 'Sửa',
+      confirm: 'Xác nhận',
+      skipPhone: 'Bỏ qua',
+      browseAll: 'Xem tất cả lớp',
+      chooseCourse: 'Chọn lớp này',
+      selected: 'Đã chọn',
+      errorEmail: 'Email có vẻ chưa đúng — bạn nhập lại giúp nhé?',
+      errorName: 'Cho tôi biết ít nhất tên gọi của bạn nhé?',
+      reviewLineCourse: (name: string) => `Lớp: ${name}`,
+      reviewLineSlot: (datetime: string) => `Lúc: ${datetime}`,
+      reviewLineContact: (name: string, email: string) => `Liên hệ: ${name} · ${email}`,
+      reviewSlotTbc: 'Lúc: sẽ xác nhận qua email',
+      cohortDefault: 'Lớp cờ vua',
+      ariaThread: 'Cuộc trò chuyện đặt lớp',
+      inputLabel: 'Tin nhắn cho trợ lý đặt lớp',
+      quickReplies: [
+        'Bé 8 tuổi mới bắt đầu',
+        'Người lớn cải thiện, cuối tuần',
+        'Luyện thi đấu, từ 12 tuổi',
+        'Kèm riêng có bản ghi',
+      ],
+      ctaBanner: '💬 Đặt lớp với WGM Mai Hưng — trò chuyện bên dưới',
+      defaultName: 'Phụ huynh học viên cờ',
+      bookingError:
+        'Đã có lỗi khi giữ chỗ. Vui lòng thử lại hoặc gửi email cho chess@bookedai.au.',
+    },
   },
 } as const;
-
-const initialInquiryFormState: InquiryFormState = {
-  customerName: '',
-  email: '',
-  phone: '',
-  studentAge: '8',
-  trainingGoal: 'Beginner foundations',
-  preferredFormat: 'Online group',
-  preferredDate: '',
-  preferredTime: '',
-  selectedServiceId: '',
-  selectedSlotId: '',
-  notes: '',
-};
 
 function getInitialLocale(): Locale {
   if (typeof window === 'undefined') {
@@ -1128,31 +1178,6 @@ function buildStudentPortalUrl(): string {
   return '/student-account';
 }
 
-function buildAttribution() {
-  if (typeof window === 'undefined') {
-    return {
-      source: 'chess.bookedai.au',
-      medium: 'web',
-      landing_path: '/chess-grandmaster',
-      referrer: null,
-    };
-  }
-  return {
-    source: window.location.hostname || 'chess.bookedai.au',
-    medium: 'web',
-    landing_path: `${window.location.pathname}${window.location.search}`,
-    referrer: document.referrer || null,
-  };
-}
-
-function buildActorContext() {
-  return {
-    channel: 'public_web' as const,
-    deployment_mode: 'standalone_app' as const,
-    tenant_ref: TENANT_REF,
-  };
-}
-
 function buildRuntimeConfig() {
   return {
     tenantRef: TENANT_REF,
@@ -1161,44 +1186,6 @@ function buildRuntimeConfig() {
     source: 'chess.bookedai.au',
     widgetId: 'grandmaster-chess-concierge',
   };
-}
-
-async function fetchChessCatalog(): Promise<MatchCandidate[]> {
-  const response = await fetch('/api/booking-assistant/catalog', {
-    headers: { accept: 'application/json' },
-  });
-  if (!response.ok) {
-    throw new Error(`Unable to load chess catalogue (${response.status}).`);
-  }
-  const payload = (await response.json()) as BookingAssistantCatalogResponse;
-  const services = Array.isArray(payload.services) ? payload.services : [];
-  return services
-    .filter((service) => {
-      const id = service.id ?? '';
-      const name = (service.name ?? '').toLowerCase();
-      const venue = (service.venue_name ?? '').toLowerCase();
-      return id.includes('chess') || name.includes('chess') || venue.includes('chess');
-    })
-    .map((service) => ({
-      candidateId: service.id ?? '',
-      providerName: 'GM Mai Hung Chess Academy',
-      serviceName: service.name ?? 'Chess training program',
-      sourceType: 'service_catalog',
-      category: service.category ?? 'Kids Services',
-      summary: service.summary ?? 'Chess coaching program',
-      venueName: service.venue_name ?? 'Grandmaster Chess Academy',
-      location: service.location ?? 'Online or arranged venue',
-      bookingUrl: service.booking_url ?? null,
-      mapUrl: service.map_url ?? null,
-      sourceUrl: service.source_url ?? null,
-      imageUrl: service.image_url ?? null,
-      amountAud: service.amount_aud ?? null,
-      currencyCode: 'AUD',
-      displayPrice: service.display_price ?? 'Enquire for pricing',
-      tags: Array.isArray(service.tags) ? service.tags.filter(Boolean) : [],
-      featured: Boolean(service.featured),
-    }))
-    .filter((service) => service.candidateId);
 }
 
 function mapProgramKeyToPieceVariant(
@@ -1335,424 +1322,42 @@ export function ChessGrandmasterApp() {
     }
   }, []);
 
-  const [catalogServices, setCatalogServices] = useState<MatchCandidate[]>([]);
-  const [catalogPending, setCatalogPending] = useState(true);
-  const [catalogError, setCatalogError] = useState('');
-  const [searchQuery, setSearchQuery] = useState<string>(dict.en.concierge.quickPrompts[0]);
-  const [searchResults, setSearchResults] = useState<MatchCandidate[]>([]);
-  const [conversation, setConversation] = useState<ConversationMessage[]>([
-    { role: 'assistant', content: dict.en.concierge.assistantWelcome },
-  ]);
-  const [searchPending, setSearchPending] = useState(false);
-  const [searchError, setSearchError] = useState('');
-  const [leadPending, setLeadPending] = useState(false);
-  const [leadStatus, setLeadStatus] = useState('');
-  const [leadError, setLeadError] = useState('');
-  const [formState, setFormState] = useState<InquiryFormState>(initialInquiryFormState);
-  const [paymentOptions, setPaymentOptions] = useState<ChessPaymentOption[]>([]);
-  const [paymentLoading, setPaymentLoading] = useState(false);
-  const [paymentError, setPaymentError] = useState('');
-  const [paymentRequest, setPaymentRequest] = useState<{
-    leadId: string;
-    bookingIntentId: string | null;
-    programKey: ChessProgramKey;
-    amountVnd: number;
-    amountAud: number;
-    parentName: string;
-    parentEmail: string | null;
-  } | null>(null);
-  const [orderConfirmation, setOrderConfirmation] = useState<{
-    orderReference: string;
-    sessionStartsAt: string | null;
-    sessionTimeLabel: string | null;
-    cohortLabel: string | null;
-    meetingUrl: string | null;
-    calendarUrl: string | null;
-    coachName: string;
-    paymentStatus: 'paid' | 'pending' | 'unpaid';
-    paymentAmountFormatted: string | null;
-  } | null>(null);
-  const [selectedSlotDetails, setSelectedSlotDetails] = useState<ChessCourseSlot | null>(null);
-
-  const returnToMainScreenAfterBooking = useCallback(() => {
-    setLeadStatus('');
-    setLeadError('');
-    setLeadPending(false);
-    setPaymentOptions([]);
-    setPaymentError('');
-    setPaymentLoading(false);
-    setPaymentRequest(null);
-    setOrderConfirmation(null);
-    setSelectedSlotDetails(null);
-    setFormState(initialInquiryFormState);
-    if (typeof window !== 'undefined') {
-      window.history.replaceState({}, '', window.location.pathname);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
-    }
-  }, []);
+  const [floatingHidden, setFloatingHidden] = useState(false);
+  const bookSectionRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     document.title = t.htmlTitle;
     document.documentElement.setAttribute('lang', locale === 'vi' ? 'vi' : 'en');
   }, [locale, t.htmlTitle]);
 
+  // Hide the floating chat-bubble CTA when the chat section enters the viewport.
   useEffect(() => {
-    setConversation((current) => {
-      if (!current.length) {
-        return [{ role: 'assistant', content: t.concierge.assistantWelcome }];
-      }
-      const next = [...current];
-      next[0] = { role: 'assistant', content: t.concierge.assistantWelcome };
-      return next;
-    });
-    setSearchQuery((current) => {
-      const allPrompts: readonly string[] = [
-        ...dict.en.concierge.quickPrompts,
-        ...dict.vi.concierge.quickPrompts,
-      ];
-      if (allPrompts.includes(current)) {
-        return t.concierge.quickPrompts[0];
-      }
-      return current;
-    });
-  }, [locale, t.concierge.assistantWelcome, t.concierge.quickPrompts]);
-
-  const loadPaymentOptions = useCallback(
-    async (
-      params: {
-        leadId: string;
-        bookingIntentId: string | null;
-        programKey: ChessProgramKey;
-        amountVnd: number;
-        amountAud: number;
-        parentName: string;
-        parentEmail: string | null;
+    if (typeof window === 'undefined') return undefined;
+    const target = bookSectionRef.current;
+    if (!target) return undefined;
+    if (typeof IntersectionObserver === 'undefined') {
+      // SSR-friendly fallback — keep button visible.
+      return undefined;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const entry = entries[0];
+        setFloatingHidden(Boolean(entry?.isIntersecting));
       },
-      activeLocale: Locale,
-    ) => {
-      setPaymentLoading(true);
-      setPaymentError('');
-      try {
-        const response = await apiV1.chessPaymentOptions({
-          lead_id: params.leadId,
-          booking_intent_id: params.bookingIntentId,
-          program_key: params.programKey,
-          amount_vnd: params.amountVnd,
-          amount_aud: params.amountAud,
-          parent_name: params.parentName,
-          parent_email: params.parentEmail,
-          locale: activeLocale,
-        });
-        if ('data' in response) {
-          setPaymentOptions(response.data.payment_options);
-        } else {
-          setPaymentOptions([]);
-        }
-      } catch (error) {
-        setPaymentError(
-          error instanceof Error
-            ? error.message
-            : activeLocale === 'vi'
-            ? 'Không tải được phương thức thanh toán lúc này.'
-            : 'We could not load your payment options just now.',
-        );
-        setPaymentOptions([]);
-      } finally {
-        setPaymentLoading(false);
-      }
-    },
-    [],
-  );
-
-  useEffect(() => {
-    if (!paymentRequest) {
-      return;
-    }
-    void loadPaymentOptions(paymentRequest, locale);
-    // We deliberately depend on paymentRequest + locale so reloading or toggling language
-    // re-fetches the correct option set.
-  }, [paymentRequest, locale, loadPaymentOptions]);
-
-  useEffect(() => {
-    let cancelled = false;
-    async function loadCatalog() {
-      setCatalogPending(true);
-      setCatalogError('');
-      try {
-        const services = await fetchChessCatalog();
-        if (cancelled) return;
-        setCatalogServices(services);
-        setFormState((current) => ({
-          ...current,
-          selectedServiceId: current.selectedServiceId || services[0]?.candidateId || '',
-        }));
-      } catch (error) {
-        if (!cancelled) {
-          setCatalogError(error instanceof Error ? error.message : 'Unable to load chess catalogue.');
-        }
-      } finally {
-        if (!cancelled) {
-          setCatalogPending(false);
-        }
-      }
-    }
-    void loadCatalog();
-    return () => {
-      cancelled = true;
-    };
+      { threshold: 0.2 },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
   }, []);
 
-  const displayedResults = searchResults.length ? searchResults : catalogServices;
-  const selectedResult = useMemo(
-    () =>
-      displayedResults.find((item) => item.candidateId === formState.selectedServiceId) ??
-      catalogServices[0] ??
-      null,
-    [catalogServices, displayedResults, formState.selectedServiceId],
-  );
-
-  async function handleSearchSubmit(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault();
-    const trimmedQuery = searchQuery.trim();
-    if (!trimmedQuery) return;
-    setSearchPending(true);
-    setSearchError('');
-    setConversation((current) => [...current, { role: 'user', content: trimmedQuery }]);
-    try {
-      // Tenant-scoped catalog search (chess tenant only — does NOT hit marketplace search).
-      // Backend filters by `tenant_id` already; the frontend just sends the visitor's natural-language
-      // class-finder query plus optional structured filters.
-      const response = await apiV1.chessCatalogSearch({
-        query: trimmedQuery,
-        filters: null,
-      });
-      if (!('data' in response)) {
-        throw new Error('Search was accepted, but no shortlist was returned yet.');
-      }
-      const matches = response.data.matches.slice(0, 6);
-      const mapped: MatchCandidate[] = matches.map((match) => ({
-        candidateId: match.service_id,
-        providerName: 'Mai Hưng Chess Academy',
-        serviceName: match.name,
-        sourceType: 'chess_catalog',
-        category: match.tier || 'Chess',
-        summary: match.summary,
-        venueName: 'Mai Hưng Chess Academy',
-        location: 'Online via Lichess + Zoom',
-        bookingUrl: null,
-        mapUrl: null,
-        sourceUrl: null,
-        imageUrl: null,
-        amountAud: null,
-        currencyCode: 'AUD',
-        displayPrice: locale === 'vi' ? match.display_price_vnd : match.display_price_aud,
-        tags: [match.format, match.tier].filter(Boolean),
-        featured: false,
-      }));
-      setSearchResults(mapped);
-      setFormState((current) => ({
-        ...current,
-        selectedServiceId: mapped[0]?.candidateId || current.selectedServiceId,
-      }));
-      const reply = mapped.length
-        ? t.concierge.assistantTopMatch(mapped[0].serviceName)
-        : t.concierge.assistantNoMatch;
-      setConversation((current) => [...current, { role: 'assistant', content: reply }]);
-    } catch (error) {
-      setSearchError(error instanceof Error ? error.message : 'Unable to search chess programs right now.');
-      setConversation((current) => [
-        ...current,
-        { role: 'assistant', content: t.concierge.assistantFallback },
-      ]);
-    } finally {
-      setSearchPending(false);
+  const focusChat = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const el = document.getElementById('book');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-  }
-
-  async function handleInquirySubmit(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLeadPending(true);
-    setLeadError('');
-    setLeadStatus('');
-    try {
-      const trimmedEmail = formState.email.trim();
-      const trimmedPhone = formState.phone.trim();
-      if (!trimmedEmail && !trimmedPhone) {
-        throw new Error(t.enroll.errorContact);
-      }
-      if (!selectedResult?.candidateId) {
-        throw new Error(t.enroll.errorService);
-      }
-      const detailNote = [
-        `${t.enroll.detailLabels.age}: ${formState.studentAge}`,
-        `${t.enroll.detailLabels.goal}: ${formState.trainingGoal}`,
-        `${t.enroll.detailLabels.format}: ${formState.preferredFormat}`,
-        selectedResult.serviceName ? `${t.enroll.detailLabels.service}: ${selectedResult.serviceName}` : null,
-        formState.notes.trim() ? `${t.enroll.detailLabels.notes}: ${formState.notes.trim()}` : null,
-        `Locale: ${locale}`,
-      ]
-        .filter(Boolean)
-        .join(' | ');
-
-      let bookingReference = '';
-      let leadId = 'captured';
-      let bookingIntentId: string | null = null;
-      let meetingUrl: string | null = null;
-      let calendarUrl: string | null = null;
-
-      if (formState.preferredDate && formState.preferredTime) {
-        const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
-          customerName: formState.customerName.trim() || t.enroll.defaultName,
-          customerEmail: trimmedEmail,
-          customerPhone: trimmedPhone,
-          serviceId: selectedResult.candidateId,
-          serviceName: selectedResult.serviceName,
-          serviceCategory: selectedResult.category || 'Kids Services',
-          requestedDate: formState.preferredDate,
-          requestedTime: formState.preferredTime,
-          timezone: 'Asia/Ho_Chi_Minh',
-          sourcePage: DEFAULT_SOURCE_PAGE,
-          notes: detailNote,
-          runtimeConfig: buildRuntimeConfig(),
-          // Forward the picked time-slot id when the visitor selected one in the
-          // TimeSlotPicker. The backend honours `desired_slot.schedule_slot_id` and
-          // matches the booking intent to that real cohort row directly.
-          scheduleSlotId: formState.selectedSlotId || null,
-        });
-        bookingReference = authoritativeResult.bookingReference || '';
-        leadId = authoritativeResult.leadId || leadId;
-        bookingIntentId = authoritativeResult.bookingIntentId || null;
-        meetingUrl = authoritativeResult.meetingUrl ?? null;
-        calendarUrl = authoritativeResult.calendarUrl ?? null;
-      } else {
-        const leadResponse = await apiV1.createLead({
-          lead_type: 'chess_program_enquiry',
-          contact: {
-            full_name: formState.customerName.trim() || t.enroll.defaultName,
-            email: trimmedEmail || null,
-            phone: trimmedPhone || null,
-            preferred_contact_method: trimmedEmail ? 'email' : 'phone',
-          },
-          business_context: {
-            business_name: 'GM Mai Hung Chess Academy',
-            industry: 'Kids Services',
-            location: selectedResult.location || selectedResult.venueName || null,
-            service_category: 'Chess coaching',
-          },
-          attribution: buildAttribution(),
-          intent_context: {
-            source_page: DEFAULT_SOURCE_PAGE,
-            intent_type: 'booking_or_callback',
-            notes: detailNote,
-            requested_service_id: selectedResult.candidateId,
-          },
-          actor_context: buildActorContext(),
-        });
-        if ('data' in leadResponse && leadResponse.data.lead_id) {
-          leadId = leadResponse.data.lead_id;
-        }
-      }
-
-      if (trimmedEmail) {
-        await apiV1.sendLifecycleEmail({
-          template_key: 'booking_confirmation',
-          to: [trimmedEmail],
-          subject:
-            locale === 'vi'
-              ? 'Học viện Cờ vua GM Mai Hùng — Đã ghi nhận đăng ký'
-              : 'GM Mai Hung Chess Academy enquiry received',
-          variables: {
-            parent_name: formState.customerName.trim() || (locale === 'vi' ? 'Phụ huynh' : 'Parent'),
-            child_age: formState.studentAge,
-            preferred_location: selectedResult.location || selectedResult.venueName || 'Chess academy',
-            preferred_date: formState.preferredDate || (locale === 'vi' ? 'Sẽ xác nhận' : 'To be confirmed'),
-            preferred_time: formState.preferredTime || (locale === 'vi' ? 'Sẽ xác nhận' : 'To be confirmed'),
-            booking_reference: bookingReference || 'pending-follow-up',
-          },
-          context: { tenant_ref: TENANT_REF, source_surface: DEFAULT_SOURCE_PAGE },
-          actor_context: buildActorContext(),
-        });
-      }
-
-      setLeadStatus(
-        bookingReference
-          ? t.enroll.successHeld(bookingReference, leadId)
-          : t.enroll.successCaptured(leadId),
-      );
-      const programKey = inferProgramKeyFromService(
-        selectedResult,
-        formState.trainingGoal,
-        formState.preferredFormat,
-      );
-      const amounts = resolveProgramAmounts(programKey);
-      const trimmedName = formState.customerName.trim() || t.enroll.defaultName;
-      setPaymentOptions([]);
-      setPaymentError('');
-      setPaymentRequest({
-        leadId,
-        bookingIntentId,
-        programKey,
-        amountVnd: amounts.vnd,
-        amountAud: amounts.aud,
-        parentName: trimmedName,
-        parentEmail: trimmedEmail || null,
-      });
-      // Build the on-screen order confirmation card. We always show it after a successful submit
-      // (even when the visitor only captured a brief without a date) so the visitor walks away
-      // with a clear reference and next-steps. Locale dictates which currency is shown — AUD
-      // for EN, VND for VI. Backend payment status is `unpaid` until they tap Stripe / transfer.
-      const sessionStartsAt = (() => {
-        if (selectedSlotDetails?.starts_at) return selectedSlotDetails.starts_at;
-        if (formState.preferredDate) {
-          return formState.preferredTime
-            ? `${formState.preferredDate}T${formState.preferredTime}:00`
-            : formState.preferredDate;
-        }
-        return null;
-      })();
-      const formattedAmount = (() => {
-        const amount = locale === 'vi' ? amounts.vnd : amounts.aud;
-        const currency = locale === 'vi' ? 'VND' : 'AUD';
-        try {
-          return new Intl.NumberFormat(locale === 'vi' ? 'vi-VN' : 'en-AU', {
-            style: 'currency',
-            currency,
-            maximumFractionDigits: currency === 'VND' ? 0 : 2,
-          }).format(amount);
-        } catch {
-          return `${amount} ${currency}`;
-        }
-      })();
-      setOrderConfirmation({
-        orderReference:
-          bookingReference || (locale === 'vi' ? 'CHESS-PENDING' : 'CHESS-PENDING'),
-        sessionStartsAt,
-        sessionTimeLabel: formState.preferredTime || null,
-        cohortLabel:
-          selectedSlotDetails?.cohort_label || selectedResult.serviceName || null,
-        meetingUrl,
-        calendarUrl,
-        coachName: 'WGM Nguyễn Thị Mai Hưng',
-        // Payment is always `unpaid` immediately after submit — the visitor still has to click
-        // Stripe / send a bank transfer. The PaymentSelection block below the order card walks
-        // them through the actual payment.
-        paymentStatus: 'unpaid',
-        paymentAmountFormatted: formattedAmount,
-      });
-
-      setFormState((current) => ({ ...current, notes: '' }));
-    } catch (error) {
-      setLeadError(
-        error instanceof Error
-          ? error.message
-          : locale === 'vi'
-          ? 'Đã có lỗi khi giữ chỗ. Vui lòng thử lại hoặc gửi email cho học viện.'
-          : 'Something went wrong saving your spot. Try again or email the academy.',
-      );
-    } finally {
-      setLeadPending(false);
-    }
-  }
+    window.dispatchEvent(new CustomEvent('chess-chat-focus'));
+  }, []);
 
   function scrollToId(id: string) {
     if (typeof window === 'undefined') return;
@@ -1761,6 +1366,26 @@ export function ChessGrandmasterApp() {
       el.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
+
+  function scrollToBookAndFocus() {
+    if (typeof window === 'undefined') return;
+    const el = document.getElementById('book');
+    if (el) {
+      el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+    window.dispatchEvent(new CustomEvent('chess-chat-focus'));
+  }
+
+  // Memoised resolver bridges into the chat with a typed program key.
+  const resolveAmountsForChat = useCallback((key: ChessProgramKeyHint) => {
+    const amounts = resolveProgramAmounts(key as ChessProgramKey);
+    return { programKey: key, vnd: amounts.vnd, aud: amounts.aud };
+  }, []);
+
+  const inferProgramKeyForChat = useCallback(
+    (serviceName: string): ChessProgramKeyHint => inferProgramKeyFromName(serviceName),
+    [],
+  );
 
   return (
     <div className="chess-app chess-shell">
@@ -1782,7 +1407,7 @@ export function ChessGrandmasterApp() {
             <button type="button" onClick={() => scrollToId('coach')} className="chess-nav-link">
               {t.nav.coach}
             </button>
-            <button type="button" onClick={() => scrollToId('concierge')} className="chess-nav-link">
+            <button type="button" onClick={() => scrollToBookAndFocus()} className="chess-nav-link">
               {t.nav.concierge}
             </button>
             <button type="button" onClick={() => scrollToId('faq')} className="chess-nav-link">
@@ -1818,7 +1443,7 @@ export function ChessGrandmasterApp() {
             <button
               type="button"
               className="chess-btn chess-btn-primary chess-btn-sm"
-              onClick={() => scrollToId('enroll')}
+              onClick={() => scrollToBookAndFocus()}
             >
               {t.nav.enroll}
             </button>
@@ -1844,14 +1469,14 @@ export function ChessGrandmasterApp() {
                 <button
                   type="button"
                   className="chess-btn chess-btn-primary"
-                  onClick={() => scrollToId('enroll')}
+                  onClick={() => scrollToBookAndFocus()}
                 >
                   {t.hero.ctaPrimary}
                 </button>
                 <button
                   type="button"
                   className="chess-btn chess-btn-secondary"
-                  onClick={() => scrollToId('concierge')}
+                  onClick={() => scrollToBookAndFocus()}
                 >
                   {t.hero.ctaSecondary}
                 </button>
@@ -1880,9 +1505,12 @@ export function ChessGrandmasterApp() {
             </div>
 
             <aside id="coach" className="chess-coach-card" aria-label={t.coach.name}>
-              <div className="chess-coach-portrait" aria-hidden="true">
-                <KnightIcon className="chess-coach-portrait-icon" />
-              </div>
+              <img
+                src="https://upload.bookedai.au/images/bb99/B7_i8BfBTN8NMxJO_B7X3Q.png"
+                alt={t.coach.portraitAlt}
+                loading="lazy"
+                className="chess-coach-portrait-img"
+              />
               <div className="chess-coach-name">{t.coach.name}</div>
               <div className="chess-coach-meta">{t.coach.meta}</div>
               <blockquote className="chess-coach-quote">{t.coach.quote}</blockquote>
@@ -1897,7 +1525,7 @@ export function ChessGrandmasterApp() {
             <button
               type="button"
               className="chess-btn chess-btn-primary chess-btn-sm"
-              onClick={() => scrollToId('enroll')}
+              onClick={() => scrollToBookAndFocus()}
             >
               {t.ctaStrip.cta}
             </button>
@@ -1925,9 +1553,12 @@ export function ChessGrandmasterApp() {
                 className="chess-coach-card chess-profile-portrait"
                 aria-label={t.profile.portraitCaption}
               >
-                <div className="chess-coach-portrait" aria-hidden="true">
-                  <KnightIcon className="chess-coach-portrait-icon" />
-                </div>
+                <img
+                  src="https://upload.bookedai.au/images/bb99/B7_i8BfBTN8NMxJO_B7X3Q.png"
+                  alt={t.coach.portraitAlt}
+                  loading="lazy"
+                  className="chess-coach-portrait-img"
+                />
                 <div className="chess-coach-name">{t.coach.name}</div>
                 <div className="chess-coach-meta">{t.profile.portraitCaption}</div>
                 <a
@@ -2037,7 +1668,7 @@ export function ChessGrandmasterApp() {
               <button
                 type="button"
                 className="chess-btn chess-btn-primary"
-                onClick={() => scrollToId('enroll')}
+                onClick={() => scrollToBookAndFocus()}
               >
                 {t.profile.ctaPrimary}
               </button>
@@ -2121,7 +1752,7 @@ export function ChessGrandmasterApp() {
                   <button
                     type="button"
                     className="chess-btn chess-btn-primary"
-                    onClick={() => scrollToId('enroll')}
+                    onClick={() => scrollToBookAndFocus()}
                   >
                     {t.programs.jumpCta}
                   </button>
@@ -2138,523 +1769,49 @@ export function ChessGrandmasterApp() {
             <button
               type="button"
               className="chess-btn chess-btn-primary chess-btn-sm"
-              onClick={() => scrollToId('enroll')}
+              onClick={() => scrollToBookAndFocus()}
             >
               {t.ctaStrip.cta}
             </button>
           </div>
         </section>
 
-        <section id="concierge" className="chess-section chess-section-dark">
+        {/* Chat-driven booking section — replaces the legacy concierge + enroll form. */}
+        <section
+          id="book"
+          ref={bookSectionRef}
+          className="chess-section chess-section-light"
+        >
           <div className="chess-container">
-            <div className="chess-split">
-              <div className="chess-concierge">
-                <header>
-                  <span className="chess-eyebrow">{t.concierge.eyebrow}</span>
-                  <h2 className="chess-section-title" style={{ marginTop: 12 }}>
-                    {t.concierge.title}
-                  </h2>
-                  <p className="chess-section-lead" style={{ marginTop: 12 }}>
-                    {t.concierge.lead}
-                  </p>
-                </header>
-                <form onSubmit={handleSearchSubmit}>
-                  <label htmlFor="chess-concierge-query" className="chess-sr-only">
-                    {t.concierge.placeholder}
-                  </label>
-                  <textarea
-                    id="chess-concierge-query"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    placeholder={t.concierge.placeholder}
-                    className="chess-textarea"
-                    style={{
-                      background: 'rgba(246, 241, 231, 0.06)',
-                      borderColor: 'rgba(201, 162, 74, 0.24)',
-                      color: 'var(--chess-on-navy)',
-                      minHeight: 120,
-                    }}
-                  />
-                  <div className="chess-concierge-prompts">
-                    {t.concierge.quickPrompts.map((prompt) => (
-                      <button
-                        key={prompt}
-                        type="button"
-                        className="chess-concierge-prompt"
-                        onClick={() => setSearchQuery(prompt)}
-                      >
-                        {prompt}
-                      </button>
-                    ))}
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={searchPending}
-                    className="chess-btn chess-btn-primary"
-                    style={{ marginTop: 18 }}
-                  >
-                    {searchPending ? t.concierge.submitting : t.concierge.submit}
-                  </button>
-                </form>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginTop: 18 }}>
-                  {conversation.map((message, index) => (
-                    <div
-                      key={`${message.role}-${index}`}
-                      className={`chess-concierge-bubble ${
-                        message.role === 'assistant' ? 'is-assistant' : 'is-user'
-                      }`}
-                    >
-                      {message.content}
-                    </div>
-                  ))}
-                  {searchError ? (
-                    <div className="chess-concierge-bubble is-assistant" role="alert">
-                      {searchError}
-                    </div>
-                  ) : null}
-                </div>
-              </div>
-
-              <div>
-                <header style={{ marginBottom: 18 }}>
-                  <span className="chess-eyebrow">{t.catalog.eyebrow}</span>
-                  <h2 className="chess-section-title" style={{ marginTop: 12 }}>
-                    {t.catalog.title}
-                  </h2>
-                </header>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  {catalogPending ? (
-                    <div
-                      className="chess-concierge-bubble is-assistant"
-                      style={{ background: 'rgba(246,241,231,0.06)' }}
-                    >
-                      {t.catalog.loading}
-                    </div>
-                  ) : null}
-                  {catalogError ? (
-                    <div className="chess-status-error" style={{ color: 'var(--chess-on-navy)', borderColor: 'rgba(181,51,51,0.45)', background: 'rgba(181,51,51,0.18)' }}>
-                      {catalogError}
-                    </div>
-                  ) : null}
-                  {!catalogPending && !catalogError && !displayedResults.length ? (
-                    <div
-                      className="chess-concierge-bubble is-assistant"
-                      style={{ background: 'rgba(246,241,231,0.06)' }}
-                    >
-                      {t.catalog.empty}
-                    </div>
-                  ) : null}
-                  {displayedResults.map((result) => {
-                    const selected = formState.selectedServiceId === result.candidateId;
-                    return (
-                      <article
-                        key={result.candidateId}
-                        className="chess-service-row"
-                        data-selected={selected ? 'true' : 'false'}
-                      >
-                        <div
-                          style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            gap: 12,
-                            flexWrap: 'wrap',
-                          }}
-                        >
-                          <div style={{ flex: 1, minWidth: 200 }}>
-                            <div className="chess-pricing-format">
-                              {result.venueName || 'Chess academy'}
-                            </div>
-                            <h3 className="chess-service-name" style={{ marginTop: 6 }}>
-                              {result.serviceName}
-                            </h3>
-                            <p className="chess-service-summary" style={{ marginTop: 8 }}>
-                              {result.summary}
-                            </p>
-                            <div
-                              style={{
-                                fontSize: '0.85rem',
-                                color: 'var(--chess-muted)',
-                                marginTop: 8,
-                              }}
-                            >
-                              {result.location}
-                            </div>
-                          </div>
-                          <span className="chess-price-pill">
-                            {result.displayPrice || t.catalog.enquiryLabel}
-                          </span>
-                        </div>
-                        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setSelectedSlotDetails(null);
-                              setFormState((current) => ({
-                                ...current,
-                                selectedServiceId: result.candidateId,
-                                selectedSlotId: '',
-                              }));
-                            }}
-                            className={`chess-btn chess-btn-sm ${
-                              selected ? 'chess-btn-light' : 'chess-btn-outline'
-                            }`}
-                            aria-pressed={selected}
-                          >
-                            {selected ? t.catalog.selectedButton : t.catalog.selectButton}
-                          </button>
-                          {result.bookingUrl ? (
-                            <a
-                              href={result.bookingUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="chess-btn chess-btn-sm chess-btn-outline"
-                            >
-                              {t.catalog.sourceLink}
-                            </a>
-                          ) : null}
-                        </div>
-                      </article>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* CTA strip — after concierge */}
-        <section className="chess-cta-strip">
-          <div className="chess-container chess-cta-strip-inner">
-            <span className="chess-cta-strip-promo">{t.ctaStrip.promo}</span>
-            <button
-              type="button"
-              className="chess-btn chess-btn-primary chess-btn-sm"
-              onClick={() => scrollToId('enroll')}
-            >
-              {t.ctaStrip.cta}
-            </button>
-          </div>
-        </section>
-
-        <section className="chess-section chess-section-light">
-          <div className="chess-container">
-            <div className="chess-split">
-              <div>
-                <span className="chess-eyebrow chess-eyebrow-on-light">{t.steps.eyebrow}</span>
-                <h2 className="chess-section-title" style={{ marginTop: 12 }}>
-                  {t.steps.title}
-                </h2>
-                <ol className="chess-step-list" style={{ marginTop: 22 }}>
-                  {t.steps.items.map((step, index) => (
-                    <li key={step} className="chess-step">
-                      <span className="chess-step-num">{index + 1}</span>
-                      <span className="chess-step-text">{step}</span>
-                    </li>
-                  ))}
-                </ol>
-              </div>
-
-              <form id="enroll" onSubmit={handleInquirySubmit} className="chess-card">
-                <div
-                  style={{
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start',
-                    flexWrap: 'wrap',
-                    gap: 12,
-                  }}
-                >
-                  <div>
-                    <span className="chess-eyebrow chess-eyebrow-on-light">{t.enroll.eyebrow}</span>
-                    <h2
-                      className="chess-display"
-                      style={{
-                        marginTop: 8,
-                        fontSize: '1.6rem',
-                        color: 'var(--chess-navy)',
-                      }}
-                    >
-                      {t.enroll.title}
-                    </h2>
-                  </div>
-                  <span className="chess-price-pill">
-                    {t.enroll.labels.selectedTag(selectedResult?.serviceName || '')}
-                  </span>
-                </div>
-                <div
-                  style={{
-                    display: 'grid',
-                    gap: 14,
-                    gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                    marginTop: 22,
-                  }}
-                >
-                  <label className="chess-field">
-                    <span className="chess-field-label">{t.enroll.labels.name}</span>
-                    <input
-                      value={formState.customerName}
-                      onChange={(event) =>
-                        setFormState((current) => ({ ...current, customerName: event.target.value }))
-                      }
-                      className="chess-input"
-                      placeholder={t.enroll.labels.namePh}
-                      autoComplete="name"
-                    />
-                  </label>
-                  <label className="chess-field">
-                    <span className="chess-field-label">{t.enroll.labels.email}</span>
-                    <input
-                      type="email"
-                      value={formState.email}
-                      onChange={(event) =>
-                        setFormState((current) => ({ ...current, email: event.target.value }))
-                      }
-                      className="chess-input"
-                      placeholder={t.enroll.labels.emailPh}
-                      inputMode="email"
-                      autoComplete="email"
-                    />
-                  </label>
-                  <label className="chess-field">
-                    <span className="chess-field-label">{t.enroll.labels.phone}</span>
-                    <input
-                      type="tel"
-                      value={formState.phone}
-                      onChange={(event) =>
-                        setFormState((current) => ({ ...current, phone: event.target.value }))
-                      }
-                      className="chess-input"
-                      placeholder={t.enroll.labels.phonePh}
-                      inputMode="tel"
-                      autoComplete="tel"
-                    />
-                  </label>
-                  <label className="chess-field">
-                    <span className="chess-field-label">{t.enroll.labels.age}</span>
-                    <select
-                      value={formState.studentAge}
-                      onChange={(event) =>
-                        setFormState((current) => ({ ...current, studentAge: event.target.value }))
-                      }
-                      className="chess-select"
-                    >
-                      {t.enroll.ageOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="chess-field">
-                    <span className="chess-field-label">{t.enroll.labels.goal}</span>
-                    <select
-                      value={formState.trainingGoal}
-                      onChange={(event) =>
-                        setFormState((current) => ({ ...current, trainingGoal: event.target.value }))
-                      }
-                      className="chess-select"
-                    >
-                      {t.enroll.goalOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="chess-field">
-                    <span className="chess-field-label">{t.enroll.labels.format}</span>
-                    <select
-                      value={formState.preferredFormat}
-                      onChange={(event) =>
-                        setFormState((current) => ({ ...current, preferredFormat: event.target.value }))
-                      }
-                      className="chess-select"
-                    >
-                      {t.enroll.formatOptions.map((opt) => (
-                        <option key={opt.value} value={opt.value}>
-                          {opt.label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="chess-field">
-                    <span className="chess-field-label">{t.enroll.labels.date}</span>
-                    <input
-                      type="date"
-                      value={formState.preferredDate}
-                      onChange={(event) => {
-                        // Manually overriding the date breaks the slot-id link, so clear it.
-                        setSelectedSlotDetails(null);
-                        setFormState((current) => ({
-                          ...current,
-                          preferredDate: event.target.value,
-                          selectedSlotId: '',
-                        }));
-                      }}
-                      className="chess-input"
-                    />
-                  </label>
-                  <label className="chess-field">
-                    <span className="chess-field-label">{t.enroll.labels.time}</span>
-                    <input
-                      type="time"
-                      value={formState.preferredTime}
-                      onChange={(event) => {
-                        setSelectedSlotDetails(null);
-                        setFormState((current) => ({
-                          ...current,
-                          preferredTime: event.target.value,
-                          selectedSlotId: '',
-                        }));
-                      }}
-                      className="chess-input"
-                    />
-                  </label>
-                </div>
-                <TimeSlotPicker
-                  locale={locale}
-                  dict={t.slotPicker}
-                  serviceId={selectedResult?.candidateId ?? null}
-                  selectedSlotId={formState.selectedSlotId}
-                  onSelect={(slot) => {
-                    setSelectedSlotDetails(slot);
-                    if (!slot) {
-                      setFormState((current) => ({
-                        ...current,
-                        selectedSlotId: '',
-                      }));
-                      return;
-                    }
-                    setFormState((current) => ({
-                      ...current,
-                      selectedSlotId: slot.slot_id,
-                      preferredDate: slot.date || current.preferredDate,
-                      preferredTime: slot.start_time || current.preferredTime,
-                    }));
-                  }}
-                />
-                <label className="chess-field" style={{ marginTop: 14 }}>
-                  <span className="chess-field-label">{t.enroll.labels.notes}</span>
-                  <textarea
-                    value={formState.notes}
-                    onChange={(event) =>
-                      setFormState((current) => ({ ...current, notes: event.target.value }))
-                    }
-                    className="chess-textarea"
-                    placeholder={t.enroll.labels.notesPh}
-                  />
-                </label>
-                <p
-                  style={{
-                    marginTop: 14,
-                    padding: '14px 16px',
-                    borderRadius: 'var(--chess-radius)',
-                    background: 'var(--chess-ivory)',
-                    color: 'var(--chess-muted)',
-                    fontSize: '0.88rem',
-                    lineHeight: 1.6,
-                  }}
-                >
-                  {t.enroll.lead}
-                </p>
-                <div
-                  style={{
-                    display: 'flex',
-                    flexWrap: 'wrap',
-                    gap: 14,
-                    alignItems: 'center',
-                    marginTop: 16,
-                  }}
-                >
-                  <button
-                    type="submit"
-                    disabled={leadPending}
-                    className="chess-btn chess-btn-primary"
-                  >
-                    {leadPending ? t.enroll.labels.submitting : t.enroll.labels.submit}
-                  </button>
-                  <span style={{ fontSize: '0.82rem', color: 'var(--chess-muted)' }}>
-                    {t.enroll.labels.replyHint}
-                  </span>
-                </div>
-                {/*
-                  Render order in the new order: PaymentSelection appears ABOVE OrderConfirmation
-                  while payment is pending so the visitor sees the actionable Stripe / VND / AUD
-                  options first. After they land, OrderConfirmation acts as the "Humanitix-style"
-                  recap: order reference + meeting link + wallet passes + what's-next.
-                */}
-                {paymentRequest ? (
-                  <PaymentSelection
-                    locale={locale}
-                    dict={t.payment}
-                    options={
-                      // Locale-correct currency rule:
-                      //   EN locale → only AUD options (Stripe AUD + AUD bank transfer)
-                      //   VI locale → only VND options (VND bank QR transfer)
-                      // The backend may return both currencies regardless of locale; we filter
-                      // here so visitors only see the option that matches the price they read
-                      // on the program card and sticky CTA.
-                      paymentOptions.filter((option) =>
-                        locale === 'vi' ? option.currency === 'VND' : option.currency === 'AUD',
-                      )
-                    }
-                    loading={paymentLoading}
-                    error={paymentError || null}
-                    onRetry={() => {
-                      void loadPaymentOptions(paymentRequest, locale);
-                    }}
-                    onSkip={returnToMainScreenAfterBooking}
-                  />
-                ) : null}
-                {orderConfirmation ? (
-                  <OrderConfirmation
-                    locale={locale}
-                    dict={t.orderConfirmation}
-                    orderReference={orderConfirmation.orderReference}
-                    session={{
-                      startsAt: orderConfirmation.sessionStartsAt,
-                      timeLabel: orderConfirmation.sessionTimeLabel,
-                      cohortLabel: orderConfirmation.cohortLabel,
-                      meetingUrl: orderConfirmation.meetingUrl,
-                      calendarUrl: orderConfirmation.calendarUrl,
-                    }}
-                    coachName={orderConfirmation.coachName}
-                    coachTitle={locale === 'vi' ? 'Đại kiện tướng nữ' : 'Woman Grandmaster'}
-                    paymentStatus={orderConfirmation.paymentStatus}
-                    paymentAmountFormatted={orderConfirmation.paymentAmountFormatted}
-                    portalOrderUrl={
-                      orderConfirmation.orderReference &&
-                      !orderConfirmation.orderReference.endsWith('-PENDING')
-                        ? buildOrderDetailUrl(orderConfirmation.orderReference)
-                        : null
-                    }
-                    onReturnHome={returnToMainScreenAfterBooking}
-                    returnHomeLabel={t.enroll.returnNow}
-                  />
-                ) : null}
-                {leadStatus && !orderConfirmation ? (
-                  <div className="chess-status-success" style={{ marginTop: 18 }}>
-                    <span className="chess-eyebrow chess-eyebrow-on-light">
-                      {t.enroll.successHeading}
-                    </span>
-                    <p
-                      style={{
-                        marginTop: 10,
-                        fontSize: '0.95rem',
-                        lineHeight: 1.65,
-                        color: 'var(--chess-text)',
-                      }}
-                    >
-                      {leadStatus}
-                    </p>
-                  </div>
-                ) : null}
-                {leadError ? (
-                  <div className="chess-status-error" style={{ marginTop: 16 }} role="alert">
-                    {leadError}
-                  </div>
-                ) : null}
-              </form>
+            <header className="chess-section-header" style={{ marginBottom: 18, textAlign: 'center' }}>
+              <span className="chess-eyebrow chess-eyebrow-on-light">{t.book.eyebrow}</span>
+            </header>
+            <div className="chess-book-cta">{t.book.banner}</div>
+            <ChessBookingChat
+              locale={locale}
+              dict={t.chat}
+              paymentDict={t.payment}
+              orderDict={t.orderConfirmation}
+              sourcePage={DEFAULT_SOURCE_PAGE}
+              runtimeConfig={buildRuntimeConfig()}
+              resolveProgramAmounts={resolveAmountsForChat}
+              inferProgramKeyFromName={inferProgramKeyForChat}
+              buildOrderDetailUrl={buildOrderDetailUrl}
+              returnHomeLabel={locale === 'vi' ? 'Quay lại' : 'Return home'}
+            />
+            <div className="chess-section-header" style={{ marginTop: 40 }}>
+              <span className="chess-eyebrow chess-eyebrow-on-light">{t.steps.eyebrow}</span>
+              <h2 className="chess-section-title" style={{ marginTop: 12 }}>
+                {t.steps.title}
+              </h2>
+              <ol className="chess-step-list" style={{ marginTop: 22 }}>
+                {t.steps.items.map((step, index) => (
+                  <li key={step} className="chess-step">
+                    <span className="chess-step-num">{index + 1}</span>
+                    <span className="chess-step-text">{step}</span>
+                  </li>
+                ))}
+              </ol>
             </div>
           </div>
         </section>
@@ -2683,7 +1840,7 @@ export function ChessGrandmasterApp() {
             <button
               type="button"
               className="chess-btn chess-btn-primary chess-btn-sm"
-              onClick={() => scrollToId('enroll')}
+              onClick={() => scrollToBookAndFocus()}
             >
               {t.ctaStrip.cta}
             </button>
@@ -2728,7 +1885,7 @@ export function ChessGrandmasterApp() {
               <button
                 type="button"
                 className="chess-footer-link"
-                onClick={() => scrollToId('enroll')}
+                onClick={() => scrollToBookAndFocus()}
                 style={{ background: 'none', border: 0, padding: '4px 0', textAlign: 'left', cursor: 'pointer' }}
               >
                 {t.nav.enroll}
@@ -2736,7 +1893,7 @@ export function ChessGrandmasterApp() {
               <button
                 type="button"
                 className="chess-footer-link"
-                onClick={() => scrollToId('concierge')}
+                onClick={() => scrollToBookAndFocus()}
                 style={{ background: 'none', border: 0, padding: '4px 0', textAlign: 'left', cursor: 'pointer' }}
               >
                 {t.nav.concierge}
@@ -2749,6 +1906,16 @@ export function ChessGrandmasterApp() {
           </div>
         </div>
       </footer>
+
+      <button
+        type="button"
+        className="chess-floating-cta"
+        aria-label={t.book.floatingLabel}
+        data-hidden={floatingHidden ? 'true' : 'false'}
+        onClick={() => scrollToBookAndFocus()}
+      >
+        💬
+      </button>
 
       <div className="chess-sticky-cta" role="region" aria-label={t.nav.enroll}>
         <div className="chess-sticky-cta-text">
@@ -2766,7 +1933,7 @@ export function ChessGrandmasterApp() {
         <button
           type="button"
           className="chess-btn chess-btn-primary chess-btn-sm"
-          onClick={() => scrollToId('enroll')}
+          onClick={() => scrollToBookAndFocus()}
         >
           {t.sticky.cta}
         </button>

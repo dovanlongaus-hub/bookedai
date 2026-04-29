@@ -697,6 +697,7 @@ async def reserve_service_time_slot(
                     """
                     update service_time_slots
                     set zoho_meeting_url = coalesce(:meeting_url, zoho_meeting_url),
+                        zoho_meeting_id = coalesce(:meeting_id, zoho_meeting_id),
                         zoho_calendar_event_id = coalesce(:event_id, zoho_calendar_event_id),
                         reserved_by_email = :reserved_email,
                         reserved_by_name = :reserved_name,
@@ -710,6 +711,7 @@ async def reserve_service_time_slot(
                 ),
                 {
                     "meeting_url": provisioning.meeting_url,
+                    "meeting_id": provisioning.meeting_id,
                     "event_id": provisioning.calendar_event_id,
                     "reserved_email": normalized_email,
                     "reserved_name": payload.full_name.strip(),

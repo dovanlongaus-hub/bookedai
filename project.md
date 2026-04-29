@@ -20,6 +20,8 @@ Current top product-surface priority: `responsive homepage web-app UX`.
 
 Latest product booking/AI-search hardening from `2026-04-28`:
 
+- execution plan added: `docs/development/product-search-booking-execution-plan-2026-04-29.md` maps the next product coding work into roles, skills, phases, acceptance gates, and backlog across search relevance, assistant UI states, after-booking order detail, customer identity, wallet pass generation, QA/release gates, and customer-care continuity
+- `2026-04-29` professional product review found the main product risk has shifted from layout to search trust: live production is responsive and technically stable, but clear location queries can still show fallback results outside the requested area; a local instant-search guardrail now penalizes location-mismatched services before they surface as top matches
 - local public pitch/homepage SME messaging pass is implemented: `pitch.bookedai.au` now adds an SME launch offer for a custom landing page, dedicated email, dedicated CRM, and preconfigured booking/meeting flow; `bookedai.au` now surfaces the same offer on the homepage; `chess.bookedai.au` and `aimentor.bookedai.au` now carry clearer BookedAI-powered proof around dedicated email, CRM, and scheduling; public-facing internal terms such as `audit ledger`, `tenant Ops`, `action_runs`, raw lead ids, and placeholder discussion notes were removed or reframed as booking activity, follow-up history, and business workspace language
 - verification passed locally with `npm --prefix frontend run build`, focused Playwright pitch/homepage/architecture suite (`8 passed`), `git diff --check`, and a public-copy grep for the removed internal phrases
 - `2026-04-29` focused product QA/UAT is complete locally with live production smoke: frontend build passed, local product UAT/regression passed (`10` tests), after-booking mobile/Android/desktop subset passed (`3` tests), product live-read popup tests passed (`4` tests), standard live-read smoke passed (`2` tests with `PLAYWRIGHT_SKIP_BUILD=1`), backend booking/chat/handoff/payment/messaging/calendar tests passed (`125` tests), and live `product.bookedai.au` smoke showed `0` overflow plus no console/request errors across `390`, `412`, and `1440` widths
@@ -2140,3 +2142,23 @@ The public homepage chat is now aligned with the tenant-scoped public lead API:
 - authenticated tenant-session `/api/v1/leads` stays reserved for tenant-bearing callers, matching the Sprint B tenant validator posture
 - customer-facing chat UI now hides raw `Tenant session required` / `actor_context.tenant_id` backend detail behind a recovery message and a review-selected-result action
 - live verification passed after deploy: homepage asset refresh, `/api/health`, and public lead smoke returned `status: captured` for tenant slug `bookedai-au`
+
+## 2026-04-29 Pitch.bookedai.au SME Polish Follow-Up
+
+The pitch deck has been further re-polished around the SME buyer story:
+
+- `pitch.bookedai.au` now opens with a booking-ready revenue-engine promise, a `What SMEs get` setup section, and earlier launch-offer proof before the deeper video and business-case slides
+- the launch offer is explicit: custom landing page, dedicated booking email, CRM workspace, booking/calendar/meeting setup, payment next steps, and follow-up workflow
+- `/architecture` now uses customer-safe wording for governance, business workspace proof, security boundaries, and the architecture diagram labels
+- the pitch navigation, architecture diagram, roadmap, and final CTA are framed as `Launch Offer`, `How It Works`, `Scale`, `Rollout`, and `Claim launch setup`
+- verification passed locally: `npm --prefix frontend run build`, focused pitch/architecture Playwright suite (`4 passed`), `git diff --check`, and scoped copy grep for removed internal phrases
+
+## 2026-04-29 Homepage SME / Pitch Investor Split And Product Public Tenant Fix
+
+The public surfaces now have clearer audience ownership:
+
+- `bookedai.au` is the SME sales homepage: the hero sells a done-for-you booking setup, the CTA asks owners to get a booking page set up, and the page emphasizes landing page, booking inbox, CRM, calendar, meeting links, payment next step, and follow-up
+- `pitch.bookedai.au` is the investor/judge deck: the hero now frames BookedAI as the AI Revenue Engine for service businesses, with live booking proof and SME pilot rollout positioned as traction and GTM evidence
+- `product.bookedai.au` public booking follow-up no longer depends on a tenant bearer token for public-web communication automation; lifecycle email/SMS/WhatsApp/Telegram routes now resolve the BookedAI public tenant fallback for public booking actors
+- public copy was cleaned of customer-visible internal phrases such as `payment posture`, `tenant proof`, `action runs`, and judge-facing wording on the default SME homepage
+- verification passed: backend communication route tests (`6 passed`), frontend production build, focused homepage/pitch/architecture Playwright (`8 passed`), `git diff --check`, and scoped internal-copy grep

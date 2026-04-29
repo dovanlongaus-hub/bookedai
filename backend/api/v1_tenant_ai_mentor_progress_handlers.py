@@ -665,6 +665,54 @@ async def tenant_aimentor_reservation_action(
 
         record = dict(row)
 
+        # On cancel: also kill the live Zoho artefacts so the meeting URL
+        # stops working and the calendar event flips to "cancelled" in
+        # everyone's calendars (Zoho auto-emails the attendees on event
+        # cancellation, so the learner gets a Zoho-side notice as well as
+        # our tenant-branded cancel email below). Best-effort — we don't
+        # roll back the seat-decrement if Zoho is unreachable.
+        if normalized_action == "cancel":
+            try:
+                async with get_session(request.app.state.session_factory) as session:
+                    artefacts_result = await session.execute(
+                        text(
+                            """
+                            select zoho_meeting_id, zoho_calendar_event_id, booking_reference
+                            from service_time_slots
+                            where id = cast(:slot_id as uuid)
+                              and tenant_id = cast(:tenant_id as uuid)
+                            limit 1
+                            """
+                        ),
+                        {
+                            "slot_id": normalized_slot_id,
+                            "tenant_id": tenant_id,
+                        },
+                    )
+                    artefact_row = artefacts_result.mappings().first()
+
+                if artefact_row and (
+                    artefact_row.get("zoho_meeting_id")
+                    or artefact_row.get("zoho_calendar_event_id")
+                ):
+                    from service_layer.zoho_aimentor_orchestrator import (
+                        cancel_slot_artifacts,
+                    )
+
+                    await cancel_slot_artifacts(
+                        request.app.state.settings,
+                        meeting_id=artefact_row.get("zoho_meeting_id"),
+                        calendar_event_id=artefact_row.get(
+                            "zoho_calendar_event_id"
+                        ),
+                        booking_reference=artefact_row.get("booking_reference"),
+                        session_factory=request.app.state.session_factory,
+                    )
+            except Exception:  # noqa: BLE001
+                # Cancel-side Zoho call is best-effort — failure logged
+                # inside the orchestrator helper.
+                pass
+
         # Best-effort: send appropriate email to the learner with the
         # tenant inbox CC'd. Triggered for ``cancel`` (tells learner +
         # offers re-book CTA) and ``complete`` (thanks learner + feedback
@@ -1004,6 +1052,147 @@ async def tenant_aimentor_zoho_credentials_save(
     )
 
 
+async def tenant_aimentor_zoho_test_connection(
+    request: Request,
+    authorization: str | None = Header(default=None),
+):
+    """Verify the saved AI Mentor Zoho credentials can mint access tokens
+    against Zoho Meeting + Calendar (scopes via the stored refresh_token).
+
+    Per-service test:
+      * Meeting → calls ``ZohoMeetingAdapter.get_access_token`` which
+        POSTs to ``/oauth/v2/token``. Success means ``refresh_token`` +
+        ``client_id`` + ``client_secret`` are valid AND the consented
+        scope set covers ``ZohoMeeting.session.ALL`` (Zoho returns the
+        same access token regardless of which scope you ask for, but
+        downstream API calls fail without scope — we validate that
+        happens cleanly via the orchestrator's own per-service
+        config-checks too).
+      * Calendar → same pattern via ``ZohoCalendarAdapter``.
+
+    Returns ``{meeting: {ok, error?}, calendar: {ok, error?}, both_ok}``
+    so the admin UI can show a per-service traffic light.
+
+    Tenant-admin auth required (this is a privileged config check).
+    """
+    tenant_ref, tenant_id, tenant_session, _membership = await _resolve_tenant_request_context(
+        request,
+        authorization=authorization,
+    )
+    if not tenant_session:
+        return _error_response(
+            _tenant_session_required_error(tenant_id=tenant_id, tenant_ref=tenant_ref),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    if not tenant_id:
+        return _error_response(
+            AppError(
+                code="tenant_not_found",
+                message="The requested tenant could not be resolved.",
+                status_code=404,
+                details={"tenant_ref": tenant_ref},
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    # Local imports keep the test-connection flow optional — when these
+    # modules aren't available (e.g. legacy deploys before migration 035),
+    # the admin form still renders, just with the button disabled.
+    try:
+        from integrations.zoho_calendar import ZohoCalendarAdapter
+        from integrations.zoho_meeting import ZohoMeetingAdapter
+        from service_layer.aimentor_zoho_config import (
+            ZohoSettingsView,
+            load_zoho_aimentor_overrides,
+        )
+    except Exception as exc:  # noqa: BLE001
+        return _error_response(
+            AppError(
+                code="aimentor_zoho_test_imports_failed",
+                message="Zoho integration modules are not available in this build.",
+                status_code=500,
+                details={"exception": str(exc)},
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    overrides = await load_zoho_aimentor_overrides(request.app.state.session_factory)
+    if not overrides:
+        return _error_response(
+            AppError(
+                code="aimentor_zoho_not_configured",
+                message=(
+                    "No Zoho credentials saved for this tenant yet. "
+                    "Paste client_id + client_secret + refresh_token first."
+                ),
+                status_code=400,
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+    settings_view = ZohoSettingsView(
+        request.app.state.settings, overrides
+    )
+
+    meeting = ZohoMeetingAdapter()
+    calendar = ZohoCalendarAdapter()
+
+    meeting_result: dict[str, object] = {"ok": False, "error": None}
+    if meeting.configured(settings_view):
+        try:
+            await meeting.get_access_token(settings_view)
+            meeting_result["ok"] = True
+        except Exception as exc:  # noqa: BLE001
+            meeting_result["error"] = _short_error(exc)
+    else:
+        meeting_result["error"] = (
+            "Missing one of: refresh_token, client_id, client_secret, meeting_user_id."
+        )
+
+    calendar_result: dict[str, object] = {"ok": False, "error": None}
+    if calendar.configured(settings_view):
+        try:
+            await calendar.get_access_token(settings_view)
+            calendar_result["ok"] = True
+        except Exception as exc:  # noqa: BLE001
+            calendar_result["error"] = _short_error(exc)
+    else:
+        calendar_result["error"] = (
+            "Missing one of: refresh_token, client_id, client_secret, calendar_uid."
+        )
+
+    return _success_response(
+        {
+            "meeting": meeting_result,
+            "calendar": calendar_result,
+            "both_ok": bool(meeting_result["ok"] and calendar_result["ok"]),
+        },
+        tenant_id=tenant_id,
+        actor_context=ActorContextPayload(
+            channel="tenant_app",
+            tenant_id=tenant_id,
+            role="tenant_admin",
+            deployment_mode="standalone_app",
+        ),
+    )
+
+
+def _short_error(exc: BaseException) -> str:
+    """Trim Zoho/HTTPX exception messages to a single human-readable line.
+
+    Strips any header / response-body content that might reflect parts of
+    the access token. Errors we typically see here:
+      - "401 Unauthorized" — refresh_token invalidated
+      - "INVALID_CLIENT" — client_secret wrong or rotated
+      - "INVALID_TOKEN" — refresh_token from a different data centre
+    """
+    raw = str(exc) or exc.__class__.__name__
+    return raw.splitlines()[0][:240]
+
+
 __all__ = [
     "TenantAIMentorProgressUpdatePayload",
     "TenantAIMentorReservationActionPayload",
@@ -1014,4 +1203,5 @@ __all__ = [
     "tenant_aimentor_reservation_action",
     "tenant_aimentor_zoho_credentials_get",
     "tenant_aimentor_zoho_credentials_save",
+    "tenant_aimentor_zoho_test_connection",
 ]

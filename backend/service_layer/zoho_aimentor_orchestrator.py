@@ -190,6 +190,118 @@ async def provision_slot_artifacts(
     )
 
 
+@dataclass(frozen=True)
+class ZohoSlotCancelResult:
+    meeting_cancelled: bool
+    calendar_event_cancelled: bool
+    meeting_error: str | None
+    calendar_error: str | None
+
+
+async def cancel_slot_artifacts(
+    settings: Settings,
+    *,
+    meeting_id: str | None,
+    calendar_event_id: str | None,
+    booking_reference: str | None = None,
+    session_factory=None,
+) -> ZohoSlotCancelResult:
+    """Cancel a slot's Zoho Meeting + Calendar event.
+
+    Mirror of ``provision_slot_artifacts`` for the inverse direction.
+    Best-effort: each adapter call is wrapped in its own try/except so a
+    failure cancelling the meeting doesn't block cancelling the calendar
+    event (and vice versa). Returns a structured result so the caller
+    can surface partial failure to the operator.
+
+    ``session_factory`` (optional) — when provided, DB-stored Zoho
+    credentials override env vars, identical to ``provision_slot_artifacts``.
+    """
+    if session_factory is not None:
+        try:
+            from service_layer.aimentor_zoho_config import (
+                ZohoSettingsView,
+                load_zoho_aimentor_overrides,
+            )
+
+            overrides = await load_zoho_aimentor_overrides(session_factory)
+            if overrides:
+                settings = ZohoSettingsView(settings, overrides)
+        except Exception as exc:  # noqa: BLE001
+            _logger.warning(
+                "zoho_aimentor_overrides_load_failed",
+                exc_info=exc,
+            )
+
+    meeting = ZohoMeetingAdapter()
+    calendar = ZohoCalendarAdapter()
+
+    meeting_cancelled = False
+    meeting_error: str | None = None
+    if meeting_id and meeting.configured(settings):
+        try:
+            await meeting.cancel_meeting(settings, meeting_id=meeting_id)
+            meeting_cancelled = True
+        except Exception as exc:  # noqa: BLE001
+            meeting_error = str(exc)
+            _logger.warning(
+                "zoho_meeting_cancel_failed",
+                extra={
+                    "event_type": "zoho_meeting_cancel_failed",
+                    "tenant_id": "",
+                    "status": 0,
+                    "route": "/api/v1/tenants/me/aimentor-reservations/{slot_id}/action",
+                    "request_id": "",
+                    "integration_name": "zoho_meeting",
+                    "conversation_id": "",
+                    "booking_reference": booking_reference or "",
+                    "job_name": "",
+                    "job_id": "",
+                },
+                exc_info=exc,
+            )
+    elif not meeting_id:
+        meeting_error = "no_meeting_id_stored"
+    else:
+        meeting_error = "zoho_meeting_not_configured"
+
+    calendar_cancelled = False
+    calendar_error: str | None = None
+    if calendar_event_id and calendar.configured(settings):
+        try:
+            await calendar.cancel_event(settings, event_id=calendar_event_id)
+            calendar_cancelled = True
+        except Exception as exc:  # noqa: BLE001
+            calendar_error = str(exc)
+            _logger.warning(
+                "zoho_calendar_cancel_failed",
+                extra={
+                    "event_type": "zoho_calendar_cancel_failed",
+                    "tenant_id": "",
+                    "status": 0,
+                    "route": "/api/v1/tenants/me/aimentor-reservations/{slot_id}/action",
+                    "request_id": "",
+                    "integration_name": "zoho_calendar",
+                    "conversation_id": "",
+                    "booking_reference": booking_reference or "",
+                    "job_name": "",
+                    "job_id": "",
+                },
+                exc_info=exc,
+            )
+    elif not calendar_event_id:
+        calendar_error = "no_calendar_event_id_stored"
+    else:
+        calendar_error = "zoho_calendar_not_configured"
+
+    return ZohoSlotCancelResult(
+        meeting_cancelled=meeting_cancelled,
+        calendar_event_cancelled=calendar_cancelled,
+        meeting_error=meeting_error,
+        calendar_error=calendar_error,
+    )
+
+
 def safe_summary(settings: Settings) -> dict[str, Any]:
     """For the admin/integrations health UI — flag whether each Zoho
     capability is configured.
@@ -204,6 +316,8 @@ def safe_summary(settings: Settings) -> dict[str, Any]:
 
 __all__ = [
     "ZohoSlotProvisioningResult",
+    "ZohoSlotCancelResult",
     "provision_slot_artifacts",
+    "cancel_slot_artifacts",
     "safe_summary",
 ]

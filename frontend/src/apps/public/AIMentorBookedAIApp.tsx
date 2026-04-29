@@ -1,10 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, type MouseEvent as ReactMouseEvent } from 'react';
 
 import '../../theme/aimentor-tokens.css';
-import { BookingAssistantDialog } from '../../components/landing/assistant/BookingAssistantDialog';
-import type { PublicBookingAssistantRuntimeConfig } from '../../components/landing/assistant/publicBookingAssistantV1';
-import { bookingAssistantContent } from '../../components/landing/data';
-import { createPublicAssistantRuntimeConfig } from '../../shared/runtime/publicAssistantRuntime';
+import { AIMentorChat, type ChatProgram } from './aimentor/AIMentorChat';
 
 const AI_MENTOR_TENANT_REF = 'ai-mentor-doer';
 
@@ -16,18 +13,6 @@ const PORTAL_BASE_URL = 'https://aimentor.bookedai.au/account';
 const PROMO_DEADLINE_ISO = '2026-05-31T23:59:59+10:00';
 
 type Locale = 'en' | 'vi';
-
-const aiMentorBookedAIRuntimeConfig: PublicBookingAssistantRuntimeConfig =
-  createPublicAssistantRuntimeConfig({
-    channel: 'public_web',
-    tenantRef: AI_MENTOR_TENANT_REF,
-    deploymentMode: 'standalone_app',
-    widgetId: 'aimentor-bookedai-au-app',
-    source: 'aimentor_bookedai_au',
-    medium: 'partner_subdomain',
-    campaign: 'aimentor_bookedai_au_partner_app',
-    surface: 'aimentor_bookedai_au_partner_app',
-  });
 
 const dict = {
   en: {
@@ -41,6 +26,14 @@ const dict = {
       countdownHours: 'h',
       countdownMinutes: 'm',
       bookCta: 'Reserve at 25% off →',
+    },
+    banner: {
+      eyebrow: 'AI Mentor 1-on-1 · 100% online',
+      headline: 'Reserve your AI Mentor 1-on-1 seat',
+      sub: 'Tap or scan the QR — opens this booking flow with the program preselected.',
+      cta: 'Open booking →',
+      imageUrl: 'https://upload.bookedai.au/images/4a6d/fg3IZ4EKl9rM3vo-y4BaRA.png',
+      imageAlt: 'AI Mentor 1-on-1 — book on aimentor.bookedai.au',
     },
     nav: {
       brandName: 'AI Mentor',
@@ -117,36 +110,74 @@ const dict = {
       name: 'Long Đỗ Văn',
       handle: 'in/dovanlong',
       linkedinUrl: 'https://www.linkedin.com/in/dovanlong/',
-      title: 'Senior practitioner. Shipping AI products since 2018.',
+      pressUrl: 'https://apacentrepreneur.com/do-van-long-a-visionary-leader-empowering-industries-with-the-disruptive-power-of-blockchain/',
+      pressLabel: 'Featured in APAC Entrepreneur',
+      title: 'Senior AI Engineer · Founder · DBA Candidate · Sydney',
       bio:
-        'Long is the Founder of BookedAI and the lead mentor for every AI Mentor 1-on-1 Pro session. Across 7+ years of shipping production AI he has built booking systems, business automations, Stripe + Zoho workflows, and AI products customers can pay for. Sessions are pragmatic, hands-on, and outcomes-first: you write code, ship something, and leave with a working product step.',
+        'Long is a Senior AI Engineer, Founder of BookedAI and longcare.au, and a current DBA candidate researching agentic AI for SMEs. AI-major graduate of Ho Chi Minh University of Technology (HCMUT / Bách Khoa), MBA from Charles Sturt University, shipping production AI since 2018. Since 2023 he has specialised in agentic AI under the OpenAI for Startups, Google for Startups, and Zoho for Startups partner programs. Currently builds AI applications for SMEs and AI advisory for Enterprises through longcare.au, while running BookedAI as a multi-tenant SaaS. Previously mentored multiple early-stage startups in Vietnam from prototype to revenue. Lead mentor for every AI Mentor 1-on-1 Pro session — pragmatic, hands-on, outcomes-first.',
       credentialsTitle: 'Credentials',
       credentials: [
-        'Founder · BookedAI (live booking and revenue engine for service businesses)',
-        '7+ years shipping production AI products',
-        '1,200+ hours of 1-on-1 mentoring across founders + engineers',
+        'Founder · longcare.au (AI apps for SMEs + AI advisory for Enterprises · Sydney, 2025–)',
+        'Founder · BookedAI (multi-tenant booking SaaS, live in production · Sydney)',
+        'DBA Candidate · Sydney School of Business and Administration (SSBA) — research: Agentic AI for SMEs',
+        'MBA · Charles Sturt University (CSU) · Sydney',
+        'AI-major graduate · Ho Chi Minh University of Technology (HCMUT / Bách Khoa)',
+        '7+ years shipping production AI products since 2018',
+        'Agentic AI specialist since 2023 — partner of OpenAI / Google / Zoho for Startups',
+        'Mentor to early-stage startups in Vietnam — prototype → revenue',
         'Bilingual mentor — sessions delivered in English or Vietnamese',
-        'Stripe-secured payment + GDPR-aware data handling',
+      ],
+      partnerBadgesTitle: 'Backed by startup programs',
+      partnerBadges: ['OpenAI for Startups', 'Google for Startups', 'Zoho for Startups'],
+      educationTitle: 'Education',
+      education: [
+        {
+          degree: 'DBA Candidate (in progress)',
+          institution: 'Sydney School of Business and Administration (SSBA)',
+          focus: 'Research focus: Agentic AI for SMEs',
+        },
+        {
+          degree: 'Master of Business Administration (MBA)',
+          institution: 'Charles Sturt University (CSU)',
+          focus: 'Sydney',
+        },
+        {
+          degree: 'BSc · AI specialisation',
+          institution: 'Ho Chi Minh University of Technology (HCMUT / Bách Khoa)',
+          focus: 'Vietnam',
+        },
       ],
       experienceTitle: 'Experience',
       experience: [
         {
-          period: '2024 — Now',
-          role: 'Founder · Senior AI Engineer',
-          org: 'BookedAI',
-          bullet: 'Built BookedAI end-to-end: chat-driven booking, Stripe checkout, Zoho CRM + Meeting integration, and dedicated business booking pages.',
+          period: '2025 — Now',
+          role: 'Founder · longcare.au',
+          org: 'Sydney',
+          bullet: 'Designs and ships AI applications for SMEs across Australia + AI advisory engagements for Enterprises. Productises agentic AI patterns from research into production stacks for paying customers.',
         },
         {
-          period: '2021 — 2024',
-          role: 'Senior AI Engineer',
-          org: 'Production AI teams',
-          bullet: 'Shipped AI assistants and automation for email triage, sales follow-up, customer support, and content operations.',
+          period: '2024 — Now',
+          role: 'Founder · Senior AI Engineer',
+          org: 'BookedAI · Sydney',
+          bullet: 'Built BookedAI end-to-end — multi-tenant SaaS with chat-driven booking, Stripe checkout, Zoho CRM + Meeting integration, agentic AI systems, and white-label tenant subdomains.',
+        },
+        {
+          period: '2023 — 2024',
+          role: 'Agentic AI specialist',
+          org: 'Sydney · OpenAI / Google / Zoho for Startups',
+          bullet: 'Production agent stacks: tool-use, RAG pipelines, autonomous workflows. Worked through three startup-program partner stacks to ship real production agents.',
+        },
+        {
+          period: '2021 — 2023',
+          role: 'Senior AI Engineer & Startup Mentor',
+          org: 'Vietnam → Sydney',
+          bullet: 'Mentored multiple early-stage startups in Vietnam from prototype to revenue. Shipped LLM-powered tools for SaaS + ops automation.',
         },
         {
           period: '2018 — 2021',
           role: 'AI / ML Engineer',
-          org: 'Early AI product teams',
-          bullet: 'Started shipping production ML models — recommendation, classification, and conversational interfaces well before LLMs went mainstream.',
+          org: 'HCMUT graduate · Vietnam',
+          bullet: 'Started shipping production ML — recommendation, classification, conversational interfaces — well before LLMs went mainstream.',
         },
       ],
       skillsTitle: 'Stack & expertise',
@@ -159,9 +190,14 @@ const dict = {
       projectsTitle: 'Featured work',
       projects: [
         {
+          name: 'longcare.au',
+          url: 'https://longcare.au',
+          description: 'AI applications for SMEs + AI advisory for Enterprises. Founded 2025 in Sydney — productises agentic AI patterns into shipped solutions for paying customers.',
+        },
+        {
           name: 'BookedAI',
           url: 'https://bookedai.au',
-          description: 'Booking and revenue engine for service businesses: chat-driven search, Stripe checkout, Zoho CRM + Meeting + Calendar integration, and dedicated landing pages.',
+          description: 'Multi-tenant booking SaaS — chat-driven search, Stripe checkout, Zoho CRM + Meeting + Calendar integration, white-label tenant subdomains.',
         },
         {
           name: 'AI Mentor 1-on-1 Pro',
@@ -325,6 +361,14 @@ const dict = {
       countdownMinutes: 'phút',
       bookCta: 'Giữ chỗ giảm 25% →',
     },
+    banner: {
+      eyebrow: 'AI Mentor 1-1 · 100% online',
+      headline: 'Giữ chỗ AI Mentor 1-1 ngay',
+      sub: 'Bấm hoặc quét QR — mở thẳng flow booking với chương trình đã chọn sẵn.',
+      cta: 'Mở booking →',
+      imageUrl: 'https://upload.bookedai.au/images/4a6d/fg3IZ4EKl9rM3vo-y4BaRA.png',
+      imageAlt: 'AI Mentor 1-1 — book trên aimentor.bookedai.au',
+    },
     nav: { brandName: 'AI Mentor', brandTag: 'Mentor 1-1 lập trình AI · Online', programs: 'Chương trình', profile: 'Mentor', howItWorks: 'Quy trình', results: 'Học viên', faq: 'Hỏi đáp', enroll: 'Giữ chỗ', studentLogin: 'Học viên' },
     languageToggle: { label: 'Ngôn ngữ', en: 'EN', vi: 'VI' },
     hero: {
@@ -368,34 +412,72 @@ const dict = {
       name: 'Long Đỗ Văn',
       handle: 'in/dovanlong',
       linkedinUrl: 'https://www.linkedin.com/in/dovanlong/',
-      title: 'Senior practitioner. Đã ship sản phẩm AI từ 2018.',
-      bio: 'Long là Founder của BookedAI và mentor chính cho mọi buổi AI Mentor 1-1 Pro. 7+ năm ship sản phẩm AI: hệ thống booking, automation vận hành, workflow Stripe + Zoho, và sản phẩm AI có khách hàng trả tiền. Buổi học thực dụng, hands-on, outcomes-first: bạn viết code thật, ship sản phẩm thật, ra về với bước sản phẩm chạy được.',
+      pressUrl: 'https://apacentrepreneur.com/do-van-long-a-visionary-leader-empowering-industries-with-the-disruptive-power-of-blockchain/',
+      pressLabel: 'Được giới thiệu trên APAC Entrepreneur',
+      title: 'Senior AI Engineer · Founder · DBA Candidate · Sydney',
+      bio: 'Long là Senior AI Engineer, Founder của BookedAI và longcare.au, đồng thời là DBA candidate đang nghiên cứu Agentic AI cho SME. Tốt nghiệp chuyên ngành AI tại ĐH Bách Khoa TP.HCM, MBA tại Charles Sturt University, ship sản phẩm AI production từ 2018. Từ 2023 chuyên sâu hệ thống Agentic AI dưới sự hỗ trợ của OpenAI for Startups, Google for Startups, và Zoho for Startups. Hiện thiết kế ứng dụng AI cho SME và tư vấn AI cho Enterprises qua longcare.au, song song vận hành BookedAI multi-tenant SaaS. Trước đây đã mentor nhiều startup sớm tại Việt Nam từ prototype đến doanh thu. Trực tiếp dẫn dắt mọi buổi AI Mentor 1-1 Pro — thực dụng, hands-on, outcomes-first.',
       credentialsTitle: 'Background',
       credentials: [
-        'Founder · BookedAI (AI Revenue Engine đang chạy cho doanh nghiệp dịch vụ)',
-        '7+ năm ship sản phẩm AI production',
-        '1.200+ giờ mentor 1-1 cho founder và engineer',
+        'Founder · longcare.au (Ứng dụng AI cho SME + tư vấn AI cho Enterprise · Sydney, 2025–)',
+        'Founder · BookedAI (multi-tenant SaaS đang chạy production · Sydney)',
+        'DBA Candidate · Sydney School of Business and Administration (SSBA) — Nghiên cứu: Agentic AI cho SME',
+        'MBA · Charles Sturt University (CSU) · Sydney',
+        'Tốt nghiệp chuyên ngành AI · Đại học Bách Khoa TP.HCM',
+        '7+ năm ship sản phẩm AI production từ 2018',
+        'Chuyên gia Agentic AI từ 2023 — đối tác OpenAI / Google / Zoho for Startups',
+        'Đã mentor startup sớm tại Việt Nam — prototype → doanh thu',
         'Mentor song ngữ — buổi học bằng EN hoặc VI',
-        'Thanh toán Stripe an toàn, xử lý dữ liệu chuẩn GDPR',
+      ],
+      partnerBadgesTitle: 'Đối tác chương trình startup',
+      partnerBadges: ['OpenAI for Startups', 'Google for Startups', 'Zoho for Startups'],
+      educationTitle: 'Bằng cấp',
+      education: [
+        {
+          degree: 'DBA Candidate (đang theo học)',
+          institution: 'Sydney School of Business and Administration (SSBA)',
+          focus: 'Nghiên cứu: Agentic AI cho SME',
+        },
+        {
+          degree: 'Master of Business Administration (MBA)',
+          institution: 'Charles Sturt University (CSU)',
+          focus: 'Sydney',
+        },
+        {
+          degree: 'BSc · Chuyên ngành AI',
+          institution: 'Đại học Bách Khoa TP.HCM (HCMUT)',
+          focus: 'Việt Nam',
+        },
       ],
       experienceTitle: 'Kinh nghiệm',
       experience: [
         {
-          period: '2024 — Hiện tại',
-          role: 'Founder · Senior AI Engineer',
-          org: 'BookedAI',
-          bullet: 'Xây BookedAI end-to-end: booking bằng chat, Stripe checkout, tích hợp Zoho CRM + Meeting, và landing page riêng cho từng dịch vụ.',
+          period: '2025 — Hiện tại',
+          role: 'Founder · longcare.au',
+          org: 'Sydney',
+          bullet: 'Thiết kế và ship ứng dụng AI cho SME tại Úc + tư vấn AI cho Enterprise. Đưa các pattern Agentic AI từ nghiên cứu vào production stack cho khách trả phí.',
         },
         {
-          period: '2021 — 2024',
-          role: 'Senior AI Engineer',
-          org: 'Production AI teams',
-          bullet: 'Ship trợ lý AI và automation cho phân loại email, follow-up sales, hỗ trợ khách hàng, và vận hành content.',
+          period: '2024 — Hiện tại',
+          role: 'Founder · Senior AI Engineer',
+          org: 'BookedAI · Sydney',
+          bullet: 'Xây BookedAI end-to-end — multi-tenant SaaS với chat-driven booking, Stripe checkout, tích hợp Zoho CRM + Meeting, hệ thống agentic AI, và white-label tenant subdomain.',
+        },
+        {
+          period: '2023 — 2024',
+          role: 'Chuyên gia Agentic AI',
+          org: 'Sydney · OpenAI / Google / Zoho for Startups',
+          bullet: 'Production agent stack: tool-use, RAG pipeline, autonomous workflow. Làm việc qua 3 chương trình startup-program partner để ship agent production thật.',
+        },
+        {
+          period: '2021 — 2023',
+          role: 'Senior AI Engineer & Mentor Startup',
+          org: 'Việt Nam → Sydney',
+          bullet: 'Mentor nhiều startup sớm tại Việt Nam từ prototype đến doanh thu. Ship tooling LLM cho SaaS và ops automation.',
         },
         {
           period: '2018 — 2021',
           role: 'AI / ML Engineer',
-          org: 'Đội AI sản phẩm sớm',
+          org: 'Tốt nghiệp ĐH Bách Khoa TP.HCM',
           bullet: 'Bắt đầu ship ML production — recommendation, classification, conversational interfaces từ trước khi LLM phổ biến.',
         },
       ],
@@ -409,9 +491,14 @@ const dict = {
       projectsTitle: 'Sản phẩm tiêu biểu',
       projects: [
         {
+          name: 'longcare.au',
+          url: 'https://longcare.au',
+          description: 'Ứng dụng AI cho SME + tư vấn AI cho Enterprise. Thành lập 2025 tại Sydney — đưa Agentic AI pattern vào sản phẩm ship cho khách trả phí.',
+        },
+        {
           name: 'BookedAI',
           url: 'https://bookedai.au',
-          description: 'AI Revenue Engine cho doanh nghiệp dịch vụ: tìm kiếm bằng chat, Stripe checkout, Zoho CRM + Meeting + Calendar, và landing page booking riêng.',
+          description: 'Multi-tenant booking SaaS — tìm kiếm bằng chat, Stripe checkout, Zoho CRM + Meeting + Calendar, white-label tenant subdomain.',
         },
         {
           name: 'AI Mentor 1-1 Pro',
@@ -656,96 +743,344 @@ function ProgramIllustration({ kind, uid }: { kind: 'first-app' | 'executes' | '
   const teal = '#14a092'; const tealDeep = '#0f5c54'; const mint = '#94e8d2'; const coral = '#ff6b3d'; const ink = '#0a1f1c'; const cream = '#fdfaf3';
   const baseStyle = { width: '100%', height: 'auto', display: 'block' as const };
 
+  // Shared sub-components for scene illustrations
+  const MentorAvatar = ({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) => (
+    <g transform={`translate(${x} ${y}) scale(${scale})`}>
+      <circle cx="0" cy="-3" r="6" fill={tealDeep} />
+      <circle cx="0" cy="-3" r="4.5" fill="#f4d4a8" />
+      <path d="M-4.5 -5 Q0 -9 4.5 -5 L4 -7 Q0 -10 -4 -7 Z" fill={ink} />
+      <path d="M-7 10 Q-7 1 0 1 Q7 1 7 10 Z" fill={teal} />
+      <rect x="-1.5" y="2" width="3" height="6" fill={coral} opacity="0.7" />
+    </g>
+  );
+  const StudentAvatar = ({ x, y, scale = 1 }: { x: number; y: number; scale?: number }) => (
+    <g transform={`translate(${x} ${y}) scale(${scale})`}>
+      <circle cx="0" cy="-3" r="5.5" fill={tealDeep} />
+      <circle cx="0" cy="-3" r="4" fill="#f0c9a8" />
+      <path d="M-3.8 -4.5 Q0 -8 3.8 -4.5 L3.5 -6.5 Q0 -8.5 -3.5 -6.5 Z" fill="#5a3d28" />
+      <path d="M-6 9 Q-6 1 0 1 Q6 1 6 9 Z" fill={coral} />
+    </g>
+  );
+
   if (kind === 'first-app') return (
     <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={baseStyle}>
-      <defs><linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={mint} stopOpacity="0.18" /><stop offset="100%" stopColor={teal} stopOpacity="0.08" /></linearGradient></defs>
+      <defs>
+        <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={mint} stopOpacity="0.22" /><stop offset="100%" stopColor={teal} stopOpacity="0.08" /></linearGradient>
+        <linearGradient id={`${id}-screen`} x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor={cream} /><stop offset="100%" stopColor="#eef7f4" /></linearGradient>
+      </defs>
       <rect width="200" height="120" fill={`url(#${id}-bg)`} />
-      <rect x="46" y="22" width="108" height="64" rx="6" fill={ink} />
-      <rect x="50" y="26" width="100" height="56" rx="3" fill={cream} />
-      <rect x="58" y="34" width="38" height="3" rx="1.5" fill={tealDeep} />
-      <rect x="58" y="42" width="58" height="3" rx="1.5" fill={teal} opacity="0.6" />
-      <rect x="58" y="50" width="46" height="3" rx="1.5" fill={teal} opacity="0.6" />
-      <rect x="58" y="58" width="68" height="3" rx="1.5" fill={teal} opacity="0.6" />
-      <rect x="58" y="66" width="32" height="3" rx="1.5" fill={tealDeep} />
-      <circle cx="138" cy="44" r="14" fill={coral} opacity="0.18" />
-      <path d="M138 34 L141 42 L149 44 L141 46 L138 54 L135 46 L127 44 L135 42 Z" fill={coral} />
-      <rect x="38" y="86" width="124" height="6" rx="3" fill={ink} />
-      <ellipse cx="100" cy="100" rx="60" ry="6" fill={teal} opacity="0.12" />
-      <rect x="14" y="14" width="44" height="16" rx="8" fill={tealDeep} />
-      <text x="36" y="25" textAnchor="middle" fill={mint} fontSize="9" fontFamily="monospace" fontWeight="700">60 MIN</text>
+      {/* Window pane in background */}
+      <rect x="8" y="10" width="46" height="38" rx="3" fill={mint} opacity="0.25" />
+      <path d="M31 10 V48 M8 29 H54" stroke={cream} strokeWidth="1" opacity="0.6" />
+      {/* Desk surface */}
+      <ellipse cx="100" cy="106" rx="92" ry="6" fill={tealDeep} opacity="0.14" />
+      <rect x="10" y="98" width="180" height="6" rx="2" fill={tealDeep} opacity="0.2" />
+      {/* Laptop body */}
+      <path d="M52 90 L148 90 L154 98 L46 98 Z" fill={ink} />
+      <rect x="56" y="32" width="88" height="58" rx="4" fill={ink} />
+      <rect x="60" y="36" width="80" height="50" rx="2" fill={`url(#${id}-screen)`} />
+      {/* Code editor mock — left gutter line numbers */}
+      <rect x="62" y="38" width="6" height="46" fill={tealDeep} opacity="0.08" />
+      {[40, 46, 52, 58, 64, 70, 76, 82].map((y, i) => (
+        <text key={`ln-${i}`} x="65" y={y + 3} textAnchor="middle" fill={tealDeep} fontSize="3" fontFamily="monospace" opacity="0.5">{i + 1}</text>
+      ))}
+      {/* Code lines */}
+      <rect x="71" y="40" width="22" height="2" rx="1" fill={coral} />
+      <rect x="95" y="40" width="14" height="2" rx="1" fill={teal} />
+      <rect x="73" y="46" width="32" height="2" rx="1" fill={tealDeep} />
+      <rect x="73" y="52" width="46" height="2" rx="1" fill={teal} opacity="0.7" />
+      <rect x="75" y="58" width="38" height="2" rx="1" fill={teal} opacity="0.7" />
+      <rect x="73" y="64" width="28" height="2" rx="1" fill={coral} opacity="0.8" />
+      <rect x="71" y="70" width="20" height="2" rx="1" fill={tealDeep} />
+      {/* Output preview window inside screen */}
+      <rect x="113" y="44" width="24" height="36" rx="2" fill={teal} opacity="0.12" stroke={teal} strokeWidth="0.5" />
+      <text x="125" y="54" textAnchor="middle" fill={tealDeep} fontSize="4" fontFamily="monospace" fontWeight="700">DEMO</text>
+      <circle cx="125" cy="62" r="4" fill={coral} />
+      <path d="M122 62 L124.5 64 L128 60" stroke={cream} strokeWidth="0.8" fill="none" strokeLinecap="round" />
+      <rect x="116" y="68" width="18" height="1.5" rx="0.5" fill={teal} opacity="0.6" />
+      <rect x="116" y="72" width="14" height="1.5" rx="0.5" fill={teal} opacity="0.6" />
+      {/* Trackpad */}
+      <rect x="84" y="92" width="32" height="3" rx="1" fill={tealDeep} opacity="0.5" />
+      {/* Student avatar — typing */}
+      <StudentAvatar x={38} y={84} scale={1.3} />
+      {/* Mentor avatar — coaching, with speech bubble */}
+      <MentorAvatar x={166} y={76} scale={1.3} />
+      <path d="M150 60 Q146 56 148 50 L162 50 Q166 50 166 54 L166 64 Q166 68 162 68 L156 68 L152 72 Z" fill={cream} stroke={teal} strokeWidth="0.8" />
+      <text x="157" y="61" textAnchor="middle" fill={tealDeep} fontSize="6" fontFamily="monospace" fontWeight="700">SHIP IT</text>
+      {/* Sparkles */}
+      <path d="M30 24 L32 30 L38 32 L32 34 L30 40 L28 34 L22 32 L28 30 Z" fill={coral} opacity="0.85" />
+      <circle cx="44" cy="20" r="1.5" fill={coral} />
+      <circle cx="48" cy="56" r="1.2" fill={teal} />
+      {/* Tags */}
+      <rect x="6" y="56" width="40" height="14" rx="7" fill={tealDeep} />
+      <text x="26" y="65.5" textAnchor="middle" fill={mint} fontSize="7" fontFamily="monospace" fontWeight="700">60 MIN</text>
+      <rect x="6" y="74" width="56" height="14" rx="7" fill={coral} />
+      <text x="34" y="83.5" textAnchor="middle" fill={cream} fontSize="7" fontFamily="monospace" fontWeight="700">WORKING DEMO</text>
     </svg>
   );
 
   if (kind === 'executes') return (
     <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={baseStyle}>
-      <defs><linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={mint} stopOpacity="0.16" /><stop offset="100%" stopColor={teal} stopOpacity="0.06" /></linearGradient></defs>
+      <defs>
+        <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={mint} stopOpacity="0.18" /><stop offset="100%" stopColor={teal} stopOpacity="0.06" /></linearGradient>
+        <radialGradient id={`${id}-glow`} cx="0.5" cy="0.5" r="0.6"><stop offset="0%" stopColor={mint} stopOpacity="0.6" /><stop offset="100%" stopColor={teal} stopOpacity="0" /></radialGradient>
+      </defs>
       <rect width="200" height="120" fill={`url(#${id}-bg)`} />
-      <rect x="14" y="48" width="44" height="24" rx="6" fill={cream} stroke={tealDeep} strokeWidth="1.5" />
-      <text x="36" y="63" textAnchor="middle" fill={tealDeep} fontSize="9" fontWeight="700" fontFamily="monospace">INPUT</text>
-      <path d="M62 60 L78 60" stroke={teal} strokeWidth="2" />
-      <circle cx="92" cy="60" r="16" fill={teal} />
-      <path d="M85 60 L91 66 L99 56" stroke={cream} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <path d="M108 60 L124 60" stroke={teal} strokeWidth="2" />
-      <rect x="128" y="48" width="56" height="24" rx="6" fill={coral} />
-      <text x="156" y="63" textAnchor="middle" fill={cream} fontSize="9" fontWeight="700" fontFamily="monospace">OUTPUT</text>
-      <circle cx="170" cy="22" r="10" stroke={tealDeep} strokeWidth="1.5" fill="none" />
-      <rect x="14" y="90" width="84" height="18" rx="9" fill={tealDeep} />
-      <text x="56" y="102" textAnchor="middle" fill={mint} fontSize="9" fontFamily="monospace" fontWeight="700">SAVES 5–10 HRS/WK</text>
+      {/* Office wall grid */}
+      <path d="M0 32 H200 M0 64 H200" stroke={teal} strokeWidth="0.4" opacity="0.15" />
+      {/* Inbox stack — left */}
+      <g>
+        <rect x="14" y="36" width="34" height="6" rx="1" fill={cream} stroke={tealDeep} strokeWidth="0.8" />
+        <rect x="14" y="44" width="34" height="6" rx="1" fill={cream} stroke={tealDeep} strokeWidth="0.8" />
+        <rect x="14" y="52" width="34" height="6" rx="1" fill={cream} stroke={tealDeep} strokeWidth="0.8" />
+        <rect x="14" y="32" width="34" height="30" rx="2" fill="none" stroke={tealDeep} strokeWidth="1.2" />
+        {/* Envelope icons */}
+        <path d="M18 38 L22 41 L26 38" stroke={tealDeep} strokeWidth="0.6" fill="none" />
+        <path d="M18 46 L22 49 L26 46" stroke={tealDeep} strokeWidth="0.6" fill="none" />
+        <path d="M18 54 L22 57 L26 54" stroke={tealDeep} strokeWidth="0.6" fill="none" />
+        <circle cx="42" cy="35" r="3" fill={coral} />
+        <text x="42" y="37" textAnchor="middle" fill={cream} fontSize="4" fontWeight="700" fontFamily="monospace">12</text>
+      </g>
+      <text x="31" y="72" textAnchor="middle" fill={tealDeep} fontSize="6" fontFamily="monospace" fontWeight="700">INBOX</text>
+      {/* Arrow 1 with dashed flow */}
+      <path d="M52 47 L72 47" stroke={teal} strokeWidth="1.5" strokeDasharray="3 2" />
+      <path d="M70 44 L74 47 L70 50 Z" fill={teal} />
+      {/* AI Agent core — center, with brain + gear */}
+      <circle cx="92" cy="48" r="22" fill={`url(#${id}-glow)`} />
+      <circle cx="92" cy="48" r="16" fill={teal} />
+      <circle cx="92" cy="48" r="13" fill={tealDeep} />
+      {/* Gear teeth */}
+      {[0, 60, 120, 180, 240, 300].map((deg, i) => (
+        <rect key={`tooth-${i}`} x="91" y="30" width="2" height="3" fill={teal} transform={`rotate(${deg} 92 48)`} />
+      ))}
+      {/* Brain/agent symbol */}
+      <path d="M88 44 Q86 44 86 47 Q86 50 88 50 L88 52 Q86 52 86 54 L96 54 Q98 54 98 52 L98 50 Q100 50 100 47 Q100 44 98 44 Z" fill={mint} stroke={cream} strokeWidth="0.4" />
+      <circle cx="89" cy="47" r="0.8" fill={tealDeep} />
+      <circle cx="95" cy="47" r="0.8" fill={tealDeep} />
+      <text x="92" y="62" textAnchor="middle" fill={mint} fontSize="4" fontFamily="monospace" fontWeight="700">AGENT</text>
+      {/* Arrow 2 */}
+      <path d="M112 47 L132 47" stroke={teal} strokeWidth="1.5" strokeDasharray="3 2" />
+      <path d="M130 44 L134 47 L130 50 Z" fill={teal} />
+      {/* Output table — right */}
+      <rect x="138" y="30" width="48" height="34" rx="2" fill={cream} stroke={tealDeep} strokeWidth="1" />
+      <rect x="138" y="30" width="48" height="6" rx="2" fill={tealDeep} />
+      <text x="162" y="34.5" textAnchor="middle" fill={mint} fontSize="4" fontFamily="monospace" fontWeight="700">RESULTS</text>
+      {[0, 1, 2, 3].map((i) => (
+        <g key={`row-${i}`}>
+          <rect x="140" y={38 + i * 6} width="2.5" height="2.5" rx="0.5" fill={teal} />
+          <path d="M140.5 39.3 L141.4 40.2 L142.5 38.7" stroke={cream} strokeWidth="0.5" fill="none" transform={`translate(0 ${i * 6})`} />
+          <rect x="146" y={38.5 + i * 6} width="20" height="1.5" rx="0.5" fill={teal} opacity="0.6" />
+          <rect x="170" y={38.5 + i * 6} width="12" height="1.5" rx="0.5" fill={coral} opacity="0.6" />
+        </g>
+      ))}
+      <text x="162" y="74" textAnchor="middle" fill={tealDeep} fontSize="6" fontFamily="monospace" fontWeight="700">AUTO</text>
+      {/* Mentor + Student observing */}
+      <MentorAvatar x={62} y={94} scale={1.1} />
+      <StudentAvatar x={82} y={94} scale={1.1} />
+      <path d="M70 88 Q76 84 82 88" stroke={teal} strokeWidth="0.8" strokeDasharray="1.5 1.5" fill="none" opacity="0.6" />
+      {/* Tag */}
+      <rect x="106" y="84" width="86" height="18" rx="9" fill={tealDeep} />
+      <text x="149" y="95.5" textAnchor="middle" fill={mint} fontSize="8" fontFamily="monospace" fontWeight="700">SAVES 5–10 HRS/WK</text>
     </svg>
   );
 
   if (kind === 'real-product') return (
     <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={baseStyle}>
-      <defs><linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={coral} stopOpacity="0.16" /><stop offset="100%" stopColor={mint} stopOpacity="0.08" /></linearGradient></defs>
+      <defs>
+        <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={coral} stopOpacity="0.18" /><stop offset="100%" stopColor={mint} stopOpacity="0.1" /></linearGradient>
+        <linearGradient id={`${id}-card`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={tealDeep} /><stop offset="100%" stopColor={teal} /></linearGradient>
+      </defs>
       <rect width="200" height="120" fill={`url(#${id}-bg)`} />
-      <path d="M50 32 L100 22 L150 32 L150 80 L100 90 L50 80 Z" fill={teal} />
-      <path d="M50 32 L100 42 L150 32" stroke={mint} strokeWidth="1.5" fill="none" />
-      <path d="M100 42 L100 90" stroke={mint} strokeWidth="1.5" />
-      <path d="M30 96 L60 86 L90 80 L120 70 L150 56 L172 44" stroke={coral} strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-      <circle cx="172" cy="44" r="4" fill={coral} />
-      <circle cx="100" cy="56" r="14" fill={cream} stroke={tealDeep} strokeWidth="1.5" />
-      <text x="100" y="60" textAnchor="middle" fill={tealDeep} fontSize="13" fontWeight="700" fontFamily="'Space Grotesk', sans-serif">$</text>
-      <rect x="14" y="14" width="64" height="16" rx="8" fill={coral} />
-      <text x="46" y="25" textAnchor="middle" fill={cream} fontSize="9" fontFamily="monospace" fontWeight="700">MONETISE</text>
+      {/* Confetti / launch sparkles */}
+      <circle cx="20" cy="14" r="1.5" fill={coral} />
+      <circle cx="180" cy="12" r="1.5" fill={teal} />
+      <circle cx="160" cy="22" r="1.2" fill={coral} />
+      <path d="M30 28 L31.5 31 L34.5 31 L32 32.8 L33 36 L30 34 L27 36 L28 32.8 L25.5 31 L28.5 31 Z" fill={coral} opacity="0.7" />
+      {/* Shop / storefront in background */}
+      <rect x="14" y="30" width="56" height="50" rx="2" fill={cream} stroke={tealDeep} strokeWidth="1" />
+      <path d="M12 30 L42 18 L72 30 Z" fill={tealDeep} />
+      <rect x="20" y="42" width="14" height="20" fill={teal} opacity="0.3" stroke={teal} strokeWidth="0.5" />
+      <rect x="38" y="42" width="14" height="14" fill={mint} opacity="0.5" stroke={teal} strokeWidth="0.5" />
+      <rect x="38" y="60" width="14" height="14" fill={coral} opacity="0.4" stroke={coral} strokeWidth="0.5" />
+      <rect x="56" y="42" width="10" height="20" fill={teal} opacity="0.3" stroke={teal} strokeWidth="0.5" />
+      <text x="42" y="38" textAnchor="middle" fill={mint} fontSize="4" fontFamily="monospace" fontWeight="700">YOUR APP</text>
+      {/* Stripe-style payment card — center-front */}
+      <g transform="rotate(-6 116 64)">
+        <rect x="86" y="46" width="60" height="36" rx="4" fill={`url(#${id}-card)`} />
+        <rect x="86" y="46" width="60" height="36" rx="4" fill="none" stroke={mint} strokeWidth="0.4" opacity="0.5" />
+        <rect x="92" y="54" width="10" height="7" rx="1" fill={coral} />
+        <path d="M93 56 L96 56 M93 58 L98 58 M93 60 L94 60" stroke={cream} strokeWidth="0.4" />
+        <rect x="92" y="66" width="32" height="2" rx="1" fill={mint} opacity="0.6" />
+        <text x="92" y="76" fill={mint} fontSize="5" fontFamily="monospace" fontWeight="700">•••• 4242</text>
+        <text x="138" y="56" textAnchor="end" fill={mint} fontSize="4" fontFamily="monospace" fontWeight="700">PAID</text>
+      </g>
+      {/* Growth arrow chart — top-right */}
+      <g>
+        <rect x="98" y="20" width="86" height="2" fill={tealDeep} opacity="0.2" />
+        <rect x="100" y="22" width="2" height="14" fill={tealDeep} opacity="0.2" />
+        <path d="M104 36 L116 30 L128 28 L142 22 L156 16 L172 10" stroke={coral} strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx="104" cy="36" r="1.5" fill={coral} />
+        <circle cx="116" cy="30" r="1.5" fill={coral} />
+        <circle cx="128" cy="28" r="1.5" fill={coral} />
+        <circle cx="142" cy="22" r="1.5" fill={coral} />
+        <circle cx="156" cy="16" r="1.5" fill={coral} />
+        <circle cx="172" cy="10" r="2.5" fill={coral} />
+        <path d="M168 14 L172 8 L176 14" stroke={coral} strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      </g>
+      {/* Coin / dollar burst */}
+      <g transform="translate(166 64)">
+        <circle r="11" fill={coral} />
+        <circle r="9" fill={cream} />
+        <text y="3" textAnchor="middle" fill={coral} fontSize="11" fontWeight="800" fontFamily="'Space Grotesk', sans-serif">$</text>
+        {[0, 60, 120, 180, 240, 300].map((deg, i) => (
+          <line key={`ray-${i}`} x1="0" y1="-14" x2="0" y2="-17" stroke={coral} strokeWidth="1.2" strokeLinecap="round" transform={`rotate(${deg})`} />
+        ))}
+      </g>
+      {/* Mentor + student celebrating */}
+      <MentorAvatar x={28} y={102} scale={1.05} />
+      <StudentAvatar x={48} y={102} scale={1.05} />
+      {/* Tags */}
+      <rect x="6" y="6" width="64" height="16" rx="8" fill={coral} />
+      <text x="38" y="17" textAnchor="middle" fill={cream} fontSize="8" fontFamily="monospace" fontWeight="700">MONETISE</text>
+      <rect x="118" y="100" width="68" height="14" rx="7" fill={tealDeep} />
+      <text x="152" y="109.5" textAnchor="middle" fill={mint} fontSize="7" fontFamily="monospace" fontWeight="700">REAL REVENUE</text>
     </svg>
   );
 
   if (kind === 'project-builder') return (
     <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={baseStyle}>
-      <defs><linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={mint} stopOpacity="0.14" /><stop offset="100%" stopColor={tealDeep} stopOpacity="0.06" /></linearGradient></defs>
+      <defs>
+        <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={mint} stopOpacity="0.16" /><stop offset="100%" stopColor={tealDeep} stopOpacity="0.06" /></linearGradient>
+      </defs>
       <rect width="200" height="120" fill={`url(#${id}-bg)`} />
-      <rect x="20" y="16" width="160" height="88" rx="6" fill={cream} stroke={tealDeep} strokeWidth="1.5" />
-      <rect x="32" y="30" width="32" height="22" rx="2" fill={coral} />
-      <rect x="72" y="30" width="32" height="22" rx="2" fill={teal} />
-      <rect x="112" y="30" width="32" height="22" rx="2" fill={mint} />
-      <rect x="32" y="60" width="32" height="22" rx="2" fill={teal} />
-      <rect x="72" y="60" width="64" height="22" rx="2" fill={tealDeep} />
-      <rect x="144" y="60" width="24" height="22" rx="2" fill={coral} />
-      <rect x="14" y="92" width="60" height="16" rx="8" fill={tealDeep} />
-      <text x="44" y="103" textAnchor="middle" fill={mint} fontSize="9" fontFamily="monospace" fontWeight="700">SPRINT-BASED</text>
+      {/* Kanban board frame */}
+      <rect x="6" y="14" width="188" height="76" rx="4" fill={cream} stroke={tealDeep} strokeWidth="1.2" />
+      <rect x="6" y="14" width="188" height="10" rx="4" fill={tealDeep} />
+      <text x="12" y="21.5" fill={mint} fontSize="6" fontFamily="monospace" fontWeight="700">SPRINT 03 / 06</text>
+      <text x="188" y="21.5" textAnchor="end" fill={mint} fontSize="6" fontFamily="monospace" fontWeight="700">▰▰▰▱▱▱</text>
+      {/* Three columns */}
+      {/* TODO column */}
+      <rect x="12" y="28" width="56" height="58" rx="2" fill={mint} opacity="0.18" />
+      <text x="40" y="35" textAnchor="middle" fill={tealDeep} fontSize="5" fontFamily="monospace" fontWeight="700">TO DO</text>
+      <g>
+        <rect x="16" y="38" width="48" height="12" rx="1.5" fill={cream} stroke={teal} strokeWidth="0.5" />
+        <rect x="18" y="40" width="22" height="2" rx="1" fill={tealDeep} />
+        <rect x="18" y="44" width="32" height="1.5" rx="0.5" fill={teal} opacity="0.5" />
+        <circle cx="60" cy="44" r="2" fill={coral} />
+      </g>
+      <g>
+        <rect x="16" y="52" width="48" height="12" rx="1.5" fill={cream} stroke={teal} strokeWidth="0.5" />
+        <rect x="18" y="54" width="18" height="2" rx="1" fill={tealDeep} />
+        <rect x="18" y="58" width="28" height="1.5" rx="0.5" fill={teal} opacity="0.5" />
+        <circle cx="60" cy="58" r="2" fill={teal} />
+      </g>
+      <g>
+        <rect x="16" y="66" width="48" height="12" rx="1.5" fill={cream} stroke={teal} strokeWidth="0.5" />
+        <rect x="18" y="68" width="14" height="2" rx="1" fill={tealDeep} />
+        <rect x="18" y="72" width="20" height="1.5" rx="0.5" fill={teal} opacity="0.5" />
+      </g>
+      {/* IN PROGRESS column */}
+      <rect x="72" y="28" width="56" height="58" rx="2" fill={coral} opacity="0.16" />
+      <text x="100" y="35" textAnchor="middle" fill={tealDeep} fontSize="5" fontFamily="monospace" fontWeight="700">IN PROGRESS</text>
+      <g>
+        <rect x="76" y="38" width="48" height="20" rx="1.5" fill={cream} stroke={coral} strokeWidth="0.8" />
+        <rect x="78" y="40" width="26" height="2" rx="1" fill={tealDeep} />
+        <rect x="78" y="44" width="36" height="1.5" rx="0.5" fill={teal} opacity="0.5" />
+        <rect x="78" y="47.5" width="28" height="1.5" rx="0.5" fill={teal} opacity="0.5" />
+        <rect x="78" y="52" width="20" height="3" rx="1.5" fill={coral} opacity="0.7" />
+        <text x="88" y="54.4" textAnchor="middle" fill={cream} fontSize="2.5" fontFamily="monospace" fontWeight="700">CODING</text>
+        <circle cx="120" cy="44" r="2" fill={coral} />
+      </g>
+      <g>
+        <rect x="76" y="62" width="48" height="14" rx="1.5" fill={cream} stroke={coral} strokeWidth="0.8" />
+        <rect x="78" y="64" width="22" height="2" rx="1" fill={tealDeep} />
+        <rect x="78" y="68" width="32" height="1.5" rx="0.5" fill={teal} opacity="0.5" />
+        <rect x="78" y="71" width="14" height="2" rx="1" fill={mint} stroke={teal} strokeWidth="0.3" />
+      </g>
+      {/* DONE column */}
+      <rect x="132" y="28" width="56" height="58" rx="2" fill={teal} opacity="0.18" />
+      <text x="160" y="35" textAnchor="middle" fill={tealDeep} fontSize="5" fontFamily="monospace" fontWeight="700">DONE</text>
+      {[0, 1, 2, 3].map((i) => (
+        <g key={`done-${i}`} transform={`translate(0 ${i * 12})`}>
+          <rect x="136" y="38" width="48" height="10" rx="1.5" fill={cream} stroke={teal} strokeWidth="0.5" />
+          <circle cx="140" cy="43" r="2" fill={teal} />
+          <path d="M138.5 43 L139.6 44.2 L141.5 41.8" stroke={cream} strokeWidth="0.6" fill="none" strokeLinecap="round" />
+          <rect x="144" y="42" width="34" height="1.5" rx="0.5" fill={tealDeep} opacity="0.6" />
+          <rect x="144" y="45" width="22" height="1" rx="0.5" fill={teal} opacity="0.5" />
+        </g>
+      ))}
+      {/* Mentor + student at board */}
+      <MentorAvatar x={26} y={104} scale={1} />
+      <StudentAvatar x={42} y={104} scale={1} />
+      {/* Commit timeline at bottom */}
+      <line x1="60" y1="106" x2="194" y2="106" stroke={teal} strokeWidth="0.6" opacity="0.4" />
+      {[64, 80, 96, 112, 128, 144, 160, 176].map((cx, i) => (
+        <circle key={`cmt-${i}`} cx={cx} cy="106" r={i === 7 ? 2.5 : 1.5} fill={i >= 6 ? coral : teal} />
+      ))}
+      {/* Tag */}
+      <rect x="120" y="98" width="74" height="14" rx="7" fill={tealDeep} />
+      <text x="157" y="107.5" textAnchor="middle" fill={mint} fontSize="7" fontFamily="monospace" fontWeight="700">CUSTOM · SPRINT</text>
     </svg>
   );
 
+  // ongoing
   return (
     <svg viewBox="0 0 200 120" xmlns="http://www.w3.org/2000/svg" aria-hidden="true" style={baseStyle}>
-      <defs><linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={teal} stopOpacity="0.14" /><stop offset="100%" stopColor={cream} stopOpacity="0.6" /></linearGradient></defs>
+      <defs>
+        <linearGradient id={`${id}-bg`} x1="0" y1="0" x2="1" y2="1"><stop offset="0%" stopColor={teal} stopOpacity="0.16" /><stop offset="100%" stopColor={cream} stopOpacity="0.6" /></linearGradient>
+      </defs>
       <rect width="200" height="120" fill={`url(#${id}-bg)`} />
-      <rect x="50" y="22" width="100" height="76" rx="6" fill={cream} stroke={tealDeep} strokeWidth="1.5" />
-      <rect x="50" y="22" width="100" height="14" rx="6" fill={tealDeep} />
-      <text x="100" y="33" textAnchor="middle" fill={mint} fontSize="9" fontFamily="monospace" fontWeight="700">MONTHLY</text>
-      {[0, 1, 2].map((row) => [0, 1, 2, 3].map((col) => {
-        const x = 60 + col * 22;
-        const y = 46 + row * 16;
-        const isFilled = (row + col) % 2 === 0;
+      {/* Calendar — left */}
+      <rect x="10" y="14" width="100" height="92" rx="4" fill={cream} stroke={tealDeep} strokeWidth="1.2" />
+      <rect x="10" y="14" width="100" height="14" rx="4" fill={tealDeep} />
+      <text x="60" y="24" textAnchor="middle" fill={mint} fontSize="7" fontFamily="monospace" fontWeight="700">MONTHLY · 2026</text>
+      {/* Calendar binding rings */}
+      <rect x="22" y="10" width="3" height="8" rx="1.5" fill={ink} />
+      <rect x="48" y="10" width="3" height="8" rx="1.5" fill={ink} />
+      <rect x="72" y="10" width="3" height="8" rx="1.5" fill={ink} />
+      <rect x="96" y="10" width="3" height="8" rx="1.5" fill={ink} />
+      {/* Day-of-week strip */}
+      {['M', 'T', 'W', 'T', 'F'].map((label, i) => (
+        <text key={`dow-${i}`} x={20 + i * 18} y="36" fill={tealDeep} fontSize="4.5" fontFamily="monospace" fontWeight="700">{label}</text>
+      ))}
+      {/* Calendar grid 4 weeks × 5 days */}
+      {[0, 1, 2, 3].map((row) => [0, 1, 2, 3, 4].map((col) => {
+        const x = 16 + col * 18;
+        const y = 40 + row * 16;
+        const isSession = (col === 1 && row === 0) || (col === 3 && row === 1) || (col === 1 && row === 2) || (col === 3 && row === 3);
+        const isPast = (row === 0 && col === 0) || (row === 0) && col === 1;
         return (
-          <g key={`${row}-${col}`}>
-            <rect x={x} y={y} width="14" height="10" rx="2" fill={isFilled ? teal : cream} stroke={teal} strokeWidth="1" />
-            {isFilled ? <path d={`M${x + 3} ${y + 5} L${x + 6} ${y + 8} L${x + 11} ${y + 3}`} stroke={cream} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none" /> : null}
+          <g key={`cal-${row}-${col}`}>
+            <rect x={x} y={y} width="14" height="14" rx="1.5" fill={isSession ? teal : cream} stroke={isSession ? tealDeep : teal} strokeWidth="0.8" />
+            {isSession ? (
+              <>
+                <path d={`M${x + 3} ${y + 7} L${x + 6} ${y + 10} L${x + 11} ${y + 4}`} stroke={cream} strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+              </>
+            ) : (
+              <text x={x + 7} y={y + 9} textAnchor="middle" fill={tealDeep} fontSize="4" fontFamily="monospace" opacity={isPast ? 0.3 : 0.7}>{row * 5 + col + 1}</text>
+            )}
           </g>
         );
       }))}
-      <rect x="14" y="92" width="60" height="16" rx="8" fill={coral} />
-      <text x="44" y="103" textAnchor="middle" fill={cream} fontSize="9" fontFamily="monospace" fontWeight="700">RETAINER</text>
+      {/* Mentor-student dyad — right */}
+      <g>
+        {/* Recurring loop arrow */}
+        <path d="M150 36 Q176 36 176 60 Q176 84 150 84 Q124 84 124 60 Q124 50 132 44" stroke={teal} strokeWidth="1.5" fill="none" strokeDasharray="3 2" />
+        <path d="M129 47 L132 44 L135 47" stroke={teal} strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        {/* Sync icon */}
+        <g transform="translate(150 60)">
+          <circle r="10" fill={cream} stroke={teal} strokeWidth="1" />
+          <path d="M-5 -2 A5 5 0 0 1 4 -3 L4 0 L8 -3 L4 -6 L4 -3" stroke={teal} strokeWidth="1.2" fill="none" strokeLinecap="round" />
+          <path d="M5 2 A5 5 0 0 1 -4 3 L-4 0 L-8 3 L-4 6 L-4 3" stroke={coral} strokeWidth="1.2" fill="none" strokeLinecap="round" />
+        </g>
+        {/* Mentor + Student */}
+        <MentorAvatar x={138} y={48} scale={1.1} />
+        <StudentAvatar x={162} y={74} scale={1.1} />
+        <text x="150" y="100" textAnchor="middle" fill={tealDeep} fontSize="5.5" fontFamily="monospace" fontWeight="700">EVERY MONTH</text>
+      </g>
+      {/* Tag */}
+      <rect x="120" y="106" width="58" height="12" rx="6" fill={coral} />
+      <text x="149" y="114.5" textAnchor="middle" fill={cream} fontSize="6.5" fontFamily="monospace" fontWeight="700">RETAINER · ∞</text>
     </svg>
   );
 }
@@ -805,7 +1140,7 @@ function PromoBanner({ t }: { t: Dict }) {
       <span style={{ fontFamily: 'var(--aim-font-mono)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', opacity: 0.95 }}>{t.promo.eyebrow}</span>
       <strong style={{ fontWeight: 700, fontSize: '0.92rem' }}>{t.promo.headline}</strong>
       <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, padding: '3px 10px', borderRadius: 999, background: 'rgba(0,0,0,0.18)', fontFamily: 'var(--aim-font-mono)', fontSize: '0.78rem', fontWeight: 600 }}>{t.promo.countdownPrefix}: {cd.days}{t.promo.countdownDays} {cd.hours}{t.promo.countdownHours} {cd.minutes}{t.promo.countdownMinutes}</span>
-      <a href="#programs" style={{ background: '#fdfaf3', color: '#e84e1e', padding: '6px 14px', borderRadius: 8, fontWeight: 700, textDecoration: 'none', fontSize: '0.84rem' }}>{t.promo.bookCta}</a>
+      <a href="#assistant" style={{ background: '#fdfaf3', color: '#e84e1e', padding: '6px 14px', borderRadius: 8, fontWeight: 700, textDecoration: 'none', fontSize: '0.84rem' }}>{t.promo.bookCta}</a>
     </div>
   );
 }
@@ -842,14 +1177,14 @@ function TopNav({ t, locale, onLocaleChange }: { t: Dict; locale: Locale; onLoca
         <div className="aim-nav-actions">
           <LanguageToggle locale={locale} onChange={onLocaleChange} label={t.languageToggle.label} enLabel={t.languageToggle.en} viLabel={t.languageToggle.vi} />
           <a className="aim-btn aim-btn-secondary aim-btn-sm" href={PORTAL_BASE_URL}>{t.nav.studentLogin}</a>
-          <a className="aim-btn aim-btn-primary aim-btn-sm" href="#programs">{t.nav.enroll}</a>
+          <a className="aim-btn aim-btn-primary aim-btn-sm" href="#assistant">{t.nav.enroll}</a>
         </div>
       </div>
     </nav>
   );
 }
 
-function Hero({ t, onPrompt, initialQuery, initialQueryRequestId }: { t: Dict; onPrompt: (prompt: string) => void; initialQuery: string | null; initialQueryRequestId: number }) {
+function Hero({ t, onPrompt, locale }: { t: Dict; onPrompt: (prompt: string) => void; locale: Locale }) {
   return (
     <section className="aim-hero">
       <div className="aim-container">
@@ -859,8 +1194,8 @@ function Hero({ t, onPrompt, initialQuery, initialQueryRequestId }: { t: Dict; o
             <h1 className="aim-hero-title" style={{ marginTop: 14 }}>{t.hero.titleLeft}<em>{t.hero.titleEm}</em>{t.hero.titleRight}</h1>
             <p className="aim-hero-lead" style={{ marginTop: 20 }}>{t.hero.lead}</p>
             <div className="aim-hero-cta">
-              <a className="aim-btn aim-btn-primary aim-btn-lg" href="#programs">{t.hero.reserveCta}</a>
-              <a className="aim-btn aim-btn-secondary aim-btn-lg" href="#assistant">{t.hero.chatCta}</a>
+              <a className="aim-btn aim-btn-primary aim-btn-lg" href="#assistant">{t.hero.reserveCta}</a>
+              <a className="aim-btn aim-btn-secondary aim-btn-lg" href="#programs">{t.hero.chatCta}</a>
             </div>
             <div className="aim-hero-trust">
               {t.hero.trustChips.map((chip, idx) => (<span key={chip} className={`aim-trust-chip${idx % 2 === 1 ? ' aim-trust-chip-coral' : ''}`}>{chip}</span>))}
@@ -891,8 +1226,148 @@ function Hero({ t, onPrompt, initialQuery, initialQueryRequestId }: { t: Dict; o
           </div>
         </div>
         <div style={{ marginTop: 36, maxWidth: 720, marginInline: 'auto', position: 'relative', zIndex: 2 }}>
-          <BookingAssistantDialog content={bookingAssistantContent} isOpen standalone embedded hideCloseControl layoutMode="product_app" closeLabel={t.nav.brandName} entrySourcePath="/aimentor" initialQuery={initialQuery} initialQueryRequestId={initialQueryRequestId} runtimeConfig={aiMentorBookedAIRuntimeConfig} onClose={() => {}} />
+          <AIMentorChat
+            programs={t.catalog.programs as ChatProgram[]}
+            locale={locale}
+            mentorInitials="LV"
+          />
         </div>
+      </div>
+    </section>
+  );
+}
+
+// ---------- BannerCallout --------------------------------------------------
+//
+// Wide promo card for the Founding Cohort banner. Tap-anywhere scrolls to
+// the chat (#assistant) — same target a QR scan would hit, since the QR
+// embedded on the printable banner encodes
+// ``https://aimentor.bookedai.au/`` and lands on this page.
+//
+// Image is hosted on upload.bookedai.au so it survives separate from the
+// frontend build. ``loading="eager"`` because the banner sits above the
+// fold for many viewports + we want the visual lock-in fast.
+
+function BannerCallout({ t }: { t: Dict }) {
+  return (
+    <section
+      style={{
+        background: 'linear-gradient(135deg, #fdfaf3 0%, #94e8d233 100%)',
+        padding: '32px 0',
+      }}
+    >
+      <div className="aim-container">
+        <a
+          href="#assistant"
+          aria-label={t.banner.imageAlt}
+          style={{
+            display: 'block',
+            position: 'relative',
+            borderRadius: 'var(--aim-radius-xl)',
+            overflow: 'hidden',
+            border: '1px solid rgba(15, 92, 84, 0.12)',
+            boxShadow: '0 18px 56px -28px rgba(15, 92, 84, 0.4)',
+            textDecoration: 'none',
+            color: 'inherit',
+            background: '#0a1f1c',
+            transition: 'transform 0.2s ease, box-shadow 0.2s ease',
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.transform = 'translateY(-2px)';
+            e.currentTarget.style.boxShadow =
+              '0 28px 64px -28px rgba(15, 92, 84, 0.55)';
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.transform = '';
+            e.currentTarget.style.boxShadow =
+              '0 18px 56px -28px rgba(15, 92, 84, 0.4)';
+          }}
+        >
+          <img
+            src={t.banner.imageUrl}
+            alt={t.banner.imageAlt}
+            loading="eager"
+            style={{
+              width: '100%',
+              height: 'auto',
+              display: 'block',
+              objectFit: 'cover',
+            }}
+          />
+          {/* Overlay with eyebrow + headline + CTA — sits at bottom on
+              desktop, full-width strip on mobile so it's always tappable
+              without obscuring the banner art. */}
+          <div
+            style={{
+              position: 'absolute',
+              left: 0,
+              right: 0,
+              bottom: 0,
+              padding: '14px 20px',
+              background:
+                'linear-gradient(180deg, rgba(6, 22, 20, 0) 0%, rgba(6, 22, 20, 0.78) 60%, rgba(6, 22, 20, 0.92) 100%)',
+              color: '#fdfaf3',
+              display: 'flex',
+              flexWrap: 'wrap',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: 12,
+            }}
+          >
+            <div style={{ flex: '1 1 280px', minWidth: 0 }}>
+              <div
+                style={{
+                  fontFamily: 'var(--aim-font-mono)',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: 'var(--aim-mint)',
+                }}
+              >
+                {t.banner.eyebrow}
+              </div>
+              <div
+                style={{
+                  fontFamily: 'var(--aim-font-display)',
+                  fontWeight: 700,
+                  fontSize: 'clamp(1.1rem, 2.2vw, 1.5rem)',
+                  letterSpacing: '-0.02em',
+                  marginTop: 4,
+                  color: '#fdfaf3',
+                }}
+              >
+                {t.banner.headline}
+              </div>
+              <div
+                style={{
+                  fontSize: '0.84rem',
+                  color: 'var(--aim-on-dark-muted)',
+                  marginTop: 4,
+                  lineHeight: 1.5,
+                }}
+              >
+                {t.banner.sub}
+              </div>
+            </div>
+            <span
+              style={{
+                flex: '0 0 auto',
+                padding: '10px 18px',
+                borderRadius: 999,
+                background: 'var(--aim-coral)',
+                color: '#fdfaf3',
+                fontFamily: 'var(--aim-font-body)',
+                fontWeight: 700,
+                fontSize: '0.92rem',
+                letterSpacing: '-0.005em',
+                boxShadow: '0 10px 24px -10px rgba(255, 107, 61, 0.55)',
+              }}
+            >
+              {t.banner.cta}
+            </span>
+          </div>
+        </a>
       </div>
     </section>
   );
@@ -933,11 +1408,56 @@ function MentorProfile({ t }: { t: Dict }) {
               <span style={{ display: 'inline-flex', width: 56, height: 56, borderRadius: 14, background: 'linear-gradient(135deg, #14a092 0%, #0f5c54 100%)', color: '#fdfaf3', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--aim-font-display)', fontWeight: 700, fontSize: '1.45rem', letterSpacing: '-0.02em' }}>LV</span>
               <div>
                 <div style={{ fontFamily: 'var(--aim-font-display)', fontWeight: 700, fontSize: '1.3rem', letterSpacing: '-0.015em', color: 'var(--aim-ink)' }}>{t.profile.name}</div>
-                <a href={t.profile.linkedinUrl} target="_blank" rel="noreferrer" style={{ fontFamily: 'var(--aim-font-mono)', fontSize: '0.78rem', color: 'var(--aim-teal-deep)', textDecoration: 'none', letterSpacing: '0.04em' }}>linkedin.com/{t.profile.handle}</a>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, marginTop: 2 }}>
+                  <a href={t.profile.linkedinUrl} target="_blank" rel="noreferrer" style={{ fontFamily: 'var(--aim-font-mono)', fontSize: '0.78rem', color: 'var(--aim-teal-deep)', textDecoration: 'none', letterSpacing: '0.04em' }}>linkedin.com/{t.profile.handle}</a>
+                  <a href={t.profile.pressUrl} target="_blank" rel="noreferrer" style={{ fontFamily: 'var(--aim-font-mono)', fontSize: '0.72rem', color: 'var(--aim-coral)', textDecoration: 'none', letterSpacing: '0.04em', display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                    ★ {t.profile.pressLabel}
+                  </a>
+                </div>
               </div>
             </div>
             <h2 className="aim-section-title" style={{ marginTop: 14, fontSize: 'clamp(1.5rem, 3vw, 2.1rem)' }}>{t.profile.title}</h2>
             <p style={{ marginTop: 14, fontSize: '1rem', lineHeight: 1.7, color: 'var(--aim-text)' }}>{t.profile.bio}</p>
+            <div style={{ marginTop: 18 }}>
+              <h3
+                style={{
+                  fontFamily: 'var(--aim-font-mono)',
+                  fontSize: '0.7rem',
+                  fontWeight: 700,
+                  letterSpacing: '0.14em',
+                  textTransform: 'uppercase',
+                  color: 'var(--aim-coral)',
+                  marginBottom: 8,
+                }}
+              >
+                {t.profile.partnerBadgesTitle}
+              </h3>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {t.profile.partnerBadges.map((badge) => (
+                  <span
+                    key={badge}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      gap: 6,
+                      padding: '5px 12px',
+                      background:
+                        'linear-gradient(135deg, rgba(255, 107, 61, 0.12) 0%, rgba(20, 160, 146, 0.1) 100%)',
+                      color: 'var(--aim-ink)',
+                      border: '1px solid rgba(255, 107, 61, 0.32)',
+                      borderRadius: 999,
+                      fontFamily: 'var(--aim-font-mono)',
+                      fontSize: '0.74rem',
+                      fontWeight: 700,
+                      letterSpacing: '0.02em',
+                    }}
+                  >
+                    <span aria-hidden="true" style={{ color: 'var(--aim-coral)' }}>◆</span>
+                    {badge}
+                  </span>
+                ))}
+              </div>
+            </div>
             <div style={{ marginTop: 22 }}>
               <h3 style={{ fontFamily: 'var(--aim-font-mono)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--aim-teal-deep)', marginBottom: 10 }}>{t.profile.credentialsTitle}</h3>
               <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -958,6 +1478,37 @@ function MentorProfile({ t }: { t: Dict }) {
               </ol>
             </div>
             <div style={{ marginTop: 24 }}>
+              <h3 style={{ fontFamily: 'var(--aim-font-mono)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--aim-teal-deep)', marginBottom: 10 }}>{t.profile.educationTitle}</h3>
+              <ol style={{ listStyle: 'none', padding: 0, margin: 0, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {t.profile.education.map((ed) => (
+                  <li
+                    key={`${ed.degree}-${ed.institution}`}
+                    style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: 2,
+                      padding: '10px 12px',
+                      background: 'var(--aim-paper)',
+                      border: '1px solid var(--aim-line)',
+                      borderRadius: 'var(--aim-radius)',
+                    }}
+                  >
+                    <div style={{ fontFamily: 'var(--aim-font-display)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--aim-ink)', letterSpacing: '-0.01em' }}>
+                      {ed.degree}
+                    </div>
+                    <div style={{ fontSize: '0.86rem', color: 'var(--aim-text)' }}>
+                      {ed.institution}
+                    </div>
+                    {ed.focus ? (
+                      <div style={{ fontFamily: 'var(--aim-font-mono)', fontSize: '0.72rem', color: 'var(--aim-coral)', letterSpacing: '0.04em', marginTop: 2 }}>
+                        {ed.focus}
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ol>
+            </div>
+            <div style={{ marginTop: 24 }}>
               <h3 style={{ fontFamily: 'var(--aim-font-mono)', fontSize: '0.72rem', fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--aim-teal-deep)', marginBottom: 10 }}>{t.profile.skillsTitle}</h3>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                 {t.profile.skills.map((skill) => (
@@ -966,8 +1517,8 @@ function MentorProfile({ t }: { t: Dict }) {
               </div>
             </div>
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, marginTop: 24 }}>
-              <a className="aim-btn aim-btn-primary" href="#programs">{t.profile.ctaPrimary}</a>
-              <a className="aim-btn aim-btn-outline" href="#assistant">{t.profile.ctaSecondary}</a>
+              <a className="aim-btn aim-btn-primary" href="#assistant">{t.profile.ctaPrimary}</a>
+              <a className="aim-btn aim-btn-outline" href="#programs">{t.profile.ctaSecondary}</a>
               <a className="aim-btn aim-btn-ghost" href={t.profile.linkedinUrl} target="_blank" rel="noreferrer">{t.profile.linkedinCta}</a>
             </div>
           </div>
@@ -1911,21 +2462,25 @@ function PriceBlock({ program, t }: { program: Program; t: Dict }) {
   );
 }
 
-function Catalog({
-  t,
-  locale,
-  onSelect,
-  onSlotPick,
-}: {
-  t: Dict;
-  locale: Locale;
-  onSelect: (programName: string) => void;
-  onSlotPick: (programName: string, slot: TimeSlot) => void;
-}) {
-  // Programs with a discounted price get the slot picker — custom-pricing
-  // programs (Project-based + Ongoing) skip it because slot selection
-  // happens after the mentor scopes the engagement.
-  const slotEligible = (p: Program) => p.discountedAmount != null;
+function Catalog({ t }: { t: Dict }) {
+  // Catalog is now chat-first. The booking flow lives entirely in
+  // ``AIMentorChat`` (#assistant): pick program → pick slot → fill name/
+  // email → atomic reserve via /api/v1/aimentor/slots/{slot_id}/reserve.
+  // Each program card's CTA dispatches a window CustomEvent the chat
+  // listens for, then smooth-scrolls the chat into view. No inline
+  // form-based booking on the cards themselves.
+  const handleReserveViaChat = (program: Program) => {
+    if (typeof window === 'undefined') return;
+    window.dispatchEvent(
+      new CustomEvent('aimentor:open-with-program', {
+        detail: { programId: program.id },
+      }),
+    );
+    const target = document.getElementById('assistant');
+    if (target && typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
 
   return (
     <section id="programs" className="aim-section aim-section-light">
@@ -1946,14 +2501,14 @@ function Catalog({
               <p className="aim-program-summary">{program.summary}</p>
               <ul className="aim-program-list">{program.tags.map((tag) => (<li key={tag}>{tag}</li>))}</ul>
               <PriceBlock program={program} t={t} />
-              {slotEligible(program) ? (
-                <TimeSlotPicker
-                  serviceId={program.id}
-                  locale={locale}
-                  onPick={(slot) => onSlotPick(program.name, slot)}
-                />
-              ) : null}
-              <button type="button" className="aim-btn aim-btn-primary aim-btn-block" onClick={() => onSelect(program.name)} aria-label={`${t.catalog.bookCta}: ${program.name}`}>{t.catalog.bookCta} →</button>
+              <button
+                type="button"
+                className="aim-btn aim-btn-primary aim-btn-block"
+                onClick={() => handleReserveViaChat(program)}
+                aria-label={`${t.catalog.bookCta}: ${program.name}`}
+              >
+                💬 {t.catalog.bookCta} →
+              </button>
             </article>
           ))}
         </div>
@@ -2157,8 +2712,8 @@ function FinalCtaBlock({ t }: { t: Dict }) {
           <h2 className="aim-section-title" style={{ color: 'var(--aim-on-dark)', maxWidth: 640 }}>{t.finalCta.title}</h2>
           <p style={{ fontSize: '1.05rem', lineHeight: 1.65, color: 'var(--aim-on-dark-muted)', maxWidth: 600 }}>{t.finalCta.lead}</p>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginTop: 6 }}>
-            <a className="aim-btn aim-btn-primary aim-btn-lg" href="#programs">{t.finalCta.primary}</a>
-            <a className="aim-btn aim-btn-secondary aim-btn-lg" href="#assistant">{t.finalCta.secondary}</a>
+            <a className="aim-btn aim-btn-primary aim-btn-lg" href="#assistant">{t.finalCta.primary}</a>
+            <a className="aim-btn aim-btn-secondary aim-btn-lg" href="#programs">{t.finalCta.secondary}</a>
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12, justifyContent: 'center', marginTop: 4 }}>
             <MoneyBackBadge label={t.finalCta.moneyBack} />
@@ -2206,7 +2761,129 @@ function FooterBlock({ t }: { t: Dict }) {
 }
 
 function StickyCta({ t }: { t: Dict }) {
-  return (<div className="aim-sticky-cta" role="region" aria-label="Quick enrol"><div className="aim-sticky-cta-text"><strong>{t.stickyCta.lead}</strong><br />{t.finalCta.moneyBack}</div><a className="aim-btn aim-btn-primary aim-btn-sm" href="#programs">{t.stickyCta.cta}</a></div>);
+  return (<div className="aim-sticky-cta" role="region" aria-label="Quick enrol"><div className="aim-sticky-cta-text"><strong>{t.stickyCta.lead}</strong><br />{t.finalCta.moneyBack}</div><a className="aim-btn aim-btn-primary aim-btn-sm" href="#assistant">{t.stickyCta.cta}</a></div>);
+}
+
+function FloatingChatFab({ locale }: { locale: Locale }) {
+  const [visible, setVisible] = useState(false);
+  const [pulsed, setPulsed] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      setVisible(window.scrollY > 480);
+    };
+    onScroll();
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    // Subtle attention pulse 3s after first becoming visible — once.
+    if (!visible || pulsed) return;
+    const t = setTimeout(() => setPulsed(true), 2400);
+    return () => clearTimeout(t);
+  }, [visible, pulsed]);
+
+  const handleClick = useCallback((event: ReactMouseEvent) => {
+    event.preventDefault();
+    const target = document.getElementById('assistant');
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } else {
+      window.location.hash = '#assistant';
+    }
+    try { window.dispatchEvent(new CustomEvent('aimentor:fab-clicked')); } catch { /* noop */ }
+  }, []);
+
+  const labelMain = locale === 'vi' ? 'Hỏi mentor' : 'Ask mentor';
+  const labelSub = locale === 'vi' ? 'Trả lời tức thì' : 'Instant reply';
+
+  return (
+    <div
+      className={`aim-fab-wrap${visible ? ' aim-fab-visible' : ''}${pulsed ? ' aim-fab-pulsed' : ''}`}
+      style={{
+        position: 'fixed',
+        right: 'clamp(14px, 3vw, 28px)',
+        bottom: 'clamp(78px, 9vw, 110px)',
+        zIndex: 1100,
+        pointerEvents: visible ? 'auto' : 'none',
+        opacity: visible ? 1 : 0,
+        transform: visible ? 'translateY(0) scale(1)' : 'translateY(16px) scale(0.92)',
+        transition: 'opacity 240ms ease, transform 240ms ease',
+      }}
+      aria-hidden={!visible}
+    >
+      <a
+        href="#assistant"
+        onClick={handleClick}
+        aria-label={labelMain}
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          gap: 10,
+          padding: '12px 18px 12px 14px',
+          borderRadius: 999,
+          background: 'linear-gradient(135deg, #ff6b3d 0%, #e84e1e 100%)',
+          color: '#fdfaf3',
+          textDecoration: 'none',
+          fontWeight: 700,
+          fontFamily: "'Space Grotesk', system-ui, sans-serif",
+          fontSize: '0.95rem',
+          boxShadow: '0 12px 28px -8px rgba(232, 78, 30, 0.45), 0 4px 10px rgba(10, 31, 28, 0.18)',
+          border: '1.5px solid rgba(253, 250, 243, 0.25)',
+        }}
+      >
+        <span
+          aria-hidden="true"
+          style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            width: 36,
+            height: 36,
+            borderRadius: '50%',
+            background: 'rgba(253, 250, 243, 0.18)',
+            position: 'relative',
+          }}
+        >
+          <svg viewBox="0 0 24 24" width={20} height={20} fill="none" stroke="#fdfaf3" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 12a8 8 0 0 1-11.5 7.2L4 21l1.8-5.5A8 8 0 1 1 21 12z" />
+            <circle cx="9" cy="12" r="0.6" fill="#fdfaf3" stroke="none" />
+            <circle cx="12" cy="12" r="0.6" fill="#fdfaf3" stroke="none" />
+            <circle cx="15" cy="12" r="0.6" fill="#fdfaf3" stroke="none" />
+          </svg>
+          <span
+            aria-hidden="true"
+            style={{
+              position: 'absolute',
+              top: -2,
+              right: -2,
+              width: 10,
+              height: 10,
+              borderRadius: '50%',
+              background: '#94e8d2',
+              border: '2px solid #ff6b3d',
+              animation: pulsed ? 'aim-fab-dot 1.6s ease-in-out infinite' : undefined,
+            }}
+          />
+        </span>
+        <span style={{ display: 'inline-flex', flexDirection: 'column', alignItems: 'flex-start', lineHeight: 1.1 }}>
+          <span>{labelMain}</span>
+          <span style={{ fontSize: '0.72rem', fontWeight: 500, opacity: 0.92, marginTop: 2 }}>{labelSub}</span>
+        </span>
+      </a>
+      <style>{`
+        @keyframes aim-fab-dot {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.4); opacity: 0.6; }
+        }
+        .aim-fab-wrap a:hover { transform: translateY(-2px); transition: transform 180ms ease; }
+        @media (max-width: 720px) {
+          .aim-fab-wrap a span:last-child > span:last-child { display: none; }
+        }
+      `}</style>
+    </div>
+  );
 }
 
 type FeedbackStatus = 'idle' | 'submitting' | 'sent' | 'error';
@@ -2260,9 +2937,6 @@ export function AIMentorBookedAIApp() {
   const queryState = useMemo(() => parseQueryState(), []);
   const [locale, setLocaleState] = useState<Locale>(getInitialLocale);
   const t = dict[locale];
-  const [initialQuery, setInitialQuery] = useState<string | null>(queryState.initialQuery);
-  const [initialQueryRequestId, setInitialQueryRequestId] = useState(queryState.initialQuery ? 1 : 0);
-  const [preselectedProgram, setPreselectedProgram] = useState<string | null>(null);
 
   const setLocale = useCallback((next: Locale) => { setLocaleState(next); persistLocale(next); }, []);
 
@@ -2271,36 +2945,38 @@ export function AIMentorBookedAIApp() {
     if (typeof document !== 'undefined') document.documentElement.setAttribute('lang', locale);
   }, [queryState.isFeedback, t.htmlTitleFeedback, t.htmlTitle, locale]);
 
-  const triggerPrompt = useCallback((prompt: string) => { setInitialQuery(prompt); setInitialQueryRequestId((c) => c + 1); }, []);
-  const onSelectProgram = useCallback((programName: string) => { setPreselectedProgram(programName); const target = document.getElementById('register'); if (target && typeof target.scrollIntoView === 'function') target.scrollIntoView({ behavior: 'smooth', block: 'start' }); }, []);
-
-  const onSlotPick = useCallback((programName: string, slot: TimeSlot) => {
-    // When a learner picks a slot, drop them into the registration form
-    // with the program preselected + the slot info appended into the
-    // free-text "what do you want to build" field. The form will then
-    // POST /api/v1/leads with the slot context in `message`.
-    setPreselectedProgram(programName);
-    const dt = new Date(slot.slot_start_at).toLocaleString(locale === 'vi' ? 'vi-VN' : 'en-AU', {
-      weekday: 'short',
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-      timeZone: 'Australia/Sydney',
-    });
-    const slotNote = locale === 'vi'
-      ? `[Đã chọn slot] ${dt} (Sydney) · slot_id=${slot.id}`
-      : `[Picked slot] ${dt} (Sydney) · slot_id=${slot.id}`;
-    if (typeof window !== 'undefined') {
-      try {
-        window.sessionStorage.setItem('aimentor.bookedai.lastSlot', JSON.stringify({ programName, slot, note: slotNote }));
-      } catch {
-        // ignore
+  // QR-banner deep link: when learners arrive via ?banner=qr, scroll the
+  // chat into view + fire a CustomEvent the chat picks up to render a
+  // QR-flavoured greeting variation. Single-shot per mount; if user
+  // refreshes without the param, we don't replay.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const isQrArrival =
+      params.get('banner') === 'qr' || params.get('source') === 'qr';
+    if (!isQrArrival) return;
+    // Wait one tick for the chat to mount its window listener, then scroll
+    // + dispatch.
+    const timer = window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('aimentor:qr-arrival'));
+      const target = document.getElementById('assistant');
+      if (target && typeof target.scrollIntoView === 'function') {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
+    }, 280);
+    return () => window.clearTimeout(timer);
+  }, []);
+
+  // ``onPrompt`` is kept for the in-card concierge prompts (Hero right
+  // panel quick-replies) — they're now hints rather than an input feed,
+  // since the dedicated AIMentorChat below the hero owns the booking
+  // flow. Scrolling to the chat surface is the most useful action.
+  const triggerPrompt = useCallback((_prompt: string) => {
+    const target = document.getElementById('assistant');
+    if (target && typeof target.scrollIntoView === 'function') {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
-    const target = document.getElementById('register');
-    if (target && typeof target.scrollIntoView === 'function') target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }, [locale]);
+  }, []);
 
   if (queryState.isFeedback) return (<div className="aimentor-app"><AIMentorFeedbackPage bookingReference={queryState.feedbackBookingReference} token={queryState.feedbackToken} t={t} /></div>);
 
@@ -2309,20 +2985,21 @@ export function AIMentorBookedAIApp() {
       <PromoBanner t={t} />
       <TopNav t={t} locale={locale} onLocaleChange={setLocale} />
       <main className="aim-shell">
-        <Hero t={t} onPrompt={triggerPrompt} initialQuery={initialQuery} initialQueryRequestId={initialQueryRequestId} />
+        <Hero t={t} onPrompt={triggerPrompt} locale={locale} />
+        <BannerCallout t={t} />
         <OutcomesBlock t={t} />
         <MentorProfile t={t} />
-        <Catalog t={t} locale={locale} onSelect={onSelectProgram} onSlotPick={onSlotPick} />
+        <Catalog t={t} />
         <Flow t={t} />
         <TrustBlock t={t} />
         <TestimonialsBlock t={t} />
-        <RegistrationForm t={t} locale={locale} preselectedProgram={preselectedProgram} onSelectProgram={setPreselectedProgram} />
         <FAQ t={t} />
         <ChannelsBlock t={t} />
         <FinalCtaBlock t={t} />
       </main>
       <FooterBlock t={t} />
       <StickyCta t={t} />
+      <FloatingChatFab locale={locale} />
     </div>
   );
 }

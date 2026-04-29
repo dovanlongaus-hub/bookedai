@@ -3,11 +3,12 @@ import { expect, test } from '@playwright/test';
 async function openHomepage(
   page: Parameters<typeof test>[0]['page'],
   path = '/?homepage_variant=product_first',
-  heading = /Never miss a paying enquiry again\./i,
+  heading = /Get a booking-ready sales page for your service business\./i,
+  eyebrow = /Done-for-you AI booking setup/i,
 ) {
   await page.goto(path);
   await expect(page.getByRole('heading', { name: heading })).toBeVisible();
-  await expect(page.getByText(/The AI revenue engine for service businesses/i).first()).toBeVisible();
+  await expect(page.getByText(eyebrow).first()).toBeVisible();
 }
 
 test.describe('public homepage responsive qa', () => {
@@ -15,13 +16,13 @@ test.describe('public homepage responsive qa', () => {
     await page.setViewportSize({ width: 1440, height: 1100 });
     await openHomepage(page);
 
-    await expect(page.getByRole('button', { name: /See a live booking/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /See a live booking flow/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /Get my booking page set up/i }).first()).toBeVisible();
     await expect(page.getByRole('heading', { name: /Launch a booking-ready business page/i })).toBeVisible();
-    await expect(page.getByText(/capture qualified enquiries before they go cold/i)).toBeVisible();
-    await expect(page.getByText(/keep CRM, email, and customer care aligned/i)).toBeVisible();
+    await expect(page.getByText(/respond before a ready-to-book customer goes cold/i)).toBeVisible();
+    await expect(page.getByText(/keep email, CRM, and customer care aligned/i)).toBeVisible();
     await page.locator('#agent-activity-proof').scrollIntoViewIfNeeded();
-    await expect(page.getByRole('heading', { name: /The judge and owner can see the revenue loop/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /The owner and team can see the revenue loop/i })).toBeVisible();
     await expect(page.getByText(/Web assistant, Product app, Telegram, Portal/i)).toBeVisible();
     await expect(page.getByText(/Ask, compare, book, and continue/i)).toBeVisible();
 
@@ -34,9 +35,9 @@ test.describe('public homepage responsive qa', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openHomepage(page);
 
-    await expect(page.getByRole('button', { name: /See a live booking/i }).first()).toBeVisible();
+    await expect(page.getByRole('button', { name: /See a live booking flow/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /Get my booking page set up/i }).first()).toBeVisible();
-    await expect(page.getByText(/capture qualified enquiries before they go cold/i)).toBeVisible();
+    await expect(page.getByText(/respond before a ready-to-book customer goes cold/i)).toBeVisible();
     await page.locator('#agent-activity-proof').scrollIntoViewIfNeeded();
     await expect(page.getByText(/Agent activity proof/i)).toBeVisible();
 
@@ -50,7 +51,8 @@ test.describe('public homepage responsive qa', () => {
     await openHomepage(
       page,
       '/?homepage_variant=control&aud=judge',
-      /One AI agent layer\. Every channel\. Every booking\. Audited\./i,
+      /One AI booking layer\. Every channel\. Every booking\. Visible\./i,
+      /The AI revenue engine for service businesses/i,
     );
 
     await page.getByRole('button', { name: /Run the live demo/i }).first().click();

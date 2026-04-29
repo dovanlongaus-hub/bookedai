@@ -73,7 +73,11 @@ def build_google_calendar_url(
     return f"https://calendar.google.com/calendar/render?{params}"
 
 
-def zoho_calendar_configured(settings: Settings | None) -> bool:
+def zoho_calendar_configured(
+    settings: Settings | None,
+    *,
+    tenant_credentials: object | None = None,
+) -> bool:
     """Return True when Zoho Calendar credentials are present.
 
     Defensive against ``None`` / partial mock settings so test fixtures
@@ -81,7 +85,22 @@ def zoho_calendar_configured(settings: Settings | None) -> bool:
     to declare every Zoho env var. Production settings always carry these
     attributes via :class:`config.Settings`, so this only widens the helper
     for test ergonomics — behaviour is unchanged when all fields are set.
+
+    When ``tenant_credentials`` is supplied (a
+    :class:`ZohoCalendarCredentials` bundle from
+    ``service_layer.zoho_tenant_credentials``), the helper considers the
+    tenant configured as long as the bundle carries a refresh-token triple
+    and any usable calendar UID (tenant or platform). Falls back to the
+    legacy platform-only path when ``tenant_credentials`` is ``None``.
     """
+    if tenant_credentials is not None:
+        refresh_token = str(getattr(tenant_credentials, "refresh_token", "") or "").strip()
+        client_id = str(getattr(tenant_credentials, "client_id", "") or "").strip()
+        client_secret = str(getattr(tenant_credentials, "client_secret", "") or "").strip()
+        calendar_uid = str(getattr(tenant_credentials, "calendar_uid", "") or "").strip()
+        if not calendar_uid and settings is not None:
+            calendar_uid = str(getattr(settings, "zoho_calendar_uid", "") or "").strip()
+        return bool(refresh_token and client_id and client_secret and calendar_uid)
     if settings is None:
         return False
     uid = getattr(settings, "zoho_calendar_uid", "") or ""
@@ -104,7 +123,18 @@ def zoho_calendar_configured(settings: Settings | None) -> bool:
     return bool(uid and (access_token or (refresh_token and client_id and client_secret)))
 
 
-def _zoho_calendar_api_base_url(settings: Settings) -> str:
+def _zoho_calendar_api_base_url(
+    settings: Settings,
+    *,
+    tenant_credentials: object | None = None,
+) -> str:
+    if tenant_credentials is not None:
+        candidate = str(getattr(tenant_credentials, "api_base_url", "") or "").strip()
+        if candidate:
+            base_url = candidate.rstrip("/")
+            if base_url.endswith("/api/v1"):
+                return base_url
+            return f"{base_url}/api/v1"
     configured = (
         getattr(settings, "zoho_calendar_api_base_url", "")
         or getattr(settings, "zoho_calendar_base_url", "")
@@ -116,11 +146,56 @@ def _zoho_calendar_api_base_url(settings: Settings) -> str:
     return f"{base_url}/api/v1"
 
 
+def _zoho_calendar_uid(
+    settings: Settings,
+    *,
+    tenant_credentials: object | None = None,
+) -> str:
+    if tenant_credentials is not None:
+        uid = str(getattr(tenant_credentials, "calendar_uid", "") or "").strip()
+        if uid:
+            return uid
+    return str(getattr(settings, "zoho_calendar_uid", "") or "").strip()
+
+
 def _zoho_calendar_timestamp(value: datetime) -> str:
     return value.astimezone(ZoneInfo("UTC")).strftime("%Y%m%dT%H%M%SZ")
 
 
-async def get_zoho_access_token(settings: Settings) -> str:
+async def get_zoho_access_token(
+    settings: Settings,
+    *,
+    tenant_credentials: object | None = None,
+) -> str:
+    if tenant_credentials is not None:
+        refresh_token = str(getattr(tenant_credentials, "refresh_token", "") or "").strip()
+        client_id = str(getattr(tenant_credentials, "client_id", "") or "").strip()
+        client_secret = str(getattr(tenant_credentials, "client_secret", "") or "").strip()
+        accounts_base = (
+            str(getattr(tenant_credentials, "accounts_base_url", "") or "").strip()
+            or str(getattr(settings, "zoho_accounts_base_url", "") or "").strip()
+            or "https://accounts.zoho.com.au"
+        )
+        if not (refresh_token and client_id and client_secret):
+            raise ValueError("Zoho Calendar OAuth credentials are incomplete (tenant)")
+        token_url = f"{accounts_base.rstrip('/')}/oauth/v2/token"
+        async with httpx.AsyncClient(timeout=20) as client:
+            response = await client.post(
+                token_url,
+                data={
+                    "refresh_token": refresh_token,
+                    "client_id": client_id,
+                    "client_secret": client_secret,
+                    "grant_type": "refresh_token",
+                },
+            )
+            response.raise_for_status()
+            payload = response.json()
+        access_token = str(payload.get("access_token") or "").strip()
+        if not access_token:
+            raise ValueError("Zoho access token response was empty (tenant)")
+        return access_token
+
     refresh_token = settings.zoho_calendar_refresh_token or settings.zoho_crm_refresh_token
     client_id = settings.zoho_calendar_client_id or settings.zoho_crm_client_id
     client_secret = settings.zoho_calendar_client_secret or settings.zoho_crm_client_secret
@@ -165,6 +240,7 @@ async def create_zoho_meeting_for_booking(
     timezone_name: str,
     duration_minutes: int = 45,
     notes: str | None = None,
+    tenant_credentials: object | None = None,
 ) -> tuple[str | None, str | None]:
     """Provision a Zoho Calendar event with a Zoho Meeting attached.
 
@@ -173,8 +249,12 @@ async def create_zoho_meeting_for_booking(
     is misconfigured on the calendar UID). This helper is a generic alternative
     to :func:`create_zoho_calendar_event` so the chess + AI Mentor booking
     flows can call it without constructing a legacy ``BookingAssistantSessionRequest``.
+
+    When ``tenant_credentials`` is supplied, the OAuth refresh + API base URL
+    + calendar UID are sourced from the tenant credential bundle so the
+    resulting calendar event lands in the tenant's own Zoho subscription.
     """
-    access_token = await get_zoho_access_token(settings)
+    access_token = await get_zoho_access_token(settings, tenant_credentials=tenant_credentials)
     zone = ZoneInfo(timezone_name)
     start_at = datetime.combine(requested_date, requested_time, tzinfo=zone)
     end_at = start_at + timedelta(minutes=max(int(duration_minutes or 45), 15))
@@ -200,9 +280,11 @@ async def create_zoho_meeting_for_booking(
         "description": "\n".join(description_lines),
     }
 
+    api_base = _zoho_calendar_api_base_url(settings, tenant_credentials=tenant_credentials)
+    calendar_uid = _zoho_calendar_uid(settings, tenant_credentials=tenant_credentials)
     async with httpx.AsyncClient(timeout=20) as client:
         response = await client.post(
-            f"{_zoho_calendar_api_base_url(settings)}/calendars/{settings.zoho_calendar_uid}/events",
+            f"{api_base}/calendars/{calendar_uid}/events",
             headers={
                 "Authorization": f"Zoho-oauthtoken {access_token}",
             },
@@ -226,8 +308,9 @@ async def create_zoho_calendar_event(
     service: ServiceCatalogItem,
     payload: BookingAssistantSessionRequest | DemoBookingRequest | PricingConsultationRequest,
     customer_email: str,
+    tenant_credentials: object | None = None,
 ) -> tuple[str | None, str | None]:
-    access_token = await get_zoho_access_token(settings)
+    access_token = await get_zoho_access_token(settings, tenant_credentials=tenant_credentials)
     zone = ZoneInfo(payload.timezone)
     date_value = getattr(payload, "requested_date", None) or getattr(payload, "preferred_date")
     time_value = getattr(payload, "requested_time", None) or getattr(payload, "preferred_time")
@@ -259,9 +342,11 @@ async def create_zoho_calendar_event(
         ),
     }
 
+    api_base = _zoho_calendar_api_base_url(settings, tenant_credentials=tenant_credentials)
+    calendar_uid = _zoho_calendar_uid(settings, tenant_credentials=tenant_credentials)
     async with httpx.AsyncClient(timeout=20) as client:
         response = await client.post(
-            f"{_zoho_calendar_api_base_url(settings)}/calendars/{settings.zoho_calendar_uid}/events",
+            f"{api_base}/calendars/{calendar_uid}/events",
             headers={
                 "Authorization": f"Zoho-oauthtoken {access_token}",
             },

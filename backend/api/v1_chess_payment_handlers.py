@@ -5,7 +5,7 @@ based across both Vietnam and Australia and many of them prefer paying via
 domestic bank transfer rather than card:
 
 * ``stripe_aud``  -- Stripe-hosted card checkout (one-time, AUD).
-* ``vnd_bank_qr`` -- Vietcombank transfer with a VietQR-rendered QR image.
+* ``vnd_bank_qr`` -- Techcombank transfer with a VietQR-rendered QR image.
 * ``aud_bank_transfer`` -- Westpac AU domestic transfer.
 
 The handler returns all three so the frontend can render every option and let

@@ -52,6 +52,18 @@ type SaveResponse = {
   error?: { message?: string };
 };
 
+type TestConnectionResult = {
+  meeting: { ok: boolean; error: string | null };
+  calendar: { ok: boolean; error: string | null };
+  both_ok: boolean;
+};
+
+type TestConnectionResponse = {
+  status?: string;
+  data?: TestConnectionResult;
+  error?: { message?: string };
+};
+
 type Locale = 'en' | 'vi';
 
 const dict = {
@@ -78,6 +90,15 @@ const dict = {
     saveSuccess: 'Saved.',
     securityNote:
       'Tip: never share these values via plain chat or email. Use 1Password / encrypted channels. Rotate the client_secret in api-console.zoho.com.au if it was ever exposed.',
+    testConnection: 'Test connection',
+    testing: 'Testing…',
+    testResultMeetingOk: '✓ Zoho Meeting reachable',
+    testResultMeetingFail: '✗ Zoho Meeting failed',
+    testResultCalendarOk: '✓ Zoho Calendar reachable',
+    testResultCalendarFail: '✗ Zoho Calendar failed',
+    testResultBothOk: 'Both services authorised — ready to provision real Zoho artefacts on every reservation.',
+    testResultPartial: 'Partial success — fix the failing service before going live.',
+    testRequestError: 'Could not run the connection test. Check that credentials were saved.',
   },
   vi: {
     title: 'AI Mentor — Thông tin Zoho',
@@ -102,6 +123,15 @@ const dict = {
     saveSuccess: 'Đã lưu.',
     securityNote:
       'Lưu ý: không share các giá trị này qua chat / email thường. Dùng 1Password / kênh mã hoá. Rotate client_secret tại api-console.zoho.com.au nếu lỡ bị lộ.',
+    testConnection: 'Kiểm tra kết nối',
+    testing: 'Đang kiểm tra…',
+    testResultMeetingOk: '✓ Zoho Meeting kết nối được',
+    testResultMeetingFail: '✗ Zoho Meeting thất bại',
+    testResultCalendarOk: '✓ Zoho Calendar kết nối được',
+    testResultCalendarFail: '✗ Zoho Calendar thất bại',
+    testResultBothOk: 'Cả hai service đã authorise — sẵn sàng provision Zoho artifacts thật cho mỗi reservation.',
+    testResultPartial: 'Một service fail — sửa trước khi go-live.',
+    testRequestError: 'Không chạy được test. Kiểm tra credentials đã save chưa.',
   },
 } as const;
 
@@ -139,6 +169,11 @@ export function AIMentorZohoCredentialsPanel({
   const [error, setError] = useState<string | null>(null);
   const [successToast, setSuccessToast] = useState<string | null>(null);
 
+  // Test-connection state
+  const [testing, setTesting] = useState(false);
+  const [testResult, setTestResult] = useState<TestConnectionResult | null>(null);
+  const [testError, setTestError] = useState<string | null>(null);
+
   const load = useCallback(async () => {
     if (!sessionToken) return;
     try {
@@ -159,6 +194,29 @@ export function AIMentorZohoCredentialsPanel({
   useEffect(() => {
     if (sessionToken) void load();
   }, [sessionToken, load]);
+
+  async function handleTestConnection() {
+    if (!sessionToken) return;
+    setTesting(true);
+    setTestError(null);
+    setTestResult(null);
+    try {
+      const res = await fetch('/api/v1/tenants/me/aimentor-zoho-credentials/test', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${sessionToken}` },
+      });
+      const payload = (await res.json().catch(() => null)) as TestConnectionResponse | null;
+      if (!res.ok || !payload || payload.status !== 'ok' || !payload.data) {
+        setTestError(payload?.error?.message || t.testRequestError);
+        return;
+      }
+      setTestResult(payload.data);
+    } catch {
+      setTestError(t.testRequestError);
+    } finally {
+      setTesting(false);
+    }
+  }
 
   async function handleSave(event: React.FormEvent) {
     event.preventDefault();
@@ -364,23 +422,105 @@ export function AIMentorZohoCredentialsPanel({
             {successToast}
           </div>
         ) : null}
-        <button
-          type="submit"
-          disabled={saving}
-          style={{
-            padding: '12px 22px',
-            borderRadius: 12,
-            border: '1px solid #ff6b3d',
-            background: '#ff6b3d',
-            color: '#fdfaf3',
-            fontWeight: 700,
-            cursor: saving ? 'not-allowed' : 'pointer',
-            fontSize: '0.92rem',
-            justifySelf: 'start',
-          }}
-        >
-          {saving ? t.saving : t.save}
-        </button>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 10, alignItems: 'center' }}>
+          <button
+            type="submit"
+            disabled={saving}
+            style={{
+              padding: '12px 22px',
+              borderRadius: 12,
+              border: '1px solid #ff6b3d',
+              background: '#ff6b3d',
+              color: '#fdfaf3',
+              fontWeight: 700,
+              cursor: saving ? 'not-allowed' : 'pointer',
+              fontSize: '0.92rem',
+            }}
+          >
+            {saving ? t.saving : t.save}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleTestConnection()}
+            disabled={!configured || testing}
+            title={
+              configured
+                ? undefined
+                : 'Save credentials first, then test the connection'
+            }
+            style={{
+              padding: '12px 22px',
+              borderRadius: 12,
+              border: '1px solid rgba(15, 92, 84, 0.32)',
+              background: 'transparent',
+              color: configured ? '#0f5c54' : '#5b6b66',
+              fontWeight: 700,
+              cursor: !configured || testing ? 'not-allowed' : 'pointer',
+              fontSize: '0.92rem',
+              opacity: configured ? 1 : 0.5,
+            }}
+          >
+            {testing ? t.testing : t.testConnection}
+          </button>
+        </div>
+
+        {/* Test-connection result panel */}
+        {testError ? (
+          <div
+            role="alert"
+            style={{
+              padding: '12px 14px',
+              borderRadius: 10,
+              background: 'rgba(192, 57, 43, 0.1)',
+              border: '1px solid rgba(192, 57, 43, 0.3)',
+              color: '#c0392b',
+              fontSize: '0.88rem',
+            }}
+          >
+            {testError}
+          </div>
+        ) : null}
+        {testResult ? (
+          <div
+            role="status"
+            style={{
+              padding: 14,
+              borderRadius: 12,
+              border: `1px solid ${testResult.both_ok ? 'rgba(47, 158, 117, 0.32)' : 'rgba(255, 107, 61, 0.32)'}`,
+              background: testResult.both_ok
+                ? 'rgba(47, 158, 117, 0.08)'
+                : 'rgba(255, 107, 61, 0.06)',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8,
+            }}
+          >
+            <div
+              style={{
+                fontFamily: "'Space Grotesk', Inter, sans-serif",
+                fontWeight: 700,
+                fontSize: '0.95rem',
+                color: testResult.both_ok ? '#0f5c54' : '#e84e1e',
+              }}
+            >
+              {testResult.both_ok ? t.testResultBothOk : t.testResultPartial}
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 12 }}>
+              <ServiceTestRow
+                ok={testResult.meeting.ok}
+                error={testResult.meeting.error}
+                okLabel={t.testResultMeetingOk}
+                failLabel={t.testResultMeetingFail}
+              />
+              <ServiceTestRow
+                ok={testResult.calendar.ok}
+                error={testResult.calendar.error}
+                okLabel={t.testResultCalendarOk}
+                failLabel={t.testResultCalendarFail}
+              />
+            </div>
+          </div>
+        ) : null}
         <p
           style={{
             fontSize: '0.78rem',
@@ -393,6 +533,57 @@ export function AIMentorZohoCredentialsPanel({
         </p>
       </form>
     </section>
+  );
+}
+
+function ServiceTestRow({
+  ok,
+  error,
+  okLabel,
+  failLabel,
+}: {
+  ok: boolean;
+  error: string | null;
+  okLabel: string;
+  failLabel: string;
+}) {
+  return (
+    <div
+      style={{
+        flex: '1 1 240px',
+        padding: '10px 12px',
+        borderRadius: 10,
+        background: '#ffffff',
+        border: `1px solid ${ok ? 'rgba(47, 158, 117, 0.32)' : 'rgba(192, 57, 43, 0.32)'}`,
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 4,
+      }}
+    >
+      <div
+        style={{
+          fontFamily: "'JetBrains Mono', monospace",
+          fontSize: '0.78rem',
+          fontWeight: 700,
+          color: ok ? '#2f9e75' : '#c0392b',
+        }}
+      >
+        {ok ? okLabel : failLabel}
+      </div>
+      {!ok && error ? (
+        <div
+          style={{
+            fontFamily: "'JetBrains Mono', monospace",
+            fontSize: '0.74rem',
+            color: '#c0392b',
+            lineHeight: 1.4,
+            wordBreak: 'break-word',
+          }}
+        >
+          {error}
+        </div>
+      ) : null}
+    </div>
   );
 }
 
