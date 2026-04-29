@@ -744,6 +744,7 @@ async def reserve_service_time_slot(
                     customer_name=payload.full_name.strip(),
                     booking_reference=booking_reference,
                     service_name=service_name,
+                    service_id=str(slot.get("service_id") or ""),
                     portal_url=portal_link_for_email,
                     slot_start_at=slot_start_at,
                     slot_end_at=slot_end_at,

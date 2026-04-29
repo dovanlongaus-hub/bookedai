@@ -55,6 +55,9 @@ export interface ChessBookingChatDictionary {
   slotsLoading: string;
   slotsEmpty: string;
   slotsError: string;
+  /** Friendly retry message when the chosen slot was reserved by someone else
+   * between picker render and submit (race-condition lock). */
+  slotLockedRetry: string;
   slotSpotsLeft: (count: number) => string;
   slotSpotsLast: (count: number) => string;
   collectingName: string;
@@ -115,7 +118,14 @@ interface ChessBookingChatProps {
   onReturnHome?: () => void;
 }
 
-export type ChessProgramKeyHint = 'beginner' | 'private' | 'tournament' | 'elite';
+export type ChessProgramKeyHint =
+  | 'beginner'
+  | 'private'
+  | 'tournament'
+  | 'elite'
+  | 'superkid'
+  | 'advanced_group'
+  | 'private_1_1';
 
 type ChatMessage =
   | { kind: 'bot'; id: string; text: string }
@@ -729,7 +739,7 @@ export function ChessBookingChat({
           customerPhone: trimmedPhone,
           serviceId: selectedCourse.service_id,
           serviceName: selectedCourse.name,
-          serviceCategory: selectedCourse.tier || 'Chess',
+          serviceCategory: 'Chess coaching',
           requestedDate: selectedSlot.date,
           requestedTime: selectedSlot.start_time,
           timezone: TIMEZONE,
@@ -756,7 +766,7 @@ export function ChessBookingChat({
           customerPhone: trimmedPhone,
           serviceId: selectedCourse.service_id,
           serviceName: selectedCourse.name,
-          serviceCategory: selectedCourse.tier || 'Chess',
+          serviceCategory: 'Chess coaching',
           requestedDate: placeholderDate,
           requestedTime: '00:00',
           timezone: TIMEZONE,
@@ -814,6 +824,60 @@ export function ChessBookingChat({
         bookingIntentId: result.bookingIntentId,
       };
       setOrderCard(card);
+      // Fire-and-forget lifecycle confirmation email so the parent receives a
+      // booking summary + meeting URL + add-to-calendar link + (when payment
+      // is still pending) a payment_link back to the portal order page where
+      // they can complete Stripe checkout or view the QR/bank transfer details.
+      // Auto-CC chess@bookedai.au is handled server-side (migration 039 + the
+      // _resolve_lifecycle_cc_list path in v1_communication_handlers.py).
+      if (trimmedEmail && result.bookingReference) {
+        const payLinkBase = (() => {
+          if (typeof window === 'undefined') return '';
+          const { hostname, protocol } = window.location;
+          if (hostname.endsWith('.bookedai.au')) {
+            return `${protocol}//portal.bookedai.au/order/${encodeURIComponent(result.bookingReference)}`;
+          }
+          return `/order/${encodeURIComponent(result.bookingReference)}`;
+        })();
+        void apiV1
+          .sendLifecycleEmail({
+            template_key: 'bookedai_booking_confirmation',
+            to: [trimmedEmail],
+            cc: [],
+            subject:
+              locale === 'vi'
+                ? `Xác nhận đăng ký lớp cờ vua — ${result.bookingReference}`
+                : `Chess class booking confirmed — ${result.bookingReference}`,
+            variables: {
+              parent_name: trimmedName,
+              service_name: selectedCourse.name,
+              cohort_label: selectedSlot?.cohort_label || '',
+              preferred_date: selectedSlot?.date || '',
+              preferred_time: selectedSlot?.start_time || '',
+              booking_reference: result.bookingReference,
+              meeting_url: result.meetingUrl || '',
+              calendar_event_url: result.calendarUrl || '',
+              payment_link: payLinkBase,
+              manage_link: payLinkBase,
+              locale,
+              amount_display: formattedAmount,
+            },
+            context: {
+              tenant_ref: 'co-mai-hung-chess-class',
+              source_surface: sourcePage,
+              booking_intent_id: result.bookingIntentId,
+            },
+            actor_context: {
+              channel: 'public_web',
+              deployment_mode: 'standalone_app',
+              tenant_ref: 'co-mai-hung-chess-class',
+            },
+          })
+          .catch(() => {
+            // Email send is best-effort; backend webhook + outbox event tracks
+            // the booking either way. Don't block the chat UX.
+          });
+      }
       setMessages((current) => current.filter((m) => m.id !== typingId));
       appendBot(dict.payment);
       setMessages((current) => [...current, { kind: 'payment', id: nextId('pay') }]);
@@ -821,6 +885,20 @@ export function ChessBookingChat({
       void loadPaymentOptions(card);
     } catch (err) {
       setMessages((current) => current.filter((m) => m.id !== typingId));
+      // Detect race-condition slot lock: backend returns a 422 whose message
+      // mentions "just filled" / "schedule slot". Auto-recover by clearing the
+      // stale slot selection, surfacing a friendly retry message, and
+      // re-fetching the live open-slot list so the visitor can pick again.
+      const message = err instanceof Error ? err.message : '';
+      const isSlotLocked = /just filled|schedule slot|slot.*full|slot.*unavailable/i.test(
+        message,
+      );
+      if (isSlotLocked && selectedCourse) {
+        setSelectedSlot(null);
+        appendBot(dict.slotLockedRetry);
+        void loadSlots(selectedCourse);
+        return;
+      }
       appendBot(err instanceof Error ? err.message : dict.bookingError);
       setStep('reviewing');
     }
@@ -830,9 +908,11 @@ export function ChessBookingChat({
     dict.bookingError,
     dict.defaultName,
     dict.payment,
+    dict.slotLockedRetry,
     dict.submitting,
     inferProgramKeyFromName,
     loadPaymentOptions,
+    loadSlots,
     locale,
     resolveProgramAmounts,
     runtimeConfig,
@@ -1056,6 +1136,12 @@ export function ChessBookingChat({
                       ? buildOrderDetailUrl(orderCard.orderReference)
                       : null
                   }
+                  tenantContact={{
+                    email: 'chess@bookedai.au',
+                    phone: null,
+                    telegramUrl: null,
+                    whatsappUrl: null,
+                  }}
                   onReturnHome={() => {
                     handleResetChat();
                     onReturnHome?.();

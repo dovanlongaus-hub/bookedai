@@ -170,7 +170,14 @@ const programs: ProgramTier[] = [
 // of truth — these locally derived numbers are only sent so the backend can echo / validate them.
 const VND_PER_AUD = 16500;
 
-type ChessProgramKey = 'beginner' | 'private' | 'tournament' | 'elite';
+type ChessProgramKey =
+  | 'beginner'
+  | 'private'
+  | 'tournament'
+  | 'elite'
+  | 'superkid'
+  | 'advanced_group'
+  | 'private_1_1';
 
 interface ChessProgramAmounts {
   programKey: ChessProgramKey;
@@ -190,6 +197,13 @@ function resolveProgramAmounts(programKey: ChessProgramKey): ChessProgramAmounts
       return { programKey, vnd: 1300000, aud: 80 };
     case 'elite':
       return { programKey, vnd: 1500000, aud: 92 };
+    // 2026-04-29 grid (Superkid / Advanced / Private 1-1) per operator brief.
+    case 'superkid':
+      return { programKey, vnd: 800000, aud: 49 };
+    case 'advanced_group':
+      return { programKey, vnd: 1000000, aud: 60 };
+    case 'private_1_1':
+      return { programKey, vnd: 1000000, aud: 60 };
     default:
       return { programKey: 'beginner', vnd: 580000, aud: Math.round(580000 / VND_PER_AUD) };
   }
@@ -197,6 +211,24 @@ function resolveProgramAmounts(programKey: ChessProgramKey): ChessProgramAmounts
 
 function inferProgramKeyFromName(serviceName: string): ChessProgramKey {
   const haystack = (serviceName || '').toLowerCase();
+  // 2026-04-29 grid keys checked first — most specific.
+  if (haystack.includes('superkid') || haystack.includes('super kid')) {
+    return 'superkid';
+  }
+  if (haystack.includes('advanced') || haystack.includes('nâng cao') || haystack.includes('nang cao')) {
+    return 'advanced_group';
+  }
+  if (
+    haystack.includes('1-1') ||
+    haystack.includes('1 kèm 1') ||
+    haystack.includes('1 kem 1') ||
+    haystack.includes('private 1-1') ||
+    haystack.includes('one-on-one') ||
+    haystack.includes('kèm riêng') ||
+    haystack.includes('kem rieng')
+  ) {
+    return 'private_1_1';
+  }
   if (
     haystack.includes('elite') ||
     haystack.includes('cao cấp') ||
@@ -443,16 +475,20 @@ const dict = {
       paymentPending: 'Pending — bank transfer',
       paymentUnpaid: 'Pay later — coach will send a reminder',
       viewOrderDetails: 'View order details',
-      addAppleWallet: 'Add to Apple Wallet',
-      saveGoogleWallet: 'Save to Google Wallet',
-      walletAppleHint: 'iPhone',
-      walletGoogleHint: 'Android',
-      walletDownloading: 'Preparing pass…',
-      walletError: 'Wallet pass is not available yet — try again or use the meeting link.',
+      joinMeeting: 'Join Zoho Meeting',
       addGoogleCalendar: 'Add to Google Calendar',
       downloadIcs: 'Download .ics',
       emailMeCopy: 'Email me a copy',
       emailMeCopySent: 'Email sent',
+      tenantContact: {
+        heading: 'Thank you — here is how to reach the academy',
+        subheading: 'Save these details. Reply with the order reference for any change or question.',
+        emailLabel: 'Email',
+        phoneLabel: 'Phone',
+        telegramLabel: 'Telegram',
+        whatsappLabel: 'WhatsApp',
+        supportLine: "WGM Mai Hưng's team replies within 24 hours on weekdays.",
+      },
       whatsNextHeading: "What's next",
       whatsNextSteps: [
         {
@@ -642,6 +678,8 @@ const dict = {
       slotsEmpty:
         'No scheduled cohorts in the next 4 weeks for this class. We can still capture your details and the coach will arrange a custom slot.',
       slotsError: 'We could not load live sessions just now.',
+      slotLockedRetry:
+        '⏳ That time was just taken by another student. Here are the open sessions still available — pick a new one and we will hold it.',
       slotSpotsLeft: (count: number) => `${count} spots left`,
       slotSpotsLast: (count: number) => `Only ${count} left`,
       collectingName: 'What name should the booking be under?',
@@ -902,16 +940,20 @@ const dict = {
       paymentPending: 'Đang chờ — chuyển khoản',
       paymentUnpaid: 'Thanh toán sau — giáo viên sẽ nhắc',
       viewOrderDetails: 'Xem chi tiết đơn',
-      addAppleWallet: 'Thêm vào Apple Wallet',
-      saveGoogleWallet: 'Lưu vào Google Wallet',
-      walletAppleHint: 'iPhone',
-      walletGoogleHint: 'Android',
-      walletDownloading: 'Đang chuẩn bị vé…',
-      walletError: 'Vé điện tử tạm thời chưa khả dụng — thử lại hoặc dùng link buổi học.',
+      joinMeeting: 'Tham gia Zoho Meeting',
       addGoogleCalendar: 'Thêm vào Google Calendar',
       downloadIcs: 'Tải .ics',
       emailMeCopy: 'Gửi tôi một bản qua email',
       emailMeCopySent: 'Đã gửi',
+      tenantContact: {
+        heading: 'Cảm ơn bạn — Đây là cách liên hệ với học viện',
+        subheading: 'Lưu các thông tin này. Khi cần thay đổi hoặc thắc mắc, hãy nhắn kèm mã đơn.',
+        emailLabel: 'Email',
+        phoneLabel: 'Điện thoại',
+        telegramLabel: 'Telegram',
+        whatsappLabel: 'WhatsApp',
+        supportLine: 'Đội WGM Mai Hưng phản hồi trong 24 giờ vào ngày làm việc.',
+      },
       whatsNextHeading: 'Việc tiếp theo',
       whatsNextSteps: [
         {
@@ -1103,6 +1145,8 @@ const dict = {
       slotsEmpty:
         'Hiện chưa có buổi học công khai trong 4 tuần tới cho lớp này. Chúng tôi vẫn ghi nhận và giáo viên sẽ sắp xếp lịch riêng.',
       slotsError: 'Không tải được lịch buổi học lúc này.',
+      slotLockedRetry:
+        '⏳ Khung giờ vừa được học viên khác đặt mất. Đây là các buổi còn trống — vui lòng chọn lại và chúng tôi giữ chỗ ngay.',
       slotSpotsLeft: (count: number) => `Còn ${count} chỗ`,
       slotSpotsLast: (count: number) => `Chỉ còn ${count} chỗ`,
       collectingName: 'Tên người đăng ký?',
@@ -1554,7 +1598,7 @@ export function ChessGrandmasterApp() {
                 aria-label={t.profile.portraitCaption}
               >
                 <img
-                  src="https://upload.bookedai.au/images/bb99/B7_i8BfBTN8NMxJO_B7X3Q.png"
+                  src="https://upload.bookedai.au/images/e719/2-GaHJfeoIYAVL_MVD8Rqg.png"
                   alt={t.coach.portraitAlt}
                   loading="lazy"
                   className="chess-coach-portrait-img chess-coach-portrait-img--profile"

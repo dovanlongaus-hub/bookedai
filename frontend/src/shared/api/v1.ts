@@ -1770,7 +1770,7 @@ export interface ChessCatalogMatch {
   summary: string;
   display_price_aud: string;
   display_price_vnd: string;
-  tier: string;
+  tier: number | null;
   format: string;
   available_slots_count: number;
 }

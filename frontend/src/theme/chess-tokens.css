@@ -438,7 +438,15 @@
 /* Hero */
 .chess-hero {
   position: relative;
-  background: linear-gradient(140deg, var(--chess-navy-deep) 0%, var(--chess-navy) 60%, var(--chess-navy-soft) 100%);
+  background:
+    linear-gradient(
+      140deg,
+      rgba(6, 16, 42, 0.82) 0%,
+      rgba(11, 29, 58, 0.78) 50%,
+      rgba(21, 41, 74, 0.86) 100%
+    ),
+    url('https://upload.bookedai.au/images/af6c/gB-95FD-jT8XitbvPyLsiQ.png')
+      center/cover no-repeat;
   color: var(--chess-on-navy);
   padding-block: 84px 96px;
   overflow: hidden;
@@ -2956,5 +2964,108 @@
     height: 48px;
     bottom: 78px;
     right: 14px;
+  }
+}
+
+/* ===========================================================================
+ * Tenant contact card on the post-booking confirmation. Replaces the wallet
+ * buttons that shipped previously. Surfaces email + optional phone/Telegram/
+ * WhatsApp so the visitor knows exactly how to reach the academy.
+ * ========================================================================= */
+.chess-app .chess-order-tenant-contact {
+  margin-top: 18px;
+  padding: 18px 20px;
+  border-radius: var(--chess-radius-lg);
+  background: linear-gradient(140deg, #fffbef 0%, #fdf4dd 100%);
+  border: 1px solid rgba(201, 162, 74, 0.4);
+  box-shadow: 0 8px 24px -16px rgba(11, 29, 58, 0.18);
+}
+.chess-app .chess-order-tenant-contact__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+.chess-app .chess-order-tenant-contact__title {
+  font-family: var(--chess-font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--chess-navy);
+  letter-spacing: -0.005em;
+}
+.chess-app .chess-order-tenant-contact__sub {
+  font-size: 0.85rem;
+  color: var(--chess-muted);
+  line-height: 1.5;
+}
+.chess-app .chess-order-tenant-contact__rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.chess-app .chess-order-tenant-contact__row {
+  display: grid;
+  grid-template-columns: 32px auto 1fr;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.7);
+  border: 1px solid rgba(201, 162, 74, 0.18);
+  border-radius: var(--chess-radius);
+}
+.chess-app .chess-order-tenant-contact__icon {
+  display: inline-flex;
+  width: 32px;
+  height: 32px;
+  align-items: center;
+  justify-content: center;
+  background: var(--chess-navy);
+  color: var(--chess-gold);
+  border-radius: 8px;
+}
+.chess-app .chess-order-tenant-contact__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--chess-muted);
+}
+.chess-app .chess-order-tenant-contact__value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--chess-navy);
+  text-decoration: none;
+  word-break: break-all;
+  justify-self: end;
+}
+.chess-app .chess-order-tenant-contact__value:hover,
+.chess-app .chess-order-tenant-contact__value:focus-visible {
+  color: var(--chess-gold-deep);
+  text-decoration: underline;
+}
+.chess-app .chess-order-tenant-contact__support {
+  margin-top: 12px;
+  font-size: 0.82rem;
+  line-height: 1.55;
+  color: var(--chess-muted);
+}
+@media (max-width: 480px) {
+  .chess-app .chess-order-tenant-contact__row {
+    grid-template-columns: 32px 1fr;
+    grid-template-areas: 'icon label' 'icon value';
+  }
+  .chess-app .chess-order-tenant-contact__icon {
+    grid-area: icon;
+    grid-row: span 2;
+  }
+  .chess-app .chess-order-tenant-contact__label {
+    grid-area: label;
+  }
+  .chess-app .chess-order-tenant-contact__value {
+    grid-area: value;
+    justify-self: start;
   }
 }

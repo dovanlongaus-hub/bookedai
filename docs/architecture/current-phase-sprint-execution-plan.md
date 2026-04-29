@@ -55,6 +55,9 @@ The current priority content hypotheses are:
 
 Latest next-phase update from `2026-04-25`:
 
+- `2026-04-29` product booking-first form simplification is closed locally for the `product.bookedai.au` booking surface: the selected-service form now removes the long `Your booking journey` guidance card and duplicate desktop stepper, preserves only a compact booking-status header and selected-service summary, and keeps the primary workflow on entering contact details, preferred time, and submitting the booking request. Frontend build and diff check passed; the mobile and desktop product full-flow UAT cases that cover the changed form passed, while the broader product suite still has one preview bootstrap failure tied to port `3100` contention.
+- `2026-04-29` tenant enterprise workspace shell is closed locally for the tenant surface: `tenant.bookedai.au` now has a sticky enterprise top bar, icon actions, desktop icon rail, sticky left menu, right content frame, and mobile bottom icon navigation while preserving existing tenant read/write logic. Frontend build and tenant Playwright UAT (`5 passed`) verified gateway continuity, mocked workspace navigation, command palette, random panel switching, screenshots, and no horizontal overflow.
+- `2026-04-29` homepage search relevance/UX refinement is closed locally for the public `bookedai.au` search surface: explicit intent plus location searches now suppress unrelated results before render, long result sets show `3` cards first with a `Search more` reveal action, and the assistant results pane has a tested scroll container. Verification passed with frontend build, homepage responsive Playwright (`5 passed`), and focused live-read homepage search tests (`2 passed`).
 - `2026-04-29` product deep QA/UAT/A-B/aggressive review is green for `product.bookedai.au`: backend focused product/search/booking/chat regression (`64 passed`), frontend build, product legacy lane (`10 passed`, `1 skipped`), product live-read lane (`11 passed`), and production multi-viewport smoke across SME/control, product-first/judge, investor/source, and public-web scenarios passed with no overflow, console errors, failed requests, or raw error copy. Shared homepage/public-assistant live-read contract drift remains a separate homepage gate refresh.
 - `2026-04-29` AI model routing is aligned with the customer-agent requirement: backend model calls default to OpenAI, Claude fallback is available through Anthropic auth when `ANTHROPIC_API_KEY` is configured, and internet/public-web search remains OpenAI-backed through the Responses `web_search` tool so sourced external service results stay labeled as `public_web_search`.
 - `2026-04-29` product search/booking execution plan is now the implementation bridge for the next coding pass: `docs/development/product-search-booking-execution-plan-2026-04-29.md` assigns role/skill ownership across Phase 17 product UI, Phase 19 identity/care, Phase 20.5 wallet continuity, Phase 21 search/payment truth, and Phase 23 release governance.
@@ -999,6 +1002,34 @@ Next recommended sequence:
 - `pitch.bookedai.au` is now the investor/judge pitch surface: category, platform ambition, live proof, business model, market, moat, GTM wedge, and rollout evidence are emphasized.
 - `product.bookedai.au` public booking communication automation now resolves the BookedAI public tenant fallback for public-web actors, preventing tenant-session-only errors from leaking into the public booking path.
 - Verification passed with backend communication tests (`6 passed`), frontend production build, focused homepage/pitch/architecture Playwright (`8 passed`), and `git diff --check`.
+
+## 2026-04-29 Product Live Search Relevance UAT
+
+- `product.bookedai.au` live search now blocks unrelated fallback cards for explicit intent/location queries before the user continues to booking.
+- Chess/Sydney searches can use the unscoped BookedAI catalog when the product tenant-scoped catalog has no relevant chess service; this keeps the product shell useful for cross-tenant BookedAI demos without showing generic spa/catering fallbacks.
+- Future Swim/Miranda searches keep Miranda/Caringbah swim results visible and suppress Brisbane/chess/spa/catering noise.
+- Verification passed with frontend build, targeted product live-read regression (`3 passed`), deploy-live, stack health at `2026-04-29T07:07:01Z`, and production Playwright UAT (`2/2`) under `output/playwright/live-uat-2026-04-29-0707/`.
+
+## 2026-04-29 Homepage Just-In-Time Location Search
+
+- `bookedai.au` homepage search now treats device location as a just-in-time user choice: near-me/location-warning queries show an in-chat `Use current location` prompt and do not auto-trigger browser geolocation during the first ranking pass.
+- Approving location reruns the same query with `user_location`; declining focuses the user on typing a suburb/area so search can stay locally grounded without showing broad Australia-wide or stale fallback cards.
+- Short intent terms now use exact-word matching in homepage ranking/filtering, reinforcing the Sprint 19 search gate that explicit service/location queries must suppress unrelated results.
+- Verification passed with frontend build plus focused live-read Playwright checks for top-3/Search-more, tenant-backed relevance, and near-me JIT location prompt behavior.
+
+## 2026-04-29 Homepage Booking-First Chat Layout
+
+- The homepage assistant now prioritizes active booking work in the right-side workspace: selected match, open booking form, or confirmation appears before progress, follow-up, and general explanation panels.
+- The chat/results pane is now a viewport-bounded scroll surface with visible scrollbar styling and contained overscroll, so long search lists can be reviewed in-frame without overflowing the screen.
+- The Sprint 19 search UX gate now includes a booking-continuity assertion: after selecting a result, the booking form must appear above procedural progress guidance on desktop-sized public assistant views.
+- Verification passed with frontend build and focused live-read Playwright checks for result pagination, scrollframe CSS, tenant-backed relevance, and booking submit order.
+
+## 2026-04-29 BookedAI.au Winning SME Homepage And Activity Drawer Fix
+
+- `bookedai.au` now carries the sharper SME acquisition promise: win more bookings from existing enquiries, then move the visitor into a live search, details, and booking path.
+- The public homepage search workspace now exposes more pre-booking decision detail on result cards and keeps BookedAI contact explicit through `info@bookedai.au`.
+- The activity drawer is scoped to the BookedAI web tenant (`bookedai-au`) and handles tenant-session failures with customer-safe copy, preserving the Sprint B isolation posture while avoiding raw API leakage.
+- Verification passed with frontend build, homepage responsive/UI Playwright (`5 passed`), diff check, live deploy, stack health at `2026-04-29T12:38:16Z`, and production browser smoke for the new headline plus sanitized activity drawer; broader live-read booking-submit fixture drift remains a separate search-contract follow-up.
 
 ## Sprint 19-22 cross-stack execution overlay (2026-04-26 review)
 

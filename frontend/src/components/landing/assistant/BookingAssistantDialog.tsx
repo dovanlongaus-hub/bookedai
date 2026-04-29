@@ -1526,72 +1526,6 @@ function buildTelegramCareUrl(params: {
   return `https://t.me/BookedAI_Manager_Bot?start=${encodeURIComponent(serviceSlug ? `svc.${serviceSlug}` : 'care')}`;
 }
 
-function buildBookingJourneySteps(params: {
-  selectedService: ServiceCatalogItem | null;
-  preferredSlot: string;
-  customerName: string;
-  customerEmail: string;
-  customerPhone: string;
-  result: BookingAssistantSessionResponse | null;
-  hasConversationStarted: boolean;
-  hasVisibleOptions: boolean;
-}) {
-  const hasContact =
-    params.customerName.trim().length > 1 &&
-    (params.customerEmail.trim().length > 3 ||
-      params.customerPhone.trim().replace(/\D/g, '').length >= 8);
-  const hasSchedule = Boolean(params.preferredSlot);
-  const hasSelection = Boolean(params.selectedService);
-  const hasResult = Boolean(params.result);
-
-  return [
-    {
-      id: 'chat',
-      label: 'Chat',
-      status: params.hasConversationStarted ? 'completed' : 'active',
-    },
-    {
-      id: 'search',
-      label: 'Search',
-      status: params.hasVisibleOptions || hasSelection || hasResult
-        ? 'completed'
-        : params.hasConversationStarted
-          ? 'active'
-          : 'pending',
-    },
-    {
-      id: 'preview',
-      label: 'Preview',
-      status: hasSelection || hasResult
-        ? 'completed'
-        : params.hasVisibleOptions
-          ? 'active'
-          : 'pending',
-    },
-    {
-      id: 'book',
-      label: 'Book',
-      status: hasResult
-        ? 'completed'
-        : hasSelection && hasContact && hasSchedule
-          ? 'active'
-          : hasSelection
-            ? 'active'
-            : 'pending',
-    },
-    {
-      id: 'pay',
-      label: 'Pay',
-      status: hasResult ? 'active' : 'pending',
-    },
-    {
-      id: 'care',
-      label: 'Care',
-      status: hasResult ? 'active' : 'pending',
-    },
-  ] as const;
-}
-
 function normalizeSyncStatus(value: string | null | undefined) {
   return (value || '').trim().toLowerCase();
 }
@@ -3357,29 +3291,6 @@ export function BookingAssistantDialog({
     [processSteps],
   );
   const progressPercent = Math.round((completedStepCount / processSteps.length) * 100);
-  const bookingJourneySteps = useMemo(
-    () =>
-      buildBookingJourneySteps({
-        selectedService,
-        preferredSlot,
-        customerName,
-        customerEmail,
-        customerPhone,
-        result,
-        hasConversationStarted,
-        hasVisibleOptions: visibleSuggestedServices.length > 0,
-      }),
-    [
-      customerEmail,
-      customerName,
-      customerPhone,
-      hasConversationStarted,
-      preferredSlot,
-      result,
-      selectedService,
-      visibleSuggestedServices.length,
-    ],
-  );
   const previewGoogleMapsUrl = previewService
     ? buildGoogleMapsSearchUrl({
         mapUrl: previewService.map_url,
@@ -6486,12 +6397,9 @@ export function BookingAssistantDialog({
                       </div>
                       {isBookedAiChessTenantService(selectedService) ? (
                         <div className="mt-3 rounded-[1rem] bg-white px-3 py-3 text-xs leading-5 text-emerald-900 ring-1 ring-emerald-200/80">
-                          <div className="font-semibold">Full BookedAI booking flow is enabled.</div>
-                          <div className="mt-1">
-                            After booking, you'll get Stripe/payment handling, a QR booking confirmation, calendar invite, email, messaging follow-up, Telegram support handoff, and a portal link to review or change details.
-                          </div>
+                          <div className="font-semibold">Booking, payment, calendar, and care are ready.</div>
                           <div className="mt-2 flex flex-wrap gap-1.5">
-                            {BOOKEDAI_TENANT_CAPABILITY_CHIPS.slice(2).map((item) => (
+                            {BOOKEDAI_TENANT_CAPABILITY_CHIPS.slice(2, 6).map((item) => (
                               <span
                                 key={`booking-form-tenant-chip-${item}`}
                                 className="rounded-full bg-emerald-50 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.1em] text-emerald-700 ring-1 ring-emerald-100"
@@ -6641,46 +6549,6 @@ export function BookingAssistantDialog({
                       ) : null}
                     </div>
                   ) : null}
-                  <div className="mt-3 rounded-[1.25rem] border border-slate-200 bg-[#fbfbfd] px-4 py-4">
-                    <div className="flex items-start justify-between gap-3">
-                      <div>
-                        <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                          Your booking journey
-                        </div>
-                        <div className="mt-1 text-sm font-semibold text-slate-950">
-                          From search to booking, payment, and follow-up
-                        </div>
-                      </div>
-                      <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-600 ring-1 ring-slate-200">
-                        Active
-                      </div>
-                    </div>
-                    <div className="mt-3 grid grid-cols-1 gap-2">
-                      {enterpriseJourneySteps.slice(0, 6).map((step) => (
-                        <div
-                          key={`pre-submit-${step.id}`}
-                          className="flex items-start justify-between gap-3 rounded-[1rem] bg-white px-3 py-3 ring-1 ring-slate-200"
-                        >
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <div className="text-[11px] font-semibold text-slate-950">{step.title}</div>
-                              {step.channel ? (
-                                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                                  {step.channel}
-                                </span>
-                              ) : null}
-                            </div>
-                            <div className="mt-1 text-[11px] leading-5 text-slate-600">{step.description}</div>
-                          </div>
-                          <div
-                            className={`shrink-0 rounded-full border px-2.5 py-1 text-xs font-semibold ${getEnterpriseStatusTone(step.status)}`}
-                          >
-                            {getEnterpriseStatusLabel(step.status)}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
                   {selectedEvent ? (
                     <div className="mt-3 rounded-[1.25rem] border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-950">
                       <div className="flex flex-wrap items-center justify-between gap-3">
@@ -6708,39 +6576,6 @@ export function BookingAssistantDialog({
                     </div>
                   ) : null}
                 </div>
-
-                {isProductAppLayout && !isCompactMobileViewport ? (
-                  <div className="rounded-[1.25rem] border border-slate-200 bg-[#fbfbfd] p-4">
-                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                      Booking journey
-                    </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
-                    {bookingJourneySteps.map((step, index) => (
-                      <div
-                        key={`journey-${step.id}`}
-                        className={`rounded-2xl px-3 py-3 text-center ${
-                          step.status === 'active'
-                            ? 'bg-violet-600 text-white'
-                            : step.status === 'completed'
-                              ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100'
-                            : 'bg-white text-slate-600 ring-1 ring-slate-200'
-                        }`}
-                      >
-                          <div className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
-                            step.status === 'active'
-                              ? 'bg-white text-slate-950'
-                              : step.status === 'completed'
-                                ? 'bg-emerald-500 text-white'
-                              : 'bg-slate-100 text-slate-600'
-                          }`}>
-                            {step.status === 'completed' ? '✓' : index + 1}
-                          </div>
-                          <div className="mt-2 text-[11px] font-semibold">{step.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
 
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block text-sm text-slate-600">

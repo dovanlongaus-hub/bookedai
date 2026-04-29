@@ -86,6 +86,21 @@ function formatEventType(eventType: string): string {
   return eventType.replace(/_/g, ' ');
 }
 
+function humanizeAgentActivityError(error: unknown): string {
+  const message = error instanceof Error ? error.message : 'Could not load agent activity.';
+  const lower = message.toLowerCase();
+
+  if (
+    lower.includes('tenant session required') ||
+    lower.includes('actor_context.tenant_id') ||
+    lower.includes('tenant bearer token')
+  ) {
+    return 'Activity is connected to the BookedAI web tenant. Start or continue the search and the public booking steps will appear here.';
+  }
+
+  return 'Could not load activity right now. The search and booking flow still works; try opening this panel again after the next message.';
+}
+
 /**
  * Wave 13-B — slash-command verb chip mapping.
  * Maps raw `context.intent_hint` values (forwarded from
@@ -174,8 +189,7 @@ export function AgentActivityDrawer({
         if (signal?.aborted) {
           return;
         }
-        const message = error instanceof Error ? error.message : 'Could not load agent activity.';
-        setErrorMessage(message);
+        setErrorMessage(humanizeAgentActivityError(error));
         setStatus('error');
       }
     },
@@ -366,7 +380,7 @@ export function AgentActivityDrawer({
                   How BookedAI is working
                 </h2>
                 <p id={descriptionId} className="mt-1 text-xs leading-5" style={{ color: 'var(--apple-text-dark-3)' }}>
-                  Live ledger of every typed agent step in this conversation.
+                  Public view of the search, shortlist, booking, and follow-up steps in this conversation.
                 </p>
               </div>
               <button
@@ -555,7 +569,7 @@ export function AgentActivityDrawer({
                   className="h-1.5 w-1.5 rounded-full"
                   style={{ background: 'var(--apple-blue)' }}
                 />
-                Auditable in admin.bookedai.au · powered by conversation_events
+                Customer-safe activity view · private workspace details stay protected
               </span>
             </footer>
           </div>

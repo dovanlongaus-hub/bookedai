@@ -17,6 +17,7 @@ import { getApiBaseUrl, shouldUseLocalStaticPublicData } from '../../shared/conf
 import { resolveApiErrorMessage } from '../../shared/api/client';
 import { isPublicBookingAssistantV1LiveReadEnabled } from '../../shared/config/publicBookingAssistant';
 import {
+  BOOKEDAI_PUBLIC_TENANT_REF,
   createBookedAiHomepageRuntimeConfig,
   getResultConfidencePresentation,
 } from '../../shared/runtime/publicAssistantRuntime';
@@ -175,6 +176,12 @@ type UserGeoContext = {
   latitude: number;
   longitude: number;
   locality: string | null;
+};
+
+type LocationRequestState = {
+  query: string;
+  reason: 'near_me' | 'location_warning' | 'legacy_request';
+  status: 'prompt' | 'requesting' | 'denied';
 };
 
 type HomepageSearchExperienceProps = {
@@ -932,8 +939,9 @@ function buildSearchResultFacts(service: ServiceCatalogItem, confidenceLabel: st
     service.price_posture || formatCurrencyAud(service.amount_aud) || 'Price not listed',
     service.duration_minutes ? `${service.duration_minutes} min` : 'Duration TBD',
     service.location || service.venue_name || 'Location TBD',
+    service.source_label || service.availability_state || service.booking_confidence || null,
     confidenceLabel,
-  ].filter((item): item is string => Boolean(item)).slice(0, 4);
+  ].filter((item): item is string => Boolean(item)).slice(0, 5);
 }
 
 function derivePaymentOptionForAutomation(params: {
@@ -1551,11 +1559,153 @@ function getLocationPriorityBucket(
 }
 
 function resolvePriorityIntentTerms(query: string, intentTermsOverride?: string[] | null) {
+  const genericIntentTerms = new Set([
+    'class',
+    'classes',
+    'coach',
+    'coaching',
+    'lesson',
+    'lessons',
+    'option',
+    'options',
+    'service',
+    'services',
+    'session',
+    'sessions',
+    'training',
+    'tutor',
+  ]);
+
   if (intentTermsOverride && intentTermsOverride.length > 0) {
-    return Array.from(new Set(intentTermsOverride.map((term) => term.trim().toLowerCase()).filter(Boolean)));
+    const normalizedOverride = intentTermsOverride
+      .map((term) => term.trim().toLowerCase())
+      .filter((term) => term.length >= 3 && !genericIntentTerms.has(term));
+
+    if (normalizedOverride.length > 0) {
+      return expandIntentTermAliases(Array.from(new Set(normalizedOverride)));
+    }
   }
 
-  return extractQueryIntentTerms(query);
+  return expandIntentTermAliases(extractQueryIntentTerms(query));
+}
+
+function expandIntentTermAliases(intentTerms: string[]) {
+  const aliases: Record<string, string[]> = {
+    barber: ['barber', 'hair', 'haircut', 'fade', 'cut'],
+    chess: ['chess', 'grandmaster', 'strategy', 'tournament'],
+    cut: ['cut', 'hair', 'haircut', 'barber', 'fade'],
+    fade: ['fade', 'hair', 'haircut', 'barber'],
+    food: ['food', 'restaurant', 'dining', 'cafe'],
+    haircut: ['haircut', 'hair', 'barber', 'fade', 'cut'],
+    restaurant: ['restaurant', 'dining', 'food', 'cafe'],
+    swim: ['swim', 'swimming', 'water', 'stroke'],
+    swimming: ['swimming', 'swim', 'water', 'stroke'],
+  };
+
+  return Array.from(
+    new Set(
+      intentTerms.flatMap((term) => aliases[term] ?? [term]),
+    ),
+  );
+}
+
+function extractExplicitLocationTerms(query: string, inferredLocation?: string | null) {
+  const normalizedQuery = normalizeSearchText([query]);
+  const explicitLocations = [
+    'adelaide',
+    'brisbane',
+    'canberra',
+    'cbd',
+    'chatswood',
+    'kirrawee',
+    'leichhardt',
+    'melbourne',
+    'miranda',
+    'parramatta',
+    'perth',
+    'rouse hill',
+    'st peters',
+    'surry hills',
+    'sydney',
+    'western sydney',
+    'wollongong',
+  ];
+  const terms = explicitLocations.filter((location) => normalizedQuery.includes(location));
+  const inferred = inferredLocation?.trim().toLowerCase();
+  if (inferred && inferred.length >= 3 && !terms.includes(inferred)) {
+    terms.push(inferred);
+  }
+  return terms;
+}
+
+function serviceMatchesAnyIntentTerm(service: ServiceCatalogItem, intentTerms: string[]) {
+  if (!intentTerms.length) {
+    return true;
+  }
+
+  const searchableText = normalizeSearchText([
+    service.id,
+    service.name,
+    service.category,
+    service.summary,
+    service.location,
+    service.venue_name,
+    service.source_label,
+    service.why_this_matches,
+    service.next_step,
+    ...service.tags,
+  ]);
+
+  const searchableWords = new Set(searchableText.split(/[^a-z0-9]+/).filter(Boolean));
+
+  return intentTerms.some((term) => {
+    const normalizedTerm = normalizeSearchText([term]);
+    if (!normalizedTerm) {
+      return false;
+    }
+    if (normalizedTerm.length <= 4) {
+      return searchableWords.has(normalizedTerm);
+    }
+    return searchableText.includes(normalizedTerm);
+  });
+}
+
+function serviceMatchesAnyLocationTerm(service: ServiceCatalogItem, locationTerms: string[], query: string) {
+  if (!locationTerms.length) {
+    return true;
+  }
+
+  const locationText = normalizeSearchText([
+    service.location,
+    service.venue_name,
+    service.source_label,
+    service.source_url,
+    service.map_url,
+    ...service.tags,
+  ]);
+  const onlineFriendly = isOnlineFriendlyService(service, query);
+  return locationTerms.some((location) => locationText.includes(location)) || onlineFriendly;
+}
+
+function filterResultsByStrictRelevance(
+  services: ServiceCatalogItem[],
+  query: string,
+  intentTermsOverride?: string[] | null,
+  inferredLocation?: string | null,
+) {
+  const intentTerms = resolvePriorityIntentTerms(query, intentTermsOverride);
+  const locationTerms = extractExplicitLocationTerms(query, inferredLocation);
+  if (!intentTerms.length && !locationTerms.length) {
+    return services;
+  }
+
+  const relevant = services.filter((service) => {
+    const matchesIntent = serviceMatchesAnyIntentTerm(service, intentTerms);
+    const matchesLocation = serviceMatchesAnyLocationTerm(service, locationTerms, query);
+    return matchesIntent && matchesLocation;
+  });
+
+  return relevant;
 }
 
 function computeIntentPriorityScore(
@@ -1578,16 +1728,28 @@ function computeIntentPriorityScore(
   ]);
 
   let score = 0;
+  const nameWords = new Set(nameText.split(/[^a-z0-9]+/).filter(Boolean));
+  const summaryWords = new Set(summaryText.split(/[^a-z0-9]+/).filter(Boolean));
+  const metadataWords = new Set(metadataText.split(/[^a-z0-9]+/).filter(Boolean));
+
+  function textHasTerm(text: string, words: Set<string>, term: string) {
+    const normalizedTerm = normalizeSearchText([term]);
+    if (!normalizedTerm) {
+      return false;
+    }
+    return normalizedTerm.length <= 4 ? words.has(normalizedTerm) : text.includes(normalizedTerm);
+  }
+
   for (const term of intentTerms) {
-    if (nameText.includes(term)) {
+    if (textHasTerm(nameText, nameWords, term)) {
       score += 7;
       continue;
     }
-    if (metadataText.includes(term)) {
+    if (textHasTerm(metadataText, metadataWords, term)) {
       score += 4;
       continue;
     }
-    if (summaryText.includes(term)) {
+    if (textHasTerm(summaryText, summaryWords, term)) {
       score += 2;
     }
   }
@@ -1896,7 +2058,7 @@ function filterResultsByIntentTerms(
     return intentTerms.some((term) => summaryText.includes(term));
   });
 
-  return filtered.length > 0 ? filtered : services;
+  return filtered;
 }
 
 function orderResultsByRecommendationIds(
@@ -2119,6 +2281,7 @@ export function HomepageSearchExperience({
   const [searchLoading, setSearchLoading] = useState(false);
   const [searchError, setSearchError] = useState('');
   const [geoHint, setGeoHint] = useState('');
+  const [locationRequest, setLocationRequest] = useState<LocationRequestState | null>(null);
   const [searchProgressStageIndex, setSearchProgressStageIndex] = useState(0);
   const [showDelayedSearchNudge, setShowDelayedSearchNudge] = useState(false);
   const [attachedReferences, setAttachedReferences] = useState<
@@ -2183,6 +2346,9 @@ export function HomepageSearchExperience({
     setAgentChatMessages([]);
     setAssistantSummary('');
     setSearchWarnings([]);
+    setSearchError('');
+    setGeoHint('');
+    setLocationRequest(null);
     setCustomerName('');
     setCustomerEmail('');
     setCustomerPhone('');
@@ -2597,6 +2763,26 @@ export function HomepageSearchExperience({
     });
   }
 
+  async function handleUseCurrentLocationForSearch() {
+    if (!locationRequest || searchLoading) {
+      return;
+    }
+
+    const requestToResolve = locationRequest;
+    setLocationRequest({ ...requestToResolve, status: 'requesting' });
+    const requestedGeo = await requestGeoContext();
+
+    if (!requestedGeo) {
+      setLocationRequest({ ...requestToResolve, status: 'denied' });
+      setGeoHint(content.ui.geoHint);
+      return;
+    }
+
+    setLocationRequest(null);
+    setGeoHint('Current location added. I am rerunning this nearby search now.');
+    await runSearch(requestToResolve.query, { geoContextOverride: requestedGeo });
+  }
+
   async function requestLegacySearch(query: string, nextGeoContext?: UserGeoContext | null) {
     const response = await fetch(`${getApiBaseUrl()}/chat/send`, {
       method: 'POST',
@@ -2856,7 +3042,7 @@ export function HomepageSearchExperience({
 
   async function runSearch(
     nextQuery: string,
-    options?: { intentHint?: string | null },
+    options?: { intentHint?: string | null; geoContextOverride?: UserGeoContext | null },
   ) {
     const trimmedQuery = nextQuery.trim();
     if (!trimmedQuery) {
@@ -2868,6 +3054,7 @@ export function HomepageSearchExperience({
     // we use whatever was stored from the most recent slash-menu pick.
     const effectiveIntentHint =
       options?.intentHint !== undefined ? options.intentHint : slashIntentHintRef.current;
+    const initialGeoContext = options?.geoContextOverride ?? geoContext;
 
     trackHomepageSearchEvent('homepage_search_started', {
       query: trimmedQuery,
@@ -2908,6 +3095,7 @@ export function HomepageSearchExperience({
     setAssistantSummary('');
     setSearchWarnings([]);
     setGeoHint('');
+    setLocationRequest(null);
     setLiveReadBookingSummary(null);
     setResult(null);
     setSubmitError('');
@@ -2925,7 +3113,7 @@ export function HomepageSearchExperience({
                 catalog?.services ?? [],
                 effectiveQuery,
               ),
-              geoContext?.locality ?? null,
+              initialGeoContext?.locality ?? null,
               effectiveQuery,
             ).slice(0, 3);
 
@@ -2970,7 +3158,7 @@ export function HomepageSearchExperience({
           message: effectiveQuery,
           conversation_id: bookingAssistantV1SessionIdRef.current,
           messages: priorAgentMessages,
-          location: nextGeoContext?.locality ?? geoContext?.locality ?? null,
+          location: nextGeoContext?.locality ?? initialGeoContext?.locality ?? null,
           preferences: selectedServiceId ? { requested_service_id: selectedServiceId } : null,
           channel_context: {
             channel: homepageRuntimeConfig.channel ?? 'public_web',
@@ -2987,8 +3175,8 @@ export function HomepageSearchExperience({
           },
           user_location: nextGeoContext
             ? { latitude: nextGeoContext.latitude, longitude: nextGeoContext.longitude }
-            : geoContext
-              ? { latitude: geoContext.latitude, longitude: geoContext.longitude }
+            : initialGeoContext
+              ? { latitude: initialGeoContext.latitude, longitude: initialGeoContext.longitude }
               : null,
           context: {
             surface: homepageRuntimeConfig.surface ?? 'bookedai_homepage_search_shell',
@@ -3036,7 +3224,7 @@ export function HomepageSearchExperience({
     }
 
     try {
-      let activeGeoContext = geoContext;
+      let activeGeoContext = initialGeoContext;
       let agentTurn = await requestCustomerAgentTurn(activeGeoContext);
       let liveRead = agentTurn?.search
         ? {
@@ -3073,56 +3261,24 @@ export function HomepageSearchExperience({
         !activeGeoContext &&
         (hasLocationPermissionWarning(liveRead.warnings) || hasNearMeIntent(trimmedQuery))
       ) {
-        const requestedGeo = await requestGeoContext();
-        if (requestedGeo) {
-          activeGeoContext = requestedGeo;
-          agentTurn = await requestCustomerAgentTurn(requestedGeo);
-          liveRead = agentTurn?.search
-            ? {
-                candidateIds: agentTurn.search.candidates.map((candidate) => candidate.candidateId),
-                rankedCandidates: agentTurn.search.candidates,
-                recommendedCandidateIds: agentTurn.search.recommendations
-                  .map((recommendation) => recommendation.candidateId)
-                  .filter(Boolean),
-                suggestedServiceId:
-                  agentTurn.search.recommendations[0]?.candidateId ??
-                  agentTurn.search.candidates[0]?.candidateId ??
-                  null,
-                queryUnderstandingSummary: agentTurn.search.query_understanding,
-                semanticAssistSummary: agentTurn.search.semantic_assist,
-                warnings: agentTurn.search.warnings,
-                trustSummary: null,
-                bookingRequestSummary: agentTurn.search.booking_context?.summary ?? null,
-                bookingPathSummary: null,
-                usedLiveRead: true,
-              }
-            : await getPublicBookingAssistantLiveReadRecommendation({
-                query: effectiveQuery,
-                sourcePage: sourcePath,
-                locationHint: requestedGeo.locality ?? null,
-                serviceCategory: null,
-                selectedServiceId: selectedServiceId || null,
-                userLocation: {
-                  latitude: requestedGeo.latitude,
-                  longitude: requestedGeo.longitude,
-                },
-                runtimeConfig: homepageRuntimeConfig,
-              });
-        } else {
-          setGeoHint(content.ui.geoHint);
-        }
+        setLocationRequest({
+          query: trimmedQuery,
+          reason: hasNearMeIntent(trimmedQuery) ? 'near_me' : 'location_warning',
+          status: 'prompt',
+        });
+        setGeoHint(content.ui.geoHint);
       }
 
       let legacyPayload: BookingAssistantChatResponse | null = null;
       if (!liveRead.usedLiveRead) {
         legacyPayload = await requestLegacySearch(effectiveQuery, activeGeoContext);
         if (legacyPayload.should_request_location && !activeGeoContext) {
-          const requestedGeo = await requestGeoContext();
-          if (requestedGeo) {
-            legacyPayload = await requestLegacySearch(effectiveQuery, requestedGeo);
-          } else {
-            setGeoHint(content.ui.geoHint);
-          }
+          setLocationRequest({
+            query: trimmedQuery,
+            reason: 'legacy_request',
+            status: 'prompt',
+          });
+          setGeoHint(content.ui.geoHint);
         }
       }
 
@@ -3157,11 +3313,22 @@ export function HomepageSearchExperience({
             effectiveQuery,
             priorityIntentTerms,
           );
+      const relevanceFilteredResults = shouldHoldResultsForLocation
+        ? []
+        : filterResultsByStrictRelevance(
+            intentFilteredResults,
+            effectiveQuery,
+            priorityIntentTerms,
+            liveRead.queryUnderstandingSummary?.inferredLocation ??
+              liveRead.semanticAssistSummary?.inferredLocation ??
+              activeGeoContext?.locality ??
+              null,
+          );
       const rankedResults =
         liveRead.recommendedCandidateIds.length > 0
-          ? intentFilteredResults
+          ? relevanceFilteredResults
           : prioritizeSearchResults(
-              intentFilteredResults,
+              relevanceFilteredResults,
               activeGeoContext?.locality ?? null,
               effectiveQuery,
               priorityIntentTerms,
@@ -3219,7 +3386,10 @@ export function HomepageSearchExperience({
           id: createAgentChatMessageId('assistant'),
           role: 'assistant',
           content: agentSummary,
-          resultIds: prioritizedResults.slice(0, 3).map((item) => item.id),
+          resultIds:
+            prioritizedResults.length > 3
+              ? []
+              : prioritizedResults.slice(0, 3).map((item) => item.id),
           suggestions: nextIntentSuggestions,
         },
       ]);
@@ -3272,7 +3442,7 @@ export function HomepageSearchExperience({
                 catalog?.services ?? [],
                 effectiveQuery,
               ),
-              geoContext?.locality ?? null,
+              initialGeoContext?.locality ?? null,
               effectiveQuery,
             ).slice(0, 3);
       const recoverySummary = humanizeHomepageSearchFailure(error);
@@ -3845,6 +4015,8 @@ export function HomepageSearchExperience({
     >
       <AgentActivityDrawer
         conversationId={bookingAssistantV1SessionIdRef.current}
+        tenantRef={BOOKEDAI_PUBLIC_TENANT_REF}
+        tabLabel="Booking activity"
       />
       {bookingReturnNotice ? (
         <StripeReturnNotice
@@ -3872,6 +4044,30 @@ export function HomepageSearchExperience({
               animation: none !important;
             }
           }
+
+          [data-testid="homepage-search-scrollframe"] {
+            scrollbar-width: thin;
+            scrollbar-color: rgba(26, 115, 232, 0.42) rgba(226, 232, 240, 0.9);
+          }
+
+          [data-testid="homepage-search-scrollframe"]::-webkit-scrollbar {
+            width: 10px;
+          }
+
+          [data-testid="homepage-search-scrollframe"]::-webkit-scrollbar-track {
+            background: rgba(226, 232, 240, 0.9);
+            border-radius: 999px;
+          }
+
+          [data-testid="homepage-search-scrollframe"]::-webkit-scrollbar-thumb {
+            background: rgba(26, 115, 232, 0.42);
+            border: 2px solid rgba(226, 232, 240, 0.9);
+            border-radius: 999px;
+          }
+
+          [data-testid="homepage-search-scrollframe"]::-webkit-scrollbar-thumb:hover {
+            background: rgba(26, 115, 232, 0.68);
+          }
         `}
       </style>
       <div className="public-search-results-shell grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
@@ -3894,8 +4090,22 @@ export function HomepageSearchExperience({
                   </div>
                 </div>
                 <p className="mt-2 text-[11px] leading-5 text-slate-500">{workspaceStatus.detail}</p>
+                <div className="mt-2 flex flex-wrap gap-2 text-[11px] font-semibold text-slate-600">
+                  <span className="rounded-full bg-white px-2.5 py-1 ring-1 ring-slate-200">
+                    Tenant web: {BOOKEDAI_PUBLIC_TENANT_REF}
+                  </span>
+                  <a
+                    href="mailto:info@bookedai.au?subject=BookedAI%20booking%20search"
+                    className="rounded-full bg-white px-2.5 py-1 text-apple-blue ring-1 ring-slate-200 transition hover:bg-apple-paper-blue-50"
+                  >
+                    info@bookedai.au
+                  </a>
+                </div>
               </div>
-              <div className="max-h-[min(68vh,50rem)] space-y-4 overflow-y-auto px-3 py-4 sm:px-4 lg:px-5">
+              <div
+                data-testid="homepage-search-scrollframe"
+                className="h-[min(70vh,52rem)] max-h-[52rem] min-h-[28rem] space-y-4 overflow-y-scroll overscroll-contain px-3 py-4 [scrollbar-gutter:stable] sm:px-4 lg:px-5"
+              >
 
             <div className="mb-5 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {customerFlowSteps.map((step, index) => {
@@ -4211,7 +4421,47 @@ export function HomepageSearchExperience({
               </div>
             ) : null}
 
-            {geoHint ? (
+            {locationRequest ? (
+              <div className="mb-3 rounded-[1rem] border border-apple-paper-blue-200 bg-apple-paper-blue-50 px-3.5 py-3 text-sm leading-6 text-apple-paper-blue-navy-700">
+                <div className="flex items-start gap-3">
+                  <div className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-apple-blue shadow-sm ring-1 ring-apple-paper-blue-200">
+                    <MapPinIcon className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-apple-paper-blue-navy-900">
+                      Use current location for this search?
+                    </div>
+                    <p className="mt-1 text-sm leading-6 text-apple-paper-blue-navy-700">
+                      {locationRequest.status === 'denied'
+                        ? 'Location permission is unavailable. Add a suburb or area in the chat and I will rank local matches from that.'
+                        : geoHint || 'For tighter local matching, include the suburb or area you prefer.'}
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() => void handleUseCurrentLocationForSearch()}
+                        disabled={searchLoading || locationRequest.status === 'requesting'}
+                        className="inline-flex h-9 items-center gap-2 rounded-lg border border-apple-blue bg-apple-blue px-3 text-xs font-semibold text-white transition hover:bg-apple-paper-blue-navy-800 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        <MapPinIcon className="h-3.5 w-3.5" />
+                        {locationRequest.status === 'requesting' ? 'Requesting location' : 'Use current location'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setLocationRequest(null);
+                          setGeoHint('Add a suburb or area in the chat and I will rank local matches from that.');
+                          searchComposerRef.current?.focus();
+                        }}
+                        className="inline-flex h-9 items-center rounded-lg border border-apple-paper-blue-200 bg-white px-3 text-xs font-semibold text-apple-paper-blue-navy-700 transition hover:bg-apple-paper-blue-100"
+                      >
+                        Type suburb instead
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ) : geoHint ? (
               <div className="mb-3 rounded-[1rem] border border-apple-paper-blue-200 bg-apple-paper-blue-50 px-3.5 py-3 text-sm leading-6 text-apple-paper-blue-navy-700">
                 {geoHint}
               </div>
@@ -4326,9 +4576,9 @@ export function HomepageSearchExperience({
                   batchSize={3}
                   className="space-y-4"
                   listClassName="space-y-3"
-                  buttonClassName="public-apple-workspace-panel-soft rounded-[1.15rem] px-4 py-3 text-sm font-semibold text-apple-near-black transition hover:bg-white"
+                  buttonClassName="inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-[1.15rem] border border-apple-paper-blue-200 bg-white px-4 py-3 text-sm font-semibold text-apple-blue shadow-apple-card transition hover:border-apple-paper-blue-300 hover:bg-apple-paper-blue-50 hover:text-apple-near-black"
                   resetKey={`${currentQuery}-${results.length}`}
-                  buttonLabel="See more results"
+                  buttonLabel="Search more"
                   emptyState={
                     <div className="public-apple-empty-state rounded-[1.2rem] px-4 py-12 text-center sm:px-8 lg:py-16">
                       <div className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/42">
@@ -4394,6 +4644,9 @@ export function HomepageSearchExperience({
                             </div>
                             <div className="mt-1 text-base font-semibold text-apple-near-black">
                               {currentQuery ? `Best matches for "${currentQuery}"` : content.ui.resultsTitle}
+                            </div>
+                            <div className="mt-1 text-sm leading-6 text-slate-600">
+                              Compare the first 3, open details, then choose Book when one option fits.
                             </div>
                           </div>
                           <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[11px] text-slate-500">
@@ -4515,6 +4768,32 @@ export function HomepageSearchExperience({
                                 {service.why_this_matches || service.next_step}
                               </p>
                             ) : null}
+                            <dl className="mt-3 grid gap-2 rounded-[0.95rem] border border-slate-200 bg-slate-50 px-3 py-3 text-[11px] sm:grid-cols-2">
+                              <div>
+                                <dt className="font-semibold uppercase tracking-[0.12em] text-slate-500">Book</dt>
+                                <dd className="mt-1 font-medium text-slate-800">
+                                  {service.booking_url ? 'Provider booking link plus BookedAI request' : 'Book through BookedAI request'}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="font-semibold uppercase tracking-[0.12em] text-slate-500">Contact</dt>
+                                <dd className="mt-1 font-medium text-slate-800">
+                                  {service.contact_phone || catalog?.business_email || 'info@bookedai.au'}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="font-semibold uppercase tracking-[0.12em] text-slate-500">Location</dt>
+                                <dd className="mt-1 font-medium text-slate-800">
+                                  {service.location || service.venue_name || 'Confirmed during booking'}
+                                </dd>
+                              </div>
+                              <div>
+                                <dt className="font-semibold uppercase tracking-[0.12em] text-slate-500">Next step</dt>
+                                <dd className="mt-1 font-medium text-slate-800">
+                                  {service.next_step || service.booking_path_type || 'Open details or book this match'}
+                                </dd>
+                              </div>
+                            </dl>
                             {tenantCapabilitySummary ? (
                               <div className="mt-2 rounded-[0.95rem] border border-emerald-100 bg-emerald-50/70 px-3 py-2">
                                 <p className="line-clamp-2 text-[11px] font-medium leading-5 text-emerald-900">
@@ -4752,8 +5031,8 @@ export function HomepageSearchExperience({
           </div>
         </section>
 
-        <aside className="public-booking-sidebar min-w-0 rounded-[1.6rem] border border-slate-200 bg-white p-3 shadow-[0_18px_50px_rgba(15,23,42,0.06)] xl:sticky xl:self-start">
-          <div className="mb-3 hidden rounded-[1.2rem] border border-slate-200 bg-apple-light px-4 py-4 xl:block">
+        <aside className="public-booking-sidebar flex min-w-0 flex-col rounded-[1.6rem] border border-slate-200 bg-white p-3 shadow-[0_18px_50px_rgba(15,23,42,0.06)] xl:sticky xl:self-start">
+          <div className="order-8 mt-3 hidden rounded-[1.2rem] border border-slate-200 bg-apple-light px-4 py-4 xl:block">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Booking flow</div>
             <div className="mt-2 text-base font-semibold text-apple-near-black">
               One calm path from search to booking.
@@ -4766,7 +5045,7 @@ export function HomepageSearchExperience({
               ))}
             </div>
           </div>
-          <div className="public-apple-workspace-panel rounded-[1.15rem] px-3.5 py-3.5">
+          <div className="public-apple-workspace-panel order-1 rounded-[1.15rem] px-3.5 py-3.5">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0">
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/42">
@@ -4785,7 +5064,7 @@ export function HomepageSearchExperience({
             </div>
           </div>
 
-          <div className="hidden xl:block public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-apple-card">
+          <div className="order-6 hidden xl:block public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-apple-card">
             <div className="flex items-center justify-between gap-3">
               <div className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/42">Progress</div>
               <div className="rounded-full border border-slate-200 bg-white px-2.5 py-1 text-xs font-semibold text-slate-500">
@@ -4826,7 +5105,7 @@ export function HomepageSearchExperience({
             </div>
           </div>
 
-          <div className="hidden xl:block public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-apple-card">
+          <div className="order-7 hidden xl:block public-apple-workspace-panel mt-3 rounded-[1.1rem] px-3.5 py-3.5 shadow-apple-card">
             <div className="text-xs font-semibold uppercase tracking-[0.16em] text-apple-near-black/42">Follow-up</div>
             <div className="mt-3 space-y-2.5">
               {enterpriseJourneySteps.slice(0, 3).map((step) => (
@@ -4846,7 +5125,7 @@ export function HomepageSearchExperience({
           </div>
 
           {selectedService ? (
-            <div className="public-apple-workspace-panel mt-3 rounded-[1.1rem] border-[1.5px] border-emerald-200 bg-[linear-gradient(180deg,#ffffff_0%,#f6fff9_100%)] px-3.5 py-3.5 shadow-[0_16px_34px_rgba(16,185,129,0.10)]">
+            <div className="public-apple-workspace-panel order-2 mt-3 rounded-[1.1rem] border-[1.5px] border-emerald-200 bg-[linear-gradient(180deg,#ffffff_0%,#f6fff9_100%)] px-3.5 py-3.5 shadow-[0_16px_34px_rgba(16,185,129,0.10)]">
               <div className="flex items-start justify-between gap-3">
                   <div>
                     <div className="mt-2 text-sm font-semibold text-apple-near-black">{selectedService.name}</div>
@@ -4930,7 +5209,7 @@ export function HomepageSearchExperience({
           ) : null}
 
           {!result && !selectedService ? (
-            <div className="mt-3 rounded-[1.1rem] border border-dashed border-slate-200 bg-apple-light px-4 py-5 text-center">
+            <div className="order-2 mt-3 rounded-[1.1rem] border border-dashed border-slate-200 bg-apple-light px-4 py-5 text-center">
               <div className="mx-auto flex h-10 w-10 items-center justify-center rounded-full bg-white text-apple-near-black ring-1 ring-apple-ring-neutral-200">
                 <SparkIcon className="h-4 w-4" />
               </div>
@@ -4954,7 +5233,7 @@ export function HomepageSearchExperience({
           {!result && selectedService ? (
             <div
               ref={bookingFormRef}
-              className={`public-apple-workspace-panel mt-3 rounded-[1.1rem] p-3.5 shadow-apple-card ${
+              className={`public-apple-workspace-panel order-3 mt-3 rounded-[1.1rem] p-3.5 shadow-apple-card ${
                 selectedService && !bookingComposerOpen ? 'hidden' : ''
               }`}
             >
@@ -5130,7 +5409,7 @@ export function HomepageSearchExperience({
           ) : null}
 
           {result ? (
-            <div className="public-apple-workspace-panel mt-3 space-y-3 rounded-[1.1rem] px-3.5 py-3.5">
+            <div className="public-apple-workspace-panel order-2 mt-3 space-y-3 rounded-[1.1rem] px-3.5 py-3.5">
               <div className="rounded-[1.2rem] bg-[linear-gradient(180deg,#5B8CFF_0%,#1A73E8_100%)] px-4 py-4 text-white shadow-[0_16px_36px_rgba(26,115,232,0.22)]">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="min-w-0">

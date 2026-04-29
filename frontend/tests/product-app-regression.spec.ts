@@ -414,7 +414,7 @@ test.describe('product app regression', () => {
 
     await page.getByRole('button', { name: /Select & book|Select to book/i }).first().click();
     await expect(page.getByText(/Ready to book/i).first()).toBeVisible();
-    await expect(page.getByText(/Your booking journey/i).first()).toBeVisible();
+    await expect(page.getByText(/Focus now:/i).first()).toBeVisible();
     await expect(page.getByLabel(/Name/i)).toBeVisible();
     await expectNoHorizontalOverflow(page);
 
@@ -601,7 +601,7 @@ test.describe('product app regression', () => {
     await page.getByRole('button', { name: /Book this service/i }).click();
     await expect(page.getByText(/Ready to book/i).first()).toBeVisible();
     await expect(page.getByText(/Details/i).first()).toBeVisible();
-    await expect(page.getByText(/Your booking journey/i).first()).toBeVisible();
+    await expect(page.getByText(/Focus now:/i).first()).toBeVisible();
 
     await page.getByLabel(/Name/i).fill('Desktop Customer');
     await page.getByRole('textbox', { name: 'Email', exact: true }).fill('desktop@example.com');

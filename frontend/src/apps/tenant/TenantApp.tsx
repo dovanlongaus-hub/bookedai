@@ -1,4 +1,20 @@
 import { FormEvent, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  Activity,
+  ArrowUpRight,
+  Bell,
+  BriefcaseBusiness,
+  Building2,
+  ChevronRight,
+  Command as CommandIcon,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  PanelLeft,
+  Plus,
+  RefreshCw,
+  UserRound,
+} from 'lucide-react';
 
 import { ApiClientError } from '../../shared/api/client';
 import { apiV1 } from '../../shared/api/v1';
@@ -838,6 +854,53 @@ function formatTenantRoleLabel(role: string | null | undefined, readOnly: boolea
     default:
       return 'Workspace access';
   }
+}
+
+function TenantIconAction({
+  label,
+  children,
+  onClick,
+  href,
+  disabled = false,
+  tone = 'default',
+}: {
+  label: string;
+  children: ReactNode;
+  onClick?: () => void;
+  href?: string;
+  disabled?: boolean;
+  tone?: 'default' | 'primary' | 'danger';
+}) {
+  const toneClass =
+    tone === 'primary'
+      ? 'border-slate-950 bg-slate-950 text-white hover:bg-slate-800'
+      : tone === 'danger'
+        ? 'border-rose-200 bg-white text-rose-700 hover:bg-rose-50'
+        : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50';
+  const className = `inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border transition focus:outline-none focus:ring-2 focus:ring-sky-300 focus:ring-offset-2 ${
+    disabled ? 'cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400' : toneClass
+  }`;
+
+  if (href) {
+    return (
+      <a href={href} aria-label={label} title={label} className={className}>
+        {children}
+      </a>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+      disabled={disabled}
+      className={className}
+    >
+      {children}
+    </button>
+  );
 }
 
 function SearchIcon({ className = 'h-5 w-5' }: { className?: string }) {
@@ -3376,11 +3439,141 @@ export function TenantApp() {
     overview.summary.lifecycle_attention_count + overview.integration_snapshot.attention_count;
   const revenueProofNarrative = buildRevenueProofNarrative(overview, billing, revenueMetrics);
   const roleDisplayLabel = formatTenantRoleLabel(overview.shell.current_role, overview.shell.read_only);
+  const contextualHeaderActions = (() => {
+    if (panel === 'catalog') {
+      return (
+        <TenantIconAction
+          label="Create service draft"
+          onClick={() => void handleCatalogCreate()}
+          disabled={catalogCreatePending || !session || !canWriteCatalog}
+          tone="primary"
+        >
+          <Plus className="h-4 w-4" aria-hidden="true" />
+        </TenantIconAction>
+      );
+    }
+
+    if (panel === 'overview') {
+      return (
+        <TenantIconAction
+          label="Open catalog readiness"
+          onClick={() => handlePanelChange('catalog', 'content_header_catalog_cta')}
+        >
+          <SearchIcon className="h-4 w-4" />
+        </TenantIconAction>
+      );
+    }
+
+    if (panel === 'bookings') {
+      return (
+        <TenantIconAction
+          label="Open operations follow-up"
+          onClick={() => handlePanelChange('operations', 'content_header_ops_cta')}
+        >
+          <SparkIcon className="h-4 w-4" />
+        </TenantIconAction>
+      );
+    }
+
+    if (panel === 'operations') {
+      return (
+        <TenantIconAction
+          label="Refresh tenant workspace"
+          onClick={() => {
+            void refreshTenantWorkspace();
+          }}
+        >
+          <RefreshCw className="h-4 w-4" aria-hidden="true" />
+        </TenantIconAction>
+      );
+    }
+
+    return null;
+  })();
 
   return (
-    <main className="booked-admin-shell booked-page-shell text-slate-950">
-      <div className="booked-page-frame booked-page-stack">
-        <section className="overflow-hidden rounded-[2rem] border border-black/6 bg-[radial-gradient(circle_at_top_left,rgba(72,123,255,0.14),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.96),rgba(246,249,255,0.98))] p-6 text-[var(--apple-near-black)] shadow-[0_24px_60px_rgba(15,23,42,0.08)] lg:p-8">
+    <main className="booked-admin-shell booked-page-shell min-h-screen bg-[#f5f7fb] text-slate-950">
+      <div className="mx-auto flex w-full max-w-[1680px] flex-col gap-5 px-3 pb-24 pt-3 sm:px-5 xl:pb-6 lg:px-6">
+        <header className="sticky top-3 z-30 rounded-2xl border border-slate-200 bg-white/95 px-3 py-3 shadow-[0_18px_46px_rgba(15,23,42,0.08)] backdrop-blur sm:px-4">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex min-w-0 items-center gap-3">
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-slate-950 text-white">
+                <Building2 className="h-5 w-5" aria-hidden="true" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="truncate text-base font-semibold tracking-tight text-slate-950 sm:text-lg">
+                    {overview.tenant.name}
+                  </h1>
+                  <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                    {overview.tenant.status ?? 'workspace'}
+                  </span>
+                </div>
+                <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+                  <span className="inline-flex items-center gap-1">
+                    <BriefcaseBusiness className="h-3.5 w-3.5" aria-hidden="true" />
+                    {overview.tenant.slug}
+                  </span>
+                  <span>{roleDisplayLabel}</span>
+                  <span>{releaseLabel}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 lg:justify-end">
+              <div className="hidden min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 md:flex">
+                <Activity className="h-4 w-4 text-emerald-600" aria-hidden="true" />
+                <span className="truncate">
+                  {catalog.counts.search_ready_records}/{catalog.counts.total_records} search-ready
+                </span>
+              </div>
+              <div className="hidden min-w-0 items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600 md:flex">
+                <Bell className="h-4 w-4 text-amber-600" aria-hidden="true" />
+                <span className="truncate">{tenantAttentionCount} attention</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <TenantIconAction
+                  label="Open workspace menu"
+                  href="#tenant-workspace-menu"
+                >
+                  <Menu className="h-4 w-4" aria-hidden="true" />
+                </TenantIconAction>
+                <TenantIconAction
+                  label="Refresh tenant workspace"
+                  onClick={() => {
+                    void refreshTenantWorkspace();
+                  }}
+                >
+                  <RefreshCw className="h-4 w-4" aria-hidden="true" />
+                </TenantIconAction>
+                <TenantIconAction
+                  label="Open command palette"
+                  tone="primary"
+                  onClick={() => {
+                    window.dispatchEvent(new KeyboardEvent('keydown', { key: 'k', ctrlKey: true }));
+                  }}
+                >
+                  <CommandIcon className="h-4 w-4" aria-hidden="true" />
+                </TenantIconAction>
+                {session ? (
+                  <TenantIconAction label="Sign out" onClick={handleSignOut} tone="danger">
+                    <LogOut className="h-4 w-4" aria-hidden="true" />
+                  </TenantIconAction>
+                ) : (
+                  <TenantIconAction
+                    label="Open tenant sign-in"
+                    onClick={() => handleOpenTenantSignIn('tenant_topbar_sign_in')}
+                    tone="primary"
+                  >
+                    <UserRound className="h-4 w-4" aria-hidden="true" />
+                  </TenantIconAction>
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <section className="overflow-hidden rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,rgba(255,255,255,0.98),rgba(248,251,255,0.96))] p-5 text-[var(--apple-near-black)] shadow-[0_18px_46px_rgba(15,23,42,0.06)] lg:p-6">
           <div className="grid gap-6 xl:grid-cols-[1.2fr_0.8fr]">
             <div className="max-w-4xl">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--apple-blue)]">
@@ -3638,24 +3831,42 @@ export function TenantApp() {
           </div>
         </nav>
 
-        <section className="grid gap-6 xl:grid-cols-[300px_minmax(0,1fr)]">
-          <aside className="space-y-4">
+        <section className="grid gap-5 xl:grid-cols-[86px_minmax(260px,300px)_minmax(0,1fr)]">
+          <aside className="hidden xl:block">
+            <div className="sticky top-[104px] flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_46px_rgba(15,23,42,0.06)]">
+              {tenantPanels.slice(0, 8).map((item) => (
+                <TenantIconAction
+                  key={`rail-${item.key}`}
+                  label={`Open ${item.label}`}
+                  onClick={() => handlePanelChange(item.key, 'workspace_icon_rail')}
+                  tone={panel === item.key ? 'primary' : 'default'}
+                >
+                  {item.icon}
+                </TenantIconAction>
+              ))}
+            </div>
+          </aside>
+
+          <aside className="space-y-4 xl:sticky xl:top-[104px] xl:self-start">
             <article
               id="tenant-workspace-menu"
-              className="scroll-mt-24 rounded-[1.75rem] border border-slate-200 bg-white p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]"
+              className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.06)]"
             >
-              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                Workspace menu
+              <div className="flex items-center justify-between gap-3">
+                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  Workspace menu
+                </div>
+                <PanelLeft className="h-4 w-4 text-slate-400" aria-hidden="true" />
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 xl:block xl:space-y-2">
+              <div className="mt-4 grid grid-cols-2 gap-2 xl:block xl:space-y-1.5">
                 {tenantPanels.map((item) => (
                   <button
                     key={item.key}
                     type="button"
                     onClick={() => handlePanelChange(item.key, 'workspace_menu')}
-                    className={`flex w-full items-start gap-2 rounded-[1.1rem] border px-3 py-3 text-left transition xl:gap-3 xl:px-4 ${
+                    className={`flex w-full items-start gap-2 rounded-xl border px-3 py-3 text-left transition xl:gap-3 ${
                       panel === item.key
-                        ? 'border-slate-950 bg-slate-950 text-white shadow-[0_16px_34px_rgba(15,23,42,0.16)]'
+                        ? 'border-slate-950 bg-slate-950 text-white shadow-[0_14px_28px_rgba(15,23,42,0.14)]'
                         : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
                     }`}
                   >
@@ -3666,12 +3877,13 @@ export function TenantApp() {
                         {item.description}
                       </span>
                     </span>
+                    <ChevronRight className={`mt-0.5 hidden h-4 w-4 xl:block ${panel === item.key ? 'text-white/70' : 'text-slate-300'}`} aria-hidden="true" />
                   </button>
                 ))}
               </div>
             </article>
 
-            <article className="rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+            <article className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">
                 Section guideline
               </div>
@@ -3711,7 +3923,32 @@ export function TenantApp() {
             ) : null}
           </aside>
 
-          <div className="space-y-6">
+          <div className="min-w-0 space-y-5 rounded-2xl border border-slate-200 bg-white/62 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] sm:p-4">
+            <section className="rounded-2xl border border-slate-200 bg-white px-4 py-4 shadow-[0_14px_34px_rgba(15,23,42,0.05)]">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
+                    Current workspace
+                  </div>
+                  <h2 className="mt-2 truncate text-2xl font-semibold tracking-tight text-slate-950">
+                    {activePanelMeta.label}
+                  </h2>
+                  <p className="mt-1 max-w-3xl text-sm leading-6 text-slate-600">
+                    {activePanelMeta.description}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2">
+                  {contextualHeaderActions}
+                  <TenantIconAction
+                    label="Open public product app"
+                    href="https://product.bookedai.au"
+                  >
+                    <ArrowUpRight className="h-4 w-4" aria-hidden="true" />
+                  </TenantIconAction>
+                </div>
+              </div>
+            </section>
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
               {metrics.map((item) => (
                 <article
@@ -5756,6 +5993,31 @@ export function TenantApp() {
           </div>
         </section>
       </div>
+      <nav
+        aria-label="Tenant mobile bottom navigation"
+        className="fixed inset-x-3 bottom-3 z-40 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-[0_18px_50px_rgba(15,23,42,0.18)] backdrop-blur xl:hidden"
+      >
+        <div className="grid grid-cols-5 gap-1">
+          {tenantPanels
+            .filter((item) => ['overview', 'catalog', 'bookings', 'operations', 'team'].includes(item.key))
+            .map((item) => (
+              <button
+                key={`bottom-${item.key}`}
+                type="button"
+                aria-label={`Open ${item.label}`}
+                title={item.label}
+                onClick={() => handlePanelChange(item.key, 'mobile_bottom_bar')}
+                className={`flex h-11 items-center justify-center rounded-xl border transition ${
+                  panel === item.key
+                    ? 'border-slate-950 bg-slate-950 text-white'
+                    : 'border-transparent bg-white text-slate-500 hover:bg-slate-50'
+                }`}
+              >
+                {item.icon}
+              </button>
+            ))}
+        </div>
+      </nav>
       <CommandPalette surface="tenant" extraCommands={tenantPaletteCommands} />
     </main>
   );

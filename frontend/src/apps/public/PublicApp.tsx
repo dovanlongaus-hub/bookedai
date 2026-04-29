@@ -67,16 +67,16 @@ const navLinks = [
 ] as const;
 
 const executiveStats = [
-  { value: '3', label: 'live service examples', detail: 'Chess, swim school, and AI Mentor proof paths' },
-  { value: 'Done-for-you', label: 'launch setup', detail: 'page, inbox, CRM, calendar, and follow-up configured' },
-  { value: '<30s', label: 'next-step capture', detail: 'booking reference, portal, and customer follow-up' },
+  { value: '3', label: 'live proof paths', detail: 'Chess, swim school, and AI Mentor flows customers can try' },
+  { value: 'Done-for-you', label: 'SME launch setup', detail: 'sales page, inbox, CRM, calendar, and follow-up configured' },
+  { value: '<30s', label: 'enquiry to action', detail: 'shortlist, booking request, portal, and customer follow-up' },
 ] as const;
 
 const investorSignals = [
-  { label: 'Capture', value: 'respond before a ready-to-book customer goes cold' },
-  { label: 'Convert', value: 'turn first contact into a clear booking step' },
-  { label: 'Follow up', value: 'keep email, CRM, and customer care aligned' },
-  { label: 'Manage', value: 'see what was booked and what needs action' },
+  { label: 'Win', value: 'reply while the customer is still ready to book' },
+  { label: 'Convert', value: 'move first contact into a clear booking step' },
+  { label: 'Follow up', value: 'keep email, CRM, payment, and customer care aligned' },
+  { label: 'See', value: 'know what was booked and what needs action' },
 ] as const;
 
 const heroFlow = ['Demand', 'Match', 'Book', 'Operate'] as const;
@@ -84,11 +84,11 @@ const heroFlow = ['Demand', 'Match', 'Book', 'Operate'] as const;
 const launchSetupCards = [
   {
     title: 'Custom landing page',
-    body: 'Your offer, prices, proof, and booking CTA live on one clear page.',
+    body: 'Your offer, prices, proof, service area, and booking CTA live on one customer-ready page.',
   },
   {
     title: 'Dedicated email',
-    body: 'Enquiries and confirmations go through a business-ready booking inbox.',
+    body: 'Enquiries and confirmations route through info@bookedai.au or your dedicated booking inbox.',
   },
   {
     title: 'Dedicated CRM',
@@ -96,7 +96,7 @@ const launchSetupCards = [
   },
   {
     title: 'Booking + meeting setup',
-    body: 'Calendar slots, meeting links, reminders, and payment next steps are configured before launch.',
+    body: 'Calendar slots, meeting links, reminders, payment next steps, and portal follow-up are configured before launch.',
   },
 ] as const;
 
@@ -370,10 +370,10 @@ export function PublicApp() {
     homepageAudience === 'sme'
       ? {
           audienceBadge: 'For SME owners',
-          eyebrow: 'Done-for-you AI booking setup',
-          title: 'Get a booking-ready sales page for your service business.',
+          eyebrow: 'Built for winning service SMEs',
+          title: 'Win more bookings from the enquiries you already get.',
           body:
-            'BookedAI sets up your landing page, booking email, CRM, calendar, meeting links, and AI follow-up so every enquiry has a clear path to book.',
+            'BookedAI sets up your sales page, booking email, CRM, calendar, meeting links, and AI follow-up so every customer has a clear path to search, choose, and book.',
           primaryCta: 'See a live booking flow',
           secondaryCta: 'Get my booking page set up',
         }
@@ -780,11 +780,11 @@ export function PublicApp() {
               Agent activity proof
             </div>
             <h2 id="agent-activity-proof-title" className="mt-5 max-w-xl text-3xl font-semibold leading-tight tracking-[-0.04em] text-white sm:text-4xl">
-              The owner and team can see the revenue loop, not just hear a promise.
+              The owner can see each step from search to booking.
             </h2>
             <p className="mt-4 max-w-2xl text-sm leading-7 text-slate-300 sm:text-base">
               This is the public proof stack: the customer asks, BookedAI ranks the next best step,
-              the booking reference opens the portal, and follow-up becomes visible for the business.
+              the booking reference opens the portal, and follow-up becomes visible for the business without exposing private tenant data.
             </p>
             <div className="mt-6 grid gap-2">
               {channelTruthRows.map((item) => (
@@ -938,6 +938,7 @@ export function PublicApp() {
             {[
               ['Who is BookedAI.au for?', 'Service businesses that rely on enquiries, calls, bookings, and follow-up to grow revenue.'],
               ['What improves first?', 'BookedAI.au tightens enquiry capture, qualification, booking flow, and customer-care continuity.'],
+              ['How do customers contact BookedAI?', 'Customers can book from the live assistant and receive follow-up from info@bookedai.au, with portal and Telegram care available after booking.'],
               ['Do we replace everything?', 'No. BookedAI.au strengthens the conversion path first, then connects CRM, email, care, and business visibility.'],
             ].map(([question, answer]) => (
               <article key={question} className="rounded-[1.4rem] border border-[#e4dccd] bg-[#fbf7ee] p-5">

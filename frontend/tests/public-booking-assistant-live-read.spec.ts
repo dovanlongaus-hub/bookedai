@@ -663,29 +663,31 @@ test.describe('public assistant rollout smoke', () => {
     await expect(page.getByText('Legacy Clinic Noise', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Result Service 4', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Result Service 6', { exact: true })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Open Google map' }).first()).toHaveAttribute(
+    await expect(page.getByRole('link', { name: 'Open Google Maps location for Result Service 1' }).first()).toHaveAttribute(
       'href',
       'https://maps.example.com/service-v1',
     );
-    await expect(page.getByRole('link', { name: 'Book now' }).first()).toHaveAttribute(
+    await expect(page.getByRole('link', { name: 'Open provider website for Result Service 1' }).first()).toHaveAttribute(
       'href',
       'https://book.example.com/service-v1',
     );
+    await expect(page.getByRole('button', { name: 'Book Result Service 1' }).first()).toBeVisible();
 
-    await page.getByRole('button', { name: 'See more results' }).first().click();
+    await page.getByRole('button', { name: 'Search more' }).first().click();
 
     await expect(page.getByText('Result Service 4', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Result Service 5', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Result Service 6', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Legacy Clinic Noise', { exact: true })).toHaveCount(0);
-    await expect(page.getByRole('link', { name: 'Open Google map' }).nth(3)).toHaveAttribute(
+    await expect(page.getByRole('link', { name: 'Open Google Maps location for Result Service 4' }).first()).toHaveAttribute(
       'href',
       'https://maps.example.com/service-v4',
     );
-    await expect(page.getByRole('link', { name: 'Book now' }).nth(3)).toHaveAttribute(
+    await expect(page.getByRole('link', { name: 'Open provider website for Result Service 4' }).first()).toHaveAttribute(
       'href',
       'https://book.example.com/service-v4',
     );
+    await expect(page.getByRole('button', { name: 'Book Result Service 4' }).first()).toBeVisible();
   });
 
   test('live-read near-me search keeps location warning visible and suppresses unrelated legacy shortlist noise @live-read', async ({
@@ -795,10 +797,7 @@ test.describe('public assistant rollout smoke', () => {
     });
 
     await page.goto('/');
-    const homepageSearchInput = page
-      .locator('#bookedai-search-assistant')
-      .getByPlaceholder(/What service do you want to book today\?/i)
-      .first();
+    const homepageSearchInput = await getActiveAssistantInput(page);
     await expect(homepageSearchInput).toBeVisible({ timeout: 10000 });
     await homepageSearchInput.fill('restaurant near me');
     await homepageSearchInput.press('Enter');
@@ -982,10 +981,7 @@ test.describe('public assistant rollout smoke', () => {
       });
 
       await page.goto('/');
-      const homepageSearchInput = page
-        .locator('#bookedai-search-assistant')
-        .getByPlaceholder(/What service do you want to book today\?/i)
-        .first();
+      const homepageSearchInput = await getActiveAssistantInput(page);
       await expect(homepageSearchInput).toBeVisible({ timeout: 10000 });
       await homepageSearchInput.fill(scenario.query);
       await homepageSearchInput.press('Enter');
@@ -1177,10 +1173,7 @@ test.describe('public assistant rollout smoke', () => {
     await expect(assistantPane.getByText('Kids Swimming Lessons - St Peters')).toHaveCount(0);
     await expect(assistantPane.getByRole('link', { name: 'Book now' })).toHaveCount(0);
 
-    const refreshedHomepageSearchInput = page
-      .locator('#bookedai-search-assistant')
-      .getByPlaceholder(/What service do you want to book today\?/i)
-      .first();
+    const refreshedHomepageSearchInput = await getActiveAssistantInput(page);
     await expect(refreshedHomepageSearchInput).toBeVisible({ timeout: 10000 });
     await refreshedHomepageSearchInput.fill('chess classes in Sydney');
     await refreshedHomepageSearchInput.press('Enter');
@@ -1371,6 +1364,42 @@ test.describe('public assistant rollout smoke', () => {
       tags: ['kids', 'children', 'chess', 'lesson', 'sydney'],
       featured: true,
     };
+    const chessClub = {
+      ...legacyService,
+      id: 'tenant-chess-club-sydney',
+      name: 'Sydney Chess Club Juniors',
+      category: 'Kids Services',
+      summary: 'Junior chess lessons and tournament practice in Sydney.',
+      venue_name: 'Sydney Chess Club',
+      location: 'Sydney CBD NSW',
+      booking_url: 'https://bookedai.au/?assistant=open',
+      tags: ['kids', 'children', 'chess', 'lesson', 'sydney'],
+      featured: false,
+    };
+    const chessAcademy = {
+      ...legacyService,
+      id: 'tenant-chess-academy-sydney',
+      name: 'Harbour Chess Academy',
+      category: 'Kids Services',
+      summary: 'Beginner chess coaching for Sydney families.',
+      venue_name: 'Harbour Chess Academy',
+      location: 'Sydney NSW',
+      booking_url: 'https://bookedai.au/?assistant=open',
+      tags: ['kids', 'children', 'chess', 'strategy', 'sydney'],
+      featured: false,
+    };
+    const chessWorkshop = {
+      ...legacyService,
+      id: 'tenant-chess-workshop-sydney',
+      name: 'Parramatta Chess Workshop',
+      category: 'Kids Services',
+      summary: 'After-school chess workshop for students in Western Sydney.',
+      venue_name: 'Parramatta Chess Workshop',
+      location: 'Parramatta NSW',
+      booking_url: 'https://bookedai.au/?assistant=open',
+      tags: ['kids', 'children', 'chess', 'workshop', 'western sydney'],
+      featured: false,
+    };
     const tutorTenant = {
       ...legacyService,
       id: 'tenant-maths-sydney',
@@ -1412,7 +1441,7 @@ test.describe('public assistant rollout smoke', () => {
           status: 'ok',
           business_email: 'hello@example.com',
           stripe_enabled: false,
-          services: [swimTenant, tutorTenant, chessTenant],
+          services: [swimTenant, tutorTenant, chessTenant, chessClub, chessAcademy, chessWorkshop],
         }),
       });
     });
@@ -1424,7 +1453,7 @@ test.describe('public assistant rollout smoke', () => {
         body: JSON.stringify({
           status: 'ok',
           reply: 'Legacy search found broad kids-service matches.',
-          matched_services: [swimTenant, tutorTenant, chessTenant],
+          matched_services: [swimTenant, tutorTenant, chessTenant, chessClub, chessAcademy, chessWorkshop],
           matched_events: [],
           suggested_service_id: swimTenant.id,
           should_request_location: false,
@@ -1456,7 +1485,7 @@ test.describe('public assistant rollout smoke', () => {
           status: 'ok',
           data: {
             request_id: 'match-tenant-intent',
-            candidates: [swimTenant, tutorTenant, chessTenant].map((service) => ({
+            candidates: [swimTenant, tutorTenant, chessTenant, chessClub, chessAcademy, chessWorkshop].map((service) => ({
               candidate_id: service.id,
               provider_name: service.venue_name,
               service_name: service.name,
@@ -1497,9 +1526,16 @@ test.describe('public assistant rollout smoke', () => {
 
     const assistantPane = await getActiveAssistantPane(page);
     await expect(assistantPane.getByText('Sydney Kids Chess Coaching', { exact: true }).first()).toBeVisible();
+    await expect(assistantPane.getByText('Sydney Chess Club Juniors', { exact: true }).first()).toBeVisible();
+    await expect(assistantPane.getByText('Harbour Chess Academy', { exact: true }).first()).toBeVisible();
+    await expect(assistantPane.getByText('Parramatta Chess Workshop', { exact: true })).toHaveCount(0);
     await expect(assistantPane.getByText('Sydney Maths Tutor', { exact: true })).toHaveCount(0);
     await expect(assistantPane.getByText('Sydney Swim Lessons', { exact: true })).toHaveCount(0);
-    await expect(page.locator('#bookedai-search-assistant').getByText('Co Mai Hung Chess Class', { exact: true }).first()).toBeVisible();
+    await expect(assistantPane.getByRole('button', { name: 'Search more' })).toBeVisible();
+    await assistantPane.getByRole('button', { name: 'Search more' }).click();
+    await expect(assistantPane.getByText('Parramatta Chess Workshop', { exact: true }).first()).toBeVisible();
+    await expect(page.getByTestId('homepage-search-scrollframe')).toHaveCSS('overflow-y', 'scroll');
+    await expect(page.locator('#bookedai-search-assistant')).toContainText('Co Mai Hung Chess Class');
   });
 
   test('live-read no-result state does not rehydrate unrelated legacy matches into chat @live-read', async ({
@@ -2631,6 +2667,7 @@ test.describe('public assistant rollout smoke', () => {
         'For tighter local matching, include the suburb or area you prefer.',
       ),
     ).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Use current location' })).toBeVisible();
     await expect(page.getByText(liveReadService.name, { exact: true })).toHaveCount(0);
     await expect(page.getByText('Legacy Barber Cut', { exact: true })).toHaveCount(0);
     await expect(page.getByText('Legacy GP Clinic', { exact: true })).toHaveCount(0);
@@ -3036,7 +3073,6 @@ test.describe('public assistant rollout smoke', () => {
     await expect(page.getByText('Booking form unlocks after a match is selected.')).toBeVisible();
     await submitAssistantQuery(page, 'Need a haircut in Sydney');
     await expect(page.getByText('BookedAI answer').first()).toBeVisible();
-    await expect(page.getByText('Live search result').first()).toBeVisible();
     await expect(page.getByText('Top research').first()).toBeVisible();
     const chatResultCard = page.locator('article').filter({ hasText: 'V1 Precision Fade' }).first();
     await expect(chatResultCard).toBeVisible();
@@ -3055,6 +3091,17 @@ test.describe('public assistant rollout smoke', () => {
 
     const bookingForm = getBookingForm(page);
     await expect(bookingForm).toBeVisible();
+    const sidebar = page.locator('aside.public-booking-sidebar').first();
+    const progressCard = sidebar.getByText('Progress', { exact: true }).first();
+    if (await progressCard.isVisible().catch(() => false)) {
+      const [formBox, progressBox] = await Promise.all([
+        bookingForm.boundingBox(),
+        progressCard.boundingBox(),
+      ]);
+      expect(formBox?.y ?? Number.POSITIVE_INFINITY).toBeLessThan(
+        progressBox?.y ?? Number.POSITIVE_INFINITY,
+      );
+    }
     await expect(page.getByText('Contact', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Preferred time', { exact: true }).first()).toBeVisible();
     await expect(page.getByText('Next step', { exact: true }).first()).toBeVisible();

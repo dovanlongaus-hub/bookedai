@@ -1,7 +1,5 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import { apiV1 } from '../../shared/api/v1';
-
 export type OrderConfirmationLocale = 'en' | 'vi';
 
 /**
@@ -43,12 +41,7 @@ export interface OrderConfirmationDictionary {
   paymentPending: string;
   paymentUnpaid: string;
   viewOrderDetails: string;
-  addAppleWallet: string;
-  saveGoogleWallet: string;
-  walletAppleHint: string;
-  walletGoogleHint: string;
-  walletDownloading: string;
-  walletError: string;
+  joinMeeting: string;
   addGoogleCalendar: string;
   downloadIcs: string;
   emailMeCopy: string;
@@ -56,6 +49,24 @@ export interface OrderConfirmationDictionary {
   whatsNextHeading: string;
   whatsNextSteps: readonly { title: string; body: string; href?: string; cta?: string }[];
   cohortDefault: string;
+  /** Tenant contact card shown after the action buttons. */
+  tenantContact: {
+    heading: string;
+    subheading: string;
+    emailLabel: string;
+    phoneLabel?: string;
+    telegramLabel?: string;
+    whatsappLabel?: string;
+    supportLine: string;
+  };
+}
+
+/** Tenant contact data passed from the consuming surface (chess subdomain). */
+export interface OrderConfirmationTenantContact {
+  email: string;
+  phone?: string | null;
+  telegramUrl?: string | null;
+  whatsappUrl?: string | null;
 }
 
 interface OrderConfirmationProps {
@@ -78,6 +89,8 @@ interface OrderConfirmationProps {
    * If null, the "View Order Details" link is hidden.
    */
   portalOrderUrl: string | null;
+  /** Tenant contact info — coach email + optional phone/messaging channels. */
+  tenantContact: OrderConfirmationTenantContact;
   onEmailMeCopy?: () => Promise<void> | void;
   /**
    * Callback fired when the visitor taps "Return to start". Used by the chess form to reset
@@ -85,18 +98,6 @@ interface OrderConfirmationProps {
    */
   onReturnHome?: () => void;
   returnHomeLabel?: string | null;
-}
-
-function detectIosUserAgent(): boolean {
-  if (typeof navigator === 'undefined' || !navigator.userAgent) return false;
-  const ua = navigator.userAgent.toLowerCase();
-  return /iphone|ipad|ipod|macintosh/.test(ua);
-}
-
-function detectAndroidUserAgent(): boolean {
-  if (typeof navigator === 'undefined' || !navigator.userAgent) return false;
-  const ua = navigator.userAgent.toLowerCase();
-  return /android/.test(ua);
 }
 
 function CheckmarkIcon() {
@@ -216,6 +217,62 @@ function CopyIcon() {
   );
 }
 
+function EmailIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <rect x="3" y="5" width="18" height="14" rx="2" fill="none" stroke="currentColor" strokeWidth="1.6" />
+      <path d="M3 7l9 7 9-7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function PhoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <path
+        d="M5 4h3l2 5-2 1a11 11 0 0 0 6 6l1-2 5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function ChatBubbleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" focusable="false">
+      <path
+        d="M4 5h16v11H8l-4 4z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.6"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" focusable="false">
+      <path d="M12 4v12m0 0l-5-5m5 5l5-5" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M5 20h14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true" focusable="false">
+      <path d="M14 4h6v6" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M20 4l-9 9" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+      <path d="M9 5H5v14h14v-4" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 function buildGoogleCalendarUrl(input: {
   title: string;
   startsAt: string | null;
@@ -282,20 +339,14 @@ export function OrderConfirmation({
   paymentStatus,
   paymentAmountFormatted,
   portalOrderUrl,
+  tenantContact,
   onEmailMeCopy,
   onReturnHome,
   returnHomeLabel,
 }: OrderConfirmationProps) {
   const [copied, setCopied] = useState(false);
-  const [walletPending, setWalletPending] = useState<'apple' | 'google' | null>(null);
-  const [walletError, setWalletError] = useState<string | null>(null);
   const [emailSent, setEmailSent] = useState(false);
   const [emailPending, setEmailPending] = useState(false);
-
-  const isIos = useMemo(() => detectIosUserAgent(), []);
-  const isAndroid = useMemo(() => detectAndroidUserAgent(), []);
-  const showAppleWallet = isIos || (!isIos && !isAndroid);
-  const showGoogleWallet = isAndroid || (!isIos && !isAndroid);
 
   const sessionTitle = useMemo(() => {
     const cohort = session.cohortLabel || dict.cohortDefault;
@@ -337,37 +388,6 @@ export function OrderConfirmation({
         // ignore — user can copy manually
       });
   }, [orderReference]);
-
-  const handleApplePass = useCallback(async () => {
-    setWalletError(null);
-    setWalletPending('apple');
-    try {
-      await apiV1.getOrderApplePass(orderReference);
-    } catch {
-      setWalletError(dict.walletError);
-    } finally {
-      setWalletPending(null);
-    }
-  }, [dict.walletError, orderReference]);
-
-  const handleGooglePass = useCallback(async () => {
-    setWalletError(null);
-    setWalletPending('google');
-    try {
-      const response = await apiV1.getOrderGoogleWalletSaveUrl(orderReference);
-      if ('data' in response && response.data?.save_url) {
-        if (typeof window !== 'undefined') {
-          window.open(response.data.save_url, '_blank', 'noopener,noreferrer');
-        }
-      } else {
-        setWalletError(dict.walletError);
-      }
-    } catch {
-      setWalletError(dict.walletError);
-    } finally {
-      setWalletPending(null);
-    }
-  }, [dict.walletError, orderReference]);
 
   const handleEmailMe = useCallback(async () => {
     if (!onEmailMeCopy) return;
@@ -509,84 +529,47 @@ export function OrderConfirmation({
       </ul>
 
       <div className="chess-order-actions" role="group" aria-label={dict.viewOrderDetails}>
-        {portalOrderUrl ? (
+        {session.meetingUrl ? (
           <a
-            href={portalOrderUrl}
+            href={session.meetingUrl}
             target="_blank"
             rel="noreferrer noopener"
             className="chess-btn chess-btn-primary chess-order-actions__primary"
           >
-            {dict.viewOrderDetails}
+            <VideoIcon />
+            <span>{dict.joinMeeting}</span>
           </a>
         ) : null}
-        {showAppleWallet ? (
-          <button
-            type="button"
-            onClick={() => {
-              void handleApplePass();
-            }}
-            disabled={walletPending !== null}
-            className="chess-wallet-button chess-wallet-apple"
-            aria-label={dict.addAppleWallet}
-          >
-            <span className="chess-wallet-button__glyph" aria-hidden="true">
-
-            </span>
-            <span className="chess-wallet-button__text">
-              <span className="chess-wallet-button__hint">{dict.walletAppleHint}</span>
-              <span className="chess-wallet-button__cta">
-                {walletPending === 'apple' ? dict.walletDownloading : dict.addAppleWallet}
-              </span>
-            </span>
-          </button>
-        ) : null}
-        {showGoogleWallet ? (
-          <button
-            type="button"
-            onClick={() => {
-              void handleGooglePass();
-            }}
-            disabled={walletPending !== null}
-            className="chess-wallet-button chess-wallet-google"
-            aria-label={dict.saveGoogleWallet}
-          >
-            <span className="chess-wallet-button__glyph" aria-hidden="true">
-              G
-            </span>
-            <span className="chess-wallet-button__text">
-              <span className="chess-wallet-button__hint">{dict.walletGoogleHint}</span>
-              <span className="chess-wallet-button__cta">
-                {walletPending === 'google' ? dict.walletDownloading : dict.saveGoogleWallet}
-              </span>
-            </span>
-          </button>
-        ) : null}
-      </div>
-
-      {walletError ? (
-        <div className="chess-status-error" role="alert" style={{ marginTop: 12 }}>
-          {walletError}
-        </div>
-      ) : null}
-
-      <div className="chess-order-secondary-actions">
         {googleCalendarUrl ? (
           <a
             href={googleCalendarUrl}
             target="_blank"
             rel="noreferrer noopener"
-            className="chess-btn chess-btn-sm chess-btn-outline"
+            className="chess-btn chess-btn-light"
           >
-            {dict.addGoogleCalendar}
+            <CalendarIcon />
+            <span>{dict.addGoogleCalendar}</span>
           </a>
         ) : null}
         {icsUrl ? (
           <a
             href={icsUrl}
             download={`${orderReference}.ics`}
-            className="chess-btn chess-btn-sm chess-btn-outline"
+            className="chess-btn chess-btn-outline chess-btn-sm"
           >
-            {dict.downloadIcs}
+            <DownloadIcon />
+            <span>{dict.downloadIcs}</span>
+          </a>
+        ) : null}
+        {portalOrderUrl ? (
+          <a
+            href={portalOrderUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="chess-btn chess-btn-outline chess-btn-sm"
+          >
+            <ExternalLinkIcon />
+            <span>{dict.viewOrderDetails}</span>
           </a>
         ) : null}
         {onEmailMeCopy ? (
@@ -596,12 +579,98 @@ export function OrderConfirmation({
               void handleEmailMe();
             }}
             disabled={emailPending || emailSent}
-            className="chess-btn chess-btn-sm chess-btn-outline"
+            className="chess-btn chess-btn-outline chess-btn-sm"
           >
-            {emailSent ? dict.emailMeCopySent : dict.emailMeCopy}
+            <EmailIcon />
+            <span>{emailSent ? dict.emailMeCopySent : dict.emailMeCopy}</span>
           </button>
         ) : null}
       </div>
+
+      {/* Tenant contact card — surfaces immediately after the primary actions so a
+       * thank-you-and-contact lands together. Replaces the wallet buttons that
+       * shipped here previously. */}
+      <aside
+        className="chess-order-tenant-contact"
+        role="group"
+        aria-label={dict.tenantContact.heading}
+      >
+        <div className="chess-order-tenant-contact__heading">
+          <span className="chess-order-tenant-contact__title">{dict.tenantContact.heading}</span>
+          <span className="chess-order-tenant-contact__sub">
+            {dict.tenantContact.subheading}
+          </span>
+        </div>
+        <ul className="chess-order-tenant-contact__rows" role="list">
+          <li className="chess-order-tenant-contact__row">
+            <span className="chess-order-tenant-contact__icon" aria-hidden="true">
+              <EmailIcon />
+            </span>
+            <span className="chess-order-tenant-contact__label">{dict.tenantContact.emailLabel}</span>
+            <a
+              href={`mailto:${tenantContact.email}`}
+              className="chess-order-tenant-contact__value"
+            >
+              {tenantContact.email}
+            </a>
+          </li>
+          {tenantContact.phone && dict.tenantContact.phoneLabel ? (
+            <li className="chess-order-tenant-contact__row">
+              <span className="chess-order-tenant-contact__icon" aria-hidden="true">
+                <PhoneIcon />
+              </span>
+              <span className="chess-order-tenant-contact__label">
+                {dict.tenantContact.phoneLabel}
+              </span>
+              <a
+                href={`tel:${tenantContact.phone.replace(/\s+/g, '')}`}
+                className="chess-order-tenant-contact__value"
+              >
+                {tenantContact.phone}
+              </a>
+            </li>
+          ) : null}
+          {tenantContact.telegramUrl && dict.tenantContact.telegramLabel ? (
+            <li className="chess-order-tenant-contact__row">
+              <span className="chess-order-tenant-contact__icon" aria-hidden="true">
+                <ChatBubbleIcon />
+              </span>
+              <span className="chess-order-tenant-contact__label">
+                {dict.tenantContact.telegramLabel}
+              </span>
+              <a
+                href={tenantContact.telegramUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="chess-order-tenant-contact__value"
+              >
+                Telegram
+              </a>
+            </li>
+          ) : null}
+          {tenantContact.whatsappUrl && dict.tenantContact.whatsappLabel ? (
+            <li className="chess-order-tenant-contact__row">
+              <span className="chess-order-tenant-contact__icon" aria-hidden="true">
+                <ChatBubbleIcon />
+              </span>
+              <span className="chess-order-tenant-contact__label">
+                {dict.tenantContact.whatsappLabel}
+              </span>
+              <a
+                href={tenantContact.whatsappUrl}
+                target="_blank"
+                rel="noreferrer noopener"
+                className="chess-order-tenant-contact__value"
+              >
+                WhatsApp
+              </a>
+            </li>
+          ) : null}
+        </ul>
+        <p className="chess-order-tenant-contact__support">
+          {dict.tenantContact.supportLine}
+        </p>
+      </aside>
 
       <div className="chess-order-whats-next">
         <h3 className="chess-order-whats-next__heading">{dict.whatsNextHeading}</h3>

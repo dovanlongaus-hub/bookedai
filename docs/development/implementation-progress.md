@@ -12,6 +12,24 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-28`
 
+Implementation update from `2026-04-29` (tenant enterprise workspace shell, local):
+
+- redesigned the tenant workspace shell in `frontend/src/apps/tenant/TenantApp.tsx` into a more enterprise operator console: sticky top bar, icon action controls, desktop icon rail, sticky left workspace menu, right-side content frame, and mobile bottom icon navigation
+- kept existing tenant API/state logic intact while improving scan order from tenant identity and trust posture into active workspace, metrics, panel content, and role-aware actions
+- added a mocked tenant workspace Playwright UAT/A-B path that covers desktop and mobile navigation, command palette opening, random panel switching across Catalog/Bookings/Ops/Team, screenshots, and no-horizontal-overflow assertions
+- verification passed: `npm --prefix frontend run build`; `cd frontend && npx playwright test tests/tenant-gateway.spec.ts --project=legacy` (`5 passed`); `cd frontend && npx playwright test tests/tenant-gateway.spec.ts --project=legacy --grep "tenant workspace enterprise shell"` (`1 passed`); `cd frontend && git diff --check -- src/apps/tenant/TenantApp.tsx`
+- published the local closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-29/121358-tenant-enterprise-workspace-shell-redesign.md`
+- status: local tenant enterprise shell redesign and UAT coverage are complete; live deploy was not run in this pass
+
+Implementation update from `2026-04-29` (homepage search relevance and shortlist UX, local):
+
+- tightened `bookedai.au` homepage search relevance so explicit intent plus location searches, including `chess classes in Sydney`, must match the requested service intent and area before rendering; unrelated city-only or category-only results are suppressed instead of shown as weak fallbacks
+- changed long-result homepage search turns to use the main shortlist surface: first `3` cards are visible, `Search more` reveals the next batch, and result guidance now points users from compare to details to explicit `Book`
+- added a tested scroll frame around the homepage chat/results pane so long search results can scroll inside the assistant instead of stretching the page awkwardly
+- updated Playwright coverage for top-3 reveal, `Search more`, chess/Sydney intent filtering, unrelated swim/math suppression, and the scroll container contract
+- verification passed: `npm --prefix frontend run build`; `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh legacy tests/public-homepage-responsive.spec.ts --workers=1 --reporter=line` (`5 passed`); `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh legacy tests/public-booking-assistant-live-read.spec.ts --grep "top 3 ranked matches|tenant-backed results" --workers=1 --reporter=line` (`2 passed`)
+- status: local homepage search relevance/UX refinement is complete; not deployed live in this pass; Notion/Discord archive entry: `docs/development/telegram-sync/2026-04-29/060032-homepage-search-relevance-and-shortlist-ux.md`
+
 Implementation update from `2026-04-29` (product live-read warning-only search recovery, local):
 
 - fixed the product assistant search path where live-read could return warnings/semantic grounding without candidates, causing the chat placeholder to be replaced by an empty shortlist and making the product screen feel like it disappeared after search
@@ -3291,6 +3309,38 @@ The `bookedai.au` public assistant now keeps lead capture on the public tenant-s
 - update: deployed the fix live through `bash scripts/deploy_live_host.sh`; production `https://bookedai.au` now serves the updated homepage bundle.
 - update: published the local closeout to Notion and Discord; archive entry is `docs/development/telegram-sync/2026-04-29/035030-homepage-chat-search-failure-recovery.md`. Published the live-deploy closeout to Notion and Discord; archive entry is `docs/development/telegram-sync/2026-04-29/040200-homepage-chat-search-recovery-live-deploy.md`.
 - verification: `npm --prefix frontend run build`; `cd frontend && npx playwright test tests/public-homepage-responsive.spec.ts --project=legacy` (`5 passed`); `git diff --check`; `bash scripts/healthcheck_stack.sh` passed at `2026-04-29T04:00:52Z`; production browser smoke passed with endpoint failures intercepted and no raw failure text visible.
+
+## 2026-04-29 Product Live Deploy And Deep Search UAT
+
+- update: deployed the product/homepage search relevance work live with `bash scripts/deploy_live_host.sh`; production health passed at `2026-04-29T07:07:01Z`, `https://api.bookedai.au/api/health` returned ok, and `product.bookedai.au` served the refreshed bundle with `last-modified: Wed, 29 Apr 2026 07:05:07 GMT`.
+- update: fixed product search fallback leakage in `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx`. Product search now filters final rendered cards by the active query, uses exact-word matching for short intent tokens, avoids broad location tokens for Miranda/Caringbah, and fetches an unscoped BookedAI catalog snapshot when the tenant-scoped product catalog has no relevant match.
+- update: added regression coverage in `frontend/tests/product-app-regression.spec.ts` for Miranda swim searches suppressing unrelated fallback results and chess/Sydney searches not surfacing generic Sydney catering/spa cards.
+- verification: `npm --prefix frontend run build`; `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh live-read tests/product-app-regression.spec.ts --grep "location-specific swim search|chess search does not|warning-only search" --workers=1 --reporter=line` (`3 passed`); `git diff --check`; live Playwright UAT at `output/playwright/live-uat-2026-04-29-0707/summary.json` passed product chess/Sydney and Future Swim/Miranda no-noise checks (`2/2`) with no horizontal overflow.
+- UAT note: booking selection opens the booking tab and contact/time form after choosing a chess result; the automated submit script needs selector refinement for the current unlabeled/placeholder-light production form fields before it can reliably submit the final request.
+
+## 2026-04-29 Homepage Just-In-Time Location Search
+
+- update: changed `frontend/src/apps/public/HomepageSearchExperience.tsx` so `near me` and backend location-warning searches ask for location in chat just in time, instead of automatically requesting browser geolocation during `runSearch`.
+- update: added a compact `Use current location` / `Type suburb instead` prompt. Current-location approval reruns the same query with `user_location`; denied or unavailable location keeps stale shortlist cards hidden and asks for a suburb/area.
+- update: tightened homepage intent relevance by using exact-word matching for short intent tokens during filtering and ranking, reducing unrelated cross-domain cards for specific queries.
+- verification: `npm --prefix frontend run build`; `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh live-read tests/public-booking-assistant-live-read.spec.ts --grep "near me asks for location just in time|homepage runtime only shows tenant-backed results|renders homepage search results with top three" --workers=1 --reporter=line` (`2 passed`); `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh live-read tests/public-booking-assistant-live-read.spec.ts --grep "chat shows only the top 3 ranked matches" --workers=1 --reporter=line` (`1 passed`).
+
+## 2026-04-29 Homepage Booking-First Chat Layout
+
+- update: reordered the homepage booking workspace in `frontend/src/apps/public/HomepageSearchExperience.tsx` so the active selected match, booking form, and booking confirmation render ahead of progress, follow-up, and general guidance panels.
+- update: changed the homepage chat/results frame to a viewport-bounded scroll container with visible scrollbar styling, stable scrollbar gutter, and contained overscroll so long search results can be reviewed without expanding the page past the screen.
+- update: extended live-read Playwright coverage to assert the booking form appears above the progress panel after a match is selected and to expect the scrollframe to use `overflow-y: scroll`.
+- verification: `npm --prefix frontend run build`; `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh live-read tests/public-booking-assistant-live-read.spec.ts --grep "chat shows only the top 3 ranked matches|homepage runtime only shows tenant-backed results|lead-and-booking shadow" --workers=1 --reporter=line` (`2 passed`); `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh live-read tests/public-booking-assistant-live-read.spec.ts --grep "booking submit uses v1 booking intent" --workers=1 --reporter=line` (`1 passed`).
+
+## 2026-04-29 BookedAI.au Winning SME Homepage And Activity Drawer Fix
+
+- update: tightened the default `bookedai.au` SME positioning in `frontend/src/apps/public/PublicApp.tsx` around winning more bookings from existing enquiries, with launch-offer copy that names the page, inbox/email, CRM, calendar, meeting links, payment next steps, portal follow-up, and `info@bookedai.au`.
+- update: improved `frontend/src/apps/public/HomepageSearchExperience.tsx` search-result cards so visitors see booking route, contact route, location, next step, source/confidence, price/duration, and a clear Book action before starting the booking form.
+- update: fixed the right-side `AgentActivityDrawer` entry from the homepage by passing tenant ref `bookedai-au` and converting tenant-session/API errors into customer-safe copy instead of rendering raw `Tenant session required` / `actor_context.tenant_id`.
+- update: extended `frontend/tests/public-homepage-responsive.spec.ts` to cover the new SME copy and the drawer error-sanitization path with a mocked 401 activity response; updated live-read helper selectors to use the current `Ask BookedAI` composer.
+- verification: `npm --prefix frontend run build`; `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 npx playwright test tests/public-homepage-responsive.spec.ts --project=legacy` (`5 passed`); `git diff --check`.
+- live verification: `bash scripts/deploy_live_host.sh` completed; `bash scripts/healthcheck_stack.sh` passed at `2026-04-29T12:38:16Z`; production Playwright smoke on `https://bookedai.au/?homepage_variant=product_first` confirmed the new headline and sanitized activity drawer with no raw `Tenant session required` / `actor_context.tenant_id` text. The only observed request warning was an aborted pitch-video media load from `upload.bookedai.au`, not a blocker for the homepage UX fix.
+- follow-up: `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 npx playwright test tests/public-booking-assistant-live-read.spec.ts --project=legacy --grep "booking submit uses v1 booking intent"` still falls into the existing recovery fixture with `0 ranked options`; keep that as a separate live-read fixture/search contract follow-up rather than blocking this homepage UX closeout.
 - `2026-04-26`
   - lane: `Sprint 19 follow-on FX-2/FX-5/FX-7 closures`
   - update: with the eight Sprint 19 P0 items already mostly closed (only operator-side `P0-2` WhatsApp provider posture remains), shipped three Tier 2 fixes from `docs/development/full-stack-review-2026-04-26.md`. The `Phase 17` and `Phase 19` backlog now records `FX-2`, `FX-5`, `FX-7` as `closed` with the carry-forward note for direct-fetch cleanup left under `FX-2`.
@@ -3306,3 +3356,10 @@ The `bookedai.au` public assistant now keeps lead capture on the public tenant-s
   - update: added WSTI judge mode at `bookedai.au/?demo=wsti`, which starts the prompt `Show WSTI AI events at Western Sydney Startup Hub this month`, shows a judge-facing banner, and keeps the live product workspace on-page.
   - update: normalized homepage CTAs around proof (`See a live booking`, `Watch the audit trail`, `Run the WSTI proof path`, `Open the proof stack`) and cleaned pricing copy in `frontend/src/components/landing/data.ts` to `$49+/mo`.
   - verification: `npm --prefix frontend run build`; `PLAYWRIGHT_SKIP_BUILD=1 npm --prefix frontend run test:playwright:legacy -- tests/public-homepage-responsive.spec.ts --workers=1` (`4 passed` through the legacy smoke subset); `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 PLAYWRIGHT_EXTERNAL_SERVER=0 npx playwright test tests/public-homepage-responsive.spec.ts --workers=1 --reporter=line` (`4 passed`); full frontend release gate passed (`build`, legacy smoke, live-read smoke, admin smoke, tenant smoke); `bash scripts/deploy_live_host.sh`; `bash scripts/healthcheck_stack.sh` passed at `2026-04-28T04:18:32Z`; live Playwright smoke for `https://bookedai.au/?homepage_variant=control&demo=wsti` confirmed the WSTI banner, Agent activity proof, channel truth labels, no horizontal overflow, and no console errors.
+
+## 2026-04-29 Product Booking-First Form Simplification
+
+- update: simplified the `product.bookedai.au` pre-submit booking form in `frontend/src/components/landing/assistant/BookingAssistantDialog.tsx` by removing the verbose `Your booking journey` instruction card and the duplicate desktop `Booking journey` stepper.
+- update: shortened the selected BookedAI-enabled service explanation from a long post-booking workflow paragraph into one compact readiness line plus a small set of capability chips, keeping the user's attention on the selected service, contact details, preferred time, and submit action.
+- update: adjusted `frontend/tests/product-app-regression.spec.ts` so the mobile and desktop full-flow UAT tests assert the booking-focused `Focus now:` copy instead of the removed journey block.
+- verification: `npm --prefix frontend run build`; `git diff --check`; product regression run reached `9 passed`, `1 skipped`, and one bootstrap failure where the first smoke test loaded `Not found` while preview servers competed for port `3100`; the changed mobile and desktop full-booking-flow tests passed; published Notion/Discord archive `docs/development/telegram-sync/2026-04-29/124126-product-booking-first-form-simplification.md`.

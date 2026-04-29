@@ -8,7 +8,7 @@ Current synchronized release baseline: `1.0.1-stable`.
 
 Latest infrastructure update date: `2026-04-16`.
 
-Latest product-surface update date: `2026-04-27`.
+Latest product-surface update date: `2026-04-29`.
 
 Latest admin and customer-care update date: `2026-04-27`.
 
@@ -16,16 +16,24 @@ Latest email configuration update date: `2026-04-27`.
 
 Latest public-search UX update date: `2026-04-29`.
 
-Current top product-surface priority: `responsive homepage web-app UX`.
+Latest tenant workspace UX update date: `2026-04-29`.
+
+Current top product-surface priority: `booking-first product app UX`.
 
 Latest product booking/AI-search hardening from `2026-04-28`:
 
+- `2026-04-29` product booking-first form simplification is implemented locally for `product.bookedai.au`: the pre-submit form no longer renders the verbose `Your booking journey` instruction card or the duplicate desktop `Booking journey` stepper, and the selected-service guidance has been reduced to a compact ready-to-book summary plus a few capability chips so the visible task stays focused on contact details, preferred time, and confirmation
+- verification passed with `npm --prefix frontend run build`, `git diff --check`, and the product regression full-flow cases that exercise the changed booking form (`mobile UAT keeps full booking flow responsive from search to thank-you` and `desktop web app UAT supports preview, select, book, and care handoff`); the full product Playwright run returned `9 passed`, `1 skipped`, and one bootstrap failure where the first smoke test saw `Not found` while preview servers were competing for port `3100`
+- `2026-04-29` tenant workspace enterprise shell redesign is implemented locally for `tenant.bookedai.au`: the tenant runtime now has a sticky enterprise top bar, icon action controls, desktop icon rail, sticky left workspace menu, right-side content frame, and mobile bottom icon navigation while preserving the existing tenant read models and panel logic
+- tenant UAT/A-B coverage now includes a mocked workspace path for `future-swim` that exercises desktop and mobile navigation, command palette opening, random panel switching across Catalog/Bookings/Ops/Team, screenshots, and no-horizontal-overflow assertions; verification passed with frontend build and `frontend/tests/tenant-gateway.spec.ts` (`5 passed`)
 - execution plan added: `docs/development/product-search-booking-execution-plan-2026-04-29.md` maps the next product coding work into roles, skills, phases, acceptance gates, and backlog across search relevance, assistant UI states, after-booking order detail, customer identity, wallet pass generation, QA/release gates, and customer-care continuity
 - `2026-04-29` professional product review found the main product risk has shifted from layout to search trust: live production is responsive and technically stable, but clear location queries can still show fallback results outside the requested area; a local instant-search guardrail now penalizes location-mismatched services before they surface as top matches
 - local public pitch/homepage SME messaging pass is implemented: `pitch.bookedai.au` now adds an SME launch offer for a custom landing page, dedicated email, dedicated CRM, and preconfigured booking/meeting flow; `bookedai.au` now surfaces the same offer on the homepage; `chess.bookedai.au` and `aimentor.bookedai.au` now carry clearer BookedAI-powered proof around dedicated email, CRM, and scheduling; public-facing internal terms such as `audit ledger`, `tenant Ops`, `action_runs`, raw lead ids, and placeholder discussion notes were removed or reframed as booking activity, follow-up history, and business workspace language
 - verification passed locally with `npm --prefix frontend run build`, focused Playwright pitch/homepage/architecture suite (`8 passed`), `git diff --check`, and a public-copy grep for the removed internal phrases
 - local homepage chat-search failure recovery is implemented: when live search or matching endpoints fail, the homepage now keeps the booking flow open, shows the safest available catalog/preview options, hides raw backend failure text, and asks the visitor for suburb, preferred time, or service detail instead of surfacing `Search needs attention`
 - verification passed locally with `npm --prefix frontend run build` and `cd frontend && npx playwright test tests/public-homepage-responsive.spec.ts --project=legacy` (`5 passed`); live deploy passed through `bash scripts/deploy_live_host.sh`, stack health passed at `2026-04-29T04:00:52Z`, and a production browser smoke confirmed `bookedai.au` search recovery copy with no leaked backend error text
+- local homepage search relevance/UX refinement is implemented: explicit intent plus location queries such as `chess classes in Sydney` now suppress out-of-intent results before rendering, the main shortlist shows the first `3` matches with a `Search more` reveal action, result copy guides the visitor from compare to details to Book, and the chat results frame has a tested scroll container for long result sets
+- verification passed locally with `npm --prefix frontend run build`, homepage responsive Playwright (`5 passed`), and focused live-read homepage tests for top-3 reveal plus chess/Sydney intent filtering (`2 passed`)
 - `2026-04-29` product deep QA/UAT/A-B/aggressive review passed after the Anthropic-compatible fallback live deploy: focused backend product/search/booking/chat regression (`64 passed`), frontend build, product legacy Playwright (`10 passed`, `1 skipped`), product live-read Playwright (`11 passed`), and production `product.bookedai.au` smoke across SME/control, product-first/judge, investor/source, and public-web scenarios all passed with visible results, overflow `0`, console errors `0`, and failed requests `0`; remaining shared homepage/public-assistant live-read contract drift is tracked outside the product lane
 - `2026-04-29` focused product QA/UAT is complete locally with live production smoke: frontend build passed, local product UAT/regression passed (`10` tests), after-booking mobile/Android/desktop subset passed (`3` tests), product live-read popup tests passed (`4` tests), standard live-read smoke passed (`2` tests with `PLAYWRIGHT_SKIP_BUILD=1`), backend booking/chat/handoff/payment/messaging/calendar tests passed (`125` tests), and live `product.bookedai.au` smoke showed `0` overflow plus no console/request errors across `390`, `412`, and `1440` widths
 - QA fix: `frontend/scripts/run_playwright_suite.sh` now uses configurable `PLAYWRIGHT_PREVIEW_READY_TIMEOUT_SECONDS` with a `180s` default so cold builds do not produce false preview-server readiness failures
@@ -2166,3 +2174,44 @@ The public surfaces now have clearer audience ownership:
 - `product.bookedai.au` public booking follow-up no longer depends on a tenant bearer token for public-web communication automation; lifecycle email/SMS/WhatsApp/Telegram routes now resolve the BookedAI public tenant fallback for public booking actors
 - public copy was cleaned of customer-visible internal phrases such as `payment posture`, `tenant proof`, `action runs`, and judge-facing wording on the default SME homepage
 - verification passed: backend communication route tests (`6 passed`), frontend production build, focused homepage/pitch/architecture Playwright (`8 passed`), `git diff --check`, and scoped internal-copy grep
+
+## 2026-04-29 Product Live Search Relevance And Deep UAT
+
+`product.bookedai.au` is live with tightened search relevance guardrails:
+
+- explicit product searches keep result cards grounded to the active service intent and location before rendering
+- `chess class for kids in Sydney` returns BookedAI chess tenant services and suppresses generic Sydney catering/spa fallbacks
+- `Future Swim lessons in Miranda` returns Miranda/Caringbah Future Swim services and suppresses Brisbane/chess/spa/catering fallbacks
+- the product assistant falls back from a tenant-scoped catalog to the unscoped BookedAI catalog only when the scoped catalog has no relevant match, preserving tenant catalog behavior while still finding cross-tenant BookedAI examples from the product shell
+- live deploy and stack health passed on `2026-04-29`; live Playwright UAT artifacts are under `output/playwright/live-uat-2026-04-29-0707/`
+
+## 2026-04-29 BookedAI.au Just-In-Time Location Search
+
+`bookedai.au` homepage search now asks for location only when the user intent requires it:
+
+- near-me or location-warning searches show an in-chat `Use current location` prompt instead of automatically invoking browser geolocation during search
+- choosing current location reruns the same query with `user_location` attached; choosing suburb entry keeps the chat focused so the user can type an area manually
+- if location permission is unavailable, stale or unrelated shortlist cards stay hidden and the assistant asks for a suburb/area before ranking nearby matches
+- intent matching now uses exact-word checks for short tokens, reducing accidental matches when the user asks for a specific service context
+- verification passed locally with frontend production build and focused live-read Playwright coverage for top-3/Search-more, tenant-backed relevance, and near-me just-in-time location prompts
+
+## 2026-04-29 Homepage Booking-First Chat Layout
+
+The homepage assistant now keeps the active booking session ahead of explanatory workflow content:
+
+- the right-side booking workspace is flex-ordered so the selected match, active booking form, or booking confirmation appears before progress, follow-up, and general guidance blocks
+- the chat/search results frame uses a fixed viewport-relative height with a visible scrollbar, stable scrollbar gutter, and contained overscroll so long result sets can be reviewed without expanding beyond the screen
+- `Search more` remains inside the scrollable chat frame and reveals additional results without hiding the current booking task
+- verification passed locally with frontend production build and focused live-read Playwright coverage for top-3/Search-more, tenant-backed relevance, scrollframe CSS, and full booking submit order
+
+## 2026-04-29 BookedAI.au Winning SME Homepage And Activity Drawer Fix
+
+The public homepage has a tighter SME buyer message and a safer tenant-scoped activity drawer:
+
+- the `bookedai.au` SME hero now leads with `Win more bookings from the enquiries you already get.` and frames BookedAI as a done-for-you setup for winning service SMEs
+- launch-offer and proof copy now spells out the service page, dedicated email, CRM, calendar, meeting links, payment next steps, portal follow-up, and `info@bookedai.au` support path
+- homepage search cards now show more decision-critical information before booking: booking route, contact route, location, next step, price/duration, source/confidence, and a clear `Book` action
+- the homepage search shell now passes the BookedAI public tenant ref `bookedai-au` into `AgentActivityDrawer`; tenant-session failures are translated into customer-safe activity copy instead of leaking `Tenant session required` / `actor_context.tenant_id`
+- verification passed locally with `npm --prefix frontend run build`, `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 npx playwright test tests/public-homepage-responsive.spec.ts --project=legacy` (`5 passed`), and `git diff --check`
+- live deployment passed through `bash scripts/deploy_live_host.sh`; stack health passed at `2026-04-29T12:38:16Z`; production browser smoke on `https://bookedai.au/?homepage_variant=product_first` confirmed the new headline and no visible raw tenant-session drawer error, with one non-blocking aborted pitch-video media request observed
+- a broader live-read booking-submit mock remains a separate fixture/recovery-path follow-up

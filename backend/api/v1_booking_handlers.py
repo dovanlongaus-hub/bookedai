@@ -155,6 +155,169 @@ async def _resolve_aimentor_welcome_locale(
     return "en"
 
 
+def _render_aimentor_payment_block(
+    *,
+    locale: str,
+    booking_reference: str,
+    payment: dict | None,
+) -> tuple[str, str]:
+    """Render the unpaid-balance payment block for the welcome email.
+
+    Returns ``(text_block, html_block)`` — both empty strings when the
+    tenant has no payment config (callers append unconditionally).
+
+    Shape of ``payment`` (mirrors ``_resolve_aimentor_payment_context``):
+      currency, amount_aud, stripe_checkout_url, bank_account
+      ({account_name, bsb, account_number, bank_name, swift}),
+      instructions_en, instructions_vi
+    """
+    if not payment or not isinstance(payment, dict):
+        return "", ""
+
+    currency = str(payment.get("currency") or "AUD")
+    amount = payment.get("amount_aud")
+    stripe_url = (payment.get("stripe_checkout_url") or "").strip()
+    bank = payment.get("bank_account") or {}
+    if not isinstance(bank, dict):
+        bank = {}
+
+    is_vi = str(locale).lower().startswith("vi")
+    headline = (
+        "Thanh toán giữ chỗ"
+        if is_vi
+        else "Confirm your seat with payment"
+    )
+    sub = (
+        "Hoàn tất 1 trong 2 cách bên dưới — slot đã giữ trong 24h."
+        if is_vi
+        else "Complete one of the methods below — your slot is held for 24 hours."
+    )
+    stripe_cta = (
+        "Mở Stripe Checkout (Credit / Debit)"
+        if is_vi
+        else "Pay by card (Stripe Checkout)"
+    )
+    bank_heading = (
+        "Hoặc chuyển khoản ngân hàng:"
+        if is_vi
+        else "Or transfer to our bank account:"
+    )
+    label_amount = "Số tiền" if is_vi else "Amount"
+    label_account_name = "Chủ tài khoản" if is_vi else "Account name"
+    label_bank = "Ngân hàng" if is_vi else "Bank"
+    label_bsb = "BSB"
+    label_account = "Số tài khoản" if is_vi else "Account number"
+    label_swift = "SWIFT"
+    label_reference = "Nội dung chuyển khoản" if is_vi else "Payment reference"
+    extra = (
+        payment.get("instructions_vi" if is_vi else "instructions_en") or ""
+    ).strip()
+
+    amount_label = f"{currency} {amount}" if amount is not None else "—"
+
+    stripe_link_with_ref = ""
+    if stripe_url:
+        sep = "&" if "?" in stripe_url else "?"
+        stripe_link_with_ref = (
+            f"{stripe_url}{sep}client_reference_id={booking_reference}"
+        )
+
+    text_lines = [
+        "",
+        f"{headline}",
+        f"  {sub}",
+        f"  {label_amount}: {amount_label}",
+        f"  {label_reference}: {booking_reference}",
+    ]
+    if stripe_link_with_ref:
+        text_lines.append(f"  {stripe_cta}: {stripe_link_with_ref}")
+    text_lines.append("")
+    text_lines.append(f"  {bank_heading}")
+    if bank.get("account_name"):
+        text_lines.append(f"    - {label_account_name}: {bank['account_name']}")
+    if bank.get("bank_name"):
+        text_lines.append(f"    - {label_bank}: {bank['bank_name']}")
+    if bank.get("bsb"):
+        text_lines.append(f"    - {label_bsb}: {bank['bsb']}")
+    if bank.get("account_number"):
+        text_lines.append(f"    - {label_account}: {bank['account_number']}")
+    if bank.get("swift"):
+        text_lines.append(f"    - {label_swift}: {bank['swift']}")
+    if extra:
+        text_lines.append(f"  {extra}")
+    text_lines.append("")
+    text_block = "\n".join(text_lines)
+
+    # HTML — mirrors the chat PaymentPanel visual style.
+    bank_rows_html = "".join(
+        f"<tr>"
+        f"<td style=\"padding:4px 12px 4px 0;font-size:12px;color:#5b6b66;"
+        f"text-transform:uppercase;letter-spacing:0.06em;font-family:"
+        f"'JetBrains Mono',ui-monospace,monospace;\">{_html_escape.escape(label)}</td>"
+        f"<td style=\"padding:4px 0;font-size:14px;color:#0a1f1c;font-weight:600;"
+        f"font-family:'JetBrains Mono',ui-monospace,monospace;\">{_html_escape.escape(value)}</td>"
+        f"</tr>"
+        for label, value in [
+            (label_account_name, str(bank.get("account_name") or "")),
+            (label_bank, str(bank.get("bank_name") or "")),
+            (label_bsb, str(bank.get("bsb") or "")),
+            (label_account, str(bank.get("account_number") or "")),
+            (label_swift, str(bank.get("swift") or "")),
+        ]
+        if value
+    )
+
+    stripe_button_html = ""
+    if stripe_link_with_ref:
+        stripe_button_html = (
+            f"<p style=\"margin:0 0 12px 0;\">"
+            f"<a href=\"{_html_escape.escape(stripe_link_with_ref)}\" "
+            "style=\"display:inline-block;padding:11px 22px;"
+            "background:linear-gradient(135deg,#635bff 0%,#4b3dff 100%);"
+            "color:#ffffff;text-decoration:none;border-radius:999px;"
+            "font-weight:700;font-size:14px;"
+            "box-shadow:0 6px 16px -4px rgba(99,91,255,0.35);\">"
+            f"💳&nbsp;{_html_escape.escape(stripe_cta)}</a>"
+            "</p>"
+        )
+
+    extra_html = (
+        f"<p style=\"margin:10px 0 0 0;font-size:12.5px;color:#5b6b66;line-height:1.5;\">"
+        f"{_html_escape.escape(extra)}</p>"
+        if extra
+        else ""
+    )
+
+    html_block = (
+        "<div style=\"margin:18px 0;padding:18px;border:1px solid "
+        "rgba(99,91,255,0.18);border-radius:14px;background:#ffffff;\">"
+        f"<p style=\"margin:0 0 4px 0;font-size:13px;font-weight:700;color:#4b3dff;"
+        "text-transform:uppercase;letter-spacing:0.1em;\">"
+        f"{_html_escape.escape(headline)}</p>"
+        f"<p style=\"margin:0 0 14px 0;font-size:14px;color:#1f2a26;line-height:1.55;\">"
+        f"{_html_escape.escape(sub)}</p>"
+        f"<p style=\"margin:0 0 4px 0;font-size:13px;color:#5b6b66;\">"
+        f"{_html_escape.escape(label_amount)}: <strong style=\"color:#0f5c54;font-size:16px;\">"
+        f"{_html_escape.escape(amount_label)}</strong></p>"
+        f"<p style=\"margin:0 0 12px 0;font-size:13px;color:#5b6b66;\">"
+        f"{_html_escape.escape(label_reference)}: "
+        f"<code style=\"font-family:'JetBrains Mono',ui-monospace,monospace;"
+        "background:rgba(20,160,146,0.1);color:#0f5c54;padding:2px 6px;"
+        f"border-radius:4px;font-size:13px;\">{_html_escape.escape(booking_reference)}</code></p>"
+        f"{stripe_button_html}"
+        f"<p style=\"margin:14px 0 6px 0;font-size:13px;font-weight:600;color:#1f2a26;\">"
+        f"{_html_escape.escape(bank_heading)}</p>"
+        f"<table cellspacing=\"0\" cellpadding=\"0\" "
+        "style=\"border-collapse:collapse;\">"
+        f"{bank_rows_html}"
+        "</table>"
+        f"{extra_html}"
+        "</div>"
+    )
+
+    return text_block, html_block
+
+
 def _render_aimentor_welcome_email(
     *,
     locale: str,
@@ -166,6 +329,7 @@ def _render_aimentor_welcome_email(
     slot_end_at: "datetime | None" = None,
     slot_timezone: str = "Australia/Sydney",
     zoho_meeting_url: str | None = None,
+    payment: dict | None = None,
 ) -> tuple[str, str, str]:
     """Render (subject, text_body, html_body) for the AI Mentor welcome email.
 
@@ -273,12 +437,19 @@ def _render_aimentor_welcome_email(
             "</div>"
         )
 
+    payment_text_block, payment_html_block = _render_aimentor_payment_block(
+        locale=locale_norm,
+        booking_reference=booking_reference,
+        payment=payment,
+    )
+
     text_body = (
         f"{greeting}\n\n"
         f"{intro}\n\n"
         f"{strings.next_steps_lead}\n"
         f"{next_steps_text}\n"
         f"{slot_text_block}"
+        f"{payment_text_block}"
         f"\n{strings.meeting_block_lead}:\n"
         f"  - {strings.meeting_video_label}\n"
         f"  - {strings.meeting_calendar_label}\n\n"
@@ -302,6 +473,7 @@ def _render_aimentor_welcome_email(
         f"{next_steps_html}"
         "</ol>"
         f"{slot_html_block}"
+        f"{payment_html_block}"
         # Online-delivery info block — every AI Mentor session is 100% online
         # so we surface the meeting + calendar provider explicitly here.
         "<div style=\"margin:18px 0;padding:14px 16px;background:#fdfaf3;border:1px solid "
@@ -584,6 +756,85 @@ async def _send_aimentor_completion_email(
         return False
 
 
+async def _resolve_aimentor_payment_context(
+    *,
+    session_factory,
+    service_id: str | None,
+    booking_reference: str,
+) -> dict | None:
+    """Look up the AI Mentor tenant payment surface + program price so the
+    welcome email can render a payment block (Stripe link + bank/QR info).
+
+    Returns ``None`` when the tenant has no payment config (e.g. fresh
+    install before migration 043 ran), in which case the email still
+    sends without the payment block.
+    """
+    try:
+        async with get_session(session_factory) as session:
+            row = await session.execute(
+                text(
+                    """
+                    select ts.settings_json->'payment' as payment
+                    from tenants t
+                    join tenant_settings ts on ts.tenant_id = t.id
+                    where t.slug = 'ai-mentor-doer'
+                    limit 1
+                    """
+                ),
+            )
+            payment = (row.mappings().first() or {}).get("payment")
+            if not payment:
+                return None
+
+            amount_aud = None
+            if service_id:
+                price_row = await session.execute(
+                    text(
+                        """
+                        select amount_aud
+                        from service_merchant_profiles
+                        where service_id = :service_id
+                          and tenant_id = (select id from tenants where slug = 'ai-mentor-doer')
+                        limit 1
+                        """
+                    ),
+                    {"service_id": service_id},
+                )
+                price_record = price_row.mappings().first()
+                if price_record and price_record.get("amount_aud") is not None:
+                    amount_aud = int(price_record.get("amount_aud"))
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning(
+            "aimentor_payment_context_lookup_failed",
+            extra={
+                "event_type": "aimentor_payment_context_lookup_failed",
+                "tenant_id": "",
+                "status": 0,
+                "route": "/api/v1/booking/intent",
+                "request_id": "",
+                "integration_name": "tenant_settings",
+                "conversation_id": "",
+                "booking_reference": booking_reference,
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+        return None
+
+    if not isinstance(payment, dict):
+        return None
+    bank = payment.get("bank_account") or {}
+    return {
+        "currency": payment.get("currency") or "AUD",
+        "amount_aud": amount_aud,
+        "stripe_checkout_url": payment.get("stripe_checkout_url"),
+        "bank_account": bank if isinstance(bank, dict) else {},
+        "instructions_en": payment.get("instructions_en"),
+        "instructions_vi": payment.get("instructions_vi"),
+    }
+
+
 async def _send_aimentor_welcome_email(
     *,
     email_service,
@@ -592,6 +843,7 @@ async def _send_aimentor_welcome_email(
     customer_name: str | None,
     booking_reference: str,
     service_name: str | None,
+    service_id: str | None = None,
     portal_url: str,
     slot_start_at: "datetime | None" = None,
     slot_end_at: "datetime | None" = None,
@@ -603,6 +855,11 @@ async def _send_aimentor_welcome_email(
 
     Returns ``True`` when the email was dispatched. Logs and swallows
     exceptions so a welcome-email failure never breaks the booking response.
+
+    Includes a payment block when the tenant has payment settings (Stripe
+    link + bank account + booking reference). When ``service_id`` is
+    provided, the program's AUD price is looked up and embedded so the
+    learner sees the exact amount due.
     """
     if email_service is None:
         return False
@@ -611,6 +868,11 @@ async def _send_aimentor_welcome_email(
     locale = await _resolve_aimentor_welcome_locale(
         session_factory=session_factory,
         customer_email=customer_email,
+    )
+    payment_context = await _resolve_aimentor_payment_context(
+        session_factory=session_factory,
+        service_id=service_id,
+        booking_reference=booking_reference,
     )
     subject, text_body, html_body = _render_aimentor_welcome_email(
         locale=locale,
@@ -622,6 +884,7 @@ async def _send_aimentor_welcome_email(
         slot_end_at=slot_end_at,
         slot_timezone=slot_timezone,
         zoho_meeting_url=zoho_meeting_url,
+        payment=payment_context,
     )
     # Always CC the AI Mentor tenant inbox so the mentor sees the same
     # email as the learner — used for follow-up + ops handoff. Caller can
