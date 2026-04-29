@@ -14,9 +14,10 @@ ARG VITE_API_BASE_URL=/api
 ENV VITE_API_BASE_URL=${VITE_API_BASE_URL}
 ARG VITE_GOOGLE_CLIENT_ID=
 ENV VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
-RUN npm run build && npm run build:widget
+RUN npm run build && npm run build:widget && npm run build:aimentor
 
 FROM nginx:1.27-alpine AS production
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY --from=build /app/dist-widget /usr/share/nginx/html/widget
+COPY --from=build /app/dist-aimentor /usr/share/nginx/html-aimentor
 COPY nginx/default.conf /etc/nginx/conf.d/default.conf

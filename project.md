@@ -14,7 +14,7 @@ Latest admin and customer-care update date: `2026-04-27`.
 
 Latest email configuration update date: `2026-04-27`.
 
-Latest public-search UX update date: `2026-04-25`.
+Latest public-search UX update date: `2026-04-29`.
 
 Current top product-surface priority: `responsive homepage web-app UX`.
 
@@ -24,6 +24,8 @@ Latest product booking/AI-search hardening from `2026-04-28`:
 - `2026-04-29` professional product review found the main product risk has shifted from layout to search trust: live production is responsive and technically stable, but clear location queries can still show fallback results outside the requested area; a local instant-search guardrail now penalizes location-mismatched services before they surface as top matches
 - local public pitch/homepage SME messaging pass is implemented: `pitch.bookedai.au` now adds an SME launch offer for a custom landing page, dedicated email, dedicated CRM, and preconfigured booking/meeting flow; `bookedai.au` now surfaces the same offer on the homepage; `chess.bookedai.au` and `aimentor.bookedai.au` now carry clearer BookedAI-powered proof around dedicated email, CRM, and scheduling; public-facing internal terms such as `audit ledger`, `tenant Ops`, `action_runs`, raw lead ids, and placeholder discussion notes were removed or reframed as booking activity, follow-up history, and business workspace language
 - verification passed locally with `npm --prefix frontend run build`, focused Playwright pitch/homepage/architecture suite (`8 passed`), `git diff --check`, and a public-copy grep for the removed internal phrases
+- local homepage chat-search failure recovery is implemented: when live search or matching endpoints fail, the homepage now keeps the booking flow open, shows the safest available catalog/preview options, hides raw backend failure text, and asks the visitor for suburb, preferred time, or service detail instead of surfacing `Search needs attention`
+- verification passed locally with `npm --prefix frontend run build` and `cd frontend && npx playwright test tests/public-homepage-responsive.spec.ts --project=legacy` (`5 passed`); live deploy passed through `bash scripts/deploy_live_host.sh`, stack health passed at `2026-04-29T04:00:52Z`, and a production browser smoke confirmed `bookedai.au` search recovery copy with no leaked backend error text
 - `2026-04-29` focused product QA/UAT is complete locally with live production smoke: frontend build passed, local product UAT/regression passed (`10` tests), after-booking mobile/Android/desktop subset passed (`3` tests), product live-read popup tests passed (`4` tests), standard live-read smoke passed (`2` tests with `PLAYWRIGHT_SKIP_BUILD=1`), backend booking/chat/handoff/payment/messaging/calendar tests passed (`125` tests), and live `product.bookedai.au` smoke showed `0` overflow plus no console/request errors across `390`, `412`, and `1440` widths
 - QA fix: `frontend/scripts/run_playwright_suite.sh` now uses configurable `PLAYWRIGHT_PREVIEW_READY_TIMEOUT_SECONDS` with a `180s` default so cold builds do not produce false preview-server readiness failures
 - local `product.bookedai.au` after-booking screen now has a professional order-confirmation layout: a confirmed-order hero, order summary, view-details action, portal/QR access, payment action, print/share/email actions, Apple Wallet and Google Wallet pass entry points, and a responsive order-detail panel with customer, contact, date/time, venue, price, and payment posture
