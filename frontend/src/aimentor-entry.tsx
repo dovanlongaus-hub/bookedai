@@ -14,7 +14,11 @@
  */
 import { StrictMode, Suspense, lazy, useEffect, useState } from 'react';
 import { createRoot } from 'react-dom/client';
-import './styles.css';
+// Standalone CSS — does NOT import tailwind, BookedAI brand kit, Apple tokens,
+// or chess-tokens. See ./aimentor-styles.css for the rationale. The full
+// monorepo entry (main.tsx) still imports ./styles.css for the AppRouter
+// flow.
+import './aimentor-styles.css';
 
 const AIMentorBookedAIApp = lazy(() =>
   import('./apps/public/AIMentorBookedAIApp').then((m) => ({ default: m.AIMentorBookedAIApp })),

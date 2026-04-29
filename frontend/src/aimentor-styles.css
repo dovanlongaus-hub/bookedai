@@ -1,0 +1,74 @@
+/*
+ * Standalone stylesheet for the aimentor.bookedai.au sub-app.
+ *
+ * This file deliberately does NOT import:
+ *   - tailwindcss        — the AI Mentor app uses only `.aim-*` classes
+ *   - minimal-bento-template.css   — BookedAI marketing template
+ *   - bookedai-brand-kit.css       — BookedAI logos / Apple tokens
+ *   - bookedai-saas-system.css     — Apple-style SaaS components
+ *   - chess-tokens.css             — chess.bookedai.au-only theme
+ *
+ * The full monorepo SPA entry (`src/main.tsx` -> `<AppRouter>`) keeps
+ * importing `./styles.css` because it has to render every subdomain.
+ * The aimentor standalone bundle imports only this minimal file so the
+ * CSS payload drops from ~298 KB (full kit) to ~25 KB (aimentor-only).
+ *
+ * If you find yourself adding a new import here, ask whether the new
+ * styles are aimentor-specific (yes → keep them scoped under
+ * `.aimentor-app`) or general (no → put them in `aimentor-tokens.css`
+ * with a `.aimentor-app` prefix). Pulling in the BookedAI brand kit
+ * here would re-introduce the visual cross-contamination this file
+ * was created to prevent.
+ */
+
+/* Modern CSS reset, scoped narrowly so the aimentor brand tokens
+ * and component classes inherit a clean baseline without dragging in
+ * Tailwind's preflight (which assumes the rest of the BookedAI design
+ * system is also loaded). */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+img,
+picture,
+video,
+canvas,
+svg {
+  display: block;
+  max-width: 100%;
+}
+
+button {
+  font: inherit;
+  cursor: pointer;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+/* The actual aimentor brand tokens, scoped components, and utilities */
+@import "./theme/aimentor-tokens.css";
