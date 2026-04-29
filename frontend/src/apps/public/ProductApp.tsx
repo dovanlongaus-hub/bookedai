@@ -1,5 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from 'react';
-import { LogOut, Mail, UserRound } from 'lucide-react';
+import { Home, LogOut, Mail, Rocket, UserRound } from 'lucide-react';
 
 import {
   brandDomainLabel,
@@ -272,53 +272,62 @@ export function ProductApp() {
       <section className="relative flex min-h-[100svh] flex-col md:min-h-[100dvh]">
         <h2 className="sr-only">Chat, search, preview, book, pay, and follow up</h2>
 
-        {/* Compact, mobile-first top bar — single primary action, thumb-zone safe. */}
+        {/*
+          Minimal top bar. Logo on the left. On the right we render a single
+          compact icon bar (Home / Pilot / Account) — replaces the previous
+          mix of decorative chips, full-text CTAs, and per-viewport variants
+          so the chat surface gets back the vertical space.
+        */}
         <div className="relative z-10 flex items-center justify-between gap-2 px-3 py-2 pt-[calc(env(safe-area-inset-top)+0.35rem)] sm:px-5 sm:pb-2 sm:pt-[calc(env(safe-area-inset-top)+0.8rem)] lg:px-6">
-          <div className="flex min-w-0 items-center gap-2 sm:gap-3">
-            <LogoMark
-              src={brandUploadedLogoPath}
-              alt={brandName}
-              className="h-10 w-[8.5rem] max-w-[calc(100vw-13rem)] shrink-0 object-cover object-center sm:w-[10.75rem]"
-            />
-            <div className="hidden items-center gap-1.5 md:flex">
-              <span className="inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1 text-xs font-semibold text-violet-700">
-                <span aria-hidden="true">✨</span>
-                Search → Booking
-              </span>
-            </div>
-          </div>
+          <LogoMark
+            src={brandUploadedLogoPath}
+            alt={brandName}
+            className="h-10 w-[8.5rem] max-w-[calc(100vw-7.5rem)] shrink-0 object-cover object-center sm:w-[10.75rem]"
+          />
 
-          <div className="flex shrink-0 items-center gap-1.5">
-            <div className="hidden items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-1 sm:flex sm:px-2.5">
-              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-emerald-500" />
-              <span className="text-xs font-semibold text-emerald-700">{productFlowLabel}</span>
-            </div>
+          <div className="relative flex shrink-0 items-center gap-1 rounded-full border border-violet-100 bg-white/80 p-1 shadow-[0_8px_22px_rgba(124,58,237,0.06)] backdrop-blur-sm">
+            <a
+              href={brandHomeUrl}
+              aria-label="Back to bookedai.au"
+              title="Back to bookedai.au"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+            >
+              <Home className="h-4 w-4" aria-hidden="true" />
+            </a>
+            <button
+              type="button"
+              onClick={openRegisterInterest}
+              aria-label="Start a 30-day pilot"
+              title="Start a 30-day pilot"
+              className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-[linear-gradient(135deg,#7c3aed_0%,#9333ea_60%,#ec4899_100%)] text-white shadow-[0_6px_16px_rgba(124,58,237,0.30)] transition hover:brightness-110 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+            >
+              <Rocket className="h-4 w-4" aria-hidden="true" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setAccountMenuOpen((current) => !current)}
+              aria-expanded={accountMenuOpen}
+              aria-label={customerProfile ? `Account: ${customerProfile.email}` : 'Sign in for faster booking'}
+              title={customerProfile ? customerProfile.email : 'Sign in'}
+              className="relative inline-flex h-9 w-9 items-center justify-center rounded-full text-slate-500 transition hover:bg-violet-50 hover:text-violet-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500"
+            >
+              {customerProfile?.avatarUrl ? (
+                <img
+                  src={customerProfile.avatarUrl}
+                  alt=""
+                  className="h-7 w-7 rounded-full object-cover"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <UserRound className="h-4 w-4" aria-hidden="true" />
+              )}
+              {customerProfile ? (
+                <span aria-hidden="true" className="absolute -right-0.5 -top-0.5 h-2 w-2 rounded-full bg-violet-500 ring-2 ring-white" />
+              ) : null}
+            </button>
 
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setAccountMenuOpen((current) => !current)}
-                aria-expanded={accountMenuOpen}
-                aria-label={customerProfile ? `Signed in as ${customerProfile.email}` : 'Sign in for faster booking'}
-                className="inline-flex h-11 min-h-[44px] max-w-[9.5rem] items-center gap-2 rounded-full border border-black/6 bg-white/72 px-2.5 text-[11px] font-semibold text-[var(--apple-near-black)] transition hover:bg-white sm:max-w-[14rem] sm:px-3 sm:text-xs"
-              >
-                {customerProfile?.avatarUrl ? (
-                  <img
-                    src={customerProfile.avatarUrl}
-                    alt=""
-                    className="h-6 w-6 shrink-0 rounded-full object-cover"
-                    referrerPolicy="no-referrer"
-                  />
-                ) : (
-                  <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[linear-gradient(135deg,#7c3aed_0%,#9333ea_100%)] text-white shadow-[0_4px_10px_rgba(124,58,237,0.28)]">
-                    <UserRound className="h-3.5 w-3.5" aria-hidden="true" />
-                  </span>
-                )}
-                <span className="truncate">{customerProfile ? customerProfile.email : 'Sign in'}</span>
-              </button>
-
-              {accountMenuOpen ? (
-                <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(20rem,calc(100vw-1.5rem))] rounded-[1.4rem] border border-violet-100 bg-white p-3.5 text-slate-700 shadow-[0_24px_60px_rgba(124,58,237,0.18)]">
+            {accountMenuOpen ? (
+              <div className="absolute right-0 top-[calc(100%+0.5rem)] z-30 w-[min(20rem,calc(100vw-1.5rem))] rounded-[1.4rem] border border-violet-100 bg-white p-3.5 text-slate-700 shadow-[0_24px_60px_rgba(124,58,237,0.18)]">
                   {customerProfile ? (
                     <div>
                       <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-violet-700">Booking profile</div>
@@ -381,79 +390,8 @@ export function ProductApp() {
                       </form>
                     </div>
                   )}
-                </div>
-              ) : null}
-            </div>
-
-            {/*
-              Mobile primary CTA. Label aligned to the canonical CTA glossary
-              (`Start a 30-day pilot`, Growth tier intent); the secondary back
-              link keeps a 44×44 touch target. The internal `start_free_trial`
-              attribution name is preserved for analytics continuity.
-            */}
-            <button
-              type="button"
-              onClick={openRegisterInterest}
-              aria-label="Start free"
-              className="booked-button inline-flex h-11 min-h-[44px] shrink-0 items-center justify-center px-3 text-[11px] font-semibold sm:hidden"
-            >
-              Start free
-            </button>
-
-            <a
-              href={brandHomeUrl}
-              aria-label="Back to main site"
-              className="inline-flex h-11 w-11 min-h-[44px] min-w-[44px] items-center justify-center rounded-full border border-black/6 bg-white/72 text-[14px] font-semibold text-[var(--apple-near-black)] transition hover:bg-white sm:hidden"
-            >
-              ←
-            </a>
-
-            <a
-              href={brandHomeUrl}
-              className="booked-button-secondary hidden shrink-0 text-[11px] font-semibold sm:inline-flex sm:text-sm"
-            >
-              ← Home
-            </a>
-            <button
-              type="button"
-              onClick={openRegisterInterest}
-              className="booked-button hidden shrink-0 text-[11px] font-semibold sm:inline-flex sm:text-sm"
-            >
-              Start a 30-day pilot
-            </button>
-          </div>
-        </div>
-
-        {/* Single compact flow strip. Keep the first screen focused on chat. */}
-        <div className="relative z-10 hidden px-3 pb-2 sm:block sm:px-5">
-          <div className="mx-auto flex max-w-[56rem] items-center gap-2 rounded-[1.1rem] border border-violet-100 bg-[linear-gradient(135deg,rgba(250,245,255,0.95),rgba(255,255,255,0.85))] px-3 py-1.5 shadow-[0_10px_28px_rgba(124,58,237,0.06)] backdrop-blur-sm sm:justify-between sm:gap-3 sm:px-4 sm:py-2">
-            <div className="hidden min-w-0 flex-1 sm:block">
-              <div className="truncate text-xs font-semibold text-[var(--apple-near-black)]">
-                {productFlowDescription}
               </div>
-            </div>
-            <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5 sm:flex-none sm:overflow-visible sm:pb-0">
-              {productFlowSteps.map((step, stepIndex) => (
-                <span
-                  key={step}
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-semibold leading-5 sm:px-2.5 sm:py-1 sm:text-xs ${
-                    stepIndex === 0
-                      ? 'bg-violet-600 text-white shadow-[0_4px_12px_rgba(124,58,237,0.25)]'
-                      : 'bg-violet-50 text-violet-700 ring-1 ring-violet-100'
-                  }`}
-                >
-                  {step}
-                </span>
-              ))}
-              <button
-                type="button"
-                onClick={openRegisterInterest}
-                aria-label="Start a 30-day pilot"
-                className="booked-button hidden h-9 min-h-9 shrink-0 items-center justify-center px-3 text-[11px] font-semibold sm:inline-flex"
-              >
-                Start pilot
-              </button>
-            </div>
+            ) : null}
           </div>
         </div>
 

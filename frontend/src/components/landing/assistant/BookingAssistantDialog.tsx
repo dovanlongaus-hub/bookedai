@@ -541,18 +541,20 @@ const SEARCH_PROGRESS_STAGES = [
 ] as const;
 
 const SEARCH_TOKEN_ALIASES: Record<string, string[]> = {
-  chess: ['chess', 'co', 'mai', 'hung', 'academy', 'kids', 'class', 'sydney'],
-  swim: ['swim', 'swimming', 'future', 'caringbah', 'miranda', 'kids', 'lesson'],
-  swimming: ['swim', 'swimming', 'future', 'caringbah', 'miranda', 'kids', 'lesson'],
+  chess: ['chess', 'mai', 'hung', 'academy'],
+  swim: ['swim', 'swimming', 'future', 'futureswim', 'water', 'stroke'],
+  swimming: ['swim', 'swimming', 'future', 'futureswim', 'water', 'stroke'],
+  futureswim: ['swim', 'swimming', 'future', 'futureswim', 'water', 'stroke'],
   mentor: ['mentor', 'ai', 'startup', 'founder', 'growth', 'product', '1-1'],
   wsti: ['wsti', 'ai', 'event', 'western', 'sydney', 'startup', 'hub'],
   event: ['event', 'meetup', 'wsti', 'western', 'sydney', 'startup', 'hub'],
+  events: ['event', 'events', 'meetup', 'wsti', 'western', 'sydney', 'startup', 'hub'],
 };
 
 const SEARCH_LOCATION_ALIASES: Record<string, string[]> = {
   sydney: ['sydney', 'nsw', 'western sydney', 'cbd'],
-  miranda: ['miranda', 'caringbah', 'sutherland', 'shire', 'nsw'],
-  caringbah: ['caringbah', 'miranda', 'sutherland', 'shire', 'nsw'],
+  miranda: ['miranda', 'caringbah', 'sutherland', 'shire'],
+  caringbah: ['caringbah', 'miranda', 'sutherland', 'shire'],
   brisbane: ['brisbane', 'south bank', 'qld', 'queensland'],
   melbourne: ['melbourne', 'carlton', 'vic', 'victoria'],
   carlton: ['carlton', 'melbourne', 'vic', 'victoria'],
@@ -596,6 +598,98 @@ function serviceMatchesRequestedLocation(service: ServiceCatalogItem, locationTo
   return locationTokens.some((token) => serviceLocationText.includes(token));
 }
 
+function getQueryIntentTokens(query: string) {
+  const genericTokens = new Set([
+    'after',
+    'around',
+    'beginner',
+    'book',
+    'booking',
+    'child',
+    'children',
+    'class',
+    'classes',
+    'closest',
+    'find',
+    'for',
+    'kids',
+    'lesson',
+    'lessons',
+    'near',
+    'option',
+    'options',
+    'service',
+    'services',
+    'session',
+    'sessions',
+    'this',
+    'week',
+    'weekend',
+  ]);
+  const locationTokens = new Set(getQueryLocationTokens(query));
+  const directTokens = query
+    .toLowerCase()
+    .split(/[^a-z0-9]+/i)
+    .map((token) => token.trim())
+    .filter((token) => token.length >= 3 && !genericTokens.has(token) && !locationTokens.has(token));
+
+  return Array.from(
+    new Set([
+      ...directTokens,
+      ...directTokens.flatMap((token) => SEARCH_TOKEN_ALIASES[token] ?? []),
+    ]),
+  );
+}
+
+function serviceMatchesRequestedIntent(service: ServiceCatalogItem, intentTokens: string[]) {
+  if (!intentTokens.length) {
+    return true;
+  }
+
+  const serviceSearchText = [
+    service.id,
+    service.name,
+    service.category,
+    service.summary,
+    service.venue_name,
+    service.location,
+    service.source_label,
+    service.why_this_matches,
+    service.next_step,
+    ...(service.tags ?? []),
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+  const serviceWords = new Set(
+    serviceSearchText
+      .split(/[^a-z0-9]+/i)
+      .map((token) => token.trim())
+      .filter(Boolean),
+  );
+
+  return intentTokens.some((token) =>
+    token.length <= 4 ? serviceWords.has(token) : serviceSearchText.includes(token),
+  );
+}
+
+function filterServicesByQueryRelevance(
+  services: ServiceCatalogItem[],
+  query: string,
+) {
+  const locationTokens = getQueryLocationTokens(query);
+  const intentTokens = getQueryIntentTokens(query);
+  if (!locationTokens.length && !intentTokens.length) {
+    return services;
+  }
+
+  return services.filter(
+    (service) =>
+      serviceMatchesRequestedLocation(service, locationTokens) &&
+      serviceMatchesRequestedIntent(service, intentTokens),
+  );
+}
+
 function curateServiceMatches(
   services: ServiceCatalogItem[],
   preferredOrder: string[] = [],
@@ -631,18 +725,13 @@ function buildInstantSearchMatches(
     .split(/[^a-z0-9]+/i)
     .map((token) => token.trim())
     .filter((token) => token.length >= 3);
-  const queryTokens = Array.from(
-    new Set([
-      ...directTokens,
-      ...directTokens.flatMap((token) => SEARCH_TOKEN_ALIASES[token] ?? []),
-    ]),
-  );
+  const queryTokens = getQueryIntentTokens(query);
   if (!queryTokens.length) {
     return services.filter((service) => service.featured).slice(0, CHAT_RESULT_BATCH_SIZE);
   }
   const locationTokens = getQueryLocationTokens(query);
 
-  return services
+  return filterServicesByQueryRelevance(services, query)
     .map((service) => {
       const searchText = [
         service.name,
@@ -2116,6 +2205,11 @@ export function BookingAssistantDialog({
     return `${url.pathname}${url.search}`;
   }
 
+  function buildAssistantGlobalApiUrl(pathname: string) {
+    const url = new URL(`${getApiBaseUrl()}${pathname}`, window.location.origin);
+    return url.pathname;
+  }
+
   function resolveBookingEndpoint(defaultPathname: string) {
     if (partnerBookingEndpoint) {
       return partnerBookingEndpoint;
@@ -2128,6 +2222,48 @@ export function BookingAssistantDialog({
       return partnerServicesEndpoint;
     }
     return buildAssistantApiUrl(defaultPathname);
+  }
+
+  async function resolveCatalogForSearch() {
+    if (catalog) {
+      return catalog;
+    }
+
+    if (shouldUseLocalStaticPublicData()) {
+      const fallbackCatalog = buildFallbackCatalog();
+      setCatalog(fallbackCatalog);
+      setCatalogError('');
+      return fallbackCatalog;
+    }
+
+    try {
+      const response = await fetch(resolveServicesEndpoint('/booking-assistant/catalog'));
+      if (!response.ok) {
+        throw new Error('Catalog snapshot was not ready.');
+      }
+      const data = (await response.json()) as BookingAssistantCatalogResponse;
+      setCatalog(data);
+      setCatalogError('');
+      return data;
+    } catch {
+      return catalog;
+    }
+  }
+
+  async function resolveGlobalCatalogForSearch() {
+    if (partnerServicesEndpoint || shouldUseLocalStaticPublicData()) {
+      return null;
+    }
+
+    try {
+      const response = await fetch(buildAssistantGlobalApiUrl('/booking-assistant/catalog'));
+      if (!response.ok) {
+        return null;
+      }
+      return (await response.json()) as BookingAssistantCatalogResponse;
+    } catch {
+      return null;
+    }
   }
 
   async function requestLegacyBookingSession(params: {
@@ -3001,6 +3137,7 @@ export function BookingAssistantDialog({
 
     return '';
   }, [messages]);
+  const effectiveSearchRequirement = pendingSearchQuery.trim() || latestCustomerRequirement;
   const bookingRequirementConfig = useMemo(
     () => getBookingRequirementConfig(selectedService, selectedEvent),
     [selectedEvent, selectedService],
@@ -3075,14 +3212,18 @@ export function BookingAssistantDialog({
         continue;
       }
 
-      return curateServiceMatches(message.matchedServices);
+      return curateServiceMatches(
+        filterServicesByQueryRelevance(message.matchedServices, effectiveSearchRequirement),
+      );
     }
 
     return [];
-  }, [messages]);
+  }, [effectiveSearchRequirement, messages]);
   const isSearchResolving = chatLoading && pendingSearchQuery.trim().length > 0;
   const visibleSuggestedServices =
-    isSearchResolving && instantSearchMatches.length > 0 ? instantSearchMatches : latestSuggestedServices;
+    isSearchResolving
+      ? filterServicesByQueryRelevance(instantSearchMatches, effectiveSearchRequirement)
+      : latestSuggestedServices;
   const activeSearchProgressStage = SEARCH_PROGRESS_STAGES[searchProgressStageIndex] ?? SEARCH_PROGRESS_STAGES[0];
   const activeSearchPrompt = SEARCH_PROGRESS_PROMPTS[searchProgressStageIndex] ?? SEARCH_PROGRESS_PROMPTS[0];
   const comparisonPair = useMemo(
@@ -3693,6 +3834,7 @@ export function BookingAssistantDialog({
     }
 
     const previousSelectedService = selectedService;
+    const activeCatalog = await resolveCatalogForSearch();
 
     const nextMessages: ChatMessage[] = [
       ...messages,
@@ -3711,7 +3853,22 @@ export function BookingAssistantDialog({
     setSelectedEvent(null);
     setPreviewService(null);
     setLiveReadSummary(null);
-    const instantMatches = buildInstantSearchMatches(catalog?.services ?? [], trimmedMessage);
+    let searchCatalog = activeCatalog;
+    let instantMatches = buildInstantSearchMatches(searchCatalog?.services ?? [], trimmedMessage);
+    if (
+      instantMatches.length === 0 &&
+      (runtimeConfig?.tenantRef || runtimeConfig?.deploymentMode)
+    ) {
+      const globalCatalog = await resolveGlobalCatalogForSearch();
+      const globalInstantMatches = buildInstantSearchMatches(
+        globalCatalog?.services ?? [],
+        trimmedMessage,
+      );
+      if (globalInstantMatches.length > 0) {
+        searchCatalog = globalCatalog;
+        instantMatches = globalInstantMatches;
+      }
+    }
     setInstantSearchMatches(instantMatches);
     setMessages((current) => [
       ...current,
@@ -3899,7 +4056,7 @@ export function BookingAssistantDialog({
       }
       const fallbackMatchedServices = instantMatches.length
         ? instantMatches
-        : curateServiceMatches(payload.matched_services);
+        : curateServiceMatches(filterServicesByQueryRelevance(payload.matched_services, trimmedMessage));
       const v1CandidateIds = hasLiveReadSearchGrounding
         ? groundedLiveReadCandidateIds
         : shadowSearch.candidateIds;
@@ -3909,9 +4066,13 @@ export function BookingAssistantDialog({
           ? shadowSearch.rankedCandidates.map(toBookingReadyServiceItem)
           : v1CandidateIds
               .map((candidateId) =>
-                catalog?.services.find((service) => service.id === candidateId) ?? null,
+                searchCatalog?.services.find((service) => service.id === candidateId) ?? null,
               )
               .filter((service): service is ServiceCatalogItem => Boolean(service));
+      const relevantShadowMatchedServices = filterServicesByQueryRelevance(
+        shadowMatchedServices,
+        trimmedMessage,
+      );
       const candidatePriorityIds = hasLiveReadSearchGrounding
         ? groundedLiveReadCandidateIds
         : shadowSearch.candidateIds;
@@ -3921,16 +4082,23 @@ export function BookingAssistantDialog({
       const mergedMatchedServices = shouldUseInstantSearchFallback
         ? fallbackMatchedServices
         : v1SearchGrounded
-        ? curateServiceMatches(shadowMatchedServices, candidatePriorityIds)
+        ? curateServiceMatches(relevantShadowMatchedServices, candidatePriorityIds)
         : curateServiceMatches(
-            [...payload.matched_services, ...shadowMatchedServices],
+            filterServicesByQueryRelevance(
+              [...payload.matched_services, ...relevantShadowMatchedServices],
+              trimmedMessage,
+            ),
             candidatePriorityIds,
           );
       const suggestedServiceId = shouldUseInstantSearchFallback
         ? fallbackMatchedServices[0]?.id ?? null
         : v1SearchGrounded
-        ? liveRead.suggestedServiceId ?? shadowMatchedServices[0]?.id ?? null
-        : payload.suggested_service_id ?? shadowMatchedServices[0]?.id ?? null;
+        ? (mergedMatchedServices.some((service) => service.id === liveRead.suggestedServiceId)
+            ? liveRead.suggestedServiceId
+            : mergedMatchedServices[0]?.id ?? null)
+        : (mergedMatchedServices.some((service) => service.id === payload.suggested_service_id)
+            ? payload.suggested_service_id
+            : mergedMatchedServices[0]?.id ?? null);
       const nextSelectedServiceId =
         suggestedServiceId ?? mergedMatchedServices[0]?.id ?? null;
       const assistantReply = shouldUseInstantSearchFallback
@@ -4983,61 +5151,12 @@ export function BookingAssistantDialog({
               >
                 {showProductWelcomeState ? (
                   <div className={isCompactMobileViewport ? 'space-y-2.5' : 'space-y-3'}>
-                    {isCompactMobileViewport ? (
-                      <div className="rounded-[1rem] border border-slate-200 bg-white/94 px-3 py-2 shadow-[0_8px_22px_rgba(15,23,42,0.05)]">
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                              {productFlowModeLabel}
-                            </div>
-                            <div className="mt-1 text-[12px] font-semibold leading-4 text-slate-950">
-                              Ask naturally — search, preview, book, and follow up in one flow.
-                            </div>
-                          </div>
-                          <div className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                            Live
-                          </div>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="overflow-hidden rounded-[1.5rem] border border-violet-200 bg-[linear-gradient(135deg,#7c3aed_0%,#9333ea_45%,#ec4899_100%)] p-4 text-white shadow-[0_18px_42px_rgba(124,58,237,0.32)]">
-                        <div className="flex flex-wrap items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="inline-flex items-center gap-1.5 rounded-full bg-white/20 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-white backdrop-blur-sm">
-                              <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-white" />
-                              {productFlowModeLabel}
-                            </div>
-                            <div className="mt-2.5 text-[1.05rem] font-bold leading-6 tracking-tight">
-                              Search — preview — book. All in one conversation.
-                            </div>
-                            <p className="mt-1.5 max-w-xl text-[12.5px] leading-5 text-white/90">
-                              Type naturally and {brandName} keeps the shortlist, preview, booking, payment, and follow-up in one flow.
-                            </p>
-                          </div>
-                          <div className="hidden shrink-0 gap-1.5 lg:flex">
-                            {productWelcomeSignals.slice(0, 3).map((signal) => (
-                              <div
-                                key={signal.label}
-                                className="w-28 rounded-[1rem] bg-white/15 px-2.5 py-2 ring-1 ring-white/20 backdrop-blur-sm"
-                              >
-                                <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-white/80">
-                                  {signal.label}
-                                </div>
-                                <div className="mt-1 line-clamp-2 text-xs leading-4 text-white">
-                                  {signal.value}
-                                </div>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    )}
-
                     {/*
-                      Welcome state — Humanitix-inspired: friendly category chips at the top
-                      let the visitor jump straight into a tenant they recognise, and the
-                      featured tenant service cards below load instantly from the catalog
-                      so the first paint is real bookable inventory rather than text prompts.
+                      Welcome state — single card. The redundant gradient hero +
+                      mobile status strip were removed because the card below
+                      already carries the "Quick browse / Pick one — or type"
+                      headline and the live status pill, and the topbar Pilot
+                      icon already covers the upsell that the hero re-pitched.
                     */}
                     <div className={`rounded-[1.6rem] border border-violet-100 bg-[linear-gradient(180deg,#faf5ff_0%,#ffffff_60%)] shadow-[0_18px_40px_rgba(124,58,237,0.06)] ${
                       isCompactMobileViewport ? 'p-3.5' : 'p-4 sm:p-5'
@@ -5202,7 +5321,13 @@ export function BookingAssistantDialog({
                   </div>
                 ) : null}
 
-                {messages.map((message, index) => (
+                {messages.map((message, index) => {
+                  const displayMatchedServices =
+                    message.role === 'assistant' && message.matchedServices?.length
+                      ? filterServicesByQueryRelevance(message.matchedServices, effectiveSearchRequirement)
+                      : [];
+
+                  return (
                   <div key={`${message.role}-${index}`} className="space-y-3">
                     <div
                       className={`flex ${
@@ -5217,7 +5342,7 @@ export function BookingAssistantDialog({
                         } ${isProductAppLayout ? 'px-3.5 py-2.5 text-[13px] leading-5' : ''}`}
                       >
                         {message.role === 'assistant'
-                          ? renderAssistantReplyContent(message.content, message.matchedServices)
+                          ? renderAssistantReplyContent(message.content, displayMatchedServices)
                           : message.content}
                         {message.role === 'assistant' && message.suggestions?.length ? (
                           <div className="mt-3 flex flex-wrap gap-2">
@@ -5236,11 +5361,11 @@ export function BookingAssistantDialog({
                       </div>
                     </div>
 
-                    {message.role === 'assistant' && message.matchedServices?.length ? (
+                    {message.role === 'assistant' && displayMatchedServices.length ? (
                       <PartnerMatchShortlist
-                        items={message.matchedServices}
+                        items={displayMatchedServices}
                         batchSize={CHAT_RESULT_BATCH_SIZE}
-                        resetKey={`${index}-${message.matchedServices.length}`}
+                        resetKey={`${index}-${displayMatchedServices.length}`}
                         listClassName="grid gap-2.5"
                         className=""
                         emptyState={null}
@@ -5248,7 +5373,7 @@ export function BookingAssistantDialog({
                           const isSelected = service.id === selectedServiceId;
                           const decisionBadge = buildDecisionBadge(
                             service,
-                            message.matchedServices ?? [],
+                            displayMatchedServices,
                             resultIndex,
                             latestCustomerRequirement,
                           );
@@ -5532,7 +5657,8 @@ export function BookingAssistantDialog({
                       </div>
                     ) : null}
                   </div>
-                ))}
+                  );
+                })}
 
                 {renderSearchResolvingPanel()}
 
@@ -5805,125 +5931,16 @@ export function BookingAssistantDialog({
                   </div>
                 </div>
               ) : null}
-              {isProductAppLayout ? (
-                <div
-                  className={`mb-3 rounded-[1.25rem] border border-slate-200 bg-white/92 p-3.5 shadow-[0_8px_20px_rgba(15,23,42,0.04)] ${
-                    isCompactMobileViewport ? 'p-2.5' : ''
-                  }`}
-                  >
-                  <div className={`flex items-center justify-between gap-3 ${
-                    isCompactMobileViewport ? 'flex-wrap' : ''
-                  }`}>
-                    <div className="min-w-0">
-                      <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                        {hasSelectionReadyForBooking ? 'Selected service' : 'Booking flow'}
-                      </div>
-                      <div className={`mt-1 font-semibold text-slate-950 ${isCompactMobileViewport ? 'text-[12px]' : 'text-[13px]'}`}>
-                        {hasSelectionReadyForBooking
-                          ? (selectedService?.name ?? selectedEvent?.title ?? 'Ready to continue')
-                          : 'Tap a result in chat to start booking.'}
-                      </div>
-                      {hasSelectionReadyForBooking && selectedService ? (
-                        <div className="mt-0.5 text-[11px] text-slate-500">
-                          {formatServicePrice(selectedService)} · {selectedService.duration_minutes} min
-                        </div>
-                      ) : null}
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      {hasSelectionReadyForBooking ? (
-                        <button
-                          type="button"
-                          onClick={focusBookingDetails}
-                          className="rounded-full bg-violet-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-violet-700 hover:shadow-[0_6px_14px_rgba(124,58,237,0.25)]"
-                        >
-                          Book now →
-                        </button>
-                      ) : (
-                        <div className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                          Select a result above
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                  <div className={`mt-2 text-slate-500 ${isCompactMobileViewport ? 'hidden' : 'text-[11px] leading-5'}`}>
-                    {hasSelectionReadyForBooking
-                      ? `Tap "Book now" to fill in your details, schedule a time, and complete payment.`
-                      : `${brandName} moves from selected result to contact details, scheduling, and payment in one flow.`}
-                  </div>
-                  <div className={`mt-3 grid ${
-                    isCompactMobileViewport && !hasSelectionReadyForBooking
-                      ? 'hidden'
-                      : isCompactMobileViewport
-                        ? 'grid-cols-3 gap-1.5'
-                        : 'grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6'
-                  }`}>
-                    {bookingJourneySteps.map((step, index) => (
-                      <div
-                        key={step.id}
-                        className={`rounded-2xl border text-center ${
-                          step.status === 'active'
-                            ? 'border-violet-600 bg-violet-600 text-white'
-                            : step.status === 'completed'
-                              ? 'border-emerald-100 bg-emerald-50 text-emerald-800'
-                            : 'border-slate-200 bg-white text-slate-600'
-                        } ${isCompactMobileViewport ? 'px-1.5 py-2' : 'px-2.5 py-2.5'}`}
-                      >
-                        <div className={`mx-auto flex items-center justify-center rounded-full font-semibold ${
-                          step.status === 'active'
-                            ? 'bg-white text-slate-950'
-                            : step.status === 'completed'
-                              ? 'bg-emerald-500 text-white'
-                            : 'bg-slate-100 text-slate-600'
-                        } ${isCompactMobileViewport ? 'h-5 w-5 text-[9px]' : 'h-6 w-6 text-xs'}`}>
-                          {step.status === 'completed' ? '✓' : index + 1}
-                        </div>
-                        <div className={`mt-2 font-semibold ${isCompactMobileViewport ? 'text-[9px] leading-3' : 'text-xs'}`}>{step.label}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
-              {isProductAppLayout ? (
-                <div className={`sticky top-0 z-10 -mx-4 mb-4 border-b border-slate-200 bg-[#f8fafc]/96 px-4 pb-3 pt-1 backdrop-blur sm:-mx-6 sm:px-6 ${
-                  isCompactMobileViewport ? 'hidden' : ''
-                }`}>
-                  <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-                    {productModuleTabs.map((tab) => (
-                      <button
-                        key={tab.id}
-                        type="button"
-                        disabled={tab.disabled}
-                        onClick={() => {
-                          setProductModuleTab(tab.id);
-                          setActiveMobilePanel('booking');
-                          setProductSheetSnap(tab.id === 'confirmed' || tab.id === 'details' ? 'full' : 'half');
-                          scrollToProductSection(tab.id);
-                        }}
-                        className={`flex min-h-11 items-center justify-center gap-1.5 rounded-[1rem] border px-3 py-2 text-center text-[11px] font-semibold transition ${
-                          productModuleTab === tab.id
-                            ? 'border-violet-600 bg-violet-600 text-white shadow-[0_12px_28px_rgba(124,58,237,0.22)]'
-                            : tab.disabled
-                              ? 'border-slate-200 bg-white text-slate-300'
-                              : 'border-slate-200 bg-white text-slate-600 hover:border-slate-300 hover:text-slate-950'
-                        }`}
-                      >
-                        <span>{tab.label}</span>
-                        {tab.badge ? (
-                          <span
-                            className={`rounded-full px-1.5 py-0.5 text-[9px] font-semibold ${
-                              productModuleTab === tab.id
-                                ? 'bg-white/15 text-white'
-                                : 'bg-emerald-50 text-emerald-700'
-                            }`}
-                          >
-                            {tab.badge}
-                          </span>
-                        ) : null}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              ) : null}
+              {/*
+               * Removed: the "Selected service / Booking flow" chrome card
+               * with the 6-step journey grid AND the sticky module tabs
+               * (Overview / Options / Details / Confirmed). Both lived above
+               * the chat scroll on product layout but duplicated info that
+               * the chat already conveys: the highlighted selected card in
+               * the message stream and the sticky "Ready to book" bar above
+               * the composer. Removing them gives the chat surface back ~20vh
+               * on desktop and ~120px on mobile.
+               */}
               <div
                 key={`workflow-panel-${selectedServiceId || selectedEvent?.url || 'idle'}-${workflowHandoffKey}`}
                 ref={bookingWorkflowSectionRef}
@@ -6031,10 +6048,18 @@ export function BookingAssistantDialog({
                 </div>
               </div>
 
+              {/*
+               * Booking-panel chrome (Best-fit shortlist header, "Selected for
+               * booking" emerald hero, secondary PartnerMatchShortlist) is
+               * fully hidden on product layout because chat already renders
+               * matched services inline + selection card highlight + sticky
+               * "Ready to book" bar above the composer. Keeping this panel
+               * on product duplicates 3-4 surfaces of the same info.
+               */}
               <div
                 key={`booking-panel-${selectedServiceId || selectedEvent?.url || 'empty'}-${selectionAnimationKey}`}
                 ref={bookingPanelRef}
-                className={`booking-focus-in mt-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 ${isProductAppLayout && !hasSelectionReadyForBooking && !result ? 'hidden' : ''}`}
+                className={`booking-focus-in mt-4 rounded-[1.75rem] border border-slate-200 bg-white p-5 ${isProductAppLayout ? 'hidden' : ''}`}
               >
                 <div ref={bookingOptionsSectionRef} className="h-0 w-0 overflow-hidden" aria-hidden="true" />
                 <div className="flex items-start justify-between gap-3">
@@ -6508,7 +6533,7 @@ export function BookingAssistantDialog({
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
-                            Ready to book
+                            {selectedEvent ? 'Ready to request' : 'Ready to book'}
                           </div>
                           <div className="mt-1 text-sm font-semibold text-slate-950">
                             {selectedService?.name ?? selectedEvent?.title}
@@ -6893,47 +6918,12 @@ export function BookingAssistantDialog({
                   Need help in Telegram? Open BookedAI Manager Bot
                 </a>
 
-                {isProductAppLayout && !isCompactMobileViewport && (selectedService || selectedEvent) && !result ? (
-                  <div className="sticky bottom-0 z-10 -mx-5 -mb-5 mt-1 border-t border-violet-100 bg-white/96 px-5 py-2 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] backdrop-blur">
-                    <div className="rounded-[1.2rem] border border-violet-100 bg-[linear-gradient(180deg,#ffffff_0%,#faf5ff_100%)] px-3 py-2.5 shadow-[0_10px_22px_rgba(124,58,237,0.08)]">
-                      <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="text-xs font-semibold uppercase tracking-[0.16em] text-violet-700">
-                            {selectedEvent ? 'Ready to request' : 'Ready to book'}
-                          </div>
-                          <div className="mt-0.5 line-clamp-1 text-[13px] font-semibold text-slate-950">
-                            {selectedService?.name ?? selectedEvent?.title}
-                          </div>
-                          <div className="mt-0.5 line-clamp-1 text-xs leading-4 text-slate-500">
-                            {selectedService
-                              ? `${formatServicePrice(selectedService)} • ${selectedService.duration_minutes} min • ${buildBestForLabel(selectedService, latestCustomerRequirement)}`
-                              : selectedEvent
-                                ? `${formatEventDate(selectedEvent.start_at)} • ${selectedEvent.organizer || 'Event organiser'}`
-                                : ''}
-                          </div>
-                        </div>
-                        <button
-                          type="submit"
-                          disabled={loading || (!selectedService && !selectedEvent)}
-                          className="shrink-0 min-h-[44px] rounded-full bg-violet-600 px-4 py-2 text-[11px] font-semibold text-white transition hover:bg-violet-700 hover:shadow-[0_8px_22px_rgba(124,58,237,0.32)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {loading ? 'Saving…' : selectedEvent ? 'Request attendance' : 'Continue to booking'}
-                        </button>
-                      </div>
-
-                      <div className="mt-1.5 flex items-center justify-between gap-2">
-                        <div className="min-w-0 line-clamp-1 text-xs leading-4 text-slate-500">
-                          {selectedService
-                            ? buildServiceLocationLabel(selectedService)
-                            : [selectedEvent?.venue_name, selectedEvent?.location].filter(Boolean).join(' • ') || 'Location shared after confirmation'}
-                        </div>
-                        <div className="shrink-0 rounded-full bg-violet-50 px-2 py-1 text-[9px] font-semibold text-violet-700 ring-1 ring-violet-100">
-                          {selectedService ? buildBookabilityLabel(selectedService) : 'Event selected'}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : null}
+                {/*
+                  Removed inner sticky "Ready to book" bar — duplicated the
+                  primary submit button already in the form AND the chat-area
+                  sticky strip above the composer. Keeping a single sticky
+                  in the chat scroll context is enough.
+                */}
               </form>
 
               {result ? (

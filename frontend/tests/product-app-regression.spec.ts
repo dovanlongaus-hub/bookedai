@@ -350,8 +350,10 @@ test.describe('product app regression', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await openProductApp(page);
 
-    await expect(page.getByRole('button', { name: 'Start free', exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: /start a 30-day pilot/i })).toHaveCount(0);
+    // Topbar is now an icon bar (Home / Pilot / Account). The pilot icon
+    // carries aria-label "Start a 30-day pilot" — same canonical CTA name
+    // as the previous full-text desktop button.
+    await expect(page.getByRole('button', { name: /start a 30-day pilot/i })).toBeVisible();
     await expect(page.getByText(/Ready to use BookedAI for your business/i)).toHaveCount(0);
     await expect(page.getByText(/Chat, search, preview, booking, payment posture/i)).toHaveCount(0);
     // Welcome state now uses Humanitix-inspired emoji category chips with
@@ -385,7 +387,8 @@ test.describe('product app regression', () => {
       bookingSessionBody: demoBookingSession,
     });
 
-    await expect(page.getByRole('button', { name: /signed in as saved@example.com/i })).toBeVisible();
+    // Account icon button uses aria-label "Account: <email>" in the new icon bar.
+    await expect(page.getByRole('button', { name: /account: saved@example\.com/i })).toBeVisible();
     await runAssistantSearch(page, 'Need a precision fade in Sydney');
     await page.getByRole('button', { name: /Select & book|Select to book/i }).first().click();
 
@@ -460,6 +463,100 @@ test.describe('product app regression', () => {
     await expect(page.getByText(/closest catalog match/i)).toBeVisible();
     await expect(page.getByText(/Precision Fade/i).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /Select & book|Select to book/i }).first()).toBeVisible();
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('location-specific swim search suppresses unrelated fallback results', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const mirandaSwimService: ServiceCatalogItem = {
+      ...demoService,
+      id: 'svc-future-swim-miranda',
+      name: 'Future Swim Miranda Beginner Lesson',
+      category: 'Kids Services',
+      summary: 'Beginner swimming lesson for children in the Sutherland Shire.',
+      venue_name: 'Future Swim',
+      location: 'Miranda NSW',
+      tags: ['future', 'swim', 'swimming', 'beginner', 'miranda', 'sutherland'],
+      featured: true,
+    };
+    const brisbaneSwimNoise: ServiceCatalogItem = {
+      ...demoService,
+      id: 'svc-brisbane-swim-noise',
+      name: 'Kids Swimming Lessons',
+      category: 'Kids Services',
+      summary: 'Swimming lessons for children outside the requested area.',
+      venue_name: 'Aqua Stars Swim School',
+      location: 'South Bank, Brisbane QLD 4101',
+      tags: ['swim', 'swimming', 'kids', 'brisbane'],
+      featured: true,
+    };
+    const chessNoise: ServiceCatalogItem = {
+      ...demoService,
+      id: 'svc-chess-noise',
+      name: 'Kids Chess Club',
+      category: 'Kids Services',
+      summary: 'After-school chess coaching.',
+      venue_name: 'Checkmate Kids Academy',
+      location: 'Carlton VIC 3053',
+      tags: ['chess', 'kids', 'club'],
+      featured: true,
+    };
+
+    await openProductApp(page, {
+      services: [brisbaneSwimNoise, chessNoise, mirandaSwimService],
+    });
+
+    await runAssistantSearch(page, 'Future Swim lessons in Miranda for a beginner child');
+    await expect(page.getByText('Future Swim Miranda Beginner Lesson', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Kids Swimming Lessons', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Kids Chess Club', { exact: true })).toHaveCount(0);
+    await expectNoHorizontalOverflow(page);
+  });
+
+  test('chess search does not let broad Sydney aliases surface generic fallback cards', async ({ page }) => {
+    await page.setViewportSize({ width: 1440, height: 1000 });
+    const cateringNoise: ServiceCatalogItem = {
+      ...demoService,
+      id: 'svc-catering-noise',
+      name: 'Catering Enquiry and Quote',
+      category: 'Food and Beverage',
+      summary: 'Collect guest count, event timing, and menu needs before issuing a catering quote.',
+      venue_name: 'Harvest Catering Co.',
+      location: 'Sydney Olympic Park NSW 2127',
+      tags: ['restaurant', 'venue', 'catering', 'event', 'food', 'sydney'],
+      featured: true,
+    };
+    const spaNoise: ServiceCatalogItem = {
+      ...demoService,
+      id: 'svc-spa-noise',
+      name: 'Signature Facial',
+      category: 'Spa',
+      summary: 'A premium facial with skin analysis and finishing massage.',
+      venue_name: 'Harbour Glow Spa',
+      location: 'Surry Hills, Sydney NSW 2010',
+      tags: ['facial', 'spa', 'skin', 'sydney'],
+      featured: true,
+    };
+    const chessService: ServiceCatalogItem = {
+      ...demoService,
+      id: 'svc-co-mai-hung-chess',
+      name: 'Kids Chess Class - Sydney Pilot',
+      category: 'Kids Services',
+      summary: 'Beginner-friendly chess coaching with Co Mai Hung.',
+      venue_name: 'Co Mai Hung Chess Class - Sydney',
+      location: 'Sydney NSW',
+      tags: ['kids', 'children', 'chess', 'strategy', 'beginner', 'sydney'],
+      featured: true,
+    };
+
+    await openProductApp(page, {
+      services: [cateringNoise, spaNoise, chessService],
+    });
+
+    await runAssistantSearch(page, 'chess class for kids in Sydney this weekend');
+    await expect(page.getByText('Kids Chess Class - Sydney Pilot', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText('Catering Enquiry and Quote', { exact: true })).toHaveCount(0);
+    await expect(page.getByText('Signature Facial', { exact: true })).toHaveCount(0);
     await expectNoHorizontalOverflow(page);
   });
 
