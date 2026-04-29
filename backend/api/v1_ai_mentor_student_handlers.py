@@ -632,13 +632,18 @@ async def reserve_service_time_slot(
             tenant_id = (tenant_row or {}).get("tenant_id")
 
             # 2. Service info for the Zoho Meeting topic + welcome email.
+            #
+            # service_merchant_profiles.tenant_id is varchar(64), not uuid —
+            # comparing without the cast keeps the planner happy. service_id
+            # is already unique enough across the 6 aimentor programs, so the
+            # tenant_id filter is just a safety scope rather than disambiguation.
             service_lookup = await session.execute(
                 text(
                     """
                     select name as service_name, duration_minutes
                     from service_merchant_profiles
                     where service_id = :service_id
-                      and tenant_id = cast(:tenant_id as uuid)
+                      and tenant_id = :tenant_id
                     limit 1
                     """
                 ),

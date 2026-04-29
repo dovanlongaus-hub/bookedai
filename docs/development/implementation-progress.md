@@ -3363,3 +3363,10 @@ The `bookedai.au` public assistant now keeps lead capture on the public tenant-s
 - update: shortened the selected BookedAI-enabled service explanation from a long post-booking workflow paragraph into one compact readiness line plus a small set of capability chips, keeping the user's attention on the selected service, contact details, preferred time, and submit action.
 - update: adjusted `frontend/tests/product-app-regression.spec.ts` so the mobile and desktop full-flow UAT tests assert the booking-focused `Focus now:` copy instead of the removed journey block.
 - verification: `npm --prefix frontend run build`; `git diff --check`; product regression run reached `9 passed`, `1 skipped`, and one bootstrap failure where the first smoke test loaded `Not found` while preview servers competed for port `3100`; the changed mobile and desktop full-booking-flow tests passed; published Notion/Discord archive `docs/development/telegram-sync/2026-04-29/124126-product-booking-first-form-simplification.md`.
+
+## 2026-04-29 Public Booking Confirmation SMS And Tenant Lookup Follow-Up
+
+- update: added compact Twilio SMS booking confirmations for `bookedai-au` public bookings with a phone number, sent best-effort alongside the existing WhatsApp confirmation and logged as `sms_booking_confirmation` activity.
+- update: capped SMS confirmation copy at two message segments and included booking reference, service, requested slot, portal link, and BookedAI support reply guidance.
+- update: fixed AI Mentor service/payment lookups that were comparing varchar `service_merchant_profiles.tenant_id` values against uuid tenant ids, preventing invalid-cast failures in live booking/payment context resolution.
+- verification: `python3 -m py_compile backend/api/v1_ai_mentor_student_handlers.py backend/api/v1_booking_handlers.py`; `git diff --check`; frontend build for the tenant workspace breakpoint follow-up; deploy-live; stack health; production homepage smoke confirmed the winning-SME copy and sanitized Booking Activity drawer.

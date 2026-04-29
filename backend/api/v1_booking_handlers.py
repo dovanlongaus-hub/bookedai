@@ -95,6 +95,16 @@ AIMENTOR_TENANT_CC_EMAIL = "aimentor@bookedai.au"
 PUBLIC_BOOKING_DEFAULT_TENANT_SLUG = "bookedai-au"
 PUBLIC_BOOKING_FALLBACK_CHANNELS = {"public_web", "embedded_widget"}
 
+# Tenants that receive an SMS booking confirmation in addition to WhatsApp.
+# Twilio SMS hits the carrier directly (no app install required), so we use it
+# as the primary touchpoint for the public bookedai.au funnel where the
+# customer may not have WhatsApp.
+BOOKING_SMS_CONFIRMATION_TENANT_SLUGS = {"bookedai-au"}
+# SMS is hard-capped to 160 GSM-7 chars before Twilio splits the message into
+# concatenated segments (each billed separately). 320 covers a 2-segment send
+# which is the longest we want to fan out per booking.
+BOOKING_SMS_CONFIRMATION_MAX_LEN = 320
+
 
 def _is_public_booking_actor(actor_context) -> bool:
     channel = str(getattr(actor_context, "channel", "") or "").strip().lower()
@@ -788,13 +798,15 @@ async def _resolve_aimentor_payment_context(
 
             amount_aud = None
             if service_id:
+                # service_merchant_profiles.tenant_id is varchar(64), not uuid,
+                # so we can't join on tenants.id directly. service_id alone is
+                # globally unique across the catalogue (per-program slug).
                 price_row = await session.execute(
                     text(
                         """
                         select amount_aud
                         from service_merchant_profiles
                         where service_id = :service_id
-                          and tenant_id = (select id from tenants where slug = 'ai-mentor-doer')
                         limit 1
                         """
                     ),
@@ -985,6 +997,38 @@ def _build_booking_confirmation_whatsapp_text(
         ]
     )
     return "\n".join(parts)
+
+
+def _build_booking_confirmation_sms_text(
+    *,
+    customer_name: str | None,
+    service_name: str | None,
+    requested_date: str | None,
+    requested_time: str | None,
+    booking_reference: str,
+    portal_url: str | None = None,
+) -> str:
+    # SMS has no markdown, no preview cards, and a tight char budget. Render a
+    # single compact line per fact so 1–2 segments cover the typical booking,
+    # and trim hard at BOOKING_SMS_CONFIRMATION_MAX_LEN to stop runaway names
+    # or service titles from blowing the segment budget.
+    name_line = f"Hi {customer_name}, " if customer_name else ""
+    slot = " ".join(p for p in [requested_date or "", requested_time or ""] if p)
+    parts = [
+        f"{name_line}your BookedAI booking is confirmed.",
+        f"Ref: {booking_reference}",
+    ]
+    if service_name:
+        parts.append(f"Service: {service_name}")
+    if slot:
+        parts.append(f"When: {slot}")
+    if portal_url:
+        parts.append(f"Manage: {portal_url}")
+    parts.append("Reply here for help — BookedAI.au")
+    body = " ".join(parts)
+    if len(body) > BOOKING_SMS_CONFIRMATION_MAX_LEN:
+        body = body[: BOOKING_SMS_CONFIRMATION_MAX_LEN - 1].rstrip() + "…"
+    return body
 
 
 def _normalize_text(value: object | None) -> str | None:
@@ -1756,6 +1800,76 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                         "route": "/api/v1/booking/intent",
                         "request_id": "",
                         "integration_name": "whatsapp",
+                        "conversation_id": normalized_phone,
+                        "booking_reference": booking_reference,
+                        "job_name": "",
+                        "job_id": "",
+                    },
+                    exc_info=exc,
+                )
+
+        # bookedai.au public funnel: also push an SMS confirmation alongside
+        # WhatsApp. WhatsApp covers app-installed customers; SMS catches the
+        # rest (carrier-routed, no install required) so the receipt always
+        # lands on the customer's phone within seconds of the booking commit.
+        if (
+            normalized_phone
+            and tenant_slug in BOOKING_SMS_CONFIRMATION_TENANT_SLUGS
+            and hasattr(request.app.state, "communication_service")
+        ):
+            try:
+                from schemas import TawkMessage
+                from services import store_event
+                sms_portal_link = _build_portal_link(
+                    booking_reference,
+                    portal_access_token.plaintext if portal_access_token else None,
+                )
+                sms_body = _build_booking_confirmation_sms_text(
+                    customer_name=payload.contact.full_name,
+                    service_name=service.name if service else None,
+                    requested_date=payload.desired_slot.date if payload.desired_slot else None,
+                    requested_time=payload.desired_slot.time if payload.desired_slot else None,
+                    booking_reference=booking_reference,
+                    portal_url=sms_portal_link,
+                )
+                await request.app.state.communication_service.send_sms(
+                    to=normalized_phone,
+                    body=sms_body,
+                )
+                sms_message = TawkMessage(
+                    conversation_id=normalized_phone,
+                    text=sms_body,
+                    sender_name="BookedAI",
+                    sender_phone=normalized_phone,
+                    metadata={"channel": "sms", "direction": "outbound", "event_type": "booking_confirmation"},
+                )
+                async with get_session(request.app.state.session_factory) as sms_session:
+                    await store_event(
+                        sms_session,
+                        source="sms",
+                        event_type="sms_booking_confirmation",
+                        message=sms_message,
+                        ai_intent="booking_confirmation",
+                        ai_reply=None,
+                        workflow_status="sent",
+                        metadata={
+                            "channel": "sms",
+                            "direction": "outbound",
+                            "booking_reference": booking_reference,
+                            "tenant_id": str(effective_tenant_id or ""),
+                            "service_name": service.name if service else None,
+                        },
+                    )
+            except Exception as exc:
+                _logger.warning(
+                    "sms_booking_confirmation_failed",
+                    extra={
+                        "event_type": "sms_booking_confirmation_failed",
+                        "tenant_id": str(effective_tenant_id or ""),
+                        "status": 0,
+                        "route": "/api/v1/booking/intent",
+                        "request_id": "",
+                        "integration_name": "sms",
                         "conversation_id": normalized_phone,
                         "booking_reference": booking_reference,
                         "job_name": "",
