@@ -14,6 +14,7 @@ const SESSION_TOKEN_STORAGE_KEY = 'aimentor.bookedai.studentSession';
 const GOOGLE_IDENTITY_SCRIPT_SRC = 'https://accounts.google.com/gsi/client';
 
 type Locale = 'en' | 'vi';
+type SignInMethod = 'google' | 'email' | 'booking';
 
 type StudentProfile = {
   id: string;
@@ -93,6 +94,23 @@ const dict = {
         'Use your Google account — the same one you used when booking — to see upcoming sessions, Stripe receipts, and the mentor progress journal.',
       googleConfigMissing:
         'Google sign-in is not configured for this environment. Email aimentor@bookedai.au and the team will share your bookings directly.',
+      tabs: {
+        google: 'Google',
+        email: 'Email help',
+        booking: 'Booking ref',
+      },
+      googleHeading: 'Continue with Google',
+      googleHelper:
+        'Fastest path when your booking email is a Google account.',
+      emailHeading: 'Need help by email?',
+      emailHelper:
+        'Send us the email used for booking and the team will resend your session details.',
+      emailCta: 'Email AI Mentor',
+      bookingHeading: 'Have a booking reference?',
+      bookingHelper:
+        'Use the reference from your confirmation email, such as AIM-1234567890.',
+      bookingPlaceholder: 'AIM-XXXXXXXXXX',
+      bookingCta: 'Open booking',
       authError: 'We could not sign you in just now. Please try again.',
       pendingTitle: 'Signing you in…',
       pendingBody: 'Connecting to Google and AI Mentor.',
@@ -153,6 +171,23 @@ const dict = {
         'Dùng tài khoản Google — cùng tài khoản bạn đã dùng khi đặt chỗ — để xem lịch học sắp tới, hoá đơn Stripe và nhật ký tiến độ từ mentor.',
       googleConfigMissing:
         'Đăng nhập Google chưa được cấu hình. Vui lòng email aimentor@bookedai.au để đội AI Mentor gửi lịch học trực tiếp.',
+      tabs: {
+        google: 'Google',
+        email: 'Email hỗ trợ',
+        booking: 'Mã booking',
+      },
+      googleHeading: 'Tiếp tục với Google',
+      googleHelper:
+        'Nhanh nhất khi email đặt chỗ của bạn là tài khoản Google.',
+      emailHeading: 'Cần hỗ trợ qua email?',
+      emailHelper:
+        'Gửi email bạn đã dùng khi đặt chỗ, đội AI Mentor sẽ gửi lại chi tiết buổi học.',
+      emailCta: 'Email AI Mentor',
+      bookingHeading: 'Bạn có mã booking?',
+      bookingHelper:
+        'Dùng mã trong email xác nhận, ví dụ AIM-1234567890.',
+      bookingPlaceholder: 'AIM-XXXXXXXXXX',
+      bookingCta: 'Mở booking',
       authError: 'Không thể đăng nhập lúc này. Vui lòng thử lại.',
       pendingTitle: 'Đang đăng nhập…',
       pendingBody: 'Đang kết nối với Google và AI Mentor.',
@@ -604,6 +639,8 @@ export function AIMentorAccountApp() {
   );
   const [authPending, setAuthPending] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [signInMethod, setSignInMethod] = useState<SignInMethod>('google');
+  const [bookingReference, setBookingReference] = useState('');
 
   const [account, setAccount] = useState<StudentMeResponse | null>(null);
   const [accountLoading, setAccountLoading] = useState(false);
@@ -650,6 +687,7 @@ export function AIMentorAccountApp() {
   // Initialize and render Google sign-in button when ready.
   useEffect(() => {
     if (sessionToken) return;
+    if (signInMethod !== 'google') return;
     if (!googleReady || !googleClientId) return;
     const accountsId = readGoogleAccountsId();
     if (!googleButtonRef.current || !accountsId) return;
@@ -715,6 +753,7 @@ export function AIMentorAccountApp() {
   }, [
     googleClientId,
     googleReady,
+    signInMethod,
     sessionToken,
     t.signIn.authError,
     locale,
@@ -908,21 +947,150 @@ export function AIMentorAccountApp() {
                   </div>
                 ) : null}
 
-                <div style={{ marginTop: 22, display: 'flex', justifyContent: 'center' }}>
-                  {googleClientId ? (
-                    <div ref={googleButtonRef} aria-label="Google sign-in" />
-                  ) : (
-                    <p
+                <div
+                  role="tablist"
+                  aria-label={t.signIn.title}
+                  style={{
+                    display: 'grid',
+                    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+                    gap: 4,
+                    marginTop: 22,
+                    padding: 4,
+                    border: '1px solid var(--aim-line)',
+                    borderRadius: 12,
+                    background: 'rgba(15, 23, 42, 0.04)',
+                  }}
+                >
+                  {(['google', 'email', 'booking'] as const).map((method) => (
+                    <button
+                      key={method}
+                      type="button"
+                      role="tab"
+                      aria-selected={signInMethod === method}
+                      onClick={() => setSignInMethod(method)}
                       style={{
-                        color: 'var(--aim-muted)',
-                        fontSize: '0.9rem',
-                        textAlign: 'center',
-                        lineHeight: 1.6,
+                        minHeight: 40,
+                        border: 0,
+                        borderRadius: 9,
+                        background: signInMethod === method ? '#ffffff' : 'transparent',
+                        color: signInMethod === method ? 'var(--aim-ink)' : 'var(--aim-muted)',
+                        boxShadow: signInMethod === method ? '0 8px 18px rgba(15, 23, 42, 0.10)' : 'none',
+                        cursor: 'pointer',
+                        fontFamily: 'var(--aim-font-display)',
+                        fontSize: '0.86rem',
+                        fontWeight: 700,
                       }}
                     >
-                      {t.signIn.googleConfigMissing}
-                    </p>
-                  )}
+                      {t.signIn.tabs[method]}
+                    </button>
+                  ))}
+                </div>
+
+                <div
+                  style={{
+                    marginTop: 14,
+                    border: '1px solid var(--aim-line)',
+                    borderRadius: 14,
+                    padding: 16,
+                    background: '#fff',
+                  }}
+                >
+                  {signInMethod === 'google' ? (
+                    <>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                        <div
+                          aria-hidden="true"
+                          style={{
+                            width: 38,
+                            height: 38,
+                            borderRadius: 10,
+                            display: 'grid',
+                            placeItems: 'center',
+                            border: '1px solid var(--aim-line)',
+                            color: 'var(--aim-ink)',
+                            fontWeight: 800,
+                          }}
+                        >
+                          G
+                        </div>
+                        <div>
+                          <div style={{ fontWeight: 800, color: 'var(--aim-ink)' }}>
+                            {t.signIn.googleHeading}
+                          </div>
+                          <div style={{ marginTop: 3, color: 'var(--aim-muted)', fontSize: '0.84rem', lineHeight: 1.45 }}>
+                            {t.signIn.googleHelper}
+                          </div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop: 16, display: 'flex', justifyContent: 'center', minHeight: 44 }}>
+                        {googleClientId ? (
+                          <div ref={googleButtonRef} aria-label="Google sign-in" />
+                        ) : (
+                          <p
+                            style={{
+                              color: 'var(--aim-muted)',
+                              fontSize: '0.9rem',
+                              textAlign: 'center',
+                              lineHeight: 1.6,
+                              margin: 0,
+                            }}
+                          >
+                            {t.signIn.googleConfigMissing}
+                          </p>
+                        )}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {signInMethod === 'email' ? (
+                    <div>
+                      <div style={{ fontWeight: 800, color: 'var(--aim-ink)' }}>
+                        {t.signIn.emailHeading}
+                      </div>
+                      <p style={{ margin: '6px 0 14px', color: 'var(--aim-muted)', fontSize: '0.9rem', lineHeight: 1.55 }}>
+                        {t.signIn.emailHelper}
+                      </p>
+                      <a
+                        className="aim-btn aim-btn-primary aim-btn-block"
+                        href="mailto:aimentor@bookedai.au?subject=AI%20Mentor%20account%20help"
+                      >
+                        {t.signIn.emailCta}
+                      </a>
+                    </div>
+                  ) : null}
+
+                  {signInMethod === 'booking' ? (
+                    <form
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const ref = bookingReference.trim();
+                        if (ref) {
+                          window.location.href = `https://portal.bookedai.au/order/${encodeURIComponent(ref)}`;
+                        }
+                      }}
+                    >
+                      <div style={{ fontWeight: 800, color: 'var(--aim-ink)' }}>
+                        {t.signIn.bookingHeading}
+                      </div>
+                      <p style={{ margin: '6px 0 12px', color: 'var(--aim-muted)', fontSize: '0.9rem', lineHeight: 1.55 }}>
+                        {t.signIn.bookingHelper}
+                      </p>
+                      <input
+                        className="aim-input"
+                        value={bookingReference}
+                        onChange={(event) => setBookingReference(event.target.value.toUpperCase())}
+                        placeholder={t.signIn.bookingPlaceholder}
+                        autoComplete="off"
+                      />
+                      <button
+                        type="submit"
+                        className="aim-btn aim-btn-primary aim-btn-block"
+                        style={{ marginTop: 10 }}
+                      >
+                        {t.signIn.bookingCta}
+                      </button>
+                    </form>
+                  ) : null}
                 </div>
 
                 <p

@@ -121,28 +121,28 @@ const TIERS: Record<PlanSlug, RecommendedTier> = {
   starter: {
     planId: 'basic',
     slug: 'starter',
-    name: 'Starter Engine',
+    name: 'Launch',
     caption:
-      'Low enquiry volume + lower ticket size — start free SaaS on one channel and prove the lift.',
-    ctaLabel: 'Start free',
+      'Low enquiry volume + lower ticket size — start with one booking-ready page and one channel.',
+    ctaLabel: 'Start Launch',
     ctaHref: '/register-interest?plan=starter',
   },
   growth: {
     planId: 'standard',
     slug: 'growth',
-    name: 'Growth Engine',
+    name: 'Grow',
     caption:
-      'Mid-market enquiry volume with steady ticket size — Growth captures the most uplift per dollar.',
+      'Mid-market enquiry volume with steady ticket size — Grow adds managed setup and multi-channel capture.',
     ctaLabel: 'Start a 30-day pilot',
     ctaHref: '/register-interest?plan=growth',
   },
   enterprise: {
     planId: 'pro',
     slug: 'enterprise',
-    name: 'Enterprise Engine',
+    name: 'Scale',
     caption:
-      'High-volume or high-ticket — Enterprise rollout adds SLA, white-label, and a named CSM.',
-    ctaLabel: 'Talk to a founder',
+      'High-volume or high-ticket — Scale adds templates, API, SLA, and a named success owner.',
+    ctaLabel: 'Plan Scale',
     ctaHref: '/register-interest?plan=enterprise',
   },
 };

@@ -291,19 +291,25 @@ async def get_zoho_access_token(
     client_id = settings.zoho_calendar_client_id or settings.zoho_crm_client_id
     client_secret = settings.zoho_calendar_client_secret or settings.zoho_crm_client_secret
 
+    direct_token = settings.zoho_calendar_access_token.strip()
     if refresh_token and client_id and client_secret:
         token_url = f"{settings.zoho_accounts_base_url.rstrip('/')}/oauth/v2/token"
         async with httpx.AsyncClient(timeout=20) as client:
-            response = await client.post(
-                token_url,
-                data={
-                    "refresh_token": refresh_token,
-                    "client_id": client_id,
-                    "client_secret": client_secret,
-                    "grant_type": "refresh_token",
-                },
-            )
-            response.raise_for_status()
+            try:
+                response = await client.post(
+                    token_url,
+                    data={
+                        "refresh_token": refresh_token,
+                        "client_id": client_id,
+                        "client_secret": client_secret,
+                        "grant_type": "refresh_token",
+                    },
+                )
+                response.raise_for_status()
+            except httpx.HTTPStatusError:
+                if direct_token:
+                    return direct_token
+                raise
             payload = response.json()
 
         access_token = str(payload.get("access_token") or "").strip()
@@ -311,7 +317,6 @@ async def get_zoho_access_token(
             raise ValueError("Zoho access token response was empty")
         return access_token
 
-    direct_token = settings.zoho_calendar_access_token.strip()
     if direct_token:
         return direct_token
 
@@ -325,7 +330,7 @@ async def create_zoho_meeting_for_booking(
     booking_reference: str,
     service_name: str,
     customer_name: str | None,
-    customer_email: str,
+    customer_email: str | None,
     requested_date,
     requested_time,
     timezone_name: str,
@@ -365,11 +370,12 @@ async def create_zoho_meeting_for_booking(
             "start": _zoho_calendar_timestamp(start_at),
             "end": _zoho_calendar_timestamp(end_at),
         },
-        "attendees": [{"email": customer_email, "status": "NEEDS-ACTION"}],
         "conference": "zmeeting",
         "reminders": [{"minutes": -30, "action": "popup"}],
         "description": "\n".join(description_lines),
     }
+    if customer_email:
+        body["attendees"] = [{"email": customer_email, "status": "NEEDS-ACTION"}]
 
     api_base = _zoho_calendar_api_base_url(settings, tenant_credentials=tenant_credentials)
     calendar_uid = _zoho_calendar_uid(settings, tenant_credentials=tenant_credentials)

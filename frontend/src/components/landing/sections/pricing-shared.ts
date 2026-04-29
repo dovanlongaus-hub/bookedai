@@ -16,6 +16,8 @@ export type Plan = {
   slug: PlanSlug;
   name: string;
   tagline: string;
+  bestFor: string;
+  outcome: string;
   setupFee: string;
   monthlyFee: string;
   commission: string;
@@ -54,36 +56,36 @@ export type ConsultationFormState = {
 };
 
 export const highlightPoints = [
-  'Free at the bottom, premium at the top, aligned in the middle on real booked revenue',
-  'Setup fee, monthly, and commission stay clearly separated so buyers can scan the model in one pass',
-  'Commission only applies to bookings BookedAI actually captures or recovers',
+  'Pick by business stage, not by feature maze',
+  'Every package includes search, booking request, portal, and follow-up visibility',
+  'Commission only applies to bookings BookedAI captures or recovers',
 ];
 
 export const topOffers = [
   {
-    eyebrow: 'Aligned incentives',
-    title: 'Pay only when BookedAI books real revenue',
-    body: 'Starter is free SaaS, Growth adds 3% on net booked revenue, and Enterprise is 5% with a negotiated floor and cap. We win when you do.',
+    eyebrow: 'Simple entry',
+    title: 'Start with the lightest package that can take a real booking',
+    body: 'Launch gives one booking-ready page and one channel. Grow adds managed setup and the main customer channels. Scale is for teams that need locations, APIs, and service-level support.',
   },
   {
-    eyebrow: 'Commercial clarity',
-    title: 'Setup, subscription, and commission are clearly separated',
-    body: 'Onboarding scope is quoted up front, the monthly stays predictable, and performance commission is only introduced when the AI Revenue Engine is producing booked outcomes.',
+    eyebrow: 'Clear promise',
+    title: 'Each package shows exactly what happens after a customer asks',
+    body: 'Customer asks, BookedAI shortlists, the booking request is captured, and the customer gets a portal, confirmation, and follow-up path.',
   },
 ];
 
 export const setupOptions = [
   {
-    label: 'Self-serve onboarding (Starter)',
-    detail: 'Solo and micro teams can launch BookedAI on their own without a setup fee, on one channel and one service catalog.',
+    label: 'Launch setup',
+    detail: 'One page, one catalog, one customer channel, portal links, and basic confirmation flow.',
   },
   {
-    label: 'Guided onboarding (Growth)',
-    detail: 'A$499 onboarding scopes catalog import, brand setup, and channel wiring across Telegram, WhatsApp, and the embed widget.',
+    label: 'Grow setup',
+    detail: 'Done-for-you catalog import, brand setup, Telegram/WhatsApp/widget wiring, CRM handoff, and booking activity review.',
   },
   {
-    label: 'Custom rollout (Enterprise)',
-    detail: 'A$2,500-A$10,000 custom rollout for multi-location, franchise, or vertical platform deployments needing SSO and dedicated CSM.',
+    label: 'Scale setup',
+    detail: 'Custom rollout for multi-location, franchise, or platform teams that need templates, SSO/API, SLA, and a named success owner.',
   },
 ];
 
@@ -93,61 +95,65 @@ export const plans: Plan[] = [
   {
     id: 'basic',
     slug: 'starter',
-    name: 'Starter Engine',
-    tagline: 'Solo / micro teams (1-3 staff)',
+    name: 'Launch',
+    tagline: 'One booking-ready page',
+    bestFor: 'Solo operators and micro teams that need a clean first booking path.',
+    outcome: 'A customer can ask, choose the service, submit a request, and reopen the portal.',
     setupFee: 'A$0 self-serve',
     monthlyFee: 'A$79/mo',
-    commission: '0% (pure SaaS)',
+    commission: '0% commission',
     price: 'A$79',
-    subtitle: 'Solo coach, single tradie, or 1-room clinic that wants a clean launch on one channel without a setup fee.',
-    badge: 'Starter Engine',
-    ctaLabel: 'Start free',
+    subtitle: 'Solo coach, single tradie, or 1-room clinic that wants a simple live booking path.',
+    badge: 'Lightest',
+    ctaLabel: 'Start Launch',
     cta: {
-      label: 'Start free',
+      label: 'Start Launch',
       href: `${registerInterestHref}?plan=starter`,
     },
-    introLabel: 'Self-serve',
+    introLabel: 'Start here',
     microcopy:
-      'Free SaaS at the bottom of the ladder. One channel, one service catalog, BookedAI Manager Bot, portal, payment QR, and email confirmations.',
+      'One service catalog, one channel, BookedAI Manager Bot, portal access, payment QR posture, and email confirmation.',
     supportingText:
-      'Capped at 50 booked/mo. Strong fit for proving demand capture before stepping up into the Growth tier.',
+      'Best for proving demand capture before adding more channels and managed follow-up.',
     features: [
-      '1 channel (Telegram OR web widget)',
+      'Booking-ready landing page',
+      '1 channel: Telegram or web widget',
       '1 service catalog',
-      'BookedAI Manager Bot + portal',
-      'Payment QR + email confirmations',
-      '50 booked/mo cap',
-      'Self-serve onboarding, no setup fee',
+      'Portal link and QR for every booking',
+      'Email confirmation and payment posture',
+      'Self-serve setup',
     ],
   },
   {
     id: 'standard',
     slug: 'growth',
-    name: 'Growth Engine',
-    tagline: 'Established SME (4-25 staff)',
+    name: 'Grow',
+    tagline: 'Managed SME booking flow',
+    bestFor: 'Salons, clinics, schools, tutors, and local service teams with repeat enquiries.',
+    outcome: 'BookedAI captures enquiries across channels and shows owners what was booked or needs action.',
     setupFee: 'A$499 onboarding',
     monthlyFee: 'A$249/mo',
     commission: '3% on net booked revenue',
     price: 'A$249',
-    subtitle: 'Salon, clinic, swim school, or tutoring centre ready to run BookedAI as the AI Revenue Engine across every channel.',
+    subtitle: 'Established SME ready for BookedAI across the main customer channels.',
     badge: 'Most popular',
     ctaLabel: 'Start a 30-day pilot',
     cta: {
       label: 'Start a 30-day pilot',
       href: `${registerInterestHref}?plan=growth`,
     },
-    introLabel: 'Aligned incentives',
+    introLabel: 'Most SMEs',
     microcopy:
-      'Growth adds a 3% commission on net booked revenue captured or recovered through BookedAI. We are aligned on real bookings, not seats.',
+      'The practical default: managed setup, multi-channel capture, customer care, CRM sync, and revenue visibility.',
     supportingText:
-      'Onboarding covers catalog import, brand wiring, and channel setup. Monthly tenant revenue summary email keeps the commercial story honest.',
+      'Commission applies only when BookedAI captures or recovers a real booking.',
     features: [
-      'All 3 channels (Telegram + WhatsApp + embed widget)',
-      'Revenue-ops agent queue + customer-care agent',
-      'Booking activity history + Stripe billing',
-      'CRM sync',
-      'Monthly tenant revenue summary email',
-      'A$499 onboarding + 3% on net booked revenue',
+      'Landing page plus embedded booking widget',
+      'Telegram, WhatsApp, and web chat paths',
+      'Customer-care handoff with booking reference',
+      'CRM, email, calendar, and payment posture',
+      'Booking activity and revenue summary',
+      'A$499 onboarding plus 3% on captured revenue',
     ],
     featured: true,
     mostPopular: true,
@@ -155,66 +161,68 @@ export const plans: Plan[] = [
   {
     id: 'pro',
     slug: 'enterprise',
-    name: 'Enterprise Engine',
-    tagline: 'Multi-location / franchise / academy (25+ staff or 3+ locations)',
+    name: 'Scale',
+    tagline: 'Multi-location revenue ops',
+    bestFor: 'Franchises, academies, and platform teams with multiple services, teams, or locations.',
+    outcome: 'A reusable booking operating system with templates, API/webhooks, SLA, and review controls.',
     setupFee: 'A$2,500-A$10,000 custom',
     monthlyFee: 'A$999+/mo',
     commission: '5% on attributable revenue (floor + cap negotiated)',
     price: 'A$999+',
-    subtitle: 'Multi-location, franchise, academy, or vertical platform that needs the multi-tenant template, SSO, and a named CSM.',
-    badge: 'Enterprise Engine',
-    ctaLabel: 'Talk to founder',
+    subtitle: 'Multi-location, franchise, academy, or platform rollout with stronger controls.',
+    badge: 'Custom',
+    ctaLabel: 'Plan Scale',
     cta: {
       label: 'Talk to founder',
       href: `${registerInterestHref}?plan=enterprise`,
     },
-    introLabel: 'Premium at the top',
+    introLabel: 'Custom rollout',
     microcopy:
-      'Custom rollout, vertical template config, SSO, white-label widget, retention/churn-rescue automation, SLA, and a named CSM.',
+      'Custom rollout, vertical templates, SSO/API, white-label widget, retention automation, SLA, and named success owner.',
     supportingText:
       'Setup fee scoped per contract. 5% commission on attributable booked revenue with floor and cap negotiated up front.',
     features: [
-      'Multi-tenant template + dedicated onboarding',
+      'Multi-location templates and dedicated onboarding',
       'Business workspace + booking activity history',
       'White-label widget + webhook + API access',
       'Retention / churn-rescue automation',
       'SLA + named CSM',
-      'A$2,500-A$10,000 setup + 5% on attributable revenue',
+      'Custom setup plus attributable revenue model',
     ],
   },
 ];
 
 export const recommendations: Recommendation[] = [
   {
-    label: 'Starter Engine',
-    detail: 'Free SaaS, 1 channel, 50 bookings/mo cap',
+    label: 'Launch',
+    detail: 'One booking-ready page and one channel',
   },
   {
-    label: 'Growth Engine',
-    detail: 'A$249/mo + 3% on net booked revenue',
+    label: 'Grow',
+    detail: 'Managed multi-channel booking flow for SMEs',
     featured: true,
   },
   {
-    label: 'Enterprise Engine',
-    detail: 'A$999+/mo + 5% on attributable revenue',
+    label: 'Scale',
+    detail: 'Multi-location templates, API, SLA, and success owner',
   },
 ];
 
 export const pricingSignals = [
   {
-    label: 'Entry point',
-    value: 'A$0 setup',
-    detail: 'Starter Engine is free SaaS so solo and micro teams can launch BookedAI before committing to commission.',
+    label: 'Launch',
+    value: 'A$79/mo',
+    detail: 'One booking-ready page and one customer channel.',
   },
   {
-    label: 'Buying ladder',
-    value: 'Starter -> Growth -> Enterprise',
-    detail: 'Step up only when AI Revenue Engine output justifies a deeper rollout, broader channels, and aligned commission.',
+    label: 'Grow',
+    value: 'A$249/mo',
+    detail: 'Managed setup, three channels, CRM/email/calendar, and revenue summary.',
   },
   {
-    label: 'Commercial model',
-    value: 'Free at the bottom, aligned in the middle, premium at the top',
-    detail: 'Setup, monthly, and commission stay separated. Commission only applies to bookings BookedAI captures or recovers.',
+    label: 'Scale',
+    value: 'A$999+/mo',
+    detail: 'Custom rollout for multi-location and platform teams.',
   },
 ];
 

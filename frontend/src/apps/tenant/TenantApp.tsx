@@ -1091,6 +1091,7 @@ export function TenantApp() {
   const [catalogQuery, setCatalogQuery] = useState('');
   const [catalogStatusFilter, setCatalogStatusFilter] = useState<CatalogStatusFilter>('all');
   const [selectedCatalogServiceId, setSelectedCatalogServiceId] = useState<string | null>(null);
+  const [workspaceMenuCollapsed, setWorkspaceMenuCollapsed] = useState(false);
   const [importPending, setImportPending] = useState(false);
   const [importMessage, setImportMessage] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
@@ -1192,7 +1193,7 @@ export function TenantApp() {
   }, [inviteContext, isGateway, session]);
 
   useEffect(() => {
-    if (isGateway) {
+    if (isGateway || !session?.session_token) {
       return;
     }
 
@@ -3307,6 +3308,82 @@ export function TenantApp() {
     );
   }
 
+  if (!session) {
+    const tenantLoginOnboarding = buildGatewayOnboardingState();
+    const tenantLabel = tenantRef
+      ? tenantRef.replace(/-/g, ' ').replace(/\b\w/g, (character) => character.toUpperCase())
+      : 'Tenant workspace';
+
+    return (
+      <main className="booked-admin-shell booked-page-shell text-slate-950">
+        <div className="mx-auto flex min-h-[calc(100vh-4rem)] w-full max-w-5xl items-center px-4 py-8 sm:px-6 lg:px-8">
+          <section className="grid w-full gap-8 lg:grid-cols-[minmax(0,0.9fr)_minmax(380px,440px)] lg:items-center">
+            <div className="min-w-0">
+              <div className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-slate-500 shadow-[0_8px_20px_rgba(15,23,42,0.05)]">
+                tenant.bookedai.au
+              </div>
+              <h1 className="mt-5 max-w-xl text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl">
+                Sign in to {tenantLabel}
+              </h1>
+              <p className="mt-4 max-w-xl text-base leading-7 text-slate-600">
+                Use the account linked to this business workspace to review bookings, catalog readiness,
+                integrations, revenue follow-up, and team access.
+              </p>
+              <div className="mt-6 grid max-w-xl gap-3 sm:grid-cols-3">
+                {[
+                  ['Bookings', 'Review requests and next steps'],
+                  ['Catalog', 'Publish search-ready services'],
+                  ['Follow-up', 'Track CRM, calendar, and care posture'],
+                ].map(([label, detail]) => (
+                  <div key={label} className="rounded-lg border border-slate-200 bg-white px-4 py-3 shadow-[0_10px_24px_rgba(15,23,42,0.05)]">
+                    <div className="text-sm font-semibold text-slate-950">{label}</div>
+                    <div className="mt-1 text-xs leading-5 text-slate-500">{detail}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <TenantAuthWorkspaceEmail
+              tenantName={tenantLabel}
+              tenantSlug={tenantRef || 'tenant.bookedai.au'}
+              tenantRef={tenantRef}
+              session={session}
+              onboarding={tenantLoginOnboarding}
+              authMode={authMode}
+              setAuthMode={handleAuthModeChange}
+              authPending={authPending}
+              authError={authError}
+              importMessage={importMessage}
+              emailSignInValue={emailSignInValue}
+              setEmailSignInValue={setEmailSignInValue}
+              passwordSignInEmail={passwordSignInEmail}
+              setPasswordSignInEmail={setPasswordSignInEmail}
+              passwordSignInValue={passwordSignInValue}
+              setPasswordSignInValue={setPasswordSignInValue}
+              emailCodeValue={emailCodeValue}
+              setEmailCodeValue={setEmailCodeValue}
+              emailCodeDelivery={emailCodeDelivery}
+              createAccountForm={createAccountForm}
+              setCreateAccountForm={setCreateAccountForm}
+              claimAccountForm={claimAccountForm}
+              setClaimAccountForm={setClaimAccountForm}
+              googleEnabled={Boolean(googleClientId)}
+              googleReady={googleReady}
+              googleButtonSlot={<div ref={googleButtonRef} />}
+              onPromptGoogle={handlePromptGoogle}
+              onRequestEmailCode={handleRequestEmailCode}
+              onVerifyEmailCode={handleVerifyEmailCode}
+              onPasswordSignIn={handlePasswordSignIn}
+              tenantChoices={tenantChoices}
+              onSelectTenantChoice={handleTenantChoiceSelection}
+              onSignOut={handleSignOut}
+              inviteContext={inviteContext}
+            />
+          </section>
+        </div>
+      </main>
+    );
+  }
+
   if (state.status === 'loading') {
     return (
       <main className="booked-runtime-shell booked-page-shell">
@@ -3442,14 +3519,22 @@ export function TenantApp() {
   const contextualHeaderActions = (() => {
     if (panel === 'catalog') {
       return (
-        <TenantIconAction
-          label="Create service draft"
-          onClick={() => void handleCatalogCreate()}
-          disabled={catalogCreatePending || !session || !canWriteCatalog}
-          tone="primary"
-        >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-        </TenantIconAction>
+        <>
+          <TenantIconAction
+            label="Run AI website import"
+            onClick={() => document.getElementById('tenant-ai-import')?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            tone="primary"
+          >
+            <SparkIcon className="h-4 w-4" />
+          </TenantIconAction>
+          <TenantIconAction
+            label="Create service draft"
+            onClick={() => void handleCatalogCreate()}
+            disabled={catalogCreatePending || !session || !canWriteCatalog}
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+          </TenantIconAction>
+        </>
       );
     }
 
@@ -3709,8 +3794,8 @@ export function TenantApp() {
         ) : null}
 
         <section
-          id="tenant-revenue-proof"
-          className="scroll-mt-24 rounded-[1.75rem] border border-emerald-200 bg-gradient-to-br from-emerald-50 via-white to-sky-50 p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)] lg:p-6"
+          id="tenant-revenue-proof-legacy"
+          className="hidden"
         >
           <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-start">
             <div>
@@ -3782,7 +3867,7 @@ export function TenantApp() {
           </div>
         </section>
 
-        <section id="tenant-activation" className="scroll-mt-24">
+        <section id="tenant-activation-legacy" className="hidden">
           <TenantActivationChecklistCard
             activation={activationState}
             eyebrow={futureSwim ? 'Future Swim activation' : 'Activation control'}
@@ -3808,17 +3893,73 @@ export function TenantApp() {
           />
         </section>
 
+        <section className="rounded-2xl border border-slate-200 bg-white px-3 py-3 shadow-[0_10px_28px_rgba(15,23,42,0.05)]">
+          <div className="grid gap-2 md:grid-cols-[1.25fr_repeat(3,minmax(120px,0.7fr))_auto] md:items-center">
+            <div className="min-w-0 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Activation control
+              </div>
+              <div className="mt-0.5 truncate text-sm font-semibold text-slate-950">
+                {activationState.actionLabel}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Search-ready
+              </div>
+              <div className="mt-0.5 text-sm font-semibold text-slate-950">
+                {catalog.counts.search_ready_records}/{catalog.counts.total_records}
+              </div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Follow-up
+              </div>
+              <div className="mt-0.5 text-sm font-semibold text-slate-950">{tenantAttentionCount}</div>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-white px-3 py-2">
+              <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                Revenue
+              </div>
+              <div className="mt-0.5 text-sm font-semibold text-slate-950">{formatAud(paidRevenueAud)}</div>
+            </div>
+            {activationState.actionPanel ? (
+              <button
+                type="button"
+                onClick={() => handlePanelChange(activationState.actionPanel ?? 'overview', 'activation_compact_cta')}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-950 px-3 text-xs font-semibold text-white transition hover:bg-slate-800"
+              >
+                Open action
+              </button>
+            ) : !session ? (
+              <button
+                type="button"
+                onClick={() => handleOpenTenantSignIn('activation_compact_sign_in_cta')}
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-sky-300 bg-sky-600 px-3 text-xs font-semibold text-white transition hover:bg-sky-700"
+              >
+                Sign in
+              </button>
+            ) : (
+              <a
+                href="#tenant-reference"
+                className="inline-flex h-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 px-3 text-xs font-semibold text-slate-700 transition hover:bg-white"
+              >
+                Reference
+              </a>
+            )}
+          </div>
+        </section>
+
         <nav
           aria-label="Tenant workspace quick navigation"
           className="xl:hidden"
         >
           <div className="flex gap-2 overflow-x-auto rounded-[1.2rem] border border-slate-200 bg-white p-2 shadow-[0_12px_30px_rgba(15,23,42,0.06)]">
             {[
-              ['Revenue', '#tenant-revenue-proof'],
-              ['Activation', '#tenant-activation'],
               ['Menu', '#tenant-workspace-menu'],
               ['Bookings', '#tenant-booking-pipeline'],
               ['Catalog', '#tenant-catalog-readiness'],
+              ['Reference', '#tenant-reference'],
             ].map(([label, href]) => (
               <a
                 key={label}
@@ -3831,59 +3972,75 @@ export function TenantApp() {
           </div>
         </nav>
 
-        <section className="grid gap-5 xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] 2xl:grid-cols-[86px_minmax(260px,300px)_minmax(0,1fr)]">
-          <aside className="hidden 2xl:block">
-            <div className="sticky top-[104px] flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_46px_rgba(15,23,42,0.06)]">
-              {tenantPanels.slice(0, 8).map((item) => (
-                <TenantIconAction
-                  key={`rail-${item.key}`}
-                  label={`Open ${item.label}`}
-                  onClick={() => handlePanelChange(item.key, 'workspace_icon_rail')}
-                  tone={panel === item.key ? 'primary' : 'default'}
-                >
-                  {item.icon}
-                </TenantIconAction>
-              ))}
-            </div>
-          </aside>
-
+        <section
+          className={`grid gap-5 ${
+            workspaceMenuCollapsed
+              ? 'xl:grid-cols-[84px_minmax(0,1fr)]'
+              : 'xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)]'
+          }`}
+        >
           <aside className="space-y-4 xl:sticky xl:top-[104px] xl:self-start">
             <article
               id="tenant-workspace-menu"
-              className="scroll-mt-24 rounded-2xl border border-slate-200 bg-white p-4 shadow-[0_18px_44px_rgba(15,23,42,0.06)]"
+              className={`scroll-mt-24 rounded-2xl border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.06)] ${
+                workspaceMenuCollapsed ? 'p-2 xl:p-2' : 'p-4'
+              }`}
             >
-              <div className="flex items-center justify-between gap-3">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+              <div className={`flex items-center gap-3 ${workspaceMenuCollapsed ? 'justify-center xl:justify-center' : 'justify-between'}`}>
+                <div className={`text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500 ${workspaceMenuCollapsed ? 'sr-only xl:sr-only' : ''}`}>
                   Workspace menu
                 </div>
-                <PanelLeft className="h-4 w-4 text-slate-400" aria-hidden="true" />
+                <button
+                  type="button"
+                  aria-label={workspaceMenuCollapsed ? 'Expand workspace menu' : 'Collapse workspace menu'}
+                  title={workspaceMenuCollapsed ? 'Expand workspace menu' : 'Collapse workspace menu'}
+                  onClick={() => {
+                    setWorkspaceMenuCollapsed((current) => {
+                      const next = !current;
+                      trackTenantEvent('tenant_workspace_menu_collapsed', {
+                        ...tenantEventContext,
+                        collapsed: next,
+                      });
+                      return next;
+                    });
+                  }}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-slate-50 text-slate-600 transition hover:bg-white focus:outline-none focus:ring-2 focus:ring-sky-300"
+                >
+                  <PanelLeft className={`h-4 w-4 transition ${workspaceMenuCollapsed ? 'rotate-180' : ''}`} aria-hidden="true" />
+                </button>
               </div>
-              <div className="mt-4 grid grid-cols-2 gap-2 xl:block xl:space-y-1.5">
+              <div className={`mt-4 grid gap-2 xl:block xl:space-y-1.5 ${workspaceMenuCollapsed ? 'grid-cols-1' : 'grid-cols-2'}`}>
                 {tenantPanels.map((item) => (
                   <button
                     key={item.key}
                     type="button"
                     onClick={() => handlePanelChange(item.key, 'workspace_menu')}
-                    className={`flex w-full items-start gap-2 rounded-xl border px-3 py-3 text-left transition xl:gap-3 ${
+                    title={item.label}
+                    aria-label={`Open ${item.label}`}
+                    className={`flex w-full rounded-xl border text-left transition ${
+                      workspaceMenuCollapsed
+                        ? 'items-center justify-center px-2 py-3 xl:h-12'
+                        : 'items-start gap-2 px-3 py-3 xl:gap-3'
+                    } ${
                       panel === item.key
                         ? 'border-slate-950 bg-slate-950 text-white shadow-[0_14px_28px_rgba(15,23,42,0.14)]'
                         : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-white'
                     }`}
                   >
-                    <span className={`mt-0.5 ${panel === item.key ? 'text-white' : 'text-slate-500'}`}>{item.icon}</span>
-                    <span className="min-w-0 flex-1">
+                    <span className={`${workspaceMenuCollapsed ? '' : 'mt-0.5'} ${panel === item.key ? 'text-white' : 'text-slate-500'}`}>{item.icon}</span>
+                    <span className={`min-w-0 flex-1 ${workspaceMenuCollapsed ? 'sr-only xl:sr-only' : ''}`}>
                       <span className="block text-sm font-semibold">{item.label}</span>
                       <span className={`mt-1 hidden text-xs leading-5 sm:block ${panel === item.key ? 'text-white/78' : 'text-slate-500'}`}>
                         {item.description}
                       </span>
                     </span>
-                    <ChevronRight className={`mt-0.5 hidden h-4 w-4 xl:block ${panel === item.key ? 'text-white/70' : 'text-slate-300'}`} aria-hidden="true" />
+                    <ChevronRight className={`mt-0.5 hidden h-4 w-4 xl:block ${workspaceMenuCollapsed ? 'xl:hidden' : ''} ${panel === item.key ? 'text-white/70' : 'text-slate-300'}`} aria-hidden="true" />
                   </button>
                 ))}
               </div>
             </article>
 
-            <article className="rounded-2xl border border-slate-200 bg-[linear-gradient(180deg,#f8fbff_0%,#eef5ff_100%)] p-5 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
+            <article className="hidden">
               <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-sky-700">
                 Section guideline
               </div>
@@ -3894,33 +4051,6 @@ export function TenantApp() {
                 {activePanelGuide}
               </p>
             </article>
-
-            {(overview.workspace.hero_image_url || introPreview) ? (
-              <article className="overflow-hidden rounded-[1.75rem] border border-slate-200 bg-white shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
-                {overview.workspace.hero_image_url ? (
-                  <img
-                    src={overview.workspace.hero_image_url}
-                    alt={`${overview.tenant.name} hero`}
-                    className="h-40 w-full object-cover"
-                  />
-                ) : null}
-                <div className="p-5">
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                    Tenant introduction
-                  </div>
-                  <p className="mt-3 text-sm leading-6 text-slate-600">
-                    {introPreview || 'Use Experience Studio to add an enterprise introduction for this tenant.'}
-                  </p>
-                  <button
-                    type="button"
-                    onClick={() => handlePanelChange('experience', 'overview_experience_cta')}
-                    className="mt-4 rounded-full border border-slate-200 bg-slate-50 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-white"
-                  >
-                    Open Experience Studio
-                  </button>
-                </div>
-              </article>
-            ) : null}
           </aside>
 
           <div className="min-w-0 space-y-5 rounded-2xl border border-slate-200 bg-white/62 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.8)] sm:p-4">
@@ -3949,19 +4079,19 @@ export function TenantApp() {
                 </div>
               </div>
             </section>
-            <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            <section className="grid gap-2 md:grid-cols-2 xl:grid-cols-4">
               {metrics.map((item) => (
                 <article
                   key={item.label}
-                  className="rounded-[1.6rem] border border-slate-200 bg-white p-5 shadow-[0_16px_40px_rgba(15,23,42,0.06)]"
+                  className="rounded-xl border border-slate-200 bg-white px-3 py-3 shadow-[0_8px_20px_rgba(15,23,42,0.04)]"
                 >
-                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                  <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
                     {item.label}
                   </div>
-                  <div className="mt-3 text-4xl font-semibold tracking-tight text-slate-950">
+                  <div className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
                     {item.value}
                   </div>
-                  <p className="mt-3 text-sm leading-6 text-slate-600">{item.caption}</p>
+                  <p className="mt-1 truncate text-xs text-slate-500">{item.caption}</p>
                 </article>
               ))}
             </section>
@@ -4571,47 +4701,72 @@ export function TenantApp() {
             </div>
 
             <div className="space-y-6">
-              <div id="tenant-auth-workspace" className="scroll-mt-24">
-                <TenantAuthWorkspaceEmail
-                  tenantName={overview.tenant.name}
-                  tenantSlug={overview.tenant.slug}
-                  tenantRef={tenantRef}
-                  session={session}
-                  onboarding={onboarding}
-                  authMode={authMode}
-                  setAuthMode={handleAuthModeChange}
-                  authPending={authPending}
-                  authError={authError}
-                  importMessage={importMessage}
-                  emailSignInValue={emailSignInValue}
-                  setEmailSignInValue={setEmailSignInValue}
-                  passwordSignInEmail={passwordSignInEmail}
-                  setPasswordSignInEmail={setPasswordSignInEmail}
-                  passwordSignInValue={passwordSignInValue}
-                  setPasswordSignInValue={setPasswordSignInValue}
-                  emailCodeValue={emailCodeValue}
-                  setEmailCodeValue={setEmailCodeValue}
-                  emailCodeDelivery={emailCodeDelivery}
-                  createAccountForm={createAccountForm}
-                  setCreateAccountForm={setCreateAccountForm}
-                  claimAccountForm={claimAccountForm}
-                  setClaimAccountForm={setClaimAccountForm}
-                  googleEnabled={Boolean(googleClientId)}
-                  googleReady={googleReady}
-                  googleButtonSlot={<div ref={googleButtonRef} />}
-                  onPromptGoogle={handlePromptGoogle}
-                  onRequestEmailCode={handleRequestEmailCode}
-                  onVerifyEmailCode={handleVerifyEmailCode}
-                  onPasswordSignIn={handlePasswordSignIn}
-                  tenantChoices={tenantChoices}
-                  onSelectTenantChoice={handleTenantChoiceSelection}
-                  onSignOut={handleSignOut}
-                  inviteContext={inviteContext}
-                />
-              </div>
+              {!session ? (
+                <div id="tenant-auth-workspace" className="scroll-mt-24">
+                  <TenantAuthWorkspaceEmail
+                    tenantName={overview.tenant.name}
+                    tenantSlug={overview.tenant.slug}
+                    tenantRef={tenantRef}
+                    session={session}
+                    onboarding={onboarding}
+                    authMode={authMode}
+                    setAuthMode={handleAuthModeChange}
+                    authPending={authPending}
+                    authError={authError}
+                    importMessage={importMessage}
+                    emailSignInValue={emailSignInValue}
+                    setEmailSignInValue={setEmailSignInValue}
+                    passwordSignInEmail={passwordSignInEmail}
+                    setPasswordSignInEmail={setPasswordSignInEmail}
+                    passwordSignInValue={passwordSignInValue}
+                    setPasswordSignInValue={setPasswordSignInValue}
+                    emailCodeValue={emailCodeValue}
+                    setEmailCodeValue={setEmailCodeValue}
+                    emailCodeDelivery={emailCodeDelivery}
+                    createAccountForm={createAccountForm}
+                    setCreateAccountForm={setCreateAccountForm}
+                    claimAccountForm={claimAccountForm}
+                    setClaimAccountForm={setClaimAccountForm}
+                    googleEnabled={Boolean(googleClientId)}
+                    googleReady={googleReady}
+                    googleButtonSlot={<div ref={googleButtonRef} />}
+                    onPromptGoogle={handlePromptGoogle}
+                    onRequestEmailCode={handleRequestEmailCode}
+                    onVerifyEmailCode={handleVerifyEmailCode}
+                    onPasswordSignIn={handlePasswordSignIn}
+                    tenantChoices={tenantChoices}
+                    onSelectTenantChoice={handleTenantChoiceSelection}
+                    onSignOut={handleSignOut}
+                    inviteContext={inviteContext}
+                  />
+                </div>
+              ) : null}
 
-              <article className="rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]">
-                <div className="rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
+              <article
+                id="tenant-ai-import"
+                className="scroll-mt-24 rounded-[1.75rem] border border-slate-200 bg-white p-6 shadow-[0_18px_44px_rgba(15,23,42,0.06)]"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="rounded-2xl bg-slate-950 p-2 text-white">
+                    <SparkIcon className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                      BookedAI agent import
+                    </div>
+                    <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
+                      Paste a website and let AI draft sellable services
+                    </h2>
+                  </div>
+                </div>
+
+                <p className="mt-3 text-sm leading-6 text-slate-600">
+                  {futureSwim
+                    ? 'The BookedAI agent scans the swim website for lesson products, centre locations, images, prices, contact email, timetable cues, and enrolment or enquiry links, then saves review-ready rows for tenant approval before public search can suggest them.'
+                    : 'The BookedAI agent scans the website for sellable products or services, locations, images, prices, contact email, duration or availability cues, and service delivery modes, then saves review-ready rows that can be suggested in chat when the customer intent matches.'}
+                </p>
+
+                <div className="mt-5 rounded-[1.2rem] border border-slate-200 bg-slate-50 px-4 py-4">
                   <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                     Permission guide
                   </div>
@@ -4633,26 +4788,6 @@ export function TenantApp() {
                     <p>Publish only when warnings are cleared and the service is genuinely ready for public search.</p>
                   </div>
                 </article>
-
-                <div className="flex items-start gap-3">
-                  <div className="rounded-2xl bg-slate-950 p-2 text-white">
-                    <SparkIcon className="h-5 w-5" />
-                  </div>
-                  <div>
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-                      AI import
-                    </div>
-                    <h2 className="mt-2 text-2xl font-semibold tracking-tight text-slate-950">
-                      Import website data into BookedAI
-                    </h2>
-                  </div>
-                </div>
-
-                <p className="mt-3 text-sm leading-6 text-slate-600">
-                  {futureSwim
-                    ? 'Tune the search focus before import so AI extracts only swim-business content that matters for parent conversion: lesson or class name, age band, confidence level, venue, schedule, pricing, description, imagery, and booking or enquiry links.'
-                    : 'Tune the search focus before import so AI extracts only booking-critical content: product or service name, duration, location, pricing, description, image, booking link, and directly relevant commercial details.'}
-                </p>
 
                 <form className="mt-5 space-y-4" onSubmit={handleCatalogImport}>
                   <label className="block">
@@ -4762,6 +4897,11 @@ export function TenantApp() {
                       {importError}
                     </div>
                   ) : null}
+                  {importMessage ? (
+                    <div className="rounded-[1rem] border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                      {importMessage}
+                    </div>
+                  ) : null}
                   {session && !canWriteCatalog ? (
                     <div className="rounded-[1rem] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                       {futureSwim
@@ -4780,7 +4920,7 @@ export function TenantApp() {
                     }`}
                   >
                     <SparkIcon className="h-4 w-4" />
-                    {importPending ? (futureSwim ? 'Importing swim website data...' : 'Importing website data...') : (futureSwim ? 'Import swim website into BookedAI' : 'Import into BookedAI')}
+                    {importPending ? (futureSwim ? 'Importing swim website data...' : 'Importing website data...') : (futureSwim ? 'Run AI import for swim website' : 'Run BookedAI AI import')}
                   </button>
                 </form>
               </article>
@@ -5990,6 +6130,136 @@ export function TenantApp() {
             />
           </section>
         ) : null}
+          </div>
+        </section>
+
+        <section
+          id="tenant-reference"
+          className="scroll-mt-24 space-y-4 rounded-2xl border border-slate-200 bg-white/70 p-4 shadow-[0_10px_28px_rgba(15,23,42,0.04)]"
+        >
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Reference
+              </div>
+              <h2 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+                Information, guidance, and activation notes
+              </h2>
+            </div>
+            <div className="text-xs text-slate-500">
+              Kept below the workbench so edit and input panels stay first.
+            </div>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-[0.82fr_1.18fr]">
+            <section id="tenant-activation" className="scroll-mt-24">
+              <TenantActivationChecklistCard
+                activation={activationState}
+                eyebrow={futureSwim ? 'Future Swim activation' : 'Activation control'}
+                action={
+                  activationState.actionPanel ? (
+                    <button
+                      type="button"
+                      onClick={() => handlePanelChange(activationState.actionPanel ?? 'overview', 'activation_reference_cta')}
+                      className="rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-900 transition hover:bg-slate-50"
+                    >
+                      {activationState.actionLabel}
+                    </button>
+                  ) : !session ? (
+                    <button
+                      type="button"
+                      onClick={() => handleOpenTenantSignIn('activation_reference_sign_in_cta')}
+                      className="rounded-full border border-sky-300 bg-sky-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-sky-700"
+                    >
+                      {activationState.actionLabel}
+                    </button>
+                  ) : null
+                }
+              />
+            </section>
+
+            <section
+              id="tenant-revenue-proof"
+              className="scroll-mt-24 rounded-[1.4rem] border border-slate-200 bg-white p-4"
+            >
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                <div>
+                  <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    {futureSwim ? 'Future Swim revenue proof' : 'Tenant revenue proof'}
+                  </div>
+                  <h3 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+                    {futureSwim ? 'Monthly booking and revenue proof' : 'Monthly booking value proof'}
+                  </h3>
+                  <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
+                    {revenueMetrics
+                      ? futureSwim
+                        ? `In the last ${revenueMetrics.period_days} days, BookedAI tracked ${revenueMetrics.sessions_started} parent enquiries, ${revenueMetrics.bookings_confirmed} booked lessons, and ${formatAud(paidRevenueAud)} in lesson revenue.`
+                        : `In the last ${revenueMetrics.period_days} days, BookedAI tracked ${revenueMetrics.sessions_started} sessions, ${revenueMetrics.bookings_confirmed} bookings, and ${formatAud(paidRevenueAud)} in revenue.`
+                      : revenueProofNarrative}
+                  </p>
+                </div>
+                {revenueMetrics ? (
+                  <div className="inline-flex w-fit items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-700">
+                    <span className="h-2 w-2 rounded-full bg-emerald-500" />
+                    {revenueMetrics.capture_rate_pct}% captured
+                  </div>
+                ) : null}
+              </div>
+
+              <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                {[
+                  {
+                    label: futureSwim ? 'Parent enquiries' : 'Sessions',
+                    value: revenueMetrics?.sessions_started ?? overview.summary.total_leads,
+                  },
+                  {
+                    label: futureSwim ? 'Lessons booked' : 'Bookings',
+                    value: revenueMetrics?.bookings_confirmed ?? bookings.status_summary.active + bookings.status_summary.completed,
+                  },
+                  {
+                    label: futureSwim ? 'Lesson revenue' : 'Revenue',
+                    value: formatAud(paidRevenueAud),
+                  },
+                  {
+                    label: 'Next follow-up',
+                    value: tenantAttentionCount,
+                  },
+                ].map((item) => (
+                  <div key={item.label} className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-3">
+                    <div className="text-[10px] font-semibold uppercase tracking-[0.12em] text-slate-500">
+                      {item.label}
+                    </div>
+                    <div className="mt-1 text-base font-semibold text-slate-950">{item.value}</div>
+                  </div>
+                ))}
+              </div>
+            </section>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <article className="rounded-[1.4rem] border border-slate-200 bg-white p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Section guideline
+              </div>
+              <h3 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+                {activePanelMeta.label}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {activePanelGuide || activePanelMeta.description}
+              </p>
+            </article>
+
+            <article className="rounded-[1.4rem] border border-slate-200 bg-white p-4">
+              <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                Tenant introduction
+              </div>
+              <h3 className="mt-1 text-lg font-semibold tracking-tight text-slate-950">
+                {overview.tenant.name}
+              </h3>
+              <p className="mt-2 text-sm leading-6 text-slate-600">
+                {introPreview || 'Use Experience Studio to add the tenant introduction, brand positioning, and public-facing context.'}
+              </p>
+            </article>
           </div>
         </section>
       </div>

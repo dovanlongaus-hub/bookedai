@@ -30,7 +30,6 @@ import sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "backend"))
 
-from datetime import timedelta
 from zoneinfo import ZoneInfo
 
 from sqlalchemy import text
@@ -39,6 +38,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Backend imports
 from config import get_settings  # type: ignore
 from db import init_engine, session_scope  # type: ignore
+from repositories.base import RepositoryContext  # type: ignore
 from repositories.chess_schedule_slot_repository import (  # type: ignore
     ChessScheduleSlotRepository,
 )
@@ -88,39 +88,39 @@ async def backfill_slot(session: AsyncSession, slot: dict, settings) -> str:
         local_dt = starts_at.astimezone(tz)
     else:
         local_dt = starts_at
-    end_dt = local_dt + timedelta(minutes=duration_minutes)
-
     title = (
         f"{slot.get('cohort_label') or slot.get('service_id')} "
         f"({slot.get('tenant_name') or slot.get('tenant_slug')})"
     )
 
     try:
-        meeting = await create_zoho_meeting_for_booking(
+        meeting_url, calendar_event_url = await create_zoho_meeting_for_booking(
             settings=settings,
             tenant_credentials=None,  # falls back to platform-wide creds
-            title=title,
-            description=f"Open slot — pre-created for {slot.get('service_id')}.",
-            starts_at=local_dt,
-            ends_at=end_dt,
-            timezone=str(tz),
-            attendees=[],  # no attendees yet — students attach on booking
+            booking_reference=f"slot-{slot['id']}",
+            service_name=title,
+            customer_name="Open chess cohort",
+            customer_email=None,
+            requested_date=local_dt.date(),
+            requested_time=local_dt.time(),
+            timezone_name=str(tz),
+            duration_minutes=duration_minutes,
+            notes=f"Open slot - pre-created for {slot.get('service_id')}.",
         )
     except Exception as exc:  # noqa: BLE001
         log.warning("zoho meeting creation failed for slot %s: %s", slot["id"], exc)
         return "zoho_failed"
 
-    if not meeting or not meeting.get("meeting_url"):
+    if not meeting_url:
         log.info("slot %s — Zoho returned empty meeting_url; skipping", slot["id"])
         return "no_url"
 
-    repo = ChessScheduleSlotRepository(session)
+    repo = ChessScheduleSlotRepository(RepositoryContext(session=session, tenant_id=slot["tenant_id"]))
     await repo.attach_meeting_metadata(
         tenant_id=slot["tenant_id"],
         slot_id=slot["id"],
-        zoho_event_id=meeting.get("event_id"),
-        zoho_meeting_url=meeting["meeting_url"],
-        zoho_calendar_event_url=meeting.get("calendar_event_url"),
+        meeting_url=meeting_url,
+        calendar_event_url=calendar_event_url,
     )
     return "ok"
 

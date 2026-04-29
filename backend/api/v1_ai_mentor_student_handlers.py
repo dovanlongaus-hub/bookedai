@@ -25,7 +25,9 @@ import hmac
 import json
 import os
 import time
+from datetime import timezone
 from typing import Literal
+from zoneinfo import ZoneInfo
 
 from fastapi import Header, Request
 from pydantic import BaseModel, Field
@@ -47,6 +49,34 @@ _logger = get_logger("bookedai.api.v1_ai_mentor_student_handlers")
 
 _STUDENT_TOKEN_TTL_SECONDS = 30 * 24 * 60 * 60  # 30 days
 _STUDENT_TOKEN_KIND = "ai_mentor_student"
+
+
+def _public_crm_sync_status(
+    *,
+    lead_status: str = "skipped",
+    contact_status: str = "skipped",
+    deal_status: str = "skipped",
+    task_status: str = "skipped",
+    warnings: list[str] | None = None,
+) -> dict[str, object]:
+    return {
+        "lead": {"sync_status": lead_status},
+        "contact": {"sync_status": contact_status},
+        "deal": {"sync_status": deal_status},
+        "task": {"sync_status": task_status},
+        "warning_codes": warnings or [],
+    }
+
+
+def _slot_local_date_time(slot_start_at, timezone_label: str) -> tuple[str, str]:
+    try:
+        tz = ZoneInfo(timezone_label or "Australia/Sydney")
+    except Exception:  # noqa: BLE001
+        tz = ZoneInfo("Australia/Sydney")
+    if slot_start_at.tzinfo is None:
+        slot_start_at = slot_start_at.replace(tzinfo=timezone.utc)
+    local_start = slot_start_at.astimezone(tz)
+    return local_start.date().isoformat(), local_start.strftime("%H:%M")
 
 
 def _resolve_student_auth_secret(request: Request) -> str:
@@ -696,6 +726,13 @@ async def reserve_service_time_slot(
         # 4. Persist learner identity + Zoho artefact references on the
         #    slot row. The reservations admin panel reads these columns
         #    directly (migration 037).
+        requested_date, requested_time = _slot_local_date_time(
+            slot_start_at,
+            timezone_label,
+        )
+        crm_sync = _public_crm_sync_status()
+        portal_url = f"https://portal.bookedai.au/order/{booking_reference}"
+        portal_token_plaintext: str | None = None
         async with get_session(request.app.state.session_factory) as session:
             await session.execute(
                 text(
@@ -726,6 +763,302 @@ async def reserve_service_time_slot(
                     "slot_id": normalized_slot_id,
                 },
             )
+            contact_result = await session.execute(
+                text(
+                    """
+                    insert into contacts (
+                      tenant_id,
+                      full_name,
+                      email,
+                      phone,
+                      primary_channel,
+                      created_at,
+                      updated_at
+                    )
+                    values (
+                      cast(:tenant_id as uuid),
+                      :full_name,
+                      :email,
+                      :phone,
+                      'email',
+                      now(),
+                      now()
+                    )
+                    on conflict do nothing
+                    returning id::text as id
+                    """
+                ),
+                {
+                    "tenant_id": tenant_id,
+                    "full_name": payload.full_name.strip(),
+                    "email": normalized_email,
+                    "phone": (payload.phone or "").strip() or None,
+                },
+            )
+            contact_id = (contact_result.mappings().first() or {}).get("id")
+            if contact_id is None:
+                existing_contact = await session.execute(
+                    text(
+                        """
+                        select id::text as id
+                        from contacts
+                        where tenant_id = cast(:tenant_id as uuid)
+                          and lower(coalesce(email, '')) = lower(:email)
+                        order by updated_at desc
+                        limit 1
+                        """
+                    ),
+                    {"tenant_id": tenant_id, "email": normalized_email},
+                )
+                contact_id = (existing_contact.mappings().first() or {}).get("id")
+
+            lead_result = await session.execute(
+                text(
+                    """
+                    insert into leads (
+                      tenant_id,
+                      contact_id,
+                      source,
+                      status,
+                      created_at,
+                      updated_at
+                    )
+                    values (
+                      cast(:tenant_id as uuid),
+                      cast(:contact_id as uuid),
+                      'aimentor_direct_reservation',
+                      'captured',
+                      now(),
+                      now()
+                    )
+                    returning id::text as id
+                    """
+                ),
+                {"tenant_id": tenant_id, "contact_id": contact_id},
+            )
+            lead_id = (lead_result.mappings().first() or {}).get("id")
+
+            metadata = {
+                "source": "aimentor_direct_reservation",
+                "aimentor": {
+                    "slot_id": normalized_slot_id,
+                    "service_id": slot.get("service_id"),
+                    "reserved_locale": payload.locale,
+                },
+                "zoho_meeting": {
+                    "meeting_url": provisioning.meeting_url,
+                    "meeting_id": provisioning.meeting_id,
+                    "calendar_event_id": provisioning.calendar_event_id,
+                    "calendar_event_url": provisioning.calendar_event_url,
+                    "provisioned": bool(
+                        provisioning.meeting_url or provisioning.calendar_event_id
+                    ),
+                    "meeting_error": provisioning.meeting_error,
+                    "calendar_error": provisioning.calendar_error,
+                },
+            }
+            booking_result = await session.execute(
+                text(
+                    """
+                    insert into booking_intents (
+                      tenant_id,
+                      contact_id,
+                      conversation_id,
+                      booking_reference,
+                      source,
+                      service_name,
+                      service_id,
+                      requested_date,
+                      requested_time,
+                      timezone,
+                      booking_path,
+                      confidence_level,
+                      status,
+                      payment_dependency_state,
+                      metadata_json,
+                      created_at,
+                      updated_at
+                    )
+                    values (
+                      cast(:tenant_id as uuid),
+                      cast(:contact_id as uuid),
+                      :conversation_id,
+                      :booking_reference,
+                      'aimentor_direct_reservation',
+                      :service_name,
+                      :service_id,
+                      :requested_date,
+                      :requested_time,
+                      :timezone,
+                      'scheduled_session',
+                      'verified',
+                      'captured',
+                      'awaiting_payment',
+                      cast(:metadata_json as jsonb),
+                      now(),
+                      now()
+                    )
+                    on conflict (booking_reference) do update
+                    set contact_id = excluded.contact_id,
+                        service_name = excluded.service_name,
+                        service_id = excluded.service_id,
+                        requested_date = excluded.requested_date,
+                        requested_time = excluded.requested_time,
+                        timezone = excluded.timezone,
+                        status = excluded.status,
+                        metadata_json = excluded.metadata_json,
+                        updated_at = now()
+                    returning id::text as id
+                    """
+                ),
+                {
+                    "tenant_id": tenant_id,
+                    "contact_id": contact_id,
+                    "conversation_id": normalized_email,
+                    "booking_reference": booking_reference,
+                    "service_name": service_name,
+                    "service_id": slot.get("service_id"),
+                    "requested_date": requested_date,
+                    "requested_time": requested_time,
+                    "timezone": timezone_label,
+                    "metadata_json": json.dumps(metadata),
+                },
+            )
+            booking_intent_id = (booking_result.mappings().first() or {}).get("id")
+
+            try:
+                from core.portal_tokens import generate_portal_access_token
+
+                issued_token = generate_portal_access_token(booking_reference)
+                await session.execute(
+                    text(
+                        """
+                        update booking_intents
+                        set portal_access_token_hash = :token_hash,
+                            portal_access_token_expires_at = :expires_at,
+                            portal_access_token_revoked_at = null,
+                            updated_at = now()
+                        where booking_reference = :booking_reference
+                        """
+                    ),
+                    {
+                        "token_hash": issued_token.token_hash,
+                        "expires_at": issued_token.expires_at,
+                        "booking_reference": booking_reference,
+                    },
+                )
+                portal_token_plaintext = issued_token.plaintext
+                portal_url = (
+                    f"https://portal.bookedai.au/order/{booking_reference}"
+                    f"?token={portal_token_plaintext}"
+                )
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning(
+                    "aimentor_portal_access_token_issue_failed",
+                    extra={
+                        "event_type": "aimentor_portal_access_token_issue_failed",
+                        "tenant_id": str(tenant_id or ""),
+                        "status": 0,
+                        "route": "/api/v1/aimentor/slots/{slot_id}/reserve",
+                        "request_id": "",
+                        "integration_name": "portal",
+                        "conversation_id": normalized_email,
+                        "booking_reference": booking_reference,
+                        "job_name": "",
+                        "job_id": "",
+                    },
+                    exc_info=exc,
+                )
+
+            tenant_crm_credentials = None
+            try:
+                from service_layer.zoho_tenant_credentials import (
+                    resolve_tenant_zoho_crm_credentials,
+                )
+
+                tenant_crm_credentials = await resolve_tenant_zoho_crm_credentials(
+                    session,
+                    tenant_id=tenant_id,
+                    settings=request.app.state.settings,
+                )
+            except Exception:  # noqa: BLE001
+                tenant_crm_credentials = None
+
+            try:
+                from service_layer.lifecycle_ops_service import (
+                    orchestrate_booking_followup_sync,
+                    orchestrate_contact_sync,
+                    orchestrate_lead_capture,
+                )
+
+                lead_sync = await orchestrate_lead_capture(
+                    session,
+                    tenant_id=str(tenant_id or ""),
+                    lead_id=lead_id,
+                    source="aimentor_direct_reservation",
+                    contact_email=normalized_email,
+                    contact_full_name=payload.full_name.strip(),
+                    contact_phone=(payload.phone or "").strip() or None,
+                    company_name=service_name,
+                    tenant_crm_credentials=tenant_crm_credentials,
+                )
+                contact_sync = await orchestrate_contact_sync(
+                    session,
+                    tenant_id=str(tenant_id or ""),
+                    contact_id=contact_id,
+                    full_name=payload.full_name.strip(),
+                    email=normalized_email,
+                    phone=(payload.phone or "").strip() or None,
+                    tenant_crm_credentials=tenant_crm_credentials,
+                )
+                booking_sync = await orchestrate_booking_followup_sync(
+                    session,
+                    tenant_id=str(tenant_id or ""),
+                    booking_intent_id=booking_intent_id,
+                    booking_reference=booking_reference,
+                    full_name=payload.full_name.strip(),
+                    email=normalized_email,
+                    phone=(payload.phone or "").strip() or None,
+                    source="aimentor_direct_reservation",
+                    service_name=service_name,
+                    requested_date=requested_date,
+                    requested_time=requested_time,
+                    timezone=timezone_label,
+                    booking_path="scheduled_session",
+                    notes=f"AI Mentor slot {normalized_slot_id}",
+                    tenant_crm_credentials=tenant_crm_credentials,
+                )
+                crm_sync = _public_crm_sync_status(
+                    lead_status=lead_sync.sync_status,
+                    contact_status=contact_sync.sync_status,
+                    deal_status=booking_sync.deal_sync_status,
+                    task_status=booking_sync.task_sync_status,
+                    warnings=(
+                        lead_sync.warning_codes
+                        + contact_sync.warning_codes
+                        + booking_sync.warning_codes
+                    ),
+                )
+            except Exception as exc:  # noqa: BLE001
+                crm_sync = _public_crm_sync_status(
+                    warnings=["crm_sync_failed"],
+                )
+                _logger.warning(
+                    "aimentor_crm_sync_failed",
+                    extra={
+                        "event_type": "aimentor_crm_sync_failed",
+                        "tenant_id": str(tenant_id or ""),
+                        "status": 0,
+                        "route": "/api/v1/aimentor/slots/{slot_id}/reserve",
+                        "request_id": "",
+                        "integration_name": "zoho_crm",
+                        "conversation_id": normalized_email,
+                        "booking_reference": booking_reference,
+                        "job_name": "",
+                        "job_id": "",
+                    },
+                    exc_info=exc,
+                )
             await session.commit()
 
         # 5. Best-effort welcome email — same composer the existing booking
@@ -739,8 +1072,7 @@ async def reserve_service_time_slot(
                 )
 
                 portal_link_for_email = (
-                    f"https://aimentor.bookedai.au/account?ref="
-                    + booking_reference
+                    f"https://aimentor.bookedai.au/account?ref={booking_reference}"
                 )
                 await _send_aimentor_welcome_email(
                     email_service=request.app.state.email_service,
@@ -776,6 +1108,7 @@ async def reserve_service_time_slot(
                 "meeting": {
                     "join_url": provisioning.meeting_url,
                     "calendar_event_id": provisioning.calendar_event_id,
+                    "calendar_event_url": provisioning.calendar_event_url,
                     "provisioned": bool(
                         provisioning.meeting_url or provisioning.calendar_event_id
                     ),
@@ -790,6 +1123,11 @@ async def reserve_service_time_slot(
                     "expect_calendar_invite": bool(provisioning.calendar_event_id),
                     "mentor_followup_within_hours": 24,
                 },
+                "portal": {
+                    "url": portal_url,
+                    "access_token": portal_token_plaintext,
+                },
+                "crm_sync": crm_sync,
             },
             tenant_id=None,
             actor_context=None,
@@ -989,8 +1327,7 @@ async def list_service_time_slots(service_id: str, request: Request):
                       sts.timezone,
                       sts.capacity,
                       sts.booked_count,
-                      sts.label,
-                      sts.zoho_meeting_url
+                      sts.label
                     from service_time_slots sts
                     where sts.tenant_id = (
                       select id from tenants where slug = 'ai-mentor-doer'
@@ -1034,7 +1371,6 @@ async def list_service_time_slots(service_id: str, request: Request):
                         - int(record.get("booked_count") or 0),
                     ),
                     "label": record.get("label"),
-                    "zoho_meeting_url": record.get("zoho_meeting_url"),
                 }
             )
 
@@ -1088,20 +1424,31 @@ async def get_aimentor_payment_info(request: Request):
             if len(account_number) >= 4
             else account_number
         )
+        stripe_checkout_url = str(payment.get("stripe_checkout_url") or "").strip()
+        if "aimentor-private-checkout" in stripe_checkout_url:
+            stripe_checkout_url = ""
+
+        qr_payload_template = str(payment.get("qr_payload_template") or "")
+        if qr_payload_template:
+            qr_payload_template = (
+                qr_payload_template
+                .replace("{bsb}", str(bank.get("bsb") or ""))
+                .replace("{account_number}", account_number)
+            )
 
         result = {
             "currency": payment.get("currency") or "AUD",
-            "stripe_checkout_url": payment.get("stripe_checkout_url"),
+            "stripe_checkout_url": stripe_checkout_url or None,
             "bank_account": {
                 "account_name": bank.get("account_name"),
                 "bsb": bank.get("bsb"),
-                "account_number": account_number,
+                "account_number": None,
                 "account_number_masked": masked,
                 "bank_name": bank.get("bank_name"),
                 "swift": bank.get("swift"),
                 "reference_prefix": bank.get("reference_prefix") or "AIM-",
             },
-            "qr_payload_template": payment.get("qr_payload_template"),
+            "qr_payload_template": qr_payload_template or None,
             "instructions_en": payment.get("instructions_en"),
             "instructions_vi": payment.get("instructions_vi"),
         }

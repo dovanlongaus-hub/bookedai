@@ -902,7 +902,9 @@ function buildAuthoritativeBookingIntentResult(params: {
   return {
     status: 'ok',
     booking_reference: bookingReference,
-    portal_url: `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(bookingReference)}`,
+    portal_url:
+      authoritativeResult.portalUrl?.trim() ||
+      `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(bookingReference)}`,
     service: selectedService,
     amount_aud: selectedService.amount_aud,
     amount_label: amountLabel,
@@ -7469,7 +7471,7 @@ export function BookingAssistantDialog({
                     type="button"
                     aria-label="Close preview"
                     onClick={() => setPreviewService(null)}
-                    className="absolute inset-0"
+                    className="absolute inset-0 z-0"
                   />
                   <div
                     role="dialog"

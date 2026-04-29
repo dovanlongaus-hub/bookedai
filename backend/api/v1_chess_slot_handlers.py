@@ -213,19 +213,45 @@ def _expand_recurrence(
 
 def _slot_to_public_view(row: dict[str, Any]) -> dict[str, Any]:
     starts_at = row.get("starts_at")
+    starts_at_iso = (
+        starts_at.isoformat() if hasattr(starts_at, "isoformat") else starts_at
+    )
+    ends_at_iso = None
+    if hasattr(starts_at, "__add__"):
+        try:
+            ends_at = starts_at + timedelta(minutes=int(row.get("duration_minutes") or 60))
+            ends_at_iso = ends_at.isoformat() if hasattr(ends_at, "isoformat") else None
+        except Exception:  # noqa: BLE001
+            ends_at_iso = None
+    available = (
+        row.get("available")
+        if row.get("available") is not None
+        else max(int(row.get("capacity") or 0) - int(row.get("enrolled_count") or 0), 0)
+    )
+    local_date = ""
+    local_time = ""
+    if hasattr(starts_at, "astimezone"):
+        try:
+            local_dt = starts_at.astimezone(ZoneInfo(str(row.get("timezone") or "Asia/Ho_Chi_Minh")))
+            local_date = local_dt.strftime("%Y-%m-%d")
+            local_time = local_dt.strftime("%H:%M")
+        except Exception:  # noqa: BLE001
+            local_date = ""
+            local_time = ""
     return {
         "id": row.get("id"),
+        "slot_id": row.get("id"),
         "service_id": row.get("service_id"),
-        "starts_at": (
-            starts_at.isoformat() if hasattr(starts_at, "isoformat") else starts_at
-        ),
+        "starts_at": starts_at_iso,
+        "ends_at": ends_at_iso,
+        "date": local_date,
+        "start_time": local_time,
         "duration_minutes": row.get("duration_minutes"),
         "timezone": row.get("timezone"),
         "capacity": row.get("capacity"),
         "enrolled_count": row.get("enrolled_count"),
-        "available": row.get("available")
-        if row.get("available") is not None
-        else max(int(row.get("capacity") or 0) - int(row.get("enrolled_count") or 0), 0),
+        "available": available,
+        "spots_left": available,
         "cohort_label": row.get("cohort_label"),
         "cohort_recurrence_rule": row.get("cohort_recurrence_rule"),
         "status": row.get("status"),
@@ -802,6 +828,7 @@ async def chess_catalog_search(
                 "display_price_aud": (
                     f"A${amount_aud:,.2f}" if amount_aud is not None else None
                 ),
+                "amount_aud": amount_aud,
                 # VND display derived from amount_aud × 16,500 (the published
                 # academy reference rate). Earlier this leaked the AUD-only
                 # `display_price` text into the VI locale, which then rendered

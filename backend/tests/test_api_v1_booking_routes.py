@@ -446,6 +446,11 @@ class Apiv1BookingRoutes(TestCase):
                         "phone": None,
                     },
                     "channel": "public_web",
+                    "desired_slot": {
+                        "date": "2026-05-06",
+                        "time": "18:30",
+                        "timezone": "Australia/Sydney",
+                    },
                     "notes": "Please call after 5pm",
                     "actor_context": {
                         "channel": "public_web",
@@ -458,6 +463,12 @@ class Apiv1BookingRoutes(TestCase):
         payload = response.json()
         self.assertEqual(payload["status"], "ok")
         self.assertEqual(payload["data"]["booking_intent_id"], "booking-intent-123")
+        self.assertEqual(payload["data"]["booking"]["requested_date"], "2026-05-06")
+        self.assertEqual(payload["data"]["booking"]["requested_time"], "18:30")
+        self.assertEqual(payload["data"]["booking"]["timezone"], "Australia/Sydney")
+        self.assertIn("zoho_meeting", payload["data"]["integrations"])
+        self.assertIn("crm_sync", payload["data"]["integrations"])
+        self.assertNotIn("record_id", payload["data"]["crm_sync"].get("lead", {}))
         self.assertEqual(len(captured_phase2_calls), 1)
         self.assertEqual(captured_phase2_calls[0]["audit_event_type"], "booking_intent.captured")
         self.assertEqual(
@@ -688,6 +699,83 @@ class Apiv1BookingRoutes(TestCase):
         self.assertEqual(payload["status"], "error")
         self.assertEqual(payload["error"]["code"], "payment_booking_tenant_mismatch")
         self.assertEqual(stripe_calls, [])
+
+    def test_create_payment_intent_allows_public_default_shell_for_provider_booking(self):
+        captured_payment_calls: list[dict[str, object]] = []
+
+        class _FakePaymentSession:
+            async def execute(self, *_args, **_kwargs):
+                return _FakeExecuteResult(
+                    {
+                        "booking_intent_id": "booking-intent-789",
+                        "booking_tenant_id": "tenant-provider",
+                        "booking_reference": "v1-provider789",
+                        "service_name": "Provider session",
+                        "service_id": "svc_provider",
+                        "customer_email": "mia@example.com",
+                        "amount_aud": 95.0,
+                        "booking_url": None,
+                    }
+                )
+
+            async def commit(self):
+                return None
+
+        @asynccontextmanager
+        async def _fake_payment_session(_session_factory):
+            yield _FakePaymentSession()
+
+        async def _resolve_public_default_tenant_id(_request, _actor_context) -> str:
+            return "tenant-public-default"
+
+        async def _create_stripe_checkout(**_kwargs):
+            return {
+                "checkout_url": "https://checkout.stripe.com/pay/cs_test_provider",
+                "external_session_id": "cs_test_provider",
+            }
+
+        async def _upsert_payment_intent(*_args, **kwargs):
+            captured_payment_calls.append(kwargs)
+            return "payment-intent-789"
+
+        async def _sync_booking_status(*_args, **_kwargs):
+            return {"booking_intent_id": "booking-intent-789"}
+
+        with patch("api.v1_booking_handlers._resolve_tenant_id", _resolve_public_default_tenant_id), patch(
+            "api.v1_booking_handlers.get_session",
+            _fake_payment_session,
+        ), patch(
+            "api.v1_booking_handlers._create_public_stripe_checkout_session",
+            _create_stripe_checkout,
+        ), patch(
+            "api.v1_booking_handlers.PaymentIntentRepository.upsert_payment_intent",
+            _upsert_payment_intent,
+        ), patch(
+            "api.v1_booking_handlers.BookingIntentRepository.sync_callback_status",
+            _sync_booking_status,
+        ), patch(
+            "api.v1_booking_handlers._record_phase2_write_activity",
+            _async_noop,
+        ):
+            client = TestClient(create_test_app())
+            response = client.post(
+                "/api/v1/payments/intents",
+                json={
+                    "booking_intent_id": "v1-provider789",
+                    "selected_payment_option": "stripe_card",
+                    "actor_context": {
+                        "channel": "public_web",
+                        "tenant_ref": "bookedai-au",
+                    },
+                },
+                headers={"origin": "https://product.bookedai.au"},
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        payload = response.json()
+        self.assertEqual(payload["status"], "ok")
+        self.assertEqual(payload["data"]["payment_status"], "requires_action")
+        self.assertEqual(captured_payment_calls[0]["tenant_id"], "tenant-provider")
 
     def test_create_payment_intent_uses_partner_checkout_url_when_available(self):
         class _FakePaymentSession:

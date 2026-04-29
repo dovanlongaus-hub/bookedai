@@ -1048,9 +1048,9 @@ export function PortalApp() {
               Review your booking and request changes in one place.
             </h1>
             <p className="mt-3 max-w-3xl text-sm leading-7 text-slate-600">
-              Enter the reference from your confirmation email or QR code. We will show the latest
-              booking status, payment step, provider details, and safe options to reschedule, change,
-              cancel, or ask for help.
+              Open the secure portal link or scan the QR code from your confirmation. If your link
+              includes a protected token, we will show the latest booking status, payment step,
+              provider details, and safe options to reschedule, change, cancel, or ask for help.
             </p>
             <div className="mt-5 grid gap-3 sm:grid-cols-3">
               {[
@@ -1091,8 +1091,8 @@ export function PortalApp() {
               </button>
             </div>
             <p className="mt-4 text-xs leading-6 text-white/60">
-              Use the booking reference from your confirmation email or QR code. Marketing links and
-              internal release IDs cannot open customer booking records.
+              Paste a booking reference only when this browser already has the secure portal token
+              from your confirmation link or QR code. Otherwise, reopen the original secure link.
             </p>
           </form>
         </div>
@@ -1108,8 +1108,8 @@ export function PortalApp() {
                 </div>
                 <h2 className="mt-3 text-xl font-semibold">Look up an existing booking reference</h2>
                 <p className="mt-3 max-w-2xl text-sm leading-7 text-[#172033]/62">
-                  Enter the booking reference from your confirmation screen or email to review the
-                  latest schedule, payment, and support details.
+                  Open the secure link from your confirmation screen, email, or QR code to review
+                  the latest schedule, payment, and support details.
                 </p>
               </section>
             ) : null}

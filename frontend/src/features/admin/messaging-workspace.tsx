@@ -42,7 +42,7 @@ export function MessagingWorkspace({
 
   useEffect(() => {
     if (selectedTenantRef) {
-      setTenantFilter((current) => (current === 'all' ? selectedTenantRef : current));
+      setTenantFilter(selectedTenantRef);
     }
   }, [selectedTenantRef]);
 

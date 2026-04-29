@@ -1550,7 +1550,7 @@ export function ChessGrandmasterApp() {
 
             <aside id="coach" className="chess-coach-card" aria-label={t.coach.name}>
               <img
-                src="https://upload.bookedai.au/images/bb99/B7_i8BfBTN8NMxJO_B7X3Q.png"
+                src="https://upload.bookedai.au/images/6bd7/PsmLv0OKgOXJowsVWMN-WQ.jpg"
                 alt={t.coach.portraitAlt}
                 loading="lazy"
                 className="chess-coach-portrait-img chess-coach-portrait-img--hero"

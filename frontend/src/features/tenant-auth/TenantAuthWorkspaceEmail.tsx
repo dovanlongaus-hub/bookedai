@@ -1,4 +1,4 @@
-import type { Dispatch, FormEventHandler, ReactNode, SetStateAction } from 'react';
+import { useState, type Dispatch, type FormEventHandler, type ReactNode, type SetStateAction } from 'react';
 
 import type { TenantAuthSessionResponse, TenantOnboardingResponse } from '../../shared/contracts';
 
@@ -134,6 +134,8 @@ export function TenantAuthWorkspaceEmail({
 }) {
   const isGateway = !tenantRef;
   const codeMatchesMode = emailCodeDelivery?.auth_intent === authMode;
+  const [authMethod, setAuthMethod] = useState<'google' | 'code' | 'password'>('google');
+  const activeAuthMethod = authMode === 'sign-in' ? authMethod : authMethod === 'password' ? 'google' : authMethod;
   const roleLabel = formatRoleLabel(session?.membership?.role ?? inviteContext?.role);
   const googleTitle =
     authMode === 'create'
@@ -232,7 +234,10 @@ export function TenantAuthWorkspaceEmail({
               <button
                 key={item.key}
                 type="button"
-                onClick={() => setAuthMode(item.key)}
+                onClick={() => {
+                  setAuthMode(item.key);
+                  setAuthMethod('google');
+                }}
                 className={`rounded-md px-4 py-2.5 text-sm font-semibold transition ${
                   authMode === item.key
                     ? 'bg-slate-950 text-white shadow-[0_10px_22px_rgba(15,23,42,0.16)]'
@@ -259,7 +264,36 @@ export function TenantAuthWorkspaceEmail({
           ) : null}
 
           <div className="mt-5 space-y-4">
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-4">
+            <div
+              className="grid gap-1 rounded-lg border border-slate-200 bg-slate-50 p-1"
+              style={{ gridTemplateColumns: authMode === 'sign-in' ? 'repeat(3, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))' }}
+              role="tablist"
+              aria-label="Tenant sign-in method"
+            >
+              {[
+                { key: 'google' as const, label: 'Google' },
+                { key: 'code' as const, label: 'Email code' },
+                ...(authMode === 'sign-in' ? [{ key: 'password' as const, label: 'Password' }] : []),
+              ].map((item) => (
+                <button
+                  key={item.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeAuthMethod === item.key}
+                  onClick={() => setAuthMethod(item.key)}
+                  className={`min-h-10 rounded-md px-3 py-2 text-sm font-semibold transition ${
+                    activeAuthMethod === item.key
+                      ? 'bg-white text-slate-950 shadow-[0_8px_18px_rgba(15,23,42,0.10)]'
+                      : 'text-slate-600 hover:bg-white/70 hover:text-slate-950'
+                  }`}
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+
+            {activeAuthMethod === 'google' ? (
+              <div className="rounded-lg border border-slate-200 bg-white px-4 py-4">
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-slate-950">{googleTitle}</div>
@@ -283,7 +317,7 @@ export function TenantAuthWorkspaceEmail({
                     >
                       {googlePrimaryAction}
                     </button>
-                    <div className="hidden min-h-[44px] w-full items-center justify-center overflow-hidden rounded-md bg-white p-1 shadow-[0_8px_18px_rgba(15,23,42,0.08)] sm:flex">
+                    <div className="hidden min-h-[44px] w-full items-center justify-center overflow-hidden rounded-md border border-slate-200 bg-white p-1 sm:flex">
                       {googleButtonSlot}
                     </div>
                     <button
@@ -300,19 +334,13 @@ export function TenantAuthWorkspaceEmail({
                 </>
               ) : (
                 <div className="booked-alert-warning mt-4">
-                  Add `VITE_GOOGLE_CLIENT_ID` in the frontend environment and `GOOGLE_OAUTH_CLIENT_ID` in the backend to enable tenant Google login.
+                  Google sign-in is not available for this workspace yet. Use email code or password to continue.
                 </div>
               )}
-            </div>
+              </div>
+            ) : null}
 
-            <div className="flex items-center gap-3">
-              <div className="h-px flex-1 bg-slate-200" />
-              <div className="text-xs font-semibold text-slate-400">or email sign-in</div>
-              <div className="h-px flex-1 bg-slate-200" />
-            </div>
-
-            {authMode === 'sign-in' ? (
-              <div className="grid gap-4 lg:grid-cols-2">
+            {activeAuthMethod === 'code' && authMode === 'sign-in' ? (
                 <form className="space-y-4 rounded-lg border border-slate-200 bg-white p-4" onSubmit={onRequestEmailCode}>
                   <div>
                     <div className="text-sm font-semibold text-slate-950">Email code</div>
@@ -342,7 +370,9 @@ export function TenantAuthWorkspaceEmail({
                     <span aria-hidden="true" className="hidden sm:inline">Send login code</span>
                   </button>
                 </form>
+            ) : null}
 
+            {activeAuthMethod === 'password' && authMode === 'sign-in' ? (
                 <form className="space-y-4 rounded-lg border border-slate-200 bg-white p-4" onSubmit={onPasswordSignIn}>
                   <div>
                     <div className="text-sm font-semibold text-slate-950">Email and password</div>
@@ -383,10 +413,9 @@ export function TenantAuthWorkspaceEmail({
                     Sign in with password
                   </button>
                 </form>
-              </div>
             ) : null}
 
-            {authMode === 'create' ? (
+            {activeAuthMethod === 'code' && authMode === 'create' ? (
               <form className="space-y-4 rounded-lg border border-slate-200 bg-white p-4" onSubmit={onRequestEmailCode}>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">
@@ -448,7 +477,7 @@ export function TenantAuthWorkspaceEmail({
               </form>
             ) : null}
 
-            {authMode === 'claim' ? (
+            {activeAuthMethod === 'code' && authMode === 'claim' ? (
               <form className="space-y-4 rounded-lg border border-slate-200 bg-white p-4" onSubmit={onRequestEmailCode}>
                 <div className="grid gap-4 sm:grid-cols-2">
                   <label className="block">

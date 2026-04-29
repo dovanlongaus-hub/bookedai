@@ -577,27 +577,27 @@ export const flowSteps = [
 ];
 
 export const metrics: Metric[] = [
-  { value: '3', label: 'Live Tenants' },
+  { value: '3', label: 'Live Verticals' },
   { value: '5', label: 'Channels Wired' },
-  { value: '<30s', label: 'Booking → Ledger' },
+  { value: '<30s', label: 'Booking → Follow-up' },
 ];
 
 export const pricingContent: PricingContent = {
   kicker: 'Pricing',
   kickerClassName: 'text-indigo-400',
-  title: 'Pay only when BookedAI books real revenue.',
-  body: 'Three tiers tied to the AI Revenue Engine. Free at the bottom, aligned in the middle, premium at the top.',
+  title: 'Choose the simplest BookedAI package that can win the next booking.',
+  body: 'Three clear packages: Launch for one booking-ready page, Grow for managed SME conversion, and Scale for multi-location revenue ops.',
   planLabel: 'Starts from',
   planPrice: 'A$79/mo',
-  planCaption: 'Starter Engine is free SaaS for solo and micro teams. Growth and Enterprise tie commission to real booked revenue.',
+  planCaption: 'Launch starts simple. Grow adds managed channels and revenue visibility. Scale adds templates, API, SLA, and a success owner.',
   planFeatures: [
-    'Starter Engine: A$79/mo, A$0 setup, 0% commission (pure SaaS)',
-    'Growth Engine: A$249/mo + A$499 onboarding + 3% on net booked revenue',
-    'Enterprise Engine: A$999+/mo + A$2,500-A$10,000 setup + 5% on attributable revenue',
-    'Setup fees scoped after a 10-min call',
+    'Launch: A$79/mo, A$0 setup, 0% commission',
+    'Grow: A$249/mo + A$499 onboarding + 3% on captured booked revenue',
+    'Scale: A$999+/mo with custom rollout, SLA, API, and success owner',
+    'Every package includes search, booking request, thank-you, portal, and follow-up',
     'Commission applies only to bookings BookedAI captures or recovers',
   ],
-  primaryCta: 'Start free — pay only on booked revenue',
+  primaryCta: 'Pick a package',
   primaryHref: productHref,
 };
 
@@ -636,14 +636,14 @@ export const trustItems: TrustItem[] = [
 
 export const faqItems: FAQItem[] = [
   {
-    question: 'How does the Starter Engine tier work?',
+    question: 'How does the Launch package work?',
     answer:
-      'Starter Engine is free SaaS at A$79/mo with no setup fee and 0% commission. It covers one channel (Telegram or web widget), one service catalog, BookedAI Manager Bot, portal, payment QR, and email confirmations, capped at 50 bookings/mo. When the AI Revenue Engine is proving real booking output, the path into Growth or Enterprise is already visible.',
+      'Launch is A$79/mo with no setup fee and 0% commission. It covers one booking-ready page, one channel, one service catalog, BookedAI Manager Bot, portal, payment QR posture, and email confirmations.',
   },
   {
     question: 'What does the commercial model look like across the three tiers?',
     answer:
-      'Setup, monthly subscription, and commission stay clearly separated. Starter Engine is A$0 setup + A$79/mo + 0% commission. Growth Engine is A$499 onboarding + A$249/mo + 3% on net booked revenue. Enterprise Engine is A$2,500-A$10,000 setup + A$999+/mo + 5% on attributable revenue with a negotiated floor and cap.',
+      'Setup, monthly subscription, and commission stay clearly separated. Launch is A$0 setup + A$79/mo + 0% commission. Grow is A$499 onboarding + A$249/mo + 3% on captured booked revenue. Scale is custom setup + A$999+/mo for multi-location, API, SLA, and success-owner needs.',
   },
   {
     question: 'Does this expand into a real business workflow, or stay as a front-end widget?',

@@ -19,7 +19,10 @@
     "test:playwright:live-read": "bash scripts/run_live_read_smoke.sh",
     "test:playwright:tenant-smoke": "bash scripts/run_tenant_smoke.sh",
     "test:playwright:smoke": "npm run test:playwright:legacy && npm run test:playwright:live-read && npm run test:playwright:admin-smoke",
-    "test:release-gate": "npm run build && PLAYWRIGHT_SKIP_BUILD=1 npm run test:playwright:smoke && PLAYWRIGHT_SKIP_BUILD=1 npm run test:playwright:tenant-smoke"
+    "test:release-gate": "npm run build && PLAYWRIGHT_SKIP_BUILD=1 npm run test:playwright:smoke && PLAYWRIGHT_SKIP_BUILD=1 npm run test:playwright:tenant-smoke",
+    "demo:chess": "PLAYWRIGHT_EXTERNAL_SERVER=1 npx playwright test tests/chess-booking-demo.spec.ts --headed --workers=1 --grep @chess-demo --project=legacy",
+    "demo:chess:vi": "DEMO_LOCALE=vi PLAYWRIGHT_EXTERNAL_SERVER=1 npx playwright test tests/chess-booking-demo.spec.ts --headed --workers=1 --grep @chess-demo --project=legacy",
+    "demo:chess:slow": "DEMO_LOCALE=en PLAYWRIGHT_EXTERNAL_SERVER=1 npx playwright test tests/chess-booking-demo.spec.ts --headed --workers=1 --grep @chess-demo --project=legacy --slow-mo=200"
   },
   "dependencies": {
     "framer-motion": "^12.38.0",

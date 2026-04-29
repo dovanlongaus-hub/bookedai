@@ -214,6 +214,19 @@ async function stubAdminWorkspaceUpgrade(page: Parameters<typeof test>[0]['page'
             published_services: 1,
             updated_at: '2026-04-23T07:00:00Z',
           },
+          {
+            id: 'tenant-future-swim',
+            slug: 'future-swim',
+            name: 'Future Swim Miranda',
+            status: 'active',
+            timezone: 'Australia/Sydney',
+            locale: 'en-AU',
+            industry: 'Swim school',
+            active_memberships: 3,
+            total_services: 4,
+            published_services: 3,
+            updated_at: '2026-04-23T08:00:00Z',
+          },
         ],
       }),
     });
@@ -244,6 +257,46 @@ async function stubAdminWorkspaceUpgrade(page: Parameters<typeof test>[0]['page'
           introduction_html: '<p>Hydration and premium skin treatments.</p>',
           guides: {
             overview: 'Start with scope.',
+            experience: '',
+            catalog: '',
+            plugin: '',
+            bookings: '',
+            integrations: '',
+            billing: '',
+            team: '',
+          },
+        },
+        members: [],
+        services: [],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/tenants/future-swim', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        tenant: {
+          id: 'tenant-future-swim',
+          slug: 'future-swim',
+          name: 'Future Swim Miranda',
+          status: 'active',
+          timezone: 'Australia/Sydney',
+          locale: 'en-AU',
+          industry: 'Swim school',
+          active_memberships: 3,
+          total_services: 4,
+          published_services: 3,
+          updated_at: '2026-04-23T08:00:00Z',
+        },
+        workspace: {
+          logo_url: null,
+          hero_image_url: null,
+          introduction_html: '<p>Structured swim classes in Miranda.</p>',
+          guides: {
+            overview: 'Start with readiness.',
             experience: '',
             catalog: '',
             plugin: '',
@@ -308,11 +361,117 @@ async function stubAdminWorkspaceUpgrade(page: Parameters<typeof test>[0]['page'
     });
   });
 
+  const messagingItems = [
+    {
+      message_key: 'crm_sync_records:42',
+      source_kind: 'crm_sync_records',
+      item_id: '42',
+      channel: 'crm',
+      delivery_status: 'retrying',
+      title: 'Harbour Glow CRM retry',
+      provider: 'Zoho CRM',
+      tenant_id: 'tenant-harbour-glow',
+      tenant_ref: 'harbour-glow',
+      tenant_name: 'Harbour Glow Spa',
+      entity_type: 'booking',
+      entity_id: 'BR-UPGRADE-1',
+      entity_label: 'BR-UPGRADE-1',
+      occurred_at: '2026-04-23T08:00:00Z',
+      latest_event_type: 'crm_sync_retry_required',
+      latest_event_at: '2026-04-23T08:00:00Z',
+      retry_eligible: true,
+      manual_follow_up: false,
+      needs_attention: true,
+      last_error: 'Lead sync needs another retry window.',
+      attempt_count: 2,
+      summary: 'Retrying Zoho CRM sync for Harbour Glow Spa.',
+    },
+    {
+      message_key: 'email_messages:77',
+      source_kind: 'email_messages',
+      item_id: '77',
+      channel: 'email',
+      delivery_status: 'sent',
+      title: 'Future Swim confirmation',
+      provider: 'Zoho Mail',
+      tenant_id: 'tenant-future-swim',
+      tenant_ref: 'future-swim',
+      tenant_name: 'Future Swim Miranda',
+      entity_type: 'booking',
+      entity_id: 'BR-SWIM-1',
+      entity_label: 'BR-SWIM-1',
+      occurred_at: '2026-04-23T08:15:00Z',
+      latest_event_type: 'email_sent',
+      latest_event_at: '2026-04-23T08:15:00Z',
+      retry_eligible: false,
+      manual_follow_up: false,
+      needs_attention: false,
+      last_error: null,
+      attempt_count: 1,
+      summary: 'Confirmation email delivered for Future Swim Miranda.',
+    },
+  ];
+
   await page.route('**/api/admin/messaging?**', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ status: 'ok', items: [] }),
+      body: JSON.stringify({ status: 'ok', items: messagingItems }),
+    });
+  });
+
+  await page.route('**/api/admin/messaging/crm_sync_records/42', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        item: messagingItems[0],
+        events: [
+          {
+            event_id: 'evt-crm-42',
+            event_type: 'crm_sync_retry_required',
+            occurred_at: '2026-04-23T08:00:00Z',
+            detail: 'Retry required before manual review.',
+            payload: {},
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/messaging/email_messages/77', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        item: messagingItems[1],
+        events: [
+          {
+            event_id: 'evt-email-77',
+            event_type: 'email_sent',
+            occurred_at: '2026-04-23T08:15:00Z',
+            detail: 'Confirmation sent.',
+            payload: {},
+          },
+        ],
+      }),
+    });
+  });
+
+  await page.route('**/api/admin/messaging/handoffs?**', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        items: [],
+        total: 0,
+        pending_count: 0,
+        failed_count: 0,
+        claimed_count: 0,
+      }),
     });
   });
 
@@ -387,5 +546,21 @@ test.describe('admin workspace upgrade lanes', () => {
     await expect(auditChronology.getByText('Customer messages', { exact: true })).toBeVisible();
     await expect(auditChronology.getByText('Provider signals', { exact: true })).toBeVisible();
     await expect(auditChronology.getByText('payment attention', { exact: true })).toBeVisible();
+  });
+
+  test('messaging workspace follows the selected tenant context @admin @admin-smoke', async ({
+    page,
+  }) => {
+    await stubAdminWorkspaceUpgrade(page);
+
+    await page.goto('/admin#tenant-workspace');
+    await page.getByRole('button', { name: /Future Swim Miranda/i }).click();
+    await expect(page.locator('#tenant-profile').getByRole('heading', { name: 'Future Swim Miranda' })).toBeVisible();
+
+    await page.getByRole('button', { name: /Open Messaging workspace/i }).click();
+    await expect(page.locator('#messaging-list').getByText('Messaging workspace', { exact: true })).toBeVisible();
+    await expect(page.locator('#messaging-list').getByText('Future Swim confirmation')).toBeVisible();
+    await expect(page.locator('#messaging-list').getByText('Harbour Glow CRM retry')).toHaveCount(0);
+    await expect(page.locator('#message-detail').getByText('Current tenant context: Future Swim Miranda.')).toBeVisible();
   });
 });

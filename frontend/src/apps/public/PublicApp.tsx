@@ -100,6 +100,39 @@ const launchSetupCards = [
   },
 ] as const;
 
+const servicePackages = [
+  {
+    name: 'Launch',
+    price: 'A$79/mo',
+    setup: 'A$0 setup',
+    fit: 'Solo operators and micro teams',
+    promise: 'One booking-ready page, one customer channel, one service catalog.',
+    flow: ['Customer asks', 'BookedAI captures details', 'Portal + email follow-up'],
+    cta: 'Start Launch',
+    featured: false,
+  },
+  {
+    name: 'Grow',
+    price: 'A$249/mo',
+    setup: 'A$499 setup + 3% captured revenue',
+    fit: 'Established service SMEs',
+    promise: 'Managed setup across web, Telegram, WhatsApp, CRM, calendar, and follow-up.',
+    flow: ['Customer asks', 'AI shortlists', 'Book + pay + care'],
+    cta: 'Start Grow pilot',
+    featured: true,
+  },
+  {
+    name: 'Scale',
+    price: 'A$999+/mo',
+    setup: 'Custom setup',
+    fit: 'Multi-location teams and platforms',
+    promise: 'Templates, API/webhooks, SLA, reporting, and a named success owner.',
+    flow: ['Multi-location intake', 'Team controls', 'Revenue ops review'],
+    cta: 'Plan Scale',
+    featured: false,
+  },
+] as const;
+
 const outcomeCards = [
   {
     icon: MessageSquareText,
@@ -725,18 +758,18 @@ export function PublicApp() {
       </section>
 
       <section id="sme-launch-offer" className="px-4 py-10 sm:px-6 lg:px-8">
-        <div className="mx-auto grid max-w-[1440px] gap-5 rounded-[2rem] border border-[#d8d0c0] bg-[#fffdf8] p-5 shadow-[0_24px_70px_rgba(86,73,50,0.08)] sm:p-7 lg:grid-cols-[0.72fr_1.28fr] lg:p-8">
+        <div className="mx-auto max-w-[1440px] rounded-[2rem] border border-[#d8d0c0] bg-[#fffdf8] p-5 shadow-[0_24px_70px_rgba(86,73,50,0.08)] sm:p-7 lg:p-8">
           <div>
             <div className="inline-flex items-center gap-2 rounded-full border border-[#c9ddd7] bg-[#eaf4f1] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#19684b]">
-              Launch offer for SMEs
+              Service packages for SMEs
             </div>
-            <h2 className="mt-5 max-w-xl text-3xl font-semibold leading-tight tracking-[-0.045em] text-[#172033] sm:text-4xl">
-              Launch a booking-ready business page in days, not months.
+            <h2 className="mt-5 max-w-3xl text-3xl font-semibold leading-tight tracking-[-0.045em] text-[#172033] sm:text-4xl">
+              Three simple ways to get BookedAI live.
             </h2>
-            <p className="mt-4 max-w-2xl text-sm leading-7 text-[#586173] sm:text-base">
-              Tell us your service, pricing, availability, and preferred contact details. BookedAI
-              sets up the page, inbox, CRM, and booking or meeting flow so customers can enquire,
-              book, and receive follow-up without your team stitching tools together.
+            <p className="mt-4 max-w-3xl text-sm leading-7 text-[#586173] sm:text-base">
+              Pick the level of help you need. Every package keeps the same customer path:
+              search, shortlist, booking request, thank-you, portal, payment posture, email,
+              SMS/WhatsApp, calendar, CRM, and care.
             </p>
             <div className="mt-6 flex flex-wrap gap-3">
               <button
@@ -761,7 +794,81 @@ export function PublicApp() {
             </div>
           </div>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="mt-7 grid gap-3 lg:grid-cols-3">
+            {servicePackages.map((pack) => (
+              <article
+                key={pack.name}
+                className={`rounded-[1.25rem] border p-5 ${
+                  pack.featured
+                    ? 'border-[#172033] bg-[#172033] text-white shadow-[0_22px_54px_rgba(23,32,51,0.18)]'
+                    : 'border-[#e4dccd] bg-white text-[#172033]'
+                }`}
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className={`text-[11px] font-bold uppercase tracking-[0.16em] ${
+                      pack.featured ? 'text-[#8efce0]' : 'text-[#19684b]'
+                    }`}>
+                      {pack.fit}
+                    </div>
+                    <h3 className="mt-2 text-2xl font-semibold tracking-[-0.04em]">{pack.name}</h3>
+                  </div>
+                  <div className={`rounded-full px-3 py-1 text-xs font-bold ${
+                    pack.featured ? 'bg-white text-[#172033]' : 'bg-[#eaf4f1] text-[#19684b]'
+                  }`}>
+                    {pack.price}
+                  </div>
+                </div>
+                <p className={`mt-3 text-sm leading-6 ${pack.featured ? 'text-slate-200' : 'text-[#586173]'}`}>
+                  {pack.promise}
+                </p>
+                <div className={`mt-4 rounded-[1rem] px-3 py-3 ${
+                  pack.featured ? 'bg-white/[0.08] ring-1 ring-white/10' : 'bg-[#f6f2ea] ring-1 ring-[#e4dccd]'
+                }`}>
+                  <div className={`text-[11px] font-bold uppercase tracking-[0.14em] ${
+                    pack.featured ? 'text-[#8efce0]' : 'text-[#7b6b4c]'
+                  }`}>
+                    Full booking flow
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {pack.flow.map((item) => (
+                      <span
+                        key={item}
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold ${
+                          pack.featured ? 'bg-white/10 text-white' : 'bg-white text-[#586173] ring-1 ring-[#e4dccd]'
+                        }`}
+                      >
+                        {item}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                <div className={`mt-4 text-sm font-semibold ${pack.featured ? 'text-white' : 'text-[#172033]'}`}>
+                  {pack.setup}
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    navigateTo(
+                      `/register-interest?source_section=homepage_service_packages&package=${pack.name.toLowerCase()}`,
+                      'homepage_service_package_clicked',
+                      { package: pack.name },
+                    )
+                  }
+                  className={`mt-5 inline-flex w-full items-center justify-center gap-2 rounded-full px-4 py-3 text-sm font-bold transition ${
+                    pack.featured
+                      ? 'bg-white text-[#172033] hover:bg-[#eef4f2]'
+                      : 'bg-[#172033] text-white hover:bg-[#263147]'
+                  }`}
+                >
+                  {pack.cta}
+                  <ArrowRight className="h-4 w-4" aria-hidden="true" />
+                </button>
+              </article>
+            ))}
+          </div>
+
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {launchSetupCards.map((card) => (
               <article key={card.title} className="rounded-[1.25rem] border border-[#e4dccd] bg-white p-5">
                 <h3 className="text-base font-semibold tracking-[-0.03em] text-[#172033]">{card.title}</h3>

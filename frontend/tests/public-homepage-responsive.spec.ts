@@ -18,7 +18,11 @@ test.describe('public homepage responsive qa', () => {
 
     await expect(page.getByRole('button', { name: /See a live booking flow/i }).first()).toBeVisible();
     await expect(page.getByRole('button', { name: /Get my booking page set up/i }).first()).toBeVisible();
-    await expect(page.getByRole('heading', { name: /Launch a booking-ready business page/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Three simple ways to get BookedAI live/i })).toBeVisible();
+    await expect(page.getByText(/Launch/i).first()).toBeVisible();
+    await expect(page.getByText(/Grow/i).first()).toBeVisible();
+    await expect(page.getByText(/Scale/i).first()).toBeVisible();
+    await expect(page.getByText(/search, shortlist, booking request, thank-you, portal/i)).toBeVisible();
     await expect(page.getByText(/reply while the customer is still ready to book/i)).toBeVisible();
     await expect(page.getByText(/keep email, CRM, payment, and customer care aligned/i)).toBeVisible();
     await page.locator('#agent-activity-proof').scrollIntoViewIfNeeded();

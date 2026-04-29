@@ -2623,10 +2623,30 @@ function RegistrationForm({ t, locale, preselectedProgram, onSelectProgram }: { 
     setStatus('submitting');
     setErrorMessage(null);
     try {
-      const response = await fetch('/api/v1/leads', {
+      const response = await fetch(`/api/v1/public/leads/${AI_MENTOR_TENANT_REF}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ tenant_ref: AI_MENTOR_TENANT_REF, locale, full_name: fullName.trim(), email: email.trim().toLowerCase(), phone: phone.trim() || null, interest: program || null, message: message.trim() || null, source: 'aimentor_bookedai_au', medium: 'partner_subdomain', campaign: 'aimentor_register_form', surface: 'aimentor_bookedai_au_partner_app' }),
+        body: JSON.stringify({
+          lead_type: 'booking_request',
+          contact: {
+            full_name: fullName.trim(),
+            email: email.trim().toLowerCase(),
+            phone: phone.trim() || null,
+            preferred_contact_method: phone.trim() ? 'phone' : 'email',
+          },
+          business_context: {
+            business_name: program || 'AI Mentor 1-1 Pro',
+            service_category: 'ai_mentoring',
+          },
+          attribution: {
+            source: 'aimentor_bookedai_au',
+            medium: 'partner_subdomain',
+            campaign: 'aimentor_register_form',
+            landing_path: '/aimentor',
+            locale,
+          },
+          intent_notes: message.trim() || null,
+        }),
       });
       if (!response.ok) {
         const payload = await response.json().catch(() => null);

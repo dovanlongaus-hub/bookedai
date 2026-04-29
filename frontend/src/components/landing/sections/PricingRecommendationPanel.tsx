@@ -35,17 +35,16 @@ export function PricingRecommendationPanel({
         <div>
           <div className="template-kicker text-sm">Need help choosing?</div>
           <h3 className="template-title mt-3 max-w-[10ch] text-2xl font-semibold tracking-tight text-slate-950 sm:text-3xl">
-            Choose the engine that matches your operating maturity
+            Choose the package that matches your booking reality
           </h3>
           <p className="template-body mt-4 max-w-[26rem] text-base leading-7">
-            Starter Engine is free SaaS to validate fit, Growth Engine is the default aligned-incentive path for most SMEs,
-            and Enterprise Engine takes over when scale, SLA, and a dedicated CSM matter.
+            Launch is the light first path, Grow is the managed SME default, and Scale is for teams that need multiple locations, API, SLA, and a success owner.
           </p>
           <div className="mt-5 flex flex-wrap gap-2">
             {[
-              'Starter for free SaaS validation',
-              'Growth as the aligned default',
-              'Enterprise when scale + SLA matter',
+              'Launch for one booking page',
+              'Grow as the managed default',
+              'Scale when locations + SLA matter',
             ].map((item) => (
               <SignalPill key={item} className="px-3 py-2 text-[11px]">
                 {item}
@@ -55,9 +54,9 @@ export function PricingRecommendationPanel({
 
           <div className="mt-6 grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
             {[
-              ['Free at the bottom', 'Starter Engine is A$79/mo with no setup fee and 0% commission so solo and micro teams can prove fit fast.'],
-              ['Aligned in the middle', 'Growth Engine is A$249/mo + A$499 onboarding + 3% on net booked revenue captured or recovered through BookedAI.'],
-              ['Premium at the top', 'Enterprise Engine is A$999+/mo with custom rollout, white-label, SLA, named CSM, and 5% on attributable revenue (floor + cap negotiated).'],
+              ['Launch', 'A$79/mo with no setup fee and 0% commission for one booking-ready page and one channel.'],
+              ['Grow', 'A$249/mo + A$499 onboarding + 3% on captured revenue for managed SME conversion.'],
+              ['Scale', 'A$999+/mo with custom rollout, templates, API, SLA, and named success owner.'],
             ].map(([title, body]) => (
               <SectionCard key={title} tone="subtle" className="rounded-[1.15rem] px-4 py-4">
                 <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">{title}</div>

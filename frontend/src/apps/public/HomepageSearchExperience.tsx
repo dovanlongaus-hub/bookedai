@@ -236,9 +236,9 @@ const SEARCH_PROGRESS_PROMPTS = [
   'Ask me to compare by closest, fastest, price, or best reviewed.',
 ] as const;
 const BOOKING_EMPTY_STEPS = [
-  'Send a booking request',
-  'Review ranked matches',
-  'Choose one option to unlock booking',
+  'Search for the service',
+  'Choose one match',
+  'Book through thank-you',
 ] as const;
 
 type FollowUpQuestion = {
@@ -545,8 +545,6 @@ type CommunicationPreviewCard = {
   channel: string;
   tone: 'dark' | 'light' | 'success';
   recipient: string;
-  summary: string;
-  body: string;
 };
 
 type EnterpriseJourneyStep = {
@@ -579,6 +577,14 @@ function CheckIcon({ className = 'h-5 w-5' }: { className?: string }) {
   return (
     <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
       <path d="m5 12 4.2 4.2L19 6.5" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function CloseIcon({ className = 'h-5 w-5' }: { className?: string }) {
+  return (
+    <svg aria-hidden="true" viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor">
+      <path d="m7 7 10 10M17 7 7 17" strokeWidth="1.9" strokeLinecap="round" />
     </svg>
   );
 }
@@ -1062,32 +1068,13 @@ function buildOperationTimeline(result: BookingAssistantSessionResponse): Operat
   ];
 }
 
-function paymentReadyCopy(result: BookingAssistantSessionResponse) {
-  return result.payment_status === 'stripe_checkout_ready'
-    ? `Pay here: ${result.payment_url}`
-    : 'Payment follow-up will be sent separately.';
-}
-
 function buildCommunicationPreviewCards(params: {
-  result: BookingAssistantSessionResponse;
-  customerName: string;
   customerEmail: string;
   customerPhone: string;
 }) {
-  const { result, customerName, customerEmail, customerPhone } = params;
-  const displayName = customerName.trim() || 'Customer';
+  const { customerEmail, customerPhone } = params;
   const normalizedEmail = customerEmail.trim().toLowerCase();
   const normalizedPhone = normalizePhoneForMessaging(customerPhone) ?? customerPhone.trim();
-  const slotLine = `${result.requested_date} at ${result.requested_time} ${result.timezone}`;
-  const serviceLabel = result.service.name;
-  const paymentLine =
-    result.payment_status === 'stripe_checkout_ready'
-      ? `Payment link: ${result.payment_url}`
-      : 'Payment will be completed after manual confirmation.';
-  const calendarLine =
-    result.meeting_event_url || result.calendar_add_url
-      ? `Calendar link: ${result.meeting_event_url ?? result.calendar_add_url}`
-      : 'A calendar invite will be sent to you once the booking is confirmed.';
 
   const cards: CommunicationPreviewCard[] = [];
 
@@ -1098,8 +1085,6 @@ function buildCommunicationPreviewCards(params: {
       channel: 'Email',
       tone: 'dark',
       recipient: normalizedEmail,
-      summary: 'Your booking confirmation with reference, payment status, and portal link.',
-      body: `Subject: Your ${serviceLabel} booking is confirmed\n\nHi ${displayName},\n\nThanks for choosing ${serviceLabel}. Your booking reference is ${result.booking_reference}.\nRequested slot: ${slotLine}.\n${paymentLine}\n${calendarLine}\nPortal: ${getBookingPortalUrl(result)}\n\nThe BookedAI team`,
     });
   }
 
@@ -1110,8 +1095,6 @@ function buildCommunicationPreviewCards(params: {
       channel: 'SMS',
       tone: 'light',
       recipient: normalizedPhone,
-      summary: 'A short reminder with your booking reference and portal link.',
-      body: `${displayName}, your ${serviceLabel} booking ref is ${result.booking_reference}. Slot: ${slotLine}. ${paymentReadyCopy(result)} Portal: ${getBookingPortalUrl(result)}`,
     });
     cards.push({
       id: 'whatsapp',
@@ -1119,8 +1102,6 @@ function buildCommunicationPreviewCards(params: {
       channel: 'WhatsApp',
       tone: 'success',
       recipient: normalizedPhone,
-      summary: 'A richer channel for payment reminders, reschedule help, and follow-up questions.',
-      body: `Hi ${displayName}, thanks for booking ${serviceLabel} with BookedAI.\nBooking reference: ${result.booking_reference}\nRequested slot: ${slotLine}\n${paymentLine}\nIf you need to reschedule or ask a question, reply here and our team will continue the conversation.`,
     });
   }
 
@@ -1403,11 +1384,17 @@ function buildAuthoritativeBookingIntentResult(params: {
       ? `A$${selectedService.amount_aud}`
       : 'TBC';
   const detailLine = nextStep?.trim() || authoritativeResult.warnings[0] || 'We will confirm the final slot with the provider.';
+  const meetingUrl =
+    authoritativeResult.meetingUrl?.trim() || null;
+  const calendarEventUrl =
+    authoritativeResult.calendarUrl?.trim() || null;
 
   return {
     status: 'ok',
     booking_reference: bookingReference,
-    portal_url: `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(bookingReference)}`,
+    portal_url:
+      authoritativeResult.portalUrl?.trim() ||
+      `https://portal.bookedai.au/?booking_reference=${encodeURIComponent(bookingReference)}`,
     service: selectedService,
     amount_aud: selectedService.amount_aud,
     amount_label: amountLabel,
@@ -1418,9 +1405,9 @@ function buildAuthoritativeBookingIntentResult(params: {
     payment_url: '',
     qr_code_url: '',
     email_status: authoritativeResult.emailStatus === 'sent' && customerEmail.trim() ? 'sent' : 'pending_manual_followup',
-    meeting_status: 'configuration_required',
-    meeting_join_url: null,
-    meeting_event_url: null,
+    meeting_status: meetingUrl || calendarEventUrl ? 'scheduled' : 'configuration_required',
+    meeting_join_url: meetingUrl,
+    meeting_event_url: calendarEventUrl,
     calendar_add_url: null,
     confirmation_message: `Booking request captured in v1. ${detailLine}`,
     contact_email: supportEmail,
@@ -3669,6 +3656,10 @@ export function HomepageSearchExperience({
               return {
                 ...currentResult,
                 automation,
+                payment_status: automation.paymentIntent?.checkoutUrl
+                  ? 'stripe_checkout_ready'
+                  : currentResult.payment_status,
+                payment_url: automation.paymentIntent?.checkoutUrl ?? currentResult.payment_url,
               };
             });
           })
@@ -3773,13 +3764,11 @@ export function HomepageSearchExperience({
     () =>
       result
         ? buildCommunicationPreviewCards({
-            result,
-            customerName,
             customerEmail,
             customerPhone,
           })
         : [],
-    [customerEmail, customerName, customerPhone, result],
+    [customerEmail, customerPhone, result],
   );
   const workspaceSummary =
     (hasActiveQuery ? assistantSummary : '') || content.ui.shortlistBody || content.ui.resultsEmptyBody;
@@ -5035,10 +5024,10 @@ export function HomepageSearchExperience({
           <div className="order-8 mt-3 hidden rounded-[1.2rem] border border-slate-200 bg-apple-light px-4 py-4 xl:block">
             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">Booking flow</div>
             <div className="mt-2 text-base font-semibold text-apple-near-black">
-              One calm path from search to booking.
+              Simple on screen, full BookedAI behind it.
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
-              {['Search', 'Choose', 'Book'].map((item) => (
+              {['Search', 'Choose', 'Book', 'Thank you'].map((item) => (
                 <div key={item} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-semibold text-slate-600 ring-1 ring-apple-ring-neutral-200">
                   {item}
                 </div>
@@ -5161,11 +5150,11 @@ export function HomepageSearchExperience({
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                   <div>
                     <div className="text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700">
-                      Brief
+                      Next
                     </div>
-                    <div className="mt-1 font-semibold">Confirm details for the selected match</div>
+                    <div className="mt-1 font-semibold">Fill name, contact, and preferred time</div>
                     <div className="mt-1 text-xs leading-5 text-emerald-800">
-                      Capture contact details, timing, and any decision-critical context. Reopen comparison only if the brief changes.
+                      BookedAI keeps the selected service locked, then creates the reference, portal, confirmations, and follow-up.
                     </div>
                   </div>
                   <div className="rounded-full bg-white px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-emerald-700 ring-1 ring-emerald-200">
@@ -5215,7 +5204,7 @@ export function HomepageSearchExperience({
               </div>
               <div className="mt-3 text-sm font-semibold text-apple-near-black">Booking form unlocks after a match is selected.</div>
               <p className="mx-auto mt-2 max-w-[18rem] text-sm leading-6 text-slate-500">
-                Keep the flow conversational first. Once a result is chosen, BookedAI carries that context into the booking brief.
+                Search first, pick the best match, then BookedAI carries the rest to thank-you and portal.
               </p>
               <div className="mt-4 space-y-2 text-left">
                 {BOOKING_EMPTY_STEPS.map((item, index) => (
@@ -5246,14 +5235,14 @@ export function HomepageSearchExperience({
                 </div>
                 {selectedService ? (
                   <p className="mt-2 text-sm leading-6 text-apple-near-black/62">
-                    Complete the booking brief for <span className="font-semibold text-apple-near-black">{selectedService.name}</span>. This match stays locked for the request.
+                    Add the minimum details for <span className="font-semibold text-apple-near-black">{selectedService.name}</span>. The full flow continues after submit.
                   </p>
                 ) : null}
                 <div className="mt-3 grid gap-2 sm:grid-cols-3">
                   {[
                     ['1', 'Contact', 'Name plus email or phone'],
-                    ['2', 'Preferred time', 'Pick the best slot'],
-                    ['3', 'Next step', 'Portal, QR, and follow-up'],
+                    ['2', 'Time', 'Preferred date and time'],
+                    ['3', 'Thank you', 'Reference, portal, care'],
                   ].map(([number, title, body]) => (
                     <div key={title} className="rounded-[0.95rem] border border-slate-200 bg-slate-50 px-3 py-3">
                       <div className="flex items-center gap-2">
@@ -5426,7 +5415,7 @@ export function HomepageSearchExperience({
                       {content.ui.thankYouBody}
                     </p>
                     <p className="mt-2 max-w-md text-sm leading-6 text-white/86">
-                      Your booking code, portal QR, and follow-up path are ready. You can review, edit, reschedule, or ask for help from the same booking record.
+                      Your booking code, portal QR, payment posture, calendar, email/SMS/WhatsApp follow-up, CRM trail, and care path are ready.
                     </p>
                     <p className="mt-2 text-sm leading-6 text-white/78">{result.confirmation_message}</p>
                     <div className="mt-3 inline-flex rounded-full bg-white/14 px-3 py-1.5 text-[11px] font-semibold text-white/90 ring-1 ring-white/14">
@@ -5434,10 +5423,10 @@ export function HomepageSearchExperience({
                     </div>
                     <div className="mt-4 rounded-[1rem] bg-white/12 px-3 py-3 ring-1 ring-white/12">
                       <div className="text-xs font-semibold uppercase tracking-[0.14em] text-white/70">
-                        Customer portal and edit flow
+                        What happens next
                       </div>
                       <p className="mt-1 text-xs leading-5 text-white/82">
-                        Scan the QR or open the live portal to review booking details, edit the request, reschedule, cancel, or save this booking. The same portal link is included in the confirmation email and follow-up flow.
+                        Open the portal to review details, edit, reschedule, cancel, or ask for help. The same link is sent in the confirmation flow.
                       </p>
                       <a
                         href={getBookingPortalUrl(result)}
@@ -5492,75 +5481,86 @@ export function HomepageSearchExperience({
                 </div>
               </div>
 
-              <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                  {[
-                    {
-                      title: 'Review booking',
-                      body: 'Open the portal to review the current booking details and booking reference.',
-                      label: 'Open portal',
-                      href: getBookingPortalUrl(result),
-                    },
-                    {
-                      title: 'Edit and submit',
-                      body: 'Use the same portal flow to adjust details, then resubmit the booking request.',
-                      label: 'Edit in portal',
-                      href: getBookingPortalUrl(result, 'edit'),
-                    },
-                    {
-                      title: 'Reschedule request',
-                      body: 'If the time no longer works, request a new slot from the booking portal.',
-                      label: 'Request reschedule',
-                      href: getBookingPortalUrl(result, 'reschedule'),
-                    },
-                    {
-                      title: 'Cancel request',
-                      body: 'If plans changed, submit a cancellation request from the same managed flow.',
-                      label: 'Request cancellation',
-                      href: getBookingPortalUrl(result, 'cancel'),
-                    },
-                    {
-                      title: 'Telegram care',
-                      body: `Open BookedAI Manager Bot with booking ${result.booking_reference} ready in the new chat session for ${result.service.name}.`,
-                      label: 'Open Telegram',
-                      href: buildTelegramCareUrl({
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+                {[
+                  {
+                    title: 'Review booking',
+                    label: 'Portal',
+                    href: getBookingPortalUrl(result),
+                    icon: 'portal',
+                  },
+                  {
+                    title: 'Edit',
+                    label: 'Edit',
+                    href: getBookingPortalUrl(result, 'edit'),
+                    icon: 'edit',
+                  },
+                  {
+                    title: 'Reschedule',
+                    label: 'Move time',
+                    href: getBookingPortalUrl(result, 'reschedule'),
+                    icon: 'calendar',
+                  },
+                  {
+                    title: 'Cancel',
+                    label: 'Cancel',
+                    href: getBookingPortalUrl(result, 'cancel'),
+                    icon: 'cancel',
+                  },
+                  {
+                    title: 'Telegram',
+                    label: 'Care',
+                    href: buildTelegramCareUrl({
+                      bookingReference: result.booking_reference,
+                      serviceName: result.service.name,
+                    }),
+                    icon: 'message',
+                    onTelegramClick: (event: ReactMouseEvent<HTMLAnchorElement>) => {
+                      void handleTelegramCareClick(event, {
                         bookingReference: result.booking_reference,
                         serviceName: result.service.name,
-                      }),
-                      onTelegramClick: (event: ReactMouseEvent<HTMLAnchorElement>) => {
-                        void handleTelegramCareClick(event, {
-                          bookingReference: result.booking_reference,
-                          serviceName: result.service.name,
-                        });
-                      },
+                      });
                     },
-                  ].map((item) => (
+                  },
+                ].map((item) => (
                   <a
                     key={item.title}
                     href={item.href}
                     onClick={(item as { onTelegramClick?: (event: ReactMouseEvent<HTMLAnchorElement>) => void }).onTelegramClick}
                     target="_blank"
                     rel="noreferrer"
-                    className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4 transition hover:border-apple-paper-blue-300 hover:bg-apple-paper-blue-50"
+                    aria-label={item.title}
+                    title={item.title}
+                    className="group flex min-h-[5.75rem] min-w-0 flex-col items-center justify-center gap-2 rounded-[0.9rem] border border-slate-200 bg-white px-2.5 py-3 text-center transition hover:border-apple-paper-blue-300 hover:bg-apple-paper-blue-50"
                   >
-                    <div className="text-[11px] font-semibold uppercase tracking-[0.14em] text-apple-blue">{item.title}</div>
-                    <div className="mt-2 text-sm leading-6 text-slate-600">{item.body}</div>
-                    <div className="mt-3 inline-flex rounded-full bg-apple-paper-blue-100 px-2.5 py-1 text-xs font-semibold uppercase tracking-[0.12em] text-apple-blue">
+                    <span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-apple-paper-blue-100 text-apple-blue ring-1 ring-apple-paper-blue-200 transition group-hover:bg-white">
+                      {item.icon === 'portal' ? <QrIcon className="h-4 w-4" /> : null}
+                      {item.icon === 'edit' ? <LinkIcon className="h-4 w-4" /> : null}
+                      {item.icon === 'calendar' ? <CalendarIcon className="h-4 w-4" /> : null}
+                      {item.icon === 'cancel' ? <CloseIcon className="h-4 w-4" /> : null}
+                      {item.icon === 'message' ? <MessageIcon className="h-4 w-4" /> : null}
+                    </span>
+                    <span className="max-w-full truncate text-[11px] font-semibold uppercase tracking-[0.08em] text-slate-500">
+                      {item.title}
+                    </span>
+                    <span className="max-w-full truncate rounded-full bg-apple-paper-blue-100 px-2.5 py-1 text-xs font-semibold text-apple-blue">
                       {item.label}
-                    </div>
+                    </span>
                   </a>
                 ))}
               </div>
 
-              <div className="public-apple-workspace-panel-soft rounded-[0.95rem] px-4 py-3">
-                <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
-                  {content.ui.followUpLabel}
+              <div className="public-apple-workspace-panel-soft flex flex-wrap items-center justify-between gap-2 rounded-[0.95rem] px-4 py-3">
+                <div className="min-w-0">
+                  <div className="text-xs font-semibold uppercase tracking-[0.14em] text-slate-500">
+                    {content.ui.followUpLabel}
+                  </div>
+                  <div className="mt-1 truncate text-sm font-semibold text-apple-near-black">
+                    {result.email_status === 'sent' ? 'Email sent' : 'Manual follow-up'}
+                  </div>
                 </div>
-                <div className="mt-1 text-sm font-semibold text-apple-near-black">
-                  {result.email_status === 'sent' ? 'Email sent' : 'Manual follow-up'}
-                </div>
-                <div className="mt-0.5 text-xs text-slate-500">From info@bookedai.au to {result.contact_email}</div>
-                <div className="mt-2 text-xs leading-5 text-slate-500">
-                  The confirmation email should include the same portal link, booking reference, payment path, and calendar action so the customer can review or edit later without losing context.
+                <div className="max-w-full truncate rounded-full bg-white px-3 py-1 text-xs font-semibold text-slate-600 ring-1 ring-slate-200">
+                  info@bookedai.au to {result.contact_email}
                 </div>
               </div>
 
@@ -5577,17 +5577,19 @@ export function HomepageSearchExperience({
 
               {communicationPreviewCards.length > 0 ? (
                 <div className="rounded-[1rem] border border-slate-200 bg-white px-4 py-4">
-                  <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
-                    Communication drafts
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
+                      Communication
+                    </div>
+                    <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      {communicationPreviewCards.length} channel{communicationPreviewCards.length === 1 ? '' : 's'}
+                    </div>
                   </div>
-                  <div className="mt-1 text-sm font-semibold text-slate-950">
-                    Customer-facing follow-up prepared from the booking result
-                  </div>
-                  <div className="mt-3 grid gap-3 lg:grid-cols-3">
+                  <div className="mt-3 grid gap-2 sm:grid-cols-3">
                     {communicationPreviewCards.map((card) => (
                       <div
                         key={card.id}
-                        className={`rounded-[1rem] px-3 py-3 ${
+                        className={`min-w-0 rounded-[0.9rem] px-3 py-3 ${
                           card.tone === 'dark'
                             ? 'bg-slate-950 text-white'
                             : card.tone === 'success'
@@ -5595,21 +5597,22 @@ export function HomepageSearchExperience({
                               : 'bg-slate-50 text-slate-900 ring-1 ring-slate-200'
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-3">
-                          <div>
-                            <div className="text-xs font-semibold uppercase tracking-[0.14em] opacity-70">
+                        <div className="flex min-w-0 items-center gap-2">
+                          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/15 ring-1 ring-current/10">
+                            {card.id === 'email' ? <MailIcon className="h-4 w-4" /> : null}
+                            {card.id === 'sms' ? <PhoneIcon className="h-4 w-4" /> : null}
+                            {card.id === 'whatsapp' ? <MessageIcon className="h-4 w-4" /> : null}
+                          </span>
+                          <div className="min-w-0">
+                            <div className="truncate text-xs font-semibold uppercase tracking-[0.12em] opacity-70">
                               {card.channel}
                             </div>
-                            <div className="mt-1 text-sm font-semibold">{card.title}</div>
-                          </div>
-                          <div className="rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">
-                            {card.recipient}
+                            <div className="mt-0.5 truncate text-sm font-semibold">{card.title}</div>
                           </div>
                         </div>
-                        <div className="mt-2 text-[11px] leading-5 opacity-80">{card.summary}</div>
-                        <pre className="mt-3 whitespace-pre-wrap break-words rounded-[0.9rem] bg-white/10 px-3 py-3 text-[11px] leading-5">
-                          {card.body}
-                        </pre>
+                        <div className="mt-3 truncate rounded-full bg-white/15 px-2.5 py-1 text-xs font-semibold">
+                          {card.recipient}
+                        </div>
                       </div>
                     ))}
                   </div>

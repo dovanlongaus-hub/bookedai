@@ -36,6 +36,7 @@ class ZohoSlotProvisioningResult:
     meeting_url: str | None
     meeting_id: str | None
     calendar_event_id: str | None
+    calendar_event_url: str | None
     meeting_error: str | None
     calendar_error: str | None
 
@@ -136,6 +137,7 @@ async def provision_slot_artifacts(
         meeting_error = "zoho_meeting_not_configured"
 
     calendar_event_id: str | None = None
+    calendar_event_url: str | None = None
     calendar_error: str | None = None
     if calendar.configured(settings):
         try:
@@ -160,6 +162,9 @@ async def provision_slot_artifacts(
                 meeting_url=meeting_url,
             )
             calendar_event_id = calendar_result.get("event_id")
+            calendar_event_url = calendar_result.get("link")
+            if not meeting_url:
+                meeting_url = calendar_result.get("meeting_url")
         except Exception as exc:  # noqa: BLE001
             calendar_error = str(exc)
             _logger.warning(
@@ -185,6 +190,7 @@ async def provision_slot_artifacts(
         meeting_url=meeting_url,
         meeting_id=meeting_id,
         calendar_event_id=calendar_event_id,
+        calendar_event_url=calendar_event_url,
         meeting_error=meeting_error,
         calendar_error=calendar_error,
     )

@@ -19,8 +19,11 @@ async function getActiveAssistantInput(page: Parameters<typeof test>[0]['page'])
 
   const homepageSearchInput = page
     .locator('#bookedai-search-assistant')
-    .getByPlaceholder(/What service do you want to book today\?/i)
+    .getByRole('textbox', { name: /Ask BookedAI/i })
     .first();
+  if ((await homepageSearchInput.count()) > 0) {
+    await homepageSearchInput.scrollIntoViewIfNeeded();
+  }
   if (await isVisible(homepageSearchInput, 500)) {
     return homepageSearchInput;
   }
@@ -30,6 +33,11 @@ async function getActiveAssistantInput(page: Parameters<typeof test>[0]['page'])
 
 async function openAssistant(page: Parameters<typeof test>[0]['page']) {
   await page.goto('/');
+  await page
+    .locator('#bookedai-search-assistant')
+    .first()
+    .scrollIntoViewIfNeeded({ timeout: 10000 })
+    .catch(() => undefined);
   const assistantInput = await getActiveAssistantInput(page);
   await expect(assistantInput).toBeVisible({ timeout: 10000 });
 }
@@ -361,8 +369,10 @@ test.describe('public assistant location guardrails', () => {
 
     await submitAssistantQuery(page, 'chess classes near me');
 
-    await expect.poll(() => searchRequestBodies.length).toBeGreaterThanOrEqual(3);
+    await expect.poll(() => searchRequestBodies.length).toBeGreaterThanOrEqual(2);
     expect(searchRequestBodies[1]?.user_location ?? null).toBeNull();
+    await page.getByRole('button', { name: /Use current location/i }).click();
+    await expect.poll(() => searchRequestBodies.length).toBeGreaterThanOrEqual(3);
     expect(searchRequestBodies[2]?.user_location).toEqual({
       latitude: -33.8688,
       longitude: 151.2093,

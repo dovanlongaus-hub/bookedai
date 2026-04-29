@@ -57,7 +57,7 @@ type TimeSlot = {
   booked_count: number;
   seats_available: number;
   label: string | null;
-  zoho_meeting_url: string | null;
+  zoho_meeting_url?: string | null;
 };
 
 type ReserveResult = {
@@ -74,9 +74,21 @@ type ReserveResult = {
   meeting: {
     join_url: string | null;
     calendar_event_id: string | null;
+    calendar_event_url?: string | null;
     provisioned: boolean;
     fallback: string | null;
   };
+  portal?: {
+    url: string | null;
+    access_token?: string | null;
+  } | null;
+  crm_sync?: {
+    lead?: { sync_status?: string | null };
+    contact?: { sync_status?: string | null };
+    deal?: { sync_status?: string | null };
+    task?: { sync_status?: string | null };
+    warning_codes?: string[];
+  } | null;
 };
 
 type Message =
@@ -286,7 +298,7 @@ const chatCopy = {
 
 const KEYWORD_INTENT: Record<string, string[]> = {
   // English keywords + Vietnamese keywords mapped to program IDs
-  'first-app': ['first', '60', 'sixty', 'beginner', 'start', 'prototype', 'app đầu', '60 phút', 'người mới', 'prototype'],
+  'first-ai-app': ['first', 'first ai', 'first app', '1 hour', '60', 'sixty', 'beginner', 'start', 'prototype', 'app đầu', '60 phút', 'người mới', 'prototype'],
   executes: ['automate', 'automation', 'workflow', 'save time', 'email triage', 'tự động', 'vận hành', 'tiết kiệm', '5 giờ'],
   'real-product': ['real product', 'monetize', 'paying', 'launch', 'stripe', 'sản phẩm', 'doanh thu', 'monetiz', '10 giờ', 'product'],
   'project-builder': ['project', 'roadmap', 'sprint', 'custom', 'dự án', 'tuỳ chỉnh', 'custom'],
@@ -2035,7 +2047,30 @@ function SuccessCard({
         <a href={icsUrl} download={icsFilename} style={successCtaSecondary}>
           ⬇ {t.successDownloadIcs}
         </a>
+        {result.portal?.url ? (
+          <a href={result.portal.url} target="_blank" rel="noreferrer" style={successCtaSecondary}>
+            🔐 {locale === 'vi' ? 'Mở portal' : 'Open portal'}
+          </a>
+        ) : null}
       </div>
+      {result.crm_sync ? (
+        <p
+          style={{
+            marginTop: 8,
+            fontSize: '0.76rem',
+            color: 'var(--aim-muted)',
+            lineHeight: 1.5,
+          }}
+        >
+          {locale === 'vi' ? 'CRM/email/calendar: ' : 'CRM/email/calendar: '}
+          {[
+            result.crm_sync.lead?.sync_status,
+            result.crm_sync.contact?.sync_status,
+            result.crm_sync.deal?.sync_status,
+            result.crm_sync.task?.sync_status,
+          ].filter(Boolean).join(' · ') || 'queued'}
+        </p>
+      ) : null}
       {!result.meeting.join_url ? (
         <p
           style={{
@@ -2361,7 +2396,7 @@ function PaymentPanel({
               <PaymentRow label={copy.bsb} value={info.bank_account.bsb || '—'} mono onCopy={info.bank_account.bsb ? () => handleCopy(info.bank_account.bsb!, 'bsb') : undefined} copied={copied === 'bsb'} copyLabel={copy.copy} copiedLabel={copy.copied} />
               <PaymentRow
                 label={copy.accountNumber}
-                value={info.bank_account.account_number || '—'}
+                value={info.bank_account.account_number || info.bank_account.account_number_masked || '—'}
                 mono
                 onCopy={info.bank_account.account_number ? () => handleCopy(info.bank_account.account_number!, 'acc') : undefined}
                 copied={copied === 'acc'}

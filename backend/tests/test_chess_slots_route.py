@@ -124,10 +124,16 @@ class ListChessCourseSlotsTestCase(TestCase):
         slots = body["data"]["slots"]
         self.assertEqual(len(slots), 1)
         self.assertEqual(slots[0]["id"], "slot-1")
+        self.assertEqual(slots[0]["slot_id"], "slot-1")
         self.assertEqual(slots[0]["available"], 6)
+        self.assertEqual(slots[0]["spots_left"], 6)
         self.assertEqual(slots[0]["capacity"], 8)
         self.assertEqual(slots[0]["enrolled_count"], 2)
         self.assertEqual(slots[0]["cohort_label"], "Mon/Wed/Fri evening cohort")
+        self.assertEqual(slots[0]["duration_minutes"], 60)
+        self.assertIn("date", slots[0])
+        self.assertIn("start_time", slots[0])
+        self.assertIn("ends_at", slots[0])
         # The handler must have asked for default 28-day window.
         call = repo.public_calls[0]
         self.assertEqual(call["service_id"], "co-mai-hung-chess-online-group-60")
@@ -183,6 +189,6 @@ class ListChessCourseSlotsTestCase(TestCase):
                 "/api/v1/chess/courses/x/slots?from=2026/05/04"
             )
 
-        self.assertEqual(resp.status_code, 400)
+        self.assertEqual(resp.status_code, 422)
         body = resp.json()
         self.assertEqual(body["status"], "error")

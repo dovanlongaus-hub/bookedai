@@ -212,6 +212,7 @@ class DesiredSlotPayload(BaseModel):
     date: str
     time: str
     timezone: str
+    schedule_slot_id: str | None = None
 
 
 class SearchCandidatesRequestPayload(BaseModel):

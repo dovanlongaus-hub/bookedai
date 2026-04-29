@@ -76,6 +76,7 @@ class ZohoCrmAdapter(ProviderAdapter):
         return summary.dict()
 
     async def get_access_token(self, settings: Settings) -> tuple[str, str | None, str]:
+        direct_token = settings.zoho_crm_access_token.strip()
         if (
             settings.zoho_crm_refresh_token.strip()
             and settings.zoho_crm_client_id.strip()
@@ -83,16 +84,21 @@ class ZohoCrmAdapter(ProviderAdapter):
         ):
             token_url = f"{settings.zoho_accounts_base_url.rstrip('/')}/oauth/v2/token"
             async with httpx.AsyncClient(timeout=20) as client:
-                response = await client.post(
-                    token_url,
-                    data={
-                        "refresh_token": settings.zoho_crm_refresh_token,
-                        "client_id": settings.zoho_crm_client_id,
-                        "client_secret": settings.zoho_crm_client_secret,
-                        "grant_type": "refresh_token",
-                    },
-                )
-                response.raise_for_status()
+                try:
+                    response = await client.post(
+                        token_url,
+                        data={
+                            "refresh_token": settings.zoho_crm_refresh_token,
+                            "client_id": settings.zoho_crm_client_id,
+                            "client_secret": settings.zoho_crm_client_secret,
+                            "grant_type": "refresh_token",
+                        },
+                    )
+                    response.raise_for_status()
+                except httpx.HTTPStatusError:
+                    if direct_token:
+                        return direct_token, None, "access_token_fallback"
+                    raise
                 payload = response.json()
 
             access_token = str(payload.get("access_token") or "").strip()
@@ -101,7 +107,6 @@ class ZohoCrmAdapter(ProviderAdapter):
             api_domain = str(payload.get("api_domain") or "").strip() or None
             return access_token, api_domain, "refresh_token"
 
-        direct_token = settings.zoho_crm_access_token.strip()
         if direct_token:
             return direct_token, None, "access_token"
 

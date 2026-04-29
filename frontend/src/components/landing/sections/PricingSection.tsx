@@ -37,34 +37,34 @@ import { SignalPill } from '../ui/SignalPill';
 
 const pricingFlow = [
   {
-    title: 'Choose the operating entry point',
-    body: 'Start with the lightest sensible deployment, then step up only when workflow depth and revenue upside justify it.',
+    title: 'Pick the package',
+    body: 'Choose Launch, Grow, or Scale based on how many channels, locations, and team controls you need.',
   },
   {
-    title: 'Confirm rollout scope',
-    body: 'Online is the default for most teams. Higher-touch rollout is reserved for real operational complexity and visible ROI.',
+    title: 'Set up the booking path',
+    body: 'BookedAI wires the page, service catalog, contact route, calendar, confirmation, portal, and follow-up path.',
   },
   {
-    title: 'Keep the commercial path clean',
-    body: 'Consultation, confirmation, and the next paid step continue through one visible buying path instead of a pricing maze.',
+    title: 'Run the full flow',
+    body: 'Customers search, choose, submit booking details, receive thank-you, then continue through portal, payment, and care.',
   },
 ];
 
 const pricingModelPillars = [
   {
     label: 'Setup',
-    value: 'Scoped clearly',
-    detail: 'Launch work is priced separately so implementation complexity never muddies the monthly decision.',
+    value: 'Clear scope',
+    detail: 'You know what BookedAI will launch before the subscription starts.',
   },
   {
     label: 'Subscription',
-    value: 'Predictable',
-    detail: 'Monthly pricing stays simple enough to approve, while still reading like a serious operating commitment.',
+    value: 'Simple monthly',
+    detail: 'Monthly pricing maps to the package, not a long list of confusing modules.',
   },
   {
     label: 'Commission',
-    value: 'Performance-linked',
-    detail: 'Introduced only when the rollout context and booked-revenue path are clear.',
+    value: 'Only on captured revenue',
+    detail: 'Performance commission appears only where BookedAI is actively capturing or recovering bookings.',
   },
 ];
 
@@ -357,16 +357,16 @@ export function PricingSection() {
 
         <div className="mx-auto max-w-4xl text-center">
           <SignalPill className="inline-flex items-center justify-center px-4 py-2 text-[11px] uppercase tracking-[0.24em]">
-            AI Revenue Engine • Free at the bottom, aligned in the middle, premium at the top
+            Simple packages • Real booking flow • Clear follow-up
           </SignalPill>
           <h2 className="template-title mt-6 text-4xl font-semibold tracking-tight text-slate-950 sm:text-5xl lg:text-6xl">
-            Pay only when BookedAI books real revenue.
+            Choose the simplest BookedAI package that can win the next booking.
           </h2>
           <p className="template-body mx-auto mt-5 max-w-2xl text-lg leading-8">
-            We&apos;re free at the bottom, premium at the top, and aligned in the middle.
+            Three packages are enough: Launch, Grow, and Scale.
           </p>
           <p className="template-body mx-auto mt-4 max-w-3xl text-sm leading-6 sm:text-base">
-            Three tiers tied to the AI Revenue Engine: Starter Engine is free SaaS for solo and micro teams, Growth Engine is A$249/mo + 3% on net booked revenue for established SMEs, and Enterprise Engine is A$999+/mo + 5% on attributable revenue for multi-location and platform deployments.
+            Each one shows what a customer can do: ask for a service, choose a match, submit booking details, receive a thank-you, and continue through portal, payment posture, email, SMS/WhatsApp, calendar, CRM, and care.
           </p>
 
           <div className="mt-8 grid gap-3 text-left sm:grid-cols-3">
@@ -393,7 +393,7 @@ export function PricingSection() {
               <div>
                 <div className="template-kicker text-[11px]">Pricing flow graphic</div>
                 <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-slate-950">
-                  The homepage should make the commercial model legible before the buyer ever opens the deeper product experience.
+                  A buyer should understand the package and the customer journey in one glance.
                 </div>
               </div>
               <div className="rounded-full bg-slate-950 px-3 py-1 text-xs font-semibold uppercase tracking-[0.14em] text-white">
@@ -432,11 +432,11 @@ export function PricingSection() {
                 AI Revenue Engine pricing
               </p>
               <h3 className="template-title mt-3 text-3xl font-semibold tracking-tight text-slate-950 sm:text-4xl">
-                Starter free, Growth aligned, Enterprise premium
+                Launch, Grow, Scale
               </h3>
             </div>
               <p className="template-body mt-5 max-w-2xl text-base leading-7">
-              Pick the engine that matches your operating maturity. Setup, monthly subscription, and performance commission stay clearly separated, so every step of the AI Revenue Engine ladder is easy to approve.
+              Pick the package by how your business books today. Setup, monthly subscription, and performance commission stay separated so the offer is easy to approve.
             </p>
             <div className="mt-6 grid gap-3 sm:grid-cols-2">
               {topOffers.map((offer) => (
@@ -461,7 +461,7 @@ export function PricingSection() {
                     Buying story
                   </div>
                   <div className="mt-2 text-lg font-semibold text-slate-950">
-                    Start free on Starter, step up to Growth when you want BookedAI to capture real booked revenue, and move to Enterprise when scale and SLA become the constraint.
+                    Start with Launch for one clean booking path, move to Grow for managed multi-channel conversion, and use Scale when locations, templates, API, or SLA matter.
                   </div>
                 </div>
                 <SignalPill className="bg-white px-3 py-1 text-xs uppercase tracking-[0.14em] text-slate-600">
@@ -469,7 +469,7 @@ export function PricingSection() {
                 </SignalPill>
               </div>
               <p className="mt-2 text-sm leading-6 text-slate-600">
-                Setup fees scoped after a 10-min call. Commission applies only to bookings BookedAI captures or recovers.
+                Commission applies only to bookings BookedAI captures or recovers.
               </p>
             </SectionCard>
           </SectionCard>
@@ -482,7 +482,7 @@ export function PricingSection() {
               Self-serve at the bottom, scoped onboarding in the middle, custom rollout at the top
             </h3>
             <p className="mt-4 text-base leading-7 text-slate-600">
-              Starter is self-serve with no setup fee. Growth includes A$499 onboarding for catalog import, brand, and channel wiring. Enterprise is custom rollout from A$2,500 to A$10,000 covering vertical template config, SSO, and dedicated CSM.
+              Launch can be self-serve. Grow includes managed onboarding for catalog import, brand, and channel wiring. Scale is a custom rollout for multi-location, franchise, or platform teams.
             </p>
             <div className="mt-6 grid gap-3">
               {setupOptions.map((item) => (

@@ -650,6 +650,27 @@ async function stubAdminPartnerProtectedActionReauth(
 }
 
 test.describe('admin session and refresh regressions', () => {
+  test('admin login groups sign-in options into simple tabs @admin @admin-smoke', async ({
+    page,
+  }) => {
+    await page.goto('/admin');
+
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Google' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Email code' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Password' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Google' }).click();
+    await expect(page.getByRole('button', { name: 'Google SSO pending' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Use password instead' })).toBeVisible();
+
+    await page.getByRole('tab', { name: 'Email code' }).click();
+    await expect(page.getByRole('button', { name: 'Email code pending' })).toBeVisible();
+    await page.getByRole('button', { name: 'Use password instead' }).click();
+    await expect(page.getByRole('button', { name: 'Sign in to admin' })).toBeVisible();
+  });
+
   test('admin refresh keeps stored session visible and logout returns to sign-in @admin @admin-smoke', async ({
     page,
   }) => {

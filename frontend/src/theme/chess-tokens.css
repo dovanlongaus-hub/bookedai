@@ -438,15 +438,7 @@
 /* Hero */
 .chess-hero {
   position: relative;
-  background:
-    linear-gradient(
-      140deg,
-      rgba(6, 16, 42, 0.82) 0%,
-      rgba(11, 29, 58, 0.78) 50%,
-      rgba(21, 41, 74, 0.86) 100%
-    ),
-    url('https://upload.bookedai.au/images/af6c/gB-95FD-jT8XitbvPyLsiQ.png')
-      center/cover no-repeat;
+  background: linear-gradient(140deg, var(--chess-navy-deep) 0%, var(--chess-navy) 60%, var(--chess-navy-soft) 100%);
   color: var(--chess-on-navy);
   padding-block: 84px 96px;
   overflow: hidden;

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 import json
 from uuid import uuid4
 
@@ -13,6 +13,71 @@ from integrations.zoho_crm.adapter import ZohoCrmAdapter
 from repositories.base import RepositoryContext
 from repositories.crm_repository import CrmSyncRepository
 from repositories.email_repository import EmailRepository
+
+
+def _settings_with_tenant_crm_credentials(settings, tenant_credentials: object | None):
+    if tenant_credentials is None:
+        return settings
+    return replace(
+        settings,
+        zoho_crm_access_token="",
+        zoho_crm_refresh_token=str(getattr(tenant_credentials, "refresh_token", "") or ""),
+        zoho_crm_client_id=str(getattr(tenant_credentials, "client_id", "") or ""),
+        zoho_crm_client_secret=str(getattr(tenant_credentials, "client_secret", "") or ""),
+        zoho_accounts_base_url=str(
+            getattr(tenant_credentials, "accounts_base_url", "") or settings.zoho_accounts_base_url
+        ),
+        zoho_crm_api_base_url=str(
+            getattr(tenant_credentials, "api_base_url", "") or settings.zoho_crm_api_base_url
+        ),
+        zoho_crm_default_lead_module=str(
+            getattr(tenant_credentials, "default_lead_module", "") or settings.zoho_crm_default_lead_module
+        ),
+        zoho_crm_default_contact_module=str(
+            getattr(tenant_credentials, "default_contact_module", "") or settings.zoho_crm_default_contact_module
+        ),
+        zoho_crm_default_deal_module=str(
+            getattr(tenant_credentials, "default_deal_module", "") or settings.zoho_crm_default_deal_module
+        ),
+        zoho_crm_default_task_module=str(
+            getattr(tenant_credentials, "default_task_module", "") or settings.zoho_crm_default_task_module
+        ),
+    )
+
+
+async def _record_crm_transport_error(
+    *,
+    repository: CrmSyncRepository,
+    tenant_id: str,
+    crm_sync_record_id: int,
+    entity_label: str,
+    record: LeadRecordContract,
+    error: httpx.HTTPError,
+    warning_code: str,
+) -> CrmSyncOperationResult:
+    await repository.update_sync_record_status(
+        tenant_id=tenant_id,
+        crm_sync_record_id=crm_sync_record_id,
+        sync_status="failed",
+    )
+    await repository.record_sync_error(
+        tenant_id=tenant_id,
+        crm_sync_record_id=crm_sync_record_id,
+        error_code="provider_transport_error",
+        error_message=f"Zoho CRM {entity_label} sync could not reach the provider.",
+        retryable=True,
+        payload_json=json.dumps(
+            {
+                entity_label: _crm_payload_dict(record),
+                "error_type": type(error).__name__,
+            }
+        ),
+    )
+    return CrmSyncOperationResult(
+        record_id=crm_sync_record_id,
+        sync_status="failed",
+        warning_codes=[warning_code],
+    )
 
 
 @dataclass
@@ -94,6 +159,7 @@ async def orchestrate_lead_capture(
     contact_phone: str | None = None,
     company_name: str | None = None,
     lead_status: str = "captured",
+    tenant_crm_credentials: object | None = None,
 ) -> CrmSyncOperationResult:
     if not tenant_id or not lead_id:
         return CrmSyncOperationResult(record_id=None, sync_status="skipped")
@@ -160,7 +226,7 @@ async def orchestrate_lead_capture(
             warning_codes=["missing_contact_email"],
         )
 
-    settings = get_settings()
+    settings = _settings_with_tenant_crm_credentials(get_settings(), tenant_crm_credentials)
     adapter = ZohoCrmAdapter()
     if not adapter.configured(settings):
         return CrmSyncOperationResult(
@@ -216,6 +282,16 @@ async def orchestrate_lead_capture(
             record_id=record_id,
             sync_status=sync_status,
             warning_codes=["provider_http_error"],
+        )
+    except httpx.HTTPError as error:
+        return await _record_crm_transport_error(
+            repository=repository,
+            tenant_id=tenant_id,
+            crm_sync_record_id=record_id,
+            entity_label="lead",
+            record=lead_record,
+            error=error,
+            warning_code="provider_transport_error",
         )
 
     external_entity_id = str(upsert_result.get("external_id") or "").strip() or None
@@ -545,6 +621,7 @@ async def orchestrate_contact_sync(
     full_name: str | None,
     email: str | None,
     phone: str | None,
+    tenant_crm_credentials: object | None = None,
 ) -> CrmSyncOperationResult:
     if not tenant_id or not contact_id:
         return CrmSyncOperationResult(record_id=None, sync_status="skipped")
@@ -588,7 +665,7 @@ async def orchestrate_contact_sync(
             warning_codes=["missing_contact_email"],
         )
 
-    settings = get_settings()
+    settings = _settings_with_tenant_crm_credentials(get_settings(), tenant_crm_credentials)
     adapter = ZohoCrmAdapter()
     if not adapter.configured(settings):
         return CrmSyncOperationResult(
@@ -645,6 +722,16 @@ async def orchestrate_contact_sync(
             sync_status=sync_status,
             warning_codes=["provider_http_error"],
         )
+    except httpx.HTTPError as error:
+        return await _record_crm_transport_error(
+            repository=repository,
+            tenant_id=tenant_id,
+            crm_sync_record_id=record_id,
+            entity_label="contact",
+            record=contact_record,
+            error=error,
+            warning_code="provider_transport_error",
+        )
 
     external_entity_id = str(upsert_result.get("external_id") or "").strip() or None
     await repository.update_sync_record_status(
@@ -679,6 +766,7 @@ async def orchestrate_booking_followup_sync(
     notes: str | None,
     external_lead_id: str | None = None,
     external_contact_id: str | None = None,
+    tenant_crm_credentials: object | None = None,
 ) -> BookingCrmSyncOperationResult:
     local_entity_id = (booking_reference or booking_intent_id or "").strip()
     if not tenant_id or not local_entity_id:
@@ -732,7 +820,7 @@ async def orchestrate_booking_followup_sync(
         payload_json=payload_json,
     )
 
-    settings = get_settings()
+    settings = _settings_with_tenant_crm_credentials(get_settings(), tenant_crm_credentials)
     adapter = ZohoCrmAdapter()
     if not adapter.configured(settings):
         return BookingCrmSyncOperationResult(
@@ -748,6 +836,7 @@ async def orchestrate_booking_followup_sync(
         tenant_id=tenant_id,
         crm_sync_record_id=deal_record_id,
         booking_record=booking_record,
+        tenant_crm_credentials=tenant_crm_credentials,
     )
     task_result = await _execute_booking_task_sync(
         repository=repository,
@@ -755,6 +844,7 @@ async def orchestrate_booking_followup_sync(
         crm_sync_record_id=task_record_id,
         booking_record=booking_record,
         external_deal_id=deal_result.external_entity_id,
+        tenant_crm_credentials=tenant_crm_credentials,
     )
     return BookingCrmSyncOperationResult(
         deal_record_id=deal_result.record_id,
@@ -991,11 +1081,12 @@ async def _execute_booking_deal_sync(
     tenant_id: str,
     crm_sync_record_id: int | None,
     booking_record: LeadRecordContract,
+    tenant_crm_credentials: object | None = None,
 ) -> CrmSyncOperationResult:
     if crm_sync_record_id is None:
         return CrmSyncOperationResult(record_id=None, sync_status="skipped")
 
-    settings = get_settings()
+    settings = _settings_with_tenant_crm_credentials(get_settings(), tenant_crm_credentials)
     adapter = ZohoCrmAdapter()
     try:
         upsert_result = await adapter.upsert_deal(settings, lead=booking_record)
@@ -1045,6 +1136,16 @@ async def _execute_booking_deal_sync(
             sync_status=sync_status,
             warning_codes=["deal_provider_http_error"],
         )
+    except httpx.HTTPError as error:
+        return await _record_crm_transport_error(
+            repository=repository,
+            tenant_id=tenant_id,
+            crm_sync_record_id=crm_sync_record_id,
+            entity_label="deal",
+            record=booking_record,
+            error=error,
+            warning_code="deal_provider_transport_error",
+        )
 
     external_entity_id = str(upsert_result.get("external_id") or "").strip() or None
     await repository.update_sync_record_status(
@@ -1068,6 +1169,7 @@ async def _execute_booking_task_sync(
     crm_sync_record_id: int | None,
     booking_record: LeadRecordContract,
     external_deal_id: str | None,
+    tenant_crm_credentials: object | None = None,
 ) -> CrmSyncOperationResult:
     if crm_sync_record_id is None:
         return CrmSyncOperationResult(record_id=None, sync_status="skipped")
@@ -1075,7 +1177,7 @@ async def _execute_booking_task_sync(
     if external_deal_id:
         booking_record.metadata["external_deal_id"] = external_deal_id
 
-    settings = get_settings()
+    settings = _settings_with_tenant_crm_credentials(get_settings(), tenant_crm_credentials)
     adapter = ZohoCrmAdapter()
     try:
         create_result = await adapter.create_follow_up_task(settings, lead=booking_record)
@@ -1124,6 +1226,16 @@ async def _execute_booking_task_sync(
             record_id=crm_sync_record_id,
             sync_status=sync_status,
             warning_codes=["task_provider_http_error"],
+        )
+    except httpx.HTTPError as error:
+        return await _record_crm_transport_error(
+            repository=repository,
+            tenant_id=tenant_id,
+            crm_sync_record_id=crm_sync_record_id,
+            entity_label="task",
+            record=booking_record,
+            error=error,
+            warning_code="task_provider_transport_error",
         )
 
     external_entity_id = str(create_result.get("external_id") or "").strip() or None
@@ -1209,6 +1321,16 @@ async def _replay_lead_sync(
             sync_status=sync_status,
             warning_codes=["provider_http_error"],
         )
+    except httpx.HTTPError as error:
+        return await _record_crm_transport_error(
+            repository=repository,
+            tenant_id=tenant_id,
+            crm_sync_record_id=crm_sync_record_id,
+            entity_label="lead",
+            record=lead_record,
+            error=error,
+            warning_code="provider_transport_error",
+        )
 
     external_entity_id = str(upsert_result.get("external_id") or "").strip() or None
     await repository.update_sync_record_status(
@@ -1292,6 +1414,16 @@ async def _replay_contact_sync(
             record_id=crm_sync_record_id,
             sync_status=sync_status,
             warning_codes=["provider_http_error"],
+        )
+    except httpx.HTTPError as error:
+        return await _record_crm_transport_error(
+            repository=repository,
+            tenant_id=tenant_id,
+            crm_sync_record_id=crm_sync_record_id,
+            entity_label="contact",
+            record=contact_record,
+            error=error,
+            warning_code="provider_transport_error",
         )
 
     external_entity_id = str(upsert_result.get("external_id") or "").strip() or None

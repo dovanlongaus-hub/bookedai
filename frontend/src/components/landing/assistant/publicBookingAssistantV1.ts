@@ -37,6 +37,7 @@ export type PublicBookingAssistantAuthoritativeBookingIntentResult = {
   conversationId: string | null;
   bookingIntentId: string;
   bookingReference: string | null;
+  portalUrl?: string | null;
   contactEmail?: string | null;
   supportEmail?: string | null;
   emailStatus?: 'sent' | 'pending_manual_followup' | null;
@@ -859,7 +860,7 @@ export async function createPublicBookingAssistantLeadAndBookingIntent(params: P
   /**
    * Optional schedule slot id. When the chess academy time-slot picker is used the visitor
    * picks a concrete slot, and the backend matches the booking intent to that slot directly.
-   * The id is forwarded under `desired_slot.schedule_slot_id` (additive on the contract).
+   * The id is forwarded as the top-level `schedule_slot_id`.
    */
   scheduleSlotId?: string | null;
 }): Promise<PublicBookingAssistantAuthoritativeBookingIntentResult> {
@@ -896,20 +897,17 @@ export async function createPublicBookingAssistantLeadAndBookingIntent(params: P
     actor_context: actorContext,
   };
 
-  const desiredSlot: CreateBookingIntentRequest['desired_slot'] & {
-    schedule_slot_id?: string;
-  } = {
+  const scheduleSlotId = params.scheduleSlotId?.trim() || null;
+  const desiredSlot: CreateBookingIntentRequest['desired_slot'] = {
     date: params.requestedDate,
     time: params.requestedTime,
     timezone: params.timezone,
   };
-  if (params.scheduleSlotId) {
-    desiredSlot.schedule_slot_id = params.scheduleSlotId;
-  }
 
   const bookingIntentRequest: CreateBookingIntentRequest = {
     service_id: params.serviceId,
     desired_slot: desiredSlot,
+    schedule_slot_id: scheduleSlotId,
     contact,
     attribution,
     channel: params.runtimeConfig?.channel ?? 'public_web',
@@ -956,16 +954,26 @@ export async function createPublicBookingAssistantLeadAndBookingIntent(params: P
     metadata?: {
       zoho_meeting?: {
         meeting_url?: string | null;
+        calendar_event_url?: string | null;
         calendar_url?: string | null;
         join_url?: string | null;
       } | null;
       meeting_url?: string | null;
+      calendar_event_url?: string | null;
       calendar_url?: string | null;
     } | null;
   }).metadata ?? null;
   const zoho = responseMeta?.zoho_meeting ?? null;
-  const meetingUrl = zoho?.meeting_url ?? zoho?.join_url ?? responseMeta?.meeting_url ?? null;
-  const calendarUrl = zoho?.calendar_url ?? responseMeta?.calendar_url ?? null;
+  const meetingBlock = bookingIntentResponse.data.meeting ?? null;
+  const meetingUrl =
+    meetingBlock?.meeting_url ?? zoho?.meeting_url ?? zoho?.join_url ?? responseMeta?.meeting_url ?? null;
+  const calendarUrl =
+    meetingBlock?.calendar_event_url ??
+    zoho?.calendar_event_url ??
+    zoho?.calendar_url ??
+    responseMeta?.calendar_event_url ??
+    responseMeta?.calendar_url ??
+    null;
 
   return {
     leadId: leadData?.lead_id ?? null,
@@ -973,6 +981,7 @@ export async function createPublicBookingAssistantLeadAndBookingIntent(params: P
     conversationId: leadData?.conversation_id ?? null,
     bookingIntentId: bookingIntentResponse.data.booking_intent_id,
     bookingReference,
+    portalUrl: portalIssue?.url ?? null,
     trust: bookingIntentResponse.data.trust,
     warnings: bookingIntentResponse.data.warnings,
     crmSync: bookingIntentResponse.data.crm_sync ?? null,

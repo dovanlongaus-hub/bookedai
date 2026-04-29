@@ -24,7 +24,9 @@ test.describe('pitch deck rendering', () => {
     await expect(page.getByText('Investor and judge pitch · pitch.bookedai.au')).toBeVisible();
     await expect(page.getByRole('link', { name: 'See live booking proof' }).first()).toBeVisible();
     await expect(page.getByRole('link', { name: 'View investor deck' }).first()).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'A packaged rollout motion, not one-off implementation work.' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'A repeatable rollout system, not custom services work.' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Agentic revenue infrastructure, not another chatbot wrapper.' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'The pitch points to deployed surfaces investors can open.' })).toBeVisible();
     await expect(page.getByText('GM Chess Academy')).toBeVisible();
     await expect(page.locator('#pitch-video').getByText('Pitch video', { exact: true })).toBeVisible();
     await expect(
@@ -48,6 +50,7 @@ test.describe('pitch deck rendering', () => {
     await expect(page.getByRole('link', { name: 'View investor deck' }).first()).toBeVisible();
     await expect(page.locator('#pitch-video').getByText('Pitch video', { exact: true })).toBeVisible();
     await expect(page.getByText('Search, shortlist, book, and continue in one visible customer flow.')).toBeVisible();
+    await expect(page.locator('#ai-innovation').getByText('AI innovation', { exact: true })).toBeVisible();
     await expect(page.getByText('Move from pitch proof to pilot traction.')).toBeVisible();
     await expectNoHorizontalOverflow(page);
 

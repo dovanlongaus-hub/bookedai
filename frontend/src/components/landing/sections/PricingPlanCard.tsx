@@ -116,6 +116,23 @@ export function PricingPlanCard({
           </p>
         </div>
 
+        <div className={`mt-5 rounded-[1rem] px-4 py-3 ring-1 ${
+          isFeatured ? 'bg-white/8 text-slate-100 ring-white/12' : 'bg-slate-50 text-slate-700 ring-slate-900/6'
+        }`}>
+          <div className={`text-[11px] font-semibold uppercase tracking-[0.14em] ${
+            isFeatured ? 'text-cyan-100' : 'text-slate-500'
+          }`}>
+            Best for
+          </div>
+          <p className="mt-1 text-sm leading-6">{plan.bestFor}</p>
+          <div className={`mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] ${
+            isFeatured ? 'text-cyan-100' : 'text-slate-500'
+          }`}>
+            Customer flow
+          </div>
+          <p className="mt-1 text-sm leading-6">{plan.outcome}</p>
+        </div>
+
         <p className={`mt-4 text-sm font-medium ${microcopyClassName}`}>{plan.microcopy}</p>
         {plan.supportingText ? (
           <p className={`mt-2 text-sm leading-6 ${supportingClassName}`}>{plan.supportingText}</p>

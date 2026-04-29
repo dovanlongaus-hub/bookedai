@@ -54,6 +54,18 @@ def _is_public_booking_actor(actor_context) -> bool:
     return channel in _PUBLIC_BOOKING_FALLBACK_CHANNELS
 
 
+def _public_safe_warnings(warnings: list[str]) -> list[str]:
+    provider_warning_seen = any("provider" in str(item).lower() for item in warnings)
+    safe = [
+        item
+        for item in warnings
+        if "provider" not in str(item).lower() and "crm" not in str(item).lower()
+    ]
+    if provider_warning_seen:
+        safe.append("Business sync requires operator review.")
+    return safe
+
+
 async def _resolve_public_booking_fallback_tenant_id(request: Request) -> str | None:
     async with get_session(request.app.state.session_factory) as session:
         return await TenantRepository(RepositoryContext(session=session)).resolve_tenant_id(
@@ -393,17 +405,27 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
             )
             await session.commit()
 
+        public_actor = _is_public_booking_actor(payload.actor_context)
+        response_warnings = warnings + email_crm_sync_result.warning_codes
         return _success_response(
             {
                 "message_id": email_result.message_id,
                 "delivery_status": email_result.delivery_status,
                 "provider_message_id": None,
-                "warnings": warnings + email_crm_sync_result.warning_codes,
+                "warnings": _public_safe_warnings(response_warnings)
+                if public_actor
+                else response_warnings,
                 "crm_sync": {
                     "task": {
-                        "record_id": email_crm_sync_result.task_record_id,
                         "sync_status": email_crm_sync_result.task_sync_status,
-                        "external_entity_id": email_crm_sync_result.task_external_entity_id,
+                        **(
+                            {}
+                            if public_actor
+                            else {
+                                "record_id": email_crm_sync_result.task_record_id,
+                                "external_entity_id": email_crm_sync_result.task_external_entity_id,
+                            }
+                        ),
                     }
                 },
             },

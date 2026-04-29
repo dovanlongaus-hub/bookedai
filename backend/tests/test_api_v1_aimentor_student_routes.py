@@ -8,6 +8,7 @@ parallel implementation of the Chess student handlers (see comment block in
 from __future__ import annotations
 
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
 from pathlib import Path
 import sys
 from types import SimpleNamespace
@@ -403,6 +404,50 @@ class _StudentNotFoundSession:
         return None
 
 
+class _AIMentorPublicSurfaceSession:
+    async def execute(self, statement, params=None):
+        sql = str(statement).strip().lower()
+        if "from service_time_slots" in sql:
+            return _FakeExecuteResult(
+                [
+                    {
+                        "id": "slot-1",
+                        "service_id": "ai-mentor-private-first-ai-app-60",
+                        "slot_start_at": datetime(2026, 5, 5, 8, 0, tzinfo=timezone.utc),
+                        "slot_end_at": datetime(2026, 5, 5, 9, 0, tzinfo=timezone.utc),
+                        "timezone": "Australia/Sydney",
+                        "capacity": 1,
+                        "booked_count": 1,
+                        "label": "Booked slot",
+                        "zoho_meeting_url": "https://meet.zoho.com/private",
+                    }
+                ]
+            )
+        if "select ts.settings_json->'payment' as payment" in sql:
+            return _FakeExecuteResult(
+                {
+                    "payment": {
+                        "currency": "AUD",
+                        "stripe_checkout_url": "https://buy.stripe.com/aimentor-private-checkout",
+                        "bank_account": {
+                            "account_name": "AI Mentor",
+                            "bsb": "123-456",
+                            "account_number": "00012345",
+                            "bank_name": "Test Bank",
+                        },
+                        "qr_payload_template": "PAY|AUD|{amount_aud}|BSB:{bsb}|ACC:{account_number}|REF:{booking_reference}",
+                    }
+                }
+            )
+        return _FakeExecuteResult(None)
+
+    async def commit(self):
+        return None
+
+    async def rollback(self):
+        return None
+
+
 class AIMentorStudentMeStudentNotFoundTestCase(TestCase):
     def test_returns_404_when_student_row_missing(self):
         app = _make_app()
@@ -427,6 +472,41 @@ class AIMentorStudentMeStudentNotFoundTestCase(TestCase):
         body = response.json()
         self.assertEqual(body["status"], "error")
         self.assertEqual(body["error"]["code"], "student_not_found")
+
+
+class AIMentorPublicSurfaceRoutesTestCase(TestCase):
+    def _client(self):
+        app = _make_app()
+
+        @asynccontextmanager
+        async def _fake_get_session(_factory):
+            yield _AIMentorPublicSurfaceSession()
+
+        patcher = patch(
+            "api.v1_ai_mentor_student_handlers.get_session",
+            _fake_get_session,
+        )
+        patcher.start()
+        self.addCleanup(patcher.stop)
+        return TestClient(app)
+
+    def test_slots_do_not_expose_zoho_meeting_url(self):
+        response = self._client().get(
+            "/api/v1/aimentor/services/ai-mentor-private-first-ai-app-60/slots"
+        )
+        self.assertEqual(response.status_code, 200, response.text)
+        slot = response.json()["data"]["slots"][0]
+        self.assertEqual(slot["seats_available"], 0)
+        self.assertNotIn("zoho_meeting_url", slot)
+
+    def test_payment_info_masks_account_and_hides_placeholder_stripe_link(self):
+        response = self._client().get("/api/v1/aimentor/payment-info")
+        self.assertEqual(response.status_code, 200, response.text)
+        data = response.json()["data"]
+        self.assertIsNone(data["stripe_checkout_url"])
+        self.assertIsNone(data["bank_account"]["account_number"])
+        self.assertEqual(data["bank_account"]["account_number_masked"], "•••• 2345")
+        self.assertIn("ACC:00012345", data["qr_payload_template"])
 
 
 # --- POST /api/v1/aimentor/students/me/logout -----------------------------

@@ -49,7 +49,16 @@ _PROGRAM_LABELS: dict[str, str] = {
     "beginner": "Chess Beginner Program",
     "private": "Chess Private 1-on-1 Coaching",
     "tournament": "Chess Tournament Preparation",
-    "home": "Chess At-Home Coaching Visit",
+    # `elite` superseded the legacy `home` (At-Home) tier when chess pivoted
+    # to online-only delivery in migration 036. We keep `home` as an alias so
+    # any cached frontend still passes through, but it now maps to the same
+    # coach blurb as `elite`.
+    "elite": "Chess Elite Online Plus",
+    "home": "Chess Elite Online Plus",
+    # 2026-04-29 grid (migration 045): Superkid + Advanced + Private 1-on-1.
+    "superkid": "Chess Superkid Group (Tue/Fri)",
+    "advanced_group": "Chess Advanced Group (Wed/Sun)",
+    "private_1_1": "Chess Private 1-on-1 with WGM Mai Hưng",
 }
 
 
@@ -61,7 +70,16 @@ class ChessPaymentOptionsRequest(BaseModel):
         default=None,
         description="Booking-intent id returned by /api/v1/bookings/intents.",
     )
-    program_key: Literal["beginner", "private", "tournament", "home"] = Field(
+    program_key: Literal[
+        "beginner",
+        "private",
+        "tournament",
+        "elite",
+        "home",  # legacy alias — kept so cached frontends keep working
+        "superkid",
+        "advanced_group",
+        "private_1_1",
+    ] = Field(
         ...,
         description="Which chess program the parent selected.",
     )

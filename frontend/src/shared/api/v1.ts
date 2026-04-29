@@ -1770,6 +1770,7 @@ export interface ChessCatalogMatch {
   summary: string;
   display_price_aud: string;
   display_price_vnd: string;
+  amount_aud?: number | null;
   tier: number | null;
   format: string;
   available_slots_count: number;
@@ -1805,6 +1806,7 @@ export interface ChessCourseSlot {
   start_time: string;
   cohort_label: string;
   spots_left: number;
+  duration_minutes?: number | null;
 }
 
 export interface ChessCourseSlotsResponse {

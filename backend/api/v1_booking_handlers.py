@@ -65,6 +65,7 @@ from service_layer.calls_scheduling import (
 )
 from service_layer.zoho_tenant_credentials import (
     resolve_tenant_zoho_calendar_credentials,
+    resolve_tenant_zoho_crm_credentials,
 )
 from service_layer.payment_lifecycle_service import (
     get_booking_payment_status,
@@ -109,6 +110,34 @@ BOOKING_SMS_CONFIRMATION_MAX_LEN = 320
 def _is_public_booking_actor(actor_context) -> bool:
     channel = str(getattr(actor_context, "channel", "") or "").strip().lower()
     return channel in PUBLIC_BOOKING_FALLBACK_CHANNELS
+
+
+def _is_public_default_tenant_actor(actor_context) -> bool:
+    if not _is_public_booking_actor(actor_context):
+        return False
+    if str(getattr(actor_context, "tenant_id", "") or "").strip():
+        return False
+    tenant_ref = str(getattr(actor_context, "tenant_ref", "") or "").strip().lower()
+    return tenant_ref == PUBLIC_BOOKING_DEFAULT_TENANT_SLUG
+
+
+def _public_safe_crm_sync_payload(
+    *,
+    lead_status: str | None = None,
+    contact_status: str | None = None,
+    deal_status: str | None = None,
+    task_status: str | None = None,
+) -> dict[str, object]:
+    return {
+        key: {"sync_status": status}
+        for key, status in {
+            "lead": lead_status,
+            "contact": contact_status,
+            "deal": deal_status,
+            "task": task_status,
+        }.items()
+        if status
+    }
 
 
 async def _resolve_aimentor_welcome_locale(
@@ -1307,7 +1336,12 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
             # on the chosen cohort instance. Group cohorts (capacity > 1) reuse
             # the slot's existing zoho_meeting_url so every enrolled student
             # joins the same meeting room.
-            normalized_slot_id = (payload.schedule_slot_id or "").strip()
+            nested_schedule_slot_id = None
+            if payload.desired_slot is not None:
+                nested_schedule_slot_id = getattr(payload.desired_slot, "schedule_slot_id", None)
+            normalized_slot_id = (
+                payload.schedule_slot_id or nested_schedule_slot_id or ""
+            ).strip()
             slot_row: dict | None = None
             slot_repo: ChessScheduleSlotRepository | None = None
             if normalized_slot_id and effective_tenant_id:
@@ -1569,6 +1603,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
             # Zoho block silently rather than 500.
             booking_settings = getattr(request.app.state, "settings", None)
             tenant_calendar_credentials = None
+            tenant_crm_credentials = None
             if booking_settings is not None:
                 try:
                     tenant_calendar_credentials = await resolve_tenant_zoho_calendar_credentials(
@@ -1578,9 +1613,16 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                     )
                 except Exception:  # noqa: BLE001
                     tenant_calendar_credentials = None
+                try:
+                    tenant_crm_credentials = await resolve_tenant_zoho_crm_credentials(
+                        session,
+                        tenant_id=effective_tenant_id,
+                        settings=booking_settings,
+                    )
+                except Exception:  # noqa: BLE001
+                    tenant_crm_credentials = None
             if (
                 zoho_meeting_url is None
-                and normalized_email
                 and zoho_calendar_configured(
                     booking_settings,
                     tenant_credentials=tenant_calendar_credentials,
@@ -1677,6 +1719,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                 contact_full_name=payload.contact.full_name,
                 contact_phone=normalized_phone,
                 company_name=service.name if service else None,
+                tenant_crm_credentials=tenant_crm_credentials,
             )
             contact_sync_result = await orchestrate_contact_sync(
                 session,
@@ -1685,6 +1728,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                 full_name=payload.contact.full_name,
                 email=normalized_email,
                 phone=normalized_phone,
+                tenant_crm_credentials=tenant_crm_credentials,
             )
             booking_crm_sync = await orchestrate_booking_followup_sync(
                 session,
@@ -1703,6 +1747,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                 notes=payload.notes,
                 external_lead_id=lead_sync_result.external_entity_id,
                 external_contact_id=contact_sync_result.external_entity_id,
+                tenant_crm_credentials=tenant_crm_credentials,
             )
             await _record_phase2_write_activity(
                 session,
@@ -1915,10 +1960,60 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
             booking_reference,
             portal_access_token.plaintext if portal_access_token else None,
         )
+        public_safe_crm_sync = _public_safe_crm_sync_payload(
+            lead_status=lead_sync_result.sync_status,
+            contact_status=contact_sync_result.sync_status,
+            deal_status=booking_crm_sync.deal_sync_status,
+            task_status=booking_crm_sync.task_sync_status,
+        )
+        internal_crm_sync = {
+            "lead": {
+                "record_id": lead_sync_result.record_id,
+                "sync_status": lead_sync_result.sync_status,
+                "external_entity_id": lead_sync_result.external_entity_id,
+                "warning_codes": lead_sync_result.warning_codes,
+            },
+            "contact": {
+                "record_id": contact_sync_result.record_id,
+                "sync_status": contact_sync_result.sync_status,
+                "external_entity_id": contact_sync_result.external_entity_id,
+                "warning_codes": contact_sync_result.warning_codes,
+            },
+            "deal": {
+                "record_id": booking_crm_sync.deal_record_id,
+                "sync_status": booking_crm_sync.deal_sync_status,
+                "external_entity_id": booking_crm_sync.deal_external_entity_id,
+            },
+            "task": {
+                "record_id": booking_crm_sync.task_record_id,
+                "sync_status": booking_crm_sync.task_sync_status,
+                "external_entity_id": booking_crm_sync.task_external_entity_id,
+            },
+            "warning_codes": booking_crm_sync.warning_codes,
+        }
+        response_crm_sync = (
+            public_safe_crm_sync
+            if _is_public_booking_actor(payload.actor_context)
+            else internal_crm_sync
+        )
+        response_meeting = {
+            "meeting_url": zoho_meeting_url,
+            "calendar_event_url": zoho_calendar_event_url,
+        }
+        response_booking = {
+            "booking_reference": booking_reference,
+            "service_id": service_id,
+            "service_name": service.name if service else None,
+            "requested_date": payload.desired_slot.date if payload.desired_slot else None,
+            "requested_time": payload.desired_slot.time if payload.desired_slot else None,
+            "timezone": payload.desired_slot.timezone if payload.desired_slot else None,
+            "schedule_slot_id": str(slot_row.get("id")) if slot_row else normalized_slot_id or None,
+        }
         return _success_response(
             {
                 "booking_intent_id": booking_intent_id,
                 "booking_reference": booking_reference,
+                "booking": response_booking,
                 "portal": {
                     "url": portal_response_link,
                     "access_token": (
@@ -1930,9 +2025,14 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                         else None
                     ),
                 },
-                "meeting": {
-                    "meeting_url": zoho_meeting_url,
-                    "calendar_event_url": zoho_calendar_event_url,
+                "meeting": response_meeting,
+                "integrations": {
+                    "zoho_meeting": response_meeting,
+                    "crm_sync": response_crm_sync,
+                },
+                "metadata": {
+                    "zoho_meeting": response_meeting,
+                    "schedule_slot_id": response_booking["schedule_slot_id"],
                 },
                 "trust": {
                     "availability_state": availability_state,
@@ -1944,31 +2044,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                     "warnings": warnings,
                 },
                 "warnings": warnings,
-                "crm_sync": {
-                    "lead": {
-                        "record_id": lead_sync_result.record_id,
-                        "sync_status": lead_sync_result.sync_status,
-                        "external_entity_id": lead_sync_result.external_entity_id,
-                        "warning_codes": lead_sync_result.warning_codes,
-                    },
-                    "contact": {
-                        "record_id": contact_sync_result.record_id,
-                        "sync_status": contact_sync_result.sync_status,
-                        "external_entity_id": contact_sync_result.external_entity_id,
-                        "warning_codes": contact_sync_result.warning_codes,
-                    },
-                    "deal": {
-                        "record_id": booking_crm_sync.deal_record_id,
-                        "sync_status": booking_crm_sync.deal_sync_status,
-                        "external_entity_id": booking_crm_sync.deal_external_entity_id,
-                    },
-                    "task": {
-                        "record_id": booking_crm_sync.task_record_id,
-                        "sync_status": booking_crm_sync.task_sync_status,
-                        "external_entity_id": booking_crm_sync.task_external_entity_id,
-                    },
-                    "warning_codes": booking_crm_sync.warning_codes,
-                },
+                "crm_sync": response_crm_sync,
             },
             tenant_id=effective_tenant_id,
             actor_context=payload.actor_context,
@@ -2019,15 +2095,16 @@ async def create_payment_intent(request: Request, payload: CreatePaymentIntentRe
 
             effective_tenant_id = _normalize_text(booking_row.get("booking_tenant_id")) or tenant_id
             if tenant_id and effective_tenant_id and effective_tenant_id != tenant_id:
-                raise AppError(
-                    code="payment_booking_tenant_mismatch",
-                    message="Booking intent does not belong to the resolved tenant.",
-                    status_code=403,
-                    details={
-                        "booking_intent_id": normalized_booking_intent_id,
-                        "tenant_id": tenant_id,
-                    },
-                )
+                if not _is_public_default_tenant_actor(payload.actor_context):
+                    raise AppError(
+                        code="payment_booking_tenant_mismatch",
+                        message="Booking intent does not belong to the resolved tenant.",
+                        status_code=403,
+                        details={
+                            "booking_intent_id": normalized_booking_intent_id,
+                            "tenant_id": tenant_id,
+                        },
+                    )
             resolved_booking_intent_id = (
                 _normalize_text(booking_row.get("booking_intent_id"))
                 or normalized_booking_intent_id

@@ -56,28 +56,35 @@ const chessScreenImageSrcSet =
 const productProofImageUrl = 'https://upload.bookedai.au/images/df6e/iarJydFRgp1aWGk5UF0d7g.png';
 
 const pitchNavItems = [
-  { id: 'hero', label: 'Overview' },
+  { id: 'hero', label: 'Thesis' },
   { id: 'problem', label: 'Problem' },
-  { id: 'solution', label: 'Solution' },
-  { id: 'proof', label: 'Live Proof' },
+  { id: 'solution', label: 'Product' },
+  { id: 'ai-innovation', label: 'AI Innovation' },
+  { id: 'use-cases', label: 'Use Cases' },
+  { id: 'proof', label: 'Product Proof' },
   { id: 'live-evidence', label: 'Evidence' },
-  { id: 'pitch-video', label: 'Video' },
-  { id: 'pricing', label: 'Plans' },
-  { id: 'launch-offer', label: 'GTM Wedge' },
-  { id: 'architecture', label: 'How It Works', href: architectureUrl },
+  { id: 'pitch-video', label: 'Demo Video' },
+  { id: 'pricing', label: 'Business Model' },
+  { id: 'launch-offer', label: 'GTM' },
+  { id: 'architecture', label: 'Architecture', href: architectureUrl },
   { id: 'why-now', label: 'Why Now' },
   { id: 'market-size', label: 'Scale' },
   { id: 'competitive-map', label: 'Alternatives' },
   { id: 'defensibility', label: 'Moat' },
   { id: 'unit-economics', label: 'Economics' },
-  { id: 'live-evidence', label: 'Live Evidence' },
   { id: 'revenue-milestones', label: 'Rollout' },
   { id: 'roadmap-execution', label: 'Roadmap' },
-  { id: 'surfaces', label: 'Live Links' },
-  { id: 'trust', label: 'Trust' },
+  { id: 'surfaces', label: 'Live Pages' },
+  { id: 'team', label: 'Team' },
 ];
 
 const industryTypes = ['Salon', 'Tradie', 'Swim School', 'Trades', 'Healthcare'];
+
+const investorProofStats = [
+  ['3', 'Live vertical proof cases', 'BookedAI, chess, and AI Mentor flows are deployed as inspectable public surfaces.'],
+  ['5+', 'Commercial surfaces', 'Homepage, product app, pitch, tenant workspace, portal, and vertical pages share one revenue story.'],
+  ['<30s', 'Target handoff loop', 'Customer enquiry can become a booking reference and business follow-up item in one session.'],
+] as const;
 
 const problemFunnel = [
   { step: '01', label: 'Enquiry arrives', sub: 'Customer reaches out via web, phone, or social', alert: false },
@@ -179,11 +186,77 @@ const architectureImageNodes = [
 ];
 
 const architectureSupportRails = [
-  ['Customer surfaces', 'bookedai.au, product, demo, portal, widget'],
-  ['Agent layer', 'customer enquiry, booking help, care/status'],
-  ['Revenue core', 'lead, booking intent, payment, email/calendar'],
-  ['Operations layer', 'team inbox, CRM follow-up, review history'],
+  ['Experience layer', 'bookedai.au, product, demo, portal, widget, vertical pages'],
+  ['AI agent layer', 'intent capture, fit scoring, booking assistance, customer-care context'],
+  ['Revenue core', 'lead, booking intent, payment posture, email, calendar, CRM follow-up'],
+  ['Business control layer', 'team workspace, admin reliability, review history, release evidence'],
 ];
+
+const aiInnovationCards = [
+  {
+    title: 'Omnichannel intent capture',
+    body: 'The same revenue workflow can receive demand from web, messaging apps, email, widgets, and future voice/call intake instead of treating each channel as a separate bot.',
+  },
+  {
+    title: 'Tenant-aware matching',
+    body: 'AI search is grounded in the business catalog, location, service fit, availability, and customer constraints so recommendations are explainable before booking.',
+  },
+  {
+    title: 'Identity-safe customer care',
+    body: 'Booking references, portal links, and contact checks keep support useful without exposing private booking details to an unauthenticated visitor.',
+  },
+  {
+    title: 'Action evidence model',
+    body: 'Key steps such as search, shortlist, booking, payment posture, CRM sync, calendar handoff, and human review become visible operational evidence.',
+  },
+  {
+    title: 'Reusable vertical templates',
+    body: 'Chess classes, swim schools, coaching, clinics, trades, and appointment-led SMEs can reuse the same page, agent, CRM, and booking setup pattern.',
+  },
+  {
+    title: 'Release-gated AI operations',
+    body: 'The product is tested through Playwright, backend regression, production smoke, and operator closeout before investor-facing claims are treated as shipped.',
+  },
+] as const;
+
+const useCaseCards = [
+  {
+    title: 'Service discovery to booking',
+    surface: 'bookedai.au + product.bookedai.au',
+    body: 'A customer asks for a service, compares the best fit, starts booking, receives a reference, and returns through portal/payment/follow-up.',
+    href: productUrl,
+  },
+  {
+    title: 'Chess academy enrolment',
+    surface: 'chess.bookedai.au',
+    body: 'A vertical page handles class selection, assessment context, selected schedule truth, payment options, email, CRM, Zoho Meeting, and Calendar handoff.',
+    href: 'https://chess.bookedai.au/',
+  },
+  {
+    title: 'AI Mentor high-intent lead',
+    surface: 'aimentor.bookedai.au',
+    body: 'A coaching offer captures enrolment intent, routes through CRM-style follow-up, Stripe checkout posture, and booked meeting continuity.',
+    href: 'https://aimentor.bookedai.au/',
+  },
+  {
+    title: 'Business workspace operations',
+    surface: 'tenant.bookedai.au',
+    body: 'Tenant teams manage catalog readiness, bookings, integrations, billing, team access, and follow-up visibility from the same operating layer.',
+    href: 'https://tenant.bookedai.au/',
+  },
+  {
+    title: 'Customer portal continuity',
+    surface: 'portal.bookedai.au',
+    body: 'Customers can reopen the booking reference, QR, payment posture, meeting/calendar handoff, and care actions after the first conversation.',
+    href: 'https://portal.bookedai.au/',
+  },
+  {
+    title: 'System architecture inspection',
+    surface: 'pitch.bookedai.au/architecture',
+    body: 'Investors and technical buyers can inspect the full customer, AI, booking, operations, integration, and deployment map.',
+    href: architectureUrl,
+  },
+] as const;
 
 const launchOfferCards = [
   {
@@ -476,12 +549,11 @@ function MasterRoadmapPitchSection() {
               id="pitch-master-roadmap-title"
               className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl lg:text-[2.6rem] lg:leading-[1.08]"
             >
-              Rollout roadmap: proof cases first, repeatable SME setup next.
+              Product roadmap: proof cases, revenue controls, then repeatable scale.
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
-              The commercial rollout is organized around a simple promise: launch real SME booking
-              verticals, prove the journey, then repeat the same configured revenue engine for the
-              next business.
+              The roadmap shows how the team moves from live vertical proof into widget
+              distribution, payment and billing truth, reusable templates, and release governance.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -517,7 +589,7 @@ function MasterRoadmapPitchSection() {
                   Launch proof
                 </div>
                 <div className="mt-1 text-sm leading-6 text-slate-700">
-                  Three live customer paths show BookedAI across classes, coaching, and service discovery.
+                  Three live customer paths show BookedAI across service discovery, classes, and coaching.
                 </div>
               </div>
               <div className="min-w-0 rounded-[1.1rem] border border-blue-200 bg-blue-50/60 px-4 py-3">
@@ -557,13 +629,15 @@ function PricingPitchSection({ openRegisterInterest }: PricingPitchSectionProps)
         <div className="grid gap-8 xl:grid-cols-[0.75fr_1.25fr] xl:items-start">
           <div>
             <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-              AI Revenue Engine pricing
+              Business model
             </SignalPill>
             <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-              Pay only when BookedAI books real revenue.
+              SaaS base, setup revenue, and performance-aligned upside.
             </h2>
             <p className="mt-4 text-sm leading-7 text-black/58">
-              We&apos;re free at the bottom, premium at the top, and aligned in the middle. {pricingContent.planCaption}
+              The model is designed for a wedge investors can underwrite: launch quickly, recover
+              onboarding cost through setup, retain through subscription, and expand through booked
+              revenue attribution.
             </p>
 
             <div className="mt-6 rounded-[1.75rem] border border-black/6 bg-white/72 p-5 backdrop-blur">
@@ -574,7 +648,7 @@ function PricingPitchSection({ openRegisterInterest }: PricingPitchSectionProps)
                 {pricingContent.planPrice}
               </div>
               <div className="mt-2 text-sm text-black/50">
-                Setup fees scoped after a 10-min call. Commission applies only to bookings BookedAI captures or recovers.
+                Setup fees are scoped by rollout complexity. Commission applies only to bookings BookedAI captures or recovers.
               </div>
             </div>
 
@@ -786,7 +860,7 @@ function SMESetupOverviewSection({ openRegisterInterest }: PricingPitchSectionPr
               Repeatable deployment
             </SignalPill>
             <h2 className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-              A packaged rollout motion, not one-off implementation work.
+              A repeatable rollout system, not custom services work.
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
               BookedAI launches the customer-facing page and the business workflow together, then
@@ -820,6 +894,83 @@ function SMESetupOverviewSection({ openRegisterInterest }: PricingPitchSectionPr
                 </h3>
                 <p className="mt-3 text-sm leading-6 text-slate-600">{card.body}</p>
               </article>
+            ))}
+          </div>
+        </div>
+      </SectionCard>
+    </section>
+  );
+}
+
+function AIInnovationSection() {
+  return (
+    <section id="ai-innovation" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+      <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#07111f_0%,#102033_50%,#153b3b_118%)] px-6 py-7 text-white shadow-[0_28px_80px_rgba(15,23,42,0.16)] sm:px-7 lg:px-8">
+        <div className="grid gap-8 xl:grid-cols-[0.68fr_1.32fr] xl:items-start">
+          <div>
+            <SignalPill className="w-fit border border-white/12 bg-white/10 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#8efce0]">
+              AI innovation
+            </SignalPill>
+            <h2 className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
+              Agentic revenue infrastructure, not another chatbot wrapper.
+            </h2>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
+              BookedAI uses AI where it changes commercial outcomes: understanding intent,
+              matching the right service, moving the customer into a booking path, and preserving
+              enough evidence for teams to trust the next action.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {aiInnovationCards.map((card) => (
+              <article key={card.title} className="rounded-[1.35rem] border border-white/10 bg-white/[0.08] p-5">
+                <h3 className="text-lg font-semibold tracking-[-0.035em] text-white">{card.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-slate-300">{card.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+      </SectionCard>
+    </section>
+  );
+}
+
+function UseCasesSection() {
+  return (
+    <section id="use-cases" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+      <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#ffffff_0%,#f8fbff_52%,#eef7f4_100%)] px-6 py-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] sm:px-7 lg:px-8">
+        <div className="grid gap-7 xl:grid-cols-[0.64fr_1.36fr] xl:items-start">
+          <div>
+            <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#0f766e]">
+              Shipped use cases and pages
+            </SignalPill>
+            <h2 className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
+              The pitch points to deployed surfaces investors can open.
+            </h2>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
+              Each page has a product job: acquisition, live booking, vertical proof, tenant
+              operations, customer continuity, or architecture inspection.
+            </p>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {useCaseCards.map((card) => (
+              <a
+                key={card.title}
+                href={card.href}
+                className="group rounded-[1.35rem] border border-black/6 bg-white/84 p-5 shadow-[0_12px_30px_rgba(15,23,42,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(15,23,42,0.08)]"
+              >
+                <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#0f766e]">
+                  {card.surface}
+                </div>
+                <h3 className="mt-3 text-lg font-semibold tracking-[-0.035em] text-[#1d1d1f]">
+                  {card.title}
+                </h3>
+                <p className="mt-3 text-sm leading-6 text-slate-600">{card.body}</p>
+                <div className="mt-4 text-xs font-semibold uppercase tracking-[0.13em] text-[#1459c7]">
+                  Open surface
+                </div>
+              </a>
             ))}
           </div>
         </div>
@@ -1295,10 +1446,27 @@ export function PitchDeckApp() {
               </h1>
 
               <p className="max-w-xl text-base leading-8 text-black/60 sm:text-lg">
-                We capture fragmented service enquiries across web, chat, messaging, email, and
-                calls, then turn them into booking references, payment and follow-up status, and
-                business-visible revenue evidence.
+                An omnichannel AI agent layer that turns fragmented enquiries into booking
+                references, payment and follow-up status, CRM/calendar handoff, and
+                investor-visible product evidence.
               </p>
+
+              <div className="grid gap-3 sm:grid-cols-3">
+                {investorProofStats.map(([value, label, detail]) => (
+                  <div
+                    key={label}
+                    className="rounded-[1.25rem] border border-black/6 bg-white/78 px-4 py-4 backdrop-blur"
+                  >
+                    <div className="text-3xl font-semibold tracking-[-0.06em] text-[#1d1d1f]">
+                      {value}
+                    </div>
+                    <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.13em] text-[#1459c7]">
+                      {label}
+                    </div>
+                    <p className="mt-2 text-xs leading-5 text-black/52">{detail}</p>
+                  </div>
+                ))}
+              </div>
 
               {/* Industry type chips */}
               <div className="flex flex-wrap gap-2">
@@ -1535,6 +1703,10 @@ export function PitchDeckApp() {
         </SectionCard>
       </section>
 
+      <AIInnovationSection />
+
+      <UseCasesSection />
+
       {/* ── 4. PRODUCT PROOF ────────────────────────────────────────── */}
       <section id="proof" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
         <div className="grid gap-5 xl:grid-cols-2">
@@ -1739,10 +1911,10 @@ export function PitchDeckApp() {
           {/* Team voices */}
           <SectionCard className="overflow-hidden bg-[linear-gradient(135deg,#ffffff_0%,#f6fbff_50%,#f0fdf4_100%)] px-6 py-6 sm:px-7 lg:px-8">
             <SignalPill className="w-fit border border-black/6 bg-white/72 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#1459c7]">
-              Team voices
+              Operator confidence
             </SignalPill>
             <h2 className="mt-5 text-2xl font-semibold tracking-[-0.04em] text-[#1d1d1f] sm:text-3xl">
-              Built for service teams, not generic chatbot theatre.
+              Built for revenue-critical service operations, not demo-only AI.
             </h2>
             <div className="mt-6 space-y-3">
               {trustItems.map((item) => (
@@ -1808,10 +1980,10 @@ export function PitchDeckApp() {
           <div className="grid gap-8 xl:grid-cols-[0.72fr_1.28fr] xl:items-start">
             <div>
               <SignalPill className="w-fit bg-[#eef2ff] px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#4338ca]">
-                {teamSectionContent.kicker}
+                Core team
               </SignalPill>
               <h2 className="mt-5 text-3xl font-semibold tracking-[-0.05em] text-[#1d1d1f] sm:text-4xl">
-                Built by business operators, engineers, and execution-minded founders
+                Founder-led team with engineering, operations, markets, and service-quality depth.
               </h2>
               <p className="mt-4 text-sm leading-7 text-black/58 sm:text-base">
                 {teamSectionContent.body}

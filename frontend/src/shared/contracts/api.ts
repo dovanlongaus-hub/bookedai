@@ -404,6 +404,7 @@ export interface V1DesiredSlot {
   date: string;
   time: string;
   timezone: string;
+  schedule_slot_id?: string | null;
 }
 
 export type V1AvailabilityState =
@@ -769,6 +770,7 @@ export interface CreateBookingIntentRequest {
   candidate_id?: string | null;
   service_id?: string | null;
   desired_slot?: V1DesiredSlot | null;
+  schedule_slot_id?: string | null;
   contact: V1LeadContactInput;
   attribution?: V1AttributionContext | null;
   channel: ApiChannel;
@@ -782,37 +784,68 @@ export interface CreateBookingIntentPortalIssue {
   expires_at: string | null;
 }
 
+export interface CreateBookingIntentCrmSync {
+  lead?: {
+    record_id?: number | null;
+    sync_status?: string | null;
+    external_entity_id?: string | null;
+    warning_codes?: string[];
+  } | null;
+  contact?: {
+    record_id?: number | null;
+    sync_status?: string | null;
+    external_entity_id?: string | null;
+    warning_codes?: string[];
+  } | null;
+  deal?: {
+    record_id?: number | null;
+    sync_status?: string | null;
+    external_entity_id?: string | null;
+  } | null;
+  task?: {
+    record_id?: number | null;
+    sync_status?: string | null;
+    external_entity_id?: string | null;
+  } | null;
+  warning_codes?: string[];
+}
+
 export interface CreateBookingIntentResponse {
   booking_intent_id: string;
   booking_reference?: string | null;
+  booking?: {
+    booking_reference?: string | null;
+    service_id?: string | null;
+    service_name?: string | null;
+    requested_date?: string | null;
+    requested_time?: string | null;
+    timezone?: string | null;
+    schedule_slot_id?: string | null;
+  } | null;
   portal?: CreateBookingIntentPortalIssue | null;
+  meeting?: {
+    meeting_url?: string | null;
+    calendar_event_url?: string | null;
+  } | null;
+  integrations?: {
+    zoho_meeting?: {
+      meeting_url?: string | null;
+      calendar_event_url?: string | null;
+    } | null;
+    crm_sync?: CreateBookingIntentCrmSync | null;
+  } | null;
+  metadata?: {
+    zoho_meeting?: {
+      meeting_url?: string | null;
+      calendar_event_url?: string | null;
+      calendar_url?: string | null;
+      join_url?: string | null;
+    } | null;
+    schedule_slot_id?: string | null;
+  } | null;
   trust: V1BookingTrustSummary;
   warnings: string[];
-  crm_sync?: {
-    lead?: {
-      record_id?: number | null;
-      sync_status?: string | null;
-      external_entity_id?: string | null;
-      warning_codes?: string[];
-    } | null;
-    contact?: {
-      record_id?: number | null;
-      sync_status?: string | null;
-      external_entity_id?: string | null;
-      warning_codes?: string[];
-    } | null;
-    deal?: {
-      record_id?: number | null;
-      sync_status?: string | null;
-      external_entity_id?: string | null;
-    } | null;
-    task?: {
-      record_id?: number | null;
-      sync_status?: string | null;
-      external_entity_id?: string | null;
-    } | null;
-    warning_codes?: string[];
-  } | null;
+  crm_sync?: CreateBookingIntentCrmSync | null;
 }
 
 export type V1PaymentStatus =

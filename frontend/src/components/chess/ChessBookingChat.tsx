@@ -226,6 +226,29 @@ function isValidEmail(value: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 }
 
+function parseMoneyAmount(value: string | null | undefined): number | null {
+  const normalized = String(value ?? '').replace(/,/g, '').match(/(\d+(?:\.\d+)?)/)?.[1];
+  if (!normalized) return null;
+  const parsed = Number(normalized);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+function resolveSelectedCourseAmounts(
+  course: ChessCatalogMatch,
+  fallback: { vnd: number; aud: number },
+): { vnd: number; aud: number } {
+  const rawAmountAud = (course as ChessCatalogMatch & { amount_aud?: number | string | null }).amount_aud;
+  const courseAud =
+    typeof rawAmountAud === 'number'
+      ? rawAmountAud
+      : typeof rawAmountAud === 'string'
+        ? Number(rawAmountAud)
+        : parseMoneyAmount(course.display_price_aud);
+  const aud = Number.isFinite(courseAud) && Number(courseAud) > 0 ? Number(courseAud) : fallback.aud;
+  const vnd = parseMoneyAmount(course.display_price_vnd) ?? Math.round(aud * 16500);
+  return { aud, vnd };
+}
+
 function buildLookaheadRange() {
   const today = new Date();
   const to = new Date(today.getTime() + 28 * 24 * 60 * 60 * 1000);
@@ -785,7 +808,10 @@ export function ChessBookingChat({
       }
 
       const programKey = inferProgramKeyFromName(selectedCourse.name);
-      const amounts = resolveProgramAmounts(programKey);
+      const amounts = resolveSelectedCourseAmounts(
+        selectedCourse,
+        resolveProgramAmounts(programKey),
+      );
       const sessionStartsAt = (() => {
         if (selectedSlot?.starts_at) return selectedSlot.starts_at;
         if (selectedSlot?.date) {
@@ -839,6 +865,41 @@ export function ChessBookingChat({
           }
           return `/order/${encodeURIComponent(result.bookingReference)}`;
         })();
+        // Build a UNIVERSAL Google Calendar "add event" URL the recipient can
+        // click without needing a Zoho login. Zoho's own viewEventURL only
+        // works for the calendar owner (chess@bookedai.au) and just shows a
+        // sign-in wall to guests. Google Calendar's render?action=TEMPLATE
+        // URL is publicly clickable from any email client.
+        const buildGoogleCalendarAddUrl = (): string => {
+          if (!sessionStartsAt) return '';
+          const startDt = new Date(sessionStartsAt);
+          if (Number.isNaN(startDt.getTime())) return '';
+          // Read duration from slot via permissive access — the API surfaces
+          // it as optional but legacy versions of the TS type omit it.
+          const slotDuration = (selectedSlot as { duration_minutes?: number | null } | null)
+            ?.duration_minutes;
+          const durationMin =
+            typeof slotDuration === 'number' && slotDuration > 0 ? slotDuration : 60;
+          const endDt = new Date(startDt.getTime() + durationMin * 60 * 1000);
+          const fmt = (d: Date): string =>
+            d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+          const params = new URLSearchParams({
+            action: 'TEMPLATE',
+            text: `${selectedCourse.name} — WGM Mai Hưng`,
+            dates: `${fmt(startDt)}/${fmt(endDt)}`,
+            details: [
+              `Booking ${result.bookingReference}`,
+              result.meetingUrl ? `Join: ${result.meetingUrl}` : '',
+              `Coach: WGM Nguyễn Thị Mai Hưng`,
+              selectedSlot?.cohort_label || '',
+            ]
+              .filter(Boolean)
+              .join('\n'),
+            location: 'Online (Lichess + Zoom + Zoho Meeting)',
+          });
+          return `https://calendar.google.com/calendar/render?${params.toString()}`;
+        };
+        const publicCalendarAdd = buildGoogleCalendarAddUrl();
         void apiV1
           .sendLifecycleEmail({
             template_key: 'bookedai_booking_confirmation',
@@ -856,7 +917,10 @@ export function ChessBookingChat({
               preferred_time: selectedSlot?.start_time || '',
               booking_reference: result.bookingReference,
               meeting_url: result.meetingUrl || '',
-              calendar_event_url: result.calendarUrl || '',
+              // Use the Google Calendar add URL (universal, no login wall) as
+              // the calendar variable — falls back to Zoho's URL only when
+              // we can't compute the public one.
+              calendar_event_url: publicCalendarAdd || result.calendarUrl || '',
               payment_link: payLinkBase,
               manage_link: payLinkBase,
               locale,
@@ -880,7 +944,11 @@ export function ChessBookingChat({
       }
       setMessages((current) => current.filter((m) => m.id !== typingId));
       appendBot(dict.payment);
-      setMessages((current) => [...current, { kind: 'payment', id: nextId('pay') }]);
+      setMessages((current) => [
+        ...current,
+        { kind: 'order', id: nextId('order') },
+        { kind: 'payment', id: nextId('pay') },
+      ]);
       setStep('payment');
       void loadPaymentOptions(card);
     } catch (err) {
@@ -922,7 +990,11 @@ export function ChessBookingChat({
   ]);
 
   const renderConfirmedOrder = useCallback(() => {
-    setMessages((current) => [...current, { kind: 'order', id: nextId('order') }]);
+    setMessages((current) =>
+      current.some((message) => message.kind === 'order')
+        ? current
+        : [...current, { kind: 'order', id: nextId('order') }],
+    );
     setStep('done');
   }, []);
 

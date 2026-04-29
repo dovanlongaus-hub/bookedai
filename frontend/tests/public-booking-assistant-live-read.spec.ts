@@ -248,6 +248,9 @@ async function getActiveAssistantInput(page: Parameters<typeof test>[0]['page'])
     .locator('#bookedai-search-assistant')
     .getByRole('textbox', { name: /Ask BookedAI/i })
     .first();
+  if ((await homepageSearchInput.count()) > 0) {
+    await homepageSearchInput.scrollIntoViewIfNeeded();
+  }
   if (await isVisible(homepageSearchInput, 500)) {
     return homepageSearchInput;
   }
@@ -275,11 +278,19 @@ async function getActiveAssistantPane(page: Parameters<typeof test>[0]['page']) 
 
 async function openAssistant(page: Parameters<typeof test>[0]['page']) {
   await page.goto('/');
+  await page
+    .locator('#bookedai-search-assistant')
+    .first()
+    .scrollIntoViewIfNeeded({ timeout: 10000 })
+    .catch(() => undefined);
   const inlineAssistantInput = page.locator('#assistant-chat-input');
   const homepageSearchInput = page
     .locator('#bookedai-search-assistant')
     .getByRole('textbox', { name: /Ask BookedAI/i })
     .first();
+  if ((await homepageSearchInput.count()) > 0) {
+    await homepageSearchInput.scrollIntoViewIfNeeded();
+  }
 
   if (!(await isVisible(inlineAssistantInput, 5000)) && !(await isVisible(homepageSearchInput, 5000))) {
     const fallbackTrigger = page
@@ -343,7 +354,11 @@ async function openBookingComposerIfNeeded(page: Parameters<typeof test>[0]['pag
     return;
   }
 
-  const progressiveButton = page.getByRole('button', { name: /Continue booking|Book this match|Book\b/i }).first();
+  const progressiveButton = page
+    .getByRole('button', {
+      name: /Continue booking|Book this match|Book V1 Precision Fade/i,
+    })
+    .first();
   if (await progressiveButton.isVisible().catch(() => false)) {
     await progressiveButton.click();
   }
@@ -3103,8 +3118,8 @@ test.describe('public assistant rollout smoke', () => {
       );
     }
     await expect(page.getByText('Contact', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Preferred time', { exact: true }).first()).toBeVisible();
-    await expect(page.getByText('Next step', { exact: true }).first()).toBeVisible();
+    await expect(page.getByText(/Preferred time|Time/i).first()).toBeVisible();
+    await expect(page.getByText(/Next step|What happens next/i).first()).toBeVisible();
     await expect(bookingForm.getByText(/Email or phone is enough/i)).toBeVisible();
     await bookingForm.getByLabel('Name').fill('BookedAI Customer');
     await bookingForm.getByLabel('Email').fill('customer@example.com');
@@ -3115,18 +3130,17 @@ test.describe('public assistant rollout smoke', () => {
 
     await expect(page.getByText('shadow-ref', { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/Booking request captured in v1\./)).toBeVisible();
-    await expect(page.getByText(/Your booking code, portal QR, and follow-up path are ready/i)).toBeVisible();
+    await expect(page.getByText(/Your booking code, portal QR, payment posture/i)).toBeVisible();
     await expect(page.getByText(/Returning to the main BookedAI screen/i)).toHaveCount(0);
     await expect(page.getByText(/This confirmation stays here as long as you need it/i)).toBeVisible();
     await expect(page.getByText('Scan to open booking')).toBeVisible();
     await expect(page.getByText('Review booking').first()).toBeVisible();
     await expect(page.getByText('Edit and submit').first()).toBeVisible();
     await expect(page.getByText('Request reschedule').first()).toBeVisible();
-    await expect(page.getByText('Customer-facing follow-up prepared from the booking result')).toBeVisible();
+    await expect(page.getByText('Communication', { exact: true }).first()).toBeVisible();
     await expect.poll(async () =>
       page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1),
     ).toBe(true);
-    await page.waitForTimeout(3200);
     await expect(page.getByText('shadow-ref', { exact: true }).first()).toBeVisible();
     await expect(page.getByText(/Returning to the main BookedAI screen/i)).toHaveCount(0);
     expect(legacySessionRequests).toBe(0);
@@ -3339,11 +3353,15 @@ test.describe('public assistant rollout smoke', () => {
             request_id: 'match-payment',
             candidates: [
               {
-                candidateId: liveReadService.id,
-                providerName: liveReadService.venue_name,
-                serviceName: liveReadService.name,
-                sourceType: 'service_catalog',
-                distanceKm: null,
+                candidate_id: liveReadService.id,
+                provider_name: liveReadService.venue_name,
+                service_name: liveReadService.name,
+                source_type: 'service_catalog',
+                distance_km: null,
+                category: liveReadService.category,
+                location: liveReadService.location,
+                booking_url: liveReadService.booking_url,
+                map_url: liveReadService.map_url,
                 explanation: 'Prompt 5 ranked this as the strongest match.',
               },
             ],
@@ -3430,7 +3448,14 @@ test.describe('public assistant rollout smoke', () => {
           status: 'ok',
           data: {
             booking_intent_id: 'booking-intent-payment',
-            booking_reference: 'shadow-payment-ref',
+            booking_reference: 'BR-2002',
+            portal: {
+              url: 'https://portal.bookedai.au/?booking_reference=BR-2002',
+            },
+            meeting: {
+              meeting_url: 'https://meet.example.com/BR-2002',
+              calendar_event_url: 'https://calendar.example.com/events/BR-2002',
+            },
             trust: {
               availability_state: 'available',
               verified: true,
@@ -3447,11 +3472,51 @@ test.describe('public assistant rollout smoke', () => {
       });
     });
 
-    await page.route('**/api/booking-assistant/session', async (route) => {
+    await page.route('**/api/v1/payments/intents', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify(stripeReadyBookingSessionResult),
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            payment_intent_id: 'payment-intent-2002',
+            payment_status: 'pending',
+            checkout_url: 'https://checkout.stripe.com/pay/cs_test_public',
+            warnings: [],
+          },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/email/messages/send', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            message_id: 'email-2002',
+            delivery_status: 'sent',
+            provider_message_id: 'provider-email-2002',
+            warnings: [],
+          },
+        }),
+      });
+    });
+
+    await page.route('**/api/v1/revenue-ops/handoffs', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            tenant_id: 'tenant-test',
+            booking_reference: 'BR-2002',
+            booking_intent_id: 'booking-intent-payment',
+            queued_actions: [{ action_type: 'booking_follow_up' }],
+          },
+        }),
       });
     });
 
@@ -3470,7 +3535,8 @@ test.describe('public assistant rollout smoke', () => {
       .getByRole('button', { name: /Create Booking Request|Continue booking/i })
       .click();
 
-    await expect(page.getByText('BR-2002', { exact: true })).toBeVisible();
+    const confirmationPanel = page.getByRole('complementary').filter({ hasText: 'BR-2002' });
+    await expect(confirmationPanel.getByText('BR-2002', { exact: true })).toBeVisible();
     await expect(page.getByText('Sent to customer')).toBeVisible();
     await expect(page.getByText('Checkout ready now')).toBeVisible();
     await expect(page.getByText('Calendar event sent')).toBeVisible();

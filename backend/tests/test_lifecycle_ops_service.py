@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import replace
 from pathlib import Path
 import sys
+from types import SimpleNamespace
 from unittest import IsolatedAsyncioTestCase
 from unittest.mock import patch
 
@@ -383,6 +384,131 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
         self.assertEqual(repository.updated_records[0]["sync_status"], "synced")
         self.assertEqual(repository.updated_records[1]["sync_status"], "synced")
         self.assertFalse(repository.error_logs)
+
+    async def test_orchestrate_booking_followup_sync_uses_tenant_crm_credentials(self):
+        seen_settings: list[Settings] = []
+        tenant_credentials = SimpleNamespace(
+            refresh_token="tenant-refresh",
+            client_id="tenant-client",
+            client_secret="tenant-secret",
+            accounts_base_url="https://accounts.zoho.com.au",
+            api_base_url="https://tenant.zohoapis.com.au/crm/v8",
+            default_lead_module="Tenant_Leads",
+            default_contact_module="Tenant_Contacts",
+            default_deal_module="Tenant_Deals",
+            default_task_module="Tenant_Tasks",
+        )
+
+        async def _upsert_deal(_self, settings, *, lead):
+            seen_settings.append(settings)
+            return {
+                "status": "success",
+                "external_id": "tenant-deal-123",
+            }
+
+        async def _create_follow_up_task(_self, settings, *, lead):
+            seen_settings.append(settings)
+            return {
+                "status": "success",
+                "external_id": "tenant-task-123",
+            }
+
+        with patch(
+            "service_layer.lifecycle_ops_service.CrmSyncRepository",
+            _FakeCrmSyncRepository,
+        ), patch(
+            "service_layer.lifecycle_ops_service.get_settings",
+            lambda: _build_test_settings(access_token=""),
+        ), patch(
+            "service_layer.lifecycle_ops_service.ZohoCrmAdapter.upsert_deal",
+            _upsert_deal,
+        ), patch(
+            "service_layer.lifecycle_ops_service.ZohoCrmAdapter.create_follow_up_task",
+            _create_follow_up_task,
+        ):
+            result = await orchestrate_booking_followup_sync(
+                object(),
+                tenant_id="tenant-test",
+                booking_intent_id="booking-123",
+                booking_reference="BK-123",
+                full_name="BookedAI Customer",
+                email="customer@example.com",
+                phone="0400111222",
+                source="widget",
+                service_name="Tenant Service",
+                requested_date="2026-04-30",
+                requested_time="10:30",
+                timezone="Australia/Sydney",
+                booking_path="request_callback",
+                notes=None,
+                tenant_crm_credentials=tenant_credentials,
+            )
+
+        self.assertEqual(result.deal_sync_status, "synced")
+        self.assertEqual(result.task_sync_status, "synced")
+        self.assertEqual([settings.zoho_crm_refresh_token for settings in seen_settings], ["tenant-refresh", "tenant-refresh"])
+        self.assertEqual([settings.zoho_crm_client_id for settings in seen_settings], ["tenant-client", "tenant-client"])
+        self.assertEqual([settings.zoho_crm_api_base_url for settings in seen_settings], ["https://tenant.zohoapis.com.au/crm/v8", "https://tenant.zohoapis.com.au/crm/v8"])
+        self.assertEqual([settings.zoho_crm_default_deal_module for settings in seen_settings], ["Tenant_Deals", "Tenant_Deals"])
+        self.assertEqual([settings.zoho_crm_default_task_module for settings in seen_settings], ["Tenant_Tasks", "Tenant_Tasks"])
+
+    async def test_orchestrate_booking_followup_sync_downgrades_crm_transport_error(self):
+        async def _upsert_deal(_self, _settings, *, lead):
+            raise httpx.ConnectError("Zoho CRM connection failed")
+
+        async def _create_follow_up_task(_self, _settings, *, lead):
+            self.assertNotIn("external_deal_id", lead.metadata)
+            return {
+                "status": "success",
+                "external_id": "zoho-task-after-deal-failure",
+            }
+
+        with patch(
+            "service_layer.lifecycle_ops_service.CrmSyncRepository",
+            _FakeCrmSyncRepository,
+        ), patch(
+            "service_layer.lifecycle_ops_service.get_settings",
+            lambda: _build_test_settings(access_token="token"),
+        ), patch(
+            "service_layer.lifecycle_ops_service.ZohoCrmAdapter.upsert_deal",
+            _upsert_deal,
+        ), patch(
+            "service_layer.lifecycle_ops_service.ZohoCrmAdapter.create_follow_up_task",
+            _create_follow_up_task,
+        ):
+            result = await orchestrate_booking_followup_sync(
+                object(),
+                tenant_id="tenant-test",
+                booking_intent_id="booking-transport-error",
+                booking_reference="BK-TRANSPORT",
+                full_name="BookedAI Customer",
+                email="customer@example.com",
+                phone="0400111222",
+                source="widget",
+                service_name="Future Swim Caringbah",
+                requested_date="2026-04-30",
+                requested_time="10:30",
+                timezone="Australia/Sydney",
+                booking_path="request_callback",
+                notes="Parent prefers Saturday morning.",
+            )
+
+        error_logs = [
+            error
+            for repository in _FakeCrmSyncRepository.instances
+            for error in repository.error_logs
+        ]
+        updated_records = [
+            record
+            for repository in _FakeCrmSyncRepository.instances
+            for record in repository.updated_records
+        ]
+        self.assertEqual(result.deal_sync_status, "failed")
+        self.assertEqual(result.task_sync_status, "synced")
+        self.assertIn("deal_provider_transport_error", result.warning_codes)
+        self.assertEqual(updated_records[0]["sync_status"], "failed")
+        self.assertEqual(error_logs[0]["error_code"], "provider_transport_error")
+        self.assertTrue(error_logs[0]["retryable"])
 
     async def test_orchestrate_lead_qualification_sync_marks_lead_contact_and_deal_synced(self):
         async def _upsert_lead(_self, _settings, *, lead):

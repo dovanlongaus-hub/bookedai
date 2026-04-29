@@ -57,6 +57,28 @@ async function stubTenantWorkspace(page: Parameters<typeof test>[0]['page']) {
     updated_at: '2026-04-29T08:00:00Z',
   };
 
+  await page.addInitScript((sessionTenant) => {
+    const session = {
+      session_token: 'tenant-uat-token',
+      expires_at: '2099-04-29T00:00:00Z',
+      provider: 'password',
+      user: {
+        email: 'owner@example.com',
+        full_name: 'Owner User',
+      },
+      tenant: sessionTenant,
+      capabilities: ['tenant_catalog_import', 'tenant_catalog_publish'],
+      membership: {
+        tenant_id: sessionTenant.id,
+        tenant_slug: sessionTenant.slug,
+        email: 'owner@example.com',
+        role: 'tenant_admin',
+        status: 'active',
+      },
+    };
+    window.localStorage.setItem(`bookedai.tenant.session.${sessionTenant.slug}`, JSON.stringify(session));
+  }, tenant);
+
   await page.route('**/api/v1/tenant/overview**', (route) =>
     route.fulfill({
       contentType: 'application/json',
@@ -477,10 +499,15 @@ test.describe('tenant gateway', () => {
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Sign in', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Create account', exact: true })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Google' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Email code' })).toBeVisible();
+    await expect(page.getByRole('tab', { name: 'Password' })).toBeVisible();
+    await page.getByRole('tab', { name: 'Email code' }).click();
     await expect(page.getByRole('button', { name: 'Send login code' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Send codeSend login code/ })).toHaveCount(0);
 
     await page.getByRole('button', { name: 'Create account', exact: true }).click();
+    await page.getByRole('tab', { name: 'Email code' }).click();
 
     await expect(page.getByText('Create business account', { exact: true }).first()).toBeVisible();
     await expect(page.getByPlaceholder('Future Swim')).toBeVisible();
@@ -587,6 +614,17 @@ test.describe('tenant gateway', () => {
     await expect(page.getByText('Current workspace')).toBeVisible();
 
     const workspaceMenu = page.locator('#tenant-workspace-menu');
+    await expect(workspaceMenu.getByText('Workspace menu')).toBeVisible();
+    await expect(page.getByLabel('Collapse workspace menu')).toBeVisible();
+    await page.getByLabel('Collapse workspace menu').click();
+    await expect(page.getByLabel('Expand workspace menu')).toBeVisible();
+    let collapsedOverflow = await page.evaluate(
+      () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+    );
+    expect(collapsedOverflow).toBeLessThanOrEqual(1);
+    await page.getByLabel('Expand workspace menu').click();
+    await expect(workspaceMenu.getByText('Workspace menu')).toBeVisible();
+
     const panelChecks: Array<{ menu: RegExp; heading: string }> = [
       { menu: /Catalog/, heading: 'Catalog' },
       { menu: /Bookings/, heading: 'Bookings' },
@@ -611,7 +649,12 @@ test.describe('tenant gateway', () => {
     }
 
     await workspaceMenu.getByRole('button', { name: /Catalog/ }).click();
+    await expect(page.getByLabel('Run AI website import')).toBeVisible();
     await expect(page.getByLabel('Create service draft')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Paste a website and let AI draft sellable services' })).toBeVisible();
+    await page.getByPlaceholder('https://futureswim.com.au').fill('https://futureswim.com.au/locations/');
+    await page.getByRole('button', { name: 'Run AI import for swim website' }).click();
+    await expect(page.getByText('AI import completed. 1 search-ready service(s) are now available in the tenant catalog.')).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Beginner Swim Class' })).toBeVisible();
 
     await workspaceMenu.getByRole('button', { name: /Team/ }).click();

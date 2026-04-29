@@ -91,7 +91,7 @@ export const defensibilityCards: Array<{ kicker: string; title: string; body: st
   {
     kicker: 'Moat 1',
     title: 'Data moat — booking follow-up history',
-    body: 'Every customer turn becomes structured booking evidence: channel, intent, booking reference, payment posture, and retention next step. Across 1,000 businesses, this creates an AU dataset that links acquisition channel to qualified intent to revenue outcome. No general-purpose LLM has access to this.',
+    body: 'Every customer turn becomes structured booking evidence: channel, intent, booking reference, payment posture, and retention next step. Across 1,000 businesses, this creates an AU dataset that links acquisition channel to qualified intent to revenue outcome.',
   },
   {
     kicker: 'Moat 2',
@@ -100,8 +100,8 @@ export const defensibilityCards: Array<{ kicker: string; title: string; body: st
   },
   {
     kicker: 'Moat 3',
-    title: 'Workflow lock-in — operations truth',
-    body: 'Tenants run their daily revenue-ops queue, billing reminders, and customer-care replies inside the BookedAI Ops surface. Replacing us means replacing the system of record, not a chat widget. Foundation models become commoditized inputs to our orchestration layer; the moat lives in the audited workflow customers operate inside every day.',
+    title: 'Workflow lock-in — operating truth',
+    body: 'Businesses run daily revenue follow-up, billing reminders, and customer-care replies inside the BookedAI workspace. Replacing us means replacing the operating workflow, not a chat widget. Foundation models become commoditized inputs to our orchestration layer; the moat lives in the workflow customers use every day.',
   },
 ];
 
@@ -159,9 +159,9 @@ export const liveEvidenceFrames: Array<{
     title: 'Same booking surfaces in the admin Reliability lane',
     caption: 'Operator sees the fresh handoff queued under 30 seconds after the Telegram turn — full conversation + tenant context attached.',
     conversation: [
-      { from: 'system', text: 'CMHC-2026-0428-014 · Co Mai Hung Chess · channel=telegram · status=PENDING_TENANT_CONFIRM' },
+      { from: 'system', text: 'CMHC-2026-0428-014 · Co Mai Hung Chess · Telegram · pending team confirmation' },
       { from: 'system', text: 'Customer: Linh P. · +61 4xx xxx xxx · child age 8 · prefers Saturday morning' },
-      { from: 'system', text: 'Agent action_run: SHORTLIST -> BOOK -> CONFIRM_OUTBOUND queued · trace 9eb8...' },
+      { from: 'system', text: 'AI shortlist, booking capture, and outbound confirmation are queued for review.' },
     ],
   },
   {
@@ -170,10 +170,10 @@ export const liveEvidenceFrames: Array<{
     title: 'Booking evidence row inside the business workspace',
     caption: 'Every step (search, shortlist, book, confirm) lands in the business follow-up history for review and reporting.',
     conversation: [
-      { from: 'system', text: 'run_id 8431 · search_intent · status=ok · 220ms · channel=telegram' },
-      { from: 'system', text: 'run_id 8432 · shortlist_match · status=ok · matched=co-mai-hung-chess' },
-      { from: 'system', text: 'run_id 8433 · booking_capture · status=ok · ref=CMHC-2026-0428-014' },
-      { from: 'system', text: 'run_id 8434 · confirm_outbound · status=ok · channel=telegram · latency=412ms' },
+      { from: 'system', text: 'Search intent captured · chess class · beginner · Sydney · Saturday morning' },
+      { from: 'system', text: 'Best-fit shortlist matched · Co Mai Hung Chess Academy · trial class available' },
+      { from: 'system', text: 'Booking captured · reference CMHC-2026-0428-014 · portal link ready' },
+      { from: 'system', text: 'Confirmation follow-up queued · Telegram + email handoff visible to team' },
     ],
   },
 ];
