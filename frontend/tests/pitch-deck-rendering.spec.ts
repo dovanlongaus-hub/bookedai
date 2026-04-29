@@ -59,11 +59,11 @@ test.describe('pitch deck rendering', () => {
     const videoLink = page.getByRole('link', { name: 'Open video' });
     await expect(videoLink).toHaveAttribute(
       'href',
-      'https://upload.bookedai.au/videos/2cc8/fxu3H6DZDcFOvpjc9UlOmQ.mp4',
+      'https://upload.bookedai.au/videos/9eb8/BhVuOlB2QXlBo-_nyOFCcA.mp4',
     );
     await expect(page.locator('video source[type="video/mp4"]')).toHaveAttribute(
       'src',
-      'https://upload.bookedai.au/videos/2cc8/fxu3H6DZDcFOvpjc9UlOmQ.mp4',
+      'https://upload.bookedai.au/videos/9eb8/BhVuOlB2QXlBo-_nyOFCcA.mp4',
     );
   });
 });

@@ -141,7 +141,7 @@ const offerPackages: Array<{
     backendPlanId: 'standard',
     icon: Rocket,
     headline: 'Established business ready to run BookedAI as the AI Revenue Engine.',
-    body: 'All three channels (Telegram, WhatsApp, embed widget), agent queue, audit ledger, Stripe billing, CRM sync, and a monthly revenue summary.',
+    body: 'All three channels (Telegram, WhatsApp, embed widget), booking-care queue, Stripe billing, CRM sync, booking activity history, and a monthly revenue summary.',
     commissionNote: 'A$499 onboarding plus 3% on net booked revenue BookedAI captures.',
     highlighted: true,
   },

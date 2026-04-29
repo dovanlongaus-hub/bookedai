@@ -2974,7 +2974,7 @@ test.describe('public assistant rollout smoke', () => {
       });
     });
 
-    await page.route('**/api/v1/leads', async (route) => {
+    await page.route('**/api/v1/public/leads/**', async (route) => {
       shadowLeadRequests += 1;
       await route.fulfill({
         status: 200,
@@ -3196,7 +3196,7 @@ test.describe('public assistant rollout smoke', () => {
       });
     });
 
-    await page.route('**/api/v1/leads', async (route) => {
+    await page.route('**/api/v1/public/leads/**', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -3357,7 +3357,7 @@ test.describe('public assistant rollout smoke', () => {
       });
     });
 
-    await page.route('**/api/v1/leads', async (route) => {
+    await page.route('**/api/v1/public/leads/**', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -3442,18 +3442,32 @@ test.describe('public assistant rollout smoke', () => {
     await expect(page.getByText('Scan to open booking')).toBeVisible();
     await expect(
       page.getByText(
-        'A calendar event has been created and included in the booking flow. After payment, Stripe returns the customer to the homepage while the booking stays logged for follow-up.',
+        'A calendar event has been created and included in the booking flow. After payment, BookedAI verifies Stripe backend status before showing the paid state.',
       ),
     ).toBeVisible();
   });
 
   test('booking success banner renders on homepage after stripe return @legacy', async ({ page }) => {
     test.skip(isLiveReadMode, 'Legacy-only homepage return assertions should not run in live-read mode.');
+    await page.route('**/api/v1/payments/status**', async (route) => {
+      await new Promise((resolve) => setTimeout(resolve, 250));
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            status: 'ok',
+            booking_reference: 'BR-2002',
+            payment_status: 'paid',
+            session_match: true,
+          },
+        }),
+      });
+    });
     await page.goto('/?booking=success&ref=BR-2002');
 
-    await expect(page.getByText('Payment complete')).toBeVisible();
-    await expect(
-      page.getByText('Booking BR-2002 has been sent through payment, confirmation, and workflow handoff.'),
-    ).toBeVisible();
+    await expect(page.getByText('Payment is being verified.')).toBeVisible();
+    await expect(page.getByText('Payment received — your booking is confirmed.')).toBeVisible();
   });
 });

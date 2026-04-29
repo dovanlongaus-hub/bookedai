@@ -39,21 +39,29 @@ class RenderedEmailTemplate:
 
 BOOKEDAI_COMMUNICATION_TEMPLATES: dict[str, str] = {
     "bookedai_booking_confirmation": (
-        "Bookedai.au confirmed: ${service_name} for ${customer_name} on ${slot_label}. "
-        "Ref ${booking_reference}. ${business_name} will handle the next step. "
-        "Manage it here: ${manage_link}. Reply on WhatsApp to ask, reschedule, or request cancellation. "
+        "*BookedAI.au booking confirmed*\n"
+        "Hi ${customer_name}, your booking path is ready.\n\n"
+        "*Service:* ${service_name}\n"
+        "*Time:* ${slot_label}\n"
+        "*Reference:* ${booking_reference}\n"
+        "*Handled by:* ${business_name}\n\n"
+        "Manage booking: ${manage_link}\n\n"
+        "*Need help?* Reply here for status, payment, reschedule, or cancellation review.\n"
         "BookedAI support: ${support_phone} or ${support_email}"
     ),
     "bookedai_demo_reminder": (
-        "Bookedai.au: Hi ${customer_name}, your live demo is coming up at ${slot_label}. "
-        "Reply to this message if you need to reschedule."
+        "*BookedAI.au demo reminder*\n"
+        "Hi ${customer_name}, your live demo is coming up at ${slot_label}.\n"
+        "Reply here if you need to reschedule."
     ),
     "bookedai_payment_followup": (
-        "Bookedai.au: Hi ${customer_name}, your ${service_name} booking is ready for the next step. "
+        "*BookedAI.au payment follow-up*\n"
+        "Hi ${customer_name}, your ${service_name} booking is ready for the next step.\n"
         "Complete payment here: ${payment_link}"
     ),
     "bookedai_manual_review": (
-        "Bookedai.au: Hi ${customer_name}, we received your request for ${service_name}. "
+        "*BookedAI.au request received*\n"
+        "Hi ${customer_name}, we received your request for ${service_name}.\n"
         "A team member will confirm details with you shortly."
     ),
 }
@@ -83,16 +91,98 @@ def _safe_mailto_href(email: str) -> str:
     return f"mailto:{quote(normalized_email, safe='@.+_-')}"
 
 
+_BOOKING_CONFIRMATION_MEETING_COPY: dict[str, dict[str, str]] = {
+    "en": {
+        "heading": "Join your online session",
+        "intro": "Your session will be online via Zoho Meeting.",
+        "meeting_label": "Meeting link",
+        "calendar_label": "Add to calendar",
+        "channel_note": (
+            "For questions, reply to this email or message us on "
+            "Telegram/WhatsApp."
+        ),
+        "cohort_label": "Cohort",
+        "prep_label": "What to prepare",
+        "coach_label": "Your coach",
+        "default_prep": "Lichess account + headphones recommended.",
+    },
+    "vi": {
+        "heading": "Tham gia buổi học online",
+        "intro": "Buổi học của bạn diễn ra online qua Zoho Meeting.",
+        "meeting_label": "Link buổi học",
+        "calendar_label": "Thêm vào lịch",
+        "channel_note": (
+            "Mọi thắc mắc, trả lời email này hoặc liên hệ qua Telegram/WhatsApp."
+        ),
+        "cohort_label": "Lớp/cohort",
+        "prep_label": "Cần chuẩn bị",
+        "coach_label": "Huấn luyện viên",
+        "default_prep": "Nên có tài khoản Lichess và tai nghe.",
+    },
+}
+
+
+def _normalize_email_locale(value: object | None) -> str:
+    raw = str(value or "").strip().lower()
+    if raw.startswith("vi"):
+        return "vi"
+    return "en"
+
+
+def _render_meeting_block_html(
+    *,
+    meeting_url: str,
+    calendar_event_url: str,
+    copy: dict[str, str],
+) -> str:
+    """Render the EN/VI 'Join your online session' block for the email HTML.
+
+    Returns an empty string when there is no meeting URL so the email still
+    looks clean for bookings without a Zoho-attached conference link.
+    """
+    if not meeting_url:
+        return ""
+    safe_meeting = _html_value(meeting_url)
+    safe_calendar = _html_value(calendar_event_url) if calendar_event_url else ""
+    safe_intro = _html_value(copy.get("intro", ""))
+    safe_meeting_label = _html_value(copy.get("meeting_label", "Meeting link"))
+    safe_calendar_label = _html_value(copy.get("calendar_label", "Add to calendar"))
+    safe_channel = _html_value(copy.get("channel_note", ""))
+    safe_heading = _html_value(copy.get("heading", "Join your online session"))
+    calendar_html = (
+        f'<div style="padding-top:6px;font-size:14px;line-height:1.65;color:#1d1d1f;">'
+        f'<strong>{safe_calendar_label}:</strong> '
+        f'<a href="{safe_calendar}" style="color:#0071e3;text-decoration:none;word-break:break-all;">{safe_calendar}</a>'
+        '</div>'
+    ) if safe_calendar else ""
+    return (
+        '<table role="presentation" width="100%" cellspacing="0" cellpadding="0" '
+        'style="margin-top:18px;background:#eff6ff;border:1px solid #bfdbfe;'
+        'border-radius:14px;">'
+        '<tr><td style="padding:16px 18px;font-size:14px;line-height:1.65;color:#1d1d1f;">'
+        f'<div style="font-size:12px;font-weight:700;letter-spacing:0.12em;'
+        f'text-transform:uppercase;color:#1d4ed8;">{safe_heading}</div>'
+        f'<p style="margin:6px 0 8px 0;font-size:14px;line-height:1.65;color:#1d1d1f;">{safe_intro}</p>'
+        '<div style="padding-top:4px;font-size:14px;line-height:1.65;color:#1d1d1f;">'
+        f'<strong>{safe_meeting_label}:</strong> '
+        f'<a href="{safe_meeting}" style="color:#0071e3;text-decoration:none;word-break:break-all;">{safe_meeting}</a>'
+        '</div>'
+        f'{calendar_html}'
+        f'<p style="margin:10px 0 0 0;font-size:13px;line-height:1.6;color:#475569;">{safe_channel}</p>'
+        '</td></tr></table>'
+    )
+
+
 def render_bookedai_confirmation_email(
     *,
     variables: dict[str, str] | None,
     public_app_url: str | None,
 ) -> RenderedEmailTemplate:
     customer_name = _safe_value(variables, "customer_name", "there")
-    service_name = _safe_value(variables, "service_name", "Bookedai.au booking")
+    service_name = _safe_value(variables, "service_name", "BookedAI.au booking")
     slot_label = _safe_value(variables, "slot_label", "To be confirmed")
     booking_reference = _safe_value(variables, "booking_reference", "Pending reference")
-    business_name = _safe_value(variables, "business_name", "Bookedai.au")
+    business_name = _safe_value(variables, "business_name", "BookedAI.au")
     venue_name = _safe_value(variables, "venue_name", business_name)
     support_email = _safe_value(variables, "support_email", DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL)
     support_phone = _safe_value(variables, "support_phone", DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE)
@@ -100,10 +190,21 @@ def render_bookedai_confirmation_email(
     manage_link = str((variables or {}).get("manage_link") or "").strip()
     timezone = _safe_value(variables, "timezone", "Australia/Sydney")
     additional_note = str((variables or {}).get("additional_note") or "").strip()
+    meeting_url = str((variables or {}).get("meeting_url") or "").strip()
+    calendar_event_url = str(
+        (variables or {}).get("calendar_event_url") or ""
+    ).strip()
+    locale = _normalize_email_locale((variables or {}).get("locale"))
+    meeting_copy = _BOOKING_CONFIRMATION_MEETING_COPY[locale]
+    cohort_label = str((variables or {}).get("cohort_label") or "").strip()
+    program_what_to_prepare = str(
+        (variables or {}).get("program_what_to_prepare") or ""
+    ).strip()
+    coach_blurb = str((variables or {}).get("coach_blurb") or "").strip()
     app_url = _safe_http_url(str(public_app_url or "").rstrip("/"), "https://bookedai.au").rstrip("/")
-    logo_url = f"{app_url}/branding/bookedai-mark-gradient.png?v=20260418-brand-system"
+    logo_url = f"{app_url}/branding/bookedai-logo-official.png?v=20260428-email-system"
     primary_link = _safe_http_url(payment_link or manage_link or app_url, app_url)
-    primary_label = "Complete next step" if payment_link else "Open Bookedai.au"
+    primary_label = "Complete next step" if payment_link else "Open BookedAI.au"
     safe_customer_name = _html_value(customer_name)
     safe_service_name = _html_value(service_name)
     safe_slot_label = _html_value(slot_label)
@@ -114,6 +215,9 @@ def render_bookedai_confirmation_email(
     safe_support_email = _html_value(support_email)
     safe_support_phone = _html_value(support_phone)
     safe_additional_note = _html_value(additional_note)
+    safe_cohort_label = _html_value(cohort_label)
+    safe_program_what_to_prepare = _html_value(program_what_to_prepare)
+    safe_coach_blurb = _html_value(coach_blurb)
     safe_logo_url = _html_value(logo_url)
     safe_primary_link = _html_value(primary_link)
     safe_mailto_href = _html_value(_safe_mailto_href(support_email))
@@ -121,7 +225,7 @@ def render_bookedai_confirmation_email(
     text_lines = [
         f"Hi {customer_name},",
         "",
-        "Your Bookedai.au booking has been confirmed.",
+        "Your BookedAI.au booking has been confirmed.",
         f"Service: {service_name}",
         f"Schedule: {slot_label}",
         f"Timezone: {timezone}",
@@ -135,69 +239,120 @@ def render_bookedai_confirmation_email(
         text_lines.append(f"Manage booking: {manage_link}")
     if additional_note:
         text_lines.extend(["", f"Note: {additional_note}"])
+    # Cohort + class info block — surfaced for any booking that ships a
+    # cohort_label / program_what_to_prepare / coach_blurb (chess slot picks
+    # provide all three; back-compat callers fall through silently).
+    if cohort_label:
+        text_lines.append(f"{meeting_copy['cohort_label']}: {cohort_label}")
+    if program_what_to_prepare or cohort_label:
+        # Default prep line for chess online sessions when the caller did not
+        # supply one. Skip the default for non-chess callers (no cohort_label).
+        prep_line = program_what_to_prepare or (
+            meeting_copy["default_prep"] if cohort_label else ""
+        )
+        if prep_line:
+            text_lines.append(f"{meeting_copy['prep_label']}: {prep_line}")
+    if coach_blurb:
+        text_lines.extend(["", f"{meeting_copy['coach_label']}: {coach_blurb}"])
+    if meeting_url:
+        # Bilingual (EN/VI) join block. Only rendered when Zoho returned a
+        # meeting link or a tenant default fallback is supplied. Falls back
+        # gracefully — if no meeting_url is present we keep the email lean.
+        text_lines.extend(
+            [
+                "",
+                meeting_copy["intro"],
+                "",
+                f"{meeting_copy['meeting_label']}: {meeting_url}",
+            ]
+        )
+        if calendar_event_url:
+            text_lines.append(
+                f"{meeting_copy['calendar_label']}: {calendar_event_url}"
+            )
+        text_lines.extend(["", meeting_copy["channel_note"]])
     text_lines.extend(
         [
             "",
             f"Need help? Reply to {support_email} or message {support_phone} on Telegram, WhatsApp, or iMessage.",
-            "Bookedai.au",
+            "BookedAI.au",
             "AI Receptionist & Booking for SMEs",
         ]
     )
 
     html = f"""
 <!doctype html>
-<html lang="en">
-  <body style="margin:0;background:#f5f5f7;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;color:#1d1d1f;">
-    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:680px;margin:0 auto;">
+<html lang="{locale}">
+  <body style="margin:0;background:#f5f5f7;padding:32px 16px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif;color:#1d1d1f;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:704px;margin:0 auto;">
       <tr>
         <td style="padding:0;">
-          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:28px;overflow:hidden;box-shadow:0 24px 60px rgba(15,23,42,0.08);">
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#ffffff;border-radius:24px;overflow:hidden;border:1px solid #e5e7eb;box-shadow:0 22px 54px rgba(15,23,42,0.10);">
             <tr>
-              <td style="padding:28px 28px 18px;background:linear-gradient(135deg,#f7fbff 0%,#ffffff 100%);border-bottom:1px solid rgba(29,29,31,0.08);">
+              <td style="padding:28px 28px 22px;background:#0b1220;border-bottom:1px solid rgba(255,255,255,0.10);">
                 <table role="presentation" cellspacing="0" cellpadding="0">
                   <tr>
-                    <td style="width:56px;height:56px;border-radius:18px;background:#f5f5f7;padding:6px;">
-                      <img src="{safe_logo_url}" alt="Bookedai.au logo" width="44" height="44" style="display:block;width:44px;height:44px;object-fit:contain;" />
+                    <td style="width:120px;height:48px;border-radius:12px;background:#ffffff;padding:8px 10px;">
+                      <img src="{safe_logo_url}" alt="BookedAI.au logo" width="100" style="display:block;width:100px;height:auto;max-height:34px;object-fit:contain;" />
                     </td>
                     <td style="padding-left:16px;">
-                      <div style="font-size:11px;font-weight:700;letter-spacing:0.14em;text-transform:uppercase;color:#0071e3;">AI Receptionist & Booking for SMEs</div>
-                      <div style="padding-top:8px;font-size:28px;line-height:1.15;font-weight:700;color:#1d1d1f;">Bookedai.au booking confirmed</div>
+                      <div style="font-size:11px;font-weight:700;letter-spacing:0.13em;text-transform:uppercase;color:#8bd3ff;">AI Revenue Engine</div>
+                      <div style="padding-top:8px;font-size:28px;line-height:1.15;font-weight:700;color:#ffffff;">Booking confirmed</div>
                     </td>
                   </tr>
                 </table>
-                <p style="margin:18px 0 0;font-size:16px;line-height:1.7;color:#3a3a3c;">
-                  Hi {safe_customer_name}, your next step with <strong>{safe_service_name}</strong> is now confirmed and ready to move forward.
+                <p style="margin:20px 0 0;font-size:16px;line-height:1.7;color:#dbeafe;">
+                  Hi {safe_customer_name}, your next step with <strong style="color:#ffffff;">{safe_service_name}</strong> is confirmed and saved to your BookedAI.au portal.
                 </p>
               </td>
             </tr>
             <tr>
               <td style="padding:28px;">
-                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f7fbff;border:1px solid #d6e8ff;border-radius:22px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-bottom:18px;">
                   <tr>
-                    <td style="padding:20px;">
+                    <td style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:14px;padding:12px 14px;font-size:13px;line-height:1.5;color:#14532d;">
+                      <strong>Status:</strong> booking captured, reference issued, and customer-care links are ready.
+                    </td>
+                  </tr>
+                </table>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:18px;">
+                  <tr>
+                    <td style="padding:20px 20px 6px;">
                       <div style="font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#0071e3;">Confirmation summary</div>
-                      <div style="padding-top:14px;font-size:16px;line-height:1.8;color:#1d1d1f;">
-                        <div><strong>Service:</strong> {safe_service_name}</div>
-                        <div><strong>Schedule:</strong> {safe_slot_label}</div>
-                        <div><strong>Timezone:</strong> {safe_timezone}</div>
-                        <div><strong>Booking reference:</strong> {safe_booking_reference}</div>
-                        <div><strong>Handled by:</strong> {safe_business_name}</div>
-                        <div><strong>Location:</strong> {safe_venue_name}</div>
-                      </div>
+                    </td>
+                  </tr>
+                  <tr><td style="padding:8px 20px 0;font-size:15px;line-height:1.65;color:#1d1d1f;"><strong>Service</strong><br>{safe_service_name}</td></tr>
+                  <tr><td style="padding:12px 20px 0;font-size:15px;line-height:1.65;color:#1d1d1f;"><strong>Schedule</strong><br>{safe_slot_label} ({safe_timezone})</td></tr>
+                  <tr><td style="padding:12px 20px 0;font-size:15px;line-height:1.65;color:#1d1d1f;"><strong>Booking reference</strong><br><span style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;background:#ffffff;border:1px solid #e2e8f0;border-radius:10px;padding:5px 8px;display:inline-block;">{safe_booking_reference}</span></td></tr>
+                  <tr>
+                    <td style="padding:12px 20px 20px;font-size:15px;line-height:1.65;color:#1d1d1f;">
+                      <strong>Handled by</strong><br>{safe_business_name}<br>
+                      <span style="color:#64748b;">{safe_venue_name}</span>
                     </td>
                   </tr>
                 </table>
                 {"<p style='margin:18px 0 0;font-size:14px;line-height:1.7;color:#3a3a3c;'><strong>Additional note:</strong> " + safe_additional_note + "</p>" if additional_note else ""}
+                {("<table role='presentation' width='100%' cellspacing='0' cellpadding='0' style='margin-top:18px;background:#fdfaf3;border:1px solid rgba(15,92,84,0.15);border-radius:14px;'><tr><td style='padding:14px 16px;font-size:14px;line-height:1.65;color:#1d1d1f;'>"
+                  + (("<div style='font-size:12px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:#0f5c54;'>" + _html_value(meeting_copy['cohort_label']) + "</div><p style='margin:6px 0 0;font-size:14px;line-height:1.65;color:#1d1d1f;'>" + safe_cohort_label + "</p>") if cohort_label else "")
+                  + (("<p style='margin:10px 0 0;font-size:14px;line-height:1.65;color:#1d1d1f;'><strong>" + _html_value(meeting_copy['prep_label']) + ":</strong> " + (safe_program_what_to_prepare or _html_value(meeting_copy['default_prep'])) + "</p>") if (program_what_to_prepare or cohort_label) else "")
+                  + (("<p style='margin:10px 0 0;font-size:14px;line-height:1.65;color:#1d1d1f;'><strong>" + _html_value(meeting_copy['coach_label']) + ":</strong> " + safe_coach_blurb + "</p>") if coach_blurb else "")
+                  + "</td></tr></table>") if (cohort_label or program_what_to_prepare or coach_blurb) else ""}
+                {_render_meeting_block_html(meeting_url=meeting_url, calendar_event_url=calendar_event_url, copy=meeting_copy)}
                 <div style="padding-top:24px;">
                   <a href="{safe_primary_link}" style="display:inline-block;background:#0071e3;color:#ffffff;text-decoration:none;font-weight:700;border-radius:999px;padding:14px 22px;">{primary_label}</a>
                 </div>
-                <p style="margin:24px 0 0;font-size:14px;line-height:1.7;color:#6e6e73;">
-                  Need help? Reply to <a href="{safe_mailto_href}" style="color:#0071e3;text-decoration:none;">{safe_support_email}</a>
-                  or message {safe_support_phone} on Telegram, WhatsApp, or iMessage.
-                </p>
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="margin-top:24px;border-top:1px solid #e5e7eb;">
+                  <tr>
+                    <td style="padding-top:18px;font-size:14px;line-height:1.7;color:#64748b;">
+                      Need help? Reply to <a href="{safe_mailto_href}" style="color:#0071e3;text-decoration:none;">{safe_support_email}</a>
+                      or message {safe_support_phone} on Telegram, WhatsApp, or iMessage. BookedAI Manager Bot can help with status, payment, reschedule, cancellation review, or a new booking search.
+                    </td>
+                  </tr>
+                </table>
               </td>
             </tr>
           </table>
+          <p style="margin:16px 8px 0;font-size:12px;line-height:1.6;color:#8a8a8e;text-align:center;">BookedAI.au turns service enquiries into booked revenue.</p>
         </td>
       </tr>
     </table>
@@ -206,7 +361,7 @@ def render_bookedai_confirmation_email(
 """.strip()
 
     return RenderedEmailTemplate(
-        subject=f"Bookedai.au confirmed: {service_name} ({booking_reference})",
+        subject=f"BookedAI.au confirmed: {service_name} ({booking_reference})",
         text="\n".join(text_lines),
         html=html,
     )
@@ -339,10 +494,10 @@ class CommunicationService:
                 raise ValueError(f"Unknown communication template: {template_key}")
             template_variables = {
                 "customer_name": "there",
-                "service_name": "Bookedai.au booking",
+                "service_name": "BookedAI.au booking",
                 "slot_label": "To be confirmed",
                 "booking_reference": "Pending reference",
-                "business_name": "Bookedai.au",
+                "business_name": "BookedAI.au",
                 "support_email": DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL,
                 "support_phone": DEFAULT_CUSTOMER_BOOKING_SUPPORT_PHONE,
                 **(variables or {}),

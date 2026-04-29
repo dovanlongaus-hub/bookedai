@@ -3,8 +3,33 @@ import { FormEvent, useCallback, useEffect, useMemo, useState } from 'react';
 import '../../theme/chess-tokens.css';
 import { createPublicBookingAssistantLeadAndBookingIntent } from '../../components/landing/assistant/publicBookingAssistantV1';
 import { PaymentSelection } from '../../components/chess/PaymentSelection';
-import { apiV1, type ChessPaymentOption } from '../../shared/api/v1';
+import { CourseIllustration, type CourseIllustrationVariant } from '../../components/chess/CourseIllustration';
+import { ChessPieceIllustration } from '../../components/chess/ChessPieceIllustration';
+import { ChessLogoLockup, ChessLogoMark } from '../../components/chess/ChessLogo';
+import {
+  IconBoard,
+  IconCertificate,
+  IconClock,
+  IconKnight,
+  IconLichess,
+  IconTrophy,
+  IconZoom,
+} from '../../components/chess/ChessIcons';
+import { OrderConfirmation } from '../../components/chess/OrderConfirmation';
+import { TimeSlotPicker } from '../../components/chess/TimeSlotPicker';
+import {
+  apiV1,
+  type ChessCatalogMatch,
+  type ChessCourseSlot,
+  type ChessPaymentOption,
+} from '../../shared/api/v1';
 import type { MatchCandidate } from '../../shared/contracts';
+
+// Launch promo countdown end (Asia/Ho_Chi_Minh = UTC+7). Bump this date to
+// extend the launch banner; keeping it as a top-level constant means there is
+// exactly one source of truth.
+const LAUNCH_PROMO_END_DATE = new Date('2026-05-12T23:59:59+07:00');
+const PROMO_BANNER_DISMISSED_KEY = 'chess.promoBanner.dismissedAt';
 
 type Locale = 'en' | 'vi';
 
@@ -23,6 +48,7 @@ type InquiryFormState = {
   preferredDate: string;
   preferredTime: string;
   selectedServiceId: string;
+  selectedSlotId: string;
   notes: string;
 };
 
@@ -50,11 +76,12 @@ type ProgramTier = {
   key: string;
   format: Record<Locale, string>;
   tier: Record<Locale, string>;
-  price: string;
+  price: Record<Locale, string>;
   priceSuffix: Record<Locale, string>;
   body: Record<Locale, string>;
   features: Record<Locale, string[]>;
   featured: boolean;
+  illustration: CourseIllustrationVariant;
 };
 
 const TENANT_REF = 'co-mai-hung-chess-class';
@@ -64,104 +91,132 @@ const LOCALE_STORAGE_KEY = 'chess.bookedai.locale';
 const programs: ProgramTier[] = [
   {
     key: 'beginner',
-    format: { en: 'Online or in-person group', vi: 'Nhóm online hoặc trực tiếp' },
+    illustration: 'beginner-group',
+    format: {
+      en: 'Online via Lichess + Zoom · Group of 8 max',
+      vi: 'Online qua Lichess + Zoom · Nhóm tối đa 8',
+    },
     tier: { en: 'Beginner Foundations', vi: 'Nền tảng cờ vua' },
-    price: '260,000 VND',
-    priceSuffix: { en: '/ student / session', vi: '/ học viên / buổi' },
+    price: { en: 'AUD 16', vi: '260,000 VND' },
+    priceSuffix: { en: 'per student per session', vi: '/ học viên / buổi' },
     body: {
-      en: 'For young learners building first-move confidence, board awareness, tactical basics, and disciplined thinking in a calm group setting.',
-      vi: 'Dành cho học viên nhỏ tuổi xây dựng nền tảng nước đi, nhận thức bàn cờ, chiến thuật cơ bản và tư duy kỷ luật trong nhóm nhỏ thân thiện.',
+      en: 'Confident first 12 moves. Tactical patterns. Disciplined thinking. Built for ages 6-12 in small focused groups.',
+      vi: 'Tự tin 12 nước đi đầu. Mẫu chiến thuật. Tư duy kỷ luật. Thiết kế cho độ tuổi 6-12 trong nhóm nhỏ tập trung.',
     },
     features: {
       en: [
-        'Ages 6–12, group of 4–8 students',
-        '60-minute structured curriculum',
+        'Online cohort, learn from anywhere',
+        'Lichess board + Zoom video',
+        'Ages 6-12, max 8 per class',
+        '60-min structured curriculum',
         'Workbook + homework included',
-        'Monthly progress report to parents',
+        'Monthly parent progress report',
+        'Sibling 15% off second child',
       ],
       vi: [
-        'Độ tuổi 6–12, lớp 4–8 học viên',
+        'Lớp online, học mọi lúc mọi nơi',
+        'Bàn cờ Lichess + video Zoom',
+        '6-12 tuổi, tối đa 8 học viên',
         'Giáo trình 60 phút có cấu trúc',
-        'Tặng kèm sách bài tập và bài về nhà',
+        'Tặng kèm sách bài tập + bài về nhà',
         'Báo cáo tiến độ hàng tháng cho phụ huynh',
+        'Giảm 15% cho con thứ 2',
       ],
     },
     featured: false,
   },
   {
     key: 'private',
-    format: { en: '1-on-1 online or in person', vi: '1 kèm 1 online hoặc trực tiếp' },
+    illustration: 'private-coaching',
+    format: {
+      en: 'Online 1-on-1 with WGM Mai Hưng',
+      vi: 'Online 1-1 với WGM Mai Hưng',
+    },
     tier: { en: 'Private Grandmaster Coaching', vi: 'Kèm riêng cùng Đại kiện tướng' },
-    price: '1,040,000 VND',
-    priceSuffix: { en: '/ session', vi: '/ buổi' },
+    price: { en: 'AUD 65', vi: '1,040,000 VND' },
+    priceSuffix: { en: 'per session', vi: '/ buổi' },
     body: {
-      en: 'A premium direct-coaching path for students who need accelerated progress, sharper calculation, and highly personalised attention.',
-      vi: 'Lộ trình kèm riêng cao cấp cho học viên cần tăng tốc tiến bộ, tính toán sắc bén và sự hướng dẫn cá nhân hóa cao.',
+      en: 'Direct grandmaster coaching with WGM Mai Hưng. Personal opening repertoire. Game-by-game review. Custom training plan tuned to your goals.',
+      vi: 'Học trực tiếp với Đại kiện tướng Mai Hưng. Kho khai cuộc cá nhân. Phân tích từng ván đấu. Lộ trình riêng theo mục tiêu của bạn.',
     },
     features: {
       en: [
-        'Direct coaching with GM Mai Hung',
-        'Custom training plan per student',
-        'Game review + opening preparation',
-        'Flexible online or in-person scheduling',
+        'Direct teaching by WGM Mai Hưng',
+        'Personal opening repertoire',
+        'Detailed game-by-game review',
+        'Custom training plan',
+        'Annual prepay: 10% off',
       ],
       vi: [
-        'Kèm trực tiếp bởi GM Mai Hùng',
-        'Lộ trình riêng cho từng học viên',
-        'Phân tích ván đấu + chuẩn bị khai cuộc',
-        'Lịch học online hoặc trực tiếp linh hoạt',
+        'WGM Mai Hưng dạy trực tiếp',
+        'Kho khai cuộc riêng',
+        'Phân tích chi tiết từng ván',
+        'Lộ trình tập luyện riêng',
+        'Đóng năm: giảm thêm 10%',
       ],
     },
     featured: true,
   },
   {
     key: 'tournament',
-    format: { en: '90-minute advanced training', vi: 'Đào tạo nâng cao 90 phút' },
+    illustration: 'tournament-prep',
+    format: {
+      en: '90-min online advanced sessions · 1-on-1 or pairs',
+      vi: 'Buổi online nâng cao 90 phút · Riêng hoặc theo cặp',
+    },
     tier: { en: 'Tournament Preparation', vi: 'Luyện thi đấu giải' },
-    price: '1,300,000 VND',
-    priceSuffix: { en: '/ session', vi: '/ buổi' },
+    price: { en: 'AUD 80', vi: '1,300,000 VND' },
+    priceSuffix: { en: 'per session', vi: '/ buổi' },
     body: {
-      en: 'Longer strategic sessions focused on opening understanding, calculation depth, tournament mindset, and competition readiness.',
-      vi: 'Buổi học chiến lược dài tập trung vào khai cuộc, tính toán sâu, tâm lý thi đấu và sự sẵn sàng tranh tài.',
+      en: 'Tournament-mindset coaching, all online. Calculation depth. Endgame mastery. Pre-event simulation games over Lichess + Zoom. Built for serious competitors.',
+      vi: 'Huấn luyện tâm lý thi đấu, hoàn toàn online. Tính toán sâu. Thuần thục tàn cuộc. Ván cờ mô phỏng trước giải qua Lichess + Zoom. Dành cho học viên thi đấu nghiêm túc.',
     },
     features: {
       en: [
-        'Deep opening repertoire building',
-        'Endgame mastery & calculation drills',
-        'Pre-tournament simulation games',
+        'Deep opening repertoire build',
+        'Endgame + calculation drills',
+        'Pre-tournament simulation',
         'Mental preparation coaching',
+        'Annual prepay: 10% off',
       ],
       vi: [
         'Xây dựng kho khai cuộc chuyên sâu',
-        'Thuần thục tàn cuộc & tính toán',
+        'Bài tập tàn cuộc + tính toán',
         'Ván cờ mô phỏng trước giải đấu',
         'Huấn luyện tâm lý thi đấu',
+        'Đóng năm: giảm thêm 10%',
       ],
     },
     featured: false,
   },
   {
-    key: 'home',
-    format: { en: 'In-person premium home visit', vi: 'Đến tận nhà cao cấp' },
-    tier: { en: 'At-Home Elite Training', vi: 'Đào tạo tinh hoa tại nhà' },
-    price: '+300,000 VND',
-    priceSuffix: { en: 'travel surcharge / session', vi: 'phụ phí đi lại / buổi' },
+    key: 'elite',
+    illustration: 'elite-plus',
+    format: {
+      en: 'Premium online · Sessions recorded · Priority WhatsApp',
+      vi: 'Online cao cấp · Có bản ghi · WhatsApp ưu tiên',
+    },
+    tier: { en: 'Elite Online Plus', vi: 'Online Cao Cấp Plus' },
+    price: { en: 'AUD 90', vi: '1,500,000 VND' },
+    priceSuffix: { en: 'per session', vi: '/ buổi' },
     body: {
-      en: 'A premium home-visit option for families who want private over-the-board training with stronger schedule flexibility and direct coaching quality.',
-      vi: 'Tuỳ chọn cao cấp đến tận nhà cho gia đình muốn học trực tiếp tại bàn cờ với lịch học linh hoạt và chất lượng kèm cặp trực tiếp.',
+      en: 'Everything in Private 1-on-1, plus recorded sessions you can rewatch, direct WhatsApp/Telegram access for between-class questions, and priority scheduling. Built for serious students who want grandmaster guidance beyond the live session.',
+      vi: 'Đầy đủ tính năng Kèm Riêng, kèm thêm bản ghi buổi học để xem lại, kênh WhatsApp/Telegram trực tiếp hỏi giữa các buổi, và ưu tiên đặt lịch. Dành cho học viên thực sự đầu tư muốn được Đại kiện tướng đồng hành ngoài giờ học.',
     },
     features: {
       en: [
-        'Coach travels to your home',
-        'Real over-the-board training',
-        'Family-friendly schedule windows',
-        'Optional sibling discount',
+        'Everything in Private 1-on-1',
+        'Sessions recorded — rewatch anytime',
+        'Direct WhatsApp/Telegram with WGM',
+        'Priority scheduling slots',
+        'Annual prepay: 10% off',
       ],
       vi: [
-        'Giáo viên đến tận nhà bạn',
-        'Học trực tiếp trên bàn cờ thật',
-        'Khung giờ linh hoạt cho gia đình',
-        'Ưu đãi cho anh/chị/em học cùng',
+        'Đầy đủ Kèm Riêng',
+        'Bản ghi buổi học — xem lại bất kỳ lúc nào',
+        'WhatsApp/Telegram trực tiếp với WGM',
+        'Ưu tiên đặt lịch',
+        'Đóng năm: giảm thêm 10%',
       ],
     },
     featured: false,
@@ -183,9 +238,8 @@ interface ChessProgramAmounts {
 }
 
 function resolveProgramAmounts(programKey: ChessProgramKey): ChessProgramAmounts {
-  // Hardcoded AUD figures that match the brief ("16, 65, 80 — your call"). The "home" tier is a
-  // surcharge on top of another tier, so we treat it as the surcharge add-on amount rather than a
-  // billable session-on-its-own price.
+  // Hardcoded AUD figures that match the brief. All tiers are now billed per session as
+  // standalone amounts (no travel surcharge tier — Tier 4 is the premium online package).
   switch (programKey) {
     case 'beginner':
       return { programKey, vnd: 260000, aud: 16 };
@@ -193,8 +247,8 @@ function resolveProgramAmounts(programKey: ChessProgramKey): ChessProgramAmounts
       return { programKey, vnd: 1040000, aud: 65 };
     case 'tournament':
       return { programKey, vnd: 1300000, aud: 80 };
-    case 'home':
-      return { programKey, vnd: 300000, aud: 19 };
+    case 'elite':
+      return { programKey, vnd: 1500000, aud: 92 };
     default:
       return { programKey: 'beginner', vnd: 260000, aud: Math.round(260000 / VND_PER_AUD) };
   }
@@ -213,14 +267,19 @@ function inferProgramKeyFromService(
   ]
     .map((value) => value.toLowerCase())
     .join(' | ');
+  if (
+    haystacks.includes('elite') ||
+    haystacks.includes('cao cấp') ||
+    haystacks.includes('cao cap') ||
+    haystacks.includes('premium')
+  ) {
+    return 'elite';
+  }
   if (haystacks.includes('tournament')) {
     return 'tournament';
   }
   if (haystacks.includes('private') || haystacks.includes('1-1') || haystacks.includes('1 kèm 1')) {
     return 'private';
-  }
-  if (haystacks.includes('home') || haystacks.includes('tận nhà') || haystacks.includes('at-home')) {
-    return 'home';
   }
   return 'beginner';
 }
@@ -237,17 +296,18 @@ const dict = {
       concierge: 'Concierge',
       faq: 'FAQ',
       enroll: 'Book a class',
+      myAccount: 'My Account',
     },
     hero: {
       eyebrow: 'Vietnam · Grandmaster-led chess academy',
-      titlePart1: 'Train chess with a real',
-      titleAccent: 'Vietnamese grandmaster',
-      titlePart2: '.',
+      titlePart1: 'Real grandmaster. Real progress.',
+      titleAccent: 'First 30 minutes free.',
+      titlePart2: '',
       lead:
-        'Beginner foundations to tournament-ready coaching. Online and in person, in English or Vietnamese. Book a class in minutes — pay per session, no hidden fees.',
-      ctaPrimary: 'Enroll now',
+        'Train chess with GM Mai Hung. Beginner foundations to tournament-ready coaching. Online or in person, English or Vietnamese. Book a free trial class today and lock the launch 20% off your first month.',
+      ctaPrimary: 'Book free trial class',
       ctaSecondary: 'Talk to the concierge',
-      trust: ['Grandmaster-led', 'Online + in person', 'EN + VI', 'Stripe / Zalo / Telegram'],
+      trust: ['Grandmaster-led', 'Online + in person', 'Dedicated email + CRM', 'Powered by BookedAI'],
       stat1Value: '15+',
       stat1Label: 'Years coaching',
       stat2Value: '500+',
@@ -255,10 +315,87 @@ const dict = {
       stat3Value: '4 tiers',
       stat3Label: 'Beginner → Tournament',
     },
+    promo: {
+      bannerText: (countdown: string) =>
+        `🎯 Launch month: 20% off your first month + free 30-min trial class. Ends in ${countdown}.`,
+      bannerCloseLabel: 'Dismiss launch promo banner',
+      bannerEndsLabel: 'Ends in',
+    },
     coach: {
-      name: 'GM Mai Hung',
-      meta: 'Grandmaster · Vietnam · Coach for beginner through tournament-level players',
+      name: 'WGM Nguyễn Thị Mai Hưng',
+      meta: 'Woman Grandmaster · Vietnam · Born 1994 in Bắc Giang · Peak FIDE 2357',
       quote: 'Chess is the discipline of seeing one move further than your opponent.',
+    },
+    profile: {
+      eyebrowMeet: 'Meet your coach',
+      heading: 'WGM Nguyễn Thị Mai Hưng — Vietnamese Woman Grandmaster',
+      paragraphs: [
+        'WGM Nguyễn Thị Mai Hưng is a Vietnamese Woman Grandmaster, born 28 January 1994 in Bắc Giang. She earned the WIM title in 2010 and the WGM title in 2014, with a peak FIDE rating of 2357 reached in October 2016.',
+        "Her competitive record includes the 2013 Vietnamese Women's Chess Championship, multiple Asian Youth Championship titles (U12 in 2005, U14 in 2007, U16 in 2010), the 2013 Asian Junior Championship (U20 girls), team and individual gold at the 2009 Women's Asian Team Championship, and individual bronze at the 2011 World Women's Team Championship. She has represented Vietnam in five Women's Chess Olympiads (2010, 2012, 2014, 2016, 2018).",
+        'All sessions are online — Mai Hưng teaches via Lichess board + Zoom video, with Zoho Meeting for 1-on-1 video conferencing and a Zoho Calendar reminder for every booking. Lessons available in English or Vietnamese for students from age 6 through adult improvers.',
+      ],
+      portraitCaption: 'WGM Nguyễn Thị Mai Hưng — academy portrait',
+      portraitVideoCta: 'Watch a 2-min preview',
+      portraitVideoNote: 'Coming soon',
+      trustBadges: [
+        'FIDE Woman Grandmaster',
+        'Peak Elo 2357 (Oct 2016)',
+        "5× Vietnam Women's Olympiad",
+        'EN + VI bilingual',
+      ],
+      eyebrowAchievements: 'Track record',
+      achievementsTitle: 'A career on the board, with the medals to show for it.',
+      achievements: [
+        '2014 — WGM title awarded by FIDE',
+        '2016 — Peak FIDE rating 2357',
+        "2013 — Vietnamese Women's Chess Champion",
+        '2009 — Asian Team Championship: team gold + individual gold',
+        "2010-2018 — 5× Vietnam Women's Olympiad team",
+        "2011 — World Women's Team Championship: individual bronze",
+      ],
+      eyebrowQuote: 'Teaching philosophy',
+      quote: 'Chess is the discipline of seeing one move further than your opponent.',
+      quoteAttribution: '— WGM Nguyễn Thị Mai Hưng',
+      eyebrowTestimonials: 'What families say',
+      testimonialsTitle: 'Stories from students and parents.',
+      testimonials: [
+        {
+          quote:
+            'My son went from never playing chess to winning his first school tournament in 6 months. Coach Mai Hưng is patient but rigorous — she teaches him to think before he moves.',
+          author: 'Mrs. Hương, mother of Linh',
+          program: 'Beginner Group',
+        },
+        {
+          quote:
+            "I work in finance and wanted a serious 1-on-1 chess coach. WGM Mai Hưng's opening preparation changed how I see the entire game.",
+          author: 'David, adult learner',
+          program: 'Private 1-on-1',
+        },
+        {
+          quote:
+            'Best part: my daughter actually looks forward to chess class. The online format with Lichess and Zoom works beautifully — even for an 8-year-old.',
+          author: 'Anh, mother of Mai',
+          program: 'Beginner Group',
+        },
+      ],
+      eyebrowHow: 'How online lessons work',
+      howTitle: 'Three steps from booking to first move.',
+      howSteps: [
+        { icon: '📅', title: '1. Book online', body: 'Pick a time on the calendar — instantly held, no card required for trial.' },
+        { icon: '📹', title: '2. Join Zoom + Lichess', body: 'You receive a Zoho Meeting link and Lichess board link. Click and play.' },
+        { icon: '✅', title: '3. Get session recording', body: 'Elite tier: a recording lands in your inbox. Other tiers: written recap.' },
+      ],
+      ctaPrimary: 'Book free trial class — no card required',
+    },
+    ctaStrip: {
+      promo: '🎯 Free 30-min trial · 20% off your first month · Online via Zoom + Lichess',
+      cta: 'Book free trial',
+    },
+    meetingBlock: {
+      heading: '🎥 Your online session is set',
+      joinLabel: 'Join via Zoho Meeting:',
+      calendarLabel: 'Add to calendar:',
+      emailNote: "We've also sent these to your email.",
     },
     why: {
       eyebrow: 'Why us',
@@ -337,6 +474,64 @@ const dict = {
         'Monthly progress report is shared with parents.',
       ],
     },
+    slotPicker: {
+      heading: 'Pick a session',
+      hint: 'These are real cohorts on the calendar over the next 4 weeks. Pick one for instant hold, or skip and we will arrange a custom slot.',
+      loading: 'Loading available sessions…',
+      empty: 'No scheduled cohorts in the next 4 weeks for this program. Pick any date and time below — the coach will confirm by email.',
+      error: 'We could not load live sessions just now.',
+      retry: 'Try again',
+      spotsLeft: (count: number) => `${count} spots left`,
+      spotsLast: (count: number) => `Only ${count} left`,
+      selected: 'Selected',
+    },
+    orderConfirmation: {
+      successHeading: 'Your spot is confirmed',
+      successSubheading:
+        'A confirmation email is on its way. Save the order reference below — your coach uses it to match every payment, message, and progress note.',
+      orderReferenceLabel: 'Order reference',
+      copyReference: 'Copy',
+      copiedReference: 'Copied',
+      rowSession: 'Session',
+      rowSessionTbc: 'Date confirmed by email',
+      rowMeeting: 'Meeting',
+      rowMeetingJoin: 'Join Zoho Meeting',
+      rowMeetingPending: 'Link emailed before class',
+      rowCoach: 'Coach',
+      rowPayment: 'Payment',
+      paymentPaid: (amount: string) => `Paid · ${amount}`,
+      paymentPending: 'Pending — bank transfer',
+      paymentUnpaid: 'Pay later — coach will send a reminder',
+      viewOrderDetails: 'View order details',
+      addAppleWallet: 'Add to Apple Wallet',
+      saveGoogleWallet: 'Save to Google Wallet',
+      walletAppleHint: 'iPhone',
+      walletGoogleHint: 'Android',
+      walletDownloading: 'Preparing pass…',
+      walletError: 'Wallet pass is not available yet — try again or use the meeting link.',
+      addGoogleCalendar: 'Add to Google Calendar',
+      downloadIcs: 'Download .ics',
+      emailMeCopy: 'Email me a copy',
+      emailMeCopySent: 'Email sent',
+      whatsNextHeading: "What's next",
+      whatsNextSteps: [
+        {
+          title: 'Check your inbox',
+          body: 'A confirmation email with the meeting link and calendar invite is on its way. Look for chess@bookedai.au.',
+        },
+        {
+          title: 'Set up Lichess',
+          body: 'Free account at lichess.org. Your coach will share the board link before class.',
+          href: 'https://lichess.org/signup',
+          cta: 'Open lichess.org/signup',
+        },
+        {
+          title: 'Show up 5 min early',
+          body: 'Open the Zoho Meeting link from your inbox or wallet pass. Your coach is in the room ready to play.',
+        },
+      ],
+      cohortDefault: 'Chess class',
+    },
     enroll: {
       eyebrow: 'Save my spot',
       title: 'Tell us about the student. We will hold a class.',
@@ -383,8 +578,8 @@ const dict = {
       ],
       errorContact: 'We need an email or phone number so the academy can reach you back.',
       errorService: 'Pick a chess program so we know what to book.',
-      successHeld: (ref: string, leadId: string) => `Your spot is held with reference ${ref}. Lead ${leadId} routed to the coach.`,
-      successCaptured: (leadId: string) => `Saved. Lead ${leadId} routed to the coach for follow-up within 24 hours.`,
+      successHeld: (ref: string, _leadId: string) => `Your spot is held with reference ${ref}. The coach has your request and will follow up with the next step.`,
+      successCaptured: (_leadId: string) => 'Saved. Your request has been sent to the coach for follow-up within 24 hours.',
       successHeading: 'Your spot is held.',
       returnNow: 'Return now',
       returnIn: (s: number) => `Returning to the main screen in ${s}s`,
@@ -476,7 +671,8 @@ const dict = {
     sticky: {
       from: 'From',
       perSession: '/ session',
-      cta: 'Enroll',
+      cta: 'Book free trial',
+      promoText: '🎯 Launch 20% off · Free trial available',
     },
     languageToggle: {
       label: 'Language',
@@ -495,17 +691,18 @@ const dict = {
       concierge: 'Tư vấn',
       faq: 'Câu hỏi',
       enroll: 'Đăng ký học',
+      myAccount: 'Tài khoản',
     },
     hero: {
       eyebrow: 'Việt Nam · Học viện cờ vua do Đại kiện tướng dẫn dắt',
-      titlePart1: 'Học cờ vua cùng',
-      titleAccent: 'Đại kiện tướng Việt Nam',
-      titlePart2: '.',
+      titlePart1: 'Đại kiện tướng thật sự. Tiến bộ thật.',
+      titleAccent: '30 phút đầu tiên miễn phí.',
+      titlePart2: '',
       lead:
-        'Từ nền tảng cho người mới đến luyện thi đấu giải. Online hoặc trực tiếp, Tiếng Anh hoặc Tiếng Việt. Đăng ký nhanh chóng — học phí theo buổi, minh bạch, không phụ phí ẩn.',
-      ctaPrimary: 'Đăng ký ngay',
+        'Học cờ cùng GM Mai Hùng. Từ nền tảng cho người mới đến luyện thi đấu giải. Online hoặc trực tiếp, Tiếng Anh hoặc Tiếng Việt. Đặt buổi thử miễn phí hôm nay để giữ ưu đãi 20% học phí tháng đầu.',
+      ctaPrimary: 'Đặt buổi thử miễn phí',
       ctaSecondary: 'Trao đổi với tư vấn',
-      trust: ['Đại kiện tướng dẫn dắt', 'Online & trực tiếp', 'Anh + Việt', 'Stripe / Zalo / Telegram'],
+      trust: ['Đại kiện tướng dẫn dắt', 'Online & trực tiếp', 'Email + CRM riêng', 'Vận hành bởi BookedAI'],
       stat1Value: '15+',
       stat1Label: 'Năm kinh nghiệm',
       stat2Value: '500+',
@@ -513,10 +710,87 @@ const dict = {
       stat3Value: '4 lộ trình',
       stat3Label: 'Cơ bản → Thi đấu',
     },
+    promo: {
+      bannerText: (countdown: string) =>
+        `🎯 Tháng ra mắt: Giảm 20% học phí tháng đầu + buổi thử miễn phí 30 phút. Kết thúc sau ${countdown}.`,
+      bannerCloseLabel: 'Đóng banner ưu đãi ra mắt',
+      bannerEndsLabel: 'Kết thúc sau',
+    },
     coach: {
-      name: 'GM Mai Hùng',
-      meta: 'Đại kiện tướng · Việt Nam · Huấn luyện cơ bản đến trình độ thi đấu',
+      name: 'WGM Nguyễn Thị Mai Hưng',
+      meta: 'Đại kiện tướng nữ · Việt Nam · Sinh 1994 tại Bắc Giang · Elo cao nhất 2357',
       quote: 'Cờ vua là kỷ luật của việc nhìn xa hơn đối thủ một nước.',
+    },
+    profile: {
+      eyebrowMeet: 'Gặp huấn luyện viên',
+      heading: 'WGM Nguyễn Thị Mai Hưng — Đại kiện tướng cờ vua nữ Việt Nam',
+      paragraphs: [
+        'WGM Nguyễn Thị Mai Hưng là Đại kiện tướng cờ vua nữ của Việt Nam, sinh ngày 28/01/1994 tại Bắc Giang. Cô đạt danh hiệu WIM năm 2010 và WGM năm 2014, đỉnh cao Elo FIDE 2357 (tháng 10/2016).',
+        'Thành tích thi đấu nổi bật gồm: vô địch nữ Việt Nam 2013, nhiều lần vô địch giải Trẻ Châu Á (U12 năm 2005, U14 năm 2007, U16 năm 2010), vô địch Trẻ Châu Á U20 nữ năm 2013, huy chương vàng đồng đội + cá nhân tại Giải Đồng đội Châu Á nữ 2009, huy chương đồng cá nhân Giải Đồng đội Thế giới nữ 2011. Cô đại diện Việt Nam tham dự 5 kỳ Olympiad cờ vua nữ (2010, 2012, 2014, 2016, 2018).',
+        'Tất cả buổi học hiện diễn ra online — Mai Hưng dạy qua bàn cờ Lichess + video Zoom, với Zoho Meeting cho buổi 1-1 và nhắc lịch tự động qua Zoho Calendar cho mỗi buổi đặt. Có thể học bằng Tiếng Anh hoặc Tiếng Việt cho học viên từ 6 tuổi đến người lớn cải thiện.',
+      ],
+      portraitCaption: 'WGM Nguyễn Thị Mai Hưng — ảnh chính thức của học viện',
+      portraitVideoCta: 'Xem giới thiệu 2 phút',
+      portraitVideoNote: 'Sắp ra mắt',
+      trustBadges: [
+        'Đại kiện tướng nữ FIDE',
+        'Elo cao nhất 2357 (10/2016)',
+        '5× Olympiad cờ vua nữ Việt Nam',
+        'Song ngữ Anh + Việt',
+      ],
+      eyebrowAchievements: 'Hành trang',
+      achievementsTitle: 'Sự nghiệp trên bàn cờ và những huy chương đi kèm.',
+      achievements: [
+        '2014 — Đạt danh hiệu WGM (FIDE)',
+        '2016 — Đỉnh cao Elo FIDE 2357',
+        '2013 — Vô địch nữ Việt Nam',
+        '2009 — Giải Đồng đội Châu Á nữ: vàng đồng đội + cá nhân',
+        '2010-2018 — 5 lần dự Olympiad nữ Việt Nam',
+        '2011 — Giải Đồng đội Thế giới nữ: đồng cá nhân',
+      ],
+      eyebrowQuote: 'Triết lý dạy học',
+      quote: 'Cờ vua là kỷ luật của việc nhìn xa hơn đối thủ một nước.',
+      quoteAttribution: '— WGM Nguyễn Thị Mai Hưng',
+      eyebrowTestimonials: 'Phụ huynh nói gì',
+      testimonialsTitle: 'Câu chuyện từ học viên và phụ huynh.',
+      testimonials: [
+        {
+          quote:
+            'Bé nhà mình từ chưa biết chơi cờ đã giành giải đầu tiên trong trường sau 6 tháng. Cô Hưng kiên nhẫn nhưng nghiêm khắc — cô dạy bé suy nghĩ trước khi đi.',
+          author: 'Chị Hương, mẹ của Linh',
+          program: 'Nhóm cơ bản',
+        },
+        {
+          quote:
+            'Tôi làm tài chính và muốn một huấn luyện viên 1-1 nghiêm túc. Bài khai cuộc của WGM Mai Hưng đã thay đổi cách tôi nhìn cả ván cờ.',
+          author: 'David, học viên trưởng thành',
+          program: 'Kèm riêng 1-1',
+        },
+        {
+          quote:
+            'Điều tuyệt nhất: con gái tôi rất mong đến giờ học cờ. Hình thức online qua Lichess + Zoom hoạt động tuyệt vời — kể cả với bé 8 tuổi.',
+          author: 'Anh, mẹ của Mai',
+          program: 'Nhóm cơ bản',
+        },
+      ],
+      eyebrowHow: 'Cách học online',
+      howTitle: 'Ba bước từ đặt lịch đến nước cờ đầu tiên.',
+      howSteps: [
+        { icon: '📅', title: '1. Đặt lịch online', body: 'Chọn giờ trên lịch — giữ chỗ ngay, buổi thử không cần thẻ.' },
+        { icon: '📹', title: '2. Vào Zoom + Lichess', body: 'Bạn nhận link Zoho Meeting và link bàn cờ Lichess. Bấm vào và chơi.' },
+        { icon: '✅', title: '3. Nhận bản ghi buổi học', body: 'Gói Cao Cấp: bản ghi gửi vào email. Gói khác: bản tóm tắt văn bản.' },
+      ],
+      ctaPrimary: 'Đặt buổi thử miễn phí — không cần thẻ',
+    },
+    ctaStrip: {
+      promo: '🎯 Buổi thử 30 phút miễn phí · Giảm 20% tháng đầu · Online qua Zoom + Lichess',
+      cta: 'Đặt buổi thử',
+    },
+    meetingBlock: {
+      heading: '🎥 Buổi học online của bạn đã được đặt',
+      joinLabel: 'Tham gia qua Zoho Meeting:',
+      calendarLabel: 'Thêm vào lịch:',
+      emailNote: 'Chúng tôi cũng đã gửi qua email cho bạn.',
     },
     why: {
       eyebrow: 'Vì sao chọn chúng tôi',
@@ -595,6 +869,64 @@ const dict = {
         'Báo cáo tiến độ hàng tháng được gửi cho phụ huynh.',
       ],
     },
+    slotPicker: {
+      heading: 'Chọn buổi học',
+      hint: 'Đây là các buổi học thật trong 4 tuần tới. Chọn một buổi để giữ chỗ ngay, hoặc bỏ qua để chúng tôi sắp xếp lịch riêng.',
+      loading: 'Đang tải các buổi học…',
+      empty: 'Hiện chưa có buổi học công khai trong 4 tuần tới cho lớp này. Chọn ngày và giờ bên dưới — giáo viên sẽ xác nhận qua email.',
+      error: 'Không tải được lịch buổi học lúc này.',
+      retry: 'Thử lại',
+      spotsLeft: (count: number) => `Còn ${count} chỗ`,
+      spotsLast: (count: number) => `Chỉ còn ${count} chỗ`,
+      selected: 'Đã chọn',
+    },
+    orderConfirmation: {
+      successHeading: 'Đã giữ chỗ thành công',
+      successSubheading:
+        'Email xác nhận đang trên đường tới hộp thư của bạn. Lưu mã đơn bên dưới — giáo viên dùng mã này để khớp mọi giao dịch, tin nhắn và ghi chú tiến độ.',
+      orderReferenceLabel: 'Mã đơn',
+      copyReference: 'Sao chép',
+      copiedReference: 'Đã sao chép',
+      rowSession: 'Buổi học',
+      rowSessionTbc: 'Lịch sẽ được xác nhận qua email',
+      rowMeeting: 'Phòng học',
+      rowMeetingJoin: 'Tham gia Zoho Meeting',
+      rowMeetingPending: 'Link sẽ gửi trước buổi học',
+      rowCoach: 'Giáo viên',
+      rowPayment: 'Thanh toán',
+      paymentPaid: (amount: string) => `Đã thanh toán · ${amount}`,
+      paymentPending: 'Đang chờ — chuyển khoản',
+      paymentUnpaid: 'Thanh toán sau — giáo viên sẽ nhắc',
+      viewOrderDetails: 'Xem chi tiết đơn',
+      addAppleWallet: 'Thêm vào Apple Wallet',
+      saveGoogleWallet: 'Lưu vào Google Wallet',
+      walletAppleHint: 'iPhone',
+      walletGoogleHint: 'Android',
+      walletDownloading: 'Đang chuẩn bị vé…',
+      walletError: 'Vé điện tử tạm thời chưa khả dụng — thử lại hoặc dùng link buổi học.',
+      addGoogleCalendar: 'Thêm vào Google Calendar',
+      downloadIcs: 'Tải .ics',
+      emailMeCopy: 'Gửi tôi một bản qua email',
+      emailMeCopySent: 'Đã gửi',
+      whatsNextHeading: 'Việc tiếp theo',
+      whatsNextSteps: [
+        {
+          title: 'Kiểm tra hộp thư',
+          body: 'Email xác nhận kèm link buổi học và lịch đang được gửi tới bạn từ chess@bookedai.au.',
+        },
+        {
+          title: 'Tạo tài khoản Lichess',
+          body: 'Đăng ký miễn phí tại lichess.org. Giáo viên sẽ gửi link bàn cờ trước buổi học.',
+          href: 'https://lichess.org/signup',
+          cta: 'Mở lichess.org/signup',
+        },
+        {
+          title: 'Vào sớm 5 phút',
+          body: 'Mở link Zoho Meeting từ email hoặc ví điện tử. Giáo viên đã có mặt trong phòng và sẵn sàng chơi.',
+        },
+      ],
+      cohortDefault: 'Lớp cờ vua',
+    },
     enroll: {
       eyebrow: 'Giữ chỗ',
       title: 'Cho chúng tôi biết về học viên — chúng tôi sẽ giữ lớp.',
@@ -641,10 +973,10 @@ const dict = {
       ],
       errorContact: 'Cần email hoặc số điện thoại để học viện liên hệ lại.',
       errorService: 'Vui lòng chọn một lớp để chúng tôi giữ chỗ.',
-      successHeld: (ref: string, leadId: string) =>
-        `Chỗ học của bạn đã được giữ với mã ${ref}. Mã đăng ký ${leadId} đã chuyển cho giáo viên.`,
-      successCaptured: (leadId: string) =>
-        `Đã ghi nhận. Mã đăng ký ${leadId} đã chuyển cho giáo viên để liên hệ trong 24 giờ.`,
+      successHeld: (ref: string, _leadId: string) =>
+        `Chỗ học của bạn đã được giữ với mã ${ref}. Giáo viên đã nhận yêu cầu và sẽ gửi bước tiếp theo.`,
+      successCaptured: (_leadId: string) =>
+        'Đã ghi nhận. Yêu cầu của bạn đã được gửi cho giáo viên để liên hệ trong 24 giờ.',
       successHeading: 'Đã giữ chỗ thành công.',
       returnNow: 'Quay lại ngay',
       returnIn: (s: number) => `Quay lại màn hình chính sau ${s}s`,
@@ -736,7 +1068,8 @@ const dict = {
     sticky: {
       from: 'Từ',
       perSession: '/ buổi',
-      cta: 'Đăng ký',
+      cta: 'Đặt buổi thử',
+      promoText: '🎯 Giảm 20% ra mắt · Có buổi thử miễn phí',
     },
     languageToggle: {
       label: 'Ngôn ngữ',
@@ -756,6 +1089,7 @@ const initialInquiryFormState: InquiryFormState = {
   preferredDate: '',
   preferredTime: '',
   selectedServiceId: '',
+  selectedSlotId: '',
   notes: '',
 };
 
@@ -772,6 +1106,26 @@ function getInitialLocale(): Locale {
     // ignore localStorage errors (private mode etc.)
   }
   return 'en';
+}
+
+function buildOrderDetailUrl(orderReference: string): string {
+  if (typeof window === 'undefined') {
+    return `/order/${encodeURIComponent(orderReference)}`;
+  }
+  const { hostname, protocol } = window.location;
+  if (hostname.endsWith('.bookedai.au')) {
+    return `${protocol}//portal.bookedai.au/order/${encodeURIComponent(orderReference)}`;
+  }
+  return `/order/${encodeURIComponent(orderReference)}`;
+}
+
+function buildStudentPortalUrl(): string {
+  if (typeof window === 'undefined') return '/student-account';
+  const { hostname, protocol } = window.location;
+  if (hostname.endsWith('.bookedai.au')) {
+    return `${protocol}//portal.bookedai.au/student-account`;
+  }
+  return '/student-account';
 }
 
 function buildAttribution() {
@@ -847,6 +1201,111 @@ async function fetchChessCatalog(): Promise<MatchCandidate[]> {
     .filter((service) => service.candidateId);
 }
 
+function mapProgramKeyToPieceVariant(
+  key: ChessProgramKey,
+): 'pawn' | 'king' | 'queen' | 'rook' {
+  switch (key) {
+    case 'beginner':
+      return 'pawn';
+    case 'private':
+      return 'king';
+    case 'tournament':
+      return 'queen';
+    case 'elite':
+      return 'rook';
+    default:
+      return 'pawn';
+  }
+}
+
+function formatPromoCountdown(now: Date, end: Date): string {
+  const diffMs = end.getTime() - now.getTime();
+  if (diffMs <= 0) {
+    return '0d 0h 0m';
+  }
+  const totalMinutes = Math.floor(diffMs / 60000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes - days * 60 * 24) / 60);
+  const minutes = totalMinutes - days * 60 * 24 - hours * 60;
+  return `${days}d ${hours}h ${minutes}m`;
+}
+
+interface PromoBannerProps {
+  text: (countdown: string) => string;
+  closeLabel: string;
+}
+
+function PromoBanner({ text, closeLabel }: PromoBannerProps) {
+  const [visible, setVisible] = useState<boolean>(false);
+  const [countdown, setCountdown] = useState<string>(() =>
+    formatPromoCountdown(new Date(), LAUNCH_PROMO_END_DATE),
+  );
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let dismissed = false;
+    try {
+      dismissed = Boolean(window.localStorage.getItem(PROMO_BANNER_DISMISSED_KEY));
+    } catch {
+      dismissed = false;
+    }
+    const expired = new Date().getTime() >= LAUNCH_PROMO_END_DATE.getTime();
+    setVisible(!dismissed && !expired);
+  }, []);
+
+  useEffect(() => {
+    if (!visible) return undefined;
+    const tick = () => {
+      const now = new Date();
+      if (now.getTime() >= LAUNCH_PROMO_END_DATE.getTime()) {
+        setVisible(false);
+        return;
+      }
+      setCountdown(formatPromoCountdown(now, LAUNCH_PROMO_END_DATE));
+    };
+    tick();
+    const id = window.setInterval(tick, 60_000);
+    return () => window.clearInterval(id);
+  }, [visible]);
+
+  const handleDismiss = useCallback(() => {
+    setVisible(false);
+    if (typeof window !== 'undefined') {
+      try {
+        window.localStorage.setItem(PROMO_BANNER_DISMISSED_KEY, new Date().toISOString());
+      } catch {
+        // ignore localStorage errors (private mode etc.)
+      }
+    }
+  }, []);
+
+  if (!visible) return null;
+
+  // We split the message around the countdown placeholder so it can be visually
+  // highlighted as a tabular-numbers chip while the surrounding copy stays
+  // localised.
+  const fullText = text(`__COUNTDOWN__`);
+  const [before, after] = fullText.split('__COUNTDOWN__');
+
+  return (
+    <div className="chess-promo-banner" role="region" aria-live="polite">
+      <div className="chess-promo-banner__text">
+        {before}
+        <span className="chess-promo-banner__countdown">{countdown}</span>
+        {after}
+      </div>
+      <button
+        type="button"
+        className="chess-promo-banner__dismiss"
+        aria-label={closeLabel}
+        onClick={handleDismiss}
+      >
+        ×
+      </button>
+    </div>
+  );
+}
+
 function KnightIcon({ className }: { className?: string }) {
   return (
     <svg
@@ -902,6 +1361,18 @@ export function ChessGrandmasterApp() {
     parentName: string;
     parentEmail: string | null;
   } | null>(null);
+  const [orderConfirmation, setOrderConfirmation] = useState<{
+    orderReference: string;
+    sessionStartsAt: string | null;
+    sessionTimeLabel: string | null;
+    cohortLabel: string | null;
+    meetingUrl: string | null;
+    calendarUrl: string | null;
+    coachName: string;
+    paymentStatus: 'paid' | 'pending' | 'unpaid';
+    paymentAmountFormatted: string | null;
+  } | null>(null);
+  const [selectedSlotDetails, setSelectedSlotDetails] = useState<ChessCourseSlot | null>(null);
 
   const returnToMainScreenAfterBooking = useCallback(() => {
     setLeadStatus('');
@@ -911,6 +1382,8 @@ export function ChessGrandmasterApp() {
     setPaymentError('');
     setPaymentLoading(false);
     setPaymentRequest(null);
+    setOrderConfirmation(null);
+    setSelectedSlotDetails(null);
     setFormState(initialInquiryFormState);
     if (typeof window !== 'undefined') {
       window.history.replaceState({}, '', window.location.pathname);
@@ -1046,35 +1519,43 @@ export function ChessGrandmasterApp() {
     setSearchError('');
     setConversation((current) => [...current, { role: 'user', content: trimmedQuery }]);
     try {
-      const response = await apiV1.searchCandidates({
+      // Tenant-scoped catalog search (chess tenant only — does NOT hit marketplace search).
+      // Backend filters by `tenant_id` already; the frontend just sends the visitor's natural-language
+      // class-finder query plus optional structured filters.
+      const response = await apiV1.chessCatalogSearch({
         query: trimmedQuery,
-        location: null,
-        preferences: { service_category: 'Kids Services' },
-        channel_context: {
-          channel: 'public_web',
-          deployment_mode: 'standalone_app',
-          tenant_ref: TENANT_REF,
-          widget_id: 'grandmaster-chess-concierge',
-        },
-        attribution: buildAttribution(),
+        filters: null,
       });
       if (!('data' in response)) {
         throw new Error('Search was accepted, but no shortlist was returned yet.');
       }
-      const nextResults = response.data.candidates
-        .filter(
-          (candidate) =>
-            candidate.candidateId.includes('chess') ||
-            (candidate.serviceName || '').toLowerCase().includes('chess'),
-        )
-        .slice(0, 6);
-      setSearchResults(nextResults);
+      const matches = response.data.matches.slice(0, 6);
+      const mapped: MatchCandidate[] = matches.map((match) => ({
+        candidateId: match.service_id,
+        providerName: 'Mai Hưng Chess Academy',
+        serviceName: match.name,
+        sourceType: 'chess_catalog',
+        category: match.tier || 'Chess',
+        summary: match.summary,
+        venueName: 'Mai Hưng Chess Academy',
+        location: 'Online via Lichess + Zoom',
+        bookingUrl: null,
+        mapUrl: null,
+        sourceUrl: null,
+        imageUrl: null,
+        amountAud: null,
+        currencyCode: 'AUD',
+        displayPrice: locale === 'vi' ? match.display_price_vnd : match.display_price_aud,
+        tags: [match.format, match.tier].filter(Boolean),
+        featured: false,
+      }));
+      setSearchResults(mapped);
       setFormState((current) => ({
         ...current,
-        selectedServiceId: nextResults[0]?.candidateId || current.selectedServiceId,
+        selectedServiceId: mapped[0]?.candidateId || current.selectedServiceId,
       }));
-      const reply = nextResults.length
-        ? t.concierge.assistantTopMatch(nextResults[0].serviceName)
+      const reply = mapped.length
+        ? t.concierge.assistantTopMatch(mapped[0].serviceName)
         : t.concierge.assistantNoMatch;
       setConversation((current) => [...current, { role: 'assistant', content: reply }]);
     } catch (error) {
@@ -1116,6 +1597,8 @@ export function ChessGrandmasterApp() {
       let bookingReference = '';
       let leadId = 'captured';
       let bookingIntentId: string | null = null;
+      let meetingUrl: string | null = null;
+      let calendarUrl: string | null = null;
 
       if (formState.preferredDate && formState.preferredTime) {
         const authoritativeResult = await createPublicBookingAssistantLeadAndBookingIntent({
@@ -1131,10 +1614,16 @@ export function ChessGrandmasterApp() {
           sourcePage: DEFAULT_SOURCE_PAGE,
           notes: detailNote,
           runtimeConfig: buildRuntimeConfig(),
+          // Forward the picked time-slot id when the visitor selected one in the
+          // TimeSlotPicker. The backend honours `desired_slot.schedule_slot_id` and
+          // matches the booking intent to that real cohort row directly.
+          scheduleSlotId: formState.selectedSlotId || null,
         });
         bookingReference = authoritativeResult.bookingReference || '';
         leadId = authoritativeResult.leadId || leadId;
         bookingIntentId = authoritativeResult.bookingIntentId || null;
+        meetingUrl = authoritativeResult.meetingUrl ?? null;
+        calendarUrl = authoritativeResult.calendarUrl ?? null;
       } else {
         const leadResponse = await apiV1.createLead({
           lead_type: 'chess_program_enquiry',
@@ -1208,6 +1697,49 @@ export function ChessGrandmasterApp() {
         parentName: trimmedName,
         parentEmail: trimmedEmail || null,
       });
+      // Build the on-screen order confirmation card. We always show it after a successful submit
+      // (even when the visitor only captured a brief without a date) so the visitor walks away
+      // with a clear reference and next-steps. Locale dictates which currency is shown — AUD
+      // for EN, VND for VI. Backend payment status is `unpaid` until they tap Stripe / transfer.
+      const sessionStartsAt = (() => {
+        if (selectedSlotDetails?.starts_at) return selectedSlotDetails.starts_at;
+        if (formState.preferredDate) {
+          return formState.preferredTime
+            ? `${formState.preferredDate}T${formState.preferredTime}:00`
+            : formState.preferredDate;
+        }
+        return null;
+      })();
+      const formattedAmount = (() => {
+        const amount = locale === 'vi' ? amounts.vnd : amounts.aud;
+        const currency = locale === 'vi' ? 'VND' : 'AUD';
+        try {
+          return new Intl.NumberFormat(locale === 'vi' ? 'vi-VN' : 'en-AU', {
+            style: 'currency',
+            currency,
+            maximumFractionDigits: currency === 'VND' ? 0 : 2,
+          }).format(amount);
+        } catch {
+          return `${amount} ${currency}`;
+        }
+      })();
+      setOrderConfirmation({
+        orderReference:
+          bookingReference || (locale === 'vi' ? 'CHESS-PENDING' : 'CHESS-PENDING'),
+        sessionStartsAt,
+        sessionTimeLabel: formState.preferredTime || null,
+        cohortLabel:
+          selectedSlotDetails?.cohort_label || selectedResult.serviceName || null,
+        meetingUrl,
+        calendarUrl,
+        coachName: 'WGM Nguyễn Thị Mai Hưng',
+        // Payment is always `unpaid` immediately after submit — the visitor still has to click
+        // Stripe / send a bank transfer. The PaymentSelection block below the order card walks
+        // them through the actual payment.
+        paymentStatus: 'unpaid',
+        paymentAmountFormatted: formattedAmount,
+      });
+
       setFormState((current) => ({ ...current, notes: '' }));
     } catch (error) {
       setLeadError(
@@ -1256,6 +1788,9 @@ export function ChessGrandmasterApp() {
             <button type="button" onClick={() => scrollToId('faq')} className="chess-nav-link">
               {t.nav.faq}
             </button>
+            <a href={buildStudentPortalUrl()} className="chess-nav-link">
+              {t.nav.myAccount}
+            </a>
           </div>
           <div className="chess-nav-actions">
             <div
@@ -1291,6 +1826,8 @@ export function ChessGrandmasterApp() {
         </div>
       </nav>
 
+      <PromoBanner text={t.promo.bannerText} closeLabel={t.promo.bannerCloseLabel} />
+
       <main id="top">
         <section className="chess-hero">
           <div className="chess-container chess-hero-grid">
@@ -1298,7 +1835,7 @@ export function ChessGrandmasterApp() {
               <span className="chess-eyebrow">{t.hero.eyebrow}</span>
               <h1 className="chess-hero-title" style={{ marginTop: 18 }}>
                 {t.hero.titlePart1} <em>{t.hero.titleAccent}</em>
-                {t.hero.titlePart2}
+                {t.hero.titlePart2 ? t.hero.titlePart2 : null}
               </h1>
               <p className="chess-hero-lead" style={{ marginTop: 24 }}>
                 {t.hero.lead}
@@ -1353,6 +1890,161 @@ export function ChessGrandmasterApp() {
           </div>
         </section>
 
+        {/* CTA strip 1 — between hero and profile */}
+        <section className="chess-cta-strip">
+          <div className="chess-container chess-cta-strip-inner">
+            <span className="chess-cta-strip-promo">{t.ctaStrip.promo}</span>
+            <button
+              type="button"
+              className="chess-btn chess-btn-primary chess-btn-sm"
+              onClick={() => scrollToId('enroll')}
+            >
+              {t.ctaStrip.cta}
+            </button>
+          </div>
+        </section>
+
+        {/* About GM Mai Hung & The Academy — main tenant profile section */}
+        <section id="about" className="chess-section chess-section-light chess-profile-section">
+          <div className="chess-container">
+            {/* Block A — Coach bio + portrait */}
+            <div className="chess-profile-grid">
+              <div className="chess-bio-paragraphs">
+                <span className="chess-eyebrow chess-eyebrow-on-light">
+                  {t.profile.eyebrowMeet}
+                </span>
+                <h2 className="chess-section-title" style={{ marginTop: 12 }}>
+                  {t.profile.heading}
+                </h2>
+                {t.profile.paragraphs.map((para, idx) => (
+                  <p key={`bio-${idx}`}>{para}</p>
+                ))}
+              </div>
+
+              <aside
+                className="chess-coach-card chess-profile-portrait"
+                aria-label={t.profile.portraitCaption}
+              >
+                <div className="chess-coach-portrait" aria-hidden="true">
+                  <KnightIcon className="chess-coach-portrait-icon" />
+                </div>
+                <div className="chess-coach-name">{t.coach.name}</div>
+                <div className="chess-coach-meta">{t.profile.portraitCaption}</div>
+                <a
+                  href="#"
+                  aria-disabled="true"
+                  onClick={(event) => event.preventDefault()}
+                  className="chess-btn chess-btn-outline chess-btn-sm chess-profile-video-cta"
+                >
+                  {t.profile.portraitVideoCta}
+                  <span className="chess-profile-video-note">
+                    {' '}
+                    · {t.profile.portraitVideoNote}
+                  </span>
+                </a>
+              </aside>
+            </div>
+
+            <div className="chess-trust-badges" role="list">
+              {t.profile.trustBadges.map((badge) => (
+                <span key={badge} className="chess-trust-chip" role="listitem">
+                  {badge}
+                </span>
+              ))}
+            </div>
+
+            {/* Block B — Achievements timeline */}
+            {/* TODO: replace with real GM Mai Hung achievements before launch */}
+            <div className="chess-profile-block">
+              <header className="chess-section-header">
+                <span className="chess-eyebrow chess-eyebrow-on-light">
+                  {t.profile.eyebrowAchievements}
+                </span>
+                <h3 className="chess-section-title chess-section-title-sm">
+                  {t.profile.achievementsTitle}
+                </h3>
+              </header>
+              <div className="chess-achievements-grid">
+                {t.profile.achievements.map((item, idx) => (
+                  <article key={`ach-${idx}`} className="chess-achievement-card">
+                    <span className="chess-achievement-num">{String(idx + 1).padStart(2, '0')}</span>
+                    <p className="chess-achievement-text">{item}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            {/* Block C — Teaching philosophy quote */}
+            <div className="chess-profile-block">
+              <span className="chess-eyebrow chess-eyebrow-on-light">
+                {t.profile.eyebrowQuote}
+              </span>
+              <blockquote className="chess-quote-block">
+                <p className="chess-quote-text">{t.profile.quote}</p>
+                <footer className="chess-quote-attribution">{t.profile.quoteAttribution}</footer>
+              </blockquote>
+            </div>
+
+            {/* Block D — Sample testimonials */}
+            {/* TODO: replace with real testimonials before launch */}
+            <div className="chess-profile-block">
+              <header className="chess-section-header">
+                <span className="chess-eyebrow chess-eyebrow-on-light">
+                  {t.profile.eyebrowTestimonials}
+                </span>
+                <h3 className="chess-section-title chess-section-title-sm">
+                  {t.profile.testimonialsTitle}
+                </h3>
+              </header>
+              <div className="chess-testimonials-grid">
+                {t.profile.testimonials.map((item, idx) => (
+                  <article key={`testimonial-${idx}`} className="chess-testimonial-card">
+                    <p className="chess-testimonial-quote">“{item.quote}”</p>
+                    <div className="chess-testimonial-meta">
+                      <span className="chess-testimonial-author">{item.author}</span>
+                      <span className="chess-testimonial-program">{item.program}</span>
+                    </div>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            {/* Block E — How online lessons work */}
+            <div className="chess-profile-block">
+              <header className="chess-section-header">
+                <span className="chess-eyebrow chess-eyebrow-on-light">
+                  {t.profile.eyebrowHow}
+                </span>
+                <h3 className="chess-section-title chess-section-title-sm">
+                  {t.profile.howTitle}
+                </h3>
+              </header>
+              <div className="chess-how-grid">
+                {t.profile.howSteps.map((step, idx) => (
+                  <article key={`how-${idx}`} className="chess-how-step">
+                    <span className="chess-how-icon" aria-hidden="true">
+                      {step.icon}
+                    </span>
+                    <h4 className="chess-how-title">{step.title}</h4>
+                    <p className="chess-how-body">{step.body}</p>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            {/* Primary CTA at end of profile section */}
+            <div className="chess-profile-cta">
+              <button
+                type="button"
+                className="chess-btn chess-btn-primary"
+                onClick={() => scrollToId('enroll')}
+              >
+                {t.profile.ctaPrimary}
+              </button>
+            </div>
+          </div>
+        </section>
+
         <section className="chess-section chess-section-light">
           <div className="chess-container">
             <header className="chess-section-header">
@@ -1402,6 +2094,9 @@ export function ChessGrandmasterApp() {
                   className="chess-pricing-card"
                   data-featured={program.featured ? 'true' : 'false'}
                 >
+                  <ChessPieceIllustration
+                    variant={mapProgramKeyToPieceVariant(program.key as ChessProgramKey)}
+                  />
                   {program.featured ? (
                     <div className="chess-pricing-format" style={{ color: 'var(--chess-gold-deep)' }}>
                       ★ {t.programs.featuredLabel}
@@ -1414,7 +2109,7 @@ export function ChessGrandmasterApp() {
                     <div className="chess-pricing-format">{program.format[locale]}</div>
                   ) : null}
                   <div>
-                    <span className="chess-pricing-amount">{program.price}</span>
+                    <span className="chess-pricing-amount">{program.price[locale]}</span>
                     <span className="chess-pricing-amount-suffix">{program.priceSuffix[locale]}</span>
                   </div>
                   <p className="chess-pricing-body">{program.body[locale]}</p>
@@ -1433,6 +2128,20 @@ export function ChessGrandmasterApp() {
                 </article>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* CTA strip — after programs */}
+        <section className="chess-cta-strip chess-cta-strip-dark">
+          <div className="chess-container chess-cta-strip-inner">
+            <span className="chess-cta-strip-promo">{t.ctaStrip.promo}</span>
+            <button
+              type="button"
+              className="chess-btn chess-btn-primary chess-btn-sm"
+              onClick={() => scrollToId('enroll')}
+            >
+              {t.ctaStrip.cta}
+            </button>
           </div>
         </section>
 
@@ -1578,12 +2287,14 @@ export function ChessGrandmasterApp() {
                         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 6 }}>
                           <button
                             type="button"
-                            onClick={() =>
+                            onClick={() => {
+                              setSelectedSlotDetails(null);
                               setFormState((current) => ({
                                 ...current,
                                 selectedServiceId: result.candidateId,
-                              }))
-                            }
+                                selectedSlotId: '',
+                              }));
+                            }}
                             className={`chess-btn chess-btn-sm ${
                               selected ? 'chess-btn-light' : 'chess-btn-outline'
                             }`}
@@ -1608,6 +2319,20 @@ export function ChessGrandmasterApp() {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* CTA strip — after concierge */}
+        <section className="chess-cta-strip">
+          <div className="chess-container chess-cta-strip-inner">
+            <span className="chess-cta-strip-promo">{t.ctaStrip.promo}</span>
+            <button
+              type="button"
+              className="chess-btn chess-btn-primary chess-btn-sm"
+              onClick={() => scrollToId('enroll')}
+            >
+              {t.ctaStrip.cta}
+            </button>
           </div>
         </section>
 
@@ -1757,9 +2482,15 @@ export function ChessGrandmasterApp() {
                     <input
                       type="date"
                       value={formState.preferredDate}
-                      onChange={(event) =>
-                        setFormState((current) => ({ ...current, preferredDate: event.target.value }))
-                      }
+                      onChange={(event) => {
+                        // Manually overriding the date breaks the slot-id link, so clear it.
+                        setSelectedSlotDetails(null);
+                        setFormState((current) => ({
+                          ...current,
+                          preferredDate: event.target.value,
+                          selectedSlotId: '',
+                        }));
+                      }}
                       className="chess-input"
                     />
                   </label>
@@ -1768,13 +2499,40 @@ export function ChessGrandmasterApp() {
                     <input
                       type="time"
                       value={formState.preferredTime}
-                      onChange={(event) =>
-                        setFormState((current) => ({ ...current, preferredTime: event.target.value }))
-                      }
+                      onChange={(event) => {
+                        setSelectedSlotDetails(null);
+                        setFormState((current) => ({
+                          ...current,
+                          preferredTime: event.target.value,
+                          selectedSlotId: '',
+                        }));
+                      }}
                       className="chess-input"
                     />
                   </label>
                 </div>
+                <TimeSlotPicker
+                  locale={locale}
+                  dict={t.slotPicker}
+                  serviceId={selectedResult?.candidateId ?? null}
+                  selectedSlotId={formState.selectedSlotId}
+                  onSelect={(slot) => {
+                    setSelectedSlotDetails(slot);
+                    if (!slot) {
+                      setFormState((current) => ({
+                        ...current,
+                        selectedSlotId: '',
+                      }));
+                      return;
+                    }
+                    setFormState((current) => ({
+                      ...current,
+                      selectedSlotId: slot.slot_id,
+                      preferredDate: slot.date || current.preferredDate,
+                      preferredTime: slot.start_time || current.preferredTime,
+                    }));
+                  }}
+                />
                 <label className="chess-field" style={{ marginTop: 14 }}>
                   <span className="chess-field-label">{t.enroll.labels.notes}</span>
                   <textarea
@@ -1819,7 +2577,62 @@ export function ChessGrandmasterApp() {
                     {t.enroll.labels.replyHint}
                   </span>
                 </div>
-                {leadStatus ? (
+                {/*
+                  Render order in the new order: PaymentSelection appears ABOVE OrderConfirmation
+                  while payment is pending so the visitor sees the actionable Stripe / VND / AUD
+                  options first. After they land, OrderConfirmation acts as the "Humanitix-style"
+                  recap: order reference + meeting link + wallet passes + what's-next.
+                */}
+                {paymentRequest ? (
+                  <PaymentSelection
+                    locale={locale}
+                    dict={t.payment}
+                    options={
+                      // Locale-correct currency rule:
+                      //   EN locale → only AUD options (Stripe AUD + AUD bank transfer)
+                      //   VI locale → only VND options (VND bank QR transfer)
+                      // The backend may return both currencies regardless of locale; we filter
+                      // here so visitors only see the option that matches the price they read
+                      // on the program card and sticky CTA.
+                      paymentOptions.filter((option) =>
+                        locale === 'vi' ? option.currency === 'VND' : option.currency === 'AUD',
+                      )
+                    }
+                    loading={paymentLoading}
+                    error={paymentError || null}
+                    onRetry={() => {
+                      void loadPaymentOptions(paymentRequest, locale);
+                    }}
+                    onSkip={returnToMainScreenAfterBooking}
+                  />
+                ) : null}
+                {orderConfirmation ? (
+                  <OrderConfirmation
+                    locale={locale}
+                    dict={t.orderConfirmation}
+                    orderReference={orderConfirmation.orderReference}
+                    session={{
+                      startsAt: orderConfirmation.sessionStartsAt,
+                      timeLabel: orderConfirmation.sessionTimeLabel,
+                      cohortLabel: orderConfirmation.cohortLabel,
+                      meetingUrl: orderConfirmation.meetingUrl,
+                      calendarUrl: orderConfirmation.calendarUrl,
+                    }}
+                    coachName={orderConfirmation.coachName}
+                    coachTitle={locale === 'vi' ? 'Đại kiện tướng nữ' : 'Woman Grandmaster'}
+                    paymentStatus={orderConfirmation.paymentStatus}
+                    paymentAmountFormatted={orderConfirmation.paymentAmountFormatted}
+                    portalOrderUrl={
+                      orderConfirmation.orderReference &&
+                      !orderConfirmation.orderReference.endsWith('-PENDING')
+                        ? buildOrderDetailUrl(orderConfirmation.orderReference)
+                        : null
+                    }
+                    onReturnHome={returnToMainScreenAfterBooking}
+                    returnHomeLabel={t.enroll.returnNow}
+                  />
+                ) : null}
+                {leadStatus && !orderConfirmation ? (
                   <div className="chess-status-success" style={{ marginTop: 18 }}>
                     <span className="chess-eyebrow chess-eyebrow-on-light">
                       {t.enroll.successHeading}
@@ -1835,19 +2648,6 @@ export function ChessGrandmasterApp() {
                       {leadStatus}
                     </p>
                   </div>
-                ) : null}
-                {paymentRequest ? (
-                  <PaymentSelection
-                    locale={locale}
-                    dict={t.payment}
-                    options={paymentOptions}
-                    loading={paymentLoading}
-                    error={paymentError || null}
-                    onRetry={() => {
-                      void loadPaymentOptions(paymentRequest, locale);
-                    }}
-                    onSkip={returnToMainScreenAfterBooking}
-                  />
                 ) : null}
                 {leadError ? (
                   <div className="chess-status-error" style={{ marginTop: 16 }} role="alert">
@@ -1873,6 +2673,20 @@ export function ChessGrandmasterApp() {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        {/* CTA strip — after FAQ */}
+        <section className="chess-cta-strip">
+          <div className="chess-container chess-cta-strip-inner">
+            <span className="chess-cta-strip-promo">{t.ctaStrip.promo}</span>
+            <button
+              type="button"
+              className="chess-btn chess-btn-primary chess-btn-sm"
+              onClick={() => scrollToId('enroll')}
+            >
+              {t.ctaStrip.cta}
+            </button>
           </div>
         </section>
       </main>
@@ -1938,7 +2752,16 @@ export function ChessGrandmasterApp() {
 
       <div className="chess-sticky-cta" role="region" aria-label={t.nav.enroll}>
         <div className="chess-sticky-cta-text">
-          <strong>{t.sticky.from} 260,000 VND</strong> {t.sticky.perSession}
+          <strong>{t.sticky.promoText}</strong>
+          <span style={{ display: 'block', opacity: 0.85, marginTop: 2 }}>
+            {/*
+              Locale-correct currency on the sticky mobile CTA:
+              EN visitors see AUD (matching the Stripe / international audience), VI visitors
+              see VND (matching the Vietnamese pricing tier shown in the program cards above).
+              Beginner Foundations: AUD 16 / VND 260,000 per session.
+            */}
+            {t.sticky.from} {locale === 'vi' ? '260,000 VND' : 'AUD 16'} {t.sticky.perSession}
+          </span>
         </div>
         <button
           type="button"

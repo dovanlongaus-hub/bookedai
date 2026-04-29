@@ -218,6 +218,137 @@ class BookingIntentRepository(BaseRepository):
             "contact_id": row.get("contact_id"),
         }
 
+    async def update_zoho_meeting_metadata(
+        self,
+        *,
+        booking_reference: str,
+        meeting_url: str | None,
+        calendar_event_url: str | None = None,
+        event_id: str | None = None,
+        scheduled_at: datetime | None = None,
+        extra: dict[str, object | None] | None = None,
+    ) -> dict[str, object | None] | None:
+        """Persist Zoho Meeting + calendar metadata onto a booking_intent row.
+
+        Stores the conference details under ``metadata_json.zoho_meeting`` so
+        downstream surfaces (student portal, tenant view, lifecycle emails) can
+        read a single canonical location. Returns the merged metadata for the
+        caller's logging or ``None`` when the booking_reference does not match
+        any row.
+        """
+        normalized_reference = (booking_reference or "").strip()
+        if not normalized_reference:
+            return None
+
+        normalized_meeting_url = (meeting_url or "").strip() or None
+        if normalized_meeting_url is None and not (calendar_event_url or event_id):
+            # Nothing actionable to persist — keep callers idempotent.
+            return None
+
+        lookup = await self.session.execute(
+            text(
+                """
+                select id::text as booking_intent_id, metadata_json
+                from booking_intents
+                where booking_reference = :booking_reference
+                limit 1
+                """
+            ),
+            {"booking_reference": normalized_reference},
+        )
+        row = lookup.mappings().first()
+        if not row:
+            return None
+
+        existing_metadata = dict(row.get("metadata_json") or {})
+        existing_zoho = (
+            dict(existing_metadata.get("zoho_meeting") or {})
+            if isinstance(existing_metadata.get("zoho_meeting"), dict)
+            else {}
+        )
+        if normalized_meeting_url is not None:
+            existing_zoho["meeting_url"] = normalized_meeting_url
+        if calendar_event_url:
+            existing_zoho["calendar_event_url"] = calendar_event_url
+        if event_id:
+            existing_zoho["event_id"] = event_id
+        if scheduled_at is not None:
+            existing_zoho["scheduled_at"] = (
+                scheduled_at.isoformat()
+                if hasattr(scheduled_at, "isoformat")
+                else str(scheduled_at)
+            )
+        if extra:
+            for key, value in extra.items():
+                if value is None:
+                    continue
+                existing_zoho[key] = value
+
+        existing_metadata["zoho_meeting"] = existing_zoho
+
+        await self.session.execute(
+            text(
+                """
+                update booking_intents
+                set
+                  metadata_json = cast(:metadata_json as jsonb),
+                  updated_at = now()
+                where id = cast(:booking_intent_id as uuid)
+                """
+            ),
+            {
+                "booking_intent_id": row["booking_intent_id"],
+                "metadata_json": json.dumps(existing_metadata),
+            },
+        )
+        return existing_metadata
+
+    async def fetch_meeting_metadata(
+        self,
+        *,
+        booking_reference: str,
+    ) -> dict[str, object | None] | None:
+        """Return ``zoho_meeting`` metadata + tenant context for a booking.
+
+        Used by the regenerate endpoint and the chess+tenant view handlers so
+        they can read the meeting URL plus the tenant id (for fallback +
+        authorisation checks) in a single round-trip.
+        """
+        normalized_reference = (booking_reference or "").strip()
+        if not normalized_reference:
+            return None
+
+        result = await self.session.execute(
+            text(
+                """
+                select
+                  bi.id::text as booking_intent_id,
+                  bi.tenant_id::text as tenant_id,
+                  bi.booking_reference,
+                  bi.service_name,
+                  bi.service_id,
+                  bi.requested_date,
+                  bi.requested_time,
+                  bi.timezone,
+                  bi.metadata_json,
+                  c.email as customer_email,
+                  c.full_name as customer_name
+                from booking_intents bi
+                left join contacts c on c.id = bi.contact_id
+                where bi.booking_reference = :booking_reference
+                limit 1
+                """
+            ),
+            {"booking_reference": normalized_reference},
+        )
+        row = result.mappings().first()
+        if not row:
+            return None
+        record = dict(row)
+        metadata = record.get("metadata_json") or {}
+        record["metadata_json"] = dict(metadata) if isinstance(metadata, dict) else {}
+        return record
+
     async def store_portal_access_token(
         self,
         *,
@@ -357,7 +488,12 @@ class BookingIntentRepository(BaseRepository):
         cadence: str = "monthly",
         limit: int = 50,
     ) -> list[dict[str, object | None]]:
-        """Return bookings whose monthly reminder is due to fire."""
+        """Return bookings whose monthly reminder is due to fire.
+
+        ``preferred_locale`` is best-effort — pulled from
+        ``ai_mentor_student_users`` when the email matches a signed-in AI
+        Mentor learner; null otherwise. Workers fall back to ``en`` when null.
+        """
         result = await self.session.execute(
             text(
                 """
@@ -374,9 +510,12 @@ class BookingIntentRepository(BaseRepository):
                   bi.reminder_last_sent_at,
                   c.full_name as customer_name,
                   c.email as customer_email,
-                  c.phone as customer_phone
+                  c.phone as customer_phone,
+                  amsu.preferred_locale as preferred_locale
                 from booking_intents bi
                 left join contacts c on c.id = bi.contact_id
+                left join ai_mentor_student_users amsu
+                  on lower(amsu.email) = lower(coalesce(c.email, ''))
                 where bi.reminder_cadence = :cadence
                   and bi.reminder_next_at is not null
                   and bi.reminder_next_at <= now()

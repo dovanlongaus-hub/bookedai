@@ -2,7 +2,6 @@ import type { ReactNode } from 'react';
 import { ArrowRight, MessageCircle } from 'lucide-react';
 
 import {
-  adminHref,
   brandContactEmail,
   brandLinkedInHref,
   brandWhatsAppHref,
@@ -42,7 +41,7 @@ const FOOTER_COLUMNS: Array<{
     links: [
       { label: 'Web app', href: productHref },
       { label: 'Roadmap', href: roadmapHref },
-      { label: 'View live tenant', href: tenantHref },
+      { label: 'View live business example', href: tenantHref },
     ],
   },
   {
@@ -50,13 +49,13 @@ const FOOTER_COLUMNS: Array<{
     links: [
       { label: 'Start a 30-day pilot', href: '/register-interest' },
       { label: 'Book a 10-min revenue demo', href: '/register-interest?source_section=footer' },
-      { label: 'Open the audit ledger', href: adminHref },
+      { label: 'Get my booking page set up', href: '/register-interest?source_section=footer_launch_setup' },
     ],
   },
   {
     heading: 'For investors',
     links: [
-      { label: 'See live tenant proof', href: tenantHref },
+      { label: 'See live customer proof', href: tenantHref },
       { label: 'Talk to a founder', href: `mailto:${brandContactEmail}` },
     ],
   },

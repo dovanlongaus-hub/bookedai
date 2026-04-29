@@ -216,7 +216,7 @@ test.describe('BookedAI demo full flow', () => {
         recommendation: placementRecommendation,
       }));
     });
-    await page.route('**/api/v1/leads', async (route) => {
+    await page.route('**/api/v1/public/leads/**', async (route) => {
       await fulfillJson(route, ok({
         lead_id: 'lead-demo',
         contact_id: 'contact-demo',

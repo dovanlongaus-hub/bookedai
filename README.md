@@ -25,6 +25,8 @@ Current public runtime decision:
 
 - BookedAI is shipping the responsive web app as the primary current-phase product surface.
 - `bookedai.au` now has an executive acquisition homepage that explains the full BookedAI revenue-engine story in the first viewport, then keeps the real live search-to-booking workspace on-page for proof.
+- `bookedai.au` and `pitch.bookedai.au` now present the early SME launch offer: BookedAI can set up a custom booking-ready landing page, dedicated email, dedicated CRM, and preconfigured booking/calendar/meeting flow for a service business.
+- `chess.bookedai.au` and `aimentor.bookedai.au` are live proof cases for that offer, showing dedicated booking pages, email identities, CRM/follow-up capture, payment posture, and meeting or class scheduling.
 - `bookedai.au` now includes a public `Agent activity proof` section plus `?demo=wsti` judge mode so WSTI/investor demos can show the visible loop from enquiry to match, booking reference, portal/payment posture, and follow-up/action evidence.
 - Security hardening from the WSTI/investor review is active: tenant bookings, leads, integrations, billing, team, and revenue metrics now require an authenticated tenant session; public booking remains supported through the `bookedai-au` fallback tenant; Stripe/payment return URLs only honor BookedAI-owned origins or local dev origins.
 - `pitch.bookedai.au` remains the deeper pitch and architecture-visualization surface for investors who want the longer company story.
@@ -112,6 +114,7 @@ Production traffic is expected to follow this path:
 - `https://demo.bookedai.au/` -> canonical public web entrypoint for the BookedAI demo experience
 - `https://portal.bookedai.au/` -> customer booking portal routes on the shared frontend plus backend proxy
 - `https://tenant.bookedai.au/` -> tenant auth gateway with Google-first sign-in/create-account, email verification code fallback, explicit workspace routing, and catalog workspace on the shared frontend plus backend proxy
+- `https://aimentor.bookedai.au/` -> AI Mentor 1-1 Pro tenant-branded student/enrolment runtime for tenant `ai-mentor-doer`
 - `https://supabase.bookedai.au/` -> Supabase Studio, Auth, REST, Storage via Kong
 - `https://n8n.bookedai.au/` -> n8n editor and webhooks
 - `https://hermes.bookedai.au/` -> Hermes knowledge/documentation service
@@ -257,6 +260,7 @@ python3 scripts/telegram_workspace_ops.py sync-repo-docs --skip-discord
 - `A` record for `demo.bookedai.au` -> same public IP
 - `A` record for `portal.bookedai.au` -> same public IP
 - `A` record for `tenant.bookedai.au` -> same public IP
+- `A` record for `aimentor.bookedai.au` -> same public IP
 - `A` record for `supabase.bookedai.au` -> same public IP
 - `A` record for `n8n.bookedai.au` -> same public IP
 - `A` record for `hermes.bookedai.au` -> same public IP
@@ -297,8 +301,10 @@ python3 scripts/telegram_workspace_ops.py sync-repo-docs --skip-discord
 - `TAWK_WEBHOOK_SECRET` if you enable signature verification
 - `EMAIL_SMTP_HOST`, `EMAIL_SMTP_PORT`, `EMAIL_SMTP_USERNAME`, `EMAIL_SMTP_PASSWORD`, `EMAIL_SMTP_FROM`; if the username/from values are omitted, BookedAI defaults both sender identity fields to `info@bookedai.au`
 - `EMAIL_IMAP_HOST`, `EMAIL_IMAP_PORT`, `EMAIL_IMAP_USERNAME`, `EMAIL_IMAP_PASSWORD`
+- `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_CURRENCY`, and `STRIPE_WEBHOOK_SECRET` for hosted Checkout/Billing and webhook reconciliation; local sandbox checks can use `python3 scripts/stripe_sandbox_smoke.py --dry-run`
 - `ZOHO_CRM_CLIENT_ID`, `ZOHO_CRM_CLIENT_SECRET`, and `ZOHO_CRM_REFRESH_TOKEN` for durable Zoho CRM write-back
 - optional `ZOHO_CRM_ACCESS_TOKEN` for short-lived smoke tests only
+- `ZOHO_CALENDAR_CLIENT_ID`, `ZOHO_CALENDAR_CLIENT_SECRET`, `ZOHO_CALENDAR_REFRESH_TOKEN`, `ZOHO_CALENDAR_UID`, and `ZOHO_CALENDAR_API_BASE_URL` for booking Calendar events plus Zoho Meeting links; keep `ZOHO_CALENDAR_ACCESS_TOKEN` as a short-lived smoke fallback only because the backend prefers refresh-token exchange at runtime
 - optional `ZOHO_CRM_NOTIFICATION_TOKEN` and `ZOHO_CRM_NOTIFICATION_CHANNEL_ID` when using Zoho CRM Notifications API to push `Deals` updates into BookedAI webhook feedback ingestion
 - Zoho Notifications registration and lifecycle calls require the OAuth scope `ZohoCRM.notifications.ALL`; if the original refresh token was minted with only CRM `modules/settings` scopes, re-consent is required before webhook registration can succeed
 - backend can now register a Zoho Notifications channel for `Deals` through `POST /api/v1/integrations/crm-feedback/zoho-webhook/register`, which targets `https://api.bookedai.au/api/v1/integrations/crm-feedback/zoho-webhook` by default
@@ -336,7 +342,7 @@ python3 scripts/zoho_crm_connect.py authorize-url \
   --redirect-uri https://api.bookedai.au/zoho/oauth/callback
 ```
 
-The helper now requests `ZohoCRM.modules.ALL,ZohoCRM.settings.ALL,ZohoCRM.notifications.ALL` by default so one consent flow can support both CRM write-back and notification-channel lifecycle.
+The helper now requests `ZohoCRM.modules.ALL,ZohoCRM.settings.ALL,ZohoCRM.notifications.ALL,ZohoCalendar.calendar.READ,ZohoCalendar.event.CREATE,ZohoMeeting.meeting.ALL` by default so one consent flow can support CRM write-back, notification-channel lifecycle, Calendar event creation, and Zoho Meeting links.
 
 ```sh
 python3 scripts/zoho_crm_connect.py exchange-code \
@@ -349,11 +355,17 @@ python3 scripts/zoho_crm_connect.py exchange-code \
 python3 scripts/zoho_crm_connect.py test-connection --module Leads
 ```
 
+```sh
+python3 scripts/zoho_crm_connect.py list-calendars
+```
+
 This helper keeps the repo-side setup closed-loop:
 
 - `authorize-url` prints the consent URL using the current client id and the correct Zoho Accounts domain for the selected data center
-- `exchange-code` swaps the returned auth code for OAuth tokens and can persist them into root `.env`
+- `exchange-code` swaps the returned auth code for OAuth tokens and can persist them into root `.env`; when the consent includes Calendar/Meeting scopes, the same refresh token can safely populate both the CRM and Calendar token families
 - `test-connection` runs the same metadata smoke test that the backend integration route uses
+- `list-calendars` lists the current Zoho calendars and their UID values so operators can set `ZOHO_CALENDAR_UID` for booking event + Zoho Meeting provisioning
+- live UAT on `2026-04-28` created booking `v1-364c66e949`; the response included Zoho Meeting and Calendar event URLs, CRM booking deal/task synced, manual payment confirm marked the booking `paid`, and Zoho payment deal/task rows synced after one throttle retry
 
    Then prepare the Supabase env file:
 
@@ -623,8 +635,8 @@ Discord Developer Portal checklist:
    You can customize the record list in root `.env`:
 
    ```env
-   CLOUDFLARE_AUTO_DNS_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,portal.bookedai.au,tenant.bookedai.au,futureswim.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,upload.bookedai.au,calendar.bookedai.au,bot.bookedai.au
-   CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,portal.bookedai.au,tenant.bookedai.au,futureswim.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,calendar.bookedai.au,bot.bookedai.au
+   CLOUDFLARE_AUTO_DNS_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,portal.bookedai.au,tenant.bookedai.au,futureswim.bookedai.au,chess.bookedai.au,aimentor.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,upload.bookedai.au,calendar.bookedai.au,bot.bookedai.au
+   CLOUDFLARE_AUTO_DNS_PROXIED_RECORDS=bookedai.au,www.bookedai.au,api.bookedai.au,admin.bookedai.au,beta.bookedai.au,product.bookedai.au,demo.bookedai.au,portal.bookedai.au,tenant.bookedai.au,futureswim.bookedai.au,chess.bookedai.au,aimentor.bookedai.au,pitch.bookedai.au,n8n.bookedai.au,supabase.bookedai.au,hermes.bookedai.au,calendar.bookedai.au,bot.bookedai.au
    ```
 
    To run the sync manually at any time:

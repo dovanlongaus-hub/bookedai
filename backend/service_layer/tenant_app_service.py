@@ -15,6 +15,7 @@ from core.customer_booking_contact import (
     customer_booking_support_label,
 )
 from db import ServiceMerchantProfile
+from integrations.stripe.constants import STRIPE_API_VERSION
 from repositories.academy_repository import AcademyRepository
 from repositories.audit_repository import AuditLogRepository
 from repositories.base import RepositoryContext
@@ -2352,6 +2353,7 @@ async def _stripe_post_form(
             headers={
                 "Authorization": f"Bearer {stripe_secret_key}",
                 "Content-Type": "application/x-www-form-urlencoded",
+                "Stripe-Version": STRIPE_API_VERSION,
             },
             content=urlencode(form_data).encode(),
         )
@@ -2371,6 +2373,7 @@ async def _stripe_get(
             f"https://api.stripe.com{path}",
             headers={
                 "Authorization": f"Bearer {stripe_secret_key}",
+                "Stripe-Version": STRIPE_API_VERSION,
             },
             params=params,
         )
@@ -2468,7 +2471,6 @@ async def create_tenant_stripe_checkout_session(
         ("customer", customer_id),
         ("success_url", return_url),
         ("cancel_url", return_url),
-        ("payment_method_types[]", "card"),
         ("line_items[0][quantity]", "1"),
         ("line_items[0][price_data][currency]", settings.stripe_currency),
         ("line_items[0][price_data][unit_amount]", str(int(monthly_amount_aud) * 100)),

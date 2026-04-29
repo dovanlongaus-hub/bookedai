@@ -314,3 +314,123 @@ class AgentActivityRoutesTestCase(TestCase):
         payload = response.json()
         self.assertEqual(payload["data"]["steps"], [])
         self.assertEqual(payload["data"]["count"], 0)
+
+    def test_user_intent_hint_in_metadata_is_surfaced_unmasked(self):
+        """Wave 13-B — slash-command verb stored on
+        ``metadata_json.user_intent_hint`` must be lifted out into a typed
+        step field (not masked, since it's a closed-enum verb, not PII)."""
+
+        base = datetime(2026, 4, 28, 9, 0, 0, tzinfo=UTC)
+        events = [
+            _build_event(
+                event_id=42,
+                created_at=base,
+                event_type="slash_command_intent",
+                metadata_json={
+                    "user_intent_hint": "book_service",
+                    "channel": "public_web",
+                    "duration_ms": 12,
+                },
+            ),
+        ]
+        capture: dict[str, int] = {}
+
+        with patch(
+            "api.v1_agent_handlers._resolve_tenant_id",
+            _resolve_tenant_id_stub,
+        ), patch(
+            "api.v1_agent_handlers.get_session",
+            _make_fake_session(events, capture),
+        ):
+            client = TestClient(_create_test_app())
+            response = client.get(
+                "/api/v1/agent/activity",
+                params={
+                    "conversation_id": "conv-intent",
+                    "tenant_id": "tenant-test",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        step = response.json()["data"]["steps"][0]
+        self.assertEqual(step["user_intent_hint"], "book_service")
+        # The hint is lifted OUT of evidence so the masker never touches it
+        # and the drawer can render a typed chip.
+        self.assertNotIn("user_intent_hint", step["evidence"])
+        # Surrounding metadata still flows through.
+        self.assertEqual(step["evidence"]["channel"], "public_web")
+        self.assertEqual(step["duration_ms"], 12)
+
+    def test_step_without_user_intent_hint_returns_null(self):
+        base = datetime(2026, 4, 28, 9, 0, 0, tzinfo=UTC)
+        events = [
+            _build_event(
+                event_id=43,
+                created_at=base,
+                event_type="message_in",
+                metadata_json={"duration_ms": 80},
+            ),
+        ]
+        capture: dict[str, int] = {}
+
+        with patch(
+            "api.v1_agent_handlers._resolve_tenant_id",
+            _resolve_tenant_id_stub,
+        ), patch(
+            "api.v1_agent_handlers.get_session",
+            _make_fake_session(events, capture),
+        ):
+            client = TestClient(_create_test_app())
+            response = client.get(
+                "/api/v1/agent/activity",
+                params={
+                    "conversation_id": "conv-no-intent",
+                    "tenant_id": "tenant-test",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        step = response.json()["data"]["steps"][0]
+        self.assertIsNone(step["user_intent_hint"])
+
+    def test_invalid_user_intent_hint_drops_to_null(self):
+        """A non-string or empty stored hint must not crash the projector
+        and must surface as ``None``."""
+
+        base = datetime(2026, 4, 28, 9, 0, 0, tzinfo=UTC)
+        events = [
+            _build_event(
+                event_id=44,
+                created_at=base,
+                event_type="slash_command_intent",
+                metadata_json={"user_intent_hint": 123},
+            ),
+            _build_event(
+                event_id=45,
+                created_at=base + timedelta(seconds=1),
+                event_type="slash_command_intent",
+                metadata_json={"user_intent_hint": "   "},
+            ),
+        ]
+        capture: dict[str, int] = {}
+
+        with patch(
+            "api.v1_agent_handlers._resolve_tenant_id",
+            _resolve_tenant_id_stub,
+        ), patch(
+            "api.v1_agent_handlers.get_session",
+            _make_fake_session(events, capture),
+        ):
+            client = TestClient(_create_test_app())
+            response = client.get(
+                "/api/v1/agent/activity",
+                params={
+                    "conversation_id": "conv-bad",
+                    "tenant_id": "tenant-test",
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        steps = response.json()["data"]["steps"]
+        self.assertIsNone(steps[0]["user_intent_hint"])
+        self.assertIsNone(steps[1]["user_intent_hint"])

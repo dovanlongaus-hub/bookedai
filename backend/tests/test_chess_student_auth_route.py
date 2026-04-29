@@ -112,7 +112,14 @@ class _ScriptedAuthSession:
                     "timezone": "Asia/Ho_Chi_Minh",
                     "status": "captured",
                     "payment_dependency_state": "stripe_checkout_ready",
-                    "metadata_json": {"payment_status": "paid"},
+                    "metadata_json": {
+                        "payment_status": "paid",
+                        "zoho_meeting": {
+                            "meeting_url": "https://meet.zoho.com/aaaa-bbbb-cccc",
+                            "calendar_event_url": "https://calendar.zoho.com/event/123",
+                        },
+                    },
+                    "tenant_settings_json": {"default_meeting_url": "https://zoom.example/fallback"},
                 }
             )
         if "from chess_student_progress" in sql:
@@ -214,9 +221,109 @@ class StudentMeRouteTestCase(TestCase):
             "11111111-2222-3333-4444-555555555555",
         )
         self.assertEqual(len(body["data"]["bookings"]), 1)
-        self.assertEqual(body["data"]["bookings"][0]["payment_status"], "paid")
+        booking = body["data"]["bookings"][0]
+        self.assertEqual(booking["payment_status"], "paid")
+        self.assertEqual(
+            booking["meeting_url"], "https://meet.zoho.com/aaaa-bbbb-cccc"
+        )
+        self.assertEqual(
+            booking["calendar_event_url"], "https://calendar.zoho.com/event/123"
+        )
         self.assertEqual(len(body["data"]["progress"]), 1)
         self.assertEqual(body["data"]["progress"][0]["level"], "Beginner Tier 1")
+
+
+class _ScriptedFallbackSession:
+    """Fake AsyncSession that has no Zoho meeting URL but a tenant default.
+
+    Lets us verify the chess studentMe response falls back to the tenant
+    ``default_meeting_url`` configured in ``tenant_settings.settings_json``
+    when Zoho did not return a meeting link for the booking.
+    """
+
+    def __init__(self, *, student_id: str, email: str):
+        self.student_id = student_id
+        self.email = email
+
+    async def execute(self, statement, params=None):
+        sql = str(statement).strip().lower()
+        if sql.startswith("select id::text as id, google_sub"):
+            return _FakeExecuteResult(
+                {
+                    "id": self.student_id,
+                    "google_sub": "sub-1",
+                    "email": self.email,
+                    "full_name": "Parent Demo",
+                    "avatar_url": None,
+                }
+            )
+        if "from booking_intents" in sql:
+            return _FakeExecuteResult(
+                {
+                    "booking_intent_id": "bi-002",
+                    "booking_reference": "v1-fallback1",
+                    "service_name": "Chess Beginner Program",
+                    "requested_date": "2026-05-01",
+                    "requested_time": "10:00",
+                    "timezone": "Asia/Ho_Chi_Minh",
+                    "status": "captured",
+                    "payment_dependency_state": "stripe_checkout_ready",
+                    "metadata_json": {"payment_status": "paid"},
+                    "tenant_settings_json": {
+                        "default_meeting_url": "https://zoom.example/tenant-fallback"
+                    },
+                }
+            )
+        if "from chess_student_progress" in sql:
+            return _FakeExecuteResult(None)
+        return _FakeExecuteResult(None)
+
+    async def commit(self):
+        return None
+
+    async def rollback(self):
+        return None
+
+
+class StudentMeMeetingFallbackTestCase(TestCase):
+    def test_falls_back_to_tenant_default_meeting_url(self):
+        app = _make_app()
+
+        class _RequestStub:
+            def __init__(self, _app):
+                self.app = _app
+
+        secret = _resolve_student_auth_secret(_RequestStub(app))
+        token = _sign_student_session_token(
+            secret=secret,
+            student_id="11111111-2222-3333-4444-555555555555",
+            email="parent@example.com",
+        )
+
+        @asynccontextmanager
+        async def _fake_get_session_fallback(_factory):
+            yield _ScriptedFallbackSession(
+                student_id="11111111-2222-3333-4444-555555555555",
+                email="parent@example.com",
+            )
+
+        with patch(
+            "api.v1_chess_student_handlers.get_session", _fake_get_session_fallback
+        ):
+            client = TestClient(app)
+            response = client.get(
+                "/api/v1/students/me",
+                headers={"Authorization": f"Bearer {token}"},
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        body = response.json()
+        bookings = body["data"]["bookings"]
+        self.assertEqual(len(bookings), 1)
+        self.assertEqual(
+            bookings[0]["meeting_url"], "https://zoom.example/tenant-fallback"
+        )
+        self.assertIsNone(bookings[0]["calendar_event_url"])
 
 
 class StudentLogoutRouteTestCase(TestCase):

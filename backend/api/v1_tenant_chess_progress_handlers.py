@@ -60,7 +60,36 @@ async def _list_tenant_chess_students(
     *,
     tenant_id: str,
 ) -> list[dict[str, object]]:
-    """Return every contact who has booked a chess intent under this tenant."""
+    """Return every contact who has booked a chess intent under this tenant.
+
+    Each student includes their most recent booking + the resolved
+    ``meeting_url`` so the tenant operator can quickly copy + share the join
+    link. Resolution mirrors :func:`_list_student_bookings`:
+
+    1. ``booking_intents.metadata_json -> 'zoho_meeting' ->> 'meeting_url'``
+    2. ``tenant_settings.settings_json ->> 'default_meeting_url'``
+    """
+    tenant_settings_row = await session.execute(
+        text(
+            """
+            select settings_json
+            from tenant_settings
+            where tenant_id = cast(:tenant_id as uuid)
+            limit 1
+            """
+        ),
+        {"tenant_id": tenant_id},
+    )
+    settings_record = tenant_settings_row.mappings().first()
+    tenant_settings = (
+        dict(settings_record.get("settings_json") or {})
+        if settings_record and isinstance(settings_record.get("settings_json"), dict)
+        else {}
+    )
+    default_meeting_url = str(
+        tenant_settings.get("default_meeting_url") or ""
+    ).strip()
+
     result = await session.execute(
         text(
             """
@@ -70,7 +99,11 @@ async def _list_tenant_chess_students(
                 c.full_name,
                 c.email,
                 bi.service_name as last_service_name,
-                bi.created_at as last_booking_at
+                bi.created_at as last_booking_at,
+                bi.metadata_json as last_metadata_json,
+                bi.booking_reference as last_booking_reference,
+                bi.requested_date as last_requested_date,
+                bi.requested_time as last_requested_time
               from contacts c
               join booking_intents bi on bi.contact_id = c.id
               where bi.tenant_id = cast(:tenant_id as uuid)
@@ -92,6 +125,10 @@ async def _list_tenant_chess_students(
               tc.full_name,
               tc.email,
               tc.last_service_name as current_program,
+              tc.last_booking_reference,
+              tc.last_metadata_json,
+              tc.last_requested_date,
+              tc.last_requested_time,
               lp.session_date,
               lp.level,
               lp.attendance,
@@ -120,6 +157,35 @@ async def _list_tenant_chess_students(
                 "notes": record.get("notes"),
                 "next_focus": record.get("next_focus"),
             }
+        last_metadata = record.get("last_metadata_json") or {}
+        zoho_meeting = (
+            last_metadata.get("zoho_meeting")
+            if isinstance(last_metadata, dict)
+            else None
+        )
+        meeting_url = ""
+        calendar_event_url: str | None = None
+        if isinstance(zoho_meeting, dict):
+            meeting_url = str(zoho_meeting.get("meeting_url") or "").strip()
+            calendar_event_url = (
+                str(zoho_meeting.get("calendar_event_url") or "").strip() or None
+            )
+        if not meeting_url and default_meeting_url:
+            meeting_url = default_meeting_url
+
+        last_requested_date = record.get("last_requested_date")
+        latest_booking = {
+            "booking_reference": record.get("last_booking_reference"),
+            "requested_date": (
+                last_requested_date.isoformat()
+                if hasattr(last_requested_date, "isoformat")
+                else last_requested_date
+            ),
+            "requested_time": record.get("last_requested_time"),
+            "meeting_url": meeting_url or None,
+            "calendar_event_url": calendar_event_url,
+        }
+
         students.append(
             {
                 "contact_id": record.get("contact_id"),
@@ -127,6 +193,8 @@ async def _list_tenant_chess_students(
                 "email": record.get("email"),
                 "current_program": record.get("current_program"),
                 "latest_progress": latest_progress,
+                "latest_booking": latest_booking,
+                "meeting_url": meeting_url or None,
             }
         )
     return students

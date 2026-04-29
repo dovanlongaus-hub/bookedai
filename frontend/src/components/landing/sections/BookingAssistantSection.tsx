@@ -2071,10 +2071,10 @@ export function BookingAssistantSection({
                       </div>
                       <p className="mt-3 text-xs leading-5 text-slate-600">
                         {bookingResult.meeting_status === 'scheduled'
-                          ? 'A calendar event has been created and included in the booking flow. After payment, Stripe returns the customer to the homepage while the booking stays logged for follow-up.'
+                          ? 'A calendar event has been created and included in the booking flow. After payment, BookedAI verifies Stripe backend status before showing the paid state.'
                           : bookingResult.calendar_add_url
-                            ? 'A Google Calendar action is ready immediately and is also included in the confirmation email. After payment, Stripe returns the customer to the homepage while the booking stays logged for follow-up.'
-                          : 'After payment, Stripe returns the customer to the homepage. Email confirmation is handled here, and the booking is already passed into the workflow for calendar or team follow-up.'}
+                            ? 'A Google Calendar action is ready immediately and is also included in the confirmation email. After payment, BookedAI verifies Stripe backend status while the booking stays logged for follow-up.'
+                          : 'After payment, BookedAI verifies Stripe backend status before showing the paid state. Email confirmation is handled here, and the booking is already passed into the workflow for calendar or team follow-up.'}
                       </p>
                     </div>
                   ) : null}

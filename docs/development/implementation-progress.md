@@ -12,6 +12,131 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-28`
 
+Implementation update from `2026-04-29` (public pitch/homepage SME messaging pass, local):
+
+- reviewed `pitch.bookedai.au`, `/architecture`, `bookedai.au`, `chess.bookedai.au`, and `aimentor.bookedai.au` through content-marketing, content-writing, frontend-design, and Playwright lenses, with a spawned content review agent providing a parallel wording audit
+- added an SME launch offer to the pitch and homepage: custom landing page, dedicated email, dedicated CRM, and preconfigured booking/calendar/meeting flow for early SME customers
+- reframed public architecture and pitch copy away from internal terms such as `audit ledger`, `tenant Ops`, `action_runs`, raw lead ids, and public placeholder notes; customer-facing copy now uses booking activity, follow-up history, business workspace, and review trail language
+- updated Chess and AI Mentor public cases to show the BookedAI-powered proof more clearly: dedicated email/CRM/scheduling on the hero/trust surface, and no customer-visible raw lead id in chess confirmation messages
+- refreshed focused Playwright expectations for the new wording and current pitch video source
+- verification passed: `npm --prefix frontend run build`; `cd frontend && npx playwright test tests/pitch-deck-rendering.spec.ts tests/pitch-architecture-viz.spec.ts tests/public-homepage-responsive.spec.ts --project=legacy` (`8 passed`); `git diff --check`; public-copy grep for removed internal phrases
+- published the closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-29/011151-public-pitch-homepage-sme-messaging-pass.md`
+- status: local public messaging and UI/UX pass is complete; live deploy remains an operator decision
+
+Implementation update from `2026-04-29` (product QA/UAT deep pass, local plus live smoke):
+
+- ran a focused QA/UAT pass for `product.bookedai.au` across local build, product regression, live-read product popup coverage, backend booking/care/payment routes, and production host smoke
+- fixed Playwright preview readiness flake by extending `frontend/scripts/run_playwright_suite.sh` readiness timeout from `60s` to configurable `PLAYWRIGHT_PREVIEW_READY_TIMEOUT_SECONDS` with a `180s` default; this prevents cold frontend builds from being reported as fake preview-server failures
+- verification passed: `npm --prefix frontend run build`; legacy product UAT suite across product app, explicit book gate, and popup detail (`10 passed`); after-booking focused mobile/Android/desktop subset (`3 passed`); product live-read popup suite (`4 passed`); standard live-read smoke with `PLAYWRIGHT_SKIP_BUILD=1` (`2 passed`); focused backend booking/chat/handoff/Stripe/Telegram/WhatsApp/Calendar suite (`125 passed`)
+- live production smoke passed for `https://product.bookedai.au/` on `390x844`, `412x915`, and `1440x1000`: assistant input visible, chess search returned matching text, horizontal overflow `0`, no console errors, no failed requests, stale long flow copy absent, and redundant logo-side `BookedAI` text absent
+- broader all-in-one live-read regression command still exposes shared homepage/test-contract drift outside the product popup lane: missing homepage input selectors in several tests, source-label expectation drift (`Sourced from the public web` vs current `Live web read`), and in-progress copy expectation drift; recommendation is to split product and homepage live-read lanes and update homepage selectors/copy contracts before treating the full broad suite as a release gate
+- published the QA closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-29/005756-product-deep-qa-uat-pass.md`
+- status: product QA/UAT pass is green locally and live smoke is healthy; live deploy for the local after-booking UI remains a separate operator decision because the worktree contains broader unrelated changes
+
+Implementation update from `2026-04-29` (product after-booking order detail UX, local):
+
+- redesigned the `product.bookedai.au` after-booking confirmation state into a more professional order screen inspired by ticketing/event systems: confirmed-order hero, order summary, order details, pass saving, portal access, payment, share, email, print, and care actions are now grouped instead of scattered
+- added Apple Wallet and Google Wallet pass entry links that preserve the booking portal reference and pass provider in the URL so the portal/backend can attach real pass generation behind those actions later
+- added a `View details` action and a responsive order-detail panel with service, venue, customer/contact, date/time, price, payment posture, portal actions, and wallet shortcuts
+- replaced new confirmation action glyphs with Lucide icons and kept tap targets at mobile-friendly sizes
+- updated product regression coverage to assert the order summary, wallet links, view-details action, single QR, and no horizontal overflow on mobile, Android-sized, and desktop booking flows
+- verification passed: `npm --prefix frontend run build`; `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh legacy tests/product-app-regression.spec.ts --workers=1 --reporter=line` (`8 passed`); `git diff --check` for touched product files
+- published the local closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-29/001320-product-after-booking-order-detail-ux.md`
+- status: local after-booking UX implementation and regression coverage are complete; live deploy and actual wallet-pass generation remain follow-up work
+
+Implementation update from `2026-04-28` (product UI/auth/search UX review, local):
+
+- reviewed and adjusted the `product.bookedai.au` product shell and assistant for desktop, mobile, and Android-sized viewports
+- removed the redundant `BookedAI` wordmark text beside the logo so the header stays compact and leaves room for account/CTA actions
+- added a top-bar account menu with Google Identity Services support when `VITE_GOOGLE_CLIENT_ID` is configured, plus an email/name fallback for environments without Google client configuration
+- added local saved-customer-profile reuse so name/email/phone can prefill later booking forms and the assistant can avoid asking repeat customers for the same basic details
+- redesigned the booking journey state strip around `Chat`, `Search`, `Preview`, `Book`, `Pay`, and `Care`; the strip is hidden on mobile so the first screen prioritizes the search/chat workspace, and the desktop/tablet version now reflects active/completed/pending states
+- improved slow live-read search UX by showing instant tenant/catalog matches first, adding service shortcut aliases for current tenant/service themes, bounding live-read waits with a fallback result, and refreshing staged search progress copy
+- updated `frontend/tests/product-app-regression.spec.ts` to guard the compact mobile shell, saved-profile prefill, desktop booking state surface, and overflow behavior
+- verification passed: `cd frontend && npx vite build`; `cd frontend && PLAYWRIGHT_SKIP_BUILD=1 bash scripts/run_playwright_suite.sh legacy tests/product-app-regression.spec.ts --workers=1 --reporter=line` (`7 passed`); responsive Playwright sweep at `390x844`, `412x915`, and `1440x1000` returned `0` horizontal overflow and no console/request errors
+- verification caveat: `npm --prefix frontend run build` is currently blocked by unrelated TypeScript errors in `frontend/src/apps/public/ChessGrandmasterApp.tsx`, not by the product files changed in this pass
+- published the local closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/180925-product-ui-auth-search-ux-local-review.md`
+- status: local product UX implementation and regression coverage are complete; live deploy and server-side authenticated customer identity binding remain follow-up gates
+
+Implementation update from `2026-04-28` (Zoho CRM/Calendar payment lifecycle setup, local):
+
+- tightened `scripts/zoho_crm_connect.py` so helper smokes prefer durable refresh-token auth over stale direct access tokens
+- expanded the default Zoho consent scopes to cover CRM modules/settings/notifications plus Calendar list/event creation and Zoho Meeting links
+- added `list-calendars` and selected the AU `info` calendar UID for `ZOHO_CALENDAR_UID`
+- fixed Zoho Calendar event creation to read `ZOHO_CALENDAR_API_BASE_URL=https://calendar.zoho.com.au/api/v1`, avoid double-appending `/api/v1`, and send live Calendar event payloads as Zoho `eventdata`
+- paid-booking reconciliation now attempts immediate Zoho `Deal` Closed Won plus payment follow-up `Task` sync with payment amount/source/time, while preserving local audit, outbox, and lifecycle email truth
+- CRM retry now supports stored `deal`, `task`, `deal_payment`, and `task_payment` payloads instead of only lead/contact rows
+- verification passed: Zoho CRM metadata smoke for `Leads` and `Deals`, Calendar list smoke, live Calendar event + Zoho Meeting smoke, `py_compile` for touched modules, and focused backend tests (`21 passed`)
+- live deploy completed through `bash scripts/deploy_live_host.sh` after repairing a frontend TypeScript build blocker in `ChessGrandmasterApp.tsx` (`selectedSlotId` initial state, `ChessPieceIllustration` import, localized price rendering)
+- post-deploy smoke passed: stack health at `2026-04-28T18:07:28Z`, live API health returned `ok`, `chess.bookedai.au` returned `200`, and local Zoho Calendar list smoke still resolves the AU `info` calendar through the refreshed env
+- follow-up live UAT found Calendar provisioning could still use an expired direct access token when `ZOHO_CALENDAR_ACCESS_TOKEN` was present; `backend/service_layer/calls_scheduling.py` now prefers refresh-token exchange before the direct token fallback, and `backend/tests/test_calls_scheduling.py` covers that behavior
+- final live UAT booking `v1-364c66e949` returned `meeting_url_present=true` and `calendar_event_url_present=true`; CRM booking `deal`/`task` synced; authenticated manual payment confirmation marked the booking `paid`; and DB evidence shows `deal_payment` plus `task_payment` both `synced` with external Zoho ids after retrying one Zoho throttle response
+- verification passed: `py_compile` for the touched Calendar helper/test, focused backend tests (`22 passed`), deploy-live, frontend production build inside deploy, stack health at `2026-04-28T23:56:51Z`, live API health, live booking UAT, manual payment UAT, and host DB CRM-sync evidence
+- status: Zoho CRM/Calendar/Meeting activation plus booking/payment lifecycle UAT is complete live for the chess tenant path
+
+Implementation update from `2026-04-28` (product mobile shell compacting, local):
+
+- tightened `product.bookedai.au` first-screen layout so the chat frame is the main surface on mobile
+- replaced the long product explainer (`Chat, search, preview, booking, payment posture, calendar, CRM/email, and customer-care follow-up...`) with the compact line `Chat, search, preview, booking, pay, and care stay connected.`
+- removed the redundant `Ready to use BookedAI... full chat-to-booking-care flow...` sentence from the mobile product shell and hid the secondary `Start a 30-day pilot` CTA on mobile because the top `Start free` CTA already exists
+- changed the flow strip to compact horizontal chips and let the assistant area use the freed vertical space with `flex-1`
+- updated product regression coverage so the stale long copy cannot return on mobile without failing the test
+- verification passed: `npm --prefix frontend run build`; `cd frontend && npx playwright test tests/product-app-regression.spec.ts --workers=1 --reporter=line` (`6 passed`)
+- published the local closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/171207-bookedai-product-mobile-shell-compacting.md`
+- status: local UI polish is complete; live deploy is not run in this pass
+
+Implementation update from `2026-04-28` (AI Mentor branded host, local):
+
+- prepared `aimentor.bookedai.au` as the tenant-branded AI Mentor 1-1 Pro runtime for tenant `ai-mentor-doer`
+- added Nginx HTTP/HTTPS proxy blocks for the host, routing `/api/` to backend and all other traffic to the shared frontend
+- added `DOMAIN_AIMENTOR` to deploy/certbot automation and bootstrap messaging
+- added `aimentor.bookedai.au` to Cloudflare DNS auto-sync defaults and the live `.env` host lists
+- added `https://aimentor.bookedai.au` to backend CORS/TrustedHost defaults and deploy env sync
+- updated frontend API-base resolution so the host uses same-origin `/api`
+- deployed live with `bash scripts/deploy_live_host.sh`; Cloudflare DNS auto-sync set `aimentor.bookedai.au` to the current production origin and certbot renewed the BookedAI certificate with `aimentor.bookedai.au` in the SAN list
+- verification passed: shell syntax checks, `backend/tests/test_cors_security.py` (`10 passed`), frontend TypeScript check, `git diff --check`, stack health at `2026-04-28T16:49:28Z`, Nginx config test, `https://aimentor.bookedai.au/` `200`, `https://aimentor.bookedai.au/api/health` backend JSON, `https://aimentor.bookedai.au/account` `200`, and live bundle routing to `AIMentorBookedAIApp`
+- published the live closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/165031-ai-mentor-branded-host-live-on-aimentor-bookedai-au.md`
+- status: `aimentor.bookedai.au` is live and routed to the AI Mentor tenant-branded runtime
+
+Implementation update from `2026-04-28` (Stripe best practices integration, local):
+
+- integrated the Stripe best-practice posture across direct backend Checkout/Billing REST calls
+- added shared Stripe API-version pinning at `backend/integrations/stripe/constants.py` with `2026-02-25.clover`
+- removed hardcoded `payment_method_types[]=card` from public booking, chat booking, chess student payment, tenant subscription billing, and pricing consultation Checkout Session creation so Stripe Dynamic Payment Methods can be controlled from Dashboard
+- added `scripts/stripe_sandbox_smoke.py` for safe test-mode Checkout Session validation; dry-run works without credentials and real runs refuse non-`sk_test_` secret keys
+- reviewed and tested the full payment flow in `docs/development/stripe-payment-flow-review-2026-04-28.md`
+- tightened the homepage Stripe return UX so `booking=success` first shows payment verification and calls `GET /api/v1/payments/status`; it only shows paid/Thank You after backend payment truth returns `paid`
+- added Playwright coverage in `frontend/tests/homepage-stripe-return-portal-handoff.spec.ts` for `verifying -> paid` Stripe return behavior with mocked backend payment status
+- added regression assertions for pinned Stripe API version and Dynamic Payment Methods on public Checkout, chess Checkout, and Telegram/chat Checkout
+- real Stripe test-mode smoke created a `cs_test_...` Checkout Session successfully with `payment_status=unpaid`
+- added `scripts/stripe_webhook_replay_smoke.sh` and `docs/development/stripe-cli-webhook-replay-runbook.md`; real Stripe CLI webhook replay is blocked locally because `stripe` is not installed
+- documented the runtime configuration, webhook contract, and upgrade procedure in `docs/development/stripe-best-practices-integration.md`
+- published the local closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/154445-bookedai-stripe-best-practices-integration.md`
+- published the payment-flow review follow-up to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/155756-bookedai-stripe-payment-flow-review-and-verified-return-follow-up.md`
+- published the Stripe return E2E/replay-runbook follow-up to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/161310-bookedai-stripe-return-e2e-and-webhook-replay-runbook.md`
+- verification passed: Stripe dry-run and real test-mode smoke, focused backend payment/Stripe/tenant regression (`143 passed`), Stripe return Playwright E2E (`4 passed`), frontend TypeScript check, frontend production build, Python compile check, and `git diff --check`
+- status: local Stripe integration hardening and return-verification UX are complete; live deploy and Stripe CLI webhook replay remain follow-up work
+
+Implementation update from `2026-04-28` (payment reconciliation lifecycle, local):
+
+- implemented the first payment-reconciliation lifecycle slice from `docs/payment-reconciliation-lifecycle-prd.md`
+- added shared `PaymentLifecycleService.mark_booking_paid(...)` so trusted Stripe, manual QR/bank confirmation, and future bank-feed matching use one idempotent booking-paid transition
+- Stripe `paid` webhook reconciliation now also updates the linked booking intent to `payment_dependency_state='paid'`, records payment metadata, audits `booking.payment_paid`, and enqueues outbox/CRM/email lifecycle evidence without double-updating the existing payment mirror
+- added `POST /api/v1/payments/manual-confirm` for authenticated tenant admin/finance confirmation of received QR/bank/manual payments, plus `GET /api/v1/payments/status` so return surfaces can show `paid` or `verifying` from backend truth instead of URL parameters
+- verification passed: `.venv-backend/bin/pytest backend/tests/test_api_v1_booking_routes.py backend/tests/test_stripe_webhook_routes.py -q` (`33 passed`); broader backend regression across search, booking runtime, booking routes, Stripe webhook, WhatsApp, Telegram, and Zoho feedback returned `139 passed`
+- published the local closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/152225-bookedai-payment-reconciliation-lifecycle-local-implementation.md`
+- status: local backend implementation complete; live deploy, portal/public status-call wiring, and real outbox worker dispatch for CRM/email payment-paid side effects remain follow-up work
+
+Implementation update from `2026-04-28` (BookedAI communication template polish, local):
+
+- refreshed outbound booking/lifecycle email rendering to match the current BookedAI.au brand: official logo, dark AI Revenue Engine header, status badge, structured confirmation summary, safer CTA/link posture, and a support footer that points customers back to `info@bookedai.au`, `+61455301335`, and BookedAI Manager Bot channels
+- reformatted reusable communication templates for native chat readability: WhatsApp/SMS-style lifecycle messages now use short lines, `*bold*` labels, booking reference, manage link, and explicit status/payment/reschedule/cancel support wording
+- tightened the direct v1 booking WhatsApp confirmation into the same native format, with booking reference, service, requested time, timezone, portal link, and request-safe next actions
+- polished customer Telegram service-search/current-order/booking-capture copy with compact HTML-safe status/action sections while preserving inline keyboard controls and portal-first booking continuity
+- verification passed locally with `.venv-backend/bin/pytest backend/tests/test_lifecycle_ops_service.py backend/tests/test_release_gate_security.py backend/tests/test_api_v1_booking_routes.py backend/tests/test_telegram_webhook_routes.py backend/tests/test_whatsapp_webhook_routes.py -q` (`114 passed`) after updating the brand capitalization assertion
+- published the local closeout to Notion and Discord; archive entry: `docs/development/telegram-sync/2026-04-28/143344-bookedai-communication-template-polish.md`
+- status: local backend template polish is complete; live deploy and real provider-send UAT are not run in this pass
+
 Implementation update from `2026-04-28` (product AI-search booking QA hardening, live closeout):
 
 - completed the proposed follow-up slice for `product.bookedai.au`: Stripe subscription webhook reconciliation, messaging-care identity hardening, AI Mentor partner-widget preflight CORS, and release/deploy verification
@@ -3075,7 +3200,17 @@ Current execution has also been running through a specialist multi-agent pattern
   - lane: `Architecture recommendations execution baseline`
   - update: promoted the Top 5 architecture recommendations into the executive and PM execution baseline: schema normalization dual-write for `bookings`/`payments`/`audit_outbox`/`tenants`, split public/admin/portal frontend artifacts, centralized backend permission registry, Prometheus + structured logs + error-tracker observability, and one canonical architecture layer map.
   - update: added concrete owners, Sprint/Phase dates, acceptance gates, and leadership open questions for canonical layer-map selection and error-tracker choice.
-  - verification: documentation-only change; internal PM/architecture markdown links were previously link-checked and the updated docs remain in `docs/executive-briefing/`, `docs/pm/`, and `docs/architecture/archimate/`.
+- verification: documentation-only change; internal PM/architecture markdown links were previously link-checked and the updated docs remain in `docs/executive-briefing/`, `docs/pm/`, and `docs/architecture/archimate/`.
+
+## 2026-04-28 BookedAI.au Public Chat Tenant-Scoped Lead Fix
+
+The `bookedai.au` public assistant now keeps lead capture on the public tenant-scoped API path:
+
+- public-web and embedded-widget booking submit calls use `/api/v1/public/leads/{tenant_slug}` when runtime config includes a `tenantRef`
+- `/api/v1/leads` remains available for authenticated tenant-session callers, but the homepage chat no longer needs a tenant bearer token for public lead capture
+- tenant-session backend errors such as `Tenant session required` and `actor_context.tenant_id` are converted into customer-safe recovery copy in the chat submit surfaces
+- homepage booking error UI now renders as a compact recovery card with a clear return-to-results action instead of exposing raw API detail
+- verification passed: frontend typecheck, production build, focused live-read booking submit Playwright test, live deploy, homepage asset probe, backend health probe, and live public lead smoke for tenant slug `bookedai-au`
 - `2026-04-26`
   - lane: `Sprint 19 follow-on FX-2/FX-5/FX-7 closures`
   - update: with the eight Sprint 19 P0 items already mostly closed (only operator-side `P0-2` WhatsApp provider posture remains), shipped three Tier 2 fixes from `docs/development/full-stack-review-2026-04-26.md`. The `Phase 17` and `Phase 19` backlog now records `FX-2`, `FX-5`, `FX-7` as `closed` with the carry-forward note for direct-fetch cleanup left under `FX-2`.

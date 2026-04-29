@@ -16,6 +16,7 @@ BookedAI's product surfaces should now express one connected revenue engine, not
 
 - primary product message: `BookedAI connects every customer message - WhatsApp, SMS, Telegram, email and web chat - into one AI Revenue Engine that captures intent, creates booking paths, supports payment and receivable follow-up, and records customer-care actions with operator-visible revenue evidence.`
 - SME-facing hero message: `Never lose a service enquiry to slow replies again. BookedAI turns chats, calls, emails, and website visits into confirmed booking paths, payment follow-up, and customer care.`
+- SME launch-offer message: `Launch a booking-ready business page in days, not months. BookedAI sets up a custom landing page, dedicated email, dedicated CRM, and preconfigured booking or meeting flow so every enquiry has a clear next step.`
 - investor/judge message: `BookedAI is an AI Revenue Engine for service businesses: an omnichannel agent layer that captures intent, creates booking references, tracks payment and follow-up posture, and records every revenue action in an auditable operating system.`
 - pitch and design surfaces should make the financial model visible without sounding like a spreadsheet: setup fee, SaaS subscription, performance-aligned commission/revenue share where appropriate, and proof through booking references, payment posture, portal reopen, tenant Ops, and audit/action evidence
 - customer-facing copy should make the channel continuity tangible: web chat, WhatsApp, SMS, Telegram, and email all continue the same booking/payment/support story
@@ -80,7 +81,7 @@ BookedAI messaging channels should feel like one consistent booking-care agent, 
 `pitch.bookedai.au` should explain the whole BookedAI system through a simple visual flow before deeper technical detail.
 
 - show the architecture as `customer surfaces -> AI agents -> booking core -> operations truth`
-- keep the visual buyer-readable: pitch, product, demo/widget, portal, search agent, revenue ops, customer-care/status, booking core, tenant Ops, admin Reliability, CRM/email, and audit ledger
+- keep the visual buyer-readable: pitch, product, demo/widget, portal, search agent, revenue follow-up, customer-care/status, booking core, business workspace, CRM/email, and booking activity history
 - use compact cards and stable grid dimensions so the diagram reads as an image-like flow on desktop and stacked cards on mobile
 - keep the deeper architecture infographic underneath as supporting detail, not the first thing a buyer has to parse
 - update this visual whenever new surfaces, agent classes, or lifecycle boundaries become product-facing

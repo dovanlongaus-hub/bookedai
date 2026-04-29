@@ -1142,3 +1142,1220 @@
 .chess-app .template-kicker {
   all: unset;
 }
+
+/* -----------------------------------------------------------------------
+ * Launch promo banner (sticky below the chess-nav)
+ * --------------------------------------------------------------------- */
+.chess-promo-banner {
+  position: sticky;
+  top: 64px;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #c9a24a 0%, #e1bd6f 100%);
+  color: var(--chess-navy-deep);
+  font-size: 0.92rem;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: 0 4px 12px -6px rgba(0, 0, 0, 0.25);
+}
+
+.chess-promo-banner__text {
+  flex: 1;
+  text-align: center;
+  letter-spacing: 0.005em;
+}
+
+.chess-promo-banner__countdown {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--chess-navy-deep);
+  color: var(--chess-gold-light);
+  font-variant-numeric: tabular-nums;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  font-size: 0.86rem;
+}
+
+.chess-promo-banner__dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 999px;
+  background: rgba(11, 29, 58, 0.12);
+  color: var(--chess-navy-deep);
+  cursor: pointer;
+  font-size: 1.05rem;
+  line-height: 1;
+  transition: background 0.18s ease;
+}
+
+.chess-promo-banner__dismiss:hover,
+.chess-promo-banner__dismiss:focus-visible {
+  background: rgba(11, 29, 58, 0.22);
+  outline: none;
+}
+
+@media (max-width: 600px) {
+  .chess-promo-banner {
+    top: 56px;
+    padding: 8px 14px;
+    font-size: 0.84rem;
+    gap: 8px;
+  }
+  .chess-promo-banner__countdown {
+    font-size: 0.78rem;
+  }
+}
+
+/* -----------------------------------------------------------------------
+ * Chess piece illustration (pricing tier topper)
+ * --------------------------------------------------------------------- */
+.chess-piece-illustration {
+  display: block;
+  width: 100%;
+  height: auto;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  filter: drop-shadow(0 6px 18px rgba(6, 16, 42, 0.18));
+  background: transparent;
+}
+
+/* -----------------------------------------------------------------------
+ * Tenant profile section — coach bio, achievements, testimonials, how-it-works
+ * Additive only. Uses navy/gold/ivory tokens already declared above.
+ * --------------------------------------------------------------------- */
+.chess-app .chess-profile-section {
+  padding-top: 96px;
+  padding-bottom: 96px;
+}
+
+.chess-app .chess-section-title-sm {
+  font-size: clamp(1.4rem, 2.4vw, 1.8rem);
+}
+
+.chess-app .chess-profile-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.4fr) minmax(0, 1fr);
+  gap: 48px;
+  align-items: start;
+}
+
+.chess-app .chess-bio-paragraphs p {
+  margin-top: 18px;
+  font-size: 1rem;
+  line-height: 1.75;
+  color: var(--chess-text);
+}
+
+.chess-app .chess-profile-portrait {
+  position: sticky;
+  top: 96px;
+}
+
+.chess-app .chess-profile-video-cta {
+  margin-top: 16px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.chess-app .chess-profile-video-cta[aria-disabled='true'] {
+  opacity: 0.85;
+  cursor: not-allowed;
+}
+
+.chess-app .chess-profile-video-note {
+  font-weight: 500;
+  font-size: 0.78rem;
+  color: var(--chess-muted);
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.chess-app .chess-trust-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 36px;
+  padding: 20px 24px;
+  border-radius: var(--chess-radius-lg);
+  border: 1px solid var(--chess-line);
+  background: var(--chess-ivory);
+}
+
+.chess-app .chess-trust-badges .chess-trust-chip {
+  background: var(--chess-paper);
+  color: var(--chess-navy);
+  border: 1px solid var(--chess-line);
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  padding: 8px 14px;
+  border-radius: 999px;
+}
+
+.chess-app .chess-profile-block {
+  margin-top: 72px;
+}
+
+.chess-app .chess-achievements-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.chess-app .chess-achievement-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 22px 22px 22px 26px;
+  background: var(--chess-paper);
+  border: 1px solid var(--chess-line);
+  border-radius: var(--chess-radius-lg);
+  box-shadow: var(--chess-shadow-card);
+  border-left: 4px solid var(--chess-gold);
+}
+
+.chess-app .chess-achievement-num {
+  font-family: var(--chess-font-display);
+  font-size: 1.4rem;
+  color: var(--chess-gold-deep);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.chess-app .chess-achievement-text {
+  font-size: 0.98rem;
+  line-height: 1.55;
+  color: var(--chess-navy);
+  font-weight: 500;
+}
+
+.chess-app .chess-quote-block {
+  margin: 24px 0 0;
+  padding: 36px 40px;
+  background: var(--chess-navy);
+  color: var(--chess-on-navy);
+  border-radius: var(--chess-radius-xl);
+  border-top: 6px solid var(--chess-gold);
+  position: relative;
+  box-shadow: var(--chess-shadow-card);
+}
+
+.chess-app .chess-quote-text {
+  font-family: var(--chess-font-display);
+  font-size: clamp(1.4rem, 2.6vw, 1.9rem);
+  line-height: 1.4;
+  color: var(--chess-gold-light);
+  font-weight: 600;
+  margin: 0;
+  letter-spacing: -0.005em;
+}
+
+.chess-app .chess-quote-attribution {
+  margin-top: 18px;
+  font-size: 0.92rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--chess-on-navy-muted);
+  text-transform: uppercase;
+}
+
+.chess-app .chess-testimonials-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 22px;
+  margin-top: 28px;
+}
+
+.chess-app .chess-testimonial-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 28px;
+  background: var(--chess-paper);
+  border: 1px solid var(--chess-line);
+  border-radius: var(--chess-radius-lg);
+  box-shadow: var(--chess-shadow-card);
+}
+
+.chess-app .chess-testimonial-quote {
+  font-size: 0.98rem;
+  line-height: 1.7;
+  color: var(--chess-text);
+  font-style: italic;
+  margin: 0;
+}
+
+.chess-app .chess-testimonial-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  border-top: 1px solid var(--chess-line);
+  padding-top: 14px;
+}
+
+.chess-app .chess-testimonial-author {
+  font-weight: 700;
+  font-size: 0.92rem;
+  color: var(--chess-navy);
+}
+
+.chess-app .chess-testimonial-program {
+  font-size: 0.78rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--chess-gold-deep);
+  font-weight: 600;
+}
+
+.chess-app .chess-how-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 18px;
+  margin-top: 28px;
+}
+
+.chess-app .chess-how-step {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 24px;
+  background: var(--chess-cream);
+  border: 1px solid var(--chess-line);
+  border-radius: var(--chess-radius-lg);
+}
+
+.chess-app .chess-how-icon {
+  font-size: 1.8rem;
+  line-height: 1;
+}
+
+.chess-app .chess-how-title {
+  font-family: var(--chess-font-display);
+  font-size: 1.1rem;
+  color: var(--chess-navy);
+  margin: 0;
+  font-weight: 700;
+}
+
+.chess-app .chess-how-body {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.6;
+  color: var(--chess-muted);
+}
+
+.chess-app .chess-profile-cta {
+  display: flex;
+  justify-content: center;
+  margin-top: 56px;
+}
+
+@media (max-width: 900px) {
+  .chess-app .chess-profile-grid {
+    grid-template-columns: 1fr;
+    gap: 32px;
+  }
+  .chess-app .chess-profile-portrait {
+    position: static;
+  }
+  .chess-app .chess-quote-block {
+    padding: 28px 24px;
+  }
+}
+
+/* -----------------------------------------------------------------------
+ * CTA strip — reinforced conversion banner between sections
+ * --------------------------------------------------------------------- */
+.chess-app .chess-cta-strip {
+  background: var(--chess-ivory);
+  border-top: 1px solid var(--chess-line);
+  border-bottom: 1px solid var(--chess-line);
+  padding: 18px 0;
+}
+
+.chess-app .chess-cta-strip-dark {
+  background: var(--chess-navy-deep);
+  border-top: 1px solid rgba(201, 162, 74, 0.24);
+  border-bottom: 1px solid rgba(201, 162, 74, 0.24);
+  color: var(--chess-on-navy);
+}
+
+.chess-app .chess-cta-strip-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.chess-app .chess-cta-strip-promo {
+  font-size: 0.95rem;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--chess-navy);
+}
+
+.chess-app .chess-cta-strip-dark .chess-cta-strip-promo {
+  color: var(--chess-on-navy);
+}
+
+@media (max-width: 600px) {
+  .chess-app .chess-cta-strip-inner {
+    flex-direction: column;
+    align-items: stretch;
+    text-align: center;
+  }
+}
+
+/* -----------------------------------------------------------------------
+ * Booking thank-you meeting block — surfaces Zoho Meeting URL prominently
+ * --------------------------------------------------------------------- */
+.chess-app .chess-meeting-block {
+  margin-top: 18px;
+  padding: 22px 24px;
+  background: linear-gradient(140deg, var(--chess-navy) 0%, var(--chess-navy-soft) 100%);
+  color: var(--chess-on-navy);
+  border-radius: var(--chess-radius-lg);
+  border: 1px solid rgba(201, 162, 74, 0.4);
+  box-shadow: var(--chess-shadow-gold);
+}
+
+.chess-app .chess-meeting-heading {
+  font-family: var(--chess-font-display);
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--chess-gold-light);
+  margin: 0 0 14px;
+}
+
+.chess-app .chess-meeting-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.chess-app .chess-meeting-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--chess-on-navy-muted);
+}
+
+.chess-app .chess-meeting-link {
+  color: var(--chess-gold-light);
+  font-size: 0.95rem;
+  font-weight: 600;
+  word-break: break-all;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.chess-app .chess-meeting-link:hover,
+.chess-app .chess-meeting-link:focus-visible {
+  color: var(--chess-gold);
+  outline: none;
+}
+
+.chess-app .chess-meeting-note {
+  margin: 12px 0 0;
+  font-size: 0.85rem;
+  color: var(--chess-on-navy-muted);
+  font-style: italic;
+}
+
+/* -----------------------------------------------------------------------
+ * Phase 3: brand mark, course illustrations, slot picker, layout polish
+ * Additive only — does not change tokens declared above.
+ * --------------------------------------------------------------------- */
+
+/* Hard guard: prevent any rogue overflow on small screens */
+.chess-app.chess-shell {
+  overflow-x: hidden;
+}
+
+.chess-app svg {
+  max-width: 100%;
+  height: auto;
+}
+
+/* Brand lockup (mark + wordmark + tagline) */
+.chess-app .chess-logo-mark {
+  flex-shrink: 0;
+  display: inline-block;
+  filter: drop-shadow(0 4px 10px rgba(6, 16, 42, 0.32));
+}
+
+.chess-app .chess-logo-lockup {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.chess-app .chess-logo-lockup__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.05;
+}
+
+.chess-app .chess-logo-lockup__wordmark {
+  font-family: var(--chess-font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  letter-spacing: -0.01em;
+}
+
+.chess-app .chess-logo-lockup__tagline {
+  font-family: var(--chess-font-body);
+  font-size: 0.66rem;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.chess-app .chess-logo-lockup--dark .chess-logo-lockup__wordmark {
+  color: var(--chess-on-navy);
+}
+
+.chess-app .chess-logo-lockup--dark .chess-logo-lockup__tagline {
+  color: var(--chess-gold);
+}
+
+.chess-app .chess-logo-lockup--light .chess-logo-lockup__wordmark {
+  color: var(--chess-navy);
+}
+
+.chess-app .chess-logo-lockup--light .chess-logo-lockup__tagline {
+  color: var(--chess-gold-deep);
+}
+
+/* Course-specific scene illustration (replaces piece-only topper on cards) */
+.chess-app .chess-course-illustration {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+  margin-bottom: 18px;
+  border-radius: 14px;
+  filter: drop-shadow(0 6px 18px rgba(6, 16, 42, 0.18));
+}
+
+/* Slot picker — per-course time-slot list */
+.chess-app .chess-slot-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 14px;
+}
+
+.chess-app .chess-slot-picker__heading {
+  font-family: var(--chess-font-display);
+  font-weight: 700;
+  font-size: 1.05rem;
+  color: var(--chess-navy);
+  margin: 0;
+}
+
+.chess-app .chess-slot-picker__hint {
+  font-size: 0.85rem;
+  color: var(--chess-muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.chess-app .chess-slot-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(170px, 1fr));
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.chess-app .chess-slot-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--chess-line);
+  border-radius: var(--chess-radius);
+  background: var(--chess-paper);
+  text-align: left;
+  cursor: pointer;
+  font-family: var(--chess-font-body);
+  transition: border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.chess-app .chess-slot-card:hover,
+.chess-app .chess-slot-card:focus-visible {
+  border-color: var(--chess-gold);
+  outline: none;
+  transform: translateY(-1px);
+}
+
+.chess-app .chess-slot-card[aria-pressed='true'] {
+  border-color: var(--chess-gold);
+  background: linear-gradient(180deg, #fffaf0 0%, var(--chess-paper) 90%);
+  box-shadow: 0 0 0 3px rgba(201, 162, 74, 0.18);
+}
+
+.chess-app .chess-slot-card__date {
+  font-weight: 700;
+  color: var(--chess-navy);
+  font-size: 0.92rem;
+}
+
+.chess-app .chess-slot-card__time {
+  font-family: var(--chess-font-display);
+  font-weight: 700;
+  font-size: 1.2rem;
+  color: var(--chess-navy-deep);
+  letter-spacing: -0.01em;
+}
+
+.chess-app .chess-slot-card__cohort {
+  font-size: 0.74rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--chess-gold-deep);
+}
+
+.chess-app .chess-slot-card__spots {
+  font-size: 0.78rem;
+  color: var(--chess-muted);
+}
+
+.chess-app .chess-slot-card__spots--low {
+  color: var(--chess-danger);
+  font-weight: 600;
+}
+
+.chess-app .chess-slot-show-more {
+  background: none;
+  border: 0;
+  padding: 4px 0;
+  text-align: left;
+  color: var(--chess-gold-deep);
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  font-family: var(--chess-font-body);
+}
+
+.chess-app .chess-slot-show-more:hover,
+.chess-app .chess-slot-show-more:focus-visible {
+  color: var(--chess-navy);
+  outline: none;
+}
+
+.chess-app .chess-slot-empty {
+  padding: 14px 16px;
+  background: var(--chess-ivory);
+  border: 1px dashed var(--chess-line-strong);
+  border-radius: var(--chess-radius);
+  font-size: 0.88rem;
+  color: var(--chess-muted);
+  line-height: 1.55;
+}
+
+/* Catalog match card (tenant-scoped search) */
+.chess-app .chess-catalog-match {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px 20px;
+  background: rgba(246, 241, 231, 0.08);
+  border: 1px solid rgba(201, 162, 74, 0.25);
+  border-radius: var(--chess-radius-lg);
+  color: var(--chess-on-navy);
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.chess-app .chess-catalog-match[data-selected='true'] {
+  border-color: var(--chess-gold);
+  background: rgba(201, 162, 74, 0.18);
+}
+
+.chess-app .chess-catalog-match__name {
+  font-family: var(--chess-font-display);
+  font-weight: 700;
+  font-size: 1.1rem;
+  color: var(--chess-on-navy);
+  letter-spacing: -0.005em;
+}
+
+.chess-app .chess-catalog-match__summary {
+  font-size: 0.88rem;
+  color: var(--chess-on-navy-muted);
+  line-height: 1.5;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.chess-app .chess-catalog-match__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  margin-top: 4px;
+  font-size: 0.78rem;
+  color: var(--chess-on-navy-muted);
+}
+
+.chess-app .chess-catalog-match__price {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(201, 162, 74, 0.18);
+  color: var(--chess-gold);
+  border-radius: 999px;
+  padding: 4px 12px;
+  font-weight: 700;
+  font-size: 0.85rem;
+}
+
+.chess-app .chess-catalog-match__slots {
+  font-size: 0.78rem;
+  color: var(--chess-on-navy-muted);
+  font-weight: 500;
+}
+
+/* Layout polish: hero padding tuned per breakpoint */
+.chess-app .chess-hero {
+  padding-block: 32px 48px;
+}
+
+@media (min-width: 768px) {
+  .chess-app .chess-hero {
+    padding-block: 48px 64px;
+  }
+}
+
+@media (min-width: 1024px) {
+  .chess-app .chess-hero {
+    padding-block: 64px 96px;
+  }
+}
+
+/* Pricing card grid: enforce 2-col tablet, 4-col desktop, equal heights */
+.chess-app .chess-grid-4 {
+  align-items: stretch;
+}
+
+.chess-app .chess-grid-4 > * {
+  height: 100%;
+}
+
+@media (min-width: 768px) and (max-width: 1023px) {
+  .chess-app .chess-grid-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Ensure container never overflows viewport edge on tiny phones */
+@media (max-width: 360px) {
+  .chess-app .chess-container {
+    padding-inline: 14px;
+  }
+  .chess-app .chess-section {
+    padding-block: 48px;
+  }
+  .chess-app .chess-hero-title {
+    font-size: 2rem;
+    line-height: 1.1;
+  }
+  .chess-app .chess-sticky-cta {
+    padding: 10px 12px env(safe-area-inset-bottom) 12px;
+    gap: 8px;
+  }
+  .chess-app .chess-sticky-cta-text {
+    font-size: 0.74rem;
+    line-height: 1.3;
+  }
+  .chess-app .chess-sticky-cta .chess-btn {
+    padding-inline: 12px;
+    font-size: 0.78rem;
+    white-space: nowrap;
+  }
+}
+
+/* -----------------------------------------------------------------------
+ * Phase 4: Humanitix-style order confirmation card
+ * Self-contained block; uses chess-tokens variables. Mobile-first.
+ * --------------------------------------------------------------------- */
+.chess-app .chess-order-confirmation {
+  margin-top: 22px;
+  padding: 22px;
+  background: var(--chess-paper);
+  border: 1px solid var(--chess-line);
+  border-radius: var(--chess-radius-lg);
+  box-shadow: var(--chess-shadow-card);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+@media (min-width: 640px) {
+  .chess-app .chess-order-confirmation {
+    padding: 32px;
+    gap: 22px;
+  }
+}
+
+.chess-app .chess-order-confirmation__header {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.chess-app .chess-order-success-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--chess-gold);
+}
+
+.chess-app .chess-order-success-icon-svg {
+  filter: drop-shadow(0 8px 18px rgba(201, 162, 74, 0.32));
+}
+
+.chess-app .chess-order-confirmation__title {
+  font-family: var(--chess-font-display);
+  font-weight: 700;
+  font-size: 1.5rem;
+  color: var(--chess-navy);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+@media (min-width: 640px) {
+  .chess-app .chess-order-confirmation__title {
+    font-size: 2rem;
+  }
+}
+
+.chess-app .chess-order-confirmation__sub {
+  margin: 0;
+  color: var(--chess-muted);
+  font-size: 0.95rem;
+  line-height: 1.55;
+}
+
+/* Order reference block */
+.chess-app .chess-order-reference {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 16px;
+  background: var(--chess-ivory);
+  border: 1px dashed var(--chess-line-strong);
+  border-radius: var(--chess-radius);
+}
+
+.chess-app .chess-order-reference__label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--chess-gold-deep);
+}
+
+.chess-app .chess-order-reference__value {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+.chess-app .chess-order-reference__code {
+  font-family: 'SFMono-Regular', Menlo, Consolas, monospace;
+  font-weight: 700;
+  font-size: 1.2rem;
+  letter-spacing: 0.06em;
+  color: var(--chess-navy);
+  word-break: break-all;
+}
+
+@media (min-width: 480px) {
+  .chess-app .chess-order-reference__code {
+    font-size: 1.4rem;
+  }
+}
+
+.chess-app .chess-order-reference__copy {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--chess-line);
+  border-radius: 999px;
+  background: var(--chess-paper);
+  color: var(--chess-navy);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: var(--chess-font-body);
+  cursor: pointer;
+  transition: border-color 0.18s ease, background 0.18s ease;
+}
+
+.chess-app .chess-order-reference__copy:hover,
+.chess-app .chess-order-reference__copy:focus-visible {
+  border-color: var(--chess-gold);
+  background: var(--chess-cream);
+  outline: none;
+}
+
+/* Info rows */
+.chess-app .chess-order-info-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chess-app .chess-order-info-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  background: var(--chess-cream);
+  border-radius: var(--chess-radius);
+  border: 1px solid var(--chess-line);
+}
+
+.chess-app .chess-order-info-row__icon {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 999px;
+  background: var(--chess-paper);
+  color: var(--chess-navy);
+  border: 1px solid var(--chess-line);
+}
+
+.chess-app .chess-order-info-row__body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.chess-app .chess-order-info-row__label {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--chess-muted);
+}
+
+.chess-app .chess-order-info-row__value {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--chess-navy);
+  line-height: 1.4;
+  word-break: break-word;
+}
+
+.chess-app .chess-order-info-row__value--paid {
+  color: var(--chess-success);
+}
+
+.chess-app .chess-order-info-row__value--pending {
+  color: var(--chess-gold-deep);
+}
+
+.chess-app .chess-order-info-row__value--unpaid {
+  color: var(--chess-danger);
+}
+
+.chess-app .chess-order-info-row__pill {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(201, 162, 74, 0.16);
+  color: var(--chess-gold-deep);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  vertical-align: 1px;
+}
+
+.chess-app .chess-order-info-row__muted {
+  color: var(--chess-muted);
+  font-weight: 500;
+}
+
+.chess-app .chess-order-info-row__link {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--chess-gold-deep);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--chess-gold);
+  align-self: flex-start;
+}
+
+.chess-app .chess-order-info-row__link:hover,
+.chess-app .chess-order-info-row__link:focus-visible {
+  color: var(--chess-navy);
+  border-bottom-color: var(--chess-navy);
+  outline: none;
+}
+
+/* Actions */
+.chess-app .chess-order-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 10px;
+}
+
+@media (min-width: 640px) {
+  .chess-app .chess-order-actions {
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  }
+}
+
+.chess-app .chess-order-actions__primary {
+  text-align: center;
+}
+
+.chess-app .chess-wallet-button {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--chess-radius);
+  border: 1px solid transparent;
+  font-family: var(--chess-font-body);
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+}
+
+.chess-app .chess-wallet-button:hover:not(:disabled),
+.chess-app .chess-wallet-button:focus-visible {
+  transform: translateY(-1px);
+  box-shadow: 0 12px 26px -16px rgba(11, 29, 58, 0.4);
+  outline: none;
+}
+
+.chess-app .chess-wallet-button:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
+
+.chess-app .chess-wallet-apple {
+  background: var(--chess-charcoal);
+  color: #ffffff;
+  border-color: var(--chess-charcoal);
+}
+
+.chess-app .chess-wallet-apple:hover:not(:disabled),
+.chess-app .chess-wallet-apple:focus-visible {
+  border-color: var(--chess-gold);
+}
+
+.chess-app .chess-wallet-google {
+  background: var(--chess-paper);
+  color: var(--chess-navy);
+  border-color: var(--chess-line-strong);
+}
+
+.chess-app .chess-wallet-google:hover:not(:disabled),
+.chess-app .chess-wallet-google:focus-visible {
+  border-color: var(--chess-gold);
+}
+
+.chess-app .chess-wallet-button__glyph {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.12);
+  font-weight: 700;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.chess-app .chess-wallet-google .chess-wallet-button__glyph {
+  background: linear-gradient(135deg, #4285f4 0%, #34a853 100%);
+  color: #ffffff;
+}
+
+.chess-app .chess-wallet-button__text {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.chess-app .chess-wallet-button__hint {
+  font-size: 0.7rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  opacity: 0.72;
+}
+
+.chess-app .chess-wallet-button__cta {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+/* Secondary actions row */
+.chess-app .chess-order-secondary-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+/* What's next list */
+.chess-app .chess-order-whats-next {
+  margin-top: 6px;
+  padding: 18px;
+  background: var(--chess-navy);
+  color: var(--chess-on-navy);
+  border-radius: var(--chess-radius-lg);
+  border: 1px solid rgba(201, 162, 74, 0.2);
+}
+
+.chess-app .chess-order-whats-next__heading {
+  font-family: var(--chess-font-display);
+  font-weight: 700;
+  font-size: 1.15rem;
+  margin: 0 0 12px;
+  color: var(--chess-on-navy);
+}
+
+.chess-app .chess-order-whats-next__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.chess-app .chess-order-whats-next__item {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.chess-app .chess-order-whats-next__num {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--chess-gold) 0%, var(--chess-gold-deep) 100%);
+  color: var(--chess-navy-deep);
+  font-weight: 800;
+  font-size: 0.85rem;
+}
+
+.chess-app .chess-order-whats-next__body {
+  flex: 1;
+  min-width: 0;
+}
+
+.chess-app .chess-order-whats-next__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--chess-on-navy);
+}
+
+.chess-app .chess-order-whats-next__text {
+  margin: 4px 0 0;
+  color: var(--chess-on-navy-muted);
+  font-size: 0.88rem;
+  line-height: 1.55;
+}
+
+.chess-app .chess-order-whats-next__cta {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--chess-gold);
+  text-decoration: none;
+  border-bottom: 1px dashed var(--chess-gold);
+}
+
+.chess-app .chess-order-whats-next__cta:hover,
+.chess-app .chess-order-whats-next__cta:focus-visible {
+  color: var(--chess-gold-light);
+  border-bottom-color: var(--chess-gold-light);
+  outline: none;
+}
+
+.chess-app .chess-order-return {
+  display: flex;
+  justify-content: center;
+}
+
+/* Selected slot card chip */
+.chess-app .chess-slot-card__selected {
+  display: inline-block;
+  margin-top: 4px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--chess-gold-deep);
+}
+
+/* 360px tweaks for the order card */
+@media (max-width: 360px) {
+  .chess-app .chess-order-confirmation {
+    padding: 16px;
+  }
+  .chess-app .chess-order-confirmation__title {
+    font-size: 1.3rem;
+  }
+  .chess-app .chess-order-reference__code {
+    font-size: 1.05rem;
+  }
+  .chess-app .chess-order-info-row {
+    padding: 10px 12px;
+    gap: 10px;
+  }
+  .chess-app .chess-order-whats-next {
+    padding: 14px;
+  }
+}

@@ -15,6 +15,7 @@ DOMAIN_PRODUCT="${DOMAIN_PRODUCT:-product.bookedai.au}"
 DOMAIN_DEMO="${DOMAIN_DEMO:-demo.bookedai.au}"
 DOMAIN_FUTURESWIM="${DOMAIN_FUTURESWIM:-futureswim.bookedai.au}"
 DOMAIN_CHESS="${DOMAIN_CHESS:-chess.bookedai.au}"
+DOMAIN_AIMENTOR="${DOMAIN_AIMENTOR:-aimentor.bookedai.au}"
 DOMAIN_PORTAL="${DOMAIN_PORTAL:-portal.bookedai.au}"
 DOMAIN_TENANT="${DOMAIN_TENANT:-tenant.bookedai.au}"
 DOMAIN_PITCH="${DOMAIN_PITCH:-pitch.bookedai.au}"
@@ -36,6 +37,7 @@ CERT_DOMAINS=(
   "${DOMAIN_DEMO}"
   "${DOMAIN_FUTURESWIM}"
   "${DOMAIN_CHESS}"
+  "${DOMAIN_AIMENTOR}"
   "${DOMAIN_PORTAL}"
   "${DOMAIN_TENANT}"
   "${DOMAIN_PITCH}"
@@ -98,6 +100,8 @@ elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_FUT
   NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_CHESS}([, ]|$)"; then
   NEEDS_CERT_UPDATE="true"
+elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_AIMENTOR}([, ]|$)"; then
+  NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_PORTAL}([, ]|$)"; then
   NEEDS_CERT_UPDATE="true"
 elif ! openssl x509 -in "${CERT_PATH}" -noout -text | grep -Eq "DNS:${DOMAIN_TENANT}([, ]|$)"; then
@@ -150,6 +154,7 @@ echo "Beta: https://${DOMAIN_BETA}"
 echo "Product: https://${DOMAIN_PRODUCT}"
 echo "Demo: https://${DOMAIN_DEMO}"
 echo "Chess: https://${DOMAIN_CHESS}"
+echo "AI Mentor: https://${DOMAIN_AIMENTOR}"
 echo "Portal: https://${DOMAIN_PORTAL}"
 echo "Tenant: https://${DOMAIN_TENANT}"
 echo "Pitch: https://${DOMAIN_PITCH}"

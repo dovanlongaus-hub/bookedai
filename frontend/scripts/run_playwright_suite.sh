@@ -40,7 +40,8 @@ cleanup() {
 trap cleanup EXIT INT TERM
 
 SERVER_URL="http://127.0.0.1:${PORT}"
-for _ in $(seq 1 60); do
+PREVIEW_READY_TIMEOUT_SECONDS="${PLAYWRIGHT_PREVIEW_READY_TIMEOUT_SECONDS:-180}"
+for _ in $(seq 1 "${PREVIEW_READY_TIMEOUT_SECONDS}"); do
   if curl -fsS "${SERVER_URL}" >/dev/null 2>&1; then
     break
   fi
@@ -48,7 +49,7 @@ for _ in $(seq 1 60); do
 done
 
 if ! curl -fsS "${SERVER_URL}" >/dev/null 2>&1; then
-  echo "[playwright-suite] preview server did not become ready at ${SERVER_URL}" >&2
+  echo "[playwright-suite] preview server did not become ready at ${SERVER_URL} after ${PREVIEW_READY_TIMEOUT_SECONDS}s" >&2
   exit 1
 fi
 

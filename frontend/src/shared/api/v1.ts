@@ -1,4 +1,5 @@
 import { apiRequest, ApiClientError } from './client';
+import { getApiBaseUrl } from '../config/api';
 import type {
   AcademyReportPreview,
   AssessmentQuestion,
@@ -589,6 +590,17 @@ function normalizeSearchCandidatesEnvelope(
 
 export async function createLead(request: CreateLeadRequest) {
   return requestV1Envelope<CreateLeadResponse>('/v1/leads', withJsonBody(request, { method: 'POST' }));
+}
+
+export type PublicCreateLeadRequest = Omit<CreateLeadRequest, 'actor_context' | 'intent_context'> & {
+  intent_notes?: string | null;
+};
+
+export async function createPublicLead(tenantSlug: string, request: PublicCreateLeadRequest) {
+  return requestV1Envelope<CreateLeadResponse>(
+    `/v1/public/leads/${encodeURIComponent(tenantSlug)}`,
+    withJsonBody(request, { method: 'POST' }),
+  );
 }
 
 export type PublicBookingStatsWindow = {
@@ -1624,6 +1636,208 @@ export async function chessPaymentOptions(request: ChessPaymentOptionsRequest) {
   );
 }
 
+// ---- Chess academy: tenant-scoped catalog search ---------------------------------------------
+//
+// Phase 3A endpoint: replaces the marketplace-wide `/v1/search/candidates` for the chess
+// academy landing surface. Backend filters by tenant, so the frontend can render a focused
+// class-finder instead of a general matcher.
+
+export interface ChessCatalogSearchFilters {
+  age_band?: string | null;
+  delivery?: string | null;
+  format?: string | null;
+  max_price_aud?: number | null;
+}
+
+export interface ChessCatalogSearchRequest {
+  query: string;
+  filters?: ChessCatalogSearchFilters | null;
+}
+
+export interface ChessCatalogMatch {
+  service_id: string;
+  name: string;
+  summary: string;
+  display_price_aud: string;
+  display_price_vnd: string;
+  tier: string;
+  format: string;
+  available_slots_count: number;
+}
+
+export interface ChessCatalogSearchResponse {
+  matches: ChessCatalogMatch[];
+}
+
+export async function chessCatalogSearch(request: ChessCatalogSearchRequest) {
+  return requestV1Envelope<ChessCatalogSearchResponse>(
+    '/v1/chess/catalog/search',
+    withJsonBody(request, { method: 'POST' }),
+  );
+}
+
+// ---- Chess academy: per-course schedule slots ------------------------------------------------
+//
+// Phase 3B endpoint: returns upcoming bookable slots for a chess course. The frontend renders a
+// scrollable picker so the visitor selects a real session instead of typing a free-text date.
+
+export interface ChessCourseSlotsOptions {
+  from?: string;
+  to?: string;
+  limit?: number;
+}
+
+export interface ChessCourseSlot {
+  slot_id: string;
+  starts_at: string;
+  ends_at: string;
+  date: string;
+  start_time: string;
+  cohort_label: string;
+  spots_left: number;
+}
+
+export interface ChessCourseSlotsResponse {
+  slots: ChessCourseSlot[];
+}
+
+export async function chessCourseSlots(serviceId: string, opts?: ChessCourseSlotsOptions) {
+  const params = new URLSearchParams();
+  if (opts?.from) params.set('from', opts.from);
+  if (opts?.to) params.set('to', opts.to);
+  if (typeof opts?.limit === 'number') params.set('limit', String(opts.limit));
+  const qs = params.toString();
+  const path = `/v1/chess/courses/${encodeURIComponent(serviceId)}/slots${qs ? `?${qs}` : ''}`;
+  return requestV1Envelope<ChessCourseSlotsResponse>(path);
+}
+
+// ---- Post-booking order experience -----------------------------------------------------------
+//
+// Phase 4 endpoints feed the Humanitix-style order confirmation card on chess.bookedai.au and
+// the standalone order page at portal.bookedai.au/order/{reference}. Wallet endpoints return
+// platform-specific pass formats (Apple .pkpass binary, Google save-url JSON envelope).
+//
+// All shapes are kept local rather than promoted to `shared/contracts` — the chess team is the
+// only consumer today, and the parent product's contract surface should not absorb tenant-scoped
+// experiments until they stabilise.
+
+export interface OrderSession {
+  id: string;
+  starts_at: string;
+  duration_minutes: number;
+  timezone: string;
+  program_name: string;
+  cohort_label: string;
+  meeting_url: string | null;
+  calendar_event_url: string | null;
+  status?: 'upcoming' | 'completed' | 'cancelled' | null;
+}
+
+export type OrderPaymentMethod = 'stripe' | 'vnd_bank' | 'aud_bank' | null;
+export type OrderPaymentStatus = 'paid' | 'pending' | 'unpaid';
+export type OrderCurrency = 'AUD' | 'VND';
+export type OrderStatus = 'confirmed' | 'pending_payment' | 'cancelled';
+
+export interface OrderPayment {
+  method: OrderPaymentMethod;
+  currency: OrderCurrency;
+  amount: number;
+  status: OrderPaymentStatus;
+  paid_at: string | null;
+  receipt_url: string | null;
+}
+
+export interface OrderCustomer {
+  name: string;
+  email: string | null;
+  phone: string | null;
+}
+
+export interface OrderCoach {
+  display_name: string;
+  title_short: string;
+  bio_short: string;
+}
+
+export interface OrderPromo {
+  applied: boolean;
+  code: string | null;
+  discount_pct: number | null;
+  label: string | null;
+}
+
+export interface OrderSupport {
+  email: string | null;
+  phone: string | null;
+  telegram: string | null;
+  whatsapp: string | null;
+}
+
+export interface OrderResponse {
+  order_reference: string;
+  status: OrderStatus;
+  customer: OrderCustomer;
+  sessions: OrderSession[];
+  payment: OrderPayment;
+  coach: OrderCoach;
+  promo: OrderPromo;
+  support: OrderSupport;
+}
+
+export async function getOrder(orderReference: string) {
+  const path = `/v1/orders/${encodeURIComponent(orderReference)}`;
+  return requestV1Envelope<OrderResponse>(path);
+}
+
+export interface OrderGoogleWalletSaveUrl {
+  save_url: string;
+}
+
+export async function getOrderGoogleWalletSaveUrl(orderReference: string) {
+  const path = `/v1/orders/${encodeURIComponent(orderReference)}/wallet/google`;
+  return requestV1Envelope<OrderGoogleWalletSaveUrl>(path);
+}
+
+/**
+ * Download the Apple Wallet pass for the given order. Triggers a browser download of the
+ * binary `.pkpass` file. Returns the synthetic blob URL (already revoked) so callers can
+ * await completion. Throws on HTTP failure so callers can surface the error inline.
+ */
+export async function getOrderApplePass(orderReference: string): Promise<void> {
+  const baseUrl = getApiBaseUrl().replace(/\/$/, '');
+  const url = `${baseUrl}/v1/orders/${encodeURIComponent(orderReference)}/wallet/apple`;
+  const response = await fetch(url, {
+    headers: { accept: 'application/vnd.apple.pkpass' },
+  });
+  if (!response.ok) {
+    let bodyText = '';
+    try {
+      bodyText = await response.text();
+    } catch {
+      // ignore
+    }
+    throw new ApiClientError(
+      `Apple Wallet pass request failed (${response.status}).`,
+      response.status,
+      bodyText || null,
+    );
+  }
+  const blob = await response.blob();
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    if (typeof document !== 'undefined') {
+      const anchor = document.createElement('a');
+      anchor.href = objectUrl;
+      anchor.download = `${orderReference}.pkpass`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+    }
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
+}
+
 export type StudentAuthIntent = 'sign_in' | 'create';
 
 export interface StudentGoogleAuthRequest {
@@ -1650,6 +1864,12 @@ export interface StudentBookingSummary {
   requested_time: string;
   status: string;
   payment_status: string;
+  /**
+   * Optional Zoho Meeting URL the student can click to join their online
+   * session. Backend exposes this on the studentMe response when the booking
+   * has a confirmed online video conferencing slot.
+   */
+  meeting_url?: string | null;
 }
 
 export interface StudentProgressEntry {
@@ -2004,6 +2224,14 @@ export type AgentActivityStep = {
   ai_reply: string | null;
   workflow_status: AgentActivityWorkflowStatus | null;
   duration_ms: number | null;
+  /**
+   * Wave 13-B — slash-command verb captured from
+   * `context.intent_hint` on the customer-agent-turn request. Present
+   * when the user invoked a typed slash command (e.g. `find_service`,
+   * `book_service`). Surface in the Agent Activity Drawer as a small
+   * chip next to the event_type label.
+   */
+  user_intent_hint: string | null;
   evidence: Record<string, unknown>;
   created_at: string | null;
 };
@@ -2029,6 +2257,7 @@ function normalizeAgentActivityStep(raw: unknown): AgentActivityStep {
     ai_reply: readString(record, 'ai_reply', 'aiReply'),
     workflow_status: readString(record, 'workflow_status', 'workflowStatus'),
     duration_ms: readNumber(record, 'duration_ms', 'durationMs'),
+    user_intent_hint: readString(record, 'user_intent_hint', 'userIntentHint'),
     evidence,
     created_at: readString(record, 'created_at', 'createdAt'),
   };
@@ -2416,6 +2645,7 @@ export async function getTenantPartnerConfig(
 
 export const apiV1 = {
   createLead,
+  createPublicLead,
   getPublicBookingStats,
   getTenantPartnerConfig,
   startChatSession,
@@ -2478,6 +2708,11 @@ export const apiV1 = {
   tenantGoogleAuth,
   tenantPasswordAuth,
   chessPaymentOptions,
+  chessCatalogSearch,
+  chessCourseSlots,
+  getOrder,
+  getOrderGoogleWalletSaveUrl,
+  getOrderApplePass,
   studentGoogleAuth,
   studentMe,
   studentLogout,

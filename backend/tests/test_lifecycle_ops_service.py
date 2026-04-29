@@ -800,10 +800,77 @@ class LifecycleOpsServiceTestCase(IsolatedAsyncioTestCase):
             public_app_url="https://bookedai.au",
         )
 
-        self.assertIn("Bookedai.au confirmed", rendered.subject)
+        self.assertIn("BookedAI.au confirmed", rendered.subject)
         self.assertIn("BK-123", rendered.text)
         self.assertIn("BookedAI remote demo", rendered.html)
         self.assertIn("https://bookedai.au/pay/BK-123", rendered.html)
+
+    async def test_render_bookedai_confirmation_email_includes_meeting_block_in_english(self):
+        """When ``meeting_url`` + ``calendar_event_url`` are present, the EN
+        copy renders a 'Join your online session' block in the text body and
+        an HTML callout. Falls back gracefully — see the next test for the
+        no-meeting case."""
+        rendered = render_bookedai_confirmation_email(
+            variables={
+                "customer_name": "Long",
+                "service_name": "BookedAI Demo",
+                "slot_label": "16 Apr, 3:00 PM",
+                "timezone": "Australia/Sydney",
+                "booking_reference": "BK-123",
+                "business_name": "BookedAI",
+                "meeting_url": "https://meet.zoho.com/abc-def-ghi",
+                "calendar_event_url": "https://calendar.zoho.com/event/123",
+                "locale": "en",
+            },
+            public_app_url="https://bookedai.au",
+        )
+
+        self.assertIn("https://meet.zoho.com/abc-def-ghi", rendered.text)
+        self.assertIn("Your session will be online via Zoho Meeting.", rendered.text)
+        self.assertIn("Add to calendar", rendered.text)
+        self.assertIn("https://meet.zoho.com/abc-def-ghi", rendered.html)
+        self.assertIn("Join your online session", rendered.html)
+
+    async def test_render_bookedai_confirmation_email_renders_vietnamese_meeting_block(self):
+        """When ``locale=vi``, the meeting block uses the Vietnamese strings.
+
+        Asserts the EN heading is NOT present so we do not silently leak
+        English copy into the Vietnamese email and degrade the localisation.
+        """
+        rendered = render_bookedai_confirmation_email(
+            variables={
+                "customer_name": "Linh",
+                "service_name": "Chess Beginner",
+                "slot_label": "1 Th5, 10:00",
+                "timezone": "Asia/Ho_Chi_Minh",
+                "booking_reference": "BK-VI-1",
+                "meeting_url": "https://meet.zoho.com/vi-room",
+                "locale": "vi",
+            },
+            public_app_url="https://bookedai.au",
+        )
+
+        self.assertIn("Buổi học của bạn diễn ra online qua Zoho Meeting.", rendered.text)
+        self.assertIn("Link buổi học", rendered.text)
+        self.assertIn("Tham gia buổi học online", rendered.html)
+        self.assertNotIn("Join your online session", rendered.html)
+
+    async def test_render_bookedai_confirmation_email_omits_meeting_block_when_no_url(self):
+        """No ``meeting_url`` means no block — the email falls back to the
+        existing payment / manage links so we don't ship empty placeholders."""
+        rendered = render_bookedai_confirmation_email(
+            variables={
+                "customer_name": "Long",
+                "service_name": "BookedAI Demo",
+                "slot_label": "16 Apr, 3:00 PM",
+                "booking_reference": "BK-123",
+            },
+            public_app_url="https://bookedai.au",
+        )
+
+        self.assertNotIn("Join your online session", rendered.html)
+        self.assertNotIn("Tham gia buổi học online", rendered.html)
+        self.assertNotIn("Your session will be online", rendered.text)
 
     async def test_render_bookedai_confirmation_email_escapes_html_values_and_rejects_unsafe_links(self):
         rendered = render_bookedai_confirmation_email(

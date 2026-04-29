@@ -14,13 +14,13 @@ const headingContent = {
   kicker: 'Proof',
   kickerClassName: 'text-emerald-600',
   title: `Real bookings. Real businesses. Live revenue running through ${brandName}.`,
-  body: 'Operators using BookedAI to recover after-hours enquiries, route fit-aware suggestions, and post bookings to the audit ledger before the team even logs in.',
+  body: 'Business owners use BookedAI to recover after-hours enquiries, route fit-aware suggestions, and keep booking follow-up visible before the team even logs in.',
 };
 
 const trustSignals = [
-  { label: 'Live tenants', value: '3 in production' },
+  { label: 'Live customer examples', value: '3 in production' },
   { label: 'Channels wired', value: '5 (web, SMS, WhatsApp, Telegram, email)' },
-  { label: 'Booking → ledger', value: '< 30s' },
+  { label: 'Booking follow-up', value: '< 30s' },
 ];
 
 export function TrustSection({ items, faqItems }: TrustSectionProps) {
@@ -53,8 +53,8 @@ export function TrustSection({ items, faqItems }: TrustSectionProps) {
             <div className="mt-4 grid gap-3">
               {[
                 'Live tenants you can open: chess.bookedai.au, futureswim.bookedai.au, ai-mentor.bookedai.au.',
-                'Bookings posted to the audit ledger inside 30 seconds, with attribution to channel and source.',
-                'Operators answer fewer manual questions per week; revenue stops leaking after-hours.',
+                'Bookings create a clear reference, portal path, and follow-up trail inside 30 seconds.',
+                'Teams answer fewer manual questions per week; revenue stops leaking after-hours.',
               ].map((item) => (
                 <div key={item} className="rounded-[1.05rem] border border-black/6 bg-white px-4 py-3 text-sm leading-6 text-black/72">
                   {item}

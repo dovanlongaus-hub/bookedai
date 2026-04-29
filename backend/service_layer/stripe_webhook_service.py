@@ -26,6 +26,7 @@ from repositories.idempotency_repository import IdempotencyRepository
 from repositories.payment_intent_repository import PaymentIntentRepository
 from repositories.tenant_repository import TenantRepository
 from repositories.webhook_repository import WebhookEventRepository
+from service_layer.payment_lifecycle_service import mark_booking_paid
 
 
 SIGNATURE_TOLERANCE_SECONDS = 5 * 60  # Stripe default tolerance window.
@@ -779,6 +780,22 @@ async def reconcile_stripe_event(
             "stripe_payment_status": handles["payment_status"],
         },
     )
+    lifecycle_result = None
+    if handles["payment_status"] == "paid":
+        lifecycle_result = await mark_booking_paid(
+            session,
+            tenant_id=booking_tenant_id,
+            booking_reference=handles["booking_reference"],
+            payment_source="stripe_checkout",
+            external_event_id=event_id,
+            external_session_id=handles["external_session_id"],
+            amount_aud=handles["amount_aud"],
+            currency=handles["currency"],
+            raw_provider_payload={"event_type": event_type},
+            actor_type="stripe_webhook",
+            actor_id=event_id,
+            sync_payment_intent=False,
+        )
 
     return {
         "status": "applied",
@@ -788,4 +805,5 @@ async def reconcile_stripe_event(
         "booking_reference": handles["booking_reference"],
         "payment_status": handles["payment_status"],
         "payment_intent_id": payment_intent_id,
+        "booking_lifecycle": lifecycle_result.as_dict() if lifecycle_result else None,
     }

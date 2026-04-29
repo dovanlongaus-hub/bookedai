@@ -246,6 +246,19 @@ async def _load_chess_student_by_id(session, *, student_id: str) -> dict[str, ob
 
 
 async def _list_student_bookings(session, *, email: str) -> list[dict[str, object]]:
+    """List the signed-in student's bookings + the persisted meeting URL.
+
+    We join ``tenant_settings`` so we can fall back to the tenant-configured
+    ``default_meeting_url`` (e.g. a tenant-owned Zoom or Google Meet link)
+    when the booking does not have a Zoho-generated meeting URL. Order of
+    preference for ``meeting_url``:
+
+    1. ``booking_intents.metadata_json -> 'zoho_meeting' ->> 'meeting_url'``
+    2. ``tenant_settings.settings_json ->> 'default_meeting_url'``
+
+    Returns ``null`` when neither source produced a value so the frontend can
+    hide the "join" CTA gracefully.
+    """
     normalized_email = (email or "").strip().lower()
     if not normalized_email:
         return []
@@ -261,9 +274,11 @@ async def _list_student_bookings(session, *, email: str) -> list[dict[str, objec
               bi.timezone,
               bi.status,
               bi.payment_dependency_state,
-              bi.metadata_json
+              bi.metadata_json,
+              ts.settings_json as tenant_settings_json
             from booking_intents bi
             left join contacts c on c.id = bi.contact_id
+            left join tenant_settings ts on ts.tenant_id = bi.tenant_id
             where lower(coalesce(c.email, '')) = :email
             order by bi.created_at desc
             limit 50
@@ -275,11 +290,26 @@ async def _list_student_bookings(session, *, email: str) -> list[dict[str, objec
     for row in result.mappings().all():
         record = dict(row)
         metadata = record.pop("metadata_json", None) or {}
+        tenant_settings = record.pop("tenant_settings_json", None) or {}
         payment_status = (
             metadata.get("payment_status")
             if isinstance(metadata, dict)
             else None
         )
+        zoho_meeting = (
+            metadata.get("zoho_meeting")
+            if isinstance(metadata, dict)
+            else None
+        )
+        meeting_url = ""
+        calendar_event_url: str | None = None
+        if isinstance(zoho_meeting, dict):
+            meeting_url = str(zoho_meeting.get("meeting_url") or "").strip()
+            calendar_event_url = (
+                str(zoho_meeting.get("calendar_event_url") or "").strip() or None
+            )
+        if not meeting_url and isinstance(tenant_settings, dict):
+            meeting_url = str(tenant_settings.get("default_meeting_url") or "").strip()
         bookings.append(
             {
                 "booking_intent_id": record.get("booking_intent_id"),
@@ -295,6 +325,8 @@ async def _list_student_bookings(session, *, email: str) -> list[dict[str, objec
                 "status": record.get("status"),
                 "payment_status": payment_status
                 or record.get("payment_dependency_state"),
+                "meeting_url": meeting_url or None,
+                "calendar_event_url": calendar_event_url,
             }
         )
     return bookings

@@ -1714,6 +1714,7 @@ class MessagingAutomationService:
             f"<b>{MessagingAutomationService._html(heading)}</b>",
             f"<b>Search</b>: {MessagingAutomationService._html(MessagingAutomationService._truncate_text(query, limit=90))}",
             f"<b>Website</b>: <a href=\"{BOOKEDAI_PUBLIC_URL}\">bookedai.au</a>",
+            "<b>Status</b>: compare options first, then book when ready.",
             "",
         ]
         for option in options:
@@ -1729,7 +1730,7 @@ class MessagingAutomationService:
             )
             lines.append(f"<b>Option {MessagingAutomationService._html(option_index)}: {MessagingAutomationService._html(title)}</b>")
             if provider:
-                lines.append(f"Provider: {MessagingAutomationService._html(provider)}")
+                lines.append(f"<b>Provider</b>: {MessagingAutomationService._html(provider)}")
             detail_bits = [bit for bit in (location, price, source_label) if bit]
             if detail_bits:
                 lines.append(MessagingAutomationService._html(" | ".join(detail_bits)))
@@ -1741,7 +1742,7 @@ class MessagingAutomationService:
             lines.append("")
         lines.extend(
             [
-                "<b>Suggested actions</b>: View details, Book an option, or open the full BookedAI form.",
+                "<b>Actions</b>: use the buttons below to view details, book an option, or open the full BookedAI form.",
                 (
                     "For a wider search, tap <b>Find more on Internet near me</b> or send your suburb."
                     if not public_web_requested
@@ -1949,17 +1950,18 @@ class MessagingAutomationService:
             [
                 f"<b>{BOOKEDAI_CUSTOMER_PROJECT_NAME}: current order found</b>",
                 f"<b>Current order</b>: <code>{MessagingAutomationService._html(booking_reference)}</code>",
+                "<b>Status</b>: active booking context is still open.",
                 f"<b>Portal</b>: <a href=\"{MessagingAutomationService._html(portal_url)}\">open order</a>",
                 f"<b>QR</b>: <a href=\"{MessagingAutomationService._html(qr_url)}\">open QR code</a>",
                 "",
                 f"<b>You asked to search</b>: {MessagingAutomationService._html(MessagingAutomationService._truncate_text(query, limit=90))}",
                 "Before I move into new options, please choose what should happen with the current booking.",
                 "",
-                "<b>Suggested actions</b>",
-                "- Keep this booking and search BookedAI.au",
-                "- Find Internet options for another booking service",
-                "- Request a change to the current booking",
-                "- Return to the current order portal anytime",
+                "<b>Actions</b>",
+                "Keep this booking and search BookedAI.au",
+                "Find Internet options for another booking service",
+                "Request a change to the current booking",
+                "Return to the current order portal anytime",
             ]
         )
 
@@ -2257,7 +2259,7 @@ class MessagingAutomationService:
             f"<b>QR</b>: <a href=\"{self._html(qr_code_url)}\">open QR code</a>\n"
             f"<b>Website</b>: <a href=\"{BOOKEDAI_PUBLIC_URL}\">bookedai.au</a>\n\n"
             f"{self._html(payment_line)}\n"
-            "Use the menu below to keep this booking, review it, ask for a change, cancel, or start a new search."
+            "<b>Next</b>: use the buttons below to review, pay when available, ask for a change, cancel for review, or start a new search."
         )
         return MessagingAutomationResult(
             ai_reply=reply,

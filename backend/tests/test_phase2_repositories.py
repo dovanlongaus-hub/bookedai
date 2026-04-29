@@ -48,7 +48,7 @@ class AuditLogRepositoryTestCase(IsolatedAsyncioTestCase):
         self.assertEqual(entry_id, 42)
         statement = execute.await_args.args[0]
         params = execute.await_args.args[1]
-        self.assertIn("slug = :tenant_ref", str(statement))
+        self.assertIn("slug = cast(:tenant_ref as text)", str(statement))
         self.assertEqual(params["tenant_ref"], "default-production-tenant")
         self.assertEqual(params["payload"], json.dumps({"status": "captured"}))
 
@@ -72,7 +72,7 @@ class AuditLogRepositoryTestCase(IsolatedAsyncioTestCase):
         params = execute.await_args.args[1]
         self.assertIn("cast(:tenant_ref as text) is null", str(statement))
         self.assertIn("cast(:event_type as text) is null", str(statement))
-        self.assertIn("slug = :tenant_ref", str(statement))
+        self.assertIn("slug = cast(:tenant_ref as text)", str(statement))
         self.assertEqual(params["tenant_ref"], "default-production-tenant")
         self.assertIsNone(params["event_type"])
 
@@ -165,7 +165,7 @@ class OutboxRepositoryTestCase(IsolatedAsyncioTestCase):
         statement = execute.await_args.args[0]
         params = execute.await_args.args[1]
         self.assertIn("insert into outbox_events", str(statement).lower())
-        self.assertIn("slug = :tenant_ref", str(statement))
+        self.assertIn("slug = cast(:tenant_ref as text)", str(statement))
         self.assertEqual(params["payload"], json.dumps({"lead_id": "lead_123"}))
         self.assertEqual(params["idempotency_key"], "crm-sync-lead-123")
 
@@ -196,7 +196,7 @@ class OutboxRepositoryTestCase(IsolatedAsyncioTestCase):
         params = execute.await_args.args[1]
         self.assertIn("update outbox_events", str(statement).lower())
         self.assertIn("available_at = now()", str(statement).lower())
-        self.assertIn("slug = :tenant_ref", str(statement))
+        self.assertIn("slug = cast(:tenant_ref as text)", str(statement))
         self.assertEqual(params["event_id"], 14)
         self.assertEqual(params["tenant_ref"], "default-production-tenant")
 
@@ -447,7 +447,7 @@ class WebhookEventRepositoryTestCase(IsolatedAsyncioTestCase):
         second_statement = execute.await_args_list[1].args[0]
         second_params = execute.await_args_list[1].args[1]
         self.assertIn("insert into webhook_events", str(first_statement).lower())
-        self.assertIn("slug = :tenant_ref", str(first_statement))
+        self.assertIn("slug = cast(:tenant_ref as text)", str(first_statement))
         self.assertEqual(first_params["external_event_id"], "wamid.123")
         self.assertIn("update webhook_events", str(second_statement).lower())
         self.assertEqual(second_params["event_id"], 17)

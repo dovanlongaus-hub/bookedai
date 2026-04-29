@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import html as _html_escape
 from datetime import UTC, datetime, timedelta
 from urllib.parse import quote, urlencode, urlparse
 
 import httpx
-from fastapi import HTTPException, Request
+from fastapi import Header, HTTPException, Query, Request
 from pydantic import BaseModel, Field
 
 from core.logging import get_logger
@@ -13,6 +14,7 @@ from core.portal_tokens import (
     PortalTokenError,
     generate_portal_access_token,
 )
+from integrations.stripe.constants import STRIPE_API_VERSION
 from repositories.booking_feedback_repository import BookingFeedbackRepository
 
 _logger = get_logger("bookedai.api.v1_booking_handlers")
@@ -31,12 +33,16 @@ from api.v1_routes import (
     ResolveBookingPathRequestPayload,
     ServiceMerchantProfile,
     StartChatSessionRequestPayload,
+    TENANT_BILLING_WRITE_ROLES,
     TenantRepository,
     ValidationAppError,
     _build_capabilities,
     _error_response,
+    _load_tenant_membership,
     _normalize_booking_path,
     _record_phase2_write_activity,
+    _require_tenant_membership_role,
+    _resolve_tenant_session,
     _resolve_tenant_id,
     _success_response,
     build_booking_trust_payload,
@@ -50,6 +56,17 @@ from api.v1_routes import (
     text,
     uuid4,
 )
+from repositories.chess_schedule_slot_repository import (
+    ChessScheduleSlotRepository,
+)
+from service_layer.calls_scheduling import (
+    create_zoho_meeting_for_booking,
+    zoho_calendar_configured,
+)
+from service_layer.payment_lifecycle_service import (
+    get_booking_payment_status,
+    mark_booking_paid,
+)
 
 
 # Tenants opted into automatic monthly customer check-ins on booking creation.
@@ -57,6 +74,19 @@ from api.v1_routes import (
 # subdomain — we wire the cadence in here so we don't need a tenant-settings round-trip.
 MONTHLY_REMINDER_DEFAULT_TENANT_SLUGS = {"ai-mentor-doer"}
 MONTHLY_REMINDER_INTERVAL_DAYS = 30
+
+# Tenants that get the AI Mentor EN/VI welcome email on booking confirmation.
+# Same slug as the monthly cadence — kept as a separate constant so we can
+# fan out to additional partners without coupling the two flows.
+AIMENTOR_WELCOME_EMAIL_TENANT_SLUGS = {"ai-mentor-doer"}
+AIMENTOR_TELEGRAM_URL = (
+    "https://t.me/BookedAI_Manager_Bot?start=svc.ai-mentor"
+)
+AIMENTOR_WHATSAPP_URL = "https://wa.me/61455301335"
+# Tenant CC inbox — every learner-facing booking email is CC'd here so the
+# mentor can follow up + nothing slips through. Kept as a constant so it's
+# trivial to swap when the tenant rotates support email.
+AIMENTOR_TENANT_CC_EMAIL = "aimentor@bookedai.au"
 
 
 PUBLIC_BOOKING_DEFAULT_TENANT_SLUG = "bookedai-au"
@@ -66,6 +96,563 @@ PUBLIC_BOOKING_FALLBACK_CHANNELS = {"public_web", "embedded_widget"}
 def _is_public_booking_actor(actor_context) -> bool:
     channel = str(getattr(actor_context, "channel", "") or "").strip().lower()
     return channel in PUBLIC_BOOKING_FALLBACK_CHANNELS
+
+
+async def _resolve_aimentor_welcome_locale(
+    *,
+    session_factory,
+    customer_email: str,
+) -> str:
+    """Look up the AI Mentor learner's saved locale for the welcome email.
+
+    Falls back to ``"en"`` when the learner has not signed in to the student
+    portal yet — keeps the welcome email behaviour graceful for first-time
+    customers.
+    """
+    normalized = (customer_email or "").strip().lower()
+    if not normalized:
+        return "en"
+    try:
+        async with get_session(session_factory) as session:
+            result = await session.execute(
+                text(
+                    """
+                    select preferred_locale
+                    from ai_mentor_student_users
+                    where lower(email) = :email
+                    limit 1
+                    """
+                ),
+                {"email": normalized},
+            )
+            row = result.scalar_one_or_none()
+            if row == "vi":
+                return "vi"
+    except Exception as exc:  # noqa: BLE001
+        # Best-effort lookup — fall back to EN on any DB issue. Log so that
+        # debuggers don't lose signal when the lookup itself is broken
+        # (vs. legitimate "no row" cases which return None silently).
+        _logger.warning(
+            "aimentor_welcome_locale_lookup_failed",
+            extra={
+                "event_type": "aimentor_welcome_locale_lookup_failed",
+                "tenant_id": "",
+                "status": 0,
+                "route": "/api/v1/booking/intent",
+                "request_id": "",
+                "integration_name": "db",
+                "conversation_id": "",
+                "booking_reference": "",
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+        return "en"
+    return "en"
+
+
+def _render_aimentor_welcome_email(
+    *,
+    locale: str,
+    customer_name: str | None,
+    booking_reference: str,
+    service_name: str | None,
+    portal_url: str,
+    slot_start_at: "datetime | None" = None,
+    slot_end_at: "datetime | None" = None,
+    slot_timezone: str = "Australia/Sydney",
+    zoho_meeting_url: str | None = None,
+) -> tuple[str, str, str]:
+    """Render (subject, text_body, html_body) for the AI Mentor welcome email.
+
+    Strings come from ``service_layer.aimentor_email_strings`` so EN/VI copy
+    stays in a single source of truth. The HTML mirrors the visual reference
+    at ``backend/integrations/email_templates/aimentor_welcome.{en,vi}.html``.
+    """
+    from service_layer.aimentor_email_strings import (
+        normalise_locale,
+        select_strings,
+    )
+
+    locale_norm = normalise_locale(locale)
+    strings = select_strings(locale_norm).welcome
+    name = (customer_name or "there").strip() or "there"
+    service_label = (service_name or "").strip() or "AI Mentor 1-on-1"
+
+    # User-controlled fields are HTML-escaped before formatting into the HTML
+    # template — service_name + customer_name + booking_reference can contain
+    # angle brackets / quotes from CRM imports or tenant ops, which would
+    # otherwise break out of the markup.
+    name_html = _html_escape.escape(name)
+    service_label_html = _html_escape.escape(service_label)
+    booking_reference_html = _html_escape.escape(booking_reference)
+
+    subject = strings.subject_template.format(service_name=service_label)
+    greeting = strings.greeting_template.format(name=name)
+    intro = strings.intro_template.format(
+        service_name=service_label,
+        booking_reference=booking_reference,
+    )
+    greeting_html = strings.greeting_template.format(name=name_html)
+    intro_html = strings.intro_template.format(
+        service_name=service_label_html,
+        booking_reference=booking_reference_html,
+    )
+
+    next_steps_text = "\n".join(
+        f"- {step}" for step in strings.next_steps
+    )
+    next_steps_html = "".join(
+        f"<li>{step}</li>" for step in strings.next_steps
+    )
+
+    # Slot context block — only rendered when the booking is tied to a real
+    # ``service_time_slots`` row (reserve endpoint path). For chat-driven
+    # bookings (legacy create_booking_intent path), slot info is absent and
+    # we fall back to the generic Zoho Meeting + Google Calendar block.
+    slot_text_block = ""
+    slot_html_block = ""
+    if slot_start_at is not None and slot_end_at is not None:
+        # Build a readable Sydney-time line: "Sat, 09 May 2026 · 19:00–20:00 AEST"
+        try:
+            from zoneinfo import ZoneInfo as _ZoneInfo
+
+            tz = _ZoneInfo(slot_timezone)
+            local_start = slot_start_at.astimezone(tz)
+            local_end = slot_end_at.astimezone(tz)
+            duration_minutes = max(
+                1, int((slot_end_at - slot_start_at).total_seconds() // 60)
+            )
+            tz_label = "AEST" if slot_timezone.endswith("Sydney") else slot_timezone
+            slot_line = (
+                f"{local_start.strftime('%a, %d %b %Y')} · "
+                f"{local_start.strftime('%H:%M')}–{local_end.strftime('%H:%M')} "
+                f"{tz_label} ({duration_minutes} min)"
+            )
+        except Exception:  # noqa: BLE001
+            slot_line = (
+                f"{slot_start_at.isoformat()} → {slot_end_at.isoformat()}"
+            )
+
+        meeting_link_text = (
+            zoho_meeting_url
+            if zoho_meeting_url
+            else "Mentor will share the Zoho Meeting link in the next message."
+        )
+        slot_text_block = (
+            f"\nYour confirmed slot:\n  - {slot_line}\n"
+            f"  - Zoho Meeting: {meeting_link_text}\n"
+        )
+        slot_line_html = _html_escape.escape(slot_line)
+        if zoho_meeting_url:
+            meeting_link_html = (
+                f"<a href=\"{_html_escape.escape(zoho_meeting_url)}\" "
+                "style=\"color:#0f5c54;text-decoration:none;font-weight:600;\">"
+                f"{_html_escape.escape(zoho_meeting_url)}</a>"
+            )
+        else:
+            meeting_link_html = (
+                "<em style=\"color:#5b6b66;\">"
+                "Mentor will share the Zoho Meeting link in the next message."
+                "</em>"
+            )
+        slot_html_block = (
+            "<div style=\"margin:18px 0;padding:16px;background:linear-gradient(135deg,"
+            "rgba(20,160,146,0.08) 0%,rgba(255,107,61,0.06) 100%);"
+            "border:1px solid rgba(20,160,146,0.22);border-radius:14px;\">"
+            "<p style=\"margin:0 0 8px 0;font-size:13px;font-weight:600;color:#0f5c54;"
+            "text-transform:uppercase;letter-spacing:0.1em;\">Your confirmed slot</p>"
+            f"<p style=\"margin:0 0 8px 0;font-size:15px;font-weight:600;color:#0a1f1c;\">"
+            f"{slot_line_html}</p>"
+            f"<p style=\"margin:0;font-size:13.5px;color:#1f2a26;\">"
+            f"<strong>Zoho Meeting:</strong> {meeting_link_html}</p>"
+            "</div>"
+        )
+
+    text_body = (
+        f"{greeting}\n\n"
+        f"{intro}\n\n"
+        f"{strings.next_steps_lead}\n"
+        f"{next_steps_text}\n"
+        f"{slot_text_block}"
+        f"\n{strings.meeting_block_lead}:\n"
+        f"  - {strings.meeting_video_label}\n"
+        f"  - {strings.meeting_calendar_label}\n\n"
+        f"{strings.portal_cta}: {portal_url}\n\n"
+        f"{strings.channel_lead}\n"
+        f"  - {strings.telegram_label}: {AIMENTOR_TELEGRAM_URL}\n"
+        f"  - {strings.whatsapp_label}: {AIMENTOR_WHATSAPP_URL}\n\n"
+        f"{strings.signature}"
+    )
+
+    html_body = (
+        "<!doctype html>"
+        f"<html lang=\"{locale_norm}\"><body style=\"margin:0;background:#fdfaf3;"
+        "font-family:-apple-system,Inter,Arial,sans-serif;color:#1f2a26;\">"
+        "<div style=\"max-width:560px;margin:24px auto;padding:28px;background:#ffffff;"
+        "border-radius:18px;border:1px solid rgba(15,92,84,0.12);\">"
+        f"<p style=\"margin:0 0 12px 0;font-size:16px;\">{greeting_html}</p>"
+        f"<p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.65;\">{intro_html}</p>"
+        f"<p style=\"margin:0 0 8px 0;font-size:15px;font-weight:600;\">{strings.next_steps_lead}</p>"
+        "<ol style=\"margin:0 0 18px 18px;padding:0;font-size:14.5px;line-height:1.6;color:#1f2a26;\">"
+        f"{next_steps_html}"
+        "</ol>"
+        f"{slot_html_block}"
+        # Online-delivery info block — every AI Mentor session is 100% online
+        # so we surface the meeting + calendar provider explicitly here.
+        "<div style=\"margin:18px 0;padding:14px 16px;background:#fdfaf3;border:1px solid "
+        "rgba(15,92,84,0.12);border-radius:12px;\">"
+        "<p style=\"margin:0 0 8px 0;font-size:13px;font-weight:600;color:#0f5c54;"
+        "text-transform:uppercase;letter-spacing:0.08em;\">"
+        f"{strings.meeting_block_lead}</p>"
+        "<p style=\"margin:0 0 6px 0;font-size:14px;color:#1f2a26;line-height:1.55;\">"
+        f"\U0001F3A5 {strings.meeting_video_label}</p>"
+        "<p style=\"margin:0;font-size:14px;color:#1f2a26;line-height:1.55;\">"
+        f"\U0001F4C5 {strings.meeting_calendar_label}</p>"
+        "</div>"
+        f"<p style=\"margin:24px 0;\"><a href=\"{portal_url}\" "
+        "style=\"display:inline-block;padding:12px 22px;background:#ff6b3d;color:#fdfaf3;"
+        "text-decoration:none;border-radius:12px;font-weight:600;\">"
+        f"{strings.portal_cta}</a></p>"
+        f"<p style=\"margin:0 0 8px 0;font-size:14px;color:#5b6b66;\">{strings.channel_lead}</p>"
+        "<p style=\"margin:0 0 18px 0;font-size:14px;\">"
+        f"<a href=\"{AIMENTOR_TELEGRAM_URL}\" "
+        "style=\"color:#0f5c54;text-decoration:none;margin-right:12px;\">"
+        f"{strings.telegram_label}</a>"
+        f"<a href=\"{AIMENTOR_WHATSAPP_URL}\" "
+        "style=\"color:#0f5c54;text-decoration:none;\">"
+        f"{strings.whatsapp_label}</a></p>"
+        f"<p style=\"margin:18px 0 0 0;font-size:13px;color:#5b6b66;\">{strings.signature}</p>"
+        "</div></body></html>"
+    )
+    return subject, text_body, html_body
+
+
+def _format_slot_line(
+    slot_start_at: "datetime | None",
+    slot_end_at: "datetime | None",
+    slot_timezone: str,
+) -> str:
+    """Render a Sydney-formatted "Sat, 09 May 2026 · 19:00–20:00 AEST" line."""
+    if slot_start_at is None or slot_end_at is None:
+        return "(time TBD)"
+    try:
+        from zoneinfo import ZoneInfo as _ZoneInfo
+
+        tz = _ZoneInfo(slot_timezone)
+        local_start = slot_start_at.astimezone(tz)
+        local_end = slot_end_at.astimezone(tz)
+        tz_label = "AEST" if slot_timezone.endswith("Sydney") else slot_timezone
+        return (
+            f"{local_start.strftime('%a, %d %b %Y')} · "
+            f"{local_start.strftime('%H:%M')}–{local_end.strftime('%H:%M')} "
+            f"{tz_label}"
+        )
+    except Exception:  # noqa: BLE001
+        return f"{slot_start_at.isoformat()} → {slot_end_at.isoformat()}"
+
+
+async def _send_aimentor_cancellation_email(
+    *,
+    email_service,
+    customer_email: str,
+    customer_name: str | None,
+    booking_reference: str,
+    service_name: str | None,
+    slot_start_at: "datetime | None" = None,
+    slot_end_at: "datetime | None" = None,
+    slot_timezone: str = "Australia/Sydney",
+    locale: str = "en",
+    cc_emails: list[str] | None = None,
+) -> bool:
+    """Best-effort cancellation email when the mentor cancels a reservation."""
+    if email_service is None or not getattr(
+        email_service, "smtp_configured", lambda: False
+    )():
+        return False
+
+    from service_layer.aimentor_email_strings import (
+        normalise_locale,
+        select_strings,
+    )
+
+    locale_norm = normalise_locale(locale)
+    strings = select_strings(locale_norm).cancellation
+    name = (customer_name or "there").strip() or "there"
+    service_label = (service_name or "").strip() or "AI Mentor 1-on-1"
+    slot_line = _format_slot_line(slot_start_at, slot_end_at, slot_timezone)
+
+    subject = strings.subject_template.format(service_name=service_label)
+    greeting = strings.greeting_template.format(name=name)
+    body = strings.body_template.format(
+        service_name=service_label,
+        booking_reference=booking_reference,
+        slot_line=slot_line,
+    )
+    name_html = _html_escape.escape(name)
+    service_label_html = _html_escape.escape(service_label)
+    booking_reference_html = _html_escape.escape(booking_reference)
+    slot_line_html = _html_escape.escape(slot_line)
+    body_html = strings.body_template.format(
+        service_name=service_label_html,
+        booking_reference=booking_reference_html,
+        slot_line=slot_line_html,
+    )
+    greeting_html = strings.greeting_template.format(name=name_html)
+
+    text_body = (
+        f"{greeting}\n\n"
+        f"{body}\n\n"
+        f"{strings.rebook_lead}\n"
+        f"  → {strings.rebook_cta}: {strings.rebook_url}\n\n"
+        f"{strings.refund_note}\n\n"
+        f"{strings.channel_lead}\n"
+        f"  - {strings.telegram_label}: {AIMENTOR_TELEGRAM_URL}\n"
+        f"  - {strings.whatsapp_label}: {AIMENTOR_WHATSAPP_URL}\n\n"
+        f"{strings.signature}"
+    )
+    html_body = (
+        "<!doctype html>"
+        f"<html lang=\"{locale_norm}\"><body style=\"margin:0;background:#fdfaf3;"
+        "font-family:-apple-system,Inter,Arial,sans-serif;color:#1f2a26;\">"
+        "<div style=\"max-width:560px;margin:24px auto;padding:28px;background:#ffffff;"
+        "border-radius:18px;border:1px solid rgba(15,92,84,0.12);\">"
+        f"<p style=\"margin:0 0 12px 0;font-size:16px;\">{greeting_html}</p>"
+        f"<p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.65;\">{body_html}</p>"
+        f"<p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.65;\">{_html_escape.escape(strings.rebook_lead)}</p>"
+        f"<p style=\"margin:24px 0;\"><a href=\"{strings.rebook_url}\" "
+        "style=\"display:inline-block;padding:12px 22px;background:#ff6b3d;color:#fdfaf3;"
+        "text-decoration:none;border-radius:12px;font-weight:600;\">"
+        f"{_html_escape.escape(strings.rebook_cta)}</a></p>"
+        f"<p style=\"margin:0 0 16px 0;font-size:13.5px;line-height:1.6;color:#5b6b66;\">"
+        f"{_html_escape.escape(strings.refund_note)}</p>"
+        f"<p style=\"margin:0 0 8px 0;font-size:14px;color:#5b6b66;\">{_html_escape.escape(strings.channel_lead)}</p>"
+        "<p style=\"margin:0 0 18px 0;font-size:14px;\">"
+        f"<a href=\"{AIMENTOR_TELEGRAM_URL}\" "
+        "style=\"color:#0f5c54;text-decoration:none;margin-right:12px;\">"
+        f"{_html_escape.escape(strings.telegram_label)}</a>"
+        f"<a href=\"{AIMENTOR_WHATSAPP_URL}\" "
+        "style=\"color:#0f5c54;text-decoration:none;\">"
+        f"{_html_escape.escape(strings.whatsapp_label)}</a></p>"
+        f"<p style=\"margin:18px 0 0 0;font-size:13px;color:#5b6b66;\">{_html_escape.escape(strings.signature)}</p>"
+        "</div></body></html>"
+    )
+
+    effective_cc = list(cc_emails or [])
+    if AIMENTOR_TENANT_CC_EMAIL not in effective_cc:
+        effective_cc.append(AIMENTOR_TENANT_CC_EMAIL)
+    try:
+        await email_service.send_email(
+            to=[customer_email],
+            cc=effective_cc,
+            subject=subject,
+            text=text_body,
+            html=html_body,
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning(
+            "aimentor_cancellation_email_send_failed",
+            extra={
+                "event_type": "aimentor_cancellation_email_send_failed",
+                "tenant_id": "",
+                "status": 0,
+                "route": "/api/v1/tenants/me/aimentor-reservations/{slot_id}/action",
+                "request_id": "",
+                "integration_name": "email",
+                "conversation_id": "",
+                "booking_reference": booking_reference,
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+        return False
+
+
+async def _send_aimentor_completion_email(
+    *,
+    email_service,
+    customer_email: str,
+    customer_name: str | None,
+    booking_reference: str,
+    service_name: str | None,
+    locale: str = "en",
+    cc_emails: list[str] | None = None,
+) -> bool:
+    """Best-effort completion email — sent when mentor marks 'Complete'."""
+    if email_service is None or not getattr(
+        email_service, "smtp_configured", lambda: False
+    )():
+        return False
+
+    from service_layer.aimentor_email_strings import (
+        normalise_locale,
+        select_strings,
+    )
+
+    locale_norm = normalise_locale(locale)
+    strings = select_strings(locale_norm).completion
+    name = (customer_name or "there").strip() or "there"
+    service_label = (service_name or "").strip() or "AI Mentor 1-on-1"
+
+    subject = strings.subject_template.format(service_name=service_label)
+    greeting = strings.greeting_template.format(name=name)
+    body = strings.body_template.format(
+        service_name=service_label,
+        booking_reference=booking_reference,
+    )
+    name_html = _html_escape.escape(name)
+    service_label_html = _html_escape.escape(service_label)
+    booking_reference_html = _html_escape.escape(booking_reference)
+    body_html = strings.body_template.format(
+        service_name=service_label_html,
+        booking_reference=booking_reference_html,
+    )
+    greeting_html = strings.greeting_template.format(name=name_html)
+
+    feedback_url = (
+        f"https://aimentor.bookedai.au/aimentor/feedback?"
+        f"booking_reference={quote(booking_reference, safe='')}"
+    )
+
+    text_body = (
+        f"{greeting}\n\n"
+        f"{body}\n\n"
+        f"{strings.feedback_lead}\n"
+        f"  → {strings.feedback_cta}: {feedback_url}\n\n"
+        f"{strings.next_program_lead}\n"
+        f"  → {strings.next_program_cta}: {strings.next_program_url}\n\n"
+        f"{strings.signature}"
+    )
+    html_body = (
+        "<!doctype html>"
+        f"<html lang=\"{locale_norm}\"><body style=\"margin:0;background:#fdfaf3;"
+        "font-family:-apple-system,Inter,Arial,sans-serif;color:#1f2a26;\">"
+        "<div style=\"max-width:560px;margin:24px auto;padding:28px;background:#ffffff;"
+        "border-radius:18px;border:1px solid rgba(15,92,84,0.12);\">"
+        f"<p style=\"margin:0 0 12px 0;font-size:16px;\">{greeting_html}</p>"
+        f"<p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.65;\">{body_html}</p>"
+        f"<p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.65;\">{_html_escape.escape(strings.feedback_lead)}</p>"
+        f"<p style=\"margin:18px 0;\"><a href=\"{feedback_url}\" "
+        "style=\"display:inline-block;padding:12px 22px;background:#ff6b3d;color:#fdfaf3;"
+        "text-decoration:none;border-radius:12px;font-weight:600;\">"
+        f"{_html_escape.escape(strings.feedback_cta)}</a></p>"
+        f"<p style=\"margin:18px 0 8px 0;font-size:14px;line-height:1.6;color:#5b6b66;\">"
+        f"{_html_escape.escape(strings.next_program_lead)}</p>"
+        f"<p style=\"margin:0 0 18px 0;font-size:14px;\">"
+        f"<a href=\"{strings.next_program_url}\" "
+        "style=\"color:#0f5c54;text-decoration:none;font-weight:600;\">"
+        f"{_html_escape.escape(strings.next_program_cta)} →</a></p>"
+        f"<p style=\"margin:18px 0 0 0;font-size:13px;color:#5b6b66;\">{_html_escape.escape(strings.signature)}</p>"
+        "</div></body></html>"
+    )
+
+    effective_cc = list(cc_emails or [])
+    if AIMENTOR_TENANT_CC_EMAIL not in effective_cc:
+        effective_cc.append(AIMENTOR_TENANT_CC_EMAIL)
+    try:
+        await email_service.send_email(
+            to=[customer_email],
+            cc=effective_cc,
+            subject=subject,
+            text=text_body,
+            html=html_body,
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning(
+            "aimentor_completion_email_send_failed",
+            extra={
+                "event_type": "aimentor_completion_email_send_failed",
+                "tenant_id": "",
+                "status": 0,
+                "route": "/api/v1/tenants/me/aimentor-reservations/{slot_id}/action",
+                "request_id": "",
+                "integration_name": "email",
+                "conversation_id": "",
+                "booking_reference": booking_reference,
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+        return False
+
+
+async def _send_aimentor_welcome_email(
+    *,
+    email_service,
+    session_factory,
+    customer_email: str,
+    customer_name: str | None,
+    booking_reference: str,
+    service_name: str | None,
+    portal_url: str,
+    slot_start_at: "datetime | None" = None,
+    slot_end_at: "datetime | None" = None,
+    slot_timezone: str = "Australia/Sydney",
+    zoho_meeting_url: str | None = None,
+    cc_emails: list[str] | None = None,
+) -> bool:
+    """Best-effort welcome email for AI Mentor learners post-confirmation.
+
+    Returns ``True`` when the email was dispatched. Logs and swallows
+    exceptions so a welcome-email failure never breaks the booking response.
+    """
+    if email_service is None:
+        return False
+    if not getattr(email_service, "smtp_configured", lambda: False)():
+        return False
+    locale = await _resolve_aimentor_welcome_locale(
+        session_factory=session_factory,
+        customer_email=customer_email,
+    )
+    subject, text_body, html_body = _render_aimentor_welcome_email(
+        locale=locale,
+        customer_name=customer_name,
+        booking_reference=booking_reference,
+        service_name=service_name,
+        portal_url=portal_url,
+        slot_start_at=slot_start_at,
+        slot_end_at=slot_end_at,
+        slot_timezone=slot_timezone,
+        zoho_meeting_url=zoho_meeting_url,
+    )
+    # Always CC the AI Mentor tenant inbox so the mentor sees the same
+    # email as the learner — used for follow-up + ops handoff. Caller can
+    # supplement with extra CCs (e.g. mentor's personal address).
+    effective_cc = list(cc_emails or [])
+    if AIMENTOR_TENANT_CC_EMAIL not in effective_cc:
+        effective_cc.append(AIMENTOR_TENANT_CC_EMAIL)
+    try:
+        await email_service.send_email(
+            to=[customer_email],
+            cc=effective_cc,
+            subject=subject,
+            text=text_body,
+            html=html_body,
+        )
+        return True
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning(
+            "aimentor_welcome_email_send_failed",
+            extra={
+                "event_type": "aimentor_welcome_email_send_failed",
+                "tenant_id": "",
+                "status": 0,
+                "route": "/api/v1/booking/intent",
+                "request_id": "",
+                "integration_name": "email",
+                "conversation_id": "",
+                "booking_reference": booking_reference,
+                "job_name": "",
+                "job_id": "",
+            },
+            exc_info=exc,
+        )
+        return False
 
 
 async def _resolve_public_booking_fallback_tenant_id(request: Request) -> str | None:
@@ -109,22 +696,27 @@ def _build_booking_confirmation_whatsapp_text(
     portal_url: str | None = None,
 ) -> str:
     name_line = f"Hi {customer_name}," if customer_name else "Hi,"
+    slot = " ".join(p for p in [requested_date or "", requested_time or ""] if p)
     parts = [
-        f"✅ Booking confirmed!\n",
-        f"{name_line} your booking request has been received.",
-        f"\n\U0001f4cb Reference: {booking_reference}",
+        "*BookedAI.au booking confirmed*",
+        f"{name_line} your booking request has been received and saved.",
+        "",
+        f"*Reference:* {booking_reference}",
     ]
     if service_name:
-        parts.append(f"\U0001f3f7️ Service: {service_name}")
-    slot = " ".join(p for p in [requested_date or "", requested_time or ""] if p)
+        parts.append(f"*Service:* {service_name}")
     if slot:
-        parts.append(f"\U0001f4c5 Date: {slot}")
+        parts.append(f"*Requested time:* {slot}")
     if timezone:
-        parts.append(f"\U0001f30f Timezone: {timezone}")
+        parts.append(f"*Timezone:* {timezone}")
     if portal_url:
-        parts.append(f"\U0001f517 Manage booking: {portal_url}")
-    parts.append(
-        "\n\nReply here anytime for help with your booking — status, changes, payment, or anything else. We're here!"
+        parts.extend(["", f"Manage booking: {portal_url}"])
+    parts.extend(
+        [
+            "",
+            "*Next:* reply here for booking status, payment help, reschedule, or cancellation review.",
+            "BookedAI Manager Bot keeps the same order context across WhatsApp, Telegram, email, and portal.",
+        ]
     )
     return "\n".join(parts)
 
@@ -200,7 +792,6 @@ async def _create_public_stripe_checkout_session(
         ("mode", "payment"),
         ("success_url", success_url),
         ("cancel_url", cancel_url),
-        ("payment_method_types[]", "card"),
         ("line_items[0][quantity]", "1"),
         ("line_items[0][price_data][currency]", stripe_currency.lower()),
         ("line_items[0][price_data][unit_amount]", str(amount_cents)),
@@ -219,6 +810,7 @@ async def _create_public_stripe_checkout_session(
             headers={
                 "Authorization": f"Bearer {stripe_secret_key}",
                 "Content-Type": "application/x-www-form-urlencoded",
+                "Stripe-Version": STRIPE_API_VERSION,
             },
             content=urlencode(form_data).encode(),
         )
@@ -399,6 +991,83 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                     statement = statement.where(ServiceMerchantProfile.tenant_id == effective_tenant_id)
                 service = (await session.execute(statement)).scalar_one_or_none()
 
+            # Optional: when the booking carries a chess schedule_slot_id, look
+            # the slot up + reserve a seat. Slot selection drives the
+            # requested_date / requested_time / timezone so the Zoho event lands
+            # on the chosen cohort instance. Group cohorts (capacity > 1) reuse
+            # the slot's existing zoho_meeting_url so every enrolled student
+            # joins the same meeting room.
+            normalized_slot_id = (payload.schedule_slot_id or "").strip()
+            slot_row: dict | None = None
+            slot_repo: ChessScheduleSlotRepository | None = None
+            if normalized_slot_id and effective_tenant_id:
+                slot_repo = ChessScheduleSlotRepository(
+                    RepositoryContext(session=session, tenant_id=effective_tenant_id)
+                )
+                slot_lookup = await slot_repo.get_slot_for_booking(
+                    tenant_id=effective_tenant_id,
+                    slot_id=normalized_slot_id,
+                )
+                if not slot_lookup:
+                    raise ValidationAppError(
+                        "Selected schedule slot was not found for this tenant.",
+                        details={"schedule_slot_id": normalized_slot_id},
+                    )
+                if str(slot_lookup.get("status") or "").lower() != "open":
+                    raise ValidationAppError(
+                        "Selected schedule slot is no longer open for booking.",
+                        details={
+                            "schedule_slot_id": normalized_slot_id,
+                            "status": slot_lookup.get("status"),
+                        },
+                    )
+                if int(slot_lookup.get("enrolled_count") or 0) >= int(
+                    slot_lookup.get("capacity") or 0
+                ):
+                    raise ValidationAppError(
+                        "Selected schedule slot has no remaining capacity.",
+                        details={"schedule_slot_id": normalized_slot_id},
+                    )
+                if service_id and slot_lookup.get("service_id") and str(
+                    slot_lookup.get("service_id")
+                ) != str(service_id):
+                    raise ValidationAppError(
+                        "Selected schedule slot does not belong to the chosen service.",
+                        details={
+                            "schedule_slot_id": normalized_slot_id,
+                            "service_id": service_id,
+                        },
+                    )
+                reserved = await slot_repo.reserve_capacity(
+                    tenant_id=effective_tenant_id,
+                    slot_id=normalized_slot_id,
+                )
+                if not reserved:
+                    raise ValidationAppError(
+                        "Selected schedule slot was just filled. Pick another time.",
+                        details={"schedule_slot_id": normalized_slot_id},
+                    )
+                slot_row = reserved
+                # Override desired_slot date/time/timezone with the canonical
+                # slot timestamp so downstream surfaces (CRM, calendar, email)
+                # all share the same anchor.
+                from api.v1_routes import DesiredSlotPayload as _DesiredSlotPayload
+
+                starts_at = slot_row.get("starts_at")
+                slot_tz = str(slot_row.get("timezone") or "Asia/Ho_Chi_Minh")
+                if hasattr(starts_at, "astimezone"):
+                    try:
+                        from zoneinfo import ZoneInfo as _ZoneInfo
+
+                        local_dt = starts_at.astimezone(_ZoneInfo(slot_tz))
+                    except Exception:  # noqa: BLE001
+                        local_dt = starts_at
+                    payload.desired_slot = _DesiredSlotPayload(
+                        date=local_dt.strftime("%Y-%m-%d"),
+                        time=local_dt.strftime("%H:%M"),
+                        timezone=slot_tz,
+                    )
+
             contact_repository = ContactRepository(RepositoryContext(session=session, tenant_id=effective_tenant_id))
             lead_repository = LeadRepository(RepositoryContext(session=session, tenant_id=effective_tenant_id))
             booking_repository = BookingIntentRepository(RepositoryContext(session=session, tenant_id=effective_tenant_id))
@@ -466,6 +1135,26 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                         "notes": payload.notes,
                         "channel": payload.channel,
                         "attribution": payload.attribution.model_dump() if payload.attribution else None,
+                        "schedule_slot_id": (
+                            str(slot_row.get("id")) if slot_row else None
+                        ),
+                        "schedule_slot": (
+                            {
+                                "id": str(slot_row.get("id")),
+                                "service_id": slot_row.get("service_id"),
+                                "starts_at": (
+                                    slot_row["starts_at"].isoformat()
+                                    if hasattr(slot_row.get("starts_at"), "isoformat")
+                                    else slot_row.get("starts_at")
+                                ),
+                                "duration_minutes": slot_row.get("duration_minutes"),
+                                "timezone": slot_row.get("timezone"),
+                                "cohort_label": slot_row.get("cohort_label"),
+                                "capacity": slot_row.get("capacity"),
+                            }
+                            if slot_row
+                            else None
+                        ),
                     }
                 ),
             )
@@ -498,6 +1187,7 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
             # AI Mentor partner-style flow: auto-enable monthly check-in reminders
             # so the customer always gets a touchpoint 30 days after their session,
             # without the booking surface having to opt in on every request.
+            tenant_slug: str | None = None
             try:
                 tenant_profile = await TenantRepository(
                     RepositoryContext(session=session)
@@ -532,6 +1222,117 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                     },
                     exc_info=exc,
                 )
+
+            # Zoho Meeting / Calendar provisioning. We try to attach a Zoho
+            # Meeting to the booking_intent so the confirmation email + portal
+            # surfaces have a join URL ready. This is opt-in via Zoho config —
+            # when credentials are missing, we skip silently. Failures inside
+            # the Zoho API call must NOT break the booking flow, so the whole
+            # block is wrapped in a broad try/except that logs a warning.
+            zoho_meeting_url: str | None = None
+            zoho_calendar_event_url: str | None = None
+
+            # Group cohorts: reuse the slot's existing meeting URL so every
+            # enrolled student joins the same Zoho Meeting. We still persist
+            # the URLs onto the booking_intent metadata for parity with the
+            # per-booking flow.
+            if slot_row and (slot_row.get("zoho_meeting_url") or slot_row.get("zoho_calendar_event_url")):
+                zoho_meeting_url = slot_row.get("zoho_meeting_url") or None
+                zoho_calendar_event_url = slot_row.get("zoho_calendar_event_url") or None
+                if zoho_meeting_url or zoho_calendar_event_url:
+                    await booking_repository.update_zoho_meeting_metadata(
+                        booking_reference=booking_reference,
+                        meeting_url=zoho_meeting_url,
+                        calendar_event_url=zoho_calendar_event_url,
+                        scheduled_at=datetime.now(tz=UTC),
+                        extra={"reused_from_schedule_slot": True},
+                    )
+
+            if (
+                zoho_meeting_url is None
+                and normalized_email
+                and zoho_calendar_configured(getattr(request.app.state, "settings", None))
+                and payload.desired_slot
+                and payload.desired_slot.date
+                and payload.desired_slot.time
+                and payload.desired_slot.timezone
+            ):
+                try:
+                    parsed_date = datetime.strptime(
+                        str(payload.desired_slot.date)[:10], "%Y-%m-%d"
+                    ).date()
+                    parsed_time = datetime.strptime(
+                        str(payload.desired_slot.time)[:5], "%H:%M"
+                    ).time()
+                    duration_minutes = int(
+                        (slot_row.get("duration_minutes") if slot_row else None)
+                        or getattr(service, "duration_minutes", None)
+                        or 45
+                    )
+                    zoho_meeting_url, zoho_calendar_event_url = await create_zoho_meeting_for_booking(
+                        settings=request.app.state.settings,
+                        booking_reference=booking_reference,
+                        service_name=(service.name if service else None) or "BookedAI session",
+                        customer_name=payload.contact.full_name,
+                        customer_email=normalized_email,
+                        requested_date=parsed_date,
+                        requested_time=parsed_time,
+                        timezone_name=payload.desired_slot.timezone,
+                        duration_minutes=duration_minutes,
+                        notes=payload.notes,
+                    )
+                    if zoho_meeting_url or zoho_calendar_event_url:
+                        await booking_repository.update_zoho_meeting_metadata(
+                            booking_reference=booking_reference,
+                            meeting_url=zoho_meeting_url,
+                            calendar_event_url=zoho_calendar_event_url,
+                            scheduled_at=datetime.now(tz=UTC),
+                        )
+                        # When the booking is anchored to a chess slot, persist
+                        # the new meeting URL onto the slot row so subsequent
+                        # students booking the same group cohort inherit it.
+                        if slot_row and slot_repo is not None:
+                            try:
+                                await slot_repo.attach_meeting_metadata(
+                                    tenant_id=effective_tenant_id,
+                                    slot_id=str(slot_row.get("id")),
+                                    meeting_url=zoho_meeting_url,
+                                    calendar_event_url=zoho_calendar_event_url,
+                                )
+                            except Exception as exc:  # noqa: BLE001
+                                _logger.warning(
+                                    "chess_slot_meeting_attach_failed",
+                                    extra={
+                                        "event_type": "chess_slot_meeting_attach_failed",
+                                        "tenant_id": str(effective_tenant_id or ""),
+                                        "status": 0,
+                                        "route": "/api/v1/booking/intent",
+                                        "request_id": "",
+                                        "integration_name": "chess_schedule_slots",
+                                        "conversation_id": "",
+                                        "booking_reference": booking_reference,
+                                        "job_name": "",
+                                        "job_id": "",
+                                    },
+                                    exc_info=exc,
+                                )
+                except Exception as exc:  # noqa: BLE001
+                    _logger.warning(
+                        "zoho_meeting_provision_failed",
+                        extra={
+                            "event_type": "zoho_meeting_provision_failed",
+                            "tenant_id": str(effective_tenant_id or ""),
+                            "status": 0,
+                            "route": "/api/v1/booking/intent",
+                            "request_id": "",
+                            "integration_name": "zoho_calendar",
+                            "conversation_id": "",
+                            "booking_reference": booking_reference,
+                            "job_name": "",
+                            "job_id": "",
+                        },
+                        exc_info=exc,
+                    )
 
             lead_sync_result = await orchestrate_lead_capture(
                 session,
@@ -673,6 +1474,29 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                     exc_info=exc,
                 )
 
+        # AI Mentor: send EN/VI welcome email post-confirmation. Best-effort —
+        # failures are logged inside the helper and never break the booking
+        # response. Locale is read from ai_mentor_student_users when the
+        # learner has signed in to the student portal at least once.
+        if (
+            normalized_email
+            and tenant_slug in AIMENTOR_WELCOME_EMAIL_TENANT_SLUGS
+            and hasattr(request.app.state, "email_service")
+        ):
+            welcome_portal_url = _build_portal_link(
+                booking_reference,
+                portal_access_token.plaintext if portal_access_token else None,
+            )
+            await _send_aimentor_welcome_email(
+                email_service=request.app.state.email_service,
+                session_factory=request.app.state.session_factory,
+                customer_email=normalized_email,
+                customer_name=payload.contact.full_name,
+                booking_reference=booking_reference,
+                service_name=service.name if service else None,
+                portal_url=welcome_portal_url,
+            )
+
         availability_state, verified, recommended_path, warnings, payment_allowed_now, booking_confidence = (
             build_booking_trust_payload(
                 service,
@@ -701,6 +1525,10 @@ async def create_booking_intent(request: Request, payload: CreateBookingIntentRe
                         if portal_access_token
                         else None
                     ),
+                },
+                "meeting": {
+                    "meeting_url": zoho_meeting_url,
+                    "calendar_event_url": zoho_calendar_event_url,
                 },
                 "trust": {
                     "availability_state": availability_state,
@@ -920,6 +1748,134 @@ async def create_payment_intent(request: Request, payload: CreatePaymentIntentRe
         return _error_response(error, tenant_id=tenant_id, actor_context=payload.actor_context)
 
 
+async def confirm_manual_payment(
+    request: Request,
+    payload: ManualPaymentConfirmPayload,
+    authorization: str | None = Header(default=None, alias="Authorization"),
+):
+    tenant_session = await _resolve_tenant_session(request, authorization=authorization)
+    if not tenant_session:
+        return _error_response(
+            AppError(
+                code="tenant_auth_required",
+                message="Sign in with a tenant admin or finance account before confirming a payment.",
+                status_code=401,
+            ),
+            tenant_id=None,
+            actor_context=None,
+        )
+
+    async with get_session(request.app.state.session_factory) as session:
+        tenant_repository = TenantRepository(RepositoryContext(session=session))
+        tenant_id = await tenant_repository.resolve_tenant_id(
+            str(tenant_session.get("tenant_ref") or "")
+        )
+        if not tenant_id:
+            return _error_response(
+                AppError(
+                    code="tenant_context_not_found",
+                    message="The authenticated tenant session could not be resolved.",
+                    status_code=401,
+                ),
+                tenant_id=None,
+                actor_context=None,
+            )
+
+        membership = await _load_tenant_membership(
+            session,
+            tenant_id=tenant_id,
+            email=str(tenant_session.get("email") or ""),
+        )
+        if not membership:
+            return _error_response(
+                AppError(
+                    code="tenant_auth_required",
+                    message="The authenticated user is not an active member of this tenant.",
+                    status_code=403,
+                ),
+                tenant_id=tenant_id,
+                actor_context=None,
+            )
+        role_error = _require_tenant_membership_role(
+            membership,
+            allowed_roles=TENANT_BILLING_WRITE_ROLES,
+            message="Only tenant admins and finance managers can confirm received payments.",
+        )
+        if role_error:
+            return _error_response(role_error, tenant_id=tenant_id, actor_context=None)
+
+        result = await mark_booking_paid(
+            session,
+            tenant_id=tenant_id,
+            booking_reference=payload.booking_reference,
+            payment_source=payload.payment_source,
+            external_event_id=payload.external_event_id,
+            external_session_id=payload.external_session_id,
+            transfer_reference=payload.transfer_reference,
+            amount_aud=payload.amount_aud,
+            currency=payload.currency,
+            paid_at=payload.paid_at,
+            raw_provider_payload={"notes": payload.notes} if payload.notes else None,
+            actor_type="tenant_payment_operator",
+            actor_id=str(tenant_session.get("email") or ""),
+        )
+        await session.commit()
+
+    if result.status == "ignored":
+        return _error_response(
+            AppError(
+                code="payment_confirmation_target_not_found",
+                message="The booking reference could not be found for this tenant.",
+                status_code=404,
+                details={"booking_reference": payload.booking_reference, "reason": result.reason},
+            ),
+            tenant_id=result.tenant_id or tenant_id,
+            actor_context=None,
+        )
+
+    return _success_response(
+        result.as_dict(),
+        tenant_id=result.tenant_id or tenant_id,
+        actor_context=None,
+        message="Payment confirmation recorded.",
+    )
+
+
+async def payment_status(
+    request: Request,
+    booking_reference: str = Query(...),
+    session_id: str | None = Query(default=None),
+    authorization: str | None = Header(default=None, alias="Authorization"),
+):
+    tenant_id: str | None = None
+    tenant_session = await _resolve_tenant_session(request, authorization=authorization)
+    async with get_session(request.app.state.session_factory) as session:
+        if tenant_session:
+            tenant_id = await TenantRepository(RepositoryContext(session=session)).resolve_tenant_id(
+                str(tenant_session.get("tenant_ref") or "")
+            )
+        status_payload = await get_booking_payment_status(
+            session,
+            tenant_id=tenant_id,
+            booking_reference=booking_reference,
+            session_id=session_id,
+        )
+
+    if status_payload.get("status") == "not_found":
+        return _error_response(
+            AppError(
+                code="payment_status_not_found",
+                message="The requested booking payment status could not be found.",
+                status_code=404,
+                details={"booking_reference": booking_reference},
+            ),
+            tenant_id=tenant_id,
+            actor_context=None,
+        )
+
+    return _success_response(status_payload, tenant_id=tenant_id, actor_context=None)
+
+
 # ----- Reminder + feedback (AI Mentor partner-style flow) ----------------------
 #
 # These endpoints sit on the booking router (alongside intent + payment) because
@@ -930,6 +1886,18 @@ async def create_payment_intent(request: Request, payload: CreatePaymentIntentRe
 class ConfigureBookingReminderPayload(BaseModel):
     cadence: str = Field("monthly")
     enabled: bool = True
+
+
+class ManualPaymentConfirmPayload(BaseModel):
+    booking_reference: str
+    payment_source: str = Field("bank_transfer")
+    transfer_reference: str | None = None
+    external_event_id: str | None = None
+    external_session_id: str | None = None
+    amount_aud: float | None = None
+    currency: str = Field("AUD")
+    paid_at: datetime | None = None
+    notes: str | None = None
 
 
 class SubmitBookingFeedbackPayload(BaseModel):

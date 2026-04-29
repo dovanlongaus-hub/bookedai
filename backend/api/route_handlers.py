@@ -46,6 +46,7 @@ from db import (
     init_database,
 )
 from integrations.ai_models import SemanticSearchAdapter
+from integrations.stripe.constants import STRIPE_API_VERSION
 from rate_limit import InMemoryRateLimiter, TooManyRequestsError
 from repositories.base import RepositoryContext
 from repositories.idempotency_repository import IdempotencyRepository
@@ -2037,7 +2038,6 @@ async def _create_chat_stripe_checkout_session(
         ("mode", "payment"),
         ("success_url", success_url),
         ("cancel_url", cancel_url),
-        ("payment_method_types[]", "card"),
         ("line_items[0][quantity]", "1"),
         ("line_items[0][price_data][currency]", currency.lower()),
         ("line_items[0][price_data][unit_amount]", str(amount_cents)),
@@ -2057,6 +2057,7 @@ async def _create_chat_stripe_checkout_session(
                 headers={
                     "Authorization": f"Bearer {secret_key}",
                     "Content-Type": "application/x-www-form-urlencoded",
+                    "Stripe-Version": STRIPE_API_VERSION,
                 },
                 content=urlencode(form_data).encode(),
             )

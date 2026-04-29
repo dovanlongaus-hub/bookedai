@@ -1,7 +1,7 @@
 /**
  * Investor-grade slide data for pitch.bookedai.au
  *
- * Source: docs/development/review-2026-04-28/lane-5-investor-hackathon-narrative.md §A4
+ * Investor narrative slide data used by the public pitch surface.
  * Audience: WSTI judges + VC unicorn-thesis investors.
  * Order in deck: inserted AFTER architecture slide and BEFORE the team / final-CTA slides.
  */
@@ -90,8 +90,8 @@ export const competitorPlots: CompetitorPlot[] = [
 export const defensibilityCards: Array<{ kicker: string; title: string; body: string }> = [
   {
     kicker: 'Moat 1',
-    title: 'Data moat — the booking ledger',
-    body: 'Every customer turn becomes a structured event in tenant-scoped conversation_events, action_runs, and job_runs tables. Across 1,000 tenants, this is the only AU dataset that links acquisition channel to qualified intent to booking reference to payment posture to retention action with provider-grade audit trail. No general-purpose LLM has access to this.',
+    title: 'Data moat — booking follow-up history',
+    body: 'Every customer turn becomes structured booking evidence: channel, intent, booking reference, payment posture, and retention next step. Across 1,000 businesses, this creates an AU dataset that links acquisition channel to qualified intent to revenue outcome. No general-purpose LLM has access to this.',
   },
   {
     kicker: 'Moat 2',
@@ -166,9 +166,9 @@ export const liveEvidenceFrames: Array<{
   },
   {
     step: '03',
-    surface: 'Tenant Ops · action_runs ledger',
-    title: 'Auditable evidence row inside the tenant Ops surface',
-    caption: 'Every step (search, shortlist, book, confirm) lands in the tenant-scoped action_runs ledger — provider-grade audit trail.',
+    surface: 'Business workspace · follow-up history',
+    title: 'Booking evidence row inside the business workspace',
+    caption: 'Every step (search, shortlist, book, confirm) lands in the business follow-up history for review and reporting.',
     conversation: [
       { from: 'system', text: 'run_id 8431 · search_intent · status=ok · 220ms · channel=telegram' },
       { from: 'system', text: 'run_id 8432 · shortlist_match · status=ok · matched=co-mai-hung-chess' },

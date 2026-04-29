@@ -138,8 +138,8 @@ const pricingPlans = [
     features: [
       'All 3 channels (Telegram + WhatsApp + widget)',
       'Revenue-ops + customer-care agent queue',
-      'Audit ledger + Stripe billing + CRM sync',
-      'Monthly tenant revenue summary email',
+      'Dedicated CRM follow-up workspace',
+      'Dedicated booking email + monthly revenue summary',
       '3% commission on net booked revenue',
     ],
     highlight: true,
@@ -152,10 +152,10 @@ const pricingPlans = [
     commission: '5% on attributable revenue',
     caption: 'Multi-location / franchise / academy (25+ staff or 3+ locations)',
     features: [
-      'Multi-tenant template + dedicated onboarding',
+      'Custom landing pages for every location or offer',
       'White-label widget + webhook + API access',
       'Retention / churn-rescue automation',
-      'Admin reliability lane + SLA + named CSM',
+      'Dedicated CRM, email identity, SLA + named CSM',
       '5% commission with floor + cap negotiated',
     ],
     highlight: false,
@@ -166,22 +166,54 @@ const pricingPlans = [
 const architectureCapabilityCards = [
   ['Designed surface', 'A visual system buyers can inspect, not a hidden backend diagram.'],
   ['Connected workflow', 'Every customer turn can become booking state, care state, and clear business evidence.'],
-  ['Enterprise posture', 'Tenant boundaries, policy gates, audit trails, and fallback rails are visible by design.'],
+  ['Enterprise posture', 'Customer data, staff handoff, payment follow-up, and manual review are visible by design.'],
 ];
 
 const architectureImageNodes = [
   ['Capture', 'Web, product, widget, WhatsApp'],
   ['Orchestrate', 'Customer AI + matching policy'],
   ['Convert', 'Lead, booking, payment posture'],
-  ['Operate', 'Tenant Ops + admin action ledger'],
+  ['Operate', 'Team workspace + follow-up history'],
 ];
 
 const architectureSupportRails = [
   ['Customer surfaces', 'bookedai.au, product, demo, portal, widget'],
-  ['Agent layer', 'customer turn, revenue ops, care/status'],
+  ['Agent layer', 'customer enquiry, booking help, care/status'],
   ['Revenue core', 'lead, booking intent, payment, email/calendar'],
-  ['Operations layer', 'tenant ops, admin reliability, audit ledger'],
+  ['Operations layer', 'team inbox, CRM follow-up, review history'],
 ];
+
+const launchOfferCards = [
+  {
+    title: 'New landing page',
+    body: 'BookedAI refreshes a dedicated landing page for the SME offer, service, or location so customers can understand and book faster.',
+  },
+  {
+    title: 'Dedicated email',
+    body: 'Each onboarded business can use a clear booking identity such as hello@yourbrand or a BookedAI-managed mailbox for confirmations and follow-up.',
+  },
+  {
+    title: 'Dedicated CRM',
+    body: 'Leads, bookings, payment posture, and customer-care notes are organized in a CRM workspace configured around the business.',
+  },
+  {
+    title: 'Booking + meeting setup',
+    body: 'Calendar, booking slots, meeting links, payment next steps, and customer reminders are preconfigured before launch.',
+  },
+] as const;
+
+const liveCaseCards = [
+  {
+    title: 'chess.bookedai.au',
+    body: 'Grandmaster Chess shows a vertical landing page, bilingual booking flow, dedicated chess@bookedai.au email, class selection, payment options, and meeting follow-up.',
+    href: 'https://chess.bookedai.au/',
+  },
+  {
+    title: 'aimentor.bookedai.au',
+    body: 'AI Mentor 1-1 Pro shows a service-specific page, dedicated aimentor@bookedai.au email, CRM-style enrolment capture, Stripe checkout, and Zoho Meeting scheduling.',
+    href: 'https://aimentor.bookedai.au/',
+  },
+] as const;
 
 function VisualChip({
   children,
@@ -352,8 +384,8 @@ function PitchArchitectureFlowVisual() {
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
               BookedAI is not a single chatbot screen. It is a connected system of acquisition
-              surfaces, AI orchestration, booking contracts, integrations, tenant operations, and
-              infrastructure controls built to turn service demand into visible revenue workflow.
+              surfaces, AI orchestration, booking records, integrations, team handoff, and follow-up
+              controls built to turn service demand into visible revenue workflow.
             </p>
 
             <div className="mt-6 grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
@@ -422,9 +454,9 @@ function MasterRoadmapPitchSection() {
               Master Roadmap — 8 Weeks to Production Scale
             </h2>
             <p className="mt-4 max-w-xl text-sm leading-7 text-slate-600 sm:text-base">
-              Phase 0 launched 2026-04-11 · Go-live 2026-04-30 · Total project completion 2026-06-07.
-              The plan synced from <code className="rounded bg-slate-100 px-1 py-0.5 text-[12px] text-slate-700">01-MASTER-ROADMAP-SYNCED.md</code> shows
-              every phase, milestone, and tenant runtime against the same calendar.
+              The commercial rollout is organized around a simple promise: launch real SME booking
+              verticals, prove the journey, then repeat the same configured revenue engine for the
+              next business.
             </p>
 
             <div className="mt-5 flex flex-wrap gap-3">
@@ -457,10 +489,10 @@ function MasterRoadmapPitchSection() {
             <figcaption className="mt-4 grid gap-3 md:grid-cols-3">
               <div className="min-w-0 rounded-[1.1rem] border border-rose-200 bg-rose-50/60 px-4 py-3">
                 <div className="text-xs font-semibold uppercase tracking-[0.14em] text-rose-700">
-                  Pre go-live · D-3 → D-0
+                  Launch proof
                 </div>
                 <div className="mt-1 text-sm leading-6 text-slate-700">
-                  Telegram-primary; 3 tenants verified — Co Mai Hung Chess, Future Swim, AI Mentor 1-1.
+                  Three live customer paths show BookedAI across classes, coaching, and service discovery.
                 </div>
               </div>
               <div className="min-w-0 rounded-[1.1rem] border border-blue-200 bg-blue-50/60 px-4 py-3">
@@ -468,7 +500,7 @@ function MasterRoadmapPitchSection() {
                   Post go-live · weekly cadence
                 </div>
                 <div className="mt-1 text-sm leading-6 text-slate-700">
-                  Widget runtime → Wallet/Stripe → Billing truth → Multi-tenant template → Release
+                  Widget, wallet/Stripe, billing follow-up, business templates, and release checks.
                   governance.
                 </div>
               </div>
@@ -602,6 +634,70 @@ function PricingPitchSection({ openRegisterInterest }: PricingPitchSectionProps)
   );
 }
 
+function LaunchOfferSection({ openRegisterInterest }: PricingPitchSectionProps) {
+  return (
+    <section id="launch-offer" className="mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
+      <SectionCard className="overflow-hidden border border-black/6 bg-[linear-gradient(135deg,#102033_0%,#153b3b_56%,#f6fbff_180%)] px-6 py-7 text-white shadow-[0_28px_80px_rgba(15,23,42,0.14)] sm:px-7 lg:px-8">
+        <div className="grid gap-8 xl:grid-cols-[0.75fr_1.25fr] xl:items-start">
+          <div>
+            <SignalPill className="w-fit border border-white/12 bg-white/10 px-4 py-1.5 text-[11px] uppercase tracking-[0.16em] text-[#8efce0]">
+              SME launch offer
+            </SignalPill>
+            <h2 className="mt-5 max-w-xl text-3xl font-semibold tracking-[-0.05em] text-white sm:text-4xl">
+              Launch with your own booking page, email, CRM, and meeting flow.
+            </h2>
+            <p className="mt-4 max-w-xl text-sm leading-7 text-slate-300 sm:text-base">
+              For early SME customers, BookedAI does more than install a chat widget. We set up a
+              business-ready revenue flow: a refreshed landing page, dedicated email identity,
+              CRM workspace, calendar, booking slots, and meeting or payment follow-up.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() => openRegisterInterest('call_to_action', 'sme_launch_offer')}
+                className="rounded-full bg-white px-5 py-3 text-sm font-semibold text-[#172033] transition hover:-translate-y-0.5 hover:bg-[#eef4f2]"
+              >
+                Claim launch setup
+              </button>
+              <a
+                href="https://chess.bookedai.au/"
+                className="rounded-full border border-white/16 bg-white/[0.08] px-5 py-3 text-sm font-semibold text-white transition hover:-translate-y-0.5 hover:bg-white/[0.14]"
+              >
+                See live case
+              </a>
+            </div>
+          </div>
+
+          <div className="grid gap-4 md:grid-cols-2">
+            {launchOfferCards.map((card) => (
+              <article key={card.title} className="rounded-[1.35rem] border border-white/10 bg-white/[0.08] p-5">
+                <h3 className="text-lg font-semibold tracking-[-0.035em] text-white">{card.title}</h3>
+                <p className="mt-3 text-sm leading-6 text-slate-300">{card.body}</p>
+              </article>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-7 grid gap-4 md:grid-cols-2">
+          {liveCaseCards.map((card) => (
+            <a
+              key={card.title}
+              href={card.href}
+              className="rounded-[1.35rem] border border-white/10 bg-white/[0.08] p-5 text-white transition hover:-translate-y-0.5 hover:bg-white/[0.12]"
+            >
+              <div className="text-xs font-semibold uppercase tracking-[0.16em] text-[#8efce0]">
+                Live BookedAI case
+              </div>
+              <h3 className="mt-2 text-xl font-semibold tracking-[-0.04em]">{card.title}</h3>
+              <p className="mt-3 text-sm leading-6 text-slate-300">{card.body}</p>
+            </a>
+          ))}
+        </div>
+      </SectionCard>
+    </section>
+  );
+}
+
 function ChessProofSection() {
   return (
     <section aria-labelledby="pitch-chess-screen-title" className="relative mx-auto w-full max-w-7xl px-6 py-6 lg:px-8 lg:py-8">
@@ -628,19 +724,20 @@ function ChessProofSection() {
                 Live proof
               </SignalPill>
               <h2 id="pitch-chess-screen-title" className="mt-4 text-2xl font-semibold leading-tight tracking-[-0.045em] text-white sm:text-3xl lg:text-4xl">
-                A real tenant flow before the architecture story.
+                A live SME booking case, not a slide mockup.
               </h2>
               <p className="mt-4 text-sm leading-7 text-slate-300 sm:text-[15px]">
                 Grandmaster Chess Academy shows the product in context: search intent, assessment,
-                placement, booking posture, portal follow-up, and revenue-ops evidence in one journey.
+                placement, dedicated booking email, payment options, portal follow-up, and customer
+                care in one journey.
               </p>
             </div>
 
             <div className="grid gap-3 sm:grid-cols-3 xl:grid-cols-1">
               {[
-                ['Tenant', 'GM Chess Academy'],
+                ['Live case', 'GM Chess Academy'],
                 ['Journey', 'Search to booking'],
-                ['Runtime', 'API-backed demo'],
+                ['Setup', 'Page + email + CRM'],
               ].map(([label, value]) => (
                 <div key={label} className="rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-3">
                   <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-400">{label}</div>
@@ -871,7 +968,7 @@ function DefensibilitySlide() {
     <InvestorSlideShell
       id="defensibility"
       kicker="Defensibility"
-      title="Why BookedAI is not roadkill for OpenAI or Google."
+      title="Why BookedAI is built for service businesses, not generic chat."
       subtitle={defensibilityLede}
     >
       <div className="grid gap-4 md:grid-cols-3">
@@ -934,8 +1031,8 @@ function LiveEvidenceSlide() {
     <InvestorSlideShell
       id="live-evidence"
       kicker="Live evidence"
-      title="Telegram booking → admin handoff → tenant Ops ledger, in under 30 seconds."
-      subtitle="Three synchronized surfaces show the same booking event in real time. The flow is wired today across @BookedAI_Manager_Bot, the admin Reliability lane, and the tenant Ops action_runs ledger."
+      title="Customer message -> booking reference -> team follow-up, in under 30 seconds."
+      subtitle="Three synchronized surfaces show the same booking event in real time: customer chat, booking portal, and business follow-up history."
     >
       <div className="grid gap-4 md:grid-cols-3">
         {liveEvidenceFrames.map((frame) => (
@@ -973,10 +1070,6 @@ function LiveEvidenceSlide() {
             <p className="mt-3 text-[12px] leading-5 text-apple-near-black/60">{frame.caption}</p>
           </div>
         ))}
-      </div>
-      <div className="mt-4 rounded-apple-comfortable border border-apple-light/60 bg-apple-light/40 px-4 py-3 text-[12px] leading-5 text-apple-near-black/64">
-        Note: rendered as styled placeholders. Live screen-recordings to be swapped in pre-WSTI demo
-        (see lane-5-investor-hackathon-narrative.md §A5 demo failure-mode checklist).
       </div>
     </InvestorSlideShell>
   );
@@ -1479,6 +1572,8 @@ export function PitchDeckApp() {
       {/* ── 5. PRICING ──────────────────────────────────────────────── */}
       <PricingPitchSection openRegisterInterest={openRegisterInterest} />
 
+      <LaunchOfferSection openRegisterInterest={openRegisterInterest} />
+
       {/* ── 6. ARCHITECTURE ─────────────────────────────────────────── */}
       <PitchArchitectureFlowVisual />
 
@@ -1503,7 +1598,7 @@ export function PitchDeckApp() {
       {/* ── 6.7 ROADMAP → REVENUE MILESTONES ────────────────────────── */}
       <RevenueMilestonesSlide />
 
-      {/* ── 6.8 ROADMAP & EXECUTION PLAN (engineering view) ─────────── */}
+      {/* ── 6.8 ROADMAP & EXECUTION PLAN ────────────────────────────── */}
       <MasterRoadmapPitchSection />
 
       {/* ── 7. SURFACES ─────────────────────────────────────────────── */}

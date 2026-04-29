@@ -16,6 +16,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from api.route_handlers import api
+from integrations.stripe.constants import STRIPE_API_VERSION
 from service_layer.messaging_automation_service import (
     CUSTOMER_AGENT_CANONICAL_NAME,
     CUSTOMER_AGENT_PLATFORM_NAMES,
@@ -2404,11 +2405,13 @@ class TelegramWebhookRoutesTestCase(TestCase):
         self.assertIn("Pay AUD", pay_button["text"])
         self.assertEqual(pay_button["url"], "https://checkout.stripe.com/c/pay/cs_test_abc")
         self.assertEqual(len(stripe_call_log), 1)
+        self.assertEqual(stripe_call_log[0]["headers"]["Stripe-Version"], STRIPE_API_VERSION)
         body_bytes = stripe_call_log[0]["content"]
         body = body_bytes.decode() if isinstance(body_bytes, (bytes, bytearray)) else str(body_bytes)
         from urllib.parse import parse_qs
         parsed_form = parse_qs(body)
         self.assertEqual(parsed_form.get("mode"), ["payment"])
+        self.assertNotIn("payment_method_types[]", parsed_form)
         self.assertEqual(parsed_form.get("line_items[0][price_data][unit_amount]"), ["3000"])
         self.assertEqual(parsed_form.get("client_reference_id"), ["v1-pay001"])
         self.assertEqual(parsed_form.get("metadata[source]"), ["telegram_manager_bot"])

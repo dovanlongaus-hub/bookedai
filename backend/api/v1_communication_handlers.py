@@ -23,6 +23,7 @@ from api.v1_routes import (
     render_bookedai_confirmation_email,
 )
 from db import MessagingChannelSession
+from repositories.base import RepositoryContext
 from service_layer.communication_service import normalize_e164
 
 
@@ -73,6 +74,77 @@ async def _find_telegram_chat_id_for_phone(session, normalized_phone: str) -> st
     return None
 
 
+async def _augment_booking_email_variables(
+    request: Request,
+    *,
+    variables: dict[str, str],
+) -> dict[str, str]:
+    """Inject ``meeting_url`` + ``calendar_event_url`` into the email variables.
+
+    Reads ``booking_reference`` (if present) from the caller-supplied variables
+    and looks up the persisted Zoho Meeting metadata on the booking_intent.
+    Falls back to the tenant's ``default_meeting_url`` (configured under
+    ``tenant_settings.settings_json.default_meeting_url``) when Zoho did not
+    return a link — useful for chess tenants that prefer Zoom / Google Meet.
+    Locale is normalised in the renderer; this helper passes it through if the
+    caller already set it.
+    """
+    from repositories.booking_intent_repository import BookingIntentRepository
+    from repositories.tenant_repository import TenantRepository
+
+    booking_reference = str(variables.get("booking_reference") or "").strip()
+    if not booking_reference:
+        return variables
+
+    if variables.get("meeting_url") and variables.get("calendar_event_url"):
+        # Caller has fully resolved values — respect them.
+        return variables
+
+    try:
+        async with get_session(request.app.state.session_factory) as session:
+            booking_repository = BookingIntentRepository(
+                RepositoryContext(session=session)
+            )
+            booking = await booking_repository.fetch_meeting_metadata(
+                booking_reference=booking_reference,
+            )
+            if not booking:
+                return variables
+
+            metadata = booking.get("metadata_json") or {}
+            zoho_meta = (
+                dict(metadata.get("zoho_meeting") or {})
+                if isinstance(metadata, dict)
+                else {}
+            )
+            meeting_url = str(zoho_meta.get("meeting_url") or "").strip()
+            calendar_url = str(zoho_meta.get("calendar_event_url") or "").strip()
+            tenant_id = booking.get("tenant_id")
+
+            if not meeting_url and tenant_id:
+                tenant_repository = TenantRepository(
+                    RepositoryContext(session=session)
+                )
+                settings_json = await tenant_repository.get_tenant_settings(
+                    str(tenant_id)
+                )
+                fallback_url = str(
+                    (settings_json or {}).get("default_meeting_url") or ""
+                ).strip()
+                if fallback_url:
+                    meeting_url = fallback_url
+    except Exception:  # noqa: BLE001
+        # Best-effort enrichment — fail silently and let the email render
+        # without the meeting block rather than break the lifecycle send.
+        return variables
+
+    if meeting_url and not variables.get("meeting_url"):
+        variables["meeting_url"] = meeting_url
+    if calendar_url and not variables.get("calendar_event_url"):
+        variables["calendar_event_url"] = calendar_url
+    return variables
+
+
 async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequestPayload):
     tenant_id = await _resolve_tenant_id(request, payload.actor_context)
     try:
@@ -85,8 +157,19 @@ async def send_lifecycle_email(request: Request, payload: SendLifecycleEmailRequ
         email_service: EmailService = request.app.state.email_service
         rendered_email = None
         if payload.template_key == "bookedai_booking_confirmation":
+            # Augment caller-supplied variables with booking_intent metadata
+            # so the EN/VI online-session block auto-fills with the Zoho
+            # Meeting URL persisted at booking time. The frontend only knows
+            # the booking_reference so it does not need to thread the URL
+            # through itself; we look it up here. Tenant default_meeting_url
+            # is used as a fallback when Zoho did not return a join link
+            # (e.g. tenant prefers Zoom / Google Meet).
+            enriched_variables = await _augment_booking_email_variables(
+                request,
+                variables=dict(payload.variables or {}),
+            )
             rendered_email = render_bookedai_confirmation_email(
-                variables=payload.variables,
+                variables=enriched_variables,
                 public_app_url=request.app.state.settings.public_app_url,
             )
         subject = payload.subject or (

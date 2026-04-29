@@ -420,7 +420,7 @@ pre {
 .template-title,
 .apple-title {
   font-family: var(--apple-font-display);
-  font-size: clamp(2.8rem, 5.8vw, 4.4rem);
+  font-size: clamp(1.8667rem, 3.8667vw, 2.9333rem);
   font-weight: 700;
   line-height: 0.98;
   letter-spacing: -0.05em;
@@ -1589,7 +1589,7 @@ pre {
 /* Static title */
 .template-static-title {
   margin-top: 1rem;
-  font-size: clamp(2.5rem, 5.5vw, 4.5rem);
+  font-size: clamp(1.6667rem, 3.6667vw, 3rem);
   font-weight: 600;
   line-height: 1.07;
   letter-spacing: -0.017em;

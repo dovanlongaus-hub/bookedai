@@ -481,6 +481,7 @@ export type AdminWorkspaceId =
   | 'overview'
   | 'tenants'
   | 'tenant-workspace'
+  | 'ai-mentor-academy'
   | 'catalog'
   | 'billing-support'
   | 'integrations'

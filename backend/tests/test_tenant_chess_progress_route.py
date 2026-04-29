@@ -77,13 +77,32 @@ async def _resolve_unauthenticated_context(*_args, **_kwargs):
 
 
 class _ListStudentsSession:
-    def __init__(self):
+    def __init__(
+        self,
+        *,
+        zoho_meeting_url: str | None = "https://meet.zoho.com/abcd-efgh",
+        default_meeting_url: str | None = None,
+    ):
         self.queries: list[str] = []
+        self.zoho_meeting_url = zoho_meeting_url
+        self.default_meeting_url = default_meeting_url
 
     async def execute(self, statement, params=None):
         sql = str(statement).strip().lower()
         self.queries.append(sql)
+        if "from tenant_settings" in sql and "with tenant_chess_contacts" not in sql:
+            settings_json = (
+                {"default_meeting_url": self.default_meeting_url}
+                if self.default_meeting_url
+                else {}
+            )
+            return _FakeExecuteResult({"settings_json": settings_json})
         if "with tenant_chess_contacts" in sql:
+            metadata = (
+                {"zoho_meeting": {"meeting_url": self.zoho_meeting_url, "calendar_event_url": "https://cal.zoho.com/e1"}}
+                if self.zoho_meeting_url
+                else {"payment_status": "paid"}
+            )
             return _FakeExecuteResult(
                 [
                     {
@@ -91,6 +110,10 @@ class _ListStudentsSession:
                         "full_name": "Demo Student",
                         "email": "student@example.com",
                         "current_program": "Chess Beginner",
+                        "last_booking_reference": "v1-zzzz9999",
+                        "last_metadata_json": metadata,
+                        "last_requested_date": "2026-05-01",
+                        "last_requested_time": "10:00",
                         "session_date": "2026-04-20",
                         "level": "Beginner Tier 1",
                         "attendance": 1,
@@ -189,6 +212,35 @@ class TenantChessStudentsListTestCase(TestCase):
         self.assertEqual(first["contact_id"], "contact-001")
         self.assertEqual(first["full_name"], "Demo Student")
         self.assertEqual(first["latest_progress"]["level"], "Beginner Tier 1")
+        self.assertEqual(first["meeting_url"], "https://meet.zoho.com/abcd-efgh")
+        self.assertEqual(
+            first["latest_booking"]["meeting_url"], "https://meet.zoho.com/abcd-efgh"
+        )
+
+    def test_meeting_url_falls_back_to_tenant_default(self):
+        """When Zoho metadata is absent, the tenant ``default_meeting_url``
+        configured in ``tenant_settings.settings_json`` is surfaced so the
+        operator still has a working join link to share."""
+        app = _make_app()
+        scripted = _ListStudentsSession(
+            zoho_meeting_url=None,
+            default_meeting_url="https://zoom.example/tenant-default",
+        )
+        with patch(
+            "api.v1_tenant_chess_progress_handlers._resolve_tenant_request_context",
+            _resolve_signed_tenant_context,
+        ), patch(
+            "api.v1_tenant_chess_progress_handlers.get_session",
+            _fake_get_session_factory(scripted),
+        ):
+            client = TestClient(app)
+            response = client.get(
+                "/api/v1/tenants/me/students?tenant_ref=co-mai-hung-chess-class"
+            )
+
+        self.assertEqual(response.status_code, 200, response.text)
+        student = response.json()["data"]["students"][0]
+        self.assertEqual(student["meeting_url"], "https://zoom.example/tenant-default")
 
 
 class TenantChessStudentProgressUpdateTestCase(TestCase):

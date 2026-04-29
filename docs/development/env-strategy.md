@@ -80,6 +80,12 @@ Admin sign-in expectations now are:
   - `ZOHO_CRM_REFRESH_TOKEN`
 - `ZOHO_CRM_CLIENT_ID`
 - `ZOHO_CRM_CLIENT_SECRET`
+- booking calendar/meeting provisioning should set:
+  - `ZOHO_CALENDAR_UID`
+  - `ZOHO_CALENDAR_REFRESH_TOKEN`
+  - `ZOHO_CALENDAR_CLIENT_ID`
+  - `ZOHO_CALENDAR_CLIENT_SECRET`
+- the Calendar token family may reuse the CRM token family only when the OAuth consent included `ZohoCalendar.calendar.READ`, `ZohoCalendar.event.CREATE`, and `ZohoMeeting.meeting.ALL`
 - optional inbound notification hardening:
   - `ZOHO_CRM_NOTIFICATION_TOKEN`
   - `ZOHO_CRM_NOTIFICATION_CHANNEL_ID`
@@ -104,6 +110,7 @@ Admin sign-in expectations now are:
   - `python3 scripts/zoho_crm_connect.py authorize-url ...`
   - `python3 scripts/zoho_crm_connect.py exchange-code ... --write-env`
   - `python3 scripts/zoho_crm_connect.py test-connection --module Leads`
+  - `python3 scripts/zoho_crm_connect.py list-calendars`
 
 ## WhatsApp customer-care runtime
 

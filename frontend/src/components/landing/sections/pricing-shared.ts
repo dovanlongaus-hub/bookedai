@@ -144,7 +144,7 @@ export const plans: Plan[] = [
     features: [
       'All 3 channels (Telegram + WhatsApp + embed widget)',
       'Revenue-ops agent queue + customer-care agent',
-      'Audit ledger + Stripe billing',
+      'Booking activity history + Stripe billing',
       'CRM sync',
       'Monthly tenant revenue summary email',
       'A$499 onboarding + 3% on net booked revenue',
@@ -175,7 +175,7 @@ export const plans: Plan[] = [
       'Setup fee scoped per contract. 5% commission on attributable booked revenue with floor and cap negotiated up front.',
     features: [
       'Multi-tenant template + dedicated onboarding',
-      'Admin reliability lane + audit ledger',
+      'Business workspace + booking activity history',
       'White-label widget + webhook + API access',
       'Retention / churn-rescue automation',
       'SLA + named CSM',

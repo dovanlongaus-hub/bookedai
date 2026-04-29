@@ -44,6 +44,10 @@ const AIMentorAccountApp = lazy(async () => {
   const module = await import('../apps/public/AIMentorAccountApp');
   return { default: module.AIMentorAccountApp };
 });
+const AIMentorZohoOAuthCallbackApp = lazy(async () => {
+  const module = await import('../apps/public/AIMentorZohoOAuthCallbackApp');
+  return { default: module.AIMentorZohoOAuthCallbackApp };
+});
 const PitchDeckApp = lazy(async () => {
   const module = await import('../apps/public/PitchDeckApp');
   return { default: module.PitchDeckApp };
@@ -87,6 +91,10 @@ const PortalApp = lazy(async () => {
 const StudentPortalApp = lazy(async () => {
   const module = await import('../apps/portal/StudentPortalApp');
   return { default: module.StudentPortalApp };
+});
+const OrderDetailApp = lazy(async () => {
+  const module = await import('../apps/portal/OrderDetailApp');
+  return { default: module.OrderDetailApp };
 });
 
 function isAdminRuntime() {
@@ -210,6 +218,18 @@ function isAIMentorBookedAIRuntime() {
   );
 }
 
+function isAIMentorZohoOAuthCallbackRoute() {
+  if (typeof window === 'undefined') return false;
+  const { hostname, pathname } = window.location;
+  if (hostname !== 'aimentor.bookedai.au' && !pathname.startsWith('/aimentor')) {
+    return false;
+  }
+  return (
+    pathname === '/aimentor/zoho-oauth-callback' ||
+    pathname === '/aimentor/zoho-oauth-callback/'
+  );
+}
+
 function isAIMentorAccountRoute() {
   if (typeof window === 'undefined') {
     return false;
@@ -282,6 +302,16 @@ function isStudentPortalRoute() {
   }
   const { pathname } = window.location;
   return pathname === '/student-account' || pathname.startsWith('/student-account/');
+}
+
+function isOrderDetailRoute() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+  const { pathname } = window.location;
+  // Match `/order/{reference}` and `/order/{reference}/...`. Bare `/order` (no slug)
+  // does not resolve to an order — fall through to the default app for that case.
+  return /^\/order\/[^/]+\/?/.test(pathname);
 }
 
 function isSandboxRuntime() {
@@ -491,6 +521,13 @@ export function AppRouter() {
   }
 
   if (isAIMentorBookedAIRuntime()) {
+    if (isAIMentorZohoOAuthCallbackRoute()) {
+      return (
+        <Suspense fallback={fallback}>
+          <AIMentorZohoOAuthCallbackApp />
+        </Suspense>
+      );
+    }
     if (isAIMentorAccountRoute()) {
       return (
         <Suspense fallback={fallback}>
@@ -533,6 +570,14 @@ export function AppRouter() {
     return (
       <Suspense fallback={fallback}>
         <StudentPortalApp />
+      </Suspense>
+    );
+  }
+
+  if (isOrderDetailRoute()) {
+    return (
+      <Suspense fallback={fallback}>
+        <OrderDetailApp />
       </Suspense>
     );
   }

@@ -16,7 +16,8 @@ test.describe('public homepage responsive qa', () => {
     await openHomepage(page);
 
     await expect(page.getByRole('button', { name: /See a live booking/i }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /Talk to a BookedAI human/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Get my booking page set up/i }).first()).toBeVisible();
+    await expect(page.getByRole('heading', { name: /Launch a booking-ready business page/i })).toBeVisible();
     await expect(page.getByText(/capture qualified enquiries before they go cold/i)).toBeVisible();
     await expect(page.getByText(/keep CRM, email, and customer care aligned/i)).toBeVisible();
     await page.locator('#agent-activity-proof').scrollIntoViewIfNeeded();
@@ -34,7 +35,7 @@ test.describe('public homepage responsive qa', () => {
     await openHomepage(page);
 
     await expect(page.getByRole('button', { name: /See a live booking/i }).first()).toBeVisible();
-    await expect(page.getByRole('button', { name: /Talk to a BookedAI human/i })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Get my booking page set up/i }).first()).toBeVisible();
     await expect(page.getByText(/capture qualified enquiries before they go cold/i)).toBeVisible();
     await page.locator('#agent-activity-proof').scrollIntoViewIfNeeded();
     await expect(page.getByText(/Agent activity proof/i)).toBeVisible();
@@ -44,19 +45,19 @@ test.describe('public homepage responsive qa', () => {
     });
   });
 
-  test('homepage hero opens the WSTI proof path and keeps audit proof visible', async ({ page }) => {
+  test('homepage hero opens the WSTI proof path and keeps booking activity visible', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await openHomepage(
       page,
-      '/?homepage_variant=control',
-      /One AI agent layer\. Live channels\. Every booking audited\./i,
+      '/?homepage_variant=control&aud=judge',
+      /One AI agent layer\. Every channel\. Every booking\. Audited\./i,
     );
 
-    await page.getByRole('button', { name: /Run the WSTI proof path/i }).first().click();
+    await page.getByRole('button', { name: /Run the live demo/i }).first().click();
 
     await expect(page.locator('#live-product')).toBeInViewport();
     await expect(page.getByText(/Show WSTI AI events at Western Sydney Startup Hub/i).first()).toBeVisible();
-    await expect(page.getByText(/action ledger/i).first()).toBeVisible();
+    await expect(page.getByText(/follow-up trail/i).first()).toBeVisible();
   });
 
   test('WSTI demo mode starts with a judge-facing proof banner', async ({ page }) => {

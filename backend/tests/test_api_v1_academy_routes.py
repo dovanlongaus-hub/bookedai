@@ -7,6 +7,7 @@ from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import AsyncMock, patch
 
+import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
@@ -15,6 +16,43 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from api.v1_router import router as v1_router
+
+
+# Wave 15: P0-2 hardened `_resolve_tenant_id` to require a tenant bearer
+# session. Academy/agent-action tests assert business contract, not auth —
+# stub the resolver in every handler module that owns one of the routes.
+async def _stub_resolve_tenant_id(_request, actor_context):
+    if actor_context is None:
+        return "tenant-chess-demo"
+    requested = getattr(actor_context, "tenant_id", None)
+    if isinstance(requested, str) and requested.strip():
+        return requested.strip()
+    ref = getattr(actor_context, "tenant_ref", None)
+    if isinstance(ref, str) and ref.strip():
+        return ref.strip()
+    return "tenant-chess-demo"
+
+
+@pytest.fixture(autouse=True)
+def _patch_resolve_tenant_id_for_academy_tests():
+    targets = [
+        "api.v1_academy_handlers._resolve_tenant_id",
+        "api.v1_booking_handlers._resolve_tenant_id",
+        "api.v1_search_handlers._resolve_tenant_id",
+        "api.v1_communication_handlers._resolve_tenant_id",
+        "api.v1_routes._resolve_tenant_id",
+    ]
+    patches = []
+    for target in targets:
+        try:
+            ctx = patch(target, _stub_resolve_tenant_id)
+            ctx.start()
+            patches.append(ctx)
+        except (AttributeError, ModuleNotFoundError):
+            pass
+    yield
+    for ctx in patches:
+        ctx.stop()
 
 
 ACTOR_CONTEXT = {

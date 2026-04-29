@@ -114,6 +114,16 @@ The PM now treats `Sprint 19` as the immediate execution board.
 
 ## Execution Log
 
+### `2026-04-28` Phase 19 Communication Template Polish
+
+- Scope: customer-facing lifecycle email, WhatsApp confirmation, and Telegram booking/search message presentation.
+- Owner lanes: Backend, Content/GTM, QA/UAT.
+- Implementation: confirmation email now uses the official BookedAI.au logo, dark brand header, status badge, structured booking summary, CTA, and support footer; WhatsApp confirmation/template copy now follows native short-line `*bold*` formatting; Telegram search/current-order/booking-capture replies now carry compact HTML-safe status/action sections while keeping inline controls.
+- Automated verification: `.venv-backend/bin/pytest backend/tests/test_lifecycle_ops_service.py backend/tests/test_release_gate_security.py backend/tests/test_api_v1_booking_routes.py backend/tests/test_telegram_webhook_routes.py backend/tests/test_whatsapp_webhook_routes.py -q` passed locally with `114 passed`.
+- Notion/Discord: published; archive entry is `docs/development/telegram-sync/2026-04-28/143344-bookedai-communication-template-polish.md`.
+- Deploy-live: not run in this pass.
+- Status: Phase 19 customer communication presentation is locally polished; live provider-send UAT remains a promotion follow-up.
+
 ### `2026-04-26` Phase 17 P0-1 Gate Check
 
 - Scope: portal and booking continuity verification for the first active Sprint 19 board item.
@@ -296,7 +306,9 @@ The project does not restart from Phase `0`. Phase `0-16` remain historical deli
 
 ## 2026-04-28 Gate Note
 
+- Zoho CRM/Calendar setup is activated and live-deployed for Phase 21 payment and booking lifecycle: refresh-token helper auth is fixed for CRM and Calendar, expanded OAuth scopes cover CRM + Calendar + Zoho Meeting, `list-calendars` selected the AU `info` calendar UID, Calendar event creation reads the AU env base URL and sends Zoho `eventdata`, and paid bookings now attempt immediate Zoho Closed Won Deal + payment follow-up Task sync. CRM, Calendar list, live Zoho Meeting event, deploy-live, stack health, API health, chess shell, and final booking/payment UAT smokes passed.
 - Zoho CRM booking lifecycle hardening is live-UAT verified with phone-only booking `v1-53a53835ae`: lead, contact, deal, and task all synced to Zoho and the booking reopened in the portal.
+- Zoho Calendar/Meeting plus payment lifecycle is live-UAT verified with chess booking `v1-364c66e949`: booking response included Zoho Meeting and Calendar event URLs, CRM booking deal/task synced, manual payment confirm marked the booking paid, and payment deal/task CRM rows synced after one Zoho throttle retry.
 - Release-gate hardening is applied for the next clean pass: frontend Playwright smoke runners build once, reuse `dist` preview, and combine legacy/admin cases; backend Telegram human-handoff suppression coverage is restored.
 
 ## 2026-04-28 WSTI Investor-Proof Homepage Gate

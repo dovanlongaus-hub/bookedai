@@ -8,6 +8,7 @@ import sys
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
+from urllib.parse import parse_qs
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -18,6 +19,7 @@ if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
 from api.v1_router import router as v1_router  # noqa: E402
+from integrations.stripe.constants import STRIPE_API_VERSION  # noqa: E402
 
 
 def _make_app(*, stripe_secret_key: str = "") -> FastAPI:
@@ -166,7 +168,10 @@ class ChessPaymentOptionsRouteTestCase(TestCase):
         )
         self.assertEqual(stripe_option["stripe_session_id"], "cs_test_chess_001")
         # And the Stripe HTTP call carried the chess_student_payment metadata.
+        self.assertEqual(fake_client.requests[0]["headers"]["Stripe-Version"], STRIPE_API_VERSION)
         body = fake_client.requests[0]["content"].decode()
+        parsed_form = parse_qs(body)
+        self.assertNotIn("payment_method_types[]", parsed_form)
         self.assertIn("metadata%5Bbookedai_kind%5D=chess_student_payment", body)
         self.assertIn("mode=payment", body)
         self.assertIn("metadata%5Bbooking_intent_id%5D=intent-aaa", body)

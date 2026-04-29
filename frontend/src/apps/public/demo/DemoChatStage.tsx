@@ -135,7 +135,7 @@ export function DemoChatStage(props: {
                   disabled={props.searching}
                   className="inline-flex h-12 min-h-[44px] items-center justify-center gap-2 rounded-full bg-apple-blue px-5 text-sm font-semibold text-white shadow-[0_9px_22px_rgba(0,113,227,0.18)] motion-safe:transition-all duration-200 hover:bg-apple-blue-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-apple-blue/60 focus-visible:ring-offset-2 focus-visible:ring-offset-apple-dark-2 disabled:cursor-not-allowed disabled:opacity-60"
                 >
-                  {props.searching ? 'Searching live operators…' : 'Find & book'}
+                  {props.searching ? 'Searching live services…' : 'Find & book'}
                   <ArrowUp className="h-4 w-4" aria-hidden="true" />
                 </button>
               </div>

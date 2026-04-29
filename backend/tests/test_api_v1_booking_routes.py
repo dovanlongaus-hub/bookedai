@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import asyncio
 from contextlib import asynccontextmanager
 from pathlib import Path
 import sys
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
+from urllib.parse import parse_qs
 
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
@@ -20,9 +22,13 @@ from api.v1_routes import (
     _raw_query_intent_terms,
     _search_terms,
 )
-from api.v1_booking_handlers import _build_payment_return_url
+from api.v1_booking_handlers import (
+    _build_payment_return_url,
+    _create_public_stripe_checkout_session,
+)
 from api.v1_router import router as v1_router
 from core.session_tokens import create_tenant_session_token
+from integrations.stripe.constants import STRIPE_API_VERSION
 from repositories.integration_repository import IntegrationRepository
 from service_layer.prompt9_matching_service import RankedServiceMatch
 from repositories.tenant_repository import TenantRepository
@@ -138,6 +144,96 @@ class _WritableFakeSession:
 
 
 class Apiv1BookingRoutes(TestCase):
+    def test_public_stripe_checkout_uses_dynamic_payment_methods_and_pinned_api_version(self):
+        stripe_calls: list[dict[str, object]] = []
+
+        class _FakeStripeResponse:
+            def raise_for_status(self):
+                return None
+
+            def json(self):
+                return {
+                    "id": "cs_test_public_001",
+                    "url": "https://checkout.stripe.com/c/pay/cs_test_public_001",
+                }
+
+        class _FakeStripeClient:
+            def __init__(self, *args, **kwargs):
+                pass
+
+            async def __aenter__(self):
+                return self
+
+            async def __aexit__(self, *_args):
+                return False
+
+            async def post(self, url, *, headers, content):
+                stripe_calls.append({"url": url, "headers": headers, "content": content})
+                return _FakeStripeResponse()
+
+        with patch("api.v1_booking_handlers.httpx.AsyncClient", _FakeStripeClient):
+            result = asyncio.run(
+                _create_public_stripe_checkout_session(
+                    stripe_secret_key="sk_test_bookedai",
+                    stripe_currency="aud",
+                    booking_reference="v1-demo123",
+                    service_name="Tutor session",
+                    amount_aud=95,
+                    customer_email="mia@example.com",
+                    success_url="https://product.bookedai.au/?booking=success",
+                    cancel_url="https://product.bookedai.au/?booking=cancelled",
+                )
+            )
+
+        self.assertEqual(
+            result["checkout_url"],
+            "https://checkout.stripe.com/c/pay/cs_test_public_001",
+        )
+        self.assertEqual(stripe_calls[0]["headers"]["Stripe-Version"], STRIPE_API_VERSION)
+        body = stripe_calls[0]["content"].decode()
+        parsed_form = parse_qs(body)
+        self.assertEqual(parsed_form.get("mode"), ["payment"])
+        self.assertNotIn("payment_method_types[]", parsed_form)
+
+    def test_manual_payment_confirm_requires_tenant_auth(self):
+        client = TestClient(create_test_app())
+
+        response = client.post(
+            "/api/v1/payments/manual-confirm",
+            json={
+                "booking_reference": "v1-demo123",
+                "payment_source": "bank_transfer",
+                "transfer_reference": "BAI-v1-demo123",
+                "amount_aud": 120,
+                "currency": "AUD",
+            },
+        )
+
+        self.assertEqual(response.status_code, 401)
+        self.assertEqual(response.json()["error"]["code"], "tenant_auth_required")
+
+    def test_payment_status_returns_backend_truth_envelope(self):
+        async def _fake_status(*_args, **_kwargs):
+            return {
+                "status": "ok",
+                "booking_reference": "v1-demo123",
+                "payment_status": "verifying",
+                "session_match": True,
+            }
+
+        with patch("api.v1_booking_handlers.get_session", _fake_get_session), patch(
+            "api.v1_booking_handlers.get_booking_payment_status",
+            _fake_status,
+        ):
+            client = TestClient(create_test_app())
+            response = client.get(
+                "/api/v1/payments/status?booking_reference=v1-demo123&session_id=cs_test_123"
+            )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json()["data"]["payment_status"], "verifying")
+        self.assertTrue(response.json()["data"]["session_match"])
+
     def test_payment_return_url_ignores_untrusted_origin(self):
         request = Request(
             {

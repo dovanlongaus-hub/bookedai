@@ -213,6 +213,7 @@ PRODUCTION_CORS_ORIGINS: tuple[str, ...] = (
     "https://upload.bookedai.au",
     "https://futureswim.bookedai.au",
     "https://chess.bookedai.au",
+    "https://aimentor.bookedai.au",
     "https://demo.bookedai.au",
     "https://beta.bookedai.au",
 )
@@ -371,7 +372,7 @@ def get_settings() -> Settings:
         stripe_webhook_secret=os.getenv("STRIPE_WEBHOOK_SECRET", ""),
         zoho_crm_api_base_url=zoho_crm_api_base_url,
         zoho_calendar_api_base_url=os.getenv(
-            "ZOHO_CALENDAR_API_BASE_URL", "https://calendar.zoho.com/api/v1"
+            "ZOHO_CALENDAR_API_BASE_URL", "https://calendar.zoho.com.au/api/v1"
         ),
         zoho_bookings_api_base_url=zoho_bookings_api_base_url,
         zoho_accounts_base_url=zoho_accounts_base_url,

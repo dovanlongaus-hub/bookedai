@@ -147,8 +147,13 @@ class _ScriptedSession:
         self.default_tenant_id = default_tenant_id
         self.executed_statements: list[str] = []
         self.payment_updates: list[dict[str, object]] = []
+        self.booking_updates: list[dict[str, object]] = []
         self.idempotency_inserts: list[dict[str, object]] = []
         self.webhook_events: list[dict[str, object]] = []
+        self.outbox_events: list[dict[str, object]] = []
+        self.crm_sync_records: list[dict[str, object]] = []
+        self.email_messages: list[dict[str, object]] = []
+        self.email_events: list[dict[str, object]] = []
         self.payment_intent_lookup_id = "pi_row_001"
         self.payment_intent_metadata: dict[str, object] = {}
         self.idempotency_already_seen = False
@@ -162,6 +167,44 @@ class _ScriptedSession:
         sql = str(statement).strip().lower()
         params = params or {}
         self.executed_statements.append(sql)
+
+        # PaymentLifecycleService booking context lookup.
+        if "left join lateral" in sql and "from booking_intents bi" in sql:
+            return _FakeExecuteResult(
+                {
+                    "booking_intent_id": "booking-intent-001",
+                    "tenant_id": self.tenant_lookup_value or self.default_tenant_id,
+                    "booking_reference": params.get("booking_reference") or "BAI-DEADBEEF",
+                    "service_name": "BookedAI test service",
+                    "requested_date": "2026-05-01",
+                    "requested_time": "10:00",
+                    "timezone": "Australia/Sydney",
+                    "booking_path": "stripe_checkout",
+                    "payment_dependency_state": "stripe_checkout_ready",
+                    "booking_metadata": {},
+                    "contact_id": "contact-001",
+                    "customer_name": "Test Customer",
+                    "customer_email": "test@example.com",
+                    "customer_phone": "+61400000000",
+                    "latest_payment_intent_id": self.payment_intent_lookup_id,
+                    "latest_payment_status": "requires_action",
+                    "latest_payment_option": "stripe_card",
+                    "latest_external_session_id": "cs_test_123",
+                    "latest_amount_aud": 45.0,
+                    "latest_currency": "aud",
+                    "latest_payment_metadata": {},
+                }
+            )
+
+        # BookingIntentRepository.sync_callback_status lookup.
+        if "contact_id::text as contact_id" in sql and "from booking_intents" in sql:
+            return _FakeExecuteResult(
+                {
+                    "booking_intent_id": "booking-intent-001",
+                    "contact_id": "contact-001",
+                    "metadata_json": {},
+                }
+            )
 
         # 1. tenant_id resolver from booking_intents.
         if "from booking_intents" in sql and "tenant_id::text" in sql:
@@ -203,6 +246,22 @@ class _ScriptedSession:
         if sql.startswith("insert into webhook_events"):
             self.webhook_events.append(dict(params))
             return _FakeExecuteResult(101)
+
+        if sql.startswith("insert into outbox_events"):
+            self.outbox_events.append(dict(params))
+            return _FakeExecuteResult(201)
+
+        if sql.startswith("insert into crm_sync_records"):
+            self.crm_sync_records.append(dict(params))
+            return _FakeExecuteResult(len(self.crm_sync_records))
+
+        if sql.startswith("insert into email_messages"):
+            self.email_messages.append(dict(params))
+            return _FakeExecuteResult(None)
+
+        if sql.startswith("insert into email_events"):
+            self.email_events.append(dict(params))
+            return _FakeExecuteResult(None)
 
         # 5. Tenant settings lookup/update for Stripe billing gateway mirrors.
         if "from tenant_settings" in sql and "stripe_customer_id" in sql:
@@ -296,6 +355,10 @@ class _ScriptedSession:
             self.payment_updates.append(dict(params))
             return _FakeExecuteResult(None)
 
+        if sql.startswith("update booking_intents"):
+            self.booking_updates.append(dict(params))
+            return _FakeExecuteResult(None)
+
         return _FakeExecuteResult(None)
 
     async def commit(self):
@@ -377,6 +440,10 @@ class StripeReconcileServiceTestCase(IsolatedAsyncioTestCase):
         self.assertAlmostEqual(float(update["amount_aud"]), 45.0, places=2)
         self.assertEqual(update["currency"], "aud")
         self.assertEqual(update["external_session_id"], "cs_test_123")
+        self.assertEqual(len(session.booking_updates), 1)
+        self.assertEqual(session.booking_updates[0]["payment_dependency_state"], "paid")
+        self.assertEqual(result["booking_lifecycle"]["status"], "applied")
+        self.assertEqual(result["booking_lifecycle"]["payment_status"], "paid")
 
     async def test_duplicate_event_id_short_circuits(self):
         session = _ScriptedSession(
@@ -571,6 +638,7 @@ class StripeWebhookRouteTestCase(TestCase):
         self.assertEqual(body_json["booking_reference"], "BAI-DEADBEEF")
         self.assertEqual(body_json["event_type"], "checkout.session.completed")
         self.assertEqual(len(scripted.payment_updates), 1)
+        self.assertEqual(len(scripted.booking_updates), 1)
 
     def test_subscription_updated_route_returns_200_and_applies_update(self):
         scripted = _ScriptedSession(

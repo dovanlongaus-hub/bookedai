@@ -767,6 +767,118 @@ async def orchestrate_booking_followup_sync(
     )
 
 
+async def orchestrate_payment_paid_sync(
+    session,
+    *,
+    tenant_id: str,
+    booking_reference: str | None,
+    booking_intent_id: str | None,
+    customer_name: str | None,
+    customer_email: str | None,
+    customer_phone: str | None,
+    service_name: str | None,
+    requested_date: str | None,
+    requested_time: str | None,
+    timezone: str | None,
+    payment_source: str | None,
+    amount_aud: float | None,
+    currency: str | None,
+    paid_at: str | None,
+    external_contact_id: str | None = None,
+    external_deal_id: str | None = None,
+) -> dict[str, object]:
+    local_entity_id = (booking_reference or booking_intent_id or "").strip()
+    if not tenant_id or not local_entity_id:
+        return {"status": "skipped", "warning_codes": ["missing_booking_context"]}
+
+    repository = CrmSyncRepository(RepositoryContext(session=session, tenant_id=tenant_id))
+    payment_record = LeadRecordContract(
+        lead_id=booking_intent_id,
+        full_name=customer_name,
+        email=customer_email,
+        phone=customer_phone,
+        source=payment_source or "payment_reconciliation",
+        company_name=service_name or "BookedAI Paid Booking",
+        tenant_id=tenant_id,
+        lead_status="paid",
+        metadata={
+            "booking_intent_id": booking_intent_id,
+            "booking_reference": booking_reference,
+            "service_name": service_name,
+            "requested_date": requested_date,
+            "requested_time": requested_time,
+            "timezone": timezone,
+            "booking_path": payment_source or "payment_reconciliation",
+            "notes": (
+                f"Payment received via {payment_source or 'payment reconciliation'}"
+                f" for {amount_aud or 0:g} {(currency or 'aud').upper()} at {paid_at or 'unknown time'}."
+            ),
+            "amount_aud": amount_aud,
+            "currency": currency,
+            "paid_at": paid_at,
+            "external_contact_id": external_contact_id,
+            "external_deal_id": external_deal_id,
+            "deal_stage": "Closed Won",
+            "task_subject": "Payment received - send thank-you/support follow-up",
+        },
+    )
+    payload_json = _crm_payload_json(payment_record)
+    deal_record_id = await repository.create_sync_record(
+        tenant_id=tenant_id,
+        entity_type="deal_payment",
+        local_entity_id=local_entity_id,
+        provider="zoho_crm",
+        sync_status="pending",
+        payload_json=payload_json,
+    )
+    task_record_id = await repository.create_sync_record(
+        tenant_id=tenant_id,
+        entity_type="task_payment",
+        local_entity_id=local_entity_id,
+        provider="zoho_crm",
+        sync_status="pending",
+        payload_json=payload_json,
+    )
+
+    settings = get_settings()
+    adapter = ZohoCrmAdapter()
+    if not adapter.configured(settings):
+        return {
+            "status": "pending",
+            "deal": {"record_id": deal_record_id, "sync_status": "pending"},
+            "task": {"record_id": task_record_id, "sync_status": "pending"},
+            "warning_codes": ["provider_unconfigured"],
+        }
+
+    deal_result = await _execute_booking_deal_sync(
+        repository=repository,
+        tenant_id=tenant_id,
+        crm_sync_record_id=deal_record_id,
+        booking_record=payment_record,
+    )
+    task_result = await _execute_booking_task_sync(
+        repository=repository,
+        tenant_id=tenant_id,
+        crm_sync_record_id=task_record_id,
+        booking_record=payment_record,
+        external_deal_id=deal_result.external_entity_id or external_deal_id,
+    )
+    return {
+        "status": "synced" if not (deal_result.warning_codes or task_result.warning_codes) else "partial",
+        "deal": {
+            "record_id": deal_result.record_id,
+            "sync_status": deal_result.sync_status,
+            "external_entity_id": deal_result.external_entity_id,
+        },
+        "task": {
+            "record_id": task_result.record_id,
+            "sync_status": task_result.sync_status,
+            "external_entity_id": task_result.external_entity_id,
+        },
+        "warning_codes": _merge_warning_codes(deal_result.warning_codes, task_result.warning_codes),
+    }
+
+
 async def execute_crm_sync_retry(
     session,
     *,
@@ -834,6 +946,22 @@ async def execute_crm_sync_retry(
             tenant_id=tenant_id,
             crm_sync_record_id=crm_sync_record_id,
             contact_record=lead_like,
+        )
+    elif entity_type in {"deal", "deal_payment"}:
+        result = await _execute_booking_deal_sync(
+            repository=repository,
+            tenant_id=tenant_id,
+            crm_sync_record_id=crm_sync_record_id,
+            booking_record=lead_like,
+        )
+    elif entity_type in {"task", "task_payment"}:
+        external_deal_id = str((lead_like.metadata or {}).get("external_deal_id") or "").strip() or None
+        result = await _execute_booking_task_sync(
+            repository=repository,
+            tenant_id=tenant_id,
+            crm_sync_record_id=crm_sync_record_id,
+            booking_record=lead_like,
+            external_deal_id=external_deal_id,
         )
     else:
         await repository.record_sync_error(

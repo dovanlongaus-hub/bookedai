@@ -11,7 +11,9 @@ import { expect, test, type Page } from '@playwright/test';
  *
  * This spec covers four scenarios:
  *   1. Smoke happy path — `?status=paid&booking_reference=…&session_id=…` surfaces
- *      the success card and a portal CTA whose href round-trips the booking ref.
+ *      the verifying card, asks backend payment status, then surfaces the success
+ *      card and a portal CTA whose href round-trips the booking ref only after
+ *      backend status is paid.
  *   2. Missing booking_reference — `?status=paid` only → success card may render
  *      but the portal CTA must NOT silently expose a malformed link.
  *   3. Cancelled — `?status=cancelled` → cancel banner renders, no portal CTA.
@@ -19,24 +21,16 @@ import { expect, test, type Page } from '@playwright/test';
  *      scroll and CTA tap-target ≥ 44px.
  *
  * Scope notes:
- *   - The current homepage source (`HomepageSearchExperience.tsx:1989-2017`) parses
- *     `?booking=success&ref=…` (legacy contract) into `bookingReturnNotice` state
- *     but never renders the notice or a portal CTA in the JSX. The skeleton from
- *     section 10.2 of the Lane 4 plan asks for the documented forward-looking
- *     contract (`?status=paid&booking_reference=…&session_id=…`). Rather than
- *     pick one, the spec probes BOTH query shapes so it stays useful as the
- *     contract converges and so the failure messages clearly point to the gap.
- *   - No backend mocking is needed: the homepage does not fetch on the Stripe
- *     return path. Tests just navigate with query params and assert UI render.
+ *   - The homepage must not trust `?booking=success` or `?status=paid` as proof
+ *     of payment. These tests mock `GET /api/v1/payments/status` and assert that
+ *     paid UI appears only after backend truth returns `payment_status=paid`.
  *
  * Audience tags applied: `@smoke @journey @audience-A @audience-C` per Lane 4
  * spec #4 ("A=SME daily UX, C=Investor pitch").
  *
- * Release-gate opt-in decision: this spec is intentionally kept OUT of the
- * grep-pinned `run_legacy_smoke.sh` / `run_live_read_smoke.sh` allowlists. Until
- * the homepage actually renders the Stripe-return portal handoff CTA, the spec
- * will fail — which is the point of P1-Q3 as a gap-detector. Operators can run
- * it explicitly with `npx playwright test homepage-stripe-return-portal-handoff`.
+ * Release-gate opt-in decision: this spec can run explicitly with
+ * `npx playwright test homepage-stripe-return-portal-handoff` and should be
+ * promoted into the release gate after the production return path is deployed.
  */
 
 const BOOKING_REF = 'BAI-STRIPE-2026';
@@ -48,6 +42,7 @@ const PORTAL_HREF_PATTERN = new RegExp(
 const SUCCESS_COPY_PATTERN = /payment\s+(received|complete|confirmed|successful)|booking\s+confirmed/i;
 const CANCELLED_COPY_PATTERN = /payment\s+(?:was\s+)?(?:not\s+completed|cancelled|canceled)|booking\s+is\s+still\s+saved/i;
 const PORTAL_CTA_NAME_PATTERN = /open\s+(?:my\s+)?booking\s+portal|view\s+(?:your|my)\s+booking|open\s+portal|continue\s+to\s+(?:the\s+)?portal/i;
+const VERIFYING_COPY_PATTERN = /payment\s+is\s+being\s+verified|checking\s+backend\s+payment\s+truth/i;
 
 async function gotoStripeReturn(page: Page, query: string): Promise<void> {
   // Navigate using both the documented forward-looking contract (`status=paid`)
@@ -58,14 +53,49 @@ async function gotoStripeReturn(page: Page, query: string): Promise<void> {
   await page.waitForLoadState('domcontentloaded');
 }
 
+async function mockPaymentStatus(
+  page: Page,
+  paymentStatus: 'paid' | 'verifying' | 'cancelled' | 'expired' = 'paid',
+  options: { defer?: boolean } = {},
+) {
+  let release = () => undefined;
+  const gate = options.defer
+    ? new Promise<void>((resolve) => {
+        release = resolve;
+      })
+    : Promise.resolve();
+  await page.route('**/api/v1/payments/status**', async (route) => {
+    await gate;
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'ok',
+        data: {
+          status: 'ok',
+          booking_reference: BOOKING_REF,
+          payment_status: paymentStatus,
+          session_match: true,
+        },
+      }),
+    });
+  });
+  return release;
+}
+
 test.describe('Stripe return -> portal handoff', () => {
-  test('smoke: paid return surfaces success card with portal CTA carrying booking_reference @smoke @journey @audience-A @audience-C', async ({
+  test('smoke: paid return verifies backend status before surfacing portal CTA @smoke @journey @audience-A @audience-C', async ({
     page,
   }) => {
+    const releasePaymentStatus = await mockPaymentStatus(page, 'paid', { defer: true });
     await gotoStripeReturn(
       page,
       `/?status=paid&booking_reference=${BOOKING_REF}&session_id=cs_test_abc&booking=success&ref=${BOOKING_REF}`,
     );
+
+    await expect(page.getByTestId('stripe-return-success-card')).toContainText(VERIFYING_COPY_PATTERN);
+    releasePaymentStatus();
+    await expect(page.locator('[data-stripe-return="paid"]')).toBeVisible();
 
     const successCardCandidates = [
       page.getByTestId('stripe-return-success-card'),
@@ -155,6 +185,7 @@ test.describe('Stripe return -> portal handoff', () => {
   test('mobile 390x844 viewport keeps success card and CTA usable without horizontal scroll @journey @audience-A @audience-C', async ({
     page,
   }) => {
+    await mockPaymentStatus(page, 'paid');
     await page.setViewportSize({ width: 390, height: 844 });
     await gotoStripeReturn(
       page,

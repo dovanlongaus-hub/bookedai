@@ -26,6 +26,7 @@ from pydantic import BaseModel, Field
 from core.errors import AppError, IntegrationAppError, PaymentAppError
 from core.logging import get_logger
 from integrations.chess_payment_accounts import CHESS_AUD_BANK, CHESS_VND_BANK
+from integrations.stripe.constants import STRIPE_API_VERSION
 
 from api.v1_routes import _error_response, _success_response
 
@@ -149,7 +150,6 @@ async def _create_chess_stripe_checkout_session(
         ("mode", "payment"),
         ("success_url", success_url),
         ("cancel_url", cancel_url),
-        ("payment_method_types[]", "card"),
         ("line_items[0][quantity]", "1"),
         ("line_items[0][price_data][currency]", "aud"),
         ("line_items[0][price_data][unit_amount]", str(amount_cents)),
@@ -175,6 +175,7 @@ async def _create_chess_stripe_checkout_session(
             headers={
                 "Authorization": f"Bearer {stripe_secret_key}",
                 "Content-Type": "application/x-www-form-urlencoded",
+                "Stripe-Version": STRIPE_API_VERSION,
             },
             content=urlencode(form_data).encode(),
         )

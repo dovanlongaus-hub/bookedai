@@ -1,5 +1,8 @@
-import { Suspense, lazy, useEffect, useState } from 'react';
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 
+import { AIMentorAcademyPanel } from '../features/admin/AIMentorAcademyPanel';
+import { AIMentorReservationsPanel } from '../features/admin/AIMentorReservationsPanel';
+import { AIMentorZohoCredentialsPanel } from '../features/admin/AIMentorZohoCredentialsPanel';
 import { AdminBookingsSection } from '../features/admin/bookings-section';
 import { AdminDashboardHeader } from '../features/admin/dashboard-header';
 import { AdminEmailStatusNote } from '../features/admin/email-status-note';
@@ -38,6 +41,7 @@ const workspacePanels: Record<AdminWorkspaceId, AdminWorkspacePanelId[]> = {
   overview: ['bookings', 'recent-events', 'selected-booking', 'portal-support'],
   tenants: ['tenant-directory'],
   'tenant-workspace': ['tenant-profile', 'tenant-team', 'tenant-services'],
+  'ai-mentor-academy': [],
   catalog: ['service-catalog', 'partners'],
   'billing-support': ['portal-support', 'selected-booking'],
   integrations: ['integrations-health', 'recent-events'],
@@ -52,6 +56,7 @@ function isWorkspaceId(value: string): value is AdminWorkspaceId {
     value === 'overview' ||
     value === 'tenants' ||
     value === 'tenant-workspace' ||
+    value === 'ai-mentor-academy' ||
     value === 'catalog' ||
     value === 'billing-support' ||
     value === 'integrations' ||
@@ -103,6 +108,24 @@ export function AdminPage() {
     }
     return parseAdminHash(window.location.hash).panel;
   });
+
+  // Reads the AI Mentor tenant session token from localStorage so the
+  // academy panel can call /api/v1/tenants/me/aimentor-students. Falls back
+  // to null when the admin has not signed into the AI Mentor tenant yet.
+  const tenantSessionTokenForAcademy = useMemo<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    if (activeWorkspace !== 'ai-mentor-academy') return null;
+    try {
+      const raw = window.localStorage.getItem(
+        'bookedai.tenant.session.ai-mentor-doer',
+      );
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { session_token?: string } | null;
+      return parsed?.session_token?.trim() || null;
+    } catch {
+      return null;
+    }
+  }, [activeWorkspace]);
   const {
     username,
     setUsername,
@@ -643,6 +666,23 @@ export function AdminPage() {
               void uploadTenantAsset(file, kind);
             }}
           />
+        ) : null}
+
+        {activeWorkspace === 'ai-mentor-academy' ? (
+          <section className="booked-page-grid" style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            <AIMentorZohoCredentialsPanel
+              sessionToken={tenantSessionTokenForAcademy}
+              locale="en"
+            />
+            <AIMentorReservationsPanel
+              sessionToken={tenantSessionTokenForAcademy}
+              locale="en"
+            />
+            <AIMentorAcademyPanel
+              sessionToken={tenantSessionTokenForAcademy}
+              locale="en"
+            />
+          </section>
         ) : null}
 
         {activeWorkspace === 'catalog' ? (

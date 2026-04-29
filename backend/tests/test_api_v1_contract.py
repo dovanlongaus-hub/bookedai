@@ -2,9 +2,51 @@ from __future__ import annotations
 
 from contextlib import asynccontextmanager
 from types import SimpleNamespace
-from unittest.mock import ANY, AsyncMock
+from unittest.mock import ANY, AsyncMock, patch
+
+import pytest
 
 import api.v1_routes as v1_routes
+
+
+# Wave 15: P0-2 (tenant cross-write fix) hardened `_resolve_tenant_id` to
+# REQUIRE a valid tenant session bearer token. These contract tests assert
+# response-envelope shape (data contract), not the auth flow — so we stub
+# the resolver across every handler module that owns one of the routes
+# under test. The stub returns the actor_context.tenant_id verbatim so each
+# test still exercises tenant scoping in downstream code.
+async def _stub_resolve_tenant_id(_request, actor_context):
+    if actor_context is None:
+        return "tenant-123"
+    requested = getattr(actor_context, "tenant_id", None)
+    if isinstance(requested, str) and requested.strip():
+        return requested.strip()
+    ref = getattr(actor_context, "tenant_ref", None)
+    if isinstance(ref, str) and ref.strip():
+        return ref.strip()
+    return "tenant-123"
+
+
+@pytest.fixture(autouse=True)
+def _patch_resolve_tenant_id_for_contract_tests():
+    """Bypass the Wave P0-2 auth gate so contract tests can verify shapes."""
+    targets = [
+        "api.v1_booking_handlers._resolve_tenant_id",
+        "api.v1_search_handlers._resolve_tenant_id",
+        "api.v1_communication_handlers._resolve_tenant_id",
+        "api.v1_routes._resolve_tenant_id",
+    ]
+    patches = []
+    for target in targets:
+        try:
+            ctx = patch(target, _stub_resolve_tenant_id)
+            ctx.start()
+            patches.append(ctx)
+        except (AttributeError, ModuleNotFoundError):
+            pass
+    yield
+    for ctx in patches:
+        ctx.stop()
 
 
 TENANT_ID = "tenant-123"

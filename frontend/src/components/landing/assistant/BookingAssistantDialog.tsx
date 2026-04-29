@@ -9,7 +9,20 @@ import {
   useRef,
   useState,
 } from 'react';
-import { MessageCircle } from 'lucide-react';
+import {
+  CalendarPlus,
+  CheckCircle2,
+  Copy,
+  CreditCard,
+  ExternalLink,
+  Mail,
+  MessageCircle,
+  Printer,
+  ReceiptText,
+  Share2,
+  Smartphone,
+  WalletCards,
+} from 'lucide-react';
 
 import {
   brandDescriptor,
@@ -234,6 +247,22 @@ type ChatMessage = {
 
 type PublicAssistantLiveReadResult = Awaited<ReturnType<typeof getPublicBookingAssistantLiveReadRecommendation>>;
 
+function buildEmptyLiveReadResult(): PublicAssistantLiveReadResult {
+  return {
+    candidateIds: [],
+    rankedCandidates: [],
+    recommendedCandidateIds: [],
+    suggestedServiceId: null,
+    queryUnderstandingSummary: null,
+    semanticAssistSummary: null,
+    warnings: ['Live ranking is still catching up. Showing chat and catalog matches first.'],
+    trustSummary: null,
+    bookingRequestSummary: null,
+    bookingPathSummary: null,
+    usedLiveRead: false,
+  };
+}
+
 type BookingAssistantDialogPartnerConfig = {
   services_endpoint?: string;
   booking_endpoint?: string;
@@ -243,6 +272,14 @@ type BookingAssistantDialogPartnerConfig = {
     post_booking_feedback?: boolean;
     monthly_reminder_default?: boolean;
   };
+};
+
+type BookingAssistantCustomerProfile = {
+  name: string;
+  email: string;
+  phone?: string | null;
+  avatarUrl?: string | null;
+  authProvider: 'google' | 'email';
 };
 
 type BookingAssistantDialogProps = {
@@ -260,6 +297,8 @@ type BookingAssistantDialogProps = {
   surfaceVariant?: 'default' | 'homepage_search';
   runtimeConfig?: PublicBookingAssistantRuntimeConfig | null;
   partnerConfig?: BookingAssistantDialogPartnerConfig | null;
+  customerProfile?: BookingAssistantCustomerProfile | null;
+  onCustomerProfileChange?: (profile: BookingAssistantCustomerProfile) => void;
 };
 
 type ProductSheetSnap = 'peek' | 'half' | 'full';
@@ -459,11 +498,11 @@ const CHAT_RESULT_BATCH_SIZE = 3;
 const SEARCH_PROGRESS_STAGES = [
   {
     label: 'Reading your request',
-    detail: 'Checking the service, location, timing, and who the booking is for.',
+    detail: 'Checking service type, tenant fit, location, timing, and who the booking is for.',
   },
   {
-    label: 'Finding likely matches',
-    detail: 'Catalog matches appear first while live ranking checks public sources and location fit.',
+    label: 'Showing tenant matches',
+    detail: 'Known BookedAI tenant services appear first so you are not waiting on public-web checks.',
   },
   {
     label: 'Ranking the shortlist',
@@ -474,6 +513,15 @@ const SEARCH_PROGRESS_STAGES = [
     detail: 'This can take longer when availability, partner booking links, maps, or Internet results need verification.',
   },
 ] as const;
+
+const SEARCH_TOKEN_ALIASES: Record<string, string[]> = {
+  chess: ['chess', 'co', 'mai', 'hung', 'academy', 'kids', 'class', 'sydney'],
+  swim: ['swim', 'swimming', 'future', 'caringbah', 'miranda', 'kids', 'lesson'],
+  swimming: ['swim', 'swimming', 'future', 'caringbah', 'miranda', 'kids', 'lesson'],
+  mentor: ['mentor', 'ai', 'startup', 'founder', 'growth', 'product', '1-1'],
+  wsti: ['wsti', 'ai', 'event', 'western', 'sydney', 'startup', 'hub'],
+  event: ['event', 'meetup', 'wsti', 'western', 'sydney', 'startup', 'hub'],
+};
 
 const SEARCH_PROGRESS_PROMPTS = [
   'You can reply with a suburb, landmark, or "near me" while I search.',
@@ -512,11 +560,17 @@ function buildInstantSearchMatches(
   services: ServiceCatalogItem[],
   query: string,
 ): ServiceCatalogItem[] {
-  const queryTokens = query
+  const directTokens = query
     .toLowerCase()
     .split(/[^a-z0-9]+/i)
     .map((token) => token.trim())
     .filter((token) => token.length >= 3);
+  const queryTokens = Array.from(
+    new Set([
+      ...directTokens,
+      ...directTokens.flatMap((token) => SEARCH_TOKEN_ALIASES[token] ?? []),
+    ]),
+  );
   if (!queryTokens.length) {
     return services.filter((service) => service.featured).slice(0, CHAT_RESULT_BATCH_SIZE);
   }
@@ -534,10 +588,21 @@ function buildInstantSearchMatches(
         .filter(Boolean)
         .join(' ')
         .toLowerCase();
-      const score = queryTokens.reduce(
-        (total, token) => total + (searchText.includes(token) ? 1 : 0),
-        service.featured ? 0.25 : 0,
+      const directScore = directTokens.reduce(
+        (total, token) => total + (searchText.includes(token) ? 2 : 0),
+        0,
       );
+      const aliasScore = queryTokens.reduce(
+        (total, token) => total + (searchText.includes(token) ? 1 : 0),
+        0,
+      );
+      const tenantBoost =
+        service.source_type === 'tenant_catalog' ||
+        service.source_label?.toLowerCase().includes('bookedai') ||
+        service.booking_path_type
+          ? 1.25
+          : 0;
+      const score = directScore + aliasScore + tenantBoost + (service.featured ? 0.25 : 0);
       return { service, score };
     })
     .filter((item) => item.score > 0)
@@ -1311,33 +1376,61 @@ function buildBookingJourneySteps(params: {
   customerEmail: string;
   customerPhone: string;
   result: BookingAssistantSessionResponse | null;
+  hasConversationStarted: boolean;
+  hasVisibleOptions: boolean;
 }) {
   const hasContact =
     params.customerName.trim().length > 1 &&
     (params.customerEmail.trim().length > 3 ||
       params.customerPhone.trim().replace(/\D/g, '').length >= 8);
   const hasSchedule = Boolean(params.preferredSlot);
+  const hasSelection = Boolean(params.selectedService);
+  const hasResult = Boolean(params.result);
 
   return [
     {
-      id: 'details',
-      label: 'Details',
-      status: params.selectedService ? 'active' : 'pending',
+      id: 'chat',
+      label: 'Chat',
+      status: params.hasConversationStarted ? 'completed' : 'active',
     },
     {
-      id: 'schedule',
-      label: 'Schedule',
-      status: hasContact && hasSchedule ? 'active' : params.selectedService ? 'pending' : 'pending',
+      id: 'search',
+      label: 'Search',
+      status: params.hasVisibleOptions || hasSelection || hasResult
+        ? 'completed'
+        : params.hasConversationStarted
+          ? 'active'
+          : 'pending',
     },
     {
-      id: 'confirm',
-      label: 'Confirm',
-      status: params.result ? 'active' : hasContact && hasSchedule ? 'pending' : 'pending',
+      id: 'preview',
+      label: 'Preview',
+      status: hasSelection || hasResult
+        ? 'completed'
+        : params.hasVisibleOptions
+          ? 'active'
+          : 'pending',
+    },
+    {
+      id: 'book',
+      label: 'Book',
+      status: hasResult
+        ? 'completed'
+        : hasSelection && hasContact && hasSchedule
+          ? 'active'
+          : hasSelection
+            ? 'active'
+            : 'pending',
+    },
+    {
+      id: 'pay',
+      label: 'Pay',
+      status: hasResult ? 'active' : 'pending',
     },
     {
       id: 'care',
       label: 'Care',
-      status: params.result ? 'active' : 'pending',
+      status: hasResult ? 'active' : 'pending',
     },
   ] as const;
 }
@@ -1804,6 +1897,8 @@ export function BookingAssistantDialog({
   surfaceVariant = 'default',
   runtimeConfig = null,
   partnerConfig = null,
+  customerProfile = null,
+  onCustomerProfileChange,
 }: BookingAssistantDialogProps) {
   const partnerPortalPrefix = partnerConfig?.portal_endpoint_prefix?.trim() || null;
   const partnerBookingEndpoint = partnerConfig?.booking_endpoint?.trim() || null;
@@ -1816,6 +1911,15 @@ export function BookingAssistantDialog({
     action?: 'edit' | 'reschedule' | 'cancel',
   ) {
     return getBookingPortalUrl(target, action, partnerPortalPrefix);
+  }
+  function resolveWalletPassUrl(
+    target: BookingAssistantSessionResponse,
+    wallet: 'apple' | 'google',
+  ) {
+    const url = new URL(resolvePortalUrl(target), window.location.origin);
+    url.searchParams.set('action', wallet === 'apple' ? 'apple_wallet' : 'google_wallet');
+    url.searchParams.set('pass', wallet);
+    return url.toString();
   }
   function resolveQrCodeUrl(target: BookingAssistantSessionResponse) {
     return getBookingQrCodeUrl(target, partnerPortalPrefix);
@@ -2697,6 +2801,15 @@ export function BookingAssistantDialog({
   }, [initialQuery, initialQueryRequestId, isOpen]);
 
   useEffect(() => {
+    if (!customerProfile) {
+      return;
+    }
+    setCustomerName((current) => current.trim() ? current : customerProfile.name);
+    setCustomerEmail((current) => current.trim() ? current : customerProfile.email);
+    setCustomerPhone((current) => current.trim() ? current : customerProfile.phone?.trim() ?? '');
+  }, [customerProfile]);
+
+  useEffect(() => {
     if (typeof window === 'undefined') {
       return;
     }
@@ -3044,8 +3157,19 @@ export function BookingAssistantDialog({
         customerEmail,
         customerPhone,
         result,
+        hasConversationStarted,
+        hasVisibleOptions: visibleSuggestedServices.length > 0,
       }),
-    [customerEmail, customerName, customerPhone, preferredSlot, result, selectedService],
+    [
+      customerEmail,
+      customerName,
+      customerPhone,
+      hasConversationStarted,
+      preferredSlot,
+      result,
+      selectedService,
+      visibleSuggestedServices.length,
+    ],
   );
   const previewGoogleMapsUrl = previewService
     ? buildGoogleMapsSearchUrl({
@@ -3677,7 +3801,7 @@ export function BookingAssistantDialog({
         }
       }
 
-      const liveRead = await liveReadPromise;
+      const liveRead = await withTimeout(liveReadPromise, 4200) ?? buildEmptyLiveReadResult();
       const hasLiveReadSearchGrounding =
         liveRead.rankedCandidates.length > 0 ||
         liveRead.candidateIds.length > 0 ||
@@ -3690,7 +3814,11 @@ export function BookingAssistantDialog({
               rankedCandidates: [] as MatchCandidate[],
               resolved: false,
             }
-          : await shadowSearchPromise;
+          : await withTimeout(shadowSearchPromise, 1800) ?? {
+              candidateIds: [] as string[],
+              rankedCandidates: [] as MatchCandidate[],
+              resolved: false,
+            };
       const groundedLiveReadCandidateIds = liveRead.candidateIds.length
         ? liveRead.candidateIds
         : liveRead.rankedCandidates
@@ -3927,6 +4055,16 @@ export function BookingAssistantDialog({
     const normalizedCustomerEmail = customerEmail.trim() ? customerEmail.trim().toLowerCase() : null;
     const normalizedCustomerPhone = customerPhone.trim() || null;
     const normalizedNotes = notes.trim() || null;
+
+    if (normalizedCustomerEmail) {
+      onCustomerProfileChange?.({
+        name: customerName.trim(),
+        email: normalizedCustomerEmail,
+        phone: normalizedCustomerPhone,
+        avatarUrl: customerProfile?.avatarUrl ?? null,
+        authProvider: customerProfile?.authProvider ?? 'email',
+      });
+    }
 
     if (selectedEvent && !selectedService) {
       const response = await fetch(resolveBookingEndpoint('/booking-assistant/session'), {
@@ -5483,7 +5621,7 @@ export function BookingAssistantDialog({
                       ? 'hidden'
                       : isCompactMobileViewport
                         ? 'grid-cols-3 gap-1.5'
-                        : 'grid-cols-1 gap-2 sm:grid-cols-3'
+                        : 'grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6'
                   }`}>
                     {bookingJourneySteps.map((step, index) => (
                       <div
@@ -5491,15 +5629,19 @@ export function BookingAssistantDialog({
                         className={`rounded-2xl border text-center ${
                           step.status === 'active'
                             ? 'border-slate-950 bg-slate-950 text-white'
+                            : step.status === 'completed'
+                              ? 'border-emerald-100 bg-emerald-50 text-emerald-800'
                             : 'border-slate-200 bg-white text-slate-600'
                         } ${isCompactMobileViewport ? 'px-1.5 py-2' : 'px-2.5 py-2.5'}`}
                       >
                         <div className={`mx-auto flex items-center justify-center rounded-full font-semibold ${
                           step.status === 'active'
                             ? 'bg-white text-slate-950'
+                            : step.status === 'completed'
+                              ? 'bg-emerald-500 text-white'
                             : 'bg-slate-100 text-slate-600'
                         } ${isCompactMobileViewport ? 'h-5 w-5 text-[9px]' : 'h-6 w-6 text-xs'}`}>
-                          {index + 1}
+                          {step.status === 'completed' ? '✓' : index + 1}
                         </div>
                         <div className={`mt-2 font-semibold ${isCompactMobileViewport ? 'text-[9px] leading-3' : 'text-xs'}`}>{step.label}</div>
                       </div>
@@ -6313,22 +6455,26 @@ export function BookingAssistantDialog({
                     <div className="text-xs font-semibold uppercase tracking-[0.16em] text-slate-500">
                       Booking journey
                     </div>
-                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-4">
-                      {bookingJourneySteps.map((step, index) => (
-                        <div
-                          key={`journey-${step.id}`}
-                          className={`rounded-2xl px-3 py-3 text-center ${
-                            step.status === 'active'
-                              ? 'bg-slate-950 text-white'
-                              : 'bg-white text-slate-600 ring-1 ring-slate-200'
-                          }`}
-                        >
+                    <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+                    {bookingJourneySteps.map((step, index) => (
+                      <div
+                        key={`journey-${step.id}`}
+                        className={`rounded-2xl px-3 py-3 text-center ${
+                          step.status === 'active'
+                            ? 'bg-slate-950 text-white'
+                            : step.status === 'completed'
+                              ? 'bg-emerald-50 text-emerald-800 ring-1 ring-emerald-100'
+                            : 'bg-white text-slate-600 ring-1 ring-slate-200'
+                        }`}
+                      >
                           <div className={`mx-auto flex h-6 w-6 items-center justify-center rounded-full text-xs font-semibold ${
                             step.status === 'active'
                               ? 'bg-white text-slate-950'
+                              : step.status === 'completed'
+                                ? 'bg-emerald-500 text-white'
                               : 'bg-slate-100 text-slate-600'
                           }`}>
-                            {index + 1}
+                            {step.status === 'completed' ? '✓' : index + 1}
                           </div>
                           <div className="mt-2 text-[11px] font-semibold">{step.label}</div>
                         </div>
@@ -6366,6 +6512,12 @@ export function BookingAssistantDialog({
                     />
                   </label>
                 </div>
+
+                {customerProfile ? (
+                  <div className="rounded-[1rem] border border-emerald-100 bg-emerald-50 px-3 py-2 text-[11px] leading-5 text-emerald-800">
+                    Using saved booking profile for {customerProfile.email}. Edit the fields if this booking is for someone else.
+                  </div>
+                ) : null}
 
                 <label className="block text-sm text-slate-600">
                   <span className="mb-2 block font-medium text-slate-700">Phone</span>
@@ -6566,7 +6718,7 @@ export function BookingAssistantDialog({
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-3">
                           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-400/20 ring-1 ring-emerald-400/30" aria-hidden="true">
-                            <span className="text-lg">✓</span>
+                            <CheckCircle2 className="h-5 w-5 text-emerald-100" />
                           </div>
                           <div className="min-w-0">
                             <div className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">
@@ -6582,13 +6734,14 @@ export function BookingAssistantDialog({
                                 className="inline-flex items-center gap-1 rounded-full bg-white/12 px-2 py-0.5 text-xs font-semibold text-white/85 ring-1 ring-white/12 transition hover:bg-white/18"
                                 aria-label="Copy booking reference"
                               >
-                                {copyState.kind === 'reference' ? '✓ Copied' : 'Copy'}
+                                <Copy className="h-3 w-3" aria-hidden="true" />
+                                {copyState.kind === 'reference' ? 'Copied' : 'Copy'}
                               </button>
                             </div>
                           </div>
                         </div>
                         <p className="mt-3 text-sm leading-6 text-emerald-100">
-                          Your booking is confirmed. Scan the QR or tap the portal link to sign in and view full details — the link stays valid as long as you need it.
+                          Your order is confirmed. Review the summary, save the pass to your wallet, or open the portal for full details, changes, payment, and support.
                         </p>
                         <div className="mt-3 flex flex-wrap items-center gap-2">
                           <div className="inline-flex items-center gap-2 rounded-full bg-white/12 px-3 py-1.5 text-[11px] font-semibold text-emerald-50 ring-1 ring-white/12">
@@ -6600,7 +6753,8 @@ export function BookingAssistantDialog({
                             onClick={() => handleCopyBookingValue('portal')}
                             className="inline-flex items-center gap-1 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/90 ring-1 ring-white/12 transition hover:bg-white/16"
                           >
-                            {copyState.kind === 'portal' ? '✓ Portal link copied' : 'Copy portal link'}
+                            <Copy className="h-3 w-3" aria-hidden="true" />
+                            {copyState.kind === 'portal' ? 'Portal link copied' : 'Copy portal link'}
                           </button>
                         </div>
                       </div>
@@ -6638,38 +6792,49 @@ export function BookingAssistantDialog({
                       </div>
                     </div>
 
-                    <div className="mt-5 grid gap-2 sm:grid-cols-3">
+                    <div className="mt-5 grid gap-2 sm:grid-cols-2 xl:grid-cols-4">
                       <a
                         href={resolvePortalUrl(result)}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center justify-center gap-1.5 rounded-[1rem] bg-white px-4 py-3 text-center text-[12px] font-semibold text-slate-950 transition hover:bg-slate-50"
                       >
-                        Open booking portal →
+                        <ExternalLink className="h-4 w-4" aria-hidden="true" />
+                        Open portal
+                      </a>
+                      <a
+                        href="#booking-order-details"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-[1rem] bg-white/10 px-4 py-3 text-center text-[12px] font-semibold text-white ring-1 ring-white/12 transition hover:bg-white/16"
+                      >
+                        <ReceiptText className="h-4 w-4" aria-hidden="true" />
+                        View details
                       </a>
                       {result.payment_url ? (
                         <a
                           href={result.payment_url}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center justify-center rounded-[1rem] bg-emerald-400/20 px-4 py-3 text-center text-[12px] font-semibold text-white ring-1 ring-emerald-300/30 transition hover:bg-emerald-400/30"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-[1rem] bg-emerald-400/20 px-4 py-3 text-center text-[12px] font-semibold text-white ring-1 ring-emerald-300/30 transition hover:bg-emerald-400/30"
                         >
-                          Continue to payment
+                          <CreditCard className="h-4 w-4" aria-hidden="true" />
+                          Payment
                         </a>
                       ) : (
                         <button
                           type="button"
                           onClick={focusBookingConfirmation}
-                          className="inline-flex items-center justify-center rounded-[1rem] bg-emerald-400/20 px-4 py-3 text-center text-[12px] font-semibold text-white ring-1 ring-emerald-300/30 transition hover:bg-emerald-400/30"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-[1rem] bg-emerald-400/20 px-4 py-3 text-center text-[12px] font-semibold text-white ring-1 ring-emerald-300/30 transition hover:bg-emerald-400/30"
                         >
+                          <CheckCircle2 className="h-4 w-4" aria-hidden="true" />
                           Review confirmation
                         </button>
                       )}
                       <button
                         type="button"
                         onClick={returnToMainBookedAiScreen}
-                        className="inline-flex items-center justify-center rounded-[1rem] bg-white/10 px-4 py-3 text-center text-[12px] font-semibold text-white transition hover:bg-white/16"
+                        className="inline-flex items-center justify-center gap-1.5 rounded-[1rem] bg-white/10 px-4 py-3 text-center text-[12px] font-semibold text-white transition hover:bg-white/16"
                       >
+                        <MessageCircle className="h-4 w-4" aria-hidden="true" />
                         Back to homepage
                       </button>
                     </div>
@@ -6682,7 +6847,8 @@ export function BookingAssistantDialog({
                           className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/95 ring-1 ring-white/15 transition hover:bg-white/16"
                           aria-label="Download calendar invite (.ics)"
                         >
-                          📅 Add to calendar
+                          <CalendarPlus className="h-3.5 w-3.5" aria-hidden="true" />
+                          Add to calendar
                         </button>
                       ) : null}
                       {canShareBooking && isWebShareAvailable() ? (
@@ -6692,7 +6858,8 @@ export function BookingAssistantDialog({
                           className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/95 ring-1 ring-white/15 transition hover:bg-white/16"
                           aria-label="Share booking via system share sheet"
                         >
-                          📤 Share
+                          <Share2 className="h-3.5 w-3.5" aria-hidden="true" />
+                          Share
                         </button>
                       ) : null}
                       <button
@@ -6701,7 +6868,8 @@ export function BookingAssistantDialog({
                         className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/95 ring-1 ring-white/15 transition hover:bg-white/16"
                         aria-label="Email this booking"
                       >
-                        ✉️ Email
+                        <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                        Email
                       </button>
                       <button
                         type="button"
@@ -6709,16 +6877,58 @@ export function BookingAssistantDialog({
                         className="inline-flex items-center gap-1.5 rounded-full bg-white/10 px-3 py-1.5 text-[11px] font-semibold text-white/95 ring-1 ring-white/15 transition hover:bg-white/16"
                         aria-label="Print booking confirmation"
                       >
-                        🖨️ Print
+                        <Printer className="h-3.5 w-3.5" aria-hidden="true" />
+                        Print
                       </button>
+                    </div>
+                    <div className="mt-4 rounded-[1.1rem] bg-white/10 p-3 ring-1 ring-white/12">
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-200">
+                            Save your booking pass
+                          </div>
+                          <div className="mt-1 text-xs leading-5 text-emerald-50">
+                            Add the order reference, portal link, and appointment details to your phone wallet.
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2 sm:min-w-[18rem]">
+                          <a
+                            href={resolveWalletPassUrl(result, 'apple')}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[0.9rem] bg-white px-3 py-2 text-[11px] font-semibold text-slate-950 transition hover:bg-slate-50"
+                          >
+                            <Smartphone className="h-4 w-4" aria-hidden="true" />
+                            Apple Wallet
+                          </a>
+                          <a
+                            href={resolveWalletPassUrl(result, 'google')}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[0.9rem] bg-white px-3 py-2 text-[11px] font-semibold text-slate-950 transition hover:bg-slate-50"
+                          >
+                            <WalletCards className="h-4 w-4" aria-hidden="true" />
+                            Google Wallet
+                          </a>
+                        </div>
+                      </div>
                     </div>
                   </section>
 
-                  <div className="booked-print-hide overflow-hidden rounded-[1.5rem] border border-slate-200 bg-[#fbfbfd] p-4 text-slate-700">
-                    <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div
+                    id="booking-order-details"
+                    className="booked-print-hide overflow-hidden rounded-[1.5rem] border border-slate-200 bg-[#fbfbfd] p-4 text-slate-700"
+                  >
+                    <div className="grid gap-4 lg:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
                       <div className="min-w-0">
                         <div className="inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700 ring-1 ring-emerald-100">
-                          Booking summary
+                          Order summary
+                        </div>
+                        <div className="mt-3 text-lg font-bold tracking-tight text-slate-950">
+                          {result.service.name}
+                        </div>
+                        <div className="mt-1 text-sm leading-6 text-slate-600">
+                          {[result.service.venue_name, result.service.location].filter(Boolean).join(' • ') || 'Location confirmed during booking'}
                         </div>
                         <div className="mt-3 text-xs font-semibold uppercase tracking-[0.18em] text-slate-500">
                           Booking reference
@@ -6758,9 +6968,58 @@ export function BookingAssistantDialog({
                           </div>
                         </div>
                       </div>
+                      <div className="rounded-[1.15rem] border border-slate-200 bg-white p-4 shadow-[0_10px_24px_rgba(15,23,42,0.04)]">
+                        <div className="flex items-start justify-between gap-3">
+                          <div>
+                            <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">
+                              Booking summary
+                            </div>
+                            <div className="mt-1 text-sm font-bold text-slate-950">
+                              {result.amount_label}
+                            </div>
+                          </div>
+                          <div className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+                            Confirmed
+                          </div>
+                        </div>
+                        <div className="mt-4 space-y-3 text-sm">
+                          {[
+                            ['Customer', customerName.trim() || 'Customer'],
+                            ['Contact', result.contact_email || customerEmail.trim() || customerPhone.trim() || 'Saved in portal'],
+                            ['Date', result.requested_date],
+                            ['Time', `${result.requested_time} ${result.timezone}`.trim()],
+                            ['Status', result.payment_status === 'stripe_checkout_ready' ? 'Payment ready' : 'Payment follow-up'],
+                          ].map(([label, value]) => (
+                            <div key={label} className="flex items-start justify-between gap-3 border-b border-slate-100 pb-2 last:border-b-0 last:pb-0">
+                              <div className="text-xs font-semibold uppercase tracking-[0.12em] text-slate-500">{label}</div>
+                              <div className="max-w-[12rem] text-right text-xs font-semibold text-slate-950">{value}</div>
+                            </div>
+                          ))}
+                        </div>
+                        <div className="mt-4 grid grid-cols-2 gap-2">
+                          <a
+                            href={resolveWalletPassUrl(result, 'apple')}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[0.9rem] border border-slate-200 bg-slate-950 px-3 py-2 text-[11px] font-semibold text-white transition hover:bg-slate-800"
+                          >
+                            <Smartphone className="h-4 w-4" aria-hidden="true" />
+                            Apple
+                          </a>
+                          <a
+                            href={resolveWalletPassUrl(result, 'google')}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded-[0.9rem] border border-slate-200 bg-white px-3 py-2 text-[11px] font-semibold text-slate-800 transition hover:bg-slate-50"
+                          >
+                            <WalletCards className="h-4 w-4" aria-hidden="true" />
+                            Google
+                          </a>
+                        </div>
+                      </div>
                     </div>
 
-                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+                    <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
                       <div className="rounded-[1rem] bg-white px-3 py-3 ring-1 ring-slate-200">
                         <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
                           Service
@@ -6785,6 +7044,14 @@ export function BookingAssistantDialog({
                           {result.requested_date}
                         </div>
                         <div className="mt-0.5 text-xs text-slate-500">{result.requested_time}</div>
+                      </div>
+                      <div className="rounded-[1rem] bg-white px-3 py-3 ring-1 ring-slate-200">
+                        <div className="text-[9px] font-semibold uppercase tracking-[0.14em] text-slate-500">
+                          Venue
+                        </div>
+                        <div className="mt-1 line-clamp-2 text-[12px] font-semibold text-slate-950">
+                          {[result.service.venue_name, result.service.location].filter(Boolean).join(' • ') || 'Confirmed in portal'}
+                        </div>
                       </div>
                     </div>
                   </div>

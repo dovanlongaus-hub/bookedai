@@ -56,6 +56,7 @@ canonical_cors_origins = [
     "https://tenant.bookedai.au",
     "https://futureswim.bookedai.au",
     "https://chess.bookedai.au",
+    "https://aimentor.bookedai.au",
     "https://api.bookedai.au",
     "https://upload.bookedai.au",
 ]

@@ -429,7 +429,7 @@ export function TenantPartnerApp({ tenantSlug }: TenantPartnerAppProps) {
               className="inline-flex flex-wrap rounded-full border border-[var(--template-border)] bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em]"
               style={{ color: 'var(--tenant-accent)' }}
             >
-              {hero.kicker || `Verified BookedAI tenant · ${brand.name}`}
+              {hero.kicker || `Live BookedAI business · ${brand.name}`}
             </div>
             <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-[-0.05em] text-apple-near-black sm:text-5xl">
               {hero.h1}
@@ -493,7 +493,7 @@ export function TenantPartnerApp({ tenantSlug }: TenantPartnerAppProps) {
           <section className="template-card p-6 sm:p-8">
             <div className="template-kicker">Why partners trust BookedAI</div>
             <h2 className="mt-2 text-3xl font-semibold tracking-[-0.05em] text-apple-near-black">
-              Operator-grade proof on every booking.
+              Business-ready proof on every booking.
             </h2>
             <ul className="mt-6 grid gap-3 md:grid-cols-3" aria-label="Trust signals">
               {trustSignals.map((signal) => {
@@ -517,7 +517,7 @@ export function TenantPartnerApp({ tenantSlug }: TenantPartnerAppProps) {
             </ul>
             {showAuditLedger ? (
               <p className="mt-4 text-xs uppercase tracking-[0.18em] text-[color:var(--apple-text-tertiary)]">
-                Audit ledger visible to this tenant.
+                Booking activity history visible to this business.
               </p>
             ) : null}
           </section>
@@ -558,7 +558,7 @@ export function TenantPartnerApp({ tenantSlug }: TenantPartnerAppProps) {
         ) : null}
 
         <footer className="flex flex-wrap items-center justify-between gap-3 text-xs text-[color:var(--apple-text-tertiary)]">
-          <span>Verified BookedAI tenant · powered by BookedAI</span>
+          <span>Live BookedAI business · powered by BookedAI</span>
           <a
             href={BOOKEDAI_HOME}
             className="hover:underline"

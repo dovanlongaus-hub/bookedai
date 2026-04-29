@@ -6,6 +6,7 @@ import {
   CreditCard,
   FileClock,
   Gauge,
+  GraduationCap,
   LayoutDashboard,
   MessageSquareText,
   PackageSearch,
@@ -67,6 +68,14 @@ const workspaceConfigs: WorkspaceConfig[] = [
     backendSurface: '/api/admin/tenants/{tenant}',
     group: 'Tenants',
     icon: UsersRound,
+  },
+  {
+    id: 'ai-mentor-academy',
+    label: 'AI Mentor Academy',
+    summary: 'List AI Mentor learners, log attendance, and append progress notes per session.',
+    backendSurface: '/api/v1/tenants/me/aimentor-students',
+    group: 'Tenants',
+    icon: GraduationCap,
   },
   {
     id: 'catalog',

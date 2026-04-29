@@ -43,6 +43,14 @@ export type PublicBookingAssistantAuthoritativeBookingIntentResult = {
   trust: CreateBookingIntentResponse['trust'];
   warnings: string[];
   crmSync: CreateBookingIntentResponse['crm_sync'] | null;
+  /**
+   * Optional Zoho Meeting URL surfaced by the backend on the booking intent
+   * response metadata (`bookingIntentMetadata.zoho_meeting.meeting_url`). This
+   * is populated only when the booking has a confirmed online session slot.
+   */
+  meetingUrl?: string | null;
+  /** Optional calendar event link (Google Calendar / .ics) for the booking. */
+  calendarUrl?: string | null;
 };
 
 export type PublicBookingAssistantRuntimeConfig = {
@@ -224,6 +232,13 @@ function buildActorContext(runtimeConfig?: PublicBookingAssistantRuntimeConfig |
     tenant_ref: runtimeConfig?.tenantRef ?? null,
     deployment_mode: runtimeConfig?.deploymentMode ?? 'standalone_app',
   };
+}
+
+function shouldUsePublicTenantLeadEndpoint(
+  runtimeConfig?: PublicBookingAssistantRuntimeConfig | null,
+) {
+  const channel = runtimeConfig?.channel ?? 'public_web';
+  return Boolean(runtimeConfig?.tenantRef) && (channel === 'public_web' || channel === 'embedded_widget');
 }
 
 function buildAttributionContext(
@@ -841,6 +856,12 @@ export async function createPublicBookingAssistantLeadAndBookingIntent(params: P
   requestedTime: string;
   timezone: string;
   runtimeConfig?: PublicBookingAssistantRuntimeConfig | null;
+  /**
+   * Optional schedule slot id. When the chess academy time-slot picker is used the visitor
+   * picks a concrete slot, and the backend matches the booking intent to that slot directly.
+   * The id is forwarded under `desired_slot.schedule_slot_id` (additive on the contract).
+   */
+  scheduleSlotId?: string | null;
 }): Promise<PublicBookingAssistantAuthoritativeBookingIntentResult> {
   if (!isPublicBookingAssistantV1Enabled()) {
     throw new Error('Public booking assistant v1 is disabled.');
@@ -875,13 +896,20 @@ export async function createPublicBookingAssistantLeadAndBookingIntent(params: P
     actor_context: actorContext,
   };
 
+  const desiredSlot: CreateBookingIntentRequest['desired_slot'] & {
+    schedule_slot_id?: string;
+  } = {
+    date: params.requestedDate,
+    time: params.requestedTime,
+    timezone: params.timezone,
+  };
+  if (params.scheduleSlotId) {
+    desiredSlot.schedule_slot_id = params.scheduleSlotId;
+  }
+
   const bookingIntentRequest: CreateBookingIntentRequest = {
     service_id: params.serviceId,
-    desired_slot: {
-      date: params.requestedDate,
-      time: params.requestedTime,
-      timezone: params.timezone,
-    },
+    desired_slot: desiredSlot,
     contact,
     attribution,
     channel: params.runtimeConfig?.channel ?? 'public_web',
@@ -890,7 +918,15 @@ export async function createPublicBookingAssistantLeadAndBookingIntent(params: P
   };
 
   const [leadResponse, bookingIntentResponse] = await Promise.all([
-    apiV1.createLead(leadRequest),
+    shouldUsePublicTenantLeadEndpoint(params.runtimeConfig)
+      ? apiV1.createPublicLead(params.runtimeConfig?.tenantRef ?? '', {
+          lead_type: leadRequest.lead_type,
+          contact: leadRequest.contact,
+          business_context: leadRequest.business_context,
+          attribution: leadRequest.attribution,
+          intent_notes: params.notes,
+        })
+      : apiV1.createLead(leadRequest),
     apiV1.createBookingIntent(bookingIntentRequest),
   ]);
 
@@ -913,6 +949,24 @@ export async function createPublicBookingAssistantLeadAndBookingIntent(params: P
     );
   }
 
+  // The backend may attach a `metadata` block on the booking intent response
+  // that surfaces integrations payloads (e.g. Zoho Meeting). The contract type
+  // does not declare `metadata`, so we read through a permissive cast.
+  const responseMeta = (bookingIntentResponse.data as unknown as {
+    metadata?: {
+      zoho_meeting?: {
+        meeting_url?: string | null;
+        calendar_url?: string | null;
+        join_url?: string | null;
+      } | null;
+      meeting_url?: string | null;
+      calendar_url?: string | null;
+    } | null;
+  }).metadata ?? null;
+  const zoho = responseMeta?.zoho_meeting ?? null;
+  const meetingUrl = zoho?.meeting_url ?? zoho?.join_url ?? responseMeta?.meeting_url ?? null;
+  const calendarUrl = zoho?.calendar_url ?? responseMeta?.calendar_url ?? null;
+
   return {
     leadId: leadData?.lead_id ?? null,
     contactId: leadData?.contact_id ?? null,
@@ -922,6 +976,8 @@ export async function createPublicBookingAssistantLeadAndBookingIntent(params: P
     trust: bookingIntentResponse.data.trust,
     warnings: bookingIntentResponse.data.warnings,
     crmSync: bookingIntentResponse.data.crm_sync ?? null,
+    meetingUrl,
+    calendarUrl,
   };
 }
 

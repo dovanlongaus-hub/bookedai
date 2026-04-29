@@ -21,9 +21,9 @@ const registerUrl =
   '/register-interest?source_section=architecture&source_cta=start_free_trial&source_detail=architecture_showcase&offer=launch10&deployment=standalone_website&setup=online';
 
 const architectureStats = [
-  ['5', 'live surfaces', 'home, product, pitch, tenant, portal'],
+  ['5', 'customer touchpoints', 'home, product, pitch, booking page, portal'],
   ['3', 'agent loops', 'capture, operate, care'],
-  ['1', 'ops ledger', 'auditable revenue workflow'],
+  ['1', 'booking history', 'traceable revenue workflow'],
 ] as const;
 
 const lanes = [
@@ -53,7 +53,7 @@ const lanes = [
     label: 'Operate',
     tone: 'from-amber-50 to-white',
     accent: 'bg-amber-500',
-    items: ['Tenant Ops', 'Admin Reliability', 'Action ledger', 'Support queue', 'Audit trail'],
+    items: ['Team workspace', 'Health checks', 'Follow-up history', 'Support queue', 'Review trail'],
   },
 ] as const;
 
@@ -214,7 +214,7 @@ function ArchitectureHeroDiagram() {
           </div>
 
           <div className="grid gap-3">
-            {['Booking intent', 'Payment posture', 'Tenant Ops', 'Audit ledger'].map((item, index) => (
+            {['Booking intent', 'Payment posture', 'Team workspace', 'Follow-up history'].map((item, index) => (
               <div key={item} className="rounded-[1.15rem] border border-emerald-100 bg-emerald-50 px-4 py-3">
                 <div className="text-xs font-semibold uppercase tracking-[0.16em] text-emerald-700">
                   System {index + 1}
@@ -238,7 +238,7 @@ function LaneMap() {
             System architecture
           </div>
           <h2 className="mt-4 text-3xl font-semibold tracking-[-0.055em] text-slate-950 sm:text-5xl">
-            A board-level map that still exposes the real operating system.
+            A board-level map of the customer journey and the business follow-up behind it.
           </h2>
         </div>
 
@@ -294,9 +294,9 @@ export function ArchitectureApp() {
               Big-tech clarity for a revenue engine built around bookings.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-slate-600">
-              This page shows the design capability behind BookedAI: customer acquisition surfaces,
-              AI orchestration, booking contracts, operations truth, and enterprise control loops in
-              one visual system.
+              This page shows the design capability behind BookedAI: customer acquisition pages,
+              AI-guided booking, payment and meeting follow-up, CRM visibility, and review controls
+              in one visual system.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -344,8 +344,8 @@ export function ArchitectureApp() {
                 The interface shows the architecture instead of hiding it in a PDF.
               </h2>
               <p className="mt-5 text-base leading-8 text-slate-600">
-                Every visual is designed to make a technical buyer feel the team understands product,
-                operations, reliability, and commercial motion as one connected system.
+                Every visual is designed to show SME owners how the product, customer care, payment
+                follow-up, and business visibility work as one connected system.
               </p>
             </div>
 
@@ -425,7 +425,7 @@ export function ArchitectureApp() {
                 [Workflow, 'Ops automation'],
                 [LockKeyhole, 'Governance'],
                 [Gauge, 'Reliability'],
-                [DatabaseZap, 'Ledger truth'],
+                [DatabaseZap, 'Booking history'],
               ].map(([Icon, label]) => {
                 const TypedIcon = Icon as typeof MessageSquareText;
                 return (

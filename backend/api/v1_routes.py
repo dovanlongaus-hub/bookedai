@@ -248,6 +248,7 @@ class CreateBookingIntentRequestPayload(BaseModel):
     candidate_id: str | None = None
     service_id: str | None = None
     desired_slot: DesiredSlotPayload | None = None
+    schedule_slot_id: str | None = None
     contact: LeadContactInputPayload
     attribution: AttributionContextPayload | None = None
     channel: str

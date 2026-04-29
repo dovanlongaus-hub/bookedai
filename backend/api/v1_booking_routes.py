@@ -10,6 +10,8 @@ router.add_api_route("/conversations/sessions", handlers.start_chat_session, met
 router.add_api_route("/bookings/path/resolve", handlers.resolve_booking_path, methods=["POST"])
 router.add_api_route("/bookings/intents", handlers.create_booking_intent, methods=["POST"])
 router.add_api_route("/payments/intents", handlers.create_payment_intent, methods=["POST"])
+router.add_api_route("/payments/manual-confirm", handlers.confirm_manual_payment, methods=["POST"])
+router.add_api_route("/payments/status", handlers.payment_status, methods=["GET"])
 router.add_api_route(
     "/booking/{booking_reference}/reminders/configure",
     handlers.configure_booking_reminder,

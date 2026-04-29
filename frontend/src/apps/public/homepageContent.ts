@@ -90,7 +90,7 @@ export const languageOptions: Array<{ value: HomepageLocale; label: string }> = 
 const hotEnglishSuggestions: HomepageSuggestion[] = [
   { label: 'Future Swim', query: 'Find Future Swim kids swimming lessons near Caringbah this weekend.' },
   { label: 'Co Mai Hung Chess', query: 'Book Co Mai Hung Chess Sydney pilot class this week.' },
-  { label: 'WSTI AI Event', query: 'Show WSTI AI events at Western Sydney Startup Hub this month.' },
+  { label: 'SME setup', query: 'Set up a booking-ready landing page, email, CRM, and calendar flow for my business.' },
   { label: 'AI Mentor 1-1', query: 'Book an AI Mentor 1-1 session for startup growth this week.' },
   { label: 'Haircut', query: 'Find a men\'s haircut near Sydney CBD this afternoon.' },
   { label: 'Restaurant', query: 'Find a restaurant near me tonight with live booking or call details.' },
@@ -99,7 +99,7 @@ const hotEnglishSuggestions: HomepageSuggestion[] = [
 const hotVietnameseSuggestions: HomepageSuggestion[] = [
   { label: 'Future Swim', query: 'Tìm lớp bơi Future Swim cho trẻ em gần Caringbah vào cuối tuần này.' },
   { label: 'Co Mai Hung Chess', query: 'Đặt lớp Co Mai Hung Chess Sydney pilot trong tuần này.' },
-  { label: 'WSTI AI Event', query: 'Tìm sự kiện AI WSTI tại Western Sydney Startup Hub trong tháng này.' },
+  { label: 'Thiết lập SME', query: 'Thiết lập landing page đặt lịch, email, CRM và lịch hẹn cho doanh nghiệp của tôi.' },
   { label: 'AI Mentor 1-1', query: 'Đặt buổi AI Mentor 1-1 cho startup trong tuần này.' },
   { label: 'Haircut', query: 'Tìm lịch cắt tóc nam gần Sydney CBD vào chiều nay.' },
   { label: 'Restaurant', query: 'Tìm nhà hàng gần tôi tối nay có link đặt bàn hoặc số điện thoại để gọi đặt chỗ.' },

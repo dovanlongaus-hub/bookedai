@@ -13,7 +13,16 @@ from urllib.request import Request, urlopen
 
 
 REPO_ROOT = Path(__file__).resolve().parent.parent
-DEFAULT_SCOPE = "ZohoCRM.modules.ALL,ZohoCRM.settings.ALL,ZohoCRM.notifications.ALL"
+DEFAULT_SCOPE = ",".join(
+    [
+        "ZohoCRM.modules.ALL",
+        "ZohoCRM.settings.ALL",
+        "ZohoCRM.notifications.ALL",
+        "ZohoCalendar.calendar.READ",
+        "ZohoCalendar.event.CREATE",
+        "ZohoMeeting.meeting.ALL",
+    ]
+)
 
 
 def load_env_file(path: Path) -> None:
@@ -64,12 +73,17 @@ def current_zoho_settings() -> dict[str, str]:
         accounts_base_url = derive_zoho_accounts_base_url(crm_api_base_url, bookings_api_base_url)
     return {
         "crm_api_base_url": crm_api_base_url,
+        "calendar_api_base_url": get_env("ZOHO_CALENDAR_API_BASE_URL", "https://calendar.zoho.com/api/v1"),
         "bookings_api_base_url": bookings_api_base_url,
         "accounts_base_url": accounts_base_url,
         "access_token": get_env("ZOHO_CRM_ACCESS_TOKEN", ""),
         "refresh_token": get_env("ZOHO_CRM_REFRESH_TOKEN", ""),
         "client_id": get_env("ZOHO_CRM_CLIENT_ID", ""),
         "client_secret": get_env("ZOHO_CRM_CLIENT_SECRET", ""),
+        "calendar_access_token": get_env("ZOHO_CALENDAR_ACCESS_TOKEN", ""),
+        "calendar_refresh_token": get_env("ZOHO_CALENDAR_REFRESH_TOKEN", ""),
+        "calendar_client_id": get_env("ZOHO_CALENDAR_CLIENT_ID", ""),
+        "calendar_client_secret": get_env("ZOHO_CALENDAR_CLIENT_SECRET", ""),
         "default_lead_module": get_env("ZOHO_CRM_DEFAULT_LEAD_MODULE", "Leads"),
         "default_contact_module": get_env("ZOHO_CRM_DEFAULT_CONTACT_MODULE", "Contacts"),
         "default_deal_module": get_env("ZOHO_CRM_DEFAULT_DEAL_MODULE", "Deals"),
@@ -132,16 +146,15 @@ def request_json(
 
 
 def get_access_token(settings: dict[str, str]) -> tuple[str, str | None, str]:
-    direct_token = settings["access_token"]
-    if direct_token:
-        return direct_token, None, "access_token"
-
     refresh_token = settings["refresh_token"]
     client_id = settings["client_id"]
     client_secret = settings["client_secret"]
     if not (refresh_token and client_id and client_secret):
+        direct_token = settings["access_token"]
+        if direct_token:
+            return direct_token, None, "access_token"
         raise SystemExit(
-            "Zoho CRM is not configured. Set ZOHO_CRM_ACCESS_TOKEN or the refresh-token trio."
+            "Zoho CRM is not configured. Set ZOHO_CRM_ACCESS_TOKEN for a short-lived smoke test or the refresh-token trio for production."
         )
 
     payload = request_json(
@@ -159,6 +172,19 @@ def get_access_token(settings: dict[str, str]) -> tuple[str, str | None, str]:
         raise SystemExit("Zoho token exchange did not return an access token.")
     api_domain = str(payload.get("api_domain") or "").strip() or None
     return access_token, api_domain, "refresh_token"
+
+
+def get_calendar_access_token(settings: dict[str, str]) -> tuple[str, str | None, str]:
+    calendar_settings = {
+        **settings,
+        "access_token": settings.get("calendar_access_token") or settings.get("access_token", ""),
+        "refresh_token": settings.get("calendar_refresh_token") or settings.get("refresh_token", ""),
+        "client_id": settings.get("calendar_client_id") or settings.get("client_id", ""),
+        "client_secret": settings.get("calendar_client_secret") or settings.get("client_secret", ""),
+    }
+    access_token, api_domain, token_source = get_access_token(calendar_settings)
+    source_prefix = "calendar_" if settings.get("calendar_refresh_token") or settings.get("calendar_access_token") else ""
+    return access_token, api_domain, f"{source_prefix}{token_source}"
 
 
 def resolve_api_base_url(settings: dict[str, str], api_domain: str | None) -> str:
@@ -224,6 +250,32 @@ def fetch_fields(*, access_token: str, api_base_url: str, module_api_name: str) 
     return fields
 
 
+def fetch_calendars(*, access_token: str, calendar_api_base_url: str) -> list[dict[str, Any]]:
+    payload = request_json(
+        method="GET",
+        url=f"{calendar_api_base_url.rstrip('/')}/calendars",
+        headers={"Authorization": f"Zoho-oauthtoken {access_token}"},
+        query_params={"category": "own", "showhiddencal": "true"},
+    )
+    items = payload.get("calendars") or payload.get("data") or []
+    if not isinstance(items, list):
+        return []
+    calendars: list[dict[str, Any]] = []
+    for item in items:
+        if not isinstance(item, dict):
+            continue
+        calendars.append(
+            {
+                "uid": item.get("uid") or item.get("calendaruid") or item.get("calendar_uid"),
+                "name": item.get("name") or item.get("calendar_name") or item.get("title"),
+                "timezone": item.get("timezone"),
+                "is_default": item.get("isdefault") or item.get("default"),
+                "allowed_conference": item.get("allowed_conference"),
+            }
+        )
+    return calendars
+
+
 def command_authorize_url(args: argparse.Namespace) -> int:
     settings = current_zoho_settings()
     client_id = (args.client_id or settings["client_id"]).strip()
@@ -278,10 +330,14 @@ def command_exchange_code(args: argparse.Namespace) -> int:
         api_domain = str(payload.get("api_domain") or "").strip()
         if refresh_token:
             updates["ZOHO_CRM_REFRESH_TOKEN"] = refresh_token
+            updates["ZOHO_CALENDAR_REFRESH_TOKEN"] = refresh_token
         if access_token:
             updates["ZOHO_CRM_ACCESS_TOKEN"] = access_token
+            updates["ZOHO_CALENDAR_ACCESS_TOKEN"] = access_token
         if api_domain:
             updates["ZOHO_CRM_API_BASE_URL"] = f"{api_domain.rstrip('/')}/crm/v8"
+        updates.setdefault("ZOHO_CALENDAR_CLIENT_ID", client_id)
+        updates.setdefault("ZOHO_CALENDAR_CLIENT_SECRET", client_secret)
         update_env_file(args.env_file, updates)
         print(f"Updated {args.env_file}")
 
@@ -321,6 +377,26 @@ def command_test_connection(args: argparse.Namespace) -> int:
             "deal_module": settings["default_deal_module"],
             "task_module": settings["default_task_module"],
         },
+    }
+    print(json.dumps(payload, indent=2, sort_keys=True))
+    return 0
+
+
+def command_list_calendars(args: argparse.Namespace) -> int:
+    settings = current_zoho_settings()
+    access_token, _, token_source = get_calendar_access_token(settings)
+    calendars = fetch_calendars(
+        access_token=access_token,
+        calendar_api_base_url=(args.calendar_api_base_url or settings["calendar_api_base_url"]).strip(),
+    )
+    payload = {
+        "provider": "zoho_calendar",
+        "status": "connected",
+        "token_source": token_source,
+        "calendar_api_base_url": (args.calendar_api_base_url or settings["calendar_api_base_url"]).strip(),
+        "calendar_count": len(calendars),
+        "calendars": calendars,
+        "env_hint": "Set ZOHO_CALENDAR_UID to the uid of the BookedAI service calendar.",
     }
     print(json.dumps(payload, indent=2, sort_keys=True))
     return 0
@@ -373,6 +449,13 @@ def build_parser() -> argparse.ArgumentParser:
     )
     test_parser.add_argument("--module", default="Leads", help="Zoho CRM module API name to inspect.")
     test_parser.set_defaults(func=command_test_connection)
+
+    calendars_parser = subparsers.add_parser(
+        "list-calendars",
+        help="List Zoho Calendar calendars so ZOHO_CALENDAR_UID can be selected.",
+    )
+    calendars_parser.add_argument("--calendar-api-base-url", help="Override ZOHO_CALENDAR_API_BASE_URL.")
+    calendars_parser.set_defaults(func=command_list_calendars)
 
     return parser
 

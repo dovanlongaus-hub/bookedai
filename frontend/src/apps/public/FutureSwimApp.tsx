@@ -476,7 +476,7 @@ export function FutureSwimApp() {
       <div className="mx-auto max-w-7xl px-5 pb-16 pt-6 sm:px-8 lg:px-10 lg:pb-24">
         <header className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <div className="template-kicker">Future Swim · Verified BookedAI tenant</div>
+            <div className="template-kicker">Future Swim · live BookedAI business</div>
             <div className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-apple-near-black">
               Live swim school running on BookedAI
             </div>
@@ -487,7 +487,7 @@ export function FutureSwimApp() {
               className="booked-button-secondary"
               aria-label="View available swim centres"
             >
-              View live tenant
+              View live business example
             </a>
             <a
               href="#booking-flow"
@@ -502,13 +502,13 @@ export function FutureSwimApp() {
         <section className="mt-8 grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
           <div className="template-card-dark p-8 sm:p-10">
             <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/88">
-              Verified BookedAI tenant · Stripe · WhatsApp · Calendar
+              Live BookedAI business · Stripe · WhatsApp · Calendar
             </div>
             <h1 className="mt-6 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl md:leading-[0.98]">
               Watch BookedAI run a live swim school — bookings, payments, and follow-up.
             </h1>
             <p className="mt-6 max-w-2xl text-lg leading-8 text-white/82">
-              Real bookings, real Stripe payments, real audit ledger. Search the live Future Swim catalogue, choose a centre, and your booking moves into the same operator console every BookedAI business runs on.
+              Real bookings, real Stripe payments, and clear follow-up history. Search the live Future Swim catalogue, choose a centre, and your booking moves into the same business workspace every BookedAI customer can use.
             </p>
 
             <div className="mt-8 flex flex-wrap gap-3">
@@ -563,7 +563,7 @@ export function FutureSwimApp() {
           <aside className="template-card p-7 sm:p-8">
             <div className="template-kicker">What makes this different</div>
             <h2 className="mt-3 text-4xl font-semibold leading-tight tracking-[-0.04em] text-apple-near-black">
-              Real bookings. Real Stripe payments. Real audit ledger.
+              Real bookings. Real Stripe payments. Real follow-up history.
             </h2>
             <div className="mt-6 space-y-3">
               {reassurancePoints.map((item) => (
@@ -849,7 +849,7 @@ export function FutureSwimApp() {
         </section>
 
         <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 text-xs text-[color:var(--apple-text-tertiary)]">
-          <span>Verified BookedAI tenant · powered by BookedAI</span>
+          <span>Live BookedAI business · powered by BookedAI</span>
           <a
             href="https://bookedai.au/"
             className="text-[var(--apple-blue)] hover:underline"

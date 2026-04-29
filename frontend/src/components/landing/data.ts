@@ -802,7 +802,7 @@ export const technicalArchitectureContent: TechnicalArchitectureContent = {
           status: 'Completed',
         },
         {
-          name: 'Revenue-ops action ledger',
+          name: 'Revenue follow-up history',
           description: 'Post-booking actions queue lead follow-up, payment reminders, CRM sync, customer-care monitoring, callbacks, reports, and retention actions.',
           status: 'In Progress',
         },
@@ -1155,7 +1155,7 @@ export const roadmapContent: RoadmapContent = {
         },
         {
           name: 'Member H',
-          track: 'Prompt 10 CRM retry ledger',
+          track: 'Prompt 10 CRM retry follow-up',
           body: 'Owns additive CRM retry truth and the first staff-visible Prompt 11 surfacing for queued `retrying` state.',
           status: 'In Progress',
         },
@@ -1348,14 +1348,14 @@ export const roadmapContent: RoadmapContent = {
     },
     {
       name: 'Phase 18',
-      timing: 'Revenue-ops ledger control',
+      timing: 'Revenue follow-up visibility',
       windowLabel: 'Active implementation',
       focusLabel: 'Account and support evidence visibility for every post-booking action',
       milestoneLabel: 'Action-run filters, summary counts, policy posture, and account visibility are now implemented; deeper evidence views remain next',
       summary: 'Phase 18 makes post-lead and post-booking operations inspectable, dispatchable, policy-aware, and safe for account and support teams.',
       tasks: [
         { title: 'Filter action runs by account, booking, student/customer, entity, lifecycle event, dependency state, status, and action type', status: 'Completed' },
-        { title: 'Expose summary counts and derived policy, approval, dependency, lifecycle, and evidence metadata in ledger responses', status: 'Completed' },
+        { title: 'Expose summary counts and derived policy, approval, dependency, lifecycle, and evidence metadata in follow-up responses', status: 'Completed' },
         { title: 'Show account read-only Ops visibility for follow-up, reminder, CRM, customer-care, webhook, report, and retention actions', status: 'Completed' },
         { title: 'Add deeper support evidence views for outbox, audit, job-run, CRM, payment, and webhook traces', status: 'Planned' },
       ],
@@ -1394,7 +1394,7 @@ export const roadmapContent: RoadmapContent = {
       windowLabel: 'Next',
       focusLabel: 'Payments, subscriptions, invoices, reminders, commission, and reconciliation',
       milestoneLabel: 'Payment intent and subscription intent foundations exist; receivable truth is the next commercial layer',
-      summary: 'Phase 21 connects customer payment state, account billing posture, subscription renewal, reminders, and commission into one auditable layer.',
+      summary: 'Phase 21 connects customer payment state, account billing posture, subscription renewal, reminders, and commission into one reviewable layer.',
       tasks: [
         { title: 'Create real subscription checkout and invoice linkage where supported', status: 'Planned' },
         { title: 'Queue policy-gated payment reminder and receivable recovery actions', status: 'Planned' },
@@ -1545,7 +1545,7 @@ export const roadmapContent: RoadmapContent = {
       tasks: [
         { title: 'Stripe payment intent + booking linkage', status: 'In Progress' },
         { title: 'Policy-gated reminder/recovery action runs', status: 'In Progress' },
-        { title: 'Manual-review revenue surfacing for tenant Ops', status: 'Planned' },
+        { title: 'Manual-review revenue surfacing for the business workspace', status: 'Planned' },
       ],
     },
     {
@@ -1564,11 +1564,11 @@ export const roadmapContent: RoadmapContent = {
       name: 'Phase 7 — Tenant workspace',
       timing: '2026-04-21 → 2026-04-26',
       windowLabel: 'Synced SSOT · 01-MASTER-ROADMAP',
-      focusLabel: 'Tenant Ops visibility, catalog publishing, onboarding template',
+      focusLabel: 'Business workspace visibility, catalog publishing, onboarding template',
       milestoneLabel: 'Shipped baseline; deeper template extraction lands in Phase 22',
-      summary: 'Phase 7 stood up the tenant workspace shell, Ops visibility, and catalog publishing baseline.',
+      summary: 'Phase 7 stood up the business workspace shell, operations visibility, and catalog publishing baseline.',
       tasks: [
-        { title: 'Tenant Ops visibility for action runs', status: 'Completed' },
+        { title: 'Business workspace visibility for follow-up actions', status: 'Completed' },
         { title: 'Tenant catalog publishing baseline', status: 'Completed' },
         { title: 'Onboarding template draft', status: 'In Progress' },
       ],
@@ -1680,29 +1680,29 @@ export const roadmapContent: RoadmapContent = {
     {
       name: 'Sprint 18',
       phaseName: 'Phase 18',
-      timing: 'Revenue-ops ledger control',
+      timing: 'Revenue follow-up visibility',
       status: 'In Progress',
       windowLabel: 'Current',
-      focusLabel: 'Tenant/admin action evidence and policy posture',
-      milestoneLabel: 'Ledger filters, summary counts, metadata, admin filters, and tenant Ops visibility are implemented',
+      focusLabel: 'Business/admin action evidence and policy posture',
+      milestoneLabel: 'Follow-up filters, summary counts, metadata, admin filters, and business workspace visibility are implemented',
       summary: 'Sprint 18 makes action runs a real team and account surface rather than a hidden automation queue.',
       evidence:
-        '`GET /api/v1/agent-actions`, admin Reliability, tenant Ops, action policy metadata, and worker dispatch behavior now share the revenue-ops ledger baseline.',
+        'The agent actions API, admin Reliability, business workspace visibility, action policy metadata, and worker dispatch behavior now share the revenue follow-up baseline.',
       mainGap:
         'Deepen evidence drawers and provider-specific trace joins for outbox, audit, job-run, CRM, payment, and webhook state.',
       nextPrompt: 'Phase 19',
       ownerGroup: 'Backend execution',
       agents: ['PM Integrator'],
       tasks: [
-        { title: 'Expose ledger filters, summary counts, and derived policy/evidence metadata', status: 'Completed' },
-        { title: 'Show tenant-safe Ops visibility without admin transition controls', status: 'Completed' },
+        { title: 'Expose follow-up filters, summary counts, and derived policy/evidence metadata', status: 'Completed' },
+        { title: 'Show business-safe operations visibility without admin transition controls', status: 'Completed' },
         { title: 'Add deeper evidence drill-ins and replay-safe controls', status: 'Planned' },
       ],
       references: [
         {
-          title: 'Phase 18 Revenue Ops Ledger Tenant Visibility',
+          title: 'Phase 18 Revenue Follow-Up Business Visibility',
           path: 'docs/development/phase-18-revenue-ops-ledger-tenant-visibility-2026-04-25.md',
-          summary: 'Implementation note for the revenue-ops ledger visibility slice.',
+          summary: 'Implementation note for the revenue follow-up visibility slice.',
         },
       ],
     },
@@ -1774,7 +1774,7 @@ export const roadmapContent: RoadmapContent = {
       milestoneLabel: 'Payment and subscription intent foundations exist',
       summary: 'Sprint 21 upgrades commercial truth so customer payments, tenant billing, and BookedAI revenue posture reconcile cleanly.',
       evidence:
-        'Payment intent, payment mirror, subscription intent, action-run reminder, and tenant/admin ledger foundations are already present.',
+        'Payment intent, payment mirror, subscription intent, action-run reminder, and account/admin follow-up foundations are already present.',
       mainGap:
         'Real checkout/invoice linkage, receivable summaries, and admin reconciliation views remain to be implemented.',
       nextPrompt: 'Phase 22',

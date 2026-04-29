@@ -67,9 +67,9 @@ const navLinks = [
 ] as const;
 
 const executiveStats = [
-  { value: '3', label: 'live tenants', detail: 'Chess, Future Swim, AI Mentor proof paths' },
+  { value: '3', label: 'live customer examples', detail: 'Chess, Future Swim, AI Mentor proof paths' },
   { value: 'Live', label: 'web + Telegram', detail: 'portal return and customer-care handoff' },
-  { value: '<30s', label: 'booking to ledger', detail: 'reference, portal, and action evidence' },
+  { value: '<30s', label: 'booking follow-up', detail: 'reference, portal, and next-step evidence' },
 ] as const;
 
 const investorSignals = [
@@ -80,6 +80,25 @@ const investorSignals = [
 ] as const;
 
 const heroFlow = ['Demand', 'Match', 'Book', 'Operate'] as const;
+
+const launchSetupCards = [
+  {
+    title: 'Custom landing page',
+    body: 'A fresh page for your service, offer, location, and booking CTA.',
+  },
+  {
+    title: 'Dedicated email',
+    body: 'A clear inbox for enquiries, confirmations, and customer follow-up.',
+  },
+  {
+    title: 'Dedicated CRM',
+    body: 'Leads, bookings, payment posture, and care notes organized in one place.',
+  },
+  {
+    title: 'Booking + meeting setup',
+    body: 'Calendar, slots, meeting links, payment next steps, and reminders configured before launch.',
+  },
+] as const;
 
 const outcomeCards = [
   {
@@ -126,7 +145,7 @@ const platformLayers = [
   {
     icon: ShieldCheck,
     title: 'Business visibility',
-    body: 'Team workspaces, reliability review, audit history, and lifecycle requests with clear business oversight.',
+    body: 'Team workspaces, reliability review, booking history, and lifecycle requests with clear business oversight.',
     tag: 'Operate',
   },
 ] as const;
@@ -151,7 +170,7 @@ const proofRows = [
 
 const channelTruthRows = [
   { label: 'Live', value: 'Web assistant, Product app, Telegram, Portal', tone: 'bg-[#eaf4f1] text-[#19684b]' },
-  { label: 'In rollout', value: 'WhatsApp inbound, Email/CRM follow-up, tenant widget proof', tone: 'bg-[#fff7df] text-[#7b5c10]' },
+  { label: 'In rollout', value: 'WhatsApp inbound, Email/CRM follow-up, business widget proof', tone: 'bg-[#fff7df] text-[#7b5c10]' },
   { label: 'Next', value: 'SMS expansion, more widgets, billing/receivables truth', tone: 'bg-[#eef2ff] text-[#354399]' },
 ] as const;
 
@@ -178,7 +197,7 @@ const agentActivityProofRows = [
     step: '04',
     title: 'Follow-up queued',
     detail: 'CRM, email, Telegram care, payment posture, and manual-review actions become inspectable.',
-    evidence: 'action ledger',
+    evidence: 'follow-up trail',
   },
 ] as const;
 
@@ -360,9 +379,9 @@ export function PublicApp() {
           eyebrow: 'The AI revenue engine for service businesses',
           title: 'Never miss a paying enquiry again.',
           body:
-            'BookedAI answers every chat, call, SMS, and DM in seconds — books the customer, takes the deposit, and follows up so your team can actually close out the day.',
+            'BookedAI gives your business a booking-ready landing page, dedicated email, dedicated CRM, and AI follow-up flow so every chat, call, SMS, and DM has a clear next step.',
           primaryCta: 'See it book a real customer',
-          secondaryCta: 'Talk to a BookedAI human (10 min)',
+          secondaryCta: 'Get my booking page set up',
         }
       : homepageAudience === 'judge'
         ? {
@@ -370,16 +389,16 @@ export function PublicApp() {
             eyebrow: 'The AI revenue engine for service businesses',
             title: 'One AI agent layer. Every channel. Every booking. Audited.',
             body:
-              'BookedAI runs a live multi-agent stack — intake, ranking, booking, payment, care — across web, WhatsApp, Telegram, SMS, and email, with an action ledger you can inspect.',
+              'BookedAI runs a live AI booking stack across web, WhatsApp, Telegram, SMS, and email, with booking activity you can inspect.',
             primaryCta: 'Run the live demo (60 sec)',
-            secondaryCta: 'Open the audit ledger',
+            secondaryCta: 'View booking activity',
           }
         : {
             audienceBadge: 'For investors',
             eyebrow: 'The AI revenue engine for service businesses',
             title: 'The revenue OS for the next 30M service businesses.',
             body:
-              'BookedAI is an omnichannel agent layer that captures intent, books the customer, takes payment, and proves the revenue — turning fragmented service commerce into one auditable operating system.',
+              'BookedAI is an omnichannel agent layer that captures intent, books the customer, takes payment, and proves the revenue across one measurable operating system.',
             primaryCta: 'See live tenant proof',
             secondaryCta: 'Read the investor pitch',
           };
@@ -449,11 +468,11 @@ export function PublicApp() {
     document.getElementById('top')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
-  function focusAuditLedger() {
+  function focusBookingActivity() {
     trackHomepageEvent('homepage_secondary_cta_clicked', {
       variant: homepageVariant,
       audience: homepageAudience,
-      action: 'focus_audit_ledger',
+      action: 'focus_booking_activity',
       href: '#agent-activity-proof',
     });
     document
@@ -476,18 +495,14 @@ export function PublicApp() {
 
   function handleSecondaryHeroAction() {
     if (homepageAudience === 'sme') {
-      // SME owners: the secondary CTA is "Talk to a BookedAI human (10 min)" — route
-      // them to the investor/contact pitch deck which currently hosts the booking
-      // request. (Follow-up: dedicated owner-call CTA target.)
-      navigateTo(pitchDeckHref, 'homepage_secondary_cta_clicked', {
-        action: 'talk_to_human',
+      navigateTo('/register-interest?source_section=homepage_launch_offer', 'homepage_secondary_cta_clicked', {
+        action: 'launch_setup',
         surface: 'hero',
       });
       return;
     }
     if (homepageAudience === 'judge') {
-      // Judges: scroll to the live agent activity proof / audit ledger surface.
-      focusAuditLedger();
+      focusBookingActivity();
       return;
     }
     // VC / investor — open the investor pitch (same canonical pitchDeckHref).
@@ -590,7 +605,7 @@ export function PublicApp() {
               >
                 {heroCopy.audienceBadge}
               </div>
-              <h1 className="mt-6 max-w-[14ch] text-[3.1rem] font-semibold leading-[0.95] tracking-[-0.055em] text-[#172033] sm:text-[4.75rem] lg:text-[5.55rem]">
+              <h1 className="mt-6 max-w-[14ch] text-[2.17rem] font-semibold leading-[0.95] tracking-[-0.055em] text-[#172033] sm:text-[3.325rem] lg:text-[3.885rem]">
                 {heroCopy.title}
               </h1>
               <p className="mt-6 max-w-2xl text-[1.08rem] leading-8 text-[#586173] sm:text-xl sm:leading-9">
@@ -711,6 +726,54 @@ export function PublicApp() {
                 </div>
               ))}
             </div>
+          </div>
+        </div>
+      </section>
+
+      <section id="sme-launch-offer" className="px-4 py-10 sm:px-6 lg:px-8">
+        <div className="mx-auto grid max-w-[1440px] gap-5 rounded-[2rem] border border-[#d8d0c0] bg-[#fffdf8] p-5 shadow-[0_24px_70px_rgba(86,73,50,0.08)] sm:p-7 lg:grid-cols-[0.72fr_1.28fr] lg:p-8">
+          <div>
+            <div className="inline-flex items-center gap-2 rounded-full border border-[#c9ddd7] bg-[#eaf4f1] px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-[#19684b]">
+              Launch offer for SMEs
+            </div>
+            <h2 className="mt-5 max-w-xl text-3xl font-semibold leading-tight tracking-[-0.045em] text-[#172033] sm:text-4xl">
+              Launch a booking-ready business page in days, not months.
+            </h2>
+            <p className="mt-4 max-w-2xl text-sm leading-7 text-[#586173] sm:text-base">
+              Tell us your service, pricing, availability, and preferred contact details. BookedAI
+              sets up the page, inbox, CRM, and booking or meeting flow so customers can enquire,
+              book, and receive follow-up without your team stitching tools together.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                onClick={() =>
+                  navigateTo('/register-interest?source_section=homepage_launch_offer', 'homepage_launch_offer_clicked', {
+                    action: 'claim_launch_setup',
+                  })
+                }
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-[#172033] px-5 py-3 text-sm font-bold text-white transition hover:bg-[#263147]"
+              >
+                Get my booking page set up
+                <ArrowRight className="h-4 w-4" aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={focusLiveProduct}
+                className="inline-flex items-center justify-center rounded-full border border-[#cfc7b8] bg-white px-5 py-3 text-sm font-bold text-[#172033] transition hover:border-[#9fb0c5]"
+              >
+                See the live flow
+              </button>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            {launchSetupCards.map((card) => (
+              <article key={card.title} className="rounded-[1.25rem] border border-[#e4dccd] bg-white p-5">
+                <h3 className="text-base font-semibold tracking-[-0.03em] text-[#172033]">{card.title}</h3>
+                <p className="mt-2 text-sm leading-6 text-[#586173]">{card.body}</p>
+              </article>
+            ))}
           </div>
         </div>
       </section>

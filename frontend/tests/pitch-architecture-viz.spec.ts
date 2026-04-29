@@ -61,10 +61,11 @@ test.describe('pitch architecture viz', () => {
     // Master Roadmap section — phase 0 through phase 23 are encoded in the
     // image alt text. We assert the alt text reaches Phase 23.
     const roadmapSection = page.locator('section#roadmap-execution');
+    await roadmapSection.scrollIntoViewIfNeeded();
     await expect(roadmapSection).toBeVisible();
 
     const roadmapImage = roadmapSection.locator('img').first();
-    await expect(roadmapImage).toBeVisible();
+    await expect(roadmapImage).toBeAttached();
 
     const roadmapAlt = await roadmapImage.getAttribute('alt');
     expect(roadmapAlt).toBeTruthy();

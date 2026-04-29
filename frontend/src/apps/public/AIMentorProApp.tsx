@@ -163,7 +163,7 @@ export function AIMentorProApp() {
               className="booked-brand-image booked-brand-image--soft h-11 w-11 rounded-[var(--apple-radius-comfortable)] ring-1 ring-black/5"
             />
             <div>
-              <div className="template-kicker">AI Mentor 1-1 Pro · Verified BookedAI tenant</div>
+              <div className="template-kicker">AI Mentor 1-1 Pro · live BookedAI business</div>
               <div className="mt-1 text-2xl font-semibold tracking-[-0.04em] text-apple-near-black">
                 Live mentorship business running on BookedAI
               </div>
@@ -182,13 +182,13 @@ export function AIMentorProApp() {
         <section className="grid gap-6 lg:grid-cols-[1.02fr_0.98fr] lg:items-start">
           <div className="template-card p-6 sm:p-8">
             <div className="inline-flex rounded-full border border-[var(--template-border)] bg-white px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--apple-blue)]">
-              Verified BookedAI tenant · Stripe · Calendar · Telegram · Email
+              Live BookedAI business · Stripe · Calendar · Telegram · Email
             </div>
             <h1 className="mt-5 max-w-3xl text-4xl font-semibold tracking-[-0.05em] text-apple-near-black sm:text-5xl">
               Watch BookedAI run a live mentorship business — book, pay, follow up.
             </h1>
             <p className="mt-5 max-w-2xl text-base leading-8 text-[color:var(--apple-text-secondary)] sm:text-lg">
-              Real bookings, real Stripe payments, real audit ledger. Search the 10 published mentoring packages, move into checkout, and mentor follow-up runs through the same BookedAI operator console every business uses.
+              Real bookings, real Stripe payments, and clear follow-up history. Search the 10 published mentoring packages, move into checkout, and mentor follow-up runs through the same BookedAI business workspace every customer can use.
             </p>
 
             <div className="mt-6 flex flex-wrap gap-3">
@@ -224,7 +224,7 @@ export function AIMentorProApp() {
 
             <div className="mt-8 grid gap-4 sm:grid-cols-3">
               {[
-                'Chat + tenant-first search',
+                'Chat + service search',
                 'Booking + Stripe checkout',
                 'Email / Calendar / Telegram',
               ].map((item) => (
@@ -293,7 +293,7 @@ export function AIMentorProApp() {
         </section>
 
         <footer className="flex flex-wrap items-center justify-between gap-3 text-xs text-[color:var(--apple-text-tertiary)]">
-          <span>Verified BookedAI tenant · powered by BookedAI</span>
+          <span>Live BookedAI business · powered by BookedAI</span>
           <a
             href="https://bookedai.au/"
             className="text-[color:var(--apple-blue)] hover:underline"

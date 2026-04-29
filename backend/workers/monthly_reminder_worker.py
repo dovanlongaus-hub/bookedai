@@ -22,6 +22,10 @@ from core.logging import get_logger
 from repositories.base import RepositoryContext
 from repositories.booking_intent_repository import BookingIntentRepository
 from repositories.job_run_repository import JobRunRepository
+from service_layer.aimentor_email_strings import (
+    normalise_locale,
+    select_strings,
+)
 
 _logger = get_logger("bookedai.workers.monthly_reminder_worker")
 
@@ -53,79 +57,99 @@ def _render_monthly_check_in_email(
     customer_name: str | None,
     booking_reference: str,
     service_name: str | None,
+    locale: str | None = None,
 ) -> tuple[str, str, str]:
-    """Return (subject, text_body, html_body) for the monthly check-in email."""
-    subject = "Your AI Mentor monthly check-in"
+    """Return (subject, text_body, html_body) for the monthly check-in email.
+
+    ``locale`` is normalised to ``"en"`` or ``"vi"``; anything else falls back
+    to English so partners that have not yet opted into VI keep the existing
+    copy. Strings come from
+    ``backend/service_layer/aimentor_email_strings.py``.
+    """
+    locale_norm = normalise_locale(locale)
+    strings = select_strings(locale_norm).monthly_check_in
     name = (customer_name or "there").strip() or "there"
-    service_line = (
-        f"It's been a month since your AI Mentor booking ({service_name}, "
-        f"reference {booking_reference})."
-        if service_name
-        else f"It's been a month since your AI Mentor booking ({booking_reference})."
-    )
     portal_url = _portal_link(booking_reference)
     feedback_url = _feedback_link(booking_reference)
+    greeting = strings.greeting_template.format(name=name)
+    if service_name:
+        service_line_text = strings.body_with_service_template.format(
+            service_name=service_name,
+            booking_reference=booking_reference,
+        )
+        service_line_html = strings.body_with_service_template.format(
+            service_name=service_name,
+            booking_reference=f"<strong>{booking_reference}</strong>",
+        )
+    else:
+        service_line_text = strings.body_without_service_template.format(
+            booking_reference=booking_reference,
+        )
+        service_line_html = strings.body_without_service_template.format(
+            booking_reference=f"<strong>{booking_reference}</strong>",
+        )
 
     text_body = (
-        f"Hi {name},\n\n"
-        f"{service_line}\n\n"
-        "How's your progress? Tap below to log a quick check-in or jump back into a session.\n\n"
-        f"Open my AI Mentor portal: {portal_url}\n"
-        f"Send your feedback: {feedback_url}\n\n"
-        "If you'd rather skip these monthly check-ins, reply to this email and we'll turn them off.\n\n"
-        "— The AI Mentor team"
+        f"{greeting}\n\n"
+        f"{service_line_text}\n\n"
+        f"{strings.progress_prompt}\n\n"
+        f"{strings.portal_cta}: {portal_url}\n"
+        f"{strings.feedback_link_label}: {feedback_url}\n\n"
+        f"{strings.unsubscribe_note}\n\n"
+        f"{strings.signature}"
     )
     html_body = _render_monthly_check_in_html(
-        customer_name=name,
-        booking_reference=booking_reference,
-        service_name=service_name,
+        greeting=greeting,
+        service_line_html=service_line_html,
+        progress_prompt=strings.progress_prompt,
+        portal_cta=strings.portal_cta,
+        feedback_link_label=strings.feedback_link_label,
+        unsubscribe_note=strings.unsubscribe_note,
+        signature=strings.signature,
         portal_url=portal_url,
         feedback_url=feedback_url,
+        locale=locale_norm,
     )
-    return subject, text_body, html_body
+    return strings.subject, text_body, html_body
 
 
 def _render_monthly_check_in_html(
     *,
-    customer_name: str,
-    booking_reference: str,
-    service_name: str | None,
+    greeting: str,
+    service_line_html: str,
+    progress_prompt: str,
+    portal_cta: str,
+    feedback_link_label: str,
+    unsubscribe_note: str,
+    signature: str,
     portal_url: str,
     feedback_url: str,
+    locale: str,
 ) -> str:
     """Build the HTML version of the monthly check-in email.
 
     Plain string template (no Jinja dependency in workers/) keeps the worker
     self-contained. The static HTML in
-    ``backend/integrations/email_templates/monthly_check_in.html`` is the
-    canonical visual reference.
+    ``backend/integrations/email_templates/aimentor_monthly_check_in.{en,vi}.html``
+    is the canonical visual reference. Brand tokens match the AI Mentor
+    front-end design system (cream / coral / teal).
     """
-    service_line = (
-        f"It's been a month since your AI Mentor booking ({service_name}, "
-        f"reference <strong>{booking_reference}</strong>)."
-        if service_name
-        else (
-            "It's been a month since your AI Mentor booking "
-            f"(<strong>{booking_reference}</strong>)."
-        )
-    )
     return (
         "<!doctype html>"
-        "<html><body style=\"margin:0;background:#f5f5f7;font-family:-apple-system,Inter,Arial,sans-serif;color:#1d1d1f;\">"
-        "<div style=\"max-width:560px;margin:24px auto;padding:24px;background:#ffffff;border-radius:18px;\">"
-        f"<p style=\"margin:0 0 12px 0;font-size:16px;\">Hi {customer_name},</p>"
-        f"<p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.6;\">{service_line}</p>"
-        "<p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.6;\">"
-        "How's your progress? Tap below to log a quick check-in or jump back into a session."
-        "</p>"
+        f"<html lang=\"{locale}\"><body style=\"margin:0;background:#fdfaf3;font-family:-apple-system,Inter,Arial,sans-serif;color:#1f2a26;\">"
+        "<div style=\"max-width:560px;margin:24px auto;padding:24px;background:#ffffff;border-radius:18px;border:1px solid rgba(15,92,84,0.12);\">"
+        f"<p style=\"margin:0 0 12px 0;font-size:16px;\">{greeting}</p>"
+        f"<p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.6;\">{service_line_html}</p>"
+        f"<p style=\"margin:0 0 16px 0;font-size:15px;line-height:1.6;\">{progress_prompt}</p>"
         f"<p style=\"margin:24px 0;\"><a href=\"{portal_url}\" "
-        "style=\"display:inline-block;padding:12px 22px;background:#0071e3;color:#ffffff;text-decoration:none;border-radius:980px;font-weight:600;\">"
-        "Open my AI Mentor portal</a></p>"
+        "style=\"display:inline-block;padding:12px 22px;background:#ff6b3d;color:#fdfaf3;text-decoration:none;border-radius:12px;font-weight:600;\">"
+        f"{portal_cta}</a></p>"
         f"<p style=\"margin:0 0 16px 0;font-size:14px;\"><a href=\"{feedback_url}\" "
-        "style=\"color:#0071e3;text-decoration:none;\">Send your feedback</a></p>"
-        "<p style=\"margin:24px 0 0 0;font-size:13px;color:#6e6e73;\">"
-        "If you'd rather skip these monthly check-ins, reply to this email and we'll turn them off."
+        f"style=\"color:#0f5c54;text-decoration:none;\">{feedback_link_label}</a></p>"
+        "<p style=\"margin:24px 0 0 0;font-size:13px;color:#5b6b66;\">"
+        f"{unsubscribe_note}"
         "</p>"
+        f"<p style=\"margin:18px 0 0 0;font-size:13px;color:#5b6b66;\">{signature}</p>"
         "</div></body></html>"
     )
 
@@ -137,6 +161,7 @@ async def _send_reminder_email(
     customer_name: str | None,
     booking_reference: str,
     service_name: str | None,
+    locale: str | None = None,
 ) -> bool:
     if email_service is None:
         return False
@@ -146,10 +171,16 @@ async def _send_reminder_email(
         customer_name=customer_name,
         booking_reference=booking_reference,
         service_name=service_name,
+        locale=locale,
     )
     try:
+        # CC the AI Mentor tenant inbox on every monthly check-in email so
+        # the mentor sees the same touchpoint the learner does and can chime
+        # in if the cadence is missing context. Hard-coded to match
+        # ``AIMENTOR_TENANT_CC_EMAIL`` in v1_booking_handlers.
         await email_service.send_email(
             to=[customer_email],
+            cc=["aimentor@bookedai.au"],
             subject=subject,
             text=text_body,
             html=html_body,
@@ -217,6 +248,7 @@ async def dispatch_due_monthly_reminders(
             customer_name=str(row.get("customer_name") or "").strip() or None,
             booking_reference=booking_reference,
             service_name=str(row.get("service_name") or "").strip() or None,
+            locale=str(row.get("preferred_locale") or "").strip() or None,
         )
         if not ok:
             skipped += 1
