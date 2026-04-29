@@ -138,7 +138,7 @@ SET
   amount_aud = 90,
   display_price = 'USD $90 / session  •  was $120  •  Founding Cohort -25%',
   tags_json = '["ai", "mentor", "private", "1-on-1", "first-ai-app", "60-min", "online", "zoho-meeting", "founding-cohort", "beginner-friendly"]'::jsonb,
-  featured = true,
+  featured = 1,
   updated_at = now()
 WHERE service_id = 'ai-mentor-private-first-ai-app-60';
 
@@ -150,7 +150,7 @@ SET
   amount_aud = 450,
   display_price = 'USD $450 / 5h  •  was $600  •  Founding Cohort -25%',
   tags_json = '["ai", "mentor", "private", "1-on-1", "automation", "5-hours", "online", "zoho-meeting", "founding-cohort", "saves-time"]'::jsonb,
-  featured = true,
+  featured = 1,
   updated_at = now()
 WHERE service_id = 'ai-mentor-private-executes-for-you-5h';
 
