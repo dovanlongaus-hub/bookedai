@@ -991,6 +991,13 @@ Next recommended sequence:
 - `/architecture` now presents the system map in buyer-safe language: customer-safe governance, business workspace proof, customer/admin separation, reusable business templates, and proof/follow-up history instead of internal audit/tenant phrasing.
 - Verification passed with frontend production build, focused pitch/architecture Playwright (`4 passed`), `git diff --check`, and scoped copy grep for removed public-facing internal phrases.
 
+## 2026-04-29 Audience Split Follow-Up
+
+- `bookedai.au` is now the SME acquisition surface: sales wording, launch setup CTA, live booking proof, and page/email/CRM/calendar/meeting setup stay prominent.
+- `pitch.bookedai.au` is now the investor/judge pitch surface: category, platform ambition, live proof, business model, market, moat, GTM wedge, and rollout evidence are emphasized.
+- `product.bookedai.au` public booking communication automation now resolves the BookedAI public tenant fallback for public-web actors, preventing tenant-session-only errors from leaking into the public booking path.
+- Verification passed with backend communication tests (`6 passed`), frontend production build, focused homepage/pitch/architecture Playwright (`8 passed`), and `git diff --check`.
+
 ## Sprint 19-22 cross-stack execution overlay (2026-04-26 review)
 
 The seven-lane review captured in `docs/development/full-stack-review-2026-04-26.md` overlays the `Phase 17-23` model with four practical sprints. This overlay is additive: it does not replace the phase plan, it tells operators which P0/P1 work to schedule first and where the A/B telemetry should activate.
