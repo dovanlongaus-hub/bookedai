@@ -3831,8 +3831,8 @@ export function TenantApp() {
           </div>
         </nav>
 
-        <section className="grid gap-5 xl:grid-cols-[86px_minmax(260px,300px)_minmax(0,1fr)]">
-          <aside className="hidden xl:block">
+        <section className="grid gap-5 xl:grid-cols-[minmax(260px,300px)_minmax(0,1fr)] 2xl:grid-cols-[86px_minmax(260px,300px)_minmax(0,1fr)]">
+          <aside className="hidden 2xl:block">
             <div className="sticky top-[104px] flex flex-col items-center gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-[0_18px_46px_rgba(15,23,42,0.06)]">
               {tenantPanels.slice(0, 8).map((item) => (
                 <TenantIconAction
@@ -5997,7 +5997,10 @@ export function TenantApp() {
         aria-label="Tenant mobile bottom navigation"
         className="fixed inset-x-3 bottom-3 z-40 rounded-2xl border border-slate-200 bg-white/95 p-2 shadow-[0_18px_50px_rgba(15,23,42,0.18)] backdrop-blur xl:hidden"
       >
-        <div className="grid grid-cols-5 gap-1">
+        <div
+          className="grid gap-1"
+          style={{ gridTemplateColumns: 'repeat(5, minmax(0, 1fr))' }}
+        >
           {tenantPanels
             .filter((item) => ['overview', 'catalog', 'bookings', 'operations', 'team'].includes(item.key))
             .map((item) => (
