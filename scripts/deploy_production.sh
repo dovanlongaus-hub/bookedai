@@ -138,8 +138,27 @@ docker compose \
   --env-file "${SUPABASE_ENV_FILE}" \
   up -d
 
-if ! docker compose -f docker-compose.prod.yml --env-file .env up -d --no-build; then
-  echo "Production compose up failed; retrying with orphan cleanup..." >&2
+# Remove any zombie containers left behind by an interrupted previous deploy.
+# Docker auto-renames a recreate target to "<12-hex>_<original-name>" when the
+# original name is still claimed by a stopped-but-not-removed container, and
+# subsequent `compose up` calls fail with a name conflict against that zombie.
+# Pattern is anchored on the 12-hex-prefix Docker uses for these renames so we
+# only ever remove containers from a real interrupted deploy, never live ones.
+ZOMBIE_BOOKEDAI_CONTAINERS="$(
+  docker ps -a --format '{{.Names}}' \
+    | grep -E '^[0-9a-f]{12}_bookedai-' || true
+)"
+if [[ -n "${ZOMBIE_BOOKEDAI_CONTAINERS}" ]]; then
+  echo "Removing zombie containers from a prior interrupted deploy:" >&2
+  echo "${ZOMBIE_BOOKEDAI_CONTAINERS}" >&2
+  echo "${ZOMBIE_BOOKEDAI_CONTAINERS}" | xargs -r docker rm -f >/dev/null
+fi
+
+# `--remove-orphans` is now applied to the first attempt so deploys do not
+# require the failure-path retry to clear services that have been removed
+# from compose. The retry block stays as a safety net for unexpected races.
+if ! docker compose -f docker-compose.prod.yml --env-file .env up -d --no-build --remove-orphans; then
+  echo "Production compose up failed; retrying with full recreate..." >&2
   docker compose -f docker-compose.prod.yml --env-file .env ps >&2 || true
   docker compose -f docker-compose.prod.yml --env-file .env up -d --remove-orphans
   docker compose -f docker-compose.prod.yml --env-file .env up -d --no-build --remove-orphans
