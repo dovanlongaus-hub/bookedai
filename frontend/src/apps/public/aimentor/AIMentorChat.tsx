@@ -26,6 +26,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { copyTextToClipboard, generateQrCodeDataUrl } from '@/shared/utils/qrCode';
 
 // ---------- types -----------------------------------------------------------
 
@@ -1830,27 +1831,90 @@ function SlotGrid({
             {day}
           </div>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-            {daySlots.map((slot) => (
-              <button
-                key={slot.id}
-                type="button"
-                onClick={() => onPick(slot)}
-                style={{
-                  padding: '8px 12px',
-                  borderRadius: 'var(--aim-radius)',
-                  border: '1px solid var(--aim-line)',
-                  background: 'var(--aim-cream)',
-                  color: 'var(--aim-ink)',
-                  fontFamily: 'var(--aim-font-display)',
-                  fontWeight: 600,
-                  fontSize: '0.88rem',
-                  cursor: 'pointer',
-                  letterSpacing: '-0.005em',
-                }}
-              >
-                {timeFmt.format(new Date(slot.slot_start_at))}
-              </button>
-            ))}
+            {daySlots.map((slot) => {
+              const isPrivate = slot.capacity === 1;
+              const isFull = slot.seats_available <= 0;
+              const isGroupBookable = !isPrivate && !isFull;
+              const disabled = isFull && isPrivate;
+              const seatsLeftLabel = !isPrivate
+                ? ` · ${slot.seats_available}/${slot.capacity}`
+                : '';
+              const bookedBadge = locale === 'vi' ? 'Đã book' : 'Booked';
+              return (
+                <button
+                  key={slot.id}
+                  type="button"
+                  onClick={() => {
+                    if (!disabled) onPick(slot);
+                  }}
+                  disabled={disabled}
+                  aria-disabled={disabled}
+                  title={
+                    disabled
+                      ? locale === 'vi'
+                        ? 'Slot 1-on-1 này đã được đặt'
+                        : 'This 1-on-1 slot is already booked'
+                      : undefined
+                  }
+                  style={{
+                    padding: '8px 12px',
+                    borderRadius: 'var(--aim-radius)',
+                    border: disabled
+                      ? '1px dashed var(--aim-line)'
+                      : isGroupBookable
+                        ? '1px solid var(--aim-teal)'
+                        : '1px solid var(--aim-line)',
+                    background: disabled
+                      ? 'rgba(10, 31, 28, 0.04)'
+                      : isGroupBookable
+                        ? 'rgba(20, 160, 146, 0.08)'
+                        : 'var(--aim-cream)',
+                    color: disabled ? 'var(--aim-muted)' : 'var(--aim-ink)',
+                    fontFamily: 'var(--aim-font-display)',
+                    fontWeight: 600,
+                    fontSize: '0.88rem',
+                    cursor: disabled ? 'not-allowed' : 'pointer',
+                    letterSpacing: '-0.005em',
+                    textDecoration: disabled ? 'line-through' : 'none',
+                    opacity: disabled ? 0.6 : 1,
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 6,
+                  }}
+                >
+                  <span>{timeFmt.format(new Date(slot.slot_start_at))}</span>
+                  {disabled ? (
+                    <span
+                      style={{
+                        fontFamily: 'var(--aim-font-mono)',
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.06em',
+                        textTransform: 'uppercase',
+                        color: 'var(--aim-coral)',
+                        background: 'rgba(255, 107, 61, 0.12)',
+                        padding: '2px 6px',
+                        borderRadius: 999,
+                      }}
+                    >
+                      {bookedBadge}
+                    </span>
+                  ) : seatsLeftLabel ? (
+                    <span
+                      style={{
+                        fontFamily: 'var(--aim-font-mono)',
+                        fontSize: '0.62rem',
+                        fontWeight: 700,
+                        letterSpacing: '0.06em',
+                        color: 'var(--aim-teal)',
+                      }}
+                    >
+                      {slot.seats_available}/{slot.capacity}
+                    </span>
+                  ) : null}
+                </button>
+              );
+            })}
           </div>
         </div>
       ))}
@@ -1984,6 +2048,11 @@ function SuccessCard({
           {t.successFallback}
         </p>
       ) : null}
+      <PaymentPanel
+        bookingReference={result.booking_reference}
+        serviceId={result.slot.service_id}
+        locale={locale}
+      />
       <button
         type="button"
         onClick={onStartOver}
@@ -2003,6 +2072,437 @@ function SuccessCard({
         {t.successAnotherCta}
       </button>
     </div>
+  );
+}
+
+// ---------- PaymentPanel: post-reservation Credit + QR tabs ----------------
+
+type PaymentInfo = {
+  currency: string;
+  stripe_checkout_url: string | null;
+  bank_account: {
+    account_name: string | null;
+    bsb: string | null;
+    account_number: string | null;
+    account_number_masked: string | null;
+    bank_name: string | null;
+    swift: string | null;
+    reference_prefix: string | null;
+  };
+  qr_payload_template: string | null;
+  instructions_en: string | null;
+  instructions_vi: string | null;
+};
+
+const PROGRAM_PRICES_AUD: Record<string, number> = {
+  'ai-mentor-private-first-ai-app-60': 90,
+  'ai-mentor-private-executes-for-you-5h': 450,
+  'ai-mentor-private-real-product-10h': 900,
+  'ai-mentor-group-first-ai-app-60': 38,
+  'ai-mentor-group-executes-for-you-5h': 188,
+  'ai-mentor-group-real-product-10h': 375,
+};
+
+function PaymentPanel({
+  bookingReference,
+  serviceId,
+  locale,
+}: {
+  bookingReference: string;
+  serviceId: string;
+  locale: Locale;
+}) {
+  const [activeTab, setActiveTab] = useState<'card' | 'qr'>('card');
+  const [info, setInfo] = useState<PaymentInfo | null>(null);
+  const [qrDataUrl, setQrDataUrl] = useState<string>('');
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+
+  const amountAud = PROGRAM_PRICES_AUD[serviceId] ?? null;
+  const copy = useMemo(
+    () =>
+      locale === 'vi'
+        ? {
+            heading: 'Thanh toán giữ chỗ',
+            sub: 'Hoàn tất 1 trong 2 cách bên dưới — slot đã giữ trong 24h.',
+            tabCard: 'Thẻ tín dụng',
+            tabQr: 'Chuyển khoản · QR',
+            stripeCta: 'Mở Stripe Checkout (Credit / Debit)',
+            stripeNote: 'Visa, Mastercard, Apple Pay, Google Pay đều hỗ trợ.',
+            stripeUnavailable: 'Hệ thống thẻ đang bảo trì — vui lòng dùng tab QR.',
+            bankAccountName: 'Chủ tài khoản',
+            bankName: 'Ngân hàng',
+            bsb: 'BSB',
+            accountNumber: 'Số tài khoản',
+            swift: 'SWIFT',
+            reference: 'Nội dung chuyển khoản',
+            amount: 'Số tiền',
+            scanCta: 'Quét QR bằng app ngân hàng để chuyển khoản',
+            copy: 'Sao chép',
+            copied: 'Đã sao chép',
+            loading: 'Đang tải thông tin thanh toán…',
+            error: 'Không tải được thông tin thanh toán — vui lòng email aimentor@bookedai.au.',
+          }
+        : {
+            heading: 'Confirm your seat with payment',
+            sub: 'Complete one of the methods below — your slot is held for 24 hours.',
+            tabCard: 'Credit / Debit card',
+            tabQr: 'Bank transfer · QR',
+            stripeCta: 'Open Stripe Checkout (Credit / Debit)',
+            stripeNote: 'Visa, Mastercard, Apple Pay, and Google Pay supported.',
+            stripeUnavailable: 'Card payments are temporarily unavailable — please use the QR tab.',
+            bankAccountName: 'Account name',
+            bankName: 'Bank',
+            bsb: 'BSB',
+            accountNumber: 'Account number',
+            swift: 'SWIFT',
+            reference: 'Payment reference',
+            amount: 'Amount',
+            scanCta: 'Scan with your banking app to pre-fill the transfer',
+            copy: 'Copy',
+            copied: 'Copied',
+            loading: 'Loading payment details…',
+            error: 'Could not load payment info — please email aimentor@bookedai.au.',
+          },
+    [locale],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch('/api/v1/aimentor/payment-info', { headers: { Accept: 'application/json' } })
+      .then((res) => res.json())
+      .then((payload) => {
+        if (cancelled) return;
+        if (payload?.status === 'ok' && payload?.data) {
+          setInfo(payload.data as PaymentInfo);
+        } else {
+          setLoadError(copy.error);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) setLoadError(copy.error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [copy.error]);
+
+  const qrPayload = useMemo(() => {
+    if (!info) return '';
+    const tpl = info.qr_payload_template ||
+      'PAY|{currency}|{amount_aud}|BSB:{bsb}|ACC:{account_number}|REF:{booking_reference}';
+    return tpl
+      .replace('{currency}', info.currency || 'AUD')
+      .replace('{amount_aud}', amountAud != null ? String(amountAud) : '')
+      .replace('{bsb}', info.bank_account.bsb || '')
+      .replace('{account_number}', info.bank_account.account_number || '')
+      .replace('{booking_reference}', bookingReference);
+  }, [info, amountAud, bookingReference]);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!qrPayload) {
+      setQrDataUrl('');
+      return undefined;
+    }
+    generateQrCodeDataUrl(qrPayload).then((url) => {
+      if (!cancelled) setQrDataUrl(url);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [qrPayload]);
+
+  const handleCopy = useCallback(async (value: string, key: string) => {
+    if (!value) return;
+    const ok = await copyTextToClipboard(value);
+    if (ok) {
+      setCopied(key);
+      setTimeout(() => setCopied(null), 1600);
+    }
+  }, []);
+
+  if (loadError) {
+    return (
+      <div style={{ marginTop: 14, padding: 12, borderRadius: 'var(--aim-radius)', background: 'rgba(255, 107, 61, 0.08)', border: '1px solid rgba(255, 107, 61, 0.3)', fontSize: '0.82rem', color: 'var(--aim-coral-deep)' }}>
+        {loadError}
+      </div>
+    );
+  }
+  if (!info) {
+    return (
+      <div style={{ marginTop: 14, padding: 12, borderRadius: 'var(--aim-radius)', background: 'rgba(20, 160, 146, 0.04)', fontSize: '0.82rem', color: 'var(--aim-muted)' }}>
+        {copy.loading}
+      </div>
+    );
+  }
+
+  const stripeUrl = info.stripe_checkout_url
+    ? `${info.stripe_checkout_url}${info.stripe_checkout_url.includes('?') ? '&' : '?'}client_reference_id=${encodeURIComponent(bookingReference)}`
+    : null;
+
+  return (
+    <div
+      style={{
+        marginTop: 14,
+        background: '#ffffff',
+        border: '1px solid var(--aim-line)',
+        borderRadius: 12,
+        overflow: 'hidden',
+        boxShadow: '0 1px 2px rgba(10, 31, 28, 0.04)',
+      }}
+    >
+      <div style={{ padding: '12px 14px 8px 14px', borderBottom: '1px solid var(--aim-line)' }}>
+        <div style={{ fontFamily: 'var(--aim-font-display)', fontWeight: 700, fontSize: '0.95rem', color: 'var(--aim-ink)' }}>
+          {copy.heading}
+          {amountAud != null ? (
+            <span style={{ marginLeft: 8, fontFamily: 'var(--aim-font-mono)', fontSize: '0.78rem', color: 'var(--aim-teal-deep)', background: 'rgba(20, 160, 146, 0.1)', padding: '2px 8px', borderRadius: 999 }}>
+              {info.currency} {amountAud}
+            </span>
+          ) : null}
+        </div>
+        <div style={{ marginTop: 4, fontSize: '0.78rem', color: 'var(--aim-muted)', lineHeight: 1.5 }}>
+          {copy.sub}
+        </div>
+      </div>
+      <div style={{ display: 'flex', borderBottom: '1px solid var(--aim-line)', background: 'rgba(20, 160, 146, 0.03)' }}>
+        {(['card', 'qr'] as const).map((tab) => {
+          const active = activeTab === tab;
+          return (
+            <button
+              key={tab}
+              type="button"
+              onClick={() => setActiveTab(tab)}
+              style={{
+                flex: 1,
+                padding: '10px 12px',
+                border: 'none',
+                background: 'transparent',
+                fontFamily: 'var(--aim-font-display)',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                color: active ? 'var(--aim-teal-deep)' : 'var(--aim-muted)',
+                borderBottom: active ? '2px solid var(--aim-teal)' : '2px solid transparent',
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 6,
+              }}
+              aria-selected={active}
+              role="tab"
+            >
+              <span>{tab === 'card' ? '💳' : '📱'}</span>
+              <span>{tab === 'card' ? copy.tabCard : copy.tabQr}</span>
+            </button>
+          );
+        })}
+      </div>
+      <div style={{ padding: 14 }}>
+        {activeTab === 'card' ? (
+          <div>
+            {stripeUrl ? (
+              <>
+                <a
+                  href={stripeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: 8,
+                    padding: '10px 16px',
+                    background: 'linear-gradient(135deg, #635bff 0%, #4b3dff 100%)',
+                    color: '#ffffff',
+                    borderRadius: 999,
+                    fontFamily: 'var(--aim-font-display)',
+                    fontWeight: 700,
+                    fontSize: '0.9rem',
+                    textDecoration: 'none',
+                    boxShadow: '0 6px 16px -4px rgba(99, 91, 255, 0.4)',
+                  }}
+                >
+                  <span aria-hidden="true">→</span>
+                  {copy.stripeCta}
+                </a>
+                <div
+                  style={{
+                    marginTop: 10,
+                    fontSize: '0.74rem',
+                    color: 'var(--aim-muted)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 6,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <span>{copy.stripeNote}</span>
+                  <span style={{ display: 'inline-flex', gap: 4 }} aria-hidden="true">
+                    <PaymentLogoBadge label="Visa" bg="#1a1f71" />
+                    <PaymentLogoBadge label="MC" bg="#eb001b" />
+                    <PaymentLogoBadge label="Pay" bg="#000000" />
+                    <PaymentLogoBadge label="GPay" bg="#1a73e8" />
+                  </span>
+                </div>
+              </>
+            ) : (
+              <div style={{ fontSize: '0.84rem', color: 'var(--aim-muted)' }}>
+                {copy.stripeUnavailable}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 180px)', gap: 14, alignItems: 'start' }}>
+            <div style={{ display: 'grid', gap: 6, fontSize: '0.82rem' }}>
+              <PaymentRow label={copy.amount} value={amountAud != null ? `${info.currency} ${amountAud}` : '—'} accent />
+              <PaymentRow label={copy.reference} value={bookingReference} mono onCopy={() => handleCopy(bookingReference, 'ref')} copied={copied === 'ref'} copyLabel={copy.copy} copiedLabel={copy.copied} />
+              <PaymentRow label={copy.bankAccountName} value={info.bank_account.account_name || '—'} />
+              <PaymentRow label={copy.bankName} value={info.bank_account.bank_name || '—'} />
+              <PaymentRow label={copy.bsb} value={info.bank_account.bsb || '—'} mono onCopy={info.bank_account.bsb ? () => handleCopy(info.bank_account.bsb!, 'bsb') : undefined} copied={copied === 'bsb'} copyLabel={copy.copy} copiedLabel={copy.copied} />
+              <PaymentRow
+                label={copy.accountNumber}
+                value={info.bank_account.account_number || '—'}
+                mono
+                onCopy={info.bank_account.account_number ? () => handleCopy(info.bank_account.account_number!, 'acc') : undefined}
+                copied={copied === 'acc'}
+                copyLabel={copy.copy}
+                copiedLabel={copy.copied}
+              />
+              {info.bank_account.swift ? (
+                <PaymentRow label={copy.swift} value={info.bank_account.swift} mono />
+              ) : null}
+              <div style={{ fontSize: '0.74rem', color: 'var(--aim-muted)', lineHeight: 1.5, marginTop: 4 }}>
+                {locale === 'vi' ? info.instructions_vi : info.instructions_en}
+              </div>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
+              <div
+                style={{
+                  width: 168,
+                  height: 168,
+                  background: '#ffffff',
+                  border: '1px solid var(--aim-line)',
+                  borderRadius: 8,
+                  padding: 6,
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                {qrDataUrl ? (
+                  <img src={qrDataUrl} alt="Payment QR" style={{ width: '100%', height: '100%' }} />
+                ) : (
+                  <div style={{ fontSize: '0.7rem', color: 'var(--aim-muted)' }}>QR…</div>
+                )}
+              </div>
+              <div
+                style={{
+                  fontSize: '0.7rem',
+                  color: 'var(--aim-muted)',
+                  textAlign: 'center',
+                  lineHeight: 1.4,
+                  maxWidth: 168,
+                }}
+              >
+                {copy.scanCta}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function PaymentRow({
+  label,
+  value,
+  mono,
+  accent,
+  onCopy,
+  copied,
+  copyLabel,
+  copiedLabel,
+}: {
+  label: string;
+  value: React.ReactNode;
+  mono?: boolean;
+  accent?: boolean;
+  onCopy?: () => void;
+  copied?: boolean;
+  copyLabel?: string;
+  copiedLabel?: string;
+}) {
+  return (
+    <div style={{ display: 'grid', gridTemplateColumns: 'minmax(96px, 36%) 1fr auto', gap: 8, alignItems: 'center' }}>
+      <div
+        style={{
+          fontFamily: 'var(--aim-font-mono)',
+          fontSize: '0.66rem',
+          letterSpacing: '0.06em',
+          textTransform: 'uppercase',
+          color: 'var(--aim-muted)',
+        }}
+      >
+        {label}
+      </div>
+      <div
+        style={{
+          fontFamily: mono ? 'var(--aim-font-mono)' : 'var(--aim-font-body)',
+          fontSize: mono ? '0.84rem' : '0.84rem',
+          fontWeight: 600,
+          color: accent ? 'var(--aim-teal-deep)' : 'var(--aim-ink)',
+          wordBreak: 'break-word',
+        }}
+      >
+        {value}
+      </div>
+      {onCopy ? (
+        <button
+          type="button"
+          onClick={onCopy}
+          style={{
+            padding: '4px 8px',
+            border: '1px solid var(--aim-line)',
+            borderRadius: 999,
+            background: copied ? 'var(--aim-teal)' : 'transparent',
+            color: copied ? '#fdfaf3' : 'var(--aim-teal-deep)',
+            fontFamily: 'var(--aim-font-mono)',
+            fontSize: '0.66rem',
+            fontWeight: 700,
+            letterSpacing: '0.04em',
+            cursor: 'pointer',
+            transition: 'background 160ms ease, color 160ms ease',
+          }}
+        >
+          {copied ? copiedLabel : copyLabel}
+        </button>
+      ) : (
+        <span />
+      )}
+    </div>
+  );
+}
+
+function PaymentLogoBadge({ label, bg }: { label: string; bg: string }) {
+  return (
+    <span
+      style={{
+        display: 'inline-flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '2px 6px',
+        background: bg,
+        color: '#ffffff',
+        fontFamily: 'var(--aim-font-mono)',
+        fontSize: '0.62rem',
+        fontWeight: 700,
+        borderRadius: 4,
+        letterSpacing: '0.02em',
+      }}
+    >
+      {label}
+    </span>
   );
 }
 

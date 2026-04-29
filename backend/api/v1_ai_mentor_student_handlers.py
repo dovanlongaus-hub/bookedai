@@ -948,12 +948,18 @@ async def exchange_zoho_oauth_code(
 
 
 async def list_service_time_slots(service_id: str, request: Request):
-    """Public endpoint — list open time slots for an AI Mentor service.
+    """Public endpoint — list time slots for an AI Mentor service.
 
-    Backed by ``service_time_slots`` (migration 036). Tenant-scoped to
-    ai-mentor-doer so this never leaks slots from other partners. Filters:
-    ``is_active = true``, ``booked_count < capacity``, and
-    ``slot_start_at > now()`` so past slots disappear automatically.
+    Backed by ``service_time_slots`` (migration 036, expanded by 042).
+    Tenant-scoped to ai-mentor-doer so this never leaks slots from other
+    partners. Filters: ``is_active = true`` and ``slot_start_at > now()``.
+
+    Booked-out 1-on-1 slots are STILL returned (with seats_available=0)
+    so the chat calendar can render them as visible-but-disabled
+    "Booked" badges — important for showing learners that 1-on-1
+    sessions exist on a given day even after the seat is taken. Group
+    slots return seats_available > 0 until capacity is hit; the chat
+    UI keeps them clickable while seats remain.
 
     No auth required — this is the same scope as the public catalogue.
     """
@@ -985,10 +991,9 @@ async def list_service_time_slots(service_id: str, request: Request):
                     )
                       and sts.service_id = :service_id
                       and sts.is_active = true
-                      and sts.booked_count < sts.capacity
                       and sts.slot_start_at > now()
                     order by sts.slot_start_at asc
-                    limit 24
+                    limit 60
                     """
                 ),
                 {"service_id": normalized_service},
@@ -1036,6 +1041,70 @@ async def list_service_time_slots(service_id: str, request: Request):
         return _error_response(error, tenant_id=None, actor_context=None)
 
 
+async def get_aimentor_payment_info(request: Request):
+    """Return AI Mentor tenant payment surface (bank + Stripe + QR template).
+
+    Pulls tenant_settings.settings_json.payment for the ``ai-mentor-doer``
+    tenant and shapes it for the chat success card. No auth required —
+    same scope as the public catalogue. Account number is returned masked
+    except the last 4 digits in case the response is logged.
+
+    Frontend uses this to render the "Pay by Credit" + "Pay by QR" tabs
+    after a slot reservation succeeds.
+    """
+    try:
+        async with get_session(request.app.state.session_factory) as session:
+            row = await session.execute(
+                text(
+                    """
+                    select ts.settings_json->'payment' as payment
+                    from tenants t
+                    join tenant_settings ts on ts.tenant_id = t.id
+                    where t.slug = 'ai-mentor-doer'
+                    limit 1
+                    """
+                ),
+            )
+            payment = (row.mappings().first() or {}).get("payment") or {}
+
+        if not isinstance(payment, dict):
+            payment = {}
+        bank = payment.get("bank_account") or {}
+        if not isinstance(bank, dict):
+            bank = {}
+
+        # Don't echo the full account number in API responses — clients
+        # see masked + last-4 only. The QR template still embeds the full
+        # number because the QR is the primary payment vehicle.
+        account_number = str(bank.get("account_number") or "")
+        masked = (
+            "•••• " + account_number[-4:]
+            if len(account_number) >= 4
+            else account_number
+        )
+
+        result = {
+            "currency": payment.get("currency") or "AUD",
+            "stripe_checkout_url": payment.get("stripe_checkout_url"),
+            "bank_account": {
+                "account_name": bank.get("account_name"),
+                "bsb": bank.get("bsb"),
+                "account_number": account_number,
+                "account_number_masked": masked,
+                "bank_name": bank.get("bank_name"),
+                "swift": bank.get("swift"),
+                "reference_prefix": bank.get("reference_prefix") or "AIM-",
+            },
+            "qr_payload_template": payment.get("qr_payload_template"),
+            "instructions_en": payment.get("instructions_en"),
+            "instructions_vi": payment.get("instructions_vi"),
+        }
+
+        return _success_response(result, tenant_id=None, actor_context=None)
+    except AppError as error:
+        return _error_response(error, tenant_id=None, actor_context=None)
+
+
 __all__ = [
     "_resolve_student_auth_secret",
     "_sign_student_session_token",
@@ -1051,4 +1120,5 @@ __all__ = [
     "SlotReservePayload",
     "exchange_zoho_oauth_code",
     "ExchangeZohoOAuthCodePayload",
+    "get_aimentor_payment_info",
 ]

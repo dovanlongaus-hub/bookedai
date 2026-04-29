@@ -42,3 +42,8 @@ router.add_api_route(
     handlers.exchange_zoho_oauth_code,
     methods=["POST"],
 )
+router.add_api_route(
+    "/aimentor/payment-info",
+    handlers.get_aimentor_payment_info,
+    methods=["GET"],
+)
