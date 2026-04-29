@@ -259,3 +259,10 @@ commit;
 -- join tenants t on t.id = s.tenant_id
 -- where t.slug = 'co-mai-hung-chess-class'
 -- group by status;
+-- Grant CRUD on chess_course_schedule_slots to the runtime application role.
+-- Idempotent: re-running has no effect when grants already exist.
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'bookedai_app') then
+    execute 'grant select, insert, update, delete on table chess_course_schedule_slots to bookedai_app';
+  end if;
+end $$;

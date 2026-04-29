@@ -797,6 +797,23 @@ function humanizePublicBookingSubmitError(error: unknown) {
   return message || 'Unable to create booking request.';
 }
 
+function humanizeHomepageSearchFailure(error: unknown) {
+  const message = error instanceof Error ? error.message : '';
+  const lower = message.toLowerCase();
+  if (
+    lower.includes('failed to fetch') ||
+    lower.includes('network') ||
+    lower.includes('timeout') ||
+    lower.includes('load failed') ||
+    lower.includes('tenant session required') ||
+    lower.includes('actor_context.tenant_id') ||
+    lower.includes('internal server error')
+  ) {
+    return 'Live search is taking longer than expected. I kept the booking flow open; add a suburb, preferred time, or service detail and I will tighten the shortlist.';
+  }
+  return 'Live search is taking longer than expected. Add one more detail and I will keep narrowing the booking options.';
+}
+
 function deriveCommunicationLaneStatus(
   lane:
     | {
@@ -3247,15 +3264,42 @@ export function HomepageSearchExperience({
         setComposerCollapsed(true);
       }
     } catch (error) {
+      const fallbackResults =
+        fastPreviewResults.length > 0
+          ? fastPreviewResults
+          : prioritizeSearchResults(
+              filterResultsByIntentTerms(
+                catalog?.services ?? [],
+                effectiveQuery,
+              ),
+              geoContext?.locality ?? null,
+              effectiveQuery,
+            ).slice(0, 3);
+      const recoverySummary = humanizeHomepageSearchFailure(error);
       trackHomepageSearchEvent('homepage_search_failed', {
         query: trimmedQuery,
         message: error instanceof Error ? error.message : 'Unable to search services right now.',
+        fallback_result_count: fallbackResults.length,
       });
-      setSearchError(error instanceof Error ? error.message : 'Unable to search services right now.');
-      setResults([]);
-      setSelectedServiceId('');
+      setSearchError('');
+      setResults(fallbackResults);
+      setSelectedServiceId((current) =>
+        current && fallbackResults.some((service) => service.id === current) ? current : '',
+      );
+      setAssistantSummary(recoverySummary);
+      setSearchWarnings(['Showing the safest available booking options while live search catches up.']);
+      setAgentChatMessages((current) => [
+        ...current,
+        {
+          id: createAgentChatMessageId('assistant'),
+          role: 'assistant',
+          content: recoverySummary,
+          resultIds: fallbackResults.slice(0, 3).map((item) => item.id),
+          suggestions: deriveIntentSuggestions(trimmedQuery).slice(0, 3),
+        },
+      ]);
       setLiveReadBookingSummary(null);
-      setComposerCollapsed(false);
+      setComposerCollapsed(fallbackResults.length > 0);
     } finally {
       setSearchLoading(false);
     }

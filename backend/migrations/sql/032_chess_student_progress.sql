@@ -31,3 +31,11 @@ CREATE TABLE IF NOT EXISTS chess_student_progress (
 
 CREATE INDEX IF NOT EXISTS idx_chess_student_progress_tenant_contact
   ON chess_student_progress(tenant_id, contact_id, session_date DESC);
+
+-- Grant CRUD on chess_student_progress to the runtime application role.
+-- Idempotent: re-running has no effect when grants already exist.
+do $$ begin
+  if exists (select 1 from pg_roles where rolname = 'bookedai_app') then
+    execute 'grant select, insert, update, delete on table chess_student_progress to bookedai_app';
+  end if;
+end $$;

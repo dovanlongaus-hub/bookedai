@@ -46,6 +46,54 @@ test.describe('public homepage responsive qa', () => {
     });
   });
 
+  test('homepage search recovers cleanly when live search fails', async ({ page }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.route('**/api/v1/agents/customer-turn', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'error', detail: 'simulated search failure' }),
+      });
+    });
+    await page.route('**/api/v1/matching/search', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'error', detail: 'simulated matching failure' }),
+      });
+    });
+    await page.route('**/api/booking-assistant/chat', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'simulated legacy chat failure' }),
+      });
+    });
+    await page.route('**/api/chat/send', async (route) => {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ detail: 'simulated legacy chat failure' }),
+      });
+    });
+
+    await openHomepage(page);
+    await page.locator('#live-product').scrollIntoViewIfNeeded();
+    const searchInput = page
+      .locator('#bookedai-search-assistant')
+      .getByRole('textbox', { name: /Ask BookedAI/i })
+      .first();
+    await expect(searchInput).toBeVisible({ timeout: 10000 });
+    await searchInput.fill('Book a chess class in Sydney this weekend');
+    await searchInput.press('Enter');
+
+    await expect(page.getByText(/Live search is taking longer than expected/i).first()).toBeVisible();
+    await expect(page.getByText(/Search needs attention/i)).toHaveCount(0);
+    await expect(
+      page.getByText(/simulated search failure|simulated matching failure|simulated legacy chat failure/i),
+    ).toHaveCount(0);
+  });
+
   test('homepage hero opens the WSTI proof path and keeps booking activity visible', async ({ page }) => {
     await page.setViewportSize({ width: 1440, height: 1000 });
     await openHomepage(
