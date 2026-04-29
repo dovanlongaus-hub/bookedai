@@ -2364,16 +2364,36 @@
  * Coach portrait CDN image — replaces the SVG knight placeholder. Used in
  * BOTH the hero coach card and the profile portrait card.
  * ========================================================================= */
+/* Coach portrait — base styling shared by both render points.
+ * Two distinct framings of the SAME banner image via modifier classes:
+ *   --hero    : banner-style 4:5 crop, focal point on the smiling subject (left half).
+ *   --profile : square 1:1 close-up, focal point shifted right + higher (face zoom).
+ * If the source banner photo's focal point isn't where these classes assume,
+ * tweak `object-position` percentages — that's the only knob. */
 .chess-app .chess-coach-portrait-img {
   width: 100%;
   height: auto;
-  aspect-ratio: 4 / 5;
   object-fit: cover;
+  object-position: 50% 30%;
   border-radius: var(--chess-radius-lg);
   border: 1px solid rgba(201, 162, 74, 0.35);
   box-shadow: var(--chess-shadow-card);
   display: block;
   background: var(--chess-navy-soft);
+}
+
+/* Hero coach card — left-of-center upper crop showing GM Mai Hưng's smile
+ * from chest up. */
+.chess-app .chess-coach-portrait-img--hero {
+  aspect-ratio: 4 / 5;
+  object-position: 35% 26%;
+}
+
+/* Profile section — square close-up with the focal point shifted right + up
+ * to give a tighter face crop, visually distinct from the hero framing. */
+.chess-app .chess-coach-portrait-img--profile {
+  aspect-ratio: 1 / 1;
+  object-position: 65% 20%;
 }
 
 /* ===========================================================================

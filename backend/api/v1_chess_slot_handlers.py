@@ -802,7 +802,17 @@ async def chess_catalog_search(
                 "display_price_aud": (
                     f"A${amount_aud:,.2f}" if amount_aud is not None else None
                 ),
-                "display_price_vnd": svc.get("display_price"),
+                # VND display derived from amount_aud × 16,500 (the published
+                # academy reference rate). Earlier this leaked the AUD-only
+                # `display_price` text into the VI locale, which then rendered
+                # "A$49 / student / session" on the Vietnamese chat UI. Now we
+                # always emit a true VND amount so chess.bookedai.au's VI
+                # locale stays purely VND and never shows AUD.
+                "display_price_vnd": (
+                    f"{int(round(amount_aud * 16500)):,} VND"
+                    if amount_aud is not None
+                    else None
+                ),
                 "tier": tier_int if tier_int < 99 else None,
                 "format": (
                     "elite"

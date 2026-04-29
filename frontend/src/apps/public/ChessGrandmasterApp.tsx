@@ -38,7 +38,7 @@ const programs: ProgramTier[] = [
       vi: 'Online qua Lichess + Zoom · Nhóm tối đa 8',
     },
     tier: { en: 'Beginner Foundations', vi: 'Nền tảng cờ vua' },
-    price: { en: 'AUD 16', vi: '260,000 VND' },
+    price: { en: 'AUD 35', vi: '580,000 VND' },
     priceSuffix: { en: 'per student per session', vi: '/ học viên / buổi' },
     body: {
       en: 'Confident first 12 moves. Tactical patterns. Disciplined thinking. Built for ages 6-12 in small focused groups.',
@@ -183,7 +183,7 @@ function resolveProgramAmounts(programKey: ChessProgramKey): ChessProgramAmounts
   // standalone amounts (no travel surcharge tier — Tier 4 is the premium online package).
   switch (programKey) {
     case 'beginner':
-      return { programKey, vnd: 260000, aud: 16 };
+      return { programKey, vnd: 580000, aud: 35 };
     case 'private':
       return { programKey, vnd: 1040000, aud: 65 };
     case 'tournament':
@@ -191,7 +191,7 @@ function resolveProgramAmounts(programKey: ChessProgramKey): ChessProgramAmounts
     case 'elite':
       return { programKey, vnd: 1500000, aud: 92 };
     default:
-      return { programKey: 'beginner', vnd: 260000, aud: Math.round(260000 / VND_PER_AUD) };
+      return { programKey: 'beginner', vnd: 580000, aud: Math.round(580000 / VND_PER_AUD) };
   }
 }
 
@@ -1509,7 +1509,7 @@ export function ChessGrandmasterApp() {
                 src="https://upload.bookedai.au/images/bb99/B7_i8BfBTN8NMxJO_B7X3Q.png"
                 alt={t.coach.portraitAlt}
                 loading="lazy"
-                className="chess-coach-portrait-img"
+                className="chess-coach-portrait-img chess-coach-portrait-img--hero"
               />
               <div className="chess-coach-name">{t.coach.name}</div>
               <div className="chess-coach-meta">{t.coach.meta}</div>
@@ -1557,7 +1557,7 @@ export function ChessGrandmasterApp() {
                   src="https://upload.bookedai.au/images/bb99/B7_i8BfBTN8NMxJO_B7X3Q.png"
                   alt={t.coach.portraitAlt}
                   loading="lazy"
-                  className="chess-coach-portrait-img"
+                  className="chess-coach-portrait-img chess-coach-portrait-img--profile"
                 />
                 <div className="chess-coach-name">{t.coach.name}</div>
                 <div className="chess-coach-meta">{t.profile.portraitCaption}</div>
@@ -1925,9 +1925,9 @@ export function ChessGrandmasterApp() {
               Locale-correct currency on the sticky mobile CTA:
               EN visitors see AUD (matching the Stripe / international audience), VI visitors
               see VND (matching the Vietnamese pricing tier shown in the program cards above).
-              Beginner Foundations: AUD 16 / VND 260,000 per session.
+              Beginner Foundations: AUD 35 / VND 580,000 per session (Sydney market rate).
             */}
-            {t.sticky.from} {locale === 'vi' ? '260,000 VND' : 'AUD 16'} {t.sticky.perSession}
+            {t.sticky.from} {locale === 'vi' ? '580,000 VND' : 'AUD 35'} {t.sticky.perSession}
           </span>
         </div>
         <button
