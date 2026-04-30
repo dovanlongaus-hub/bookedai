@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 import json
+import logging
 import re
 from typing import Any
 from urllib.parse import parse_qs, quote, urlencode, urlparse
@@ -11,6 +12,9 @@ from zoneinfo import ZoneInfo
 
 from config import Settings
 from schemas import BookingAssistantSessionRequest, DemoBookingRequest, PricingConsultationRequest, ServiceCatalogItem
+
+
+_logger = logging.getLogger(__name__)
 
 
 # Zoho Calendar's auto-zmeeting integration returns the HOST start URL
@@ -399,6 +403,97 @@ async def create_zoho_meeting_for_booking(
     meeting_link = _attendee_join_url_from_zoho(meeting_data, raw_meeting_link)
     event_url = str(event.get("viewEventURL") or "").strip() or None
     return meeting_link, event_url
+
+
+async def cancel_zoho_meeting_for_booking(
+    settings: Settings,
+    *,
+    meeting_id: str,
+    tenant_credentials: object | None = None,
+) -> dict[str, Any]:
+    """Cancel a Zoho Meeting session and return a normalised result dict.
+
+    Lifecycle wrapper around :class:`ZohoMeetingAdapter.cancel_meeting`. On
+    success returns ``{"status": "cancelled", "meeting_id": ..., ...}``. On
+    failure logs and returns ``{"status": "failed", "error": ..., "meeting_id": ...}``
+    — callers (typically ``lifecycle_ops_service``) drive any retry via the
+    outbox rather than re-raising here.
+    """
+    from integrations.zoho_meeting import ZohoMeetingAdapter
+
+    adapter = ZohoMeetingAdapter()
+    try:
+        result = await adapter.cancel_meeting(
+            settings,
+            meeting_id=meeting_id,
+        )
+    except (ValueError, httpx.HTTPError) as exc:
+        _logger.warning(
+            "zoho_meeting_cancel_failed",
+            extra={
+                "event_type": "zoho_meeting_cancel_failed",
+                "integration_name": "zoho_meeting",
+                "meeting_id": meeting_id,
+            },
+            exc_info=exc,
+        )
+        return {"status": "failed", "error": str(exc), "meeting_id": meeting_id}
+
+    return {
+        "status": "cancelled",
+        "meeting_id": str(result.get("meeting_id") or meeting_id),
+        "provider": str(result.get("provider") or "zoho_meeting"),
+        "provider_status": str(result.get("status") or "deleted"),
+    }
+
+
+async def update_zoho_meeting_time_for_booking(
+    settings: Settings,
+    *,
+    meeting_id: str,
+    new_start_at: datetime,
+    duration_minutes: int,
+    timezone_name: str = "Australia/Sydney",
+    tenant_credentials: object | None = None,
+) -> dict[str, Any]:
+    """Reschedule a Zoho Meeting session and return a normalised result dict.
+
+    Lifecycle wrapper around :class:`ZohoMeetingAdapter.update_meeting_time`.
+    On success returns ``{"status": "updated", "meeting_id": ..., ...}``. On
+    failure logs and returns ``{"status": "failed", "error": ..., "meeting_id": ...}``
+    — callers drive any retry via the outbox rather than re-raising here.
+    """
+    from integrations.zoho_meeting import ZohoMeetingAdapter
+
+    adapter = ZohoMeetingAdapter()
+    try:
+        result = await adapter.update_meeting_time(
+            settings,
+            meeting_id=meeting_id,
+            new_start_at=new_start_at,
+            duration_minutes=duration_minutes,
+            timezone_label=timezone_name,
+        )
+    except (ValueError, httpx.HTTPError) as exc:
+        _logger.warning(
+            "zoho_meeting_update_failed",
+            extra={
+                "event_type": "zoho_meeting_update_failed",
+                "integration_name": "zoho_meeting",
+                "meeting_id": meeting_id,
+            },
+            exc_info=exc,
+        )
+        return {"status": "failed", "error": str(exc), "meeting_id": meeting_id}
+
+    return {
+        "status": "updated",
+        "meeting_id": str(result.get("meeting_id") or meeting_id),
+        "provider": str(result.get("provider") or "zoho_meeting"),
+        "provider_status": str(result.get("status") or "updated"),
+        "start_time_iso": str(result.get("start_time_iso") or ""),
+        "duration_minutes": int(result.get("duration_minutes") or duration_minutes),
+    }
 
 
 async def create_zoho_calendar_event(

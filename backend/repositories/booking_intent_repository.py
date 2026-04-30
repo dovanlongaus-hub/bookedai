@@ -303,6 +303,99 @@ class BookingIntentRepository(BaseRepository):
         )
         return existing_metadata
 
+    async def update_slot_assignment(
+        self,
+        *,
+        booking_reference: str,
+        new_slot_id: str | None = None,
+        new_requested_date: str | None = None,
+        new_requested_time: str | None = None,
+        new_timezone: str | None = None,
+    ) -> dict | None:
+        """Update slot assignment fields on a booking_intent row.
+
+        Used by reschedule flows: chess paths typically pass ``new_slot_id``
+        (which is persisted under ``metadata_json.slot_id`` since the
+        ``booking_intents`` table has no dedicated column for it), while AI
+        Mentor paths typically pass new date/time/timezone. Each parameter is
+        only applied when non-None — callers can mix and match without
+        clobbering unrelated fields. Returns the updated row as a dict, or
+        ``None`` when no row matched ``booking_reference``.
+        """
+        normalized_reference = (booking_reference or "").strip()
+        if not normalized_reference:
+            return None
+
+        normalized_slot_id = (new_slot_id or "").strip() or None
+        if (
+            normalized_slot_id is None
+            and new_requested_date is None
+            and new_requested_time is None
+            and new_timezone is None
+        ):
+            # Nothing actionable to persist — keep callers idempotent.
+            return None
+
+        if normalized_slot_id is not None:
+            lookup = await self.session.execute(
+                text(
+                    """
+                    select id::text as booking_intent_id, metadata_json
+                    from booking_intents
+                    where booking_reference = :booking_reference
+                    limit 1
+                    """
+                ),
+                {"booking_reference": normalized_reference},
+            )
+            row = lookup.mappings().first()
+            if not row:
+                return None
+            existing_metadata = dict(row.get("metadata_json") or {})
+            existing_metadata["slot_id"] = normalized_slot_id
+            metadata_payload = json.dumps(existing_metadata)
+        else:
+            metadata_payload = None
+
+        result = await self.session.execute(
+            text(
+                """
+                update booking_intents
+                set
+                  requested_date = coalesce(:new_requested_date, requested_date),
+                  requested_time = coalesce(:new_requested_time, requested_time),
+                  timezone = coalesce(:new_timezone, timezone),
+                  metadata_json = coalesce(
+                    cast(:metadata_json as jsonb),
+                    metadata_json
+                  ),
+                  updated_at = now()
+                where booking_reference = :booking_reference
+                returning
+                  id::text as booking_intent_id,
+                  tenant_id::text as tenant_id,
+                  booking_reference,
+                  requested_date,
+                  requested_time,
+                  timezone,
+                  metadata_json,
+                  status,
+                  updated_at
+                """
+            ),
+            {
+                "booking_reference": normalized_reference,
+                "new_requested_date": new_requested_date,
+                "new_requested_time": new_requested_time,
+                "new_timezone": new_timezone,
+                "metadata_json": metadata_payload,
+            },
+        )
+        row = result.mappings().first()
+        if not row:
+            return None
+        return dict(row)
+
     async def fetch_meeting_metadata(
         self,
         *,
@@ -683,3 +776,101 @@ class BookingIntentRepository(BaseRepository):
         if not row:
             return None
         return dict(row)
+
+    async def is_transcript_task_synced(
+        self,
+        *,
+        booking_reference: str,
+    ) -> bool:
+        """Return True when this booking already has a Zoho transcript Task.
+
+        Idempotency guard for the conversation-transcript Zoho sync flow:
+        the booking-confirmation handler may fire twice on retries, and we
+        must not spam the CRM contact timeline with duplicate transcripts.
+        Reads ``metadata_json.transcript_task_synced`` and treats a truthy
+        value as "already synced; skip".
+        """
+        normalized_reference = (booking_reference or "").strip()
+        if not normalized_reference:
+            return False
+        result = await self.session.execute(
+            text(
+                """
+                select metadata_json
+                from booking_intents
+                where booking_reference = :booking_reference
+                limit 1
+                """
+            ),
+            {"booking_reference": normalized_reference},
+        )
+        row = result.mappings().first()
+        if not row:
+            return False
+        metadata = row.get("metadata_json")
+        if not isinstance(metadata, dict):
+            return False
+        return bool(metadata.get("transcript_task_synced"))
+
+    async def mark_transcript_task_synced(
+        self,
+        *,
+        booking_reference: str,
+        zoho_task_id: str | None = None,
+        line_count: int | None = None,
+    ) -> bool:
+        """Stamp a booking_intent row as having had its transcript pushed to Zoho.
+
+        Stores ``transcript_task_synced=true`` plus a small audit dict
+        (``transcript_task = {zoho_task_id, line_count, synced_at}``) so
+        operators can reconcile the Zoho Task back to the local booking
+        without round-tripping the CRM API.
+        """
+        normalized_reference = (booking_reference or "").strip()
+        if not normalized_reference:
+            return False
+
+        lookup = await self.session.execute(
+            text(
+                """
+                select id::text as booking_intent_id, metadata_json
+                from booking_intents
+                where booking_reference = :booking_reference
+                limit 1
+                """
+            ),
+            {"booking_reference": normalized_reference},
+        )
+        row = lookup.mappings().first()
+        if not row:
+            return False
+
+        existing_metadata = (
+            dict(row.get("metadata_json")) if isinstance(row.get("metadata_json"), dict) else {}
+        )
+        existing_metadata["transcript_task_synced"] = True
+        transcript_audit = {
+            "zoho_task_id": (zoho_task_id or "").strip() or None,
+            "line_count": int(line_count) if line_count is not None else None,
+            "synced_at": datetime.utcnow().isoformat() + "Z",
+        }
+        existing_metadata["transcript_task"] = {
+            key: value for key, value in transcript_audit.items() if value is not None
+        }
+
+        await self.session.execute(
+            text(
+                """
+                update booking_intents
+                set
+                  metadata_json = cast(:metadata_json as jsonb),
+                  updated_at = now()
+                where id = cast(:booking_intent_id as uuid)
+                """
+            ),
+            {
+                "booking_intent_id": row["booking_intent_id"],
+                "metadata_json": json.dumps(existing_metadata),
+            },
+        )
+        return True

@@ -5,6 +5,7 @@ from api.v1_admin_tenant_config_routes import router as admin_tenant_config_rout
 from api.v1_agent_routes import router as agent_router
 from api.v1_ai_mentor_student_routes import router as ai_mentor_student_router
 from api.v1_assessment_routes import router as assessment_router
+from api.v1_booking_lifecycle_routes import router as booking_lifecycle_router
 from api.v1_booking_routes import router as booking_router
 from api.v1_chess_meeting_routes import router as chess_meeting_router
 from api.v1_chess_payment_routes import router as chess_payment_router
@@ -36,6 +37,7 @@ router.include_router(ai_mentor_student_router)
 router.include_router(assessment_router)
 router.include_router(search_router)
 router.include_router(booking_router)
+router.include_router(booking_lifecycle_router)
 router.include_router(chess_meeting_router)
 router.include_router(chess_payment_router)
 router.include_router(chess_slot_router)
