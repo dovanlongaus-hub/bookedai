@@ -1,25 +1,29 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import { Waves, MapPin, Clock, Droplet, Users, ArrowRight } from 'lucide-react';
+
+import '../../theme/future-swim-tokens.css';
 
 import { createPublicBookingAssistantLeadAndBookingIntent } from '../../components/landing/assistant/publicBookingAssistantV1';
 import { apiV1 } from '../../shared/api/v1';
 import type { MatchCandidate } from '../../shared/contracts';
 
-type ConversationMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-};
+import { CentreCard } from '../../components/future-swim/CentreCard';
+import { FutureSwimAsk } from '../../components/future-swim/FutureSwimAsk';
+import { FutureSwimHeader } from '../../components/future-swim/FutureSwimHeader';
+import { LevelCard } from '../../components/future-swim/LevelCard';
+import { StickyChatCtas } from '../../components/future-swim/StickyChatCtas';
+import { TimetableGrid } from '../../components/future-swim/TimetableGrid';
 
-type InquiryFormState = {
-  parentName: string;
-  email: string;
-  phone: string;
-  childAge: string;
-  confidenceLevel: string;
-  preferredDate: string;
-  preferredTime: string;
-  selectedServiceId: string;
-  notes: string;
-};
+import {
+  FUTURE_SWIM_CENTRES,
+  type Centre,
+  type CentreCode,
+} from './futureswim/centres';
+import {
+  FUTURE_SWIM_LEVELS,
+  parseLevelCode,
+  type LevelCode,
+} from './futureswim/levels';
 
 type BookingAssistantCatalogResponse = {
   status?: string;
@@ -43,21 +47,70 @@ type BookingAssistantCatalogResponse = {
   }>;
 };
 
+type ServiceRow = MatchCandidate & {
+  centreCode: CentreCode | null;
+  levelCode: LevelCode | null;
+};
+
+type LevelOfferingKey = `${CentreCode}-${LevelCode}`;
+
+type InquiryFormState = {
+  parentName: string;
+  email: string;
+  phone: string;
+  childAge: string;
+  confidenceLevel: string;
+  preferredDate: string;
+  preferredTime: string;
+  centreCode: CentreCode;
+  levelCode: LevelCode;
+  notes: string;
+};
+
 const FUTURE_SWIM_TENANT_REF = 'future-swim';
 const DEFAULT_SOURCE_PAGE = 'future-swim-runtime';
 
-const quickPrompts = [
-  'My child is 3 and nervous in the water. Which Future Swim centre is the best fit in the Shire?',
-  'Find a small-class beginner lesson near Miranda for a 4-year-old on weekends.',
-  'We want a warm-pool class for a 5-year-old near Leichhardt.',
-  'Which Future Swim location is best for early water confidence and make-up lessons?',
+const WHATSAPP_HREF =
+  'https://wa.me/61455301335?text=Hi%20Future%20Swim%2C%20I%27d%20like%20to%20book%20a%20lesson.';
+const TELEGRAM_HREF = 'https://t.me/BookedAI_Manager_Bot?start=futureswim';
+
+const TRUST_SIGNALS = [
+  'Warm ozone-treated pools',
+  'Max 3 in beginner classes',
+  'Make-up lessons available',
 ];
 
-const reassurancePoints = [
-  'Results and recommendations are limited to Future Swim centres only.',
-  'Prices and centre links reflect the current Future Swim catalogue.',
-  'Booking requests, enquiries, and confirmation emails are handled securely through the BookedAI platform.',
-  'Designed for parents — not a generic chatbot.',
+const FAQS: Array<{ question: string; answer: string }> = [
+  {
+    question: 'Do you offer make-up lessons?',
+    answer:
+      'Yes. If you give your centre advance notice and a slot is available, missed lessons can be made up at any Future Swim centre. Speak to your centre manager or send a message via Future Swim Ask.',
+  },
+  {
+    question: 'Is there a sibling discount?',
+    answer:
+      'Future Swim runs ongoing promotions for second-and-third children. Pricing varies by centre — ask your local centre or send a quick note via WhatsApp and we will confirm what is current.',
+  },
+  {
+    question: 'What should my child bring?',
+    answer:
+      'A swimsuit, two towels, goggles (optional for first lessons), and warm clothing for after the lesson. Babies should wear a leak-proof reusable swim nappy. Showers are available at every centre.',
+  },
+  {
+    question: 'Is a free trial available at St Peters?',
+    answer:
+      'Yes — the St Peters centre offers a complimentary trial lesson for new families. Book through Future Swim Ask, WhatsApp, or by calling the centre directly.',
+  },
+  {
+    question: 'Why ozone instead of chlorine?',
+    answer:
+      'Future Swim pools use ozone-treated water alongside a low residual sanitiser. The water is gentler on skin, eyes, and swimsuits than traditional high-chlorine pools, while still meeting NSW Health pool-water standards.',
+  },
+  {
+    question: 'What happens if my child cries during the lesson?',
+    answer:
+      'Tears in the first few lessons are normal — our coaches are trained to build trust at the child\'s pace. We will keep you fully briefed at the pool deck and, with your permission, slow the lesson down or step back to comfort skills before progressing.',
+  },
 ];
 
 const initialInquiryFormState: InquiryFormState = {
@@ -68,7 +121,8 @@ const initialInquiryFormState: InquiryFormState = {
   confidenceLevel: 'Nervous beginner',
   preferredDate: '',
   preferredTime: '',
-  selectedServiceId: '',
+  centreCode: 'caringbah',
+  levelCode: 'learn-to-swim',
   notes: '',
 };
 
@@ -81,7 +135,6 @@ function buildAttribution() {
       referrer: null,
     };
   }
-
   return {
     source: 'futureswim.bookedai.au',
     medium: 'web',
@@ -109,58 +162,29 @@ function buildRuntimeConfig() {
 }
 
 function formatPrice(price?: string | null, amount?: number | null) {
-  if (price && price.trim()) {
-    return price.trim();
-  }
+  if (price && price.trim()) return price.trim();
   if (typeof amount === 'number' && amount > 0.01) {
     return `A$${amount.toFixed(Number.isInteger(amount) ? 0 : 2)}`;
   }
   return 'Please enquire';
 }
 
-function formatAmountBand(services: MatchCandidate[]) {
-  const priced = services
-    .map((service) => service.amountAud)
-    .filter((value): value is number => typeof value === 'number' && value > 0.01)
-    .sort((a, b) => a - b);
-
-  if (!priced.length) {
-    return 'Enquire for pricing';
+function parseCentreCode(serviceId: string): CentreCode | null {
+  for (const centre of FUTURE_SWIM_CENTRES) {
+    if (serviceId.includes(`-${centre.code}-`) || serviceId.startsWith(`future-swim-${centre.code}-`)) {
+      return centre.code;
+    }
   }
-
-  const min = priced[0];
-  const max = priced[priced.length - 1];
-  if (min === max) {
-    return `From A$${min.toFixed(Number.isInteger(min) ? 0 : 2)}`;
-  }
-  return `A$${min.toFixed(Number.isInteger(min) ? 0 : 2)} to A$${max.toFixed(Number.isInteger(max) ? 0 : 2)}`;
+  return null;
 }
 
-function buildAssistantReply(results: MatchCandidate[]) {
-  if (!results.length) {
-    return 'I could not find a perfect match from that description. You can still send an enquiry below and the Future Swim team will follow up with you.';
-  }
-
-  const top = results[0];
-  const second = results[1];
-  if (second) {
-    return `The best current Future Swim matches are ${top.venueName || top.serviceName} and ${second.venueName || second.serviceName}. Choose one below and I’ll move it into the booking flow.`;
-  }
-
-  return `The closest Future Swim match is ${top.venueName || top.serviceName}. Continue below to enquire or send a booking request.`;
-}
-
-async function fetchFutureSwimCatalog(): Promise<MatchCandidate[]> {
+async function fetchFutureSwimCatalog(): Promise<ServiceRow[]> {
   const response = await fetch('/api/booking-assistant/catalog', {
-    headers: {
-      accept: 'application/json',
-    },
+    headers: { accept: 'application/json' },
   });
-
   if (!response.ok) {
     throw new Error(`Unable to load Future Swim catalogue (${response.status}).`);
   }
-
   const payload = (await response.json()) as BookingAssistantCatalogResponse;
   const services = Array.isArray(payload.services) ? payload.services : [];
 
@@ -175,186 +199,156 @@ async function fetchFutureSwimCatalog(): Promise<MatchCandidate[]> {
         sourceUrl.includes('futureswim.com.au')
       );
     })
-    .map((service) => ({
-      candidateId: service.id ?? '',
-      providerName: 'Future Swim',
-      serviceName: service.name ?? 'Future Swim lesson',
-      sourceType: 'service_catalog',
-      category: service.category ?? 'Kids Services',
-      summary: service.summary ?? 'Future Swim lesson and enrolment option.',
-      venueName: service.venue_name ?? 'Future Swim',
-      location: service.location ?? 'Sydney NSW',
-      bookingUrl: service.booking_url ?? null,
-      mapUrl: service.map_url ?? null,
-      sourceUrl: service.source_url ?? null,
-      imageUrl: service.image_url ?? null,
-      amountAud: service.amount_aud ?? null,
-      currencyCode: 'AUD',
-      displayPrice: formatPrice(service.display_price, service.amount_aud),
-      tags: Array.isArray(service.tags) ? service.tags.filter(Boolean) : [],
-      featured: Boolean(service.featured),
-    }))
-    .filter((service) => service.candidateId)
-    .sort((a, b) => Number(Boolean(b.featured)) - Number(Boolean(a.featured)) || a.serviceName.localeCompare(b.serviceName));
+    .map((service) => {
+      const id = service.id ?? '';
+      return {
+        candidateId: id,
+        providerName: 'Future Swim',
+        serviceName: service.name ?? 'Future Swim lesson',
+        sourceType: 'service_catalog',
+        category: service.category ?? 'Kids Services',
+        summary: service.summary ?? 'Future Swim lesson and enrolment option.',
+        venueName: service.venue_name ?? 'Future Swim',
+        location: service.location ?? 'Sydney NSW',
+        bookingUrl: service.booking_url ?? null,
+        mapUrl: service.map_url ?? null,
+        sourceUrl: service.source_url ?? null,
+        imageUrl: service.image_url ?? null,
+        amountAud: service.amount_aud ?? null,
+        currencyCode: 'AUD',
+        displayPrice: formatPrice(service.display_price, service.amount_aud),
+        tags: Array.isArray(service.tags) ? service.tags.filter(Boolean) : [],
+        featured: Boolean(service.featured),
+        centreCode: parseCentreCode(id),
+        levelCode: parseLevelCode(id),
+      } satisfies ServiceRow;
+    })
+    .filter((service) => service.candidateId);
 }
 
 export function FutureSwimApp() {
-  const [catalogServices, setCatalogServices] = useState<MatchCandidate[]>([]);
+  const [catalogServices, setCatalogServices] = useState<ServiceRow[]>([]);
   const [catalogPending, setCatalogPending] = useState(true);
   const [catalogError, setCatalogError] = useState('');
-  const [searchQuery, setSearchQuery] = useState(quickPrompts[0]);
-  const [searchResults, setSearchResults] = useState<MatchCandidate[]>([]);
-  const [conversation, setConversation] = useState<ConversationMessage[]>([
-    {
-      role: 'assistant',
-      content:
-        'Welcome to Future Swim. Tell me your child’s age, confidence level, and preferred area, and I will shortlist only Future Swim options.',
-    },
-  ]);
-  const [searchPending, setSearchPending] = useState(false);
-  const [searchError, setSearchError] = useState('');
+  const [askOpen, setAskOpen] = useState(false);
+  const [askInitialQuery, setAskInitialQuery] = useState<string | null>(null);
+  const [timetableCentre, setTimetableCentre] = useState<CentreCode>('caringbah');
+  const [timetableLevel, setTimetableLevel] = useState<LevelCode>('learn-to-swim');
   const [leadPending, setLeadPending] = useState(false);
   const [leadStatus, setLeadStatus] = useState('');
   const [leadError, setLeadError] = useState('');
-  const [thankYouReturnCountdown, setThankYouReturnCountdown] = useState(5);
+  const [thankYouCountdown, setThankYouCountdown] = useState(5);
   const [formState, setFormState] = useState<InquiryFormState>(initialInquiryFormState);
 
-  function returnToMainScreenAfterBooking() {
-    setLeadStatus('');
-    setLeadError('');
-    setLeadPending(false);
-    setFormState(initialInquiryFormState);
-    window.history.replaceState({}, '', window.location.pathname);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-  }
-
   useEffect(() => {
-    document.title = 'Future Swim | Live BookedAI tenant — bookings, payments, follow-up';
+    document.title = 'Future Swim · Small-class swim lessons in Sydney';
   }, []);
 
   useEffect(() => {
-    if (!leadStatus) {
-      setThankYouReturnCountdown(5);
-      return;
-    }
-
-    setThankYouReturnCountdown(5);
-    const countdownInterval = window.setInterval(() => {
-      setThankYouReturnCountdown((current) => Math.max(0, current - 1));
-    }, 1000);
-    const returnTimer = window.setTimeout(() => {
-      returnToMainScreenAfterBooking();
-    }, 5000);
-
-    return () => {
-      window.clearInterval(countdownInterval);
-      window.clearTimeout(returnTimer);
-    };
-  }, [leadStatus]);
-
-  useEffect(() => {
     let cancelled = false;
-
     async function loadCatalog() {
       setCatalogPending(true);
       setCatalogError('');
       try {
         const services = await fetchFutureSwimCatalog();
-        if (cancelled) {
-          return;
-        }
+        if (cancelled) return;
         setCatalogServices(services);
-        setFormState((current) => ({
-          ...current,
-          selectedServiceId: current.selectedServiceId || services[0]?.candidateId || '',
-        }));
       } catch (error) {
         if (!cancelled) {
-          setCatalogError(error instanceof Error ? error.message : 'Unable to load Future Swim catalogue.');
+          setCatalogError(
+            error instanceof Error ? error.message : 'Unable to load Future Swim catalogue.',
+          );
         }
       } finally {
-        if (!cancelled) {
-          setCatalogPending(false);
-        }
+        if (!cancelled) setCatalogPending(false);
       }
     }
-
     void loadCatalog();
     return () => {
       cancelled = true;
     };
   }, []);
 
-  const displayedResults = searchResults.length ? searchResults : catalogServices;
-
-  const selectedResult = useMemo(
-    () => displayedResults.find((item) => item.candidateId === formState.selectedServiceId) ?? catalogServices[0] ?? null,
-    [catalogServices, displayedResults, formState.selectedServiceId],
-  );
-
-  const heroMetrics = useMemo(() => {
-    const uniqueVenues = new Set(catalogServices.map((item) => item.venueName || item.serviceName));
-    return {
-      centreCount: uniqueVenues.size,
-      priceBand: formatAmountBand(catalogServices),
-      featuredCount: catalogServices.filter((item) => item.featured).length,
-    };
-  }, [catalogServices]);
-
-  async function handleSearchSubmit(event?: FormEvent<HTMLFormElement>) {
-    event?.preventDefault();
-    const trimmedQuery = searchQuery.trim();
-    if (!trimmedQuery) {
+  useEffect(() => {
+    if (!leadStatus) {
+      setThankYouCountdown(5);
       return;
     }
+    setThankYouCountdown(5);
+    const interval = window.setInterval(() => {
+      setThankYouCountdown((current) => Math.max(0, current - 1));
+    }, 1000);
+    const timer = window.setTimeout(() => {
+      setLeadStatus('');
+      setLeadError('');
+      setLeadPending(false);
+      setFormState(initialInquiryFormState);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }, 5000);
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timer);
+    };
+  }, [leadStatus]);
 
-    setSearchPending(true);
-    setSearchError('');
-    setConversation((current) => [...current, { role: 'user', content: trimmedQuery }]);
-
-    try {
-      const response = await apiV1.searchCandidates({
-        query: trimmedQuery,
-        location: null,
-        preferences: {
-          service_category: 'Kids Services',
-        },
-        channel_context: {
-          channel: 'public_web',
-          deployment_mode: 'standalone_app',
-          tenant_ref: FUTURE_SWIM_TENANT_REF,
-          widget_id: 'future-swim-concierge',
-        },
-        attribution: buildAttribution(),
-      });
-
-      if (!('data' in response)) {
-        throw new Error('Search was accepted, but no shortlist was returned yet.');
+  const levelOfferings = useMemo(() => {
+    const map = new Map<LevelOfferingKey, ServiceRow>();
+    for (const service of catalogServices) {
+      if (service.centreCode && service.levelCode) {
+        map.set(`${service.centreCode}-${service.levelCode}`, service);
       }
-
-      const nextResults = response.data.candidates
-        .filter((candidate) => candidate.providerName === 'Future Swim' || candidate.candidateId.startsWith('future-swim-'))
-        .slice(0, 6);
-
-      setSearchResults(nextResults);
-      setFormState((current) => ({
-        ...current,
-        selectedServiceId: nextResults[0]?.candidateId || current.selectedServiceId,
-      }));
-      setConversation((current) => [...current, { role: 'assistant', content: buildAssistantReply(nextResults) }]);
-    } catch (error) {
-      setSearchError(error instanceof Error ? error.message : 'Unable to search Future Swim right now.');
-      setConversation((current) => [
-        ...current,
-        {
-          role: 'assistant',
-          content:
-            'The search is temporarily unavailable. You can still submit your enquiry below and the Future Swim team will be in touch.',
-        },
-      ]);
-    } finally {
-      setSearchPending(false);
     }
+    return map;
+  }, [catalogServices]);
+
+  const centreServices = useMemo(() => {
+    const map = new Map<CentreCode, ServiceRow>();
+    for (const service of catalogServices) {
+      if (service.centreCode && !service.levelCode) {
+        map.set(service.centreCode, service);
+      }
+    }
+    return map;
+  }, [catalogServices]);
+
+  function priceForCentre(centre: Centre): string {
+    const direct = centreServices.get(centre.code);
+    if (direct) return direct.displayPrice ?? formatPrice(null, direct.amountAud);
+    const anyOffering = Array.from(levelOfferings.values()).find(
+      (service) => service.centreCode === centre.code,
+    );
+    if (anyOffering) return anyOffering.displayPrice ?? formatPrice(null, anyOffering.amountAud);
+    return 'Please enquire';
+  }
+
+  function priceForCentreLevel(centre: CentreCode, level: LevelCode): string | null {
+    const offering = levelOfferings.get(`${centre}-${level}`);
+    if (!offering) return null;
+    return offering.displayPrice ?? formatPrice(null, offering.amountAud);
+  }
+
+  function selectedOffering(): ServiceRow | null {
+    const offering = levelOfferings.get(`${formState.centreCode}-${formState.levelCode}`);
+    if (offering) return offering;
+    return centreServices.get(formState.centreCode) ?? null;
+  }
+
+  function openAskWith(prompt?: string) {
+    if (prompt) setAskInitialQuery(prompt);
+    setAskOpen(true);
+  }
+
+  function jumpToBookTrial(centre: CentreCode, level: LevelCode) {
+    setFormState((current) => ({ ...current, centreCode: centre, levelCode: level }));
+    const target = document.getElementById('book-trial');
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
+  function handleChooseLevel(levelCode: LevelCode) {
+    setFormState((current) => ({ ...current, levelCode }));
+    setTimetableLevel(levelCode);
+    const target = document.getElementById('timetable');
+    target?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
   async function handleInquirySubmit(event: FormEvent<HTMLFormElement>) {
@@ -369,15 +363,16 @@ export function FutureSwimApp() {
       if (!trimmedEmail && !trimmedPhone) {
         throw new Error('Please provide at least an email or phone number so Future Swim can follow up.');
       }
-      if (!selectedResult?.candidateId) {
-        throw new Error('Please choose a Future Swim centre or lesson option before submitting.');
+      const offering = selectedOffering();
+      if (!offering?.candidateId) {
+        throw new Error('Please choose a Future Swim centre and level before submitting.');
       }
 
       const detailNote = [
         `Child age: ${formState.childAge}`,
         `Confidence: ${formState.confidenceLevel}`,
-        selectedResult.serviceName ? `Selected service: ${selectedResult.serviceName}` : null,
-        selectedResult.venueName ? `Preferred centre: ${selectedResult.venueName}` : null,
+        offering.serviceName ? `Selected service: ${offering.serviceName}` : null,
+        offering.venueName ? `Preferred centre: ${offering.venueName}` : null,
         formState.notes.trim() ? `Parent notes: ${formState.notes.trim()}` : null,
       ]
         .filter(Boolean)
@@ -391,9 +386,9 @@ export function FutureSwimApp() {
           customerName: formState.parentName.trim() || 'Future Swim parent',
           customerEmail: trimmedEmail,
           customerPhone: trimmedPhone,
-          serviceId: selectedResult.candidateId,
-          serviceName: selectedResult.serviceName,
-          serviceCategory: selectedResult.category || 'Kids Services',
+          serviceId: offering.candidateId,
+          serviceName: offering.serviceName,
+          serviceCategory: offering.category || 'Kids Services',
           requestedDate: formState.preferredDate,
           requestedTime: formState.preferredTime,
           timezone: 'Australia/Sydney',
@@ -401,7 +396,6 @@ export function FutureSwimApp() {
           notes: detailNote,
           runtimeConfig: buildRuntimeConfig(),
         });
-
         bookingReference = authoritativeResult.bookingReference || '';
         leadId = authoritativeResult.leadId || leadId;
       } else {
@@ -416,19 +410,18 @@ export function FutureSwimApp() {
           business_context: {
             business_name: 'Future Swim',
             industry: 'Kids Services',
-            location: selectedResult.venueName || selectedResult.location || null,
-            service_category: selectedResult.category || 'Kids swim lessons',
+            location: offering.venueName || offering.location || null,
+            service_category: offering.category || 'Kids swim lessons',
           },
           attribution: buildAttribution(),
           intent_context: {
             source_page: DEFAULT_SOURCE_PAGE,
             intent_type: 'booking_or_callback',
             notes: detailNote,
-            requested_service_id: selectedResult.candidateId,
+            requested_service_id: offering.candidateId,
           },
           actor_context: buildActorContext(),
         });
-
         if ('data' in leadResponse && leadResponse.data.lead_id) {
           leadId = leadResponse.data.lead_id;
         }
@@ -442,7 +435,7 @@ export function FutureSwimApp() {
           variables: {
             parent_name: formState.parentName.trim() || 'Parent',
             child_age: formState.childAge,
-            preferred_location: selectedResult.venueName || 'Future Swim',
+            preferred_location: offering.venueName || 'Future Swim',
             preferred_date: formState.preferredDate || 'To be confirmed',
             preferred_time: formState.preferredTime || 'To be confirmed',
             booking_reference: bookingReference || 'pending-follow-up',
@@ -460,289 +453,390 @@ export function FutureSwimApp() {
           ? `Your booking request has been received. Reference: ${bookingReference}. The Future Swim team will be in touch soon.`
           : `Your enquiry has been received. The Future Swim team will be in touch soon.`,
       );
-      setFormState((current) => ({
-        ...current,
-        notes: '',
-      }));
+      setFormState((current) => ({ ...current, notes: '' }));
+      void leadId;
     } catch (error) {
-      setLeadError(error instanceof Error ? error.message : 'Unable to submit your Future Swim enquiry right now.');
+      setLeadError(
+        error instanceof Error ? error.message : 'Unable to submit your Future Swim enquiry right now.',
+      );
     } finally {
       setLeadPending(false);
     }
   }
 
+  const heroPriceLabel = useMemo(() => {
+    const prices = catalogServices
+      .map((service) => service.amountAud)
+      .filter((value): value is number => typeof value === 'number' && value > 0.01);
+    if (!prices.length) return 'From A$30 per 30-min lesson';
+    const min = Math.min(...prices);
+    const max = Math.max(...prices);
+    if (min === max) return `A$${min} per 30-min lesson`;
+    return `A$${min}–A$${max} per 30-min lesson`;
+  }, [catalogServices]);
+
   return (
-    <main className="min-h-screen bg-apple-light text-apple-near-black">
-      <div className="mx-auto max-w-7xl px-5 pb-16 pt-6 sm:px-8 lg:px-10 lg:pb-24">
-        <header className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <div className="template-kicker">Future Swim · live BookedAI business</div>
-            <div className="mt-2 text-3xl font-semibold tracking-[-0.03em] text-apple-near-black">
-              Live swim school running on BookedAI
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-3">
-            <a
-              href="#centres"
-              className="booked-button-secondary"
-              aria-label="View available swim centres"
-            >
-              View live business example
-            </a>
-            <a
-              href="#booking-flow"
-              className="booked-button"
-              aria-label="Save my spot in a Future Swim class"
-            >
-              Save my spot
-            </a>
-          </div>
-        </header>
+    <main id="top" className="fs-app fs-shell">
+      <FutureSwimHeader
+        onOpenAsk={() => openAskWith()}
+        whatsappHref={WHATSAPP_HREF}
+        telegramHref={TELEGRAM_HREF}
+      />
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-[1.08fr_0.92fr] lg:items-stretch">
-          <div className="template-card-dark p-8 sm:p-10">
-            <div className="inline-flex rounded-full border border-white/15 bg-white/10 px-4 py-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-white/88">
-              Live BookedAI business · Stripe · WhatsApp · Calendar
-            </div>
-            <h1 className="mt-6 max-w-4xl text-4xl font-semibold leading-[1.05] tracking-[-0.05em] text-white sm:text-5xl md:text-6xl md:leading-[0.98]">
-              Watch BookedAI run a live swim school — bookings, payments, and follow-up.
-            </h1>
-            <p className="mt-6 max-w-2xl text-lg leading-8 text-white/82">
-              Real bookings, real Stripe payments, and clear follow-up history. Search the live Future Swim catalogue, choose a centre, and your booking moves into the same business workspace every BookedAI customer can use.
-            </p>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              <a
-                href="#booking-flow"
-                className="booked-button"
-                aria-label="Run the live Future Swim demo"
-              >
-                Run the live demo
-              </a>
-              <a
-                href="https://bookedai.au/"
-                className="booked-button-secondary apple-button-secondary-dark"
-                aria-label="Talk to a BookedAI human about this tenant"
-              >
-                Talk to a BookedAI human
-              </a>
-            </div>
-
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <div className="rounded-[var(--apple-radius-large)] border border-white/12 bg-white/10 p-5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/74">Centres in flow</div>
-                <div className="mt-3 text-4xl font-semibold tracking-[-0.04em]">{heroMetrics.centreCount || '6'}</div>
-                <div className="mt-2 text-sm text-white/74">Live Future Swim venues from the operator catalogue.</div>
-              </div>
-              <div className="rounded-[var(--apple-radius-large)] border border-white/12 bg-white/10 p-5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/74">Current pricing</div>
-                <div className="mt-3 text-2xl font-semibold tracking-[-0.04em]">{heroMetrics.priceBand}</div>
-                <div className="mt-2 text-sm text-white/74">Loaded from the live BookedAI operator catalogue.</div>
-              </div>
-              <div className="rounded-[var(--apple-radius-large)] border border-white/12 bg-white/10 p-5">
-                <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-white/74">Featured centres</div>
-                <div className="mt-3 text-4xl font-semibold tracking-[-0.04em]">{heroMetrics.featuredCount || '4'}</div>
-                <div className="mt-2 text-sm text-white/74">Priority venues ready for parent-facing promotion.</div>
-              </div>
-            </div>
-
-            <div className="mt-8 flex flex-wrap gap-3">
-              {quickPrompts.map((prompt) => (
-                <button
-                  key={prompt}
-                  type="button"
-                  onClick={() => setSearchQuery(prompt)}
-                  className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-left text-xs font-semibold text-white/88 transition hover:bg-white/16"
-                >
-                  {prompt}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          <aside className="template-card p-7 sm:p-8">
-            <div className="template-kicker">What makes this different</div>
-            <h2 className="mt-3 text-4xl font-semibold leading-tight tracking-[-0.04em] text-apple-near-black">
-              Real bookings. Real Stripe payments. Real follow-up history.
-            </h2>
-            <div className="mt-6 space-y-3">
-              {reassurancePoints.map((item) => (
-                <div key={item} className="template-card-subtle px-5 py-4 text-sm leading-7 text-[color:var(--apple-text-secondary)]">
-                  {item}
-                </div>
-              ))}
-            </div>
-            <div className="mt-6 template-card-subtle p-5">
-              <div className="template-kicker">Pricing note</div>
-              <p className="mt-3 text-sm leading-7 text-[color:var(--apple-text-secondary)]">
-                Prices reflect the live Future Swim operator catalogue. Confirm exact class fees and open spots with your preferred centre.
+      {/* HERO */}
+      <section className="fs-hero fs-water-pattern" aria-labelledby="fs-hero-title">
+        <div className="fs-container">
+          <div className="grid items-center gap-10 lg:grid-cols-[1.15fr_0.85fr]">
+            <div>
+              <div className="fs-kicker">Future Swim · Sydney</div>
+              <h1 id="fs-hero-title" className="fs-h1 mt-4">
+                Small-class swim lessons that build real confidence — from first splash to pre-squad.
+              </h1>
+              <p className="mt-5 max-w-2xl text-lg leading-8 text-[color:var(--fs-text-muted)]">
+                Five Sydney centres. Warm ozone-treated pools. Maximum 3 children per beginner class.
+                Find your level, see weekly times, and reserve a spot in seconds with Future Swim Ask.
               </p>
-            </div>
-          </aside>
-        </section>
 
-        <section className="mt-8 grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">
-          <div className="template-card p-7">
-            <div className="template-kicker">Find your centre</div>
-            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-apple-near-black">Search the way a parent speaks</h2>
-            <p className="mt-4 text-sm leading-7 text-[color:var(--apple-text-secondary)]">
-              Tell us your child&apos;s age, confidence level, and preferred area. We&apos;ll shortlist the best-fit Future Swim centres for you.
-            </p>
+              <div className="mt-6 flex flex-wrap gap-2" aria-label="Trust signals">
+                {TRUST_SIGNALS.map((signal) => (
+                  <span key={signal} className="fs-chip">
+                    {signal}
+                  </span>
+                ))}
+              </div>
 
-            <form className="mt-6" onSubmit={handleSearchSubmit}>
-              <textarea
-                value={searchQuery}
-                onChange={(event) => setSearchQuery(event.target.value)}
-                className="min-h-40 w-full rounded-[var(--apple-radius-large)] border border-[var(--template-border)] bg-white px-5 py-4 text-base leading-7 text-apple-near-black outline-none placeholder:text-[color:var(--apple-text-tertiary)] sm:text-sm"
-                placeholder="My child is 4, nervous in the water, and we would prefer a weekend beginner class near Caringbah or Miranda."
-                aria-label="Describe your child to find the best Future Swim centre"
-              />
-              <div className="mt-4 flex flex-wrap gap-3">
-                <button
-                  type="submit"
-                  disabled={searchPending}
-                  className="booked-button"
-                  aria-label="Find best-fit Future Swim centres"
-                >
-                  {searchPending ? 'Searching Future Swim…' : 'Find best-fit centres'}
-                </button>
+              <div className="mt-7 flex flex-wrap gap-3">
+                <a href="#levels" className="fs-button" aria-label="Find your level">
+                  Find your level
+                  <ArrowRight size={16} aria-hidden="true" />
+                </a>
                 <button
                   type="button"
-                  onClick={() => {
-                    setSearchResults([]);
-                    setSearchError('');
-                    setConversation((current) => current.slice(0, 1));
-                  }}
-                  className="booked-button-secondary"
-                  aria-label="Reset shortlist"
+                  onClick={() => openAskWith()}
+                  className="fs-button-coral"
+                  aria-label="Open Future Swim Ask"
                 >
-                  Reset shortlist
+                  <Waves size={16} aria-hidden="true" />
+                  Open Future Swim Ask
                 </button>
               </div>
-            </form>
 
-            <div className="mt-6 space-y-3">
-              {conversation.map((message, index) => (
-                <div
-                  key={`${message.role}-${index}`}
-                  className={`rounded-[var(--apple-radius-comfortable)] px-4 py-3 text-sm leading-7 ${
-                    message.role === 'assistant'
-                      ? 'template-card-subtle text-[color:var(--apple-text-secondary)]'
-                      : 'bg-apple-near-black text-white'
-                  }`}
+              <div className="mt-10 grid gap-4 sm:grid-cols-3">
+                <div className="fs-card-flat">
+                  <div className="fs-kicker">Centres</div>
+                  <div className="mt-2 text-3xl font-bold tracking-tight">5</div>
+                  <div className="text-sm text-[color:var(--fs-text-muted)]">Sydney-wide</div>
+                </div>
+                <div className="fs-card-flat">
+                  <div className="fs-kicker">Levels</div>
+                  <div className="mt-2 text-3xl font-bold tracking-tight">4</div>
+                  <div className="text-sm text-[color:var(--fs-text-muted)]">Babies to pre-squad</div>
+                </div>
+                <div className="fs-card-flat">
+                  <div className="fs-kicker">Per-lesson</div>
+                  <div className="mt-2 text-2xl font-bold tracking-tight">{heroPriceLabel.split(' ')[0]}</div>
+                  <div className="text-sm text-[color:var(--fs-text-muted)]">30-min lessons</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="fs-card-feature">
+              <div className="fs-kicker">Future Swim Ask</div>
+              <h2 className="mt-3 text-2xl font-bold tracking-tight text-[color:var(--fs-text)]">
+                Tell us about your swimmer.
+              </h2>
+              <p className="mt-3 text-sm leading-7 text-[color:var(--fs-text-muted)]">
+                Our chat assistant shortlists Future Swim levels, centres, and times based on your
+                child&apos;s age and confidence — then hands you straight to booking.
+              </p>
+              <ul className="mt-4 space-y-2 text-sm">
+                {[
+                  'Match age + ability to the right level',
+                  'See weekly slots at your nearest centre',
+                  'Book or hold a spot in under a minute',
+                ].map((item) => (
+                  <li key={item} className="flex gap-2">
+                    <span aria-hidden="true" className="mt-1.5 h-1.5 w-1.5 flex-none rounded-full bg-[color:var(--fs-primary-dark)]" />
+                    {item}
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                onClick={() => openAskWith()}
+                className="fs-button mt-5 w-full"
+                aria-label="Open Future Swim Ask now"
+              >
+                Open Future Swim Ask
+                <ArrowRight size={16} aria-hidden="true" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <svg
+          className="fs-hero-waves"
+          viewBox="0 0 1440 80"
+          preserveAspectRatio="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M0,32 C240,80 480,0 720,32 C960,64 1200,16 1440,40 L1440,80 L0,80 Z"
+            fill="rgba(14,165,233,0.18)"
+          />
+          <path
+            d="M0,48 C240,16 480,72 720,48 C960,24 1200,72 1440,48 L1440,80 L0,80 Z"
+            fill="rgba(14,165,233,0.10)"
+          />
+        </svg>
+      </section>
+
+      {/* LEVELS */}
+      <section id="levels" className="fs-container py-16 sm:py-20">
+        <div className="max-w-3xl">
+          <div className="fs-kicker">Levels</div>
+          <h2 className="fs-section-title mt-3">Choose your level</h2>
+          <p className="fs-section-lead mt-3">
+            Four official Future Swim levels run at every active centre — from babies in arms to
+            squad-ready swimmers. Group sizes stay small so every child gets real coaching time in
+            the water.
+          </p>
+        </div>
+
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          {FUTURE_SWIM_LEVELS.map((level) => (
+            <LevelCard key={level.code} level={level} onChoose={handleChooseLevel} />
+          ))}
+        </div>
+      </section>
+
+      {/* CENTRES */}
+      <section id="centres" className="fs-container py-16 sm:py-20">
+        <div className="max-w-3xl">
+          <div className="fs-kicker">Centres</div>
+          <h2 className="fs-section-title mt-3">Find your nearest centre</h2>
+          <p className="fs-section-lead mt-3">
+            Five purpose-built indoor pools across Sydney — Sutherland Shire, the inner west, and
+            the north-west growth corridor. Every centre runs warm ozone-treated water year-round.
+          </p>
+        </div>
+
+        {catalogPending ? (
+          <div className="fs-card-flat mt-8 text-sm text-[color:var(--fs-text-muted)]">
+            Loading the live Future Swim catalogue&hellip;
+          </div>
+        ) : null}
+        {catalogError ? (
+          <div className="fs-card-flat mt-8 border-[color:var(--fs-danger)] text-sm text-[color:var(--fs-danger)]">
+            {catalogError}
+          </div>
+        ) : null}
+
+        <div className="mt-10 grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+          {FUTURE_SWIM_CENTRES.map((centre) => (
+            <CentreCard
+              key={centre.code}
+              centre={centre}
+              priceLabel={priceForCentre(centre)}
+              whatsappHref={WHATSAPP_HREF}
+              telegramHref={TELEGRAM_HREF}
+            />
+          ))}
+        </div>
+      </section>
+
+      {/* TIMETABLE */}
+      <section id="timetable" className="fs-container py-16 sm:py-20">
+        <div className="max-w-3xl">
+          <div className="fs-kicker">Timetable</div>
+          <h2 className="fs-section-title mt-3">Weekly timetable</h2>
+          <p className="fs-section-lead mt-3">
+            Pick a centre and level to see this term&apos;s 30-minute lesson slots. Times can change
+            at short notice — confirm before your first lesson.
+          </p>
+        </div>
+
+        <div className="mt-8 fs-card">
+          <div>
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--fs-text-soft)]">
+              1. Choose centre
+            </div>
+            <div className="mt-3 flex flex-wrap gap-2" role="tablist" aria-label="Choose centre">
+              {FUTURE_SWIM_CENTRES.map((centre) => (
+                <button
+                  key={centre.code}
+                  type="button"
+                  role="tab"
+                  aria-selected={timetableCentre === centre.code}
+                  className={`fs-button-ghost ${timetableCentre === centre.code ? 'fs-active' : ''}`}
+                  onClick={() => setTimetableCentre(centre.code)}
                 >
-                  {message.content}
-                </div>
+                  <MapPin size={14} aria-hidden="true" />
+                  {centre.name}
+                </button>
               ))}
-              {searchError ? (
-                <div className="rounded-[var(--apple-radius-comfortable)] template-card-subtle px-4 py-3 text-sm text-apple-near-black">
-                  {searchError}
-                </div>
-              ) : null}
             </div>
           </div>
 
-          <div id="centres" className="template-card p-7">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="template-kicker">Live operator catalogue</div>
-                <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-apple-near-black">Future Swim centres and products</h2>
-              </div>
-              <span className="template-chip">Live catalogue</span>
+          <div className="mt-6">
+            <div className="text-xs font-semibold uppercase tracking-[0.18em] text-[color:var(--fs-text-soft)]">
+              2. Choose level
             </div>
-
-            <div className="mt-6 space-y-4">
-              {catalogPending ? <div className="template-card-subtle px-5 py-4 text-sm text-[color:var(--apple-text-secondary)]">Loading Future Swim catalogue…</div> : null}
-              {catalogError ? <div className="template-card-subtle px-5 py-4 text-sm text-apple-near-black">{catalogError}</div> : null}
-              {!catalogPending && !catalogError && !displayedResults.length ? (
-                <div className="template-card-subtle px-5 py-4 text-sm text-[color:var(--apple-text-secondary)]">No Future Swim centres are currently visible in the catalogue.</div>
-              ) : null}
-              {displayedResults.map((result) => {
-                const selected = formState.selectedServiceId === result.candidateId;
-                return (
-                  <article
-                    key={result.candidateId}
-                    className={`rounded-[var(--apple-radius-large)] border p-5 transition ${
-                      selected ? 'border-[var(--apple-blue)] bg-white' : 'template-card-subtle'
-                    }`}
-                  >
-                    <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                      <div>
-                        <div className="template-kicker">{result.venueName || 'Future Swim'}</div>
-                        <h3 className="mt-2 text-3xl font-semibold tracking-[-0.04em] text-apple-near-black">{result.serviceName}</h3>
-                        <p className="mt-3 max-w-2xl text-sm leading-7 text-[color:var(--apple-text-secondary)]">{result.summary}</p>
-                        <div className="mt-3 text-sm font-medium text-[color:var(--apple-text-secondary)]">{result.location}</div>
-                      </div>
-                      <div className="rounded-[var(--apple-radius-comfortable)] bg-white px-4 py-3 text-sm font-semibold text-apple-near-black shadow-sm">
-                        {formatPrice(result.displayPrice, result.amountAud)}
-                      </div>
-                    </div>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                      <button
-                        type="button"
-                        onClick={() => setFormState((current) => ({ ...current, selectedServiceId: result.candidateId }))}
-                        className="booked-button"
-                        aria-label={selected ? 'Centre selected for booking' : `Choose ${result.venueName || 'this centre'}`}
-                      >
-                        {selected ? 'Selected for booking' : 'Choose this centre'}
-                      </button>
-                      {result.sourceUrl || result.bookingUrl ? (
-                        <a
-                          href={result.sourceUrl || result.bookingUrl || '#'}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="booked-button-secondary"
-                          aria-label={`Open ${result.venueName || 'Future Swim'} page in a new tab`}
-                        >
-                          View Future Swim page
-                        </a>
-                      ) : null}
-                      {result.mapUrl ? (
-                        <a
-                          href={result.mapUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="booked-button-secondary"
-                          aria-label={`Open map for ${result.venueName || 'this centre'}`}
-                        >
-                          Open map
-                        </a>
-                      ) : null}
-                    </div>
-                  </article>
-                );
-              })}
+            <div className="mt-3 flex flex-wrap gap-2" role="tablist" aria-label="Choose level">
+              {FUTURE_SWIM_LEVELS.map((level) => (
+                <button
+                  key={level.code}
+                  type="button"
+                  role="tab"
+                  aria-selected={timetableLevel === level.code}
+                  className={`fs-button-ghost ${timetableLevel === level.code ? 'fs-active' : ''}`}
+                  onClick={() => setTimetableLevel(level.code)}
+                >
+                  {level.name}
+                </button>
+              ))}
             </div>
           </div>
-        </section>
 
-        <section id="booking-flow" className="mt-8 grid gap-6 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="template-card-subtle p-7">
-            <div className="template-kicker">How it works</div>
-            <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-apple-near-black">From parent request to booked follow-up</h2>
-            <ol className="mt-6 space-y-4 text-sm leading-7 text-[color:var(--apple-text-secondary)]">
-              <li className="rounded-[var(--apple-radius-comfortable)] bg-white px-5 py-4">1. Search stays focused on Future Swim only — no other businesses are recommended.</li>
-              <li className="rounded-[var(--apple-radius-comfortable)] bg-white px-5 py-4">2. The parent selects a centre or lesson card with current pricing and source links.</li>
-              <li className="rounded-[var(--apple-radius-comfortable)] bg-white px-5 py-4">3. Fill in your contact details, child age, and any notes for the team.</li>
-              <li className="rounded-[var(--apple-radius-comfortable)] bg-white px-5 py-4">4. With a preferred date and time, a booking request is created and confirmed by email.</li>
-              <li className="rounded-[var(--apple-radius-comfortable)] bg-white px-5 py-4">5. A confirmation email is sent to you, and the Future Swim team follows up to confirm your spot.</li>
-            </ol>
+          <div className="mt-8 border-t border-[color:var(--fs-border)] pt-6">
+            <TimetableGrid
+              centre={timetableCentre}
+              level={timetableLevel}
+              priceLabel={priceForCentreLevel(timetableCentre, timetableLevel)}
+            />
+            <div className="mt-6 flex flex-wrap gap-3">
+              <button
+                type="button"
+                className="fs-button"
+                onClick={() => jumpToBookTrial(timetableCentre, timetableLevel)}
+                aria-label="Reserve a spot for this centre and level"
+              >
+                Reserve this slot
+                <ArrowRight size={16} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                className="fs-button-secondary"
+                onClick={() => openAskWith(`Show me ${timetableLevel} times at Future Swim ${timetableCentre}.`)}
+              >
+                <Waves size={16} aria-hidden="true" />
+                Ask about this slot
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* PRICING */}
+      <section id="pricing" className="fs-container py-16 sm:py-20">
+        <div className="grid gap-10 lg:grid-cols-[0.95fr_1.05fr] lg:items-start">
+          <div>
+            <div className="fs-kicker">Pricing</div>
+            <h2 className="fs-section-title mt-3">Stable per-lesson rate. No surprises.</h2>
+            <p className="fs-section-lead mt-4">
+              Future Swim charges a stable per-lesson rate, billed monthly by direct debit so your
+              child&apos;s spot is held all term — just like enrolling at the centre directly.
+              You&apos;re charged ongoing for your reserved spot, not per-attendance. Cancel before
+              the 25th of any month to avoid the next billing cycle.
+            </p>
+            <ul className="mt-5 space-y-2 text-sm leading-7 text-[color:var(--fs-text)]">
+              <li className="flex gap-2">
+                <Droplet size={14} aria-hidden="true" className="mt-1.5 text-[color:var(--fs-primary-dark)]" />
+                30-minute lessons in warm ozone-treated water.
+              </li>
+              <li className="flex gap-2">
+                <Users size={14} aria-hidden="true" className="mt-1.5 text-[color:var(--fs-primary-dark)]" />
+                Maximum 3 in beginner classes; 4 in stroke and pre-squad.
+              </li>
+              <li className="flex gap-2">
+                <Clock size={14} aria-hidden="true" className="mt-1.5 text-[color:var(--fs-primary-dark)]" />
+                Make-up lessons available with notice.
+              </li>
+            </ul>
+            <p className="mt-5 text-xs text-[color:var(--fs-text-soft)]">
+              Source:{' '}
+              <a
+                href="https://futureswim.com.au/pricing/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline"
+              >
+                futureswim.com.au/pricing
+              </a>
+              . Where a centre&apos;s rate is not published, we use a regional reference rate —
+              confirm the exact fee with the centre before enrolling.
+            </p>
           </div>
 
-          <form onSubmit={handleInquirySubmit} className="template-card p-7">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <div className="template-kicker">Your details</div>
-                <h2 className="mt-3 text-4xl font-semibold tracking-[-0.04em] text-apple-near-black">Save my spot</h2>
-              </div>
-              <span className="template-chip">{selectedResult?.venueName || 'Select a centre'}</span>
-            </div>
+          <div className="fs-card p-0 overflow-hidden">
+            <table className="fs-pricing-table">
+              <thead>
+                <tr>
+                  <th>Centre</th>
+                  <th>Per-lesson rate</th>
+                </tr>
+              </thead>
+              <tbody>
+                {FUTURE_SWIM_CENTRES.map((centre) => (
+                  <tr key={centre.code}>
+                    <td>
+                      <div className="font-semibold text-[color:var(--fs-text)]">{centre.name}</div>
+                      <div className="text-xs text-[color:var(--fs-text-muted)]">{centre.address}</div>
+                    </td>
+                    <td>
+                      <div className="font-semibold">{priceForCentre(centre)}</div>
+                      {centre.pricingIndicative ? (
+                        <div className="text-xs text-[color:var(--fs-text-soft)]">Indicative</div>
+                      ) : (
+                        <div className="text-xs text-[color:var(--fs-success)]">Confirmed</div>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </section>
 
-            <div className="mt-6 grid gap-4 md:grid-cols-2">
+      {/* FAQ */}
+      <section id="faq" className="fs-container py-16 sm:py-20">
+        <div className="max-w-3xl">
+          <div className="fs-kicker">FAQ</div>
+          <h2 className="fs-section-title mt-3">Parent questions, answered</h2>
+        </div>
+        <div className="fs-faq mt-8 max-w-3xl">
+          {FAQS.map((faq) => (
+            <details key={faq.question}>
+              <summary>{faq.question}</summary>
+              <div className="fs-faq-body">{faq.answer}</div>
+            </details>
+          ))}
+        </div>
+      </section>
+
+      {/* BOOK / LEAD FORM */}
+      <section id="book-trial" className="fs-container py-16 sm:py-20">
+        <div className="grid gap-10 lg:grid-cols-[0.85fr_1.15fr]">
+          <div>
+            <div className="fs-kicker">Reserve</div>
+            <h2 className="fs-section-title mt-3">Book a trial or reserve a spot</h2>
+            <p className="fs-section-lead mt-4">
+              Tell us about your swimmer. With a preferred date and time we&apos;ll create a hold;
+              without one, we&apos;ll follow up to find a slot that works for the whole family.
+            </p>
+            <ul className="mt-5 space-y-2 text-sm leading-7 text-[color:var(--fs-text-muted)]">
+              <li>St Peters offers a free trial lesson for new families.</li>
+              <li>Confirmation email comes through after submission.</li>
+              <li>Make-up lessons are arranged directly with your centre.</li>
+            </ul>
+          </div>
+
+          <form onSubmit={handleInquirySubmit} className="fs-card">
+            <div className="grid gap-4 md:grid-cols-2">
               <input
                 value={formState.parentName}
                 onChange={(event) => setFormState((current) => ({ ...current, parentName: event.target.value }))}
-                className="min-h-[44px] rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-base outline-none sm:text-sm"
+                className="fs-input"
                 placeholder="Parent name"
                 aria-label="Parent name"
                 autoComplete="name"
@@ -751,7 +845,7 @@ export function FutureSwimApp() {
                 type="email"
                 value={formState.email}
                 onChange={(event) => setFormState((current) => ({ ...current, email: event.target.value }))}
-                className="min-h-[44px] rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-base outline-none sm:text-sm"
+                className="fs-input"
                 placeholder="Email"
                 aria-label="Email"
                 inputMode="email"
@@ -761,7 +855,7 @@ export function FutureSwimApp() {
                 type="tel"
                 value={formState.phone}
                 onChange={(event) => setFormState((current) => ({ ...current, phone: event.target.value }))}
-                className="min-h-[44px] rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-base outline-none sm:text-sm"
+                className="fs-input"
                 placeholder="Phone"
                 aria-label="Phone"
                 inputMode="tel"
@@ -770,35 +864,55 @@ export function FutureSwimApp() {
               <select
                 value={formState.childAge}
                 onChange={(event) => setFormState((current) => ({ ...current, childAge: event.target.value }))}
-                className="rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-sm outline-none"
+                className="fs-select"
                 aria-label="Child age"
               >
-                {['2', '3', '4', '5', '6'].map((age) => (
+                {['Under 1', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11+'].map((age) => (
                   <option key={age} value={age}>{`Child age: ${age}`}</option>
                 ))}
               </select>
               <select
                 value={formState.confidenceLevel}
                 onChange={(event) => setFormState((current) => ({ ...current, confidenceLevel: event.target.value }))}
-                className="rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-sm outline-none md:col-span-2"
+                className="fs-select md:col-span-2"
                 aria-label="Confidence level"
               >
                 {['Nervous beginner', 'Comfortable beginner', 'Improving confidence', 'Ready for progression'].map((level) => (
                   <option key={level} value={level}>{level}</option>
                 ))}
               </select>
+              <select
+                value={formState.centreCode}
+                onChange={(event) => setFormState((current) => ({ ...current, centreCode: event.target.value as CentreCode }))}
+                className="fs-select"
+                aria-label="Preferred centre"
+              >
+                {FUTURE_SWIM_CENTRES.map((centre) => (
+                  <option key={centre.code} value={centre.code}>{`Centre: ${centre.name}`}</option>
+                ))}
+              </select>
+              <select
+                value={formState.levelCode}
+                onChange={(event) => setFormState((current) => ({ ...current, levelCode: event.target.value as LevelCode }))}
+                className="fs-select"
+                aria-label="Preferred level"
+              >
+                {FUTURE_SWIM_LEVELS.map((level) => (
+                  <option key={level.code} value={level.code}>{`Level: ${level.name}`}</option>
+                ))}
+              </select>
               <input
                 type="date"
                 value={formState.preferredDate}
                 onChange={(event) => setFormState((current) => ({ ...current, preferredDate: event.target.value }))}
-                className="rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-sm outline-none"
+                className="fs-input"
                 aria-label="Preferred date"
               />
               <input
                 type="time"
                 value={formState.preferredTime}
                 onChange={(event) => setFormState((current) => ({ ...current, preferredTime: event.target.value }))}
-                className="rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-sm outline-none"
+                className="fs-input"
                 aria-label="Preferred time"
               />
             </div>
@@ -806,59 +920,146 @@ export function FutureSwimApp() {
             <textarea
               value={formState.notes}
               onChange={(event) => setFormState((current) => ({ ...current, notes: event.target.value }))}
-              className="mt-4 min-h-32 w-full rounded-[var(--apple-radius-comfortable)] border border-[var(--template-border)] bg-white px-4 py-3 text-sm leading-7 outline-none"
+              className="fs-textarea mt-4"
               placeholder="Anything Future Swim should know — water confidence, prior lessons, sibling needs, preferred days, or whether you want an assessment first."
               aria-label="Notes for Future Swim"
             />
 
-            <div className="mt-4 template-card-subtle px-4 py-4 text-sm leading-7 text-[color:var(--apple-text-secondary)]">
-              Add a preferred date and time to lock in the booking. Without them, your enquiry is still recorded and the team will follow up to find a time.
+            <div className="mt-4 fs-card-flat text-sm leading-6 text-[color:var(--fs-text-muted)]">
+              Add a preferred date and time to lock in the booking. Without them, your enquiry is
+              still recorded and the team will follow up to find a time.
             </div>
 
             <button
               type="submit"
               disabled={leadPending}
-              className="booked-button mt-5 min-h-[44px]"
+              className="fs-button mt-5"
               aria-label="Save my spot in this Future Swim class"
             >
               {leadPending ? 'Submitting…' : 'Save my spot'}
+              <ArrowRight size={16} aria-hidden="true" />
             </button>
 
             {leadStatus ? (
-              <div className="mt-4 template-card-subtle px-5 py-5">
-                <div className="template-kicker">Thank you</div>
-                <div className="mt-2 text-xl font-semibold tracking-[-0.03em] text-apple-near-black">
+              <div className="mt-4 fs-card-flat">
+                <div className="fs-kicker">Thank you</div>
+                <div className="mt-2 text-xl font-bold tracking-tight text-[color:var(--fs-text)]">
                   Your booking request has been received.
                 </div>
-                <p className="mt-2 text-sm leading-7 text-[color:var(--apple-text-secondary)]">{leadStatus}</p>
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <span className="template-chip">Returning to the main screen in {thankYouReturnCountdown}s</span>
-                  <button
-                    type="button"
-                    onClick={returnToMainScreenAfterBooking}
-                    className="booked-button-secondary"
-                    aria-label="Return to the main screen now"
-                  >
-                    Return now
-                  </button>
+                <p className="mt-2 text-sm leading-7 text-[color:var(--fs-text-muted)]">{leadStatus}</p>
+                <div className="mt-3 text-xs text-[color:var(--fs-text-soft)]">
+                  Returning to the top in {thankYouCountdown}s
                 </div>
               </div>
             ) : null}
-            {leadError ? <div className="mt-4 template-card-subtle px-4 py-3 text-sm text-apple-near-black">{leadError}</div> : null}
+            {leadError ? (
+              <div className="mt-4 fs-card-flat" style={{ borderColor: 'var(--fs-danger)', color: 'var(--fs-danger)' }}>
+                {leadError}
+              </div>
+            ) : null}
           </form>
-        </section>
+        </div>
+      </section>
 
-        <footer className="mt-12 flex flex-wrap items-center justify-between gap-3 text-xs text-[color:var(--apple-text-tertiary)]">
-          <span>Live BookedAI business · powered by BookedAI</span>
-          <a
-            href="https://bookedai.au/"
-            className="text-[var(--apple-blue)] hover:underline"
-            aria-label="Visit BookedAI homepage"
-          >
-            bookedai.au
-          </a>
-        </footer>
-      </div>
+      {/* FOOTER */}
+      <footer className="fs-footer">
+        <div className="fs-container">
+          <div className="fs-footer-grid">
+            <div>
+              <div className="flex items-center gap-3">
+                <span className="fs-brand-mark" aria-hidden="true">
+                  <Waves size={20} />
+                </span>
+                <div>
+                  <div className="text-base font-bold text-white">Future Swim</div>
+                  <div className="text-xs uppercase tracking-[0.18em] text-[color:var(--fs-primary-soft)]">
+                    Sydney swim school
+                  </div>
+                </div>
+              </div>
+              <p className="mt-4 max-w-md text-sm leading-7 text-white/80">
+                Leading swim school for babies and children in Sydney. Five centres, four levels,
+                small classes, warm pools.
+              </p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                <a
+                  href={WHATSAPP_HREF}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="fs-sticky-button fs-sticky-whatsapp"
+                  style={{ minHeight: 38, padding: '6px 14px', fontSize: '0.78rem' }}
+                  aria-label="Chat with Future Swim on WhatsApp"
+                >
+                  WhatsApp
+                </a>
+                <a
+                  href={TELEGRAM_HREF}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="fs-sticky-button fs-sticky-telegram"
+                  style={{ minHeight: 38, padding: '6px 14px', fontSize: '0.78rem' }}
+                  aria-label="Chat with Future Swim on Telegram"
+                >
+                  Telegram
+                </a>
+              </div>
+            </div>
+
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--fs-primary-soft)]">
+                Centres
+              </div>
+              <ul className="mt-3 space-y-2 text-sm">
+                {FUTURE_SWIM_CENTRES.map((centre) => (
+                  <li key={centre.code}>
+                    <a href={centre.sourceUrl} target="_blank" rel="noreferrer">
+                      {centre.name} — {centre.phoneDisplay}
+                    </a>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div>
+              <div className="text-xs font-bold uppercase tracking-[0.18em] text-[color:var(--fs-primary-soft)]">
+                Explore
+              </div>
+              <ul className="mt-3 space-y-2 text-sm">
+                <li><a href="#levels">Levels</a></li>
+                <li><a href="#centres">Centres</a></li>
+                <li><a href="#timetable">Timetable</a></li>
+                <li><a href="#pricing">Pricing</a></li>
+                <li><a href="#faq">FAQ</a></li>
+                <li><a href="https://futureswim.com.au" target="_blank" rel="noreferrer">futureswim.com.au</a></li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="fs-footer-meta">
+            <span>&copy; {new Date().getFullYear()} Future Swim · Sydney NSW</span>
+            <span>
+              Powered by{' '}
+              <a href="https://bookedai.au/" target="_blank" rel="noreferrer">
+                BookedAI
+              </a>
+            </span>
+          </div>
+        </div>
+      </footer>
+
+      <StickyChatCtas
+        onOpenAsk={() => openAskWith()}
+        whatsappHref={WHATSAPP_HREF}
+        telegramHref={TELEGRAM_HREF}
+      />
+      <FutureSwimAsk
+        open={askOpen}
+        onOpenChange={(value) => {
+          setAskOpen(value);
+          if (!value) setAskInitialQuery(null);
+        }}
+        initialQuery={askInitialQuery}
+      />
     </main>
   );
 }

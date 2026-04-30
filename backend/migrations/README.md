@@ -83,6 +83,7 @@ The first schema package focuses on:
 - `sql/027_portal_access_token.sql`
 - `sql/028_chess_tenant_publish_full_catalog_aud_35_per_hour.sql`
 - `sql/029_tenant_partner_config.sql`
+- `sql/047_future_swim_levels_timetable_and_partner_config.sql`
 
 ## Notes
 
