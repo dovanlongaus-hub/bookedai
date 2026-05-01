@@ -4,6 +4,8 @@ Date: `2026-04-25`
 
 Document status: `active execution baseline`
 
+Priority overlay: `docs/development/priority-execution-order-2026-05-01.md`
+
 ## Purpose
 
 This document converts the current repository truth into one execution plan that is:

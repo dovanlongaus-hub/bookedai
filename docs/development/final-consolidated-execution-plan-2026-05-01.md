@@ -6,6 +6,8 @@ Status: `active final planning baseline before next coding slices`
 
 Language: Vietnamese operator summary with English file references.
 
+Priority overlay: `docs/development/priority-execution-order-2026-05-01.md`
+
 ## Purpose
 
 Tài liệu này là bản tổng hợp cuối cùng sau khi rà lại chuỗi tài liệu từ yêu cầu PRD tổng thể, master roadmap, phase/sprint plan, gap analysis, pre-coding backlog, Phase A technical foundation, và các thay đổi mới trong workspace ngày `2026-05-01`.
@@ -277,13 +279,14 @@ Acceptance gate:
 
 Do not open broad coding. Open the next work as a controlled package:
 
-1. Finish `Phase A` approval and attach it to the active roadmap stack.
-2. Prepare `BL-1` confirmation matrix as the first coding-ready slice.
-3. Prepare `BL-2` status vocabulary in parallel as a copy/API/UI contract.
-4. Prepare `BL-3` portal truth completion scope against current portal behavior.
-5. Prepare `BL-4` tenant/admin evidence visibility scope against current operator surfaces.
-6. Start `BL-14A` commercial profile/spec implementation only after the truth-layer contracts are clear enough to avoid revenue-state drift.
-7. Queue API/widget/installability maps after the commercial baseline is not ambiguous.
+1. Create the automation / recurring communications safety registry and kill-switch checklist.
+2. Prepare `BL-1` and `BL-2` as one confirmation + status contract package.
+3. Apply the first confirmation/status contract to the highest-risk mutation path: booking/payment/cancel-reschedule.
+4. Prepare and execute `BL-3` portal truth completion scope against one fresh booking reference.
+5. Prepare and execute `BL-4` tenant/admin evidence visibility for that same reference.
+6. Run the Future Swim strict UAT loop and document gaps.
+7. Start `BL-14A` commercial profile/spec implementation only after the truth-layer contracts are clear enough to avoid revenue-state drift.
+8. Queue API/widget/installability maps after the commercial baseline is not ambiguous.
 
 ## Definition Of Done For The Next Slice
 

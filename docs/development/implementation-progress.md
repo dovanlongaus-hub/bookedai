@@ -12,6 +12,15 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-28`
 
+Implementation update from `2026-05-01` (priority execution order review, documentation-only):
+
+- reviewed the new planning stack after the latest requirement-doc sync, PR merges, and live deploy
+- created `docs/development/priority-execution-order-2026-05-01.md` as the active priority overlay for choosing the next coding slices
+- reordered near-term execution around `automation safety -> confirmation/status truth -> portal truth -> operator evidence -> Future Swim UAT -> commercial truth -> hot-path backend discipline -> installability -> reusable vertical templates -> release governance`
+- updated the final consolidated execution plan, pre-coding backlog, PM execution plan, and current phase/sprint plan to reference the new priority overlay
+- published the priority review to Notion with Discord skipped; archive entry: `docs/development/telegram-sync/2026-05-01/142012-priority-execution-order-review-2026-05-01.md`
+- verification is documentation-only with `git diff --check`
+
 Implementation update from `2026-05-01` (requirement docs sync and live deploy closeout):
 
 - fast-forwarded `main` to include PR `#35`, synchronized active requirement/PM/UAT/RACI/milestone/phase docs with the corrected default closeout posture, and pushed commits `c5df637` plus `60f7ba8`

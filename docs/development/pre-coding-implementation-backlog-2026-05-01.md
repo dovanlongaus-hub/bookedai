@@ -222,18 +222,24 @@ In practice this means:
 
 ## Recommended immediate next coding-prep order
 
-1. `BL-1 Final-choice confirmation matrix`
-2. `BL-2 Canonical status vocabulary rollout`
-3. `BL-3 Portal truth completion pass`
-4. `BL-4 Tenant/admin evidence visibility pass`
-5. `BL-14A BookedAI monetization and commission operating baseline`
-6. `BL-15 Scale-ready API family architecture map`
-7. `BL-16 Partner widget and installability baseline`
-8. `BL-17 Tenant-isolated AI ingestion pipeline map`
-9. `BL-18 Shared-portal plus enterprise-portal strategy`
-10. `BL-9 Future Swim proof-lane closeout map`
-11. `BL-12 Recoverable revenue model pass`
-12. `BL-14 Tenant Revenue Proof dashboard closeout`
+Read `docs/development/priority-execution-order-2026-05-01.md` as the active priority overlay.
+
+1. Automation / recurring communications safety registry and kill-switch checklist
+2. `BL-1 Final-choice confirmation matrix`
+3. `BL-2 Canonical status vocabulary rollout`
+4. First confirmation/status implementation on booking/payment/cancel-reschedule
+5. `BL-3 Portal truth completion pass`
+6. `BL-4 Tenant/admin evidence visibility pass`
+7. `BL-9 Future Swim proof-lane closeout map`
+8. Future Swim tenant-admin onboarding and strict UAT loop
+9. `BL-14A BookedAI monetization and commission operating baseline`
+10. Hot-path backend scale discipline for booking/payment/audit/tenant truth
+11. `BL-15 Scale-ready API family architecture map`
+12. `BL-16 Partner widget and installability baseline`
+13. `BL-17 Tenant-isolated AI ingestion pipeline map`
+14. `BL-18 Shared-portal plus enterprise-portal strategy`
+15. `BL-12 Recoverable revenue model pass`
+16. `BL-14 Tenant Revenue Proof dashboard closeout`
 
 ## Go/no-go rule
 

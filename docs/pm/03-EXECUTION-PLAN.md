@@ -19,6 +19,8 @@
 >
 > **For the final `2026-05-01` PRD-to-master-plan-to-detailed-execution consolidation before new coding**, read [`../development/final-consolidated-execution-plan-2026-05-01.md`](../development/final-consolidated-execution-plan-2026-05-01.md).
 >
+> **For the practical execution priority order after the latest review**, read [`../development/priority-execution-order-2026-05-01.md`](../development/priority-execution-order-2026-05-01.md).
+>
 > The dates listed in the body sections below are RETAINED for historical traceability but are SUPERSEDED by the synced pack.
 
 Date: `2026-04-26` (today). Status: `active execution baseline`.
