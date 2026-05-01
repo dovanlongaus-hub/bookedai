@@ -7,6 +7,9 @@ Required environment variables (set in docker-compose / deployment):
     PIPER_TTS_URL                 default ``http://piper-tts:5000``
     PIPER_VOICE                   default ``en_US-ryan-medium``
     PIPER_REQUEST_TIMEOUT_SECONDS default ``15``
+
+Wiring is feature-flagged via ``ENABLE_BOT_VOICE_OUT`` (default off);
+flip the flag once a Piper service is reachable from the bot host.
 """
 from __future__ import annotations
 
