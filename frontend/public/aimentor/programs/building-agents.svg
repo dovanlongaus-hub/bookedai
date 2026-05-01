@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-labelledby="t">
+  <title id="t">Building AI Agents</title>
+  <rect width="320" height="200" rx="18" fill="#fdfaf3"/>
+  <rect x="8" y="8" width="304" height="184" rx="14" fill="#f8d99a" opacity="0.4"/>
+  <!-- chat bubble -->
+  <path d="M40 50 H 170 a 14 14 0 0 1 14 14 V 110 a 14 14 0 0 1 -14 14 H 90 L 60 148 V 124 H 40 a 14 14 0 0 1 -14 -14 V 64 a 14 14 0 0 1 14 -14 Z" fill="#ff6b3d"/>
+  <circle cx="70" cy="88" r="5" fill="#fdfaf3"/>
+  <circle cx="100" cy="88" r="5" fill="#fdfaf3"/>
+  <circle cx="130" cy="88" r="5" fill="#fdfaf3"/>
+  <!-- robot silhouette -->
+  <g transform="translate(220 60)" fill="#0f5c54">
+    <rect x="0" y="20" width="70" height="70" rx="10"/>
+    <rect x="-6" y="42" width="6" height="26" rx="2"/>
+    <rect x="70" y="42" width="6" height="26" rx="2"/>
+    <rect x="14" y="92" width="14" height="22" rx="2"/>
+    <rect x="42" y="92" width="14" height="22" rx="2"/>
+    <line x1="35" y1="6" x2="35" y2="20" stroke="#0f5c54" stroke-width="3"/>
+    <circle cx="35" cy="4" r="4"/>
+  </g>
+  <circle cx="240" cy="92" r="6" fill="#fdfaf3"/>
+  <circle cx="270" cy="92" r="6" fill="#fdfaf3"/>
+  <text x="20" y="184" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#1f2a26">Building AI Agents</text>
+</svg>

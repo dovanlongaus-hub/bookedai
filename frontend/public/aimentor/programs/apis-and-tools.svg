@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-labelledby="t">
+  <title id="t">APIs and Tools</title>
+  <rect width="320" height="200" rx="18" fill="#fdfaf3"/>
+  <rect x="8" y="8" width="304" height="184" rx="14" fill="#f8d99a" opacity="0.4"/>
+  <!-- left block -->
+  <rect x="40" y="60" width="80" height="60" rx="10" fill="#0f5c54"/>
+  <rect x="50" y="72" width="60" height="6" rx="3" fill="#fdfaf3" opacity="0.7"/>
+  <rect x="50" y="86" width="40" height="6" rx="3" fill="#fdfaf3" opacity="0.7"/>
+  <rect x="50" y="100" width="50" height="6" rx="3" fill="#fdfaf3" opacity="0.7"/>
+  <!-- right block -->
+  <rect x="200" y="60" width="80" height="60" rx="10" fill="#1f2a26"/>
+  <rect x="210" y="72" width="60" height="6" rx="3" fill="#f8d99a"/>
+  <rect x="210" y="86" width="40" height="6" rx="3" fill="#f8d99a"/>
+  <rect x="210" y="100" width="50" height="6" rx="3" fill="#f8d99a"/>
+  <!-- connectors -->
+  <path d="M120 80 L 160 80 L 160 100 L 200 100" stroke="#ff6b3d" stroke-width="4" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M200 80 L 160 80" stroke="#ff6b3d" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <circle cx="160" cy="80" r="6" fill="#ff6b3d"/>
+  <circle cx="160" cy="100" r="6" fill="#ff6b3d"/>
+  <text x="20" y="184" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#1f2a26">APIs &amp; Tools</text>
+</svg>

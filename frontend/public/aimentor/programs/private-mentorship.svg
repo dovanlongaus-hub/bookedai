@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-labelledby="t">
+  <title id="t">Private Mentorship</title>
+  <rect width="320" height="200" rx="18" fill="#fdfaf3"/>
+  <rect x="8" y="8" width="304" height="184" rx="14" fill="#f8d99a" opacity="0.4"/>
+  <!-- mentor silhouette -->
+  <g transform="translate(50 60)">
+    <circle cx="30" cy="22" r="22" fill="#0f5c54"/>
+    <path d="M0 100 C 4 70 18 56 30 56 C 42 56 56 70 60 100 Z" fill="#0f5c54"/>
+  </g>
+  <!-- mentee silhouette -->
+  <g transform="translate(180 70)">
+    <circle cx="28" cy="20" r="20" fill="#1f2a26"/>
+    <path d="M0 90 C 4 64 16 52 28 52 C 40 52 52 64 56 90 Z" fill="#1f2a26"/>
+  </g>
+  <!-- speech bubble between -->
+  <g transform="translate(118 50)">
+    <path d="M0 14 a 14 14 0 0 1 14 -14 H 56 a 14 14 0 0 1 14 14 V 38 a 14 14 0 0 1 -14 14 H 36 L 22 64 V 52 H 14 a 14 14 0 0 1 -14 -14 Z" fill="#ff6b3d"/>
+    <circle cx="22" cy="26" r="3" fill="#fdfaf3"/>
+    <circle cx="35" cy="26" r="3" fill="#fdfaf3"/>
+    <circle cx="48" cy="26" r="3" fill="#fdfaf3"/>
+  </g>
+  <text x="20" y="184" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#1f2a26">Private Mentorship</text>
+</svg>

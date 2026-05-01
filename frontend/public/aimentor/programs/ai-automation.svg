@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-labelledby="t">
+  <title id="t">AI Automation</title>
+  <rect width="320" height="200" rx="18" fill="#fdfaf3"/>
+  <rect x="8" y="8" width="304" height="184" rx="14" fill="#f8d99a" opacity="0.4"/>
+  <!-- gear -->
+  <g transform="translate(110 95)" fill="#0f5c54">
+    <circle r="42"/>
+    <g>
+      <rect x="-8" y="-58" width="16" height="20" rx="2"/>
+      <rect x="-8" y="38" width="16" height="20" rx="2"/>
+      <rect x="-58" y="-8" width="20" height="16" rx="2"/>
+      <rect x="38" y="-8" width="20" height="16" rx="2"/>
+      <rect x="-8" y="-58" width="16" height="20" rx="2" transform="rotate(45)"/>
+      <rect x="-8" y="38" width="16" height="20" rx="2" transform="rotate(45)"/>
+      <rect x="-58" y="-8" width="20" height="16" rx="2" transform="rotate(45)"/>
+      <rect x="38" y="-8" width="20" height="16" rx="2" transform="rotate(45)"/>
+    </g>
+    <circle r="14" fill="#fdfaf3"/>
+  </g>
+  <!-- lightning bolt -->
+  <path d="M220 40 L 192 110 L 220 110 L 200 168 L 254 96 L 226 96 L 244 40 Z" fill="#ff6b3d" stroke="#1f2a26" stroke-width="2" stroke-linejoin="round"/>
+  <text x="20" y="184" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#1f2a26">AI Automation</text>
+</svg>

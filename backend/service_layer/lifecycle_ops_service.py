@@ -2742,3 +2742,761 @@ async def orchestrate_booking_rescheduled(
         "communications": communications,
         "warnings": warnings,
     }
+
+
+# ---------------------------------------------------------------------------
+# Phase 4 lifecycle orchestrators: retention cadence + status transitions
+# ---------------------------------------------------------------------------
+#
+# Append-only additions for the AI Mentor retention cadence (T+1d / T+7d /
+# T+30d / T+90d) and the booking status-transition pipeline (completed /
+# no_show / refunded / in_progress).
+#
+# These follow the same defensive contract as the Phase 1 orchestrators:
+# every external call is wrapped in try/except, partial results land in the
+# return dict via ``warnings``, and the outbox event is the source of truth
+# for downstream retries.
+
+
+# Inline copy table for retention bot messages on telegram + whatsapp. We
+# keep this inline (rather than a template_key lookup) because retention
+# bot blasts are plain-text and don't need the email render pipeline.
+_RETENTION_BOT_COPY: dict[str, dict[str, str]] = {
+    "t1d_thank_you": {
+        "en": (
+            "Thanks for your BookedAI session yesterday! "
+            "We'd love your feedback — reply with a quick rating (1-5)."
+        ),
+        "vi": (
+            "Cam on ban da tham gia phien BookedAI hom qua! "
+            "Vui long phan hoi voi danh gia nhanh (1-5)."
+        ),
+    },
+    "t7d_check_in": {
+        "en": "How's your project going? Let us know if you'd like a follow-up call.",
+        "vi": "Du an cua ban tien trien the nao? Bao chung toi neu ban muon hen mot cuoc goi tiep theo.",
+    },
+    "t30d_progress": {
+        "en": (
+            "Time for a check-in? Use code BOOKED10 for 10% off your next BookedAI session."
+        ),
+        "vi": (
+            "Den luc kiem tra tien do? Dung ma BOOKED10 de giam 10% cho phien BookedAI tiep theo."
+        ),
+    },
+    "t90d_winback": {
+        "en": "We miss you! Come back to BookedAI — your next session is on us up to $50.",
+        "vi": "Chung toi nho ban! Quay lai BookedAI — phien tiep theo duoc tang den $50.",
+    },
+}
+
+
+_RETENTION_TEMPLATE_MAP: dict[str, str] = {
+    "t1d_thank_you": "aimentor_retention_t1",
+    "t7d_check_in": "aimentor_retention_t7",
+    "t30d_progress": "aimentor_retention_t30",
+    "t90d_winback": "aimentor_winback_t90",
+}
+
+
+_STATUS_DEAL_STAGE_MAP: dict[str, dict[str, str | None]] = {
+    "completed": {"deal_stage": "Closed Won", "reason": None},
+    "no_show": {"deal_stage": "Closed Lost", "reason": "no_show"},
+    "refunded": {"deal_stage": "Closed Lost", "reason": "refund"},
+    "in_progress": {"deal_stage": "In Progress", "reason": None},
+}
+
+
+async def orchestrate_retention_touch(
+    session,
+    *,
+    tenant_id: str,
+    booking_reference: str,
+    customer_email: str,
+    customer_name: str | None,
+    cadence: str,
+    preferred_channel: str = "email",
+    locale: str = "en",
+    raw_provider_payload: dict | None = None,
+) -> dict[str, object]:
+    """Orchestrate a single retention-cadence touch for a booking.
+
+    The retention worker calls this once per cadence per booking. We
+    enforce idempotency via the outbox UNIQUE constraint on
+    ``f"retention:{cadence}:{booking_reference}"`` so a duplicate fire
+    short-circuits with ``status='already_sent'``.
+
+    Steps:
+      1. Validate cadence; reject unknown values.
+      2. Enqueue outbox event (idempotent on retention key).
+      3. Dispatch the touch on the preferred channel (email / telegram /
+         whatsapp).
+      4. Record a ``retention_touch`` CRM sync record + best-effort Zoho
+         follow-up task.
+    """
+    warnings: list[str] = []
+    template_key = _RETENTION_TEMPLATE_MAP.get(cadence)
+    if not template_key:
+        return {
+            "status": "invalid_cadence",
+            "cadence": cadence,
+            "booking_reference": booking_reference,
+            "warnings": ["unknown_cadence"],
+        }
+
+    normalized_channel = (preferred_channel or "email").strip().lower()
+    if normalized_channel not in ("email", "telegram", "whatsapp"):
+        return {
+            "status": "invalid_channel",
+            "channel": normalized_channel,
+            "booking_reference": booking_reference,
+            "warnings": ["unknown_channel"],
+        }
+
+    normalized_locale = (locale or "en").strip().lower()
+    if normalized_locale.startswith("vi"):
+        normalized_locale = "vi"
+    else:
+        normalized_locale = "en"
+
+    sent_at = datetime.now(timezone.utc)
+    idempotency_key = f"retention:{cadence}:{booking_reference}"
+
+    _logger.info(
+        "orchestrate_retention_touch_begin",
+        extra={
+            "event_type": "orchestrate_retention_touch_begin",
+            "tenant_id": tenant_id,
+            "booking_reference": booking_reference,
+            "cadence": cadence,
+            "channel": normalized_channel,
+        },
+    )
+
+    # Step 1: outbox enqueue with idempotency guard.
+    outbox_repository = OutboxRepository(
+        RepositoryContext(session=session, tenant_id=tenant_id)
+    )
+    outbox_payload = {
+        "booking_reference": booking_reference,
+        "tenant_id": tenant_id,
+        "cadence": cadence,
+        "channel": normalized_channel,
+        "customer_email": customer_email,
+        "customer_name": customer_name,
+        "locale": normalized_locale,
+        "template_key": template_key,
+        "sent_at": sent_at.isoformat(),
+        "raw_provider_payload": raw_provider_payload or {},
+    }
+    outbox_event_id: int | None = None
+    try:
+        outbox_event_id = await outbox_repository.enqueue_event(
+            tenant_id=tenant_id,
+            event_type="retention.touch.dispatched",
+            aggregate_type="booking_intent",
+            aggregate_id=booking_reference,
+            payload=outbox_payload,
+            idempotency_key=idempotency_key,
+        )
+    except Exception as exc:  # noqa: BLE001
+        # Most likely a UNIQUE-constraint hit — duplicate retention touch.
+        _logger.info(
+            "retention_touch_outbox_duplicate_or_failed",
+            extra={
+                "event_type": "retention_touch_outbox_duplicate_or_failed",
+                "tenant_id": tenant_id,
+                "booking_reference": booking_reference,
+                "cadence": cadence,
+                "idempotency_key": idempotency_key,
+            },
+            exc_info=exc,
+        )
+        return {
+            "status": "already_sent",
+            "cadence": cadence,
+            "channel": normalized_channel,
+            "booking_reference": booking_reference,
+            "idempotency_key": idempotency_key,
+            "outbox_event_id": None,
+            "warnings": ["outbox_duplicate_or_failed"],
+        }
+
+    # Step 2: dispatch on preferred channel.
+    email_result: dict[str, Any] = {"status": "skipped"}
+    communication_result: dict[str, Any] = {"status": "skipped"}
+
+    if normalized_channel == "email":
+        if customer_email:
+            try:
+                email_outcome = await orchestrate_lifecycle_email(
+                    session,
+                    tenant_id=tenant_id,
+                    template_key=template_key,
+                    subject=f"BookedAI follow-up — {cadence}",
+                    provider="outbox",
+                    delivery_status="queued",
+                    contact_id=None,
+                    event_payload={
+                        "template_key": template_key,
+                        "locale": normalized_locale,
+                        "recipient_email": customer_email,
+                        "cadence": cadence,
+                        "booking_reference": booking_reference,
+                        "variables": {
+                            "customer_name": customer_name,
+                            "booking_reference": booking_reference,
+                            "cadence": cadence,
+                            "current_year": datetime.now().year,
+                        },
+                    },
+                )
+                email_result = {
+                    "message_id": email_outcome.message_id,
+                    "delivery_status": email_outcome.delivery_status,
+                    "record_status": email_outcome.record_status,
+                    "provider": email_outcome.provider,
+                    "warnings": email_outcome.warning_codes,
+                }
+                if email_outcome.warning_codes:
+                    warnings.extend(email_outcome.warning_codes)
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning(
+                    "retention_touch_email_failed",
+                    extra={
+                        "event_type": "retention_touch_email_failed",
+                        "tenant_id": tenant_id,
+                        "booking_reference": booking_reference,
+                        "cadence": cadence,
+                    },
+                    exc_info=exc,
+                )
+                warnings.append("email_failed")
+                email_result = {"status": "failed", "error": str(exc)}
+        else:
+            email_result = {"status": "skipped", "reason": "no_customer_email"}
+            warnings.append("missing_customer_email")
+    else:
+        # telegram / whatsapp bot copy from the inline _RETENTION_BOT_COPY
+        # table. Fall back to EN if the locale strings don't exist.
+        copy_table = _RETENTION_BOT_COPY.get(cadence) or {}
+        body = copy_table.get(normalized_locale) or copy_table.get("en") or (
+            f"BookedAI follow-up: {cadence}"
+        )
+        try:
+            comm = await orchestrate_communication_touch(
+                session,
+                tenant_id=tenant_id,
+                channel=normalized_channel,
+                to=customer_email or "",
+                body=body,
+                provider=f"{normalized_channel}_outbox",
+                delivery_status="queued",
+                actor_channel="retention_worker",
+                template_key=template_key,
+                metadata={
+                    "booking_reference": booking_reference,
+                    "cadence": cadence,
+                    "locale": normalized_locale,
+                },
+            )
+            communication_result = {
+                "message_id": comm.message_id,
+                "delivery_status": comm.delivery_status,
+                "record_status": comm.record_status,
+                "provider": comm.provider,
+                "warnings": comm.warning_codes,
+            }
+            if comm.warning_codes:
+                warnings.extend(comm.warning_codes)
+        except Exception as exc:  # noqa: BLE001
+            _logger.warning(
+                "retention_touch_communication_failed",
+                extra={
+                    "event_type": "retention_touch_communication_failed",
+                    "tenant_id": tenant_id,
+                    "booking_reference": booking_reference,
+                    "cadence": cadence,
+                    "channel": normalized_channel,
+                },
+                exc_info=exc,
+            )
+            warnings.append(f"{normalized_channel}_touch_failed")
+            communication_result = {"status": "failed", "error": str(exc)}
+
+    # Step 3: CRM sync record + best-effort Zoho follow-up task.
+    crm_sync: dict[str, Any] = {}
+    crm_repository = CrmSyncRepository(
+        RepositoryContext(session=session, tenant_id=tenant_id)
+    )
+    crm_payload = {
+        "booking_reference": booking_reference,
+        "cadence": cadence,
+        "channel": normalized_channel,
+        "sent_at": sent_at.isoformat(),
+        "customer_name": customer_name,
+        "customer_email": customer_email,
+        "locale": normalized_locale,
+    }
+    crm_sync_record_id: int | None = None
+    try:
+        crm_sync_record_id = await crm_repository.create_sync_record(
+            tenant_id=tenant_id,
+            entity_type="retention_touch",
+            local_entity_id=booking_reference,
+            provider="zoho_crm",
+            sync_status="pending",
+            payload_json=json.dumps(crm_payload),
+        )
+        crm_sync["record_id"] = crm_sync_record_id
+        crm_sync["sync_status"] = "pending"
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning(
+            "retention_touch_crm_seed_failed",
+            extra={
+                "event_type": "retention_touch_crm_seed_failed",
+                "tenant_id": tenant_id,
+                "booking_reference": booking_reference,
+                "cadence": cadence,
+            },
+            exc_info=exc,
+        )
+        warnings.append("crm_seed_failed")
+        crm_sync["sync_status"] = "failed"
+
+    settings = get_settings()
+    adapter = ZohoCrmAdapter()
+    if crm_sync_record_id is not None and adapter.configured(settings):
+        try:
+            follow_up_record = LeadRecordContract(
+                lead_id=booking_reference,
+                full_name=customer_name,
+                email=customer_email,
+                phone=None,
+                source="retention_touch",
+                company_name="BookedAI Retention",
+                tenant_id=tenant_id,
+                lead_status="retention_followup",
+                metadata={
+                    **crm_payload,
+                    "task_subject": f"Retention {cadence} - {customer_name or 'BookedAI customer'}",
+                },
+            )
+            task_result = await adapter.create_follow_up_task(
+                settings, lead=follow_up_record
+            )
+            external_entity_id = task_result.get("external_entity_id") or task_result.get(
+                "id"
+            )
+            await crm_repository.update_sync_record_status(
+                tenant_id=tenant_id,
+                crm_sync_record_id=crm_sync_record_id,
+                sync_status="synced",
+                external_entity_id=str(external_entity_id) if external_entity_id else None,
+                mark_synced=True,
+            )
+            crm_sync["sync_status"] = "synced"
+            crm_sync["external_entity_id"] = (
+                str(external_entity_id) if external_entity_id else None
+            )
+        except (ValueError, httpx.HTTPError) as exc:
+            _logger.warning(
+                "retention_touch_crm_push_failed",
+                extra={
+                    "event_type": "retention_touch_crm_push_failed",
+                    "tenant_id": tenant_id,
+                    "booking_reference": booking_reference,
+                    "cadence": cadence,
+                },
+                exc_info=exc,
+            )
+            warnings.append("crm_push_failed")
+            crm_sync["sync_status"] = "pending"
+        except Exception as exc:  # noqa: BLE001
+            # Skip silently on any other Zoho failure (per spec).
+            _logger.info(
+                "retention_touch_crm_push_skipped",
+                extra={
+                    "event_type": "retention_touch_crm_push_skipped",
+                    "tenant_id": tenant_id,
+                    "booking_reference": booking_reference,
+                    "cadence": cadence,
+                },
+                exc_info=exc,
+            )
+            warnings.append("crm_push_skipped")
+            crm_sync["sync_status"] = "pending"
+    elif crm_sync_record_id is not None:
+        crm_sync["sync_status"] = "pending"
+        warnings.append("crm_provider_unconfigured")
+
+    _logger.info(
+        "orchestrate_retention_touch_complete",
+        extra={
+            "event_type": "orchestrate_retention_touch_complete",
+            "tenant_id": tenant_id,
+            "booking_reference": booking_reference,
+            "cadence": cadence,
+            "channel": normalized_channel,
+            "outbox_event_id": outbox_event_id,
+            "warnings": warnings,
+        },
+    )
+
+    return {
+        "status": "sent",
+        "cadence": cadence,
+        "channel": normalized_channel,
+        "booking_reference": booking_reference,
+        "tenant_id": tenant_id,
+        "sent_at": sent_at.isoformat(),
+        "idempotency_key": idempotency_key,
+        "outbox_event_id": outbox_event_id,
+        "email_result": email_result,
+        "communication_result": communication_result,
+        "crm_sync": crm_sync,
+        "warnings": warnings,
+    }
+
+
+async def orchestrate_status_update(
+    session,
+    *,
+    tenant_id: str,
+    booking_reference: str,
+    new_status: str,
+    actor_type: str,
+    actor_id: str | None = None,
+    notes: str | None = None,
+    raw_provider_payload: dict | None = None,
+) -> dict[str, object]:
+    """Orchestrate a booking status transition (completed / no_show /
+    refunded / in_progress).
+
+    Mirrors the defensive contract of :func:`orchestrate_booking_cancelled`:
+    each external step is best-effort, partial failures are recorded as
+    ``warnings``, and the outbox event is the source of truth for
+    downstream retries (the feedback-request worker subscribes to
+    ``booking.status.updated`` for ``completed`` rows).
+    """
+    warnings: list[str] = []
+
+    if new_status not in {"completed", "no_show", "refunded", "in_progress"}:
+        return {
+            "status": "invalid_status",
+            "requested": new_status,
+            "booking_reference": booking_reference,
+            "warnings": ["invalid_status"],
+        }
+
+    _logger.info(
+        "orchestrate_status_update_begin",
+        extra={
+            "event_type": "orchestrate_status_update_begin",
+            "tenant_id": tenant_id,
+            "booking_reference": booking_reference,
+            "new_status": new_status,
+            "actor_type": actor_type,
+        },
+    )
+
+    context = await _lookup_booking_lifecycle_context(
+        session,
+        tenant_id=tenant_id,
+        booking_reference=booking_reference,
+        booking_intent_id=None,
+    )
+    if not context:
+        return {
+            "status": "not_found",
+            "booking_reference": booking_reference,
+            "warnings": ["booking_not_found"],
+        }
+
+    resolved_tenant_id = (context.get("tenant_id") or tenant_id or "").strip()
+    resolved_reference = (context.get("booking_reference") or booking_reference or "").strip()
+    resolved_intent_id = (context.get("booking_intent_id") or "").strip()
+    booking_metadata = (
+        context.get("booking_metadata")
+        if isinstance(context.get("booking_metadata"), dict)
+        else {}
+    )
+    customer_email = (context.get("customer_email") or "").strip() or None
+    customer_name = (context.get("customer_name") or "").strip() or None
+    service_name = (context.get("service_name") or "").strip() or None
+    contact_id = (context.get("contact_id") or "").strip() or None
+    customer_locale = _extract_customer_locale(booking_metadata)
+    updated_at = datetime.now(timezone.utc)
+
+    stage_map = _STATUS_DEAL_STAGE_MAP[new_status]
+    deal_stage = stage_map["deal_stage"]
+    deal_reason = stage_map["reason"]
+
+    idempotency_key = (
+        f"{actor_type}:status_update:{new_status}:{resolved_reference}"
+    )
+
+    # Step 1: update booking row.
+    booking_repository = BookingIntentRepository(
+        RepositoryContext(session=session, tenant_id=resolved_tenant_id)
+    )
+    try:
+        await booking_repository.sync_callback_status(
+            tenant_id=resolved_tenant_id,
+            booking_reference=resolved_reference,
+            status=new_status,
+            metadata_updates={
+                "status_updated_at": updated_at.isoformat(),
+                "status_update_actor_type": actor_type,
+                "status_update_actor_id": actor_id,
+                "status_update_notes": (notes or "").strip() or None,
+                "status_update_deal_stage": deal_stage,
+                "status_update_deal_reason": deal_reason,
+            },
+        )
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning(
+            "status_update_row_failed",
+            extra={
+                "event_type": "status_update_row_failed",
+                "tenant_id": resolved_tenant_id,
+                "booking_reference": resolved_reference,
+                "new_status": new_status,
+            },
+            exc_info=exc,
+        )
+        warnings.append("booking_status_update_failed")
+
+    # Step 2: CRM sync record + best-effort Zoho deal upsert.
+    crm_sync: dict[str, Any] = {}
+    crm_repository = CrmSyncRepository(
+        RepositoryContext(session=session, tenant_id=resolved_tenant_id)
+    )
+    crm_payload = {
+        "booking_reference": resolved_reference,
+        "booking_intent_id": resolved_intent_id,
+        "service_name": service_name,
+        "customer_name": customer_name,
+        "customer_email": customer_email,
+        "new_status": new_status,
+        "deal_stage": deal_stage,
+        "reason": deal_reason,
+        "notes": (notes or "").strip() or None,
+        "updated_at": updated_at.isoformat(),
+        "actor_type": actor_type,
+    }
+    crm_sync_record_id: int | None = None
+    try:
+        crm_sync_record_id = await crm_repository.create_sync_record(
+            tenant_id=resolved_tenant_id,
+            entity_type="deal_status_update",
+            local_entity_id=resolved_reference,
+            provider="zoho_crm",
+            sync_status="pending",
+            payload_json=json.dumps(crm_payload),
+        )
+        crm_sync["record_id"] = crm_sync_record_id
+        crm_sync["sync_status"] = "pending"
+    except Exception as exc:  # noqa: BLE001
+        _logger.warning(
+            "status_update_crm_seed_failed",
+            extra={
+                "event_type": "status_update_crm_seed_failed",
+                "tenant_id": resolved_tenant_id,
+                "booking_reference": resolved_reference,
+                "new_status": new_status,
+            },
+            exc_info=exc,
+        )
+        warnings.append("crm_seed_failed")
+        crm_sync["sync_status"] = "failed"
+
+    settings = get_settings()
+    adapter = ZohoCrmAdapter()
+    if crm_sync_record_id is not None and adapter.configured(settings):
+        try:
+            status_record = LeadRecordContract(
+                lead_id=resolved_intent_id or resolved_reference,
+                full_name=customer_name,
+                email=customer_email,
+                phone=(context.get("customer_phone") or "").strip() or None,
+                source="booking_status_update",
+                company_name=service_name or "BookedAI Booking",
+                tenant_id=resolved_tenant_id,
+                lead_status=new_status,
+                metadata={
+                    **crm_payload,
+                    "task_subject": f"Status update: {new_status} — {service_name or 'BookedAI Booking'}",
+                },
+            )
+            upsert_result = await adapter.upsert_deal(settings, lead=status_record)
+            external_entity_id = upsert_result.get("external_entity_id") or upsert_result.get(
+                "id"
+            )
+            await crm_repository.update_sync_record_status(
+                tenant_id=resolved_tenant_id,
+                crm_sync_record_id=crm_sync_record_id,
+                sync_status="synced",
+                external_entity_id=str(external_entity_id) if external_entity_id else None,
+                mark_synced=True,
+            )
+            crm_sync["sync_status"] = "synced"
+            crm_sync["external_entity_id"] = (
+                str(external_entity_id) if external_entity_id else None
+            )
+        except (ValueError, httpx.HTTPError) as exc:
+            _logger.warning(
+                "status_update_crm_push_failed",
+                extra={
+                    "event_type": "status_update_crm_push_failed",
+                    "tenant_id": resolved_tenant_id,
+                    "booking_reference": resolved_reference,
+                    "new_status": new_status,
+                },
+                exc_info=exc,
+            )
+            warnings.append("crm_push_failed")
+            crm_sync["sync_status"] = "pending"
+    elif crm_sync_record_id is not None:
+        crm_sync["sync_status"] = "pending"
+        warnings.append("crm_provider_unconfigured")
+
+    # Step 3: outbox event (idempotent on actor_type:status_update:status:ref).
+    outbox_event_id: int | None = None
+    outbox_repository = OutboxRepository(
+        RepositoryContext(session=session, tenant_id=resolved_tenant_id)
+    )
+    outbox_payload = {
+        "booking_reference": resolved_reference,
+        "booking_intent_id": resolved_intent_id,
+        "tenant_id": resolved_tenant_id,
+        "service_name": service_name,
+        "customer_name": customer_name,
+        "customer_email": customer_email,
+        "new_status": new_status,
+        "deal_stage": deal_stage,
+        "reason": deal_reason,
+        "notes": (notes or "").strip() or None,
+        "actor_type": actor_type,
+        "actor_id": actor_id,
+        "updated_at": updated_at.isoformat(),
+        "raw_provider_payload": raw_provider_payload or {},
+    }
+    try:
+        outbox_event_id = await outbox_repository.enqueue_event(
+            tenant_id=resolved_tenant_id,
+            event_type="booking.status.updated",
+            aggregate_type="booking_intent",
+            aggregate_id=resolved_intent_id or resolved_reference,
+            payload=outbox_payload,
+            idempotency_key=idempotency_key,
+        )
+    except Exception as exc:  # noqa: BLE001
+        # UNIQUE-constraint hit — duplicate status update.
+        _logger.info(
+            "status_update_outbox_duplicate_or_failed",
+            extra={
+                "event_type": "status_update_outbox_duplicate_or_failed",
+                "tenant_id": resolved_tenant_id,
+                "booking_reference": resolved_reference,
+                "new_status": new_status,
+                "idempotency_key": idempotency_key,
+            },
+            exc_info=exc,
+        )
+        return {
+            "status": "already_updated",
+            "booking_reference": resolved_reference,
+            "new_status": new_status,
+            "deal_stage": deal_stage,
+            "outbox_event_id": None,
+            "idempotency_key": idempotency_key,
+            "crm_sync": crm_sync,
+            "warnings": warnings + ["outbox_duplicate_or_failed"],
+        }
+
+    # Step 4: completion email (only on 'completed' — other statuses are
+    # admin-only signals and stay silent).
+    email_result: dict[str, Any] = {"status": "skipped"}
+    if new_status == "completed":
+        if customer_email:
+            subject_label = service_name or "your BookedAI booking"
+            try:
+                email_outcome = await orchestrate_lifecycle_email(
+                    session,
+                    tenant_id=resolved_tenant_id,
+                    template_key="aimentor_completion_thank_you",
+                    subject=f"Thanks for completing {subject_label}",
+                    provider="outbox",
+                    delivery_status="queued",
+                    contact_id=contact_id,
+                    event_payload={
+                        **outbox_payload,
+                        "template_key": "aimentor_completion_thank_you",
+                        "locale": customer_locale,
+                        "recipient_email": customer_email,
+                        "variables": {
+                            "customer_name": customer_name,
+                            "service_name": service_name,
+                            "booking_reference": resolved_reference,
+                            "completed_at": updated_at.isoformat(),
+                            "current_year": datetime.now().year,
+                        },
+                    },
+                )
+                email_result = {
+                    "message_id": email_outcome.message_id,
+                    "delivery_status": email_outcome.delivery_status,
+                    "record_status": email_outcome.record_status,
+                    "provider": email_outcome.provider,
+                    "warnings": email_outcome.warning_codes,
+                }
+                if email_outcome.warning_codes:
+                    warnings.extend(email_outcome.warning_codes)
+            except Exception as exc:  # noqa: BLE001
+                _logger.warning(
+                    "status_update_email_failed",
+                    extra={
+                        "event_type": "status_update_email_failed",
+                        "tenant_id": resolved_tenant_id,
+                        "booking_reference": resolved_reference,
+                        "new_status": new_status,
+                    },
+                    exc_info=exc,
+                )
+                warnings.append("email_failed")
+                email_result = {"status": "failed", "error": str(exc)}
+        else:
+            email_result = {"status": "skipped", "reason": "no_customer_email"}
+            warnings.append("missing_customer_email")
+    else:
+        email_result = {"status": "skipped", "reason": "admin_only_signal"}
+
+    _logger.info(
+        "orchestrate_status_update_complete",
+        extra={
+            "event_type": "orchestrate_status_update_complete",
+            "tenant_id": resolved_tenant_id,
+            "booking_reference": resolved_reference,
+            "new_status": new_status,
+            "deal_stage": deal_stage,
+            "outbox_event_id": outbox_event_id,
+            "warnings": warnings,
+        },
+    )
+
+    return {
+        "status": "updated",
+        "booking_reference": resolved_reference,
+        "booking_intent_id": resolved_intent_id,
+        "tenant_id": resolved_tenant_id,
+        "new_status": new_status,
+        "deal_stage": deal_stage,
+        "reason": deal_reason,
+        "updated_at": updated_at.isoformat(),
+        "outbox_event_id": outbox_event_id,
+        "idempotency_key": idempotency_key,
+        "crm_sync": crm_sync,
+        "email": email_result,
+        "warnings": warnings,
+    }

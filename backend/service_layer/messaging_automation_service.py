@@ -13,7 +13,7 @@ from typing import Any
 from urllib.parse import urlencode, urlparse
 from uuid import uuid4
 
-from sqlalchemy import desc, func, or_, select
+from sqlalchemy import desc, func, or_, select, text as sql_text
 
 from core.customer_booking_contact import DEFAULT_CUSTOMER_BOOKING_SUPPORT_EMAIL
 from core.portal_tokens import PortalTokenError, generate_portal_access_token
@@ -160,6 +160,18 @@ class MessagingAutomationService:
         metadata: dict[str, object],
     ) -> MessagingAutomationResult:
         normalized_channel = self._normalize_channel(channel)
+
+        # Voice STT — runs BEFORE the rate limiter / slash dispatch so the
+        # downstream pipeline sees a normal text message. Telegram-only for
+        # v1; WhatsApp voice (different audio format + auth flow) is deferred.
+        voice_failure = await self._maybe_transcribe_voice(
+            channel=normalized_channel,
+            message=message,
+            metadata=metadata,
+        )
+        if voice_failure is not None:
+            return voice_failure
+
         conversation_key = self._conversation_key(message=message, metadata=metadata)
 
         # Per-chat-id inbound rate limit (Lane 6 §5 P2 guardrail). Silently
@@ -295,6 +307,81 @@ class MessagingAutomationService:
 
         slash_intent, slash_args = self._parse_slash_command(message.text)
         cancel_intent_locked = False
+
+        # ── Phase 2: AIMentor in-Telegram booking flow ──────────────────────
+        # 1) Honour an active book-flow state machine first (collecting
+        #    name → email → phone → confirming). Any free-text message
+        #    while a state is active should advance/reset that state, not
+        #    be re-routed through the regular intent dispatcher.
+        # 2) Detect Telegram inline-keyboard callbacks. The webhook layer
+        #    has already mapped callback_data → message.text, so we look
+        #    for the `aim:program:` / `aim:slot:` prefixes here.
+        # 3) Promote free-text "programs" / "khoá học" / "courses" to the
+        #    same handler as the /programs slash command for parity.
+        active_book_state = self._active_book_intent_state(
+            channel_state.get("session_metadata") if isinstance(channel_state, dict) else None
+        )
+        if normalized_channel == "telegram" and active_book_state:
+            book_state_result = await self._handle_book_state_machine(
+                session,
+                channel=normalized_channel,
+                conversation_id=conversation_key,
+                tenant_id=tenant_ref,
+                identity_metadata=identity_metadata,
+                locale=locale,
+                message=message,
+                metadata=metadata,
+                existing_state=channel_state,
+                state=active_book_state,
+            )
+            if book_state_result is not None:
+                return book_state_result
+
+        if normalized_channel == "telegram":
+            raw_text = str(message.text or "").strip()
+            if raw_text.startswith("aim:program:"):
+                service_id = raw_text[len("aim:program:") :].strip()
+                return await self._handle_program_pick(
+                    session,
+                    channel=normalized_channel,
+                    conversation_id=conversation_key,
+                    tenant_id=tenant_ref,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                    service_id=service_id,
+                    existing_state=channel_state,
+                )
+            if raw_text.startswith("aim:slot:"):
+                payload = raw_text[len("aim:slot:") :].strip()
+                # Format: aim:slot:<service_id>:<starts_at_iso>
+                # Note: ISO timestamps contain ':' so split on first ':'
+                # and treat the rest as starts_at.
+                if ":" in payload:
+                    slot_service_id, _, slot_starts_at = payload.partition(":")
+                    return await self._handle_slot_pick(
+                        session,
+                        channel=normalized_channel,
+                        conversation_id=conversation_key,
+                        tenant_id=tenant_ref,
+                        identity_metadata=identity_metadata,
+                        locale=locale,
+                        service_id=slot_service_id.strip(),
+                        starts_at_iso=slot_starts_at.strip(),
+                        existing_state=channel_state,
+                    )
+            if slash_intent is None and self._is_programs_keyword_intent(message.text):
+                slash_intent = "programs"
+
+        if slash_intent == "programs":
+            return await self._handle_programs_list(
+                session,
+                channel=normalized_channel,
+                conversation_id=conversation_key,
+                tenant_id=tenant_ref,
+                identity_metadata=identity_metadata,
+                locale=locale,
+                existing_state=channel_state,
+            )
 
         if slash_intent == "help":
             return await self._build_welcome_result(
@@ -1404,6 +1491,10 @@ class MessagingAutomationService:
             "/booking": "mybookings",
             "/cancel": "cancel",
             "/support": "support",
+            "/programs": "programs",
+            "/program": "programs",
+            "/courses": "programs",
+            "/course": "programs",
         }
         return mapping.get(head), args
 
@@ -3355,6 +3446,876 @@ class MessagingAutomationService:
             metadata=cleared,
         )
 
+    # ──────────────────────────────────────────────────────────────────
+    # Phase 2: AIMentor in-Telegram booking flow
+    #
+    # State machine (stored on MessagingChannelSession.metadata):
+    #
+    #   <none>  ── /programs ──▶  picking_program
+    #   picking_program  ── aim:program:<sid> ──▶  picking_slot
+    #   picking_slot  ── aim:slot:<sid>:<iso> ──▶  collecting_name
+    #   collecting_name  ── free text ──▶  collecting_email
+    #   collecting_email  ── free text ──▶  collecting_phone
+    #   collecting_phone  ── free text ──▶  confirming
+    #   confirming  ── YES ──▶  <none> + booking created
+    #   confirming  ── NO  ──▶  <none>
+    #
+    # Tenant: AIMENTOR_TENANT_SLUG ("ai-mentor-doer"). Resolved via
+    # TenantRepository.resolve_tenant_id at handler time so we don't
+    # have to thread tenant_id from the dispatcher.
+    # ──────────────────────────────────────────────────────────────────
+
+    AIMENTOR_TENANT_SLUG = "ai-mentor-doer"
+    BOOK_INTENT_TTL_SECONDS = 60 * 30  # 30 min — clears stale half-typed flows.
+    PROGRAMS_INLINE_KEYBOARD_LIMIT = 6
+    SLOTS_INLINE_KEYBOARD_LIMIT = 5
+
+    BOOK_INTENT_STATES = {
+        "picking_program",
+        "picking_slot",
+        "collecting_name",
+        "collecting_email",
+        "collecting_phone",
+        "confirming",
+    }
+
+    @classmethod
+    def _active_book_intent_state(
+        cls, session_metadata: dict[str, object] | None
+    ) -> str | None:
+        if not isinstance(session_metadata, dict):
+            return None
+        state = str(session_metadata.get("book_intent_state") or "").strip()
+        if state not in {"collecting_name", "collecting_email", "collecting_phone", "confirming"}:
+            # Only the *interactive text-collection* states count as
+            # "active" — picking_program / picking_slot just record where
+            # the user paused after a callback button press.
+            return None
+        recorded = str(session_metadata.get("book_intent_recorded_at") or "").strip()
+        if recorded:
+            try:
+                recorded_at = datetime.fromisoformat(recorded)
+            except ValueError:
+                return state
+            if recorded_at.tzinfo is None:
+                recorded_at = recorded_at.replace(tzinfo=UTC)
+            if datetime.now(UTC) - recorded_at > timedelta(
+                seconds=cls.BOOK_INTENT_TTL_SECONDS
+            ):
+                return None
+        return state
+
+    @staticmethod
+    def _is_programs_keyword_intent(message_text: str) -> bool:
+        normalized = unicodedata.normalize(
+            "NFKD", str(message_text or "").strip().lower()
+        )
+        ascii_text = "".join(ch for ch in normalized if not unicodedata.combining(ch))
+        keywords = {"programs", "program", "courses", "course", "khoa hoc", "khoahoc"}
+        return ascii_text in keywords
+
+    async def _resolve_aimentor_tenant_id(self, session) -> str | None:
+        try:
+            repo = TenantRepository(RepositoryContext(session=session))
+            return await repo.resolve_tenant_id(self.AIMENTOR_TENANT_SLUG)
+        except Exception:  # pragma: no cover - defensive
+            _logger.exception("aimentor_tenant_resolve_failed")
+            return None
+
+    async def _fetch_aimentor_programs(
+        self, session, *, limit: int = PROGRAMS_INLINE_KEYBOARD_LIMIT
+    ) -> list[dict[str, object]]:
+        tenant_id = await self._resolve_aimentor_tenant_id(session)
+        if not tenant_id:
+            return []
+        try:
+            result = await session.execute(
+                sql_text(
+                    """
+                    select
+                      service_id, name, summary, display_price,
+                      coalesce(featured, 0) as featured
+                    from service_merchant_profiles
+                    where tenant_id = cast(:tenant_id as text)
+                      and publish_state = 'published'
+                      and coalesce(is_active, 1) = 1
+                    order by
+                      coalesce(featured, 0) desc,
+                      coalesce((metadata->>'sort_order')::int, 9999) asc,
+                      name asc
+                    limit :limit
+                    """
+                ),
+                {"tenant_id": tenant_id, "limit": int(limit)},
+            )
+            rows = result.mappings().all()
+        except Exception:  # pragma: no cover - defensive
+            _logger.exception("aimentor_programs_fetch_failed")
+            return []
+        return [dict(row) for row in rows]
+
+    async def _fetch_aimentor_slots(
+        self, session, *, service_id: str, limit: int = SLOTS_INLINE_KEYBOARD_LIMIT
+    ) -> list[dict[str, object]]:
+        if not service_id:
+            return []
+        try:
+            result = await session.execute(
+                sql_text(
+                    """
+                    select
+                      sts.id::text as id,
+                      sts.service_id,
+                      sts.slot_start_at,
+                      sts.slot_end_at,
+                      sts.timezone,
+                      sts.capacity,
+                      sts.booked_count
+                    from service_time_slots sts
+                    where sts.tenant_id = (
+                      select id from tenants where slug = :slug
+                    )
+                      and sts.service_id = :service_id
+                      and sts.is_active = true
+                      and sts.slot_start_at > now()
+                      and (sts.capacity - sts.booked_count) > 0
+                    order by sts.slot_start_at asc
+                    limit :limit
+                    """
+                ),
+                {
+                    "slug": self.AIMENTOR_TENANT_SLUG,
+                    "service_id": service_id,
+                    "limit": int(limit),
+                },
+            )
+            rows = result.mappings().all()
+        except Exception:  # pragma: no cover - defensive
+            _logger.exception("aimentor_slots_fetch_failed")
+            return []
+        return [dict(row) for row in rows]
+
+    @staticmethod
+    def _format_slot_button_label(slot_start_at: object) -> str:
+        if isinstance(slot_start_at, datetime):
+            ts = slot_start_at
+            if ts.tzinfo is None:
+                ts = ts.replace(tzinfo=UTC)
+            return ts.strftime("%a %d %b, %H:%M")
+        return str(slot_start_at or "").strip() or "Available slot"
+
+    async def _set_book_intent_metadata(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        customer_identity: dict[str, object],
+        existing_state: dict[str, object] | None,
+        updates: dict[str, object],
+    ) -> None:
+        if not conversation_id:
+            return
+        existing_metadata = (existing_state or {}).get("session_metadata") if existing_state else {}
+        if not isinstance(existing_metadata, dict):
+            existing_metadata = {}
+        merged = {**existing_metadata, **updates}
+        merged["book_intent_recorded_at"] = datetime.now(UTC).isoformat()
+        await self._upsert_channel_session_state(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=customer_identity,
+            service_search_query=(existing_state or {}).get("service_search_query"),
+            service_options=[
+                item
+                for item in ((existing_state or {}).get("service_options") or [])
+                if isinstance(item, dict)
+            ],
+            reply_controls=(existing_state or {}).get("reply_controls") or {},
+            last_ai_intent=str(updates.get("book_intent_state") or "book_intent_active"),
+            last_workflow_status="answered",
+            metadata=merged,
+        )
+
+    async def _clear_book_intent_metadata(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        customer_identity: dict[str, object],
+        existing_state: dict[str, object] | None,
+    ) -> None:
+        if not conversation_id:
+            return
+        existing_metadata = (existing_state or {}).get("session_metadata") if existing_state else {}
+        if not isinstance(existing_metadata, dict):
+            return
+        keys_to_clear = {
+            "book_intent_state",
+            "book_intent_program_id",
+            "book_intent_program_name",
+            "book_intent_slot_starts_at",
+            "book_intent_slot_label",
+            "book_intent_collected_name",
+            "book_intent_collected_email",
+            "book_intent_collected_phone",
+            "book_intent_recorded_at",
+        }
+        cleared = {k: v for k, v in existing_metadata.items() if k not in keys_to_clear}
+        await self._upsert_channel_session_state(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=customer_identity,
+            service_search_query=(existing_state or {}).get("service_search_query"),
+            service_options=[
+                item
+                for item in ((existing_state or {}).get("service_options") or [])
+                if isinstance(item, dict)
+            ],
+            reply_controls=(existing_state or {}).get("reply_controls") or {},
+            last_ai_intent="book_intent_cleared",
+            last_workflow_status="answered",
+            metadata=cleared,
+        )
+
+    async def _handle_programs_list(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        identity_metadata: dict[str, object],
+        locale: str,
+        existing_state: dict[str, object] | None,
+    ) -> MessagingAutomationResult:
+        # WhatsApp parity is best-effort: WhatsApp Cloud reply buttons cap
+        # at 3 per message and the catalog can have up to 6 programs, so
+        # we ship a deep-link instead and surface a TODO.
+        if channel != "telegram":
+            body = self._localized(
+                "programs_pick_open_web",
+                locale,
+                url="https://aimentor.bookedai.au",
+            )
+            return MessagingAutomationResult(
+                ai_reply=body,
+                ai_intent="programs_open_web",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": self._layer_metadata(channel),
+                    "customer_identity": identity_metadata,
+                    "customer_care_status": "programs_open_web",
+                    "locale": locale,
+                },
+            )
+
+        programs = await self._fetch_aimentor_programs(session)
+        if not programs:
+            body = self._localized("programs_empty", locale)
+            return MessagingAutomationResult(
+                ai_reply=body,
+                ai_intent="programs_empty",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": self._layer_metadata(channel),
+                    "customer_identity": identity_metadata,
+                    "customer_care_status": "programs_empty",
+                    "locale": locale,
+                },
+            )
+
+        keyboard_rows: list[list[dict[str, str]]] = []
+        for program in programs:
+            service_id = str(program.get("service_id") or "").strip()
+            name = str(program.get("name") or "").strip() or service_id
+            if not service_id:
+                continue
+            callback = f"aim:program:{service_id}"
+            # Telegram callback_data limit is 64 bytes. Skip rather than
+            # truncate — a truncated id would silently mis-route.
+            if len(callback.encode("utf-8")) > 64:
+                continue
+            keyboard_rows.append(
+                [{"text": name[:60], "callback_data": callback}]
+            )
+
+        body = self._localized("programs_pick_prompt", locale)
+        reply_markup = {"inline_keyboard": keyboard_rows} if keyboard_rows else None
+
+        await self._set_book_intent_metadata(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=identity_metadata,
+            existing_state=existing_state,
+            updates={"book_intent_state": "picking_program"},
+        )
+
+        result_metadata: dict[str, object] = {
+            "messaging_layer": self._layer_metadata(channel),
+            "customer_identity": identity_metadata,
+            "customer_care_status": "programs_pick",
+            "locale": locale,
+            "book_intent_state": "picking_program",
+        }
+        if reply_markup is not None:
+            result_metadata["reply_controls"] = {
+                "telegram_reply_markup": reply_markup,
+                "telegram_parse_mode": "HTML",
+            }
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="programs_pick",
+            workflow_status="answered",
+            metadata=result_metadata,
+        )
+
+    async def _handle_program_pick(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        identity_metadata: dict[str, object],
+        locale: str,
+        service_id: str,
+        existing_state: dict[str, object] | None,
+    ) -> MessagingAutomationResult:
+        if not service_id:
+            return MessagingAutomationResult(
+                ai_reply=self._localized("programs_empty", locale),
+                ai_intent="programs_empty",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": self._layer_metadata(channel),
+                    "customer_identity": identity_metadata,
+                    "locale": locale,
+                },
+            )
+
+        slots = await self._fetch_aimentor_slots(session, service_id=service_id)
+        # Resolve program display name for later confirmation summary.
+        program_name = service_id
+        try:
+            programs = await self._fetch_aimentor_programs(session, limit=50)
+            for program in programs:
+                if str(program.get("service_id") or "").strip() == service_id:
+                    program_name = str(program.get("name") or service_id).strip()
+                    break
+        except Exception:  # pragma: no cover - defensive
+            pass
+
+        if not slots:
+            body = self._localized("programs_no_slots", locale)
+            return MessagingAutomationResult(
+                ai_reply=body,
+                ai_intent="programs_no_slots",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": self._layer_metadata(channel),
+                    "customer_identity": identity_metadata,
+                    "customer_care_status": "programs_no_slots",
+                    "locale": locale,
+                },
+            )
+
+        keyboard_rows: list[list[dict[str, str]]] = []
+        for slot in slots:
+            slot_start = slot.get("slot_start_at")
+            if isinstance(slot_start, datetime):
+                if slot_start.tzinfo is None:
+                    slot_start = slot_start.replace(tzinfo=UTC)
+                starts_at_iso = slot_start.isoformat()
+            else:
+                starts_at_iso = str(slot_start or "").strip()
+            if not starts_at_iso:
+                continue
+            label = self._format_slot_button_label(slot_start)
+            callback = f"aim:slot:{service_id}:{starts_at_iso}"
+            if len(callback.encode("utf-8")) > 64:
+                # Compress the iso to the shortest representation
+                # (drop seconds, microseconds, timezone offset chars).
+                if isinstance(slot_start, datetime):
+                    short_iso = slot_start.strftime("%Y-%m-%dT%H:%M")
+                    callback = f"aim:slot:{service_id}:{short_iso}"
+            if len(callback.encode("utf-8")) > 64:
+                continue
+            keyboard_rows.append([{"text": label, "callback_data": callback}])
+
+        body = self._localized("programs_pick_slot", locale)
+        reply_markup = {"inline_keyboard": keyboard_rows} if keyboard_rows else None
+
+        await self._set_book_intent_metadata(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=identity_metadata,
+            existing_state=existing_state,
+            updates={
+                "book_intent_state": "picking_slot",
+                "book_intent_program_id": service_id,
+                "book_intent_program_name": program_name,
+            },
+        )
+
+        result_metadata: dict[str, object] = {
+            "messaging_layer": self._layer_metadata(channel),
+            "customer_identity": identity_metadata,
+            "customer_care_status": "programs_pick_slot",
+            "locale": locale,
+            "book_intent_state": "picking_slot",
+            "book_intent_program_id": service_id,
+        }
+        if reply_markup is not None:
+            result_metadata["reply_controls"] = {
+                "telegram_reply_markup": reply_markup,
+                "telegram_parse_mode": "HTML",
+            }
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="programs_pick_slot",
+            workflow_status="answered",
+            metadata=result_metadata,
+        )
+
+    async def _handle_slot_pick(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        identity_metadata: dict[str, object],
+        locale: str,
+        service_id: str,
+        starts_at_iso: str,
+        existing_state: dict[str, object] | None,
+    ) -> MessagingAutomationResult:
+        if not service_id or not starts_at_iso:
+            return MessagingAutomationResult(
+                ai_reply=self._localized("programs_no_slots", locale),
+                ai_intent="programs_no_slots",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": self._layer_metadata(channel),
+                    "customer_identity": identity_metadata,
+                    "locale": locale,
+                },
+            )
+
+        # Format a nicer label for confirmation summary.
+        slot_label = starts_at_iso
+        try:
+            parsed = datetime.fromisoformat(starts_at_iso)
+            slot_label = self._format_slot_button_label(parsed)
+        except ValueError:
+            pass
+
+        await self._set_book_intent_metadata(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=identity_metadata,
+            existing_state=existing_state,
+            updates={
+                "book_intent_state": "collecting_name",
+                "book_intent_program_id": service_id,
+                "book_intent_slot_starts_at": starts_at_iso,
+                "book_intent_slot_label": slot_label,
+            },
+        )
+
+        body = self._localized("book_collect_name", locale)
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="book_collect_name",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "book_collect_name",
+                "locale": locale,
+                "book_intent_state": "collecting_name",
+                "book_intent_program_id": service_id,
+                "book_intent_slot_starts_at": starts_at_iso,
+                "reply_controls": {"telegram_parse_mode": "HTML"},
+            },
+        )
+
+    async def _handle_book_state_machine(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        tenant_id: str | None,
+        identity_metadata: dict[str, object],
+        locale: str,
+        message: TawkMessage,
+        metadata: dict[str, object],
+        existing_state: dict[str, object] | None,
+        state: str,
+    ) -> MessagingAutomationResult | None:
+        text_value = str(message.text or "").strip()
+        existing_metadata = (
+            (existing_state or {}).get("session_metadata") if existing_state else {}
+        )
+        if not isinstance(existing_metadata, dict):
+            existing_metadata = {}
+
+        # Allow users to bail out of the flow by typing /cancel or /help —
+        # don't gobble those messages.
+        if text_value.startswith("/"):
+            await self._clear_book_intent_metadata(
+                session,
+                channel=channel,
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                customer_identity=identity_metadata,
+                existing_state=existing_state,
+            )
+            return None
+
+        if state == "collecting_name":
+            name = text_value
+            if len(name) < 2 or len(name) > 120:
+                return MessagingAutomationResult(
+                    ai_reply=self._localized("book_collect_name", locale),
+                    ai_intent="book_collect_name",
+                    workflow_status="answered",
+                    metadata={
+                        "messaging_layer": self._layer_metadata(channel),
+                        "customer_identity": identity_metadata,
+                        "locale": locale,
+                        "book_intent_state": state,
+                    },
+                )
+            await self._set_book_intent_metadata(
+                session,
+                channel=channel,
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                customer_identity=identity_metadata,
+                existing_state=existing_state,
+                updates={
+                    "book_intent_state": "collecting_email",
+                    "book_intent_collected_name": name,
+                },
+            )
+            return MessagingAutomationResult(
+                ai_reply=self._localized("book_collect_email", locale),
+                ai_intent="book_collect_email",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": self._layer_metadata(channel),
+                    "customer_identity": identity_metadata,
+                    "locale": locale,
+                    "book_intent_state": "collecting_email",
+                },
+            )
+
+        if state == "collecting_email":
+            email = text_value
+            if "@" not in email or "." not in email or len(email) > 200:
+                return MessagingAutomationResult(
+                    ai_reply=self._localized("book_invalid_email", locale),
+                    ai_intent="book_invalid_email",
+                    workflow_status="answered",
+                    metadata={
+                        "messaging_layer": self._layer_metadata(channel),
+                        "customer_identity": identity_metadata,
+                        "locale": locale,
+                        "book_intent_state": state,
+                    },
+                )
+            await self._set_book_intent_metadata(
+                session,
+                channel=channel,
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                customer_identity=identity_metadata,
+                existing_state=existing_state,
+                updates={
+                    "book_intent_state": "collecting_phone",
+                    "book_intent_collected_email": email.lower(),
+                },
+            )
+            return MessagingAutomationResult(
+                ai_reply=self._localized("book_collect_phone", locale),
+                ai_intent="book_collect_phone",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": self._layer_metadata(channel),
+                    "customer_identity": identity_metadata,
+                    "locale": locale,
+                    "book_intent_state": "collecting_phone",
+                },
+            )
+
+        if state == "collecting_phone":
+            phone_digits = re.sub(r"[^\d+]", "", text_value)
+            digits_only = re.sub(r"\D", "", phone_digits)
+            if len(digits_only) < 7 or len(phone_digits) > 32:
+                return MessagingAutomationResult(
+                    ai_reply=self._localized("book_invalid_phone", locale),
+                    ai_intent="book_invalid_phone",
+                    workflow_status="answered",
+                    metadata={
+                        "messaging_layer": self._layer_metadata(channel),
+                        "customer_identity": identity_metadata,
+                        "locale": locale,
+                        "book_intent_state": state,
+                    },
+                )
+            program_name = str(
+                existing_metadata.get("book_intent_program_name")
+                or existing_metadata.get("book_intent_program_id")
+                or ""
+            ).strip()
+            slot_label = str(
+                existing_metadata.get("book_intent_slot_label")
+                or existing_metadata.get("book_intent_slot_starts_at")
+                or ""
+            ).strip()
+            await self._set_book_intent_metadata(
+                session,
+                channel=channel,
+                conversation_id=conversation_id,
+                tenant_id=tenant_id,
+                customer_identity=identity_metadata,
+                existing_state=existing_state,
+                updates={
+                    "book_intent_state": "confirming",
+                    "book_intent_collected_phone": phone_digits,
+                },
+            )
+            summary = self._localized(
+                "book_summary",
+                locale,
+                program=program_name or "AIMentor",
+                slot=slot_label or "TBC",
+            )
+            return MessagingAutomationResult(
+                ai_reply=summary,
+                ai_intent="book_summary",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": self._layer_metadata(channel),
+                    "customer_identity": identity_metadata,
+                    "locale": locale,
+                    "book_intent_state": "confirming",
+                    "reply_controls": {
+                        "telegram_reply_markup": {
+                            "inline_keyboard": [
+                                [
+                                    {"text": "YES", "callback_data": "YES"},
+                                    {"text": "NO", "callback_data": "NO"},
+                                ]
+                            ]
+                        },
+                        "telegram_parse_mode": "HTML",
+                    },
+                },
+            )
+
+        if state == "confirming":
+            decision = text_value.strip().lower()
+            if decision in {"yes", "y", "ok", "confirm", "đồng ý", "dong y", "co"}:
+                return await self._finalize_book_intent(
+                    session,
+                    channel=channel,
+                    conversation_id=conversation_id,
+                    identity_metadata=identity_metadata,
+                    locale=locale,
+                    message=message,
+                    existing_state=existing_state,
+                    existing_metadata=existing_metadata,
+                )
+            if decision in {"no", "n", "cancel", "huy", "hủy", "khong", "không"}:
+                await self._clear_book_intent_metadata(
+                    session,
+                    channel=channel,
+                    conversation_id=conversation_id,
+                    tenant_id=tenant_id,
+                    customer_identity=identity_metadata,
+                    existing_state=existing_state,
+                )
+                return MessagingAutomationResult(
+                    ai_reply=self._localized("book_cancelled", locale),
+                    ai_intent="book_cancelled",
+                    workflow_status="answered",
+                    metadata={
+                        "messaging_layer": self._layer_metadata(channel),
+                        "customer_identity": identity_metadata,
+                        "customer_care_status": "book_cancelled",
+                        "locale": locale,
+                    },
+                )
+            # Unknown reply at confirm step → re-prompt.
+            program_name = str(
+                existing_metadata.get("book_intent_program_name")
+                or existing_metadata.get("book_intent_program_id")
+                or ""
+            ).strip()
+            slot_label = str(
+                existing_metadata.get("book_intent_slot_label")
+                or existing_metadata.get("book_intent_slot_starts_at")
+                or ""
+            ).strip()
+            return MessagingAutomationResult(
+                ai_reply=self._localized(
+                    "book_summary",
+                    locale,
+                    program=program_name or "AIMentor",
+                    slot=slot_label or "TBC",
+                ),
+                ai_intent="book_summary",
+                workflow_status="answered",
+                metadata={
+                    "messaging_layer": self._layer_metadata(channel),
+                    "customer_identity": identity_metadata,
+                    "locale": locale,
+                    "book_intent_state": "confirming",
+                },
+            )
+
+        return None
+
+    async def _finalize_book_intent(
+        self,
+        session,
+        *,
+        channel: str,
+        conversation_id: str | None,
+        identity_metadata: dict[str, object],
+        locale: str,
+        message: TawkMessage,
+        existing_state: dict[str, object] | None,
+        existing_metadata: dict[str, object],
+    ) -> MessagingAutomationResult:
+        tenant_id = await self._resolve_aimentor_tenant_id(session)
+        service_id = str(existing_metadata.get("book_intent_program_id") or "").strip() or None
+        service_name = str(existing_metadata.get("book_intent_program_name") or "AIMentor").strip()
+        starts_at_iso = str(existing_metadata.get("book_intent_slot_starts_at") or "").strip()
+        full_name = str(existing_metadata.get("book_intent_collected_name") or "").strip() or None
+        email = str(existing_metadata.get("book_intent_collected_email") or "").strip().lower() or None
+        phone = str(existing_metadata.get("book_intent_collected_phone") or "").strip() or None
+
+        booking_reference = f"v1-{uuid4().hex[:10]}"
+        booking_intent_id: str | None = None
+        try:
+            if tenant_id:
+                contact_repository = ContactRepository(
+                    RepositoryContext(session=session, tenant_id=tenant_id)
+                )
+                lead_repository = LeadRepository(
+                    RepositoryContext(session=session, tenant_id=tenant_id)
+                )
+                booking_repository = BookingIntentRepository(
+                    RepositoryContext(session=session, tenant_id=tenant_id)
+                )
+                contact_id = await contact_repository.upsert_contact(
+                    tenant_id=tenant_id,
+                    full_name=full_name,
+                    email=email,
+                    phone=phone,
+                    primary_channel=channel,
+                )
+                lead_id = await lead_repository.upsert_lead(
+                    tenant_id=tenant_id,
+                    contact_id=contact_id,
+                    source=channel,
+                    status="captured",
+                )
+                requested_date: str | None = None
+                requested_time: str | None = None
+                if starts_at_iso:
+                    try:
+                        parsed = datetime.fromisoformat(starts_at_iso)
+                        requested_date = parsed.strftime("%Y-%m-%d")
+                        requested_time = parsed.strftime("%H:%M")
+                    except ValueError:
+                        pass
+                booking_intent_id = await booking_repository.upsert_booking_intent(
+                    tenant_id=tenant_id,
+                    contact_id=contact_id,
+                    booking_reference=booking_reference,
+                    conversation_id=str(message.conversation_id or conversation_id or ""),
+                    source=f"{channel}_aimentor",
+                    service_name=service_name,
+                    service_id=service_id,
+                    requested_date=requested_date,
+                    requested_time=requested_time,
+                    timezone="Australia/Sydney",
+                    booking_path="aimentor_telegram_bot",
+                    confidence_level="high",
+                    status="captured",
+                    payment_dependency_state="pending",
+                    metadata_json=json.dumps(
+                        {
+                            "source": "messaging_automation_aimentor",
+                            "channel": channel,
+                            "service_id": service_id,
+                            "slot_starts_at": starts_at_iso,
+                            "lead_id": lead_id,
+                            "telegram_chat_id": str(
+                                identity_metadata.get("telegram_chat_id") or ""
+                            )
+                            or None,
+                        }
+                    ),
+                )
+                try:
+                    await session.commit()
+                except Exception:  # pragma: no cover - defensive
+                    _logger.exception("aimentor_booking_commit_failed")
+        except Exception:  # pragma: no cover - defensive
+            _logger.exception("aimentor_booking_intent_persist_failed")
+
+        await self._clear_book_intent_metadata(
+            session,
+            channel=channel,
+            conversation_id=conversation_id,
+            tenant_id=tenant_id,
+            customer_identity=identity_metadata,
+            existing_state=existing_state,
+        )
+
+        body = self._localized(
+            "book_success",
+            locale,
+            ref=booking_reference,
+        )
+        return MessagingAutomationResult(
+            ai_reply=body,
+            ai_intent="book_success",
+            workflow_status="answered",
+            metadata={
+                "messaging_layer": self._layer_metadata(channel),
+                "customer_identity": identity_metadata,
+                "customer_care_status": "book_success",
+                "booking_reference": booking_reference,
+                "booking_intent_id": booking_intent_id,
+                "service_id": service_id,
+                "service_name": service_name,
+                "slot_starts_at": starts_at_iso,
+                "locale": locale,
+                "reply_controls": {"telegram_parse_mode": "HTML"},
+            },
+        )
+
     @classmethod
     def _is_cancel_intent_active(cls, session_metadata: dict[str, object] | None) -> bool:
         if not isinstance(session_metadata, dict):
@@ -3452,6 +4413,121 @@ class MessagingAutomationService:
             cls._resolve_locale(locale),
             support_email=support_email,
         )
+
+    # ------------------------------------------------------------------
+    # Voice STT (Telegram only for v1; WhatsApp deferred — different audio
+    # format + auth flow). Lifted out of ``handle_customer_message`` to keep
+    # the dispatcher readable. Tests patch ``_download_voice_audio`` and
+    # ``_build_whisper_adapter`` to avoid touching the network. See also
+    # ``LOCALIZED_COPY['voice_failed']`` for the friendly fallback string.
+    # ------------------------------------------------------------------
+
+    async def _maybe_transcribe_voice(
+        self,
+        *,
+        channel: str,
+        message: TawkMessage,
+        metadata: dict[str, object],
+    ) -> "MessagingAutomationResult | None":
+        """If the inbound message is a Telegram voice note, run Whisper STT.
+
+        Returns ``None`` when there is no voice payload or transcription
+        succeeds (in which case ``message.text`` has been replaced in place).
+        Returns a populated :class:`MessagingAutomationResult` when STT
+        fails — caller should short-circuit and reply with that result.
+        """
+
+        if channel != "telegram":
+            return None
+        voice_meta = metadata.get("voice")
+        if not isinstance(voice_meta, dict):
+            return None
+        file_id = str(voice_meta.get("file_id") or "").strip()
+        if not file_id:
+            return None
+
+        locale = self._resolve_locale(metadata.get("telegram_language_code"))
+        bot_token = (
+            os.getenv("BOOKEDAI_CUSTOMER_TELEGRAM_BOT_TOKEN")
+            or os.getenv("TELEGRAM_BOT_TOKEN")
+            or ""
+        ).strip()
+
+        try:
+            audio_bytes = await self._download_voice_audio(
+                token=bot_token,
+                file_id=file_id,
+            )
+            adapter = self._build_whisper_adapter()
+            transcription = await adapter.transcribe(
+                audio_bytes,
+                filename="voice.ogg",
+                language_hint=locale,
+            )
+        except Exception as exc:  # noqa: BLE001 — any failure → friendly fallback
+            _logger.warning(
+                "messaging_voice_transcription_failed channel=%s error_type=%s",
+                channel,
+                type(exc).__name__,
+                extra={
+                    "event_type": "messaging_voice_transcription_failed",
+                    "channel": channel,
+                    "error_type": type(exc).__name__,
+                },
+            )
+            failure_reply = self._localized("voice_failed", locale)
+            return MessagingAutomationResult(
+                ai_reply=failure_reply,
+                ai_intent="voice_transcription_failed",
+                workflow_status="answered",
+                metadata={
+                    "channel": channel,
+                    "customer_care_status": "voice_transcription_failed",
+                    "voice_transcription": {
+                        "status": "failed",
+                        "error_type": type(exc).__name__,
+                    },
+                    "locale": locale,
+                },
+            )
+
+        # Replace the placeholder text with the transcription so downstream
+        # slash-command parsing, NLU, and lifecycle ops behave identically to
+        # a typed message. Privacy: never log the transcription content.
+        message.text = transcription.text
+        existing_message_meta = (
+            message.metadata if isinstance(message.metadata, dict) else {}
+        )
+        existing_message_meta["voice_transcribed"] = True
+        message.metadata = existing_message_meta
+        metadata["voice_transcription"] = {
+            "status": "ok",
+            "detected_language": transcription.detected_language,
+            "duration_seconds": transcription.duration_seconds,
+            "latency_ms": transcription.latency_ms,
+            "text_length": len(transcription.text),
+        }
+        return None
+
+    @staticmethod
+    async def _download_voice_audio(*, token: str, file_id: str) -> bytes:
+        """Wrapper so tests can patch the network call without touching
+        :mod:`integrations.telegram.voice_download` directly.
+        """
+
+        from integrations.telegram.voice_download import download_telegram_voice
+
+        return await download_telegram_voice(token, file_id)
+
+    @staticmethod
+    def _build_whisper_adapter():
+        """Factory hook for the Whisper adapter; tests patch this to inject
+        a mock without monkeypatching the whole module.
+        """
+
+        from integrations.ai_models.whisper_adapter import WhisperAdapter
+
+        return WhisperAdapter.from_env()
 
     SUPPORTED_LOCALES = ("en", "vi")
     DEFAULT_LOCALE = "en"
@@ -3655,6 +4731,67 @@ class MessagingAutomationService:
         "reschedule_failed_generic": {
             "en": "Something went wrong rescheduling. Our team will follow up shortly.",
             "vi": "Có lỗi khi đổi lịch. Đội ngũ sẽ liên hệ với bạn sớm.",
+        },
+        # ── Phase 2: AIMentor in-Telegram booking flow ──
+        "programs_pick_prompt": {
+            "en": "Pick a program to book:",
+            "vi": "Chọn khoá để đặt:",
+        },
+        "programs_pick_slot": {
+            "en": "Pick a time:",
+            "vi": "Chọn giờ:",
+        },
+        "programs_empty": {
+            "en": "No programs are open for booking right now. Try again soon.",
+            "vi": "Hiện chưa có khoá học nào mở booking. Bạn quay lại sau nhé.",
+        },
+        "programs_no_slots": {
+            "en": "No open slots for this program right now. Try another program.",
+            "vi": "Khoá này chưa có lịch trống. Bạn chọn khoá khác giúp mình.",
+        },
+        "programs_pick_open_web": {
+            "en": "Book on web: {url}",
+            "vi": "Đặt trên web: {url}",
+        },
+        "book_collect_name": {
+            "en": "Great. What's your full name?",
+            "vi": "OK. Tên đầy đủ của bạn?",
+        },
+        "book_collect_email": {
+            "en": "Email?",
+            "vi": "Email?",
+        },
+        "book_collect_phone": {
+            "en": "Phone?",
+            "vi": "Số điện thoại?",
+        },
+        "book_invalid_email": {
+            "en": "That doesn't look like a valid email. Please try again.",
+            "vi": "Email chưa hợp lệ. Bạn nhập lại giúp mình.",
+        },
+        "book_invalid_phone": {
+            "en": "That doesn't look like a valid phone. Please try again (digits + optional +).",
+            "vi": "Số điện thoại chưa hợp lệ. Bạn nhập lại (chỉ số và dấu +).",
+        },
+        "book_summary": {
+            "en": "Confirm booking: {program} at {slot}? Reply YES/NO",
+            "vi": "Xác nhận đặt: {program} lúc {slot}? Trả lời YES/NO",
+        },
+        "book_success": {
+            "en": "Booked! Reference {ref}. We'll email confirmation.",
+            "vi": "Đã đặt! Mã {ref}. Mình sẽ gửi xác nhận qua email.",
+        },
+        "book_cancelled": {
+            "en": "Booking cancelled.",
+            "vi": "Đã huỷ đặt chỗ.",
+        },
+        "voice_heard": {
+            "en": "Heard: \"{text}\"",
+            "vi": "Nghe được: \"{text}\"",
+        },
+        "voice_failed": {
+            "en": "I couldn't hear that. Could you type your message?",
+            "vi": "Mình không nghe rõ. Bạn gõ lại giúp nhé?",
         },
     }
 

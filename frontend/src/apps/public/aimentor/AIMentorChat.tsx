@@ -27,6 +27,11 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { copyTextToClipboard, generateQrCodeDataUrl } from '@/shared/utils/qrCode';
+import { MentorVoiceController } from '../../../components/aimentor/MentorVoiceController';
+
+// TODO Phase 2 follow-up: rich rendering with MentorMessageCard / ProgramCard / SlotGridCompact.
+// Components are imported and ready in src/components/aimentor/. Swap inline message rendering
+// + slot grid + program list when product validates the new look.
 
 // ---------- types -----------------------------------------------------------
 
@@ -557,6 +562,10 @@ export function AIMentorChat({ programs, locale, mentorInitials = 'LV' }: AIMent
   const [draft, setDraft] = useState('');
   const [pendingSubmit, setPendingSubmit] = useState(false);
   const [contactError, setContactError] = useState<string | null>(null);
+  const [voiceMode, setVoiceMode] = useState(false);
+  const [voiceListening, setVoiceListening] = useState(false);
+  const [pendingSpeak, setPendingSpeak] = useState<string | null>(null);
+  const lastSpokenIdRef = useRef<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom on new message
@@ -867,6 +876,36 @@ export function AIMentorChat({ programs, locale, mentorInitials = 'LV' }: AIMent
     setDraft('');
   }, [draft, handleQuery]);
 
+  // Voice → text: feed final transcripts straight into the existing handleQuery
+  // path so the chat behaves exactly as if the user had typed + sent the text.
+  const handleVoiceTranscript = useCallback(
+    (text: string) => {
+      if (!text.trim()) return;
+      setVoiceListening(false);
+      handleQuery(text);
+    },
+    [handleQuery],
+  );
+
+  // Voice ← text: speak each new assistant text message once when voice mode is on.
+  // The chat appends non-text payloads (programs/slots/contact_form/typing) AFTER
+  // each text reply, so messages[messages.length - 1] is rarely text. Scan back
+  // for the most-recent assistant text and dedupe via lastSpokenIdRef so toggling
+  // voice off→on doesn't re-speak the same message.
+  useEffect(() => {
+    if (!voiceMode) return;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const msg = messages[i];
+      if (msg.role !== 'assistant') continue;
+      if (msg.kind !== 'text') continue;
+      if (typeof msg.body !== 'string' || !msg.body.trim()) continue;
+      if (lastSpokenIdRef.current === msg.id) return;
+      lastSpokenIdRef.current = msg.id;
+      setPendingSpeak(msg.body);
+      return;
+    }
+  }, [messages, voiceMode]);
+
   const handleStartOver = useCallback(() => {
     clearPersistedChatState();
     restoredFromStorage.current = false;
@@ -978,8 +1017,28 @@ export function AIMentorChat({ programs, locale, mentorInitials = 'LV' }: AIMent
             {t.headerSubtitle}
           </div>
         </div>
-        {/* Action buttons — handoff + reset + maximize/close */}
+        {/* Action buttons — voice toggle + handoff + reset + maximize/close */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flex: '0 0 auto' }}>
+          <button
+            type="button"
+            onClick={() => setVoiceMode((v) => !v)}
+            aria-pressed={voiceMode}
+            title={voiceMode ? 'Voice on — tap to switch off' : 'Voice off — tap to switch on'}
+            style={{
+              padding: '4px 10px',
+              borderRadius: 999,
+              border: '1px solid rgba(253, 250, 243, 0.3)',
+              background: voiceMode ? 'rgba(148, 232, 210, 0.25)' : 'transparent',
+              color: '#fdfaf3',
+              fontFamily: 'var(--aim-font-mono)',
+              fontSize: '0.7rem',
+              letterSpacing: '0.06em',
+              textTransform: 'uppercase',
+              cursor: 'pointer',
+            }}
+          >
+            {voiceMode ? 'Voice on' : 'Voice off'}
+          </button>
           <HeaderIconButton
             ariaLabel={t.headerHandoffAria}
             title={t.headerHandoffLabel}
@@ -1129,6 +1188,17 @@ export function AIMentorChat({ programs, locale, mentorInitials = 'LV' }: AIMent
         >
           {t.inputSendLabel}
         </button>
+        {voiceMode && (
+          <MentorVoiceController
+            active={voiceListening}
+            onToggleActive={() => setVoiceListening((v) => !v)}
+            onTranscript={handleVoiceTranscript}
+            speakText={pendingSpeak}
+            onSpeakDone={() => setPendingSpeak(null)}
+            locale={locale === 'vi' ? 'vi-VN' : 'en-US'}
+            className="aim-chat-mic"
+          />
+        )}
       </div>
     </section>
   );

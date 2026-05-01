@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 200" width="320" height="200" role="img" aria-labelledby="t">
+  <title id="t">Production AI</title>
+  <rect width="320" height="200" rx="18" fill="#fdfaf3"/>
+  <rect x="8" y="8" width="304" height="184" rx="14" fill="#f8d99a" opacity="0.4"/>
+  <!-- cloud -->
+  <path d="M200 50 C 175 50 160 70 165 88 C 145 90 135 105 140 122 C 145 138 162 142 178 138 L 268 138 C 286 138 296 124 290 108 C 298 100 296 84 282 80 C 280 60 252 48 232 58 C 222 50 210 48 200 50 Z" fill="#0f5c54"/>
+  <!-- server stack -->
+  <g>
+    <rect x="60" y="80" width="100" height="28" rx="6" fill="#1f2a26"/>
+    <circle cx="74" cy="94" r="4" fill="#ff6b3d"/>
+    <rect x="86" y="91" width="60" height="6" rx="2" fill="#f8d99a" opacity="0.7"/>
+    <rect x="60" y="116" width="100" height="28" rx="6" fill="#1f2a26"/>
+    <circle cx="74" cy="130" r="4" fill="#ff6b3d"/>
+    <rect x="86" y="127" width="60" height="6" rx="2" fill="#f8d99a" opacity="0.7"/>
+    <rect x="60" y="152" width="100" height="20" rx="6" fill="#1f2a26"/>
+    <circle cx="74" cy="162" r="3" fill="#ff6b3d"/>
+  </g>
+  <!-- connecting line -->
+  <path d="M160 94 C 180 94 180 110 200 110" stroke="#ff6b3d" stroke-width="3" fill="none" stroke-dasharray="4 4"/>
+  <text x="20" y="40" font-family="-apple-system, system-ui, sans-serif" font-size="13" font-weight="600" fill="#1f2a26">Production AI</text>
+</svg>
