@@ -3439,3 +3439,9 @@ The `bookedai.au` public assistant now keeps lead capture on the public tenant-s
 - update: confirmed the remaining requirement/doc worktree branches are patch-equivalent with `main`; remote branches were deleted after `main` was pushed, while local locked worktree branches were left in place and detached from gone upstreams to avoid interrupting active agent worktrees.
 - verification: `git cherry -v main ...` showed remaining worktree branches as patch-equivalent; `python3 -m py_compile` passed for touched backend/internal bridge files; `frontend/package.json` parsed successfully; `git diff --cached --check` passed during conflict resolution; `main` pushed to `origin/main` at `9bf34da`.
 - follow-up cleanup: recorded merge ancestry for all remaining patch-equivalent local branches, pushed `main` to `22250ec`, removed the clean locked worktrees, deleted all local non-main branches, pruned worktrees, and confirmed GitHub has no open PRs. Repo now has only `main` and `origin/main`.
+
+## 2026-05-01 Full Workspace Merge And Live Redeploy
+
+- update: rechecked the workspace after the final branch cleanup; there were no open PRs, no non-main local branches, no remote branches besides `origin/main`, and no uncommitted code to merge.
+- update: redeployed live with `bash scripts/deploy_live_host.sh`; production and beta backend/web images rebuilt, containers restarted, proxy restarted, and the existing BookedAI Booking Intake n8n workflow stayed active.
+- verification: stack health passed at `2026-05-01T22:00:17Z`; smoke probes returned HTTP `200` for API health, public, product, tenant, admin, portal, and AI Mentor. Discord was not used.
