@@ -305,33 +305,77 @@ function readPortalKey(): string {
   return '';
 }
 
+const SESSION_TOKEN_STORAGE_KEY = 'futureswim.portal.sessionToken';
+
+function readStoredSessionToken(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return window.localStorage.getItem(SESSION_TOKEN_STORAGE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function persistSessionToken(token: string | null) {
+  if (typeof window === 'undefined') return;
+  try {
+    if (token) window.localStorage.setItem(SESSION_TOKEN_STORAGE_KEY, token);
+    else window.localStorage.removeItem(SESSION_TOKEN_STORAGE_KEY);
+  } catch {
+    /* localStorage unavailable — fall back to in-memory session only */
+  }
+}
+
+type LoginStage = 'request_email' | 'verify_code' | 'submitting';
+
 export function FutureSwimParentPortalApp() {
   const [keyValue, setKeyValue] = useState<string>(readPortalKey);
+  const [sessionToken, setSessionToken] = useState<string | null>(readStoredSessionToken);
   const [loadState, setLoadState] = useState<LoadState>({ kind: 'idle' });
-  const [keyDraft, setKeyDraft] = useState<string>('');
+
+  const [loginStage, setLoginStage] = useState<LoginStage>('request_email');
+  const [emailDraft, setEmailDraft] = useState<string>('');
+  const [codeDraft, setCodeDraft] = useState<string>('');
+  const [loginNotice, setLoginNotice] = useState<string>('');
+  const [loginError, setLoginError] = useState<string>('');
 
   const isDemo = keyValue === FUTURE_SWIM_DEMO_PORTAL_KEY;
+  const isAuthenticated = Boolean(sessionToken);
 
   useEffect(() => {
     document.title = 'Future Swim · Parent portal';
   }, []);
 
   useEffect(() => {
-    if (!keyValue) {
+    let cancelled = false;
+    if (!keyValue && !sessionToken) {
       setLoadState({ kind: 'idle' });
       return;
     }
-    let cancelled = false;
     setLoadState({ kind: 'loading' });
     (async () => {
       try {
-        const response = await fetch(
-          `/api/v1/futureswim/portal/preview?key=${encodeURIComponent(keyValue)}`,
-          { headers: { accept: 'application/json' } },
-        );
+        let response: Response;
+        if (sessionToken) {
+          response = await fetch('/api/v1/futureswim/portal/me', {
+            headers: { accept: 'application/json', Authorization: `Bearer ${sessionToken}` },
+          });
+        } else {
+          response = await fetch(
+            `/api/v1/futureswim/portal/preview?key=${encodeURIComponent(keyValue)}`,
+            { headers: { accept: 'application/json' } },
+          );
+        }
         const json = (await response.json()) as FutureSwimPortalResponse;
         if (cancelled) return;
         if (!response.ok || json.status !== 'ok' || !json.data) {
+          if (response.status === 401 && sessionToken) {
+            persistSessionToken(null);
+            setSessionToken(null);
+            setLoadState({ kind: 'idle' });
+            setLoginError('Your portal session expired. Sign in again with your email.');
+            return;
+          }
           const message =
             (json as { message?: string }).message ||
             'That portal link has expired or is not recognised. Reply to your Future Swim welcome email to get a fresh link.';
@@ -353,53 +397,180 @@ export function FutureSwimParentPortalApp() {
     return () => {
       cancelled = true;
     };
-  }, [keyValue]);
+  }, [keyValue, sessionToken]);
 
   const summary = useMemo(() => {
     if (loadState.kind !== 'ready') return null;
     return loadState.payload;
   }, [loadState]);
 
+  async function handleRequestCode(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const email = emailDraft.trim();
+    if (!email || !email.includes('@')) {
+      setLoginError('Please enter the email Future Swim has on file for you.');
+      return;
+    }
+    setLoginStage('submitting');
+    setLoginError('');
+    setLoginNotice('');
+    try {
+      const response = await fetch('/api/v1/futureswim/portal/login/request', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ email }),
+      });
+      if (!response.ok) {
+        throw new Error(`Server error (HTTP ${response.status}).`);
+      }
+      setLoginStage('verify_code');
+      setLoginNotice(
+        `If that email matches a Future Swim portal account, we sent a 6-digit code. Check your inbox (and spam) — the code is valid for 15 minutes.`,
+      );
+    } catch (err) {
+      setLoginStage('request_email');
+      setLoginError(
+        err instanceof Error ? `We couldn't send your code: ${err.message}` : "We couldn't send your code right now.",
+      );
+    }
+  }
+
+  async function handleVerifyCode(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const email = emailDraft.trim();
+    const code = codeDraft.trim();
+    if (!email || !code) {
+      setLoginError('Enter your email and the 6-digit code from your inbox.');
+      return;
+    }
+    setLoginStage('submitting');
+    setLoginError('');
+    try {
+      const response = await fetch('/api/v1/futureswim/portal/login/verify', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', accept: 'application/json' },
+        body: JSON.stringify({ email, code }),
+      });
+      const json = (await response.json()) as
+        | { status: 'ok'; data: { session_token: string } }
+        | { status: 'error'; error?: { message?: string } };
+      if (!response.ok || json.status !== 'ok' || !('data' in json)) {
+        const message =
+          (json as { error?: { message?: string } }).error?.message ||
+          'That code is invalid or has expired. Request a new code from the portal.';
+        setLoginStage('verify_code');
+        setLoginError(message);
+        return;
+      }
+      const token = json.data.session_token;
+      persistSessionToken(token);
+      setSessionToken(token);
+      setCodeDraft('');
+      setLoginStage('request_email');
+      setLoginNotice('');
+    } catch (err) {
+      setLoginStage('verify_code');
+      setLoginError(
+        err instanceof Error ? `We couldn't verify your code: ${err.message}` : "We couldn't verify your code right now.",
+      );
+    }
+  }
+
+  function handleLogout() {
+    persistSessionToken(null);
+    setSessionToken(null);
+    setEmailDraft('');
+    setCodeDraft('');
+    setLoginStage('request_email');
+    setLoginNotice('');
+    setLoginError('');
+    setLoadState({ kind: 'idle' });
+    setKeyValue('');
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }
+
   return (
     <div className="fs-app">
       <main className="fs-shell">
         <div className="fs-container py-10 sm:py-14">
-          {!keyValue ? (
+          {!keyValue && !isAuthenticated ? (
             <section className="fs-card-feature mx-auto max-w-2xl">
               <div className="fs-kicker">Parent portal · Sign in</div>
               <h1 className="mt-3 text-3xl font-semibold tracking-tight text-[color:var(--fs-text)]">
                 Open your Future Swim portal
               </h1>
               <p className="mt-3 text-sm leading-6 text-[color:var(--fs-text-muted)]">
-                Paste the access link from your latest Future Swim email, or use the demo to see how progress notes and evaluations look.
+                Sign in with the email Future Swim has on file. We'll send a 6-digit code so you don't have to remember a password.
               </p>
-              <form
-                className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  const trimmed = keyDraft.trim();
-                  if (!trimmed) return;
-                  const params = new URLSearchParams(window.location.search);
-                  params.set('key', trimmed);
-                  window.history.replaceState({}, '', `${window.location.pathname}?${params.toString()}`);
-                  setKeyValue(trimmed);
-                }}
-              >
-                <input
-                  className="fs-input flex-1"
-                  type="text"
-                  placeholder="Portal access key"
-                  aria-label="Portal access key"
-                  value={keyDraft}
-                  onChange={(event) => setKeyDraft(event.target.value)}
-                />
-                <button type="submit" className="fs-button">
-                  Open portal <ArrowRight size={16} aria-hidden="true" />
-                </button>
-              </form>
+
+              {loginStage === 'verify_code' ? (
+                <form className="mt-6 grid gap-3" onSubmit={handleVerifyCode}>
+                  <div className="text-sm text-[color:var(--fs-text-muted)]" data-testid="login-email-echo">
+                    Code sent to <strong>{emailDraft}</strong>.{' '}
+                    <button
+                      type="button"
+                      className="underline text-[color:var(--fs-primary-dark)]"
+                      onClick={() => {
+                        setLoginStage('request_email');
+                        setLoginError('');
+                        setLoginNotice('');
+                        setCodeDraft('');
+                      }}
+                    >
+                      Use a different email
+                    </button>
+                  </div>
+                  <input
+                    className="fs-input"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    maxLength={8}
+                    placeholder="6-digit code"
+                    aria-label="Sign-in code"
+                    value={codeDraft}
+                    onChange={(event) => setCodeDraft(event.target.value)}
+                  />
+                  <button type="submit" className="fs-button" disabled={!codeDraft.trim()}>
+                    Verify code <ArrowRight size={16} aria-hidden="true" />
+                  </button>
+                </form>
+              ) : (
+                <form className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center" onSubmit={handleRequestCode}>
+                  <input
+                    className="fs-input flex-1"
+                    type="email"
+                    inputMode="email"
+                    autoComplete="email"
+                    placeholder="parent@example.com"
+                    aria-label="Email address"
+                    value={emailDraft}
+                    onChange={(event) => setEmailDraft(event.target.value)}
+                  />
+                  <button type="submit" className="fs-button" disabled={loginStage === 'submitting' || !emailDraft.trim()}>
+                    {loginStage === 'submitting' ? 'Sending code…' : 'Email me a code'}
+                    <ArrowRight size={16} aria-hidden="true" />
+                  </button>
+                </form>
+              )}
+
+              {loginNotice ? (
+                <div className="fs-card-flat mt-4 text-sm text-[color:var(--fs-text-muted)]">{loginNotice}</div>
+              ) : null}
+              {loginError ? (
+                <div
+                  className="fs-card-flat mt-4 text-sm"
+                  style={{ borderColor: 'var(--fs-danger)', color: 'var(--fs-danger)' }}
+                >
+                  {loginError}
+                </div>
+              ) : null}
+
               <button
                 type="button"
-                className="mt-4 fs-button-ghost"
+                className="mt-6 fs-button-ghost"
                 onClick={() => {
                   const params = new URLSearchParams(window.location.search);
                   params.set('demo', '1');
@@ -407,7 +578,7 @@ export function FutureSwimParentPortalApp() {
                   setKeyValue(FUTURE_SWIM_DEMO_PORTAL_KEY);
                 }}
               >
-                <Sparkles size={14} aria-hidden="true" /> Open demo portal
+                <Sparkles size={14} aria-hidden="true" /> Or open the demo portal
               </button>
             </section>
           ) : null}
@@ -425,13 +596,9 @@ export function FutureSwimParentPortalApp() {
               <button
                 type="button"
                 className="mt-3 fs-button-ghost"
-                onClick={() => {
-                  setKeyValue('');
-                  setKeyDraft('');
-                  window.history.replaceState({}, '', window.location.pathname);
-                }}
+                onClick={handleLogout}
               >
-                Try a different access key
+                Sign out and try again
               </button>
             </div>
           ) : null}
@@ -446,9 +613,22 @@ export function FutureSwimParentPortalApp() {
               ) : (
                 summary.students.map((student) => <StudentSection key={student.id} student={student} />)
               )}
-              <footer className="mt-10 text-xs text-[color:var(--fs-text-soft)]">
-                Future Swim parent portal · Powered by BookedAI · <a href="https://futureswim.bookedai.au/">Back to homepage</a>
-              </footer>
+              <div className="mt-8 flex flex-wrap items-center justify-between gap-3 text-xs text-[color:var(--fs-text-soft)]">
+                <span>
+                  Future Swim parent portal · Powered by BookedAI ·{' '}
+                  <a href="https://futureswim.bookedai.au/">Back to homepage</a>
+                </span>
+                {isAuthenticated ? (
+                  <button
+                    type="button"
+                    className="fs-button-ghost"
+                    onClick={handleLogout}
+                    aria-label="Sign out of Future Swim portal"
+                  >
+                    Sign out
+                  </button>
+                ) : null}
+              </div>
             </>
           ) : null}
         </div>
