@@ -5,6 +5,7 @@ import * as path from 'node:path';
 
 const mode = process.env.PLAYWRIGHT_PUBLIC_ASSISTANT_MODE === 'live-read' ? 'live-read' : 'legacy';
 const port = mode === 'live-read' ? 3101 : 3100;
+const explicitBaseUrl = process.env.PLAYWRIGHT_BASE_URL?.trim();
 const modeEnv =
   mode === 'live-read'
     ? 'VITE_PUBLIC_BOOKING_ASSISTANT_V1_ENABLED=1 VITE_PUBLIC_BOOKING_ASSISTANT_V1_LIVE_READ=1 '
@@ -38,7 +39,7 @@ export default defineConfig({
   reporter: 'list',
   outputDir,
   use: {
-    baseURL: `http://127.0.0.1:${port}`,
+    baseURL: explicitBaseUrl || `http://127.0.0.1:${port}`,
     headless: true,
     trace: 'retain-on-failure',
   },

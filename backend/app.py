@@ -11,6 +11,7 @@ from starlette.types import ASGIApp, Message, Receive, Scope, Send
 
 from api.admin_routes import router as admin_router
 from api.communication_routes import router as communication_router
+from api.internal_routes import router as internal_router
 from api.internal_worker_routes import router as internal_worker_router
 from api.public_catalog_routes import router as public_catalog_router
 from api.route_handlers import lifespan, settings
@@ -753,6 +754,7 @@ def create_app() -> FastAPI:
     app.include_router(admin_router)
     app.include_router(communication_router)
     app.include_router(v1_router)
+    app.include_router(internal_router)
     app.include_router(internal_worker_router)
 
     # Wave 5-E-3 embed sub-app: separate CORS surface (allow_origins=["*"],

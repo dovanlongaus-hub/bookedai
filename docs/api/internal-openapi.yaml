@@ -1,0 +1,75 @@
+openapi: 3.0.3
+info:
+  title: BookedAI Internal API
+  version: 0.1.0
+  description: |
+    Internal orchestration API for chatbot and automation workflows.
+    This surface maps to existing backend handlers under `/api/internal/v1/*`.
+
+servers:
+  - url: http://localhost:8001
+    description: Local docker-compose backend host port
+
+components:
+  securitySchemes:
+    InternalBearer:
+      type: http
+      scheme: bearer
+      bearerFormat: token
+    InternalHeader:
+      type: apiKey
+      in: header
+      name: X-BookedAI-Token
+  responses:
+    Unauthorized:
+      description: Missing or invalid internal API token
+
+security:
+  - InternalBearer: []
+  - InternalHeader: []
+
+paths:
+  /api/internal/v1/integrations/providers/status:
+    get:
+      summary: Provider connectivity and safe configuration status
+      responses:
+        "200":
+          description: Success envelope with provider items
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/internal/v1/booking/leads/create:
+    post:
+      summary: Create or upsert a lead with orchestration side effects
+      responses:
+        "200":
+          description: Success envelope with lead identifiers
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/internal/v1/search/candidates:
+    post:
+      summary: Search and rank candidate service options
+      responses:
+        "200":
+          description: Success envelope with ranked candidates
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/internal/v1/communications/email/send:
+    post:
+      summary: Trigger lifecycle email send and write-back tracking
+      responses:
+        "200":
+          description: Success envelope with message + sync state
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /api/internal/v1/integrations/outbox/dispatch:
+    post:
+      summary: Dispatch pending outbox events
+      responses:
+        "200":
+          description: Success envelope with job run status
+        "401":
+          $ref: "#/components/responses/Unauthorized"
