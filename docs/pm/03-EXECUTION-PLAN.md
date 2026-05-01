@@ -367,6 +367,30 @@ Trùng với [`bookedai-master-roadmap-2026-04-26.md` §Sprint 19-22 forward pla
 - Pricing changes (if any) shipped end-to-end through tenant workspace + public surfaces.
 - Runbook for paid customer onboarding + self-serve account creation.
 
+## 9A. Sub-project execution status
+
+Each tenant sub-project rolls up into the master phase plan above but ships in its own PR + migration cadence so the proof verticals can move ahead of platform-wide phases.
+
+### Future Swim sub-project — phases shipped
+
+| Phase | Scope | PRs | Migrations |
+|---|---|---|---|
+| 1 | Brand-led redesign + 20 service rows + Future Swim Ask | #22 | 047 |
+| 1.5 | Zoho CRM activation (futureswim tagged via Lead_Source_Detail) | #23 | 049 |
+| 3.1 | Parent portal (preview mode by `?key=`) | #24 | 051 |
+| 3.2A | Parent magic-email-code login + Bearer session | #25 | (reuses 015) |
+| 3.2B | Coach ops API (3 endpoints, Bearer auth) | #28 | 052 |
+| 3.2C | Bookings list in portal + canonical requirements doc | #29 | 053 |
+| 3.3 | Coach magic-email-code login + ops dashboard UI | #32 | (reuses 015) |
+| 4 | Region backfill + monthly reminder enabled | #34 | 054, 055 |
+
+**Deferred (not yet PR'd):**
+
+- Phase 2B — WhatsApp interactive picker (needs tenant-attribution design for shared `+61455301335`)
+- Phase 4.1 — chess broadcast tool branch needs to merge before futureswim broadcast composer is reachable (futureswim wiring already in place)
+
+**See:** [`docs/pm/12-FUTURESWIM-FEATURE-REQUIREMENTS-AND-STATUS.md`](12-FUTURESWIM-FEATURE-REQUIREMENTS-AND-STATUS.md) for the per-requirement traceability table.
+
 ## 10. A/B Experiment Cadence
 
 Full matrix in [`full-stack-review-2026-04-26.md`](../development/full-stack-review-2026-04-26.md). Activation cadence:

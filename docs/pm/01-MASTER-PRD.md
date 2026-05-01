@@ -58,6 +58,28 @@ clinics, beauty/wellness, trades/local services, tutoring/education, kids activi
 
 Source: [`prd.md` §4](../../prd.md), [`bookedai-master-prd.md`](../architecture/bookedai-master-prd.md), [`tenant-app-strategy.md`](../architecture/tenant-app-strategy.md).
 
+## 3A. Sub-project / tenant subdomains
+
+Each proof tenant is delivered as a sub-project on its own subdomain, sharing the BookedAI backend API + Zoho CRM integration but free to diverge visually within the Apple Design System (per `MEMORY.md`). Status of in-flight sub-projects:
+
+### Sub-project: futureswim.bookedai.au
+
+**Tenant:** Future Swim — Sydney swim school, 5 active centres (Caringbah, Kirrawee, Leichhardt, Rouse Hill, St Peters).
+
+**Product surface (live as of 2026-05-01):**
+
+- `https://futureswim.bookedai.au` — brand-led consumer site, 4 levels × 5 centres, weekly timetable, Future Swim Ask chat
+- `https://futureswim.bookedai.au/portal` — parent portal: students + progress + evaluations + bookings
+- `https://futureswim.bookedai.au/coach` — coach ops dashboard: lesson notes + evaluations
+
+**Key product decisions:**
+
+- Sub-project is visually independent (sky-blue + coral palette) but shares the BookedAI backend API + Zoho CRM integration.
+- Auth: parents + coaches use passwordless email-code login (15-min code, 30-day Bearer JWT session).
+- Pricing: 4 of 5 centres carry verified per-lesson rate; 1 marked indicative (Kirrawee) until centre confirms publicly.
+
+**See:** [`docs/pm/12-FUTURESWIM-FEATURE-REQUIREMENTS-AND-STATUS.md`](12-FUTURESWIM-FEATURE-REQUIREMENTS-AND-STATUS.md) for the 18-requirement log + delivery status + deferred roadmap.
+
 ## 4. Jobs-to-be-Done (JTBD)
 
 | JTBD-ID | Job | When | So that |
