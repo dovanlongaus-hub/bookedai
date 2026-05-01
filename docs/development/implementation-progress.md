@@ -17,6 +17,7 @@ Implementation update from `2026-05-01` (requirement docs Discord-default sync, 
 - fast-forwarded `main` after PR `#35` added Future Swim sub-project cross-references into the PM master PRD and execution plan
 - re-synchronized active requirement, PM, milestone, RACI, UAT, and phase-23 planning docs with the operator preference that Discord is no longer a default closeout or alerting surface
 - restored the final consolidated execution plan cross-reference in `docs/pm/03-EXECUTION-PLAN.md` after the fast-forward
+- published the closeout to Notion with Discord skipped; archive entry: `docs/development/telegram-sync/2026-05-01/141431-requirement-docs-closeout-posture-sync-2026-05-01.md`
 - verification is documentation-only with `git diff --check`
 
 Implementation update from `2026-05-01` (Discord closeout preference, documentation-only):
