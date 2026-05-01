@@ -8,3 +8,4 @@ pydantic
 httpx
 python-multipart
 PyNaCl
+openai>=1.40
