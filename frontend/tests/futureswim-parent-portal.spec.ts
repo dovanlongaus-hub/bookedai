@@ -79,6 +79,10 @@ const PORTAL_PAYLOAD = {
   meta: { version: 'v1', request_id: 't-portal-1', tenant_id: null, actor: { actor_type: null, actor_id: null }, issued_at: '2026-05-01T00:00:00Z', trace_id: null },
 };
 
+const VALID_LOGIN_EMAIL = 'parent@example.com';
+const VALID_LOGIN_CODE = '123456';
+const VALID_SESSION_TOKEN = 'mock.session.token.for.testing';
+
 async function stubPortalApi(page: Page) {
   await page.route('**/api/v1/futureswim/portal/preview**', async (route: Route) => {
     const url = new URL(route.request().url());
@@ -95,6 +99,57 @@ async function stubPortalApi(page: Page) {
         }),
       });
     }
+  });
+
+  await page.route('**/api/v1/futureswim/portal/login/request', async (route: Route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ status: 'ok', data: { status: 'code_sent', expires_in_minutes: 15 } }),
+    });
+  });
+
+  await page.route('**/api/v1/futureswim/portal/login/verify', async (route: Route) => {
+    const body = JSON.parse(route.request().postData() || '{}') as { email?: string; code?: string };
+    if ((body.email || '').toLowerCase() === VALID_LOGIN_EMAIL.toLowerCase() && body.code === VALID_LOGIN_CODE) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          status: 'ok',
+          data: {
+            session_token: VALID_SESSION_TOKEN,
+            expires_in_seconds: 2592000,
+            parent: { id: 'parent-1', email: VALID_LOGIN_EMAIL, full_name: 'Test Parent' },
+          },
+        }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'error',
+        error: { code: 'invalid_or_expired_code', message: 'That code is invalid or has expired. Request a new code from the portal.', details: {} },
+      }),
+    });
+  });
+
+  await page.route('**/api/v1/futureswim/portal/me', async (route: Route) => {
+    const auth = route.request().headers()['authorization'] || '';
+    if (auth.includes(VALID_SESSION_TOKEN)) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(PORTAL_PAYLOAD) });
+      return;
+    }
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        status: 'error',
+        error: { code: 'auth_required', message: 'Sign in to your Future Swim portal to view this dashboard.', details: {} },
+      }),
+    });
   });
 }
 
@@ -124,15 +179,52 @@ test.describe('futureswim parent portal', () => {
     await expect(page.getByText(/expired or is not recognised/i)).toBeVisible();
   });
 
-  test('sign-in form lets a parent paste a key and open the portal', async ({ page }) => {
+  test('email-code login: request → verify → portal', async ({ page }) => {
     await stubPortalApi(page);
     await page.goto('/futureswim/portal');
 
     await expect(page.getByRole('heading', { name: /Open your Future Swim portal/i })).toBeVisible();
 
-    await page.getByLabel(/Portal access key/i).fill(PORTAL_KEY);
-    await page.getByRole('button', { name: /Open portal/i }).click();
+    await page.getByLabel(/Email address/i).fill(VALID_LOGIN_EMAIL);
+    await page.getByRole('button', { name: /Email me a code/i }).click();
+
+    await expect(page.getByText(/sent a 6-digit code/i)).toBeVisible();
+
+    await page.getByLabel(/Sign-in code/i).fill(VALID_LOGIN_CODE);
+    await page.getByRole('button', { name: /Verify code/i }).click();
 
     await expect(page.getByRole('heading', { level: 1 })).toContainText(/Welcome back, Sample/i);
+    await expect(page.getByRole('button', { name: /Sign out/i })).toBeVisible();
+  });
+
+  test('email-code login: invalid code shows error and lets parent retry', async ({ page }) => {
+    await stubPortalApi(page);
+    await page.goto('/futureswim/portal');
+
+    await page.getByLabel(/Email address/i).fill(VALID_LOGIN_EMAIL);
+    await page.getByRole('button', { name: /Email me a code/i }).click();
+
+    await page.getByLabel(/Sign-in code/i).fill('000000');
+    await page.getByRole('button', { name: /Verify code/i }).click();
+
+    await expect(page.getByText(/invalid or has expired/i)).toBeVisible();
+
+    await page.getByLabel(/Sign-in code/i).fill(VALID_LOGIN_CODE);
+    await page.getByRole('button', { name: /Verify code/i }).click();
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(/Welcome back, Sample/i);
+  });
+
+  test('persisted session token loads the portal directly without login', async ({ page }) => {
+    await stubPortalApi(page);
+    await page.addInitScript(([key, token]) => {
+      window.localStorage.setItem(key as string, token as string);
+    }, ['futureswim.portal.sessionToken', VALID_SESSION_TOKEN]);
+    await page.goto('/futureswim/portal');
+
+    await expect(page.getByRole('heading', { level: 1 })).toContainText(/Welcome back, Sample/i, { timeout: 6000 });
+    await expect(page.getByRole('button', { name: /Sign out/i })).toBeVisible();
+
+    await page.getByRole('button', { name: /Sign out/i }).click();
+    await expect(page.getByRole('heading', { name: /Open your Future Swim portal/i })).toBeVisible();
   });
 });

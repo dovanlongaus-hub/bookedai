@@ -12,3 +12,21 @@ router.add_api_route(
     handlers.futureswim_portal_preview,
     methods=["GET"],
 )
+
+router.add_api_route(
+    "/futureswim/portal/login/request",
+    handlers.futureswim_portal_login_request,
+    methods=["POST"],
+)
+
+router.add_api_route(
+    "/futureswim/portal/login/verify",
+    handlers.futureswim_portal_login_verify,
+    methods=["POST"],
+)
+
+router.add_api_route(
+    "/futureswim/portal/me",
+    handlers.futureswim_portal_me,
+    methods=["GET"],
+)
