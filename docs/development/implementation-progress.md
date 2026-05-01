@@ -12,6 +12,13 @@ It is also the mandatory write-back target whenever a change has been completed 
 
 Date: `2026-04-28`
 
+Implementation update from `2026-05-01` (Discord closeout preference, documentation-only):
+
+- operator instruction updated the closeout rule: skip Discord updates/connections by default unless explicitly requested for a task
+- updated long-term memory, the pre-coding checklist, and the final consolidated execution plan so future work uses repo docs, memory, and Notion/archive as the default closeout path
+- historical implementation-progress entries that already mention prior Discord posts were left as history
+- verification is documentation-only with `git diff --check`
+
 Implementation update from `2026-05-01` (key feature roadmap expansion, documentation-only):
 
 - created `project_vn.md` as the Vietnamese consolidated project requirements document covering BookedAI core, shared platform requirements, AI Ask/chat, booking/payment/portal, messaging/CRM/calendar, tenant/admin workspaces, non-functional requirements, KPIs, roadmap, and the Chess Academy, Future Swim, and AI Mentor 1-1 Pro subprojects

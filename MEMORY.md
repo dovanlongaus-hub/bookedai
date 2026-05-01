@@ -5,6 +5,7 @@
 - Primary operator: Aus Dvl
 - Main working mode: direct execution with short explanations
 - Telegram is an active coding surface for BookedAI work, not just notifications
+- Discord updates are no longer a default closeout path; do not connect to or post Discord unless the operator explicitly asks for Discord on that task.
 
 ## OpenClaw / Bot Runtime
 
@@ -39,6 +40,7 @@
   - why it changed
   - any follow-up risk or TODO
 - If implementation changes behavior or architecture, sync the relevant repo docs
+- Default closeout now uses repo docs, daily memory, and Notion/archive when needed; skip Discord unless explicitly requested.
 
 ## Documentation Sources Of Truth
 
